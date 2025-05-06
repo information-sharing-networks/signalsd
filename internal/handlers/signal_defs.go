@@ -11,7 +11,6 @@ import (
 	"github.com/nickabs/signals"
 	"github.com/nickabs/signals/internal/database"
 	"github.com/nickabs/signals/internal/helpers"
-	"github.com/rs/zerolog/log"
 )
 
 type SignalDefHandler struct {
@@ -25,12 +24,12 @@ func NewSignalDefHandler(cfg *signals.ServiceConfig) *SignalDefHandler {
 // todo - handle dupe slugs/ optional detail field
 func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http.Request) {
 	type createSignalDefRequest struct {
-		SchemaURL   string `json:"schema_url"`
-		ReadmeURL   string `json:"readme_url"`
-		Title       string `json:"title"`
-		Detail      string `json:"detail"`
-		BumpVersion string `json:"bump_version"` // major, minor, patch (used to increment signal_def.sem_ver)
-		Stage       string `json:"stage"`        // dev/test/live/deprecated/closed
+		SchemaURL string `json:"schema_url"`
+		ReadmeURL string `json:"readme_url"`
+		Title     string `json:"title"`
+		Detail    string `json:"detail"`
+		BumpType  string `json:"bump_type"` // major, minor, patch (used to increment signal_def.sem_ver)
+		Stage     string `json:"stage"`     // dev/test/live/deprecated/closed
 	}
 	var req createSignalDefRequest
 	var res database.SignalDef
@@ -51,27 +50,61 @@ func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http
 		return
 	}
 
+	// validate fields
+	if req.BumpType == "" || req.Detail == "" || req.ReadmeURL == "" || req.SchemaURL == "" ||
+		req.Title == "" || req.Stage == "" {
+		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, "one or missing field in the body of the requet")
+		return
+	}
+
+	if err := helpers.CheckUrl(req.SchemaURL); err != nil {
+		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("invalid schema url: %v", err))
+		return
+	}
+	if err := helpers.CheckUrl(req.ReadmeURL); err != nil {
+		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("invalid schema url: %v", err))
+		return
+	}
+
+	// generate slug.
 	slug, err := helpers.GenerateSlug(req.Title)
 	if err != nil {
 		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, "could not create slug from title")
 		return
 	}
 
-	if err := helpers.ValidateURL(req.SchemaURL); err != nil {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, "invalid schema url")
+	// check if slug has already been used by another user (not permitted)
+	exists, err := s.cfg.DB.ExistsSignalDefWithSlugAndDifferentUser(r.Context(), database.ExistsSignalDefWithSlugAndDifferentUserParams{
+		Slug:   slug,
+		UserID: userID,
+	})
+	if err != nil {
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, "database error")
+		return
+	}
+	if exists {
+		helpers.RespondWithError(w, r, http.StatusConflict, signals.ErrCodeResourceAlreadyExists, fmt.Sprintf("the {%s} slug is already in use - pick a new title for your slug", slug))
 		return
 	}
 
-	//todo increment semver
-	// check the slug was not already registered
-	// check the schmea url has changed
-	// check nulls
-	// check stage
-	// latest version
-	//
-	semVer := "0.0.1"
+	//  increment the semver using the supplied bump instruction supplied in the
+	currentSignalDef, err := s.cfg.DB.GetSemVerAndSchemaForLatestSlugVersion(r.Context(), slug)
+	if err != nil {
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, fmt.Sprintf("database error: %v", err))
+		return
+	}
 
-	log.Debug().Msgf("req.Stage %v\n", req.Stage)
+	if currentSignalDef.SchemaURL == req.SchemaURL {
+		helpers.RespondWithError(w, r, http.StatusConflict, signals.ErrCodeResourceAlreadyExists, "you must supply an updated schemaURL if you want to bump the version")
+		return
+	}
+
+	semVer, err := helpers.IncrementSemVer(req.BumpType, currentSignalDef.SemVer)
+	if err != nil {
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, fmt.Sprintf("could not bump sem ver : %v", err))
+		return
+	}
+
 	createParams = database.CreateSignalDefParams{
 		Slug:      slug,
 		SchemaURL: req.SchemaURL,

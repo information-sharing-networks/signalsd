@@ -7,6 +7,8 @@ go dependenicies:
  [goose](https://github.com/pressly/goose)
 ``` bash
 go install github.com/pressly/goose/v3/cmd/goose@latest #database migrations 
+go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest #type safe code for SQL queries
+
 ```
 
 # config
@@ -55,3 +57,13 @@ go build ./cmd/signalsd/
 # or
 go run cmd/signalsd/main.go
 ```
+# Development
+database alterations are made by adding files to sql/schema
+001_foo.sql
+002_bar.sql 
+...
+
+new sql queries are added in 
+sql/queries
+
+use `sqlc generate` from the root of the project to regenerate the type save go code 

@@ -12,9 +12,9 @@ import (
 )
 
 const createSignalDef = `-- name: CreateSignalDef :one
+
 INSERT INTO signal_defs (id, created_at, updated_at, slug, schema_url, readme_url, title, detail, sem_ver, stage, user_id)
-VALUES ( gen_random_uuid(), NOW(), NOW(), $1, $2, $3, $4, $5, $6, $7, $8 )
-RETURNING id, created_at, updated_at, slug, schema_url, readme_url, title, detail, sem_ver, stage, user_id
+VALUES (gen_random_uuid(), now(), now(), $1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, created_at, updated_at, slug, schema_url, readme_url, title, detail, sem_ver, stage, user_id
 `
 
 type CreateSignalDefParams struct {
@@ -57,7 +57,9 @@ func (q *Queries) CreateSignalDef(ctx context.Context, arg CreateSignalDefParams
 }
 
 const deleteSignalDef = `-- name: DeleteSignalDef :execrows
-DELETE FROM signal_defs 
+
+DELETE
+FROM signal_defs
 WHERE id = $1
 `
 
@@ -69,8 +71,63 @@ func (q *Queries) DeleteSignalDef(ctx context.Context, id uuid.UUID) (int64, err
 	return result.RowsAffected()
 }
 
+const existsSignalDefWithSlugAndDifferentUser = `-- name: ExistsSignalDefWithSlugAndDifferentUser :one
+
+SELECT EXISTS
+  (SELECT 1
+   FROM signal_defs
+   WHERE slug = $1
+     AND user_id != $2) AS EXISTS
+`
+
+type ExistsSignalDefWithSlugAndDifferentUserParams struct {
+	Slug   string    `json:"slug"`
+	UserID uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) ExistsSignalDefWithSlugAndDifferentUser(ctx context.Context, arg ExistsSignalDefWithSlugAndDifferentUserParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, existsSignalDefWithSlugAndDifferentUser, arg.Slug, arg.UserID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const getSemVerAndSchemaForLatestSlugVersion = `-- name: GetSemVerAndSchemaForLatestSlugVersion :one
+SELECT '0.0.0' AS sem_ver,
+       '' AS schema_url
+WHERE NOT EXISTS
+    (SELECT 1
+     FROM signal_defs sd1
+     WHERE sd1.slug = $1)
+UNION ALL
+SELECT sd2.sem_ver,
+       sd2.schema_url
+FROM signal_defs sd2
+WHERE sd2.slug = $1
+  AND sd2.sem_ver =
+    (SELECT max(sd3.sem_ver)
+     FROM signal_defs sd3
+     WHERE sd3.slug = $1)
+`
+
+type GetSemVerAndSchemaForLatestSlugVersionRow struct {
+	SemVer    string `json:"sem_ver"`
+	SchemaURL string `json:"schema_url"`
+}
+
+// this query will return an empty string for schema_url and a sem_ver of '0.0.0'if there are no signals defs for the supplied slug
+func (q *Queries) GetSemVerAndSchemaForLatestSlugVersion(ctx context.Context, slug string) (GetSemVerAndSchemaForLatestSlugVersionRow, error) {
+	row := q.db.QueryRowContext(ctx, getSemVerAndSchemaForLatestSlugVersion, slug)
+	var i GetSemVerAndSchemaForLatestSlugVersionRow
+	err := row.Scan(&i.SemVer, &i.SchemaURL)
+	return i, err
+}
+
 const getSignalDef = `-- name: GetSignalDef :one
-SELECT id, created_at, updated_at, slug, schema_url, readme_url, title, detail, sem_ver, stage, user_id FROM signal_defs WHERE id = $1
+
+SELECT id, created_at, updated_at, slug, schema_url, readme_url, title, detail, sem_ver, stage, user_id
+FROM signal_defs
+WHERE id = $1
 `
 
 func (q *Queries) GetSignalDef(ctx context.Context, id uuid.UUID) (SignalDef, error) {
@@ -93,7 +150,10 @@ func (q *Queries) GetSignalDef(ctx context.Context, id uuid.UUID) (SignalDef, er
 }
 
 const getSignalDefs = `-- name: GetSignalDefs :many
-SELECT id, created_at, updated_at, slug, schema_url, readme_url, title, detail, sem_ver, stage, user_id FROM signal_defs ORDER BY created_at ASC
+
+SELECT id, created_at, updated_at, slug, schema_url, readme_url, title, detail, sem_ver, stage, user_id
+FROM signal_defs
+ORDER BY created_at ASC
 `
 
 func (q *Queries) GetSignalDefs(ctx context.Context) ([]SignalDef, error) {

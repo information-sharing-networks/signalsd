@@ -27,7 +27,7 @@ CREATE TABLE signal_defs (
     CONSTRAINT valid_readme_url 
         CHECK (readme_url ~ '^https://github\.com/[a-zA-Z0-9_-]+/[a-zA-Z0-9_.-]+.*\.md$'),
     CONSTRAINT stage_check
-    CHECK (stage IN ('dev','test', 'live', 'deprecated', 'closed')),
+    CHECK (stage IN ('dev','test', 'live', 'deprecated', 'closed','shuttered')),
     CONSTRAINT fk_signal_defs_user
         FOREIGN KEY (user_id)
         REFERENCES users(id)

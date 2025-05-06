@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -73,6 +74,9 @@ func RespondWithJSON(w http.ResponseWriter, status int, payload any) {
 }
 
 // GenerateSlug generates a URL-friendly slug from a given string.
+// slugs identify a set of versioned signal_defs describing the same data set.
+// Only the owner of the inital slug can update it or add new versions.
+// A slug can't be owned by more than one user.
 func GenerateSlug(input string) (string, error) {
 	if input == "" {
 		return "", fmt.Errorf("no input string supplied to GenerateSlug")
@@ -97,10 +101,57 @@ func GenerateSlug(input string) (string, error) {
 
 	return trimmed, nil
 }
-func ValidateURL(rawURL string) error {
-	_, err := url.ParseRequestURI(rawURL)
+
+// currently only github links are supported - it is recommended that user use linked to tagged versions of the file
+// e.g https://github.com/nickabs/transmission/blob/v2.21.2/locales/af.json
+// / TODO - other checks including checking the file exists and - in case of scheam urls - is a valid json schema.
+func CheckUrl(rawURL string) error {
+	parsedURL, err := url.ParseRequestURI(rawURL)
 	if err != nil {
-		return fmt.Errorf("invalid URL format: %w", err)
+		return fmt.Errorf("invalid URL supplied: %w", err)
 	}
+
+	if parsedURL.Scheme != "https" || parsedURL.Host != "github.com" {
+		return fmt.Errorf("link must be a https://github.com url (make sure to include both the scheme and hostname)")
+	}
+
 	return nil
+}
+
+// expects a semver in the form "major.minor.patch" and increments major/minor/patch according to supplied bump_type
+func IncrementSemVer(bump_type string, semVer string) (string, error) {
+
+	components := strings.Split(semVer, ".")
+
+	if len(components) != 3 {
+		return "", fmt.Errorf("can't bump version, invalid semVer supplied")
+	}
+
+	major, err := strconv.Atoi(components[0])
+	if err != nil {
+		return "", fmt.Errorf("can't bump version, invalid semVer supplied")
+	}
+	minor, err := strconv.Atoi(components[1])
+	if err != nil {
+		return "", fmt.Errorf("can't bump version, invalid semVer supplied")
+	}
+	patch, err := strconv.Atoi(components[2])
+	if err != nil {
+		return "", fmt.Errorf("can't bump version, invalid semVer supplied")
+	}
+
+	switch bump_type {
+	case "major":
+		major++
+		minor = 0
+		patch = 0
+	case "minor":
+		minor++
+		patch = 0
+	case "patch":
+		patch++
+	default:
+		return "", fmt.Errorf("can't bump version, invalid bump type supplied")
+	}
+	return fmt.Sprintf("%d.%d.%d", major, minor, patch), nil
 }

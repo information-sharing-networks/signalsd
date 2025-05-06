@@ -1,4 +1,5 @@
 notes.md
-.env
+/.env
+/.psqlrc
 /signalsd
 tmp/
