@@ -7,6 +7,7 @@ package database
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -125,15 +126,33 @@ func (q *Queries) GetSemVerAndSchemaForLatestSlugVersion(ctx context.Context, sl
 
 const getSignalDef = `-- name: GetSignalDef :one
 
-SELECT id, created_at, updated_at, slug, schema_url, readme_url, title, detail, sem_ver, stage, user_id
-FROM signal_defs
-WHERE id = $1
+SELECT u.email,
+       sd.id, sd.created_at, sd.updated_at, sd.slug, sd.schema_url, sd.readme_url, sd.title, sd.detail, sd.sem_ver, sd.stage, sd.user_id
+FROM signal_defs sd
+JOIN users u ON sd.user_id = u.id
+WHERE sd.id = $1
 `
 
-func (q *Queries) GetSignalDef(ctx context.Context, id uuid.UUID) (SignalDef, error) {
+type GetSignalDefRow struct {
+	Email     string    `json:"email"`
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Slug      string    `json:"slug"`
+	SchemaURL string    `json:"schema_url"`
+	ReadmeURL string    `json:"readme_url"`
+	Title     string    `json:"title"`
+	Detail    string    `json:"detail"`
+	SemVer    string    `json:"sem_ver"`
+	Stage     string    `json:"stage"`
+	UserID    uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) GetSignalDef(ctx context.Context, id uuid.UUID) (GetSignalDefRow, error) {
 	row := q.db.QueryRowContext(ctx, getSignalDef, id)
-	var i SignalDef
+	var i GetSignalDefRow
 	err := row.Scan(
+		&i.Email,
 		&i.ID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -151,21 +170,41 @@ func (q *Queries) GetSignalDef(ctx context.Context, id uuid.UUID) (SignalDef, er
 
 const getSignalDefs = `-- name: GetSignalDefs :many
 
-SELECT id, created_at, updated_at, slug, schema_url, readme_url, title, detail, sem_ver, stage, user_id
-FROM signal_defs
-ORDER BY created_at ASC
+SELECT u.email,
+       sd.id, sd.created_at, sd.updated_at, sd.slug, sd.schema_url, sd.readme_url, sd.title, sd.detail, sd.sem_ver, sd.stage, sd.user_id
+FROM signal_defs sd
+JOIN users u ON sd.user_id = u.id
+ORDER BY u.email, 
+         sd.slug,
+         sd.sem_ver ASC
 `
 
-func (q *Queries) GetSignalDefs(ctx context.Context) ([]SignalDef, error) {
+type GetSignalDefsRow struct {
+	Email     string    `json:"email"`
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Slug      string    `json:"slug"`
+	SchemaURL string    `json:"schema_url"`
+	ReadmeURL string    `json:"readme_url"`
+	Title     string    `json:"title"`
+	Detail    string    `json:"detail"`
+	SemVer    string    `json:"sem_ver"`
+	Stage     string    `json:"stage"`
+	UserID    uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) GetSignalDefs(ctx context.Context) ([]GetSignalDefsRow, error) {
 	rows, err := q.db.QueryContext(ctx, getSignalDefs)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []SignalDef
+	var items []GetSignalDefsRow
 	for rows.Next() {
-		var i SignalDef
+		var i GetSignalDefsRow
 		if err := rows.Scan(
+			&i.Email,
 			&i.ID,
 			&i.CreatedAt,
 			&i.UpdatedAt,

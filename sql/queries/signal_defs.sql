@@ -5,15 +5,21 @@ VALUES (gen_random_uuid(), now(), now(), $1, $2, $3, $4, $5, $6, $7, $8) RETURNI
 
 -- name: GetSignalDefs :many
 
-SELECT *
-FROM signal_defs
-ORDER BY created_at ASC;
+SELECT u.email,
+       sd.*
+FROM signal_defs sd
+JOIN users u ON sd.user_id = u.id
+ORDER BY u.email, 
+         sd.slug,
+         sd.sem_ver ASC;
 
 -- name: GetSignalDef :one
 
-SELECT *
-FROM signal_defs
-WHERE id = $1;
+SELECT u.email,
+       sd.*
+FROM signal_defs sd
+JOIN users u ON sd.user_id = u.id
+WHERE sd.id = $1;
 
 -- name: DeleteSignalDef :execrows
 

@@ -26,7 +26,6 @@ func RespondWithError(w http.ResponseWriter, r *http.Request, statusCode int, er
 	if !ok {
 		reqLog = &log.Logger
 	}
-	//reqLog := logger.FromContext(r.Context())
 	reqID := middleware.GetReqID(r.Context())
 
 	reqLog.Error().
@@ -105,7 +104,7 @@ func GenerateSlug(input string) (string, error) {
 // currently only github links are supported - it is recommended that user use linked to tagged versions of the file
 // e.g https://github.com/nickabs/transmission/blob/v2.21.2/locales/af.json
 // / TODO - other checks including checking the file exists and - in case of scheam urls - is a valid json schema.
-func CheckUrl(rawURL string) error {
+func CheckSchemaAndReadmeURLs(rawURL string) error {
 	parsedURL, err := url.ParseRequestURI(rawURL)
 	if err != nil {
 		return fmt.Errorf("invalid URL supplied: %w", err)

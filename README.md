@@ -66,4 +66,4 @@ database alterations are made by adding files to sql/schema
 new sql queries are added in 
 sql/queries
 
-use `sqlc generate` from the root of the project to regenerate the type save go code 
+use `sqlc generate` from the root of the project to regenerate the type safe go code after adding or altering any queries

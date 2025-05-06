@@ -21,7 +21,6 @@ func NewSignalDefHandler(cfg *signals.ServiceConfig) *SignalDefHandler {
 	return &SignalDefHandler{cfg: cfg}
 }
 
-// todo - handle dupe slugs/ optional detail field
 func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http.Request) {
 	type createSignalDefRequest struct {
 		SchemaURL string `json:"schema_url"`
@@ -57,11 +56,11 @@ func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http
 		return
 	}
 
-	if err := helpers.CheckUrl(req.SchemaURL); err != nil {
+	if err := helpers.CheckSchemaAndReadmeURLs(req.SchemaURL); err != nil {
 		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("invalid schema url: %v", err))
 		return
 	}
-	if err := helpers.CheckUrl(req.ReadmeURL); err != nil {
+	if err := helpers.CheckSchemaAndReadmeURLs(req.ReadmeURL); err != nil {
 		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("invalid schema url: %v", err))
 		return
 	}
@@ -150,6 +149,9 @@ func (s *SignalDefHandler) GetSignalDefsHandler(w http.ResponseWriter, r *http.R
 	helpers.RespondWithJSON(w, http.StatusOK, res)
 
 }
+
+// only delete by signal def id is supported currently
+// TODO - delete by slug; add controls to prevent/warn when deleting active signal defs.
 func (s *SignalDefHandler) DeleteSignalDefsHandler(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()

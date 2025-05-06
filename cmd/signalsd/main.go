@@ -14,6 +14,7 @@ import (
 	"github.com/nickabs/signals/internal/routes"
 )
 
+// TODO - will the signal defs ever need to be private? Current implementation assumes 'no'
 func main() {
 	logger.ServerLogger.Info().Msg("Starting server")
 
