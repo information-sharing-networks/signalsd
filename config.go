@@ -18,6 +18,7 @@ type ServiceConfig struct {
 	Environment string
 	Port        int
 	SecretKey   string
+	LogLevel    zerolog.Level
 }
 
 // shared constants
@@ -50,6 +51,24 @@ func InitConfig() *ServiceConfig {
 		"test":    true,
 		"staging": true,
 	}
+
+	// log level
+	var logLevel zerolog.Level
+
+	logLevelStr := os.Getenv("SIGNALS_LOG_LEVEL")
+	if logLevelStr == "" {
+		logger.ServerLogger.Warn().Msgf("SIGNALS_LOG_LEVEL not set, defaulting to %s", defaultLogLevelStr)
+		logLevelStr = defaultLogLevelStr
+	}
+	logLevel, err := zerolog.ParseLevel(logLevelStr)
+	if err != nil {
+		logLevel = zerolog.DebugLevel
+		logger.ServerLogger.Warn().Msg("SIGNALS_LOG_LEVEL not valid, defaulting to debug")
+	}
+
+	logger.ServerLogger.Info().Msgf("log level set to {%v} \n", logLevel)
+	zerolog.SetGlobalLevel(logLevel)
+	logger.InitLogger(logLevel)
 
 	// environment
 	environment := os.Getenv("SIGNALS_ENVIRONMENT")
@@ -100,27 +119,11 @@ func InitConfig() *ServiceConfig {
 		logger.ServerLogger.Fatal().Msg("SIGNALS_SECRET_KEY environment variable is not set")
 	}
 
-	// log level
-	var logLevel zerolog.Level
-
-	logLevelStr := os.Getenv("SIGNALS_LOG_LEVEL")
-	if logLevelStr == "" {
-		logger.ServerLogger.Warn().Msgf("SIGNALS_LOG_LEVEL not set, defaulting to %s", defaultLogLevelStr)
-		logLevelStr = defaultLogLevelStr
-	}
-	logLevel, err = zerolog.ParseLevel(logLevelStr)
-	if err != nil {
-		logLevel = zerolog.DebugLevel
-		logger.ServerLogger.Warn().Msg("SIGNALS_LOG_LEVEL not valid, defaulting to debug")
-	}
-
-	logger.ServerLogger.Info().Msgf("log level set to {%v} \n", logLevel)
-	zerolog.SetGlobalLevel(logLevel)
-
 	return &ServiceConfig{
 		DB:          dbQueries,
 		Environment: environment,
 		Port:        port,
 		SecretKey:   secretKey,
+		LogLevel:    logLevel,
 	}
 }

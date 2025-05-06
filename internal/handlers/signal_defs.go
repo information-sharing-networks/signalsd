@@ -38,18 +38,19 @@ func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http
 
 	ctx := r.Context()
 
+	defer r.Body.Close()
+
 	userID, ok := ctx.Value(signals.UserIDKey).(uuid.UUID)
 	if !ok {
 		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, "did not receive userID from middleware")
+		return
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
 		return
 	}
-	defer r.Body.Close()
 
-	log.Debug().Msgf("Signal defs req body %v\n", req)
 	slug, err := helpers.GenerateSlug(req.Title)
 	if err != nil {
 		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, "could not create slug from title")

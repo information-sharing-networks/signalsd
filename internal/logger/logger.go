@@ -9,7 +9,7 @@ import (
 
 var ServerLogger zerolog.Logger
 
-func init() {
+func InitLogger(logLevel zerolog.Level) {
 
 	// default api logger (json)
 	log.Logger = zerolog.New(os.Stdout).
@@ -27,7 +27,7 @@ func init() {
 		Caller().
 		Logger() //std log
 
-	if zerolog.GlobalLevel() == zerolog.DebugLevel {
+	if logLevel == zerolog.DebugLevel {
 		log.Logger = ServerLogger //user standard console log when in debug mode
 	}
 }

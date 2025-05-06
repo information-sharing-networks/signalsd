@@ -1,5 +1,5 @@
 
-# pre-requisites
+# prerequisites
 go 1.24 or above
 PostgresSql@17 or above
 
@@ -9,9 +9,7 @@ go dependenicies:
 go install github.com/pressly/goose/v3/cmd/goose@latest #database migrations 
 ```
 
-
 # config
-
 set the following env variables
 ``` bash
 # sample Signals service config

@@ -34,11 +34,12 @@ func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) 
 
 	authService := auth.NewAuthService(u.cfg)
 
+	defer r.Body.Close()
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
 		return
 	}
-	defer r.Body.Close()
 
 	if req.Email == "" || req.Password == "" {
 		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, "you must supply {email} and {password}")
@@ -92,12 +93,13 @@ func (u *UserHandler) UpdateUserHandler(w http.ResponseWriter, r *http.Request) 
 		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, "did not receive userID from middleware")
 	}
 
+	defer r.Body.Close()
+
 	req := updateUserRequest{}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
 		return
 	}
-	defer r.Body.Close()
 
 	if req.Email == "" || req.Password == "" {
 		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, "expecting a email or password in http body")

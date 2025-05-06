@@ -39,11 +39,12 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	authService := auth.NewAuthService(l.cfg)
 
+	defer r.Body.Close()
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
 		return
 	}
-	defer r.Body.Close()
 
 	exists, err := l.cfg.DB.ExistsUserWithEmail(r.Context(), req.Email)
 	if err != nil {

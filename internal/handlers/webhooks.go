@@ -25,10 +25,11 @@ func (wh *WebhookHandler) HandlerWebhook(w http.ResponseWriter, r *http.Request)
 	}
 	var req webhookRequest
 
+	defer r.Body.Close()
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
 		return
 	}
-	defer r.Body.Close()
 	helpers.RespondWithError(w, r, http.StatusNoContent, signals.ErrCodeNotImplemented, "todo - webhooks not yet implemented")
 }
