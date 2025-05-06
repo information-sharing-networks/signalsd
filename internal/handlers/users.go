@@ -96,7 +96,12 @@ func (u *UserHandler) UpdateUserHandler(w http.ResponseWriter, r *http.Request) 
 	defer r.Body.Close()
 
 	req := updateUserRequest{}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+
+	defer r.Body.Close()
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	err := decoder.Decode(&req)
+	if err != nil {
 		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
 		return
 	}

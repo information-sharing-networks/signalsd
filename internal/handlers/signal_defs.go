@@ -47,6 +47,8 @@ func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http
 		return
 	}
 
+	defer r.Body.Close()
+
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
 		return
@@ -117,6 +119,7 @@ func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http
 		SemVer:    semVer,
 		UserID:    userID,
 	}
+
 	res, err = s.cfg.DB.CreateSignalDef(r.Context(), createParams)
 	if err != nil {
 		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("could not create signal definition: %v", err))
@@ -170,7 +173,6 @@ func (s *SignalDefHandler) UpdateSignalDefHandler(w http.ResponseWriter, r *http
 	}
 
 	//check body
-	defer r.Body.Close()
 
 	defer r.Body.Close()
 	decoder := json.NewDecoder(r.Body)
