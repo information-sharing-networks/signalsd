@@ -47,8 +47,6 @@ func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http
 		return
 	}
 
-	defer r.Body.Close()
-
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
 		return
@@ -66,7 +64,7 @@ func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http
 		return
 	}
 	if err := helpers.CheckSchemaAndReadmeURLs(req.ReadmeURL); err != nil {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("invalid schema url: %v", err))
+		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("invalid readme url: %v", err))
 		return
 	}
 
@@ -128,9 +126,7 @@ func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http
 	helpers.RespondWithJSON(w, http.StatusCreated, res)
 }
 
-// todo error on unexpected json fields
 func (s *SignalDefHandler) UpdateSignalDefHandler(w http.ResponseWriter, r *http.Request) {
-	//PDATE signal_defs SET (updated_at, readme_url, detail, stage) = (NOW(), $2, $3, $4, $5)
 	type updateSignalDefRequest struct {
 		ReadmeURL string `json:"readme_url"`
 		Detail    string `json:"detail"`
@@ -176,13 +172,17 @@ func (s *SignalDefHandler) UpdateSignalDefHandler(w http.ResponseWriter, r *http
 	//check body
 	defer r.Body.Close()
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	defer r.Body.Close()
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	err = decoder.Decode(&req)
+	if err != nil {
 		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
 		return
 	}
 
 	if req.Detail == "" && req.ReadmeURL == "" && req.Stage == "" {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeResourceNotFound, "no updateable fields found in body of request")
+		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, "no updateable fields found in body of request")
 		return
 	}
 
@@ -195,8 +195,15 @@ func (s *SignalDefHandler) UpdateSignalDefHandler(w http.ResponseWriter, r *http
 		}
 	}
 
+	if req.ReadmeURL != "" {
+		if err := helpers.CheckSchemaAndReadmeURLs(req.ReadmeURL); err != nil {
+			helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("invalid readme url: %v", err))
+			return
+		}
+	}
+
 	// if values not supplied in json then use the currentValues
-	if req.ReadmeURL != currentSignalDef.ReadmeURL {
+	if req.ReadmeURL == "" {
 		req.ReadmeURL = currentSignalDef.ReadmeURL
 	}
 
@@ -204,7 +211,7 @@ func (s *SignalDefHandler) UpdateSignalDefHandler(w http.ResponseWriter, r *http
 		req.Detail = currentSignalDef.Detail
 	}
 
-	if req.Stage != "" {
+	if req.Stage == "" {
 		req.Stage = currentSignalDef.Stage
 	}
 
