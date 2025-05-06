@@ -3,6 +3,12 @@
 INSERT INTO signal_defs (id, created_at, updated_at, slug, schema_url, readme_url, title, detail, sem_ver, stage, user_id)
 VALUES (gen_random_uuid(), now(), now(), $1, $2, $3, $4, $5, $6, $7, $8) RETURNING *;
 
+
+-- name: UpdateSignalDefDetails :execrows
+UPDATE signal_defs SET (updated_at, readme_url, detail, stage) = (NOW(), $2, $3, $4)
+WHERE id = $1;
+
+
 -- name: GetSignalDefs :many
 
 SELECT u.email,

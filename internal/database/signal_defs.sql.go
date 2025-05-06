@@ -229,3 +229,28 @@ func (q *Queries) GetSignalDefs(ctx context.Context) ([]GetSignalDefsRow, error)
 	}
 	return items, nil
 }
+
+const updateSignalDefDetails = `-- name: UpdateSignalDefDetails :execrows
+UPDATE signal_defs SET (updated_at, readme_url, detail, stage) = (NOW(), $2, $3, $4)
+WHERE id = $1
+`
+
+type UpdateSignalDefDetailsParams struct {
+	ID        uuid.UUID `json:"id"`
+	ReadmeURL string    `json:"readme_url"`
+	Detail    string    `json:"detail"`
+	Stage     string    `json:"stage"`
+}
+
+func (q *Queries) UpdateSignalDefDetails(ctx context.Context, arg UpdateSignalDefDetailsParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateSignalDefDetails,
+		arg.ID,
+		arg.ReadmeURL,
+		arg.Detail,
+		arg.Stage,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}

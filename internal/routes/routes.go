@@ -27,6 +27,7 @@ func RegisterRoutes(r *chi.Mux, cfg *signals.ServiceConfig) {
 	r.Get("/api/signal_defs", signalDefsHandler.GetSignalDefsHandler)
 	r.Get("/api/signal_defs/{SignalDefID}", signalDefsHandler.GetSignalDefHandler)
 	r.Delete("/api/signal_defs/{SignalDefID}", signalDefsHandler.DeleteSignalDefsHandler)
+	r.Put("/api/signal_defs/{SignalDefID}", signalDefsHandler.UpdateSignalDefHandler)
 
 	// Health
 	r.Get("/api/health", adminHandler.ReadinessHandler) // health check
