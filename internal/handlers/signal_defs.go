@@ -61,11 +61,11 @@ func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http
 		return
 	}
 
-	if err := helpers.CheckSchemaAndReadmeURLs(req.SchemaURL); err != nil {
+	if err := helpers.CheckSignalDefsURL(req.SchemaURL, "schema"); err != nil {
 		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("invalid schema url: %v", err))
 		return
 	}
-	if err := helpers.CheckSchemaAndReadmeURLs(req.ReadmeURL); err != nil {
+	if err := helpers.CheckSignalDefsURL(req.ReadmeURL, "readme"); err != nil {
 		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("invalid readme url: %v", err))
 		return
 	}
@@ -198,7 +198,7 @@ func (s *SignalDefHandler) UpdateSignalDefHandler(w http.ResponseWriter, r *http
 	}
 
 	if req.ReadmeURL != "" {
-		if err := helpers.CheckSchemaAndReadmeURLs(req.ReadmeURL); err != nil {
+		if err := helpers.CheckSignalDefsURL(req.ReadmeURL, "readme"); err != nil {
 			helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("invalid readme url: %v", err))
 			return
 		}

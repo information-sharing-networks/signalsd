@@ -101,19 +101,36 @@ func GenerateSlug(input string) (string, error) {
 	return trimmed, nil
 }
 
-// currently only github links are supported - it is recommended that user use linked to tagged versions of the file
+// currently links to files in files in public github repos are supported - it is recommended to link to a tagged version of the file,
 // e.g https://github.com/nickabs/transmission/blob/v2.21.2/locales/af.json
-// / TODO - other checks including checking the file exists and - in case of scheam urls - is a valid json schema.
-func CheckSchemaAndReadmeURLs(rawURL string) error {
+func CheckSignalDefsURL(rawURL string, urlType string) error {
+	// TODO - additional checks, e.g checking the file exists and - in case of scheam urls - is a valid json schema.
 	parsedURL, err := url.ParseRequestURI(rawURL)
 	if err != nil {
 		return fmt.Errorf("invalid URL supplied: %w", err)
 	}
 
 	if parsedURL.Scheme != "https" || parsedURL.Host != "github.com" {
-		return fmt.Errorf("link must be a https://github.com url (make sure to include both the scheme and hostname)")
+		return fmt.Errorf("expecting an absolute url for a file in a public github repo, e.g https://github.com/user/project/v0.0.1/locales/filename")
 	}
 
+	suffixPattern := `\.(([^\.\/]+$))`
+	re := regexp.MustCompile(suffixPattern)
+	suffix := re.FindStringSubmatch(parsedURL.Path)[0]
+
+	log.Debug().Msg(suffix)
+	switch urlType {
+	case "schema":
+		if suffix != ".json" {
+			return fmt.Errorf("expected a .json file")
+		}
+	case "readme":
+		if suffix != ".md" {
+			return fmt.Errorf("expected a .md file")
+		}
+	default:
+		return fmt.Errorf("internal server error - invalid url type sent to function %s", urlType)
+	}
 	return nil
 }
 
