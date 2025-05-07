@@ -28,7 +28,7 @@ func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http
 		Title     string `json:"title"`
 		Detail    string `json:"detail"`
 		BumpType  string `json:"bump_type"` // major, minor, patch (used to increment signal_def.sem_ver)
-		Stage     string `json:"stage"`     // dev/test/live/deprecated/closed
+		Stage     string `json:"stage"`     // ValidSignalDefStages
 	}
 	var req createSignalDefRequest
 	var res database.SignalDef
@@ -61,12 +61,16 @@ func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http
 		return
 	}
 
-	if err := helpers.CheckSignalDefsURL(req.SchemaURL, "schema"); err != nil {
+	if err := helpers.CheckSignalDefURL(req.SchemaURL, "schema"); err != nil {
 		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("invalid schema url: %v", err))
 		return
 	}
-	if err := helpers.CheckSignalDefsURL(req.ReadmeURL, "readme"); err != nil {
+	if err := helpers.CheckSignalDefURL(req.ReadmeURL, "readme"); err != nil {
 		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("invalid readme url: %v", err))
+		return
+	}
+	if !signals.ValidSignalDefStages[req.Stage] {
+		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeInvalidRequest, "invalid stage supplied")
 		return
 	}
 
@@ -133,7 +137,7 @@ func (s *SignalDefHandler) UpdateSignalDefHandler(w http.ResponseWriter, r *http
 	type updateSignalDefRequest struct {
 		ReadmeURL string `json:"readme_url"`
 		Detail    string `json:"detail"`
-		Stage     string `json:"stage"` // dev/test/live/deprecated/closed
+		Stage     string `json:"stage"` // signals.ValidSignalDefStages
 	}
 
 	var req = updateSignalDefRequest{}
@@ -188,17 +192,15 @@ func (s *SignalDefHandler) UpdateSignalDefHandler(w http.ResponseWriter, r *http
 		return
 	}
 
-	//todo - these defs need to be part of shared config - helper? note lowercase - helper to return array too
 	if req.Stage != "" {
-		if req.Stage != "dev" && req.Stage != "test" && req.Stage != "live" && req.Stage != "deprecated" && req.Stage != "shuttered" {
-
+		if !signals.ValidSignalDefStages[req.Stage] {
 			helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeInvalidRequest, "invalid stage supplied")
 			return
 		}
 	}
 
 	if req.ReadmeURL != "" {
-		if err := helpers.CheckSignalDefsURL(req.ReadmeURL, "readme"); err != nil {
+		if err := helpers.CheckSignalDefURL(req.ReadmeURL, "readme"); err != nil {
 			helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("invalid readme url: %v", err))
 			return
 		}

@@ -12,6 +12,14 @@ import (
 	"github.com/rs/zerolog"
 )
 
+/*
+config sets up shared variables for the service:
+- ServiceConfig: main calls initConfig() and gets a pointer to the newly initialized config struct - the config is then passed to all handlers as a parameter.
+- common constants - e.g token expiry times
+- common maps - used to list valid values for certain fields e.g signalDefs.Stage
+- common context keys
+*/
+
 // service configuration
 type ServiceConfig struct {
 	DB          *database.Queries
@@ -21,11 +29,27 @@ type ServiceConfig struct {
 	LogLevel    zerolog.Level
 }
 
-// shared constants
+// common constants
 const (
 	AccessTokenExpiry  = time.Hour
 	RefreshTokenExpiry = 60 * 24 * time.Hour
 )
+
+// common maps
+var ValidSignalDefStages = map[string]bool{ // stored in the signal_defs.stage column
+	"dev":        true,
+	"test":       true,
+	"live":       true,
+	"deprecated": true,
+	"closed":     true,
+	"shuttered":  true,
+}
+var validEnvs = map[string]bool{
+	"dev":     true,
+	"prod":    true,
+	"test":    true,
+	"staging": true,
+}
 
 // Common context keys
 type ContextKey struct {
@@ -37,20 +61,13 @@ var (
 	UserIDKey        = ContextKey{"user-id"}
 )
 
-// InitConfig loads environment variables, establishes database connection,
-// and returns an initialized ServiceConfig struct.
+// InitConfig loads environment variables, establishes database connection and returns a ServiceConfig struct
 func InitConfig() *ServiceConfig {
 	const (
 		defaultPort        = 8080
 		defaultEnviromnent = "dev"
 		defaultLogLevelStr = "debug"
 	)
-	validEnvs := map[string]bool{
-		"dev":     true,
-		"prod":    true,
-		"test":    true,
-		"staging": true,
-	}
 
 	// log level
 	var logLevel zerolog.Level

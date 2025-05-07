@@ -103,7 +103,7 @@ func GenerateSlug(input string) (string, error) {
 
 // currently links to files in files in public github repos are supported - it is recommended to link to a tagged version of the file,
 // e.g https://github.com/nickabs/transmission/blob/v2.21.2/locales/af.json
-func CheckSignalDefsURL(rawURL string, urlType string) error {
+func CheckSignalDefURL(rawURL string, urlType string) error {
 	// TODO - additional checks, e.g checking the file exists and - in case of scheam urls - is a valid json schema.
 	parsedURL, err := url.ParseRequestURI(rawURL)
 	if err != nil {
