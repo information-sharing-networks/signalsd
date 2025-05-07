@@ -21,6 +21,12 @@ func NewSignalDefHandler(cfg *signals.ServiceConfig) *SignalDefHandler {
 	return &SignalDefHandler{cfg: cfg}
 }
 
+// CreateSignalDefHandler inserts rows into signal_defs.
+//
+// The 'title' supplied in the http request body is turned into a slug.
+// Slugs represent a group of versioned definitions describing a data set.
+// Slugs are owned by the originating user and can't be reused by other users.
+// Slugs are versioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new def and specify the bump type (major/minor/patch) to increment the semver
 func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http.Request) {
 	type createSignalDefRequest struct {
 		SchemaURL string `json:"schema_url"`

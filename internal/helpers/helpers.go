@@ -118,7 +118,6 @@ func CheckSignalDefURL(rawURL string, urlType string) error {
 	re := regexp.MustCompile(suffixPattern)
 	suffix := re.FindStringSubmatch(parsedURL.Path)[0]
 
-	log.Debug().Msg(suffix)
 	switch urlType {
 	case "schema":
 		if suffix != ".json" {

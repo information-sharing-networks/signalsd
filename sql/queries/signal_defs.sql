@@ -17,7 +17,7 @@ FROM signal_defs sd
 JOIN users u ON sd.user_id = u.id
 ORDER BY u.email, 
          sd.slug,
-         sd.sem_ver ASC;
+         sd.sem_ver DESC;
 
 -- name: GetSignalDef :one
 
