@@ -20,6 +20,12 @@ type LoginHandler struct {
 func NewLoginHandler(cfg *signals.ServiceConfig) *LoginHandler {
 	return &LoginHandler{cfg: cfg}
 }
+
+// @Param request body handlers.LoginHandler.loginRequest true "req bd"
+// @Success 200 {object} handlers.LoginHandler.loginResponse
+// @Failure 401
+// @Failure 404
+// @Router /api/login [post]
 func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	type loginRequest struct {
 		Password string `json:"password"`
@@ -30,7 +36,6 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		ID           uuid.UUID `json:"id"`
 		CreatedAt    time.Time `json:"created_at"`
 		UpdatedAt    time.Time `json:"updated_at"`
-		Email        string    `json:"email"`
 		AccessToken  string    `json:"access_token"`
 		RefreshToken string    `json:"refresh_token"`
 	}
@@ -94,7 +99,6 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		ID:           user.ID,
 		CreatedAt:    user.CreatedAt,
 		UpdatedAt:    user.UpdatedAt,
-		Email:        user.Email,
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 	}

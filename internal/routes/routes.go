@@ -1,9 +1,13 @@
 package routes
 
 import (
+	"net/http"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/nickabs/signals"
 	"github.com/nickabs/signals/internal/handlers"
+
+	_ "github.com/nickabs/signals/docs"
 )
 
 func RegisterRoutes(r *chi.Mux, cfg *signals.ServiceConfig) {
@@ -34,4 +38,12 @@ func RegisterRoutes(r *chi.Mux, cfg *signals.ServiceConfig) {
 
 	// Admin endpoints
 	r.Post("/admin/reset", adminHandler.ResetHandler) // delete all users and content (dev only)
+
+	// API doco
+	r.Get("/swagger.json", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./docs/swagger.json")
+	})
+	r.Get("/docs", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "./docs/redoc.html")
+	})
 }

@@ -1,5 +1,14 @@
 package main
 
+// @title Signals
+// @version v0.0.1
+// @description Signals service API
+// @host localhost:8080
+// @accept json
+// @produce json
+// @securityDefinitions.basic  BasicAuth
+// @externalDocs.description  OpenAPI
+
 import (
 	"fmt"
 	"net/http"
@@ -12,6 +21,8 @@ import (
 	"github.com/nickabs/signals/internal/logger"
 	internalMiddleware "github.com/nickabs/signals/internal/middleware"
 	"github.com/nickabs/signals/internal/routes"
+
+	_ "github.com/nickabs/signals/docs"
 )
 
 // TODO - will the signal defs ever need to be private? Current implementation assumes 'no'

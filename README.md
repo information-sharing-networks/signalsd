@@ -1,17 +1,20 @@
 
-# prerequisites
+# go service dependencies
 go 1.24 or above
 PostgresSql@17 or above
 
-go dependenicies:
+# go development dependenicies:
  [goose](https://github.com/pressly/goose)
+ [sqlc](https://github/sqlc-dev/sqlc)
+ [swaggo](https://github.com/swaggo/swag)
 ``` bash
 go install github.com/pressly/goose/v3/cmd/goose@latest #database migrations 
 go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest #type safe code for SQL queries
+go install github.com/swaggo/swag/cmd/swag@latest #generates OpenApi specs from go comments
 
 ```
 
-# config
+# environment config
 set the following env variables
 ``` bash
 # sample Signals service config
@@ -26,7 +29,8 @@ the secret key is used to sign the JWT access tokens used by the service.  You c
 ``` bash
 openssl rand -base64 64
 ```
-# database setup (mac)
+
+# local postgres database setup (mac)
 ``` bash
 # 1 install and start postgresql server
 brew install postgresql@17
@@ -57,6 +61,7 @@ go build ./cmd/signalsd/
 # or
 go run cmd/signalsd/main.go
 ```
+
 # Development
 database alterations are made by adding files to sql/schema
 001_foo.sql
@@ -67,3 +72,9 @@ new sql queries are added in
 sql/queries
 
 use `sqlc generate` from the root of the project to regenerate the type safe go code after adding or altering any queries
+
+# API docs
+generate OpenApi docs
+```bash
+swag init -g cmd/signalsd/main.go # from module root
+```

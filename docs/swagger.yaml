@@ -1,0 +1,133 @@
+consumes:
+- application/json
+definitions:
+  handlers.CreateUserHandler.createUserRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  handlers.CreateUserHandler.createUserResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  handlers.LoginHandler.loginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  handlers.LoginHandler.loginResponse:
+    properties:
+      access_token:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      refresh_token:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  signals.ErrorCode:
+    enum:
+    - access_token_expired
+    - authentication_error
+    - authorization_error
+    - database_error
+    - forbidden
+    - internal_error
+    - invalid_request
+    - malformed_body
+    - not_implemented
+    - refresh_token_expired
+    - refresh_token_revoked
+    - resource_already_exists
+    - resource_not_found
+    - token_error
+    - user_alread_exists
+    - user_not_found
+    type: string
+    x-enum-varnames:
+    - ErrCodeAccessTokenExpired
+    - ErrCodeAuthenticationFailure
+    - ErrCodeAuthorizationFailure
+    - ErrCodeDatabaseError
+    - ErrCodeForbidden
+    - ErrCodeInternalError
+    - ErrCodeInvalidRequest
+    - ErrCodeMalformedBody
+    - ErrCodeNotImplemented
+    - ErrCodeRefreshTokenExpired
+    - ErrCodeRefreshTokenRevoked
+    - ErrCodeResourceAlreadyExists
+    - ErrCodeResourceNotFound
+    - ErrCodeTokenError
+    - ErrCodeUserAlreadyExists
+    - ErrCodeUserNotFound
+  signals.ErrorResponse:
+    properties:
+      error_code:
+        $ref: '#/definitions/signals.ErrorCode'
+      message:
+        type: string
+    type: object
+externalDocs:
+  description: OpenAPI
+host: localhost:8080
+info:
+  contact: {}
+  description: Signals service API
+  title: Signals
+  version: v0.0.1
+paths:
+  /api/login:
+    post:
+      parameters:
+      - description: req bd
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.LoginHandler.loginRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.LoginHandler.loginResponse'
+        "401":
+          description: Unauthorized
+        "404":
+          description: Not Found
+  /api/users:
+    post:
+      parameters:
+      - description: req bd
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateUserHandler.createUserRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.CreateUserHandler.createUserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+produces:
+- application/json
+securityDefinitions:
+  BasicAuth:
+    type: basic
+swagger: "2.0"

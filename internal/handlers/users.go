@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/nickabs/signals"
@@ -22,6 +23,10 @@ func NewUserHandler(cfg *signals.ServiceConfig) *UserHandler {
 	return &UserHandler{cfg: cfg}
 }
 
+// @Param request body handlers.CreateUserHandler.createUserRequest true "req bd"
+// @Success 200 {object} handlers.CreateUserHandler.createUserResponse
+// @Failure 400 {object} signals.ErrorResponse
+// @Router /api/users [post]
 func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 	type createUserRequest struct {
 		Password string `json:"password"`
@@ -30,7 +35,15 @@ func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) 
 
 	var req createUserRequest
 
-	var res database.User
+	type createUserResponse struct {
+		ID        uuid.UUID `json:"id"`
+		CreatedAt time.Time `json:"created_at"`
+		UpdatedAt time.Time `json:"updated_at"`
+	}
+
+	var newUser = database.User{}
+
+	var res = createUserResponse{}
 
 	authService := auth.NewAuthService(u.cfg)
 
@@ -62,7 +75,7 @@ func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	res, err = u.cfg.DB.CreateUser(r.Context(), database.CreateUserParams{
+	newUser, err = u.cfg.DB.CreateUser(r.Context(), database.CreateUserParams{
 		HashedPassword: hashedPassword,
 		Email:          req.Email,
 	})
@@ -71,6 +84,11 @@ func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	res = createUserResponse{
+		ID:        newUser.ID,
+		CreatedAt: newUser.CreatedAt,
+		UpdatedAt: newUser.UpdatedAt,
+	}
 	helpers.RespondWithJSON(w, http.StatusCreated, res)
 }
 
