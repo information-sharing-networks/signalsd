@@ -20,16 +20,28 @@ func NewAuthHandler(cfg *signals.ServiceConfig) *AuthHandler {
 	return &AuthHandler{cfg: cfg}
 }
 
-// RefreshAccessTokenHandler returns a new access token in the response body when
-// a valid access token is provided as a Authorization Bearer {access token} header.
-// Refreshed access tokens are not issued if the token has expired or been revoked.
+// RefreshAccessTokenHandler godoc
 //
-// Note access tokens are 256bit randmom strings, not JWTs.
+//	@Summary		Refresh access token
+//	@Description	Returns a new JWT access token.
+//	@Description	Access tokens are not issued if the refresh token has expired or been revoked.
+//	@Description	Users must log in again to obtain a new refresh token if the current one has expired or been revoked.
+//	@Tags			auth
 //
-// If the access token has expired, the user must reauthenticate go get a new token.
+//	@Success		200	{object}	handlers.RefreshAccessTokenHandler.refreshResponse
+//	@Failure		400	{object}	signals.ErrorResponse
+//	@Failure		401	{object}	signals.ErrorResponse
+//	@Failure		500	{object}	signals.ErrorResponse
+//
+//	@Security		BearerRefreshToken
+//
+//	@Router			/api/refresh [post]
+//
+// note refresh tokens are random 256b strings, not JWTs
 func (a *AuthHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.Request) {
+
 	type refreshResponse struct {
-		AccessToken string `json:"token"`
+		AccessToken string `json:"access_token"`
 	}
 
 	authService := auth.NewAuthService(a.cfg)
@@ -48,7 +60,7 @@ func (a *AuthHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.R
 	refreshTokenRow, err := a.cfg.DB.GetRefreshToken(r.Context(), refreshToken)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeTokenError, "Invalid token")
+			helpers.RespondWithError(w, r, http.StatusUnauthorized, signals.ErrCodeTokenError, "Invalid token")
 			return
 		}
 		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeTokenError, "could not refresh the token")
@@ -75,7 +87,23 @@ func (a *AuthHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.R
 	helpers.RespondWithJSON(w, http.StatusOK, res)
 }
 
-// RevokeRefreshTokenHandler revokes the refresh token supplied in the Authorization header
+// RevokeRefreshTokenHandler godoc
+//
+//	@Summary		Revoke refresh token
+//	@Description	Revoke a refresh token to prevent it being used to create new access tokens.
+//	@Description	Note that any unexpired access tokens issued for this user will continue to work until they expire.
+//	@Description	Users must log in again to obtain a new refresh token if the current one has been revoked.
+//	@Tags			auth
+//
+//	@Success		204
+//	@Failure		400	{object}	signals.ErrorResponse
+//	@Failure		401	{object}	signals.ErrorResponse
+//	@Failure		404	{object}	signals.ErrorResponse
+//	@Failure		500	{object}	signals.ErrorResponse
+//
+//	@Security		BearerRefreshToken
+//
+//	@Router			/api/revoke [post]
 func (a *AuthHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 	if r.ContentLength != 0 {
 		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintln("This endpoint does not expect a request body"))

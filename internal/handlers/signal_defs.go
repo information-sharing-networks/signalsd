@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/nickabs/signals"
@@ -21,23 +22,49 @@ func NewSignalDefHandler(cfg *signals.ServiceConfig) *SignalDefHandler {
 	return &SignalDefHandler{cfg: cfg}
 }
 
-// CreateSignalDefHandler inserts rows into signal_defs.
+// CreateSignalDefHandler godoc
 //
-// The 'title' supplied in the http request body is turned into a slug.
-// Slugs represent a group of versioned definitions describing a data set.
-// Slugs are owned by the originating user and can't be reused by other users.
-// Slugs are versioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new def and specify the bump type (major/minor/patch) to increment the semver
+//	@Summary		Create signal definition
+//	@Description	The supplied title is converted into a url-friendly slug.
+//	@Description
+//	@Description	Slugs represent a group of versioned signal definitions.
+//	@Description
+//	@Description	Slugs are owned by the originating user and can't be reused by other users.
+//	@Description
+//	@Description	Slugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new def and specify the bump type (major/minor/patch) to increment the semver
+//	@Description
+//	@Description	Slugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new def and specify the bump type (major/minor/patch) to increment the semver
+//	@Description
+//
+//	@Tags		signal definitions
+//
+//	@Param		request	body		handlers.CreateSignalDefHandler.createSignalDefRequest	true	"signal definition etails"
+//
+//	@Success	201		{object}	handlers.CreateSignalDefHandler.createSignalDefResponse
+//	@Failure	400		{object}	signals.ErrorResponse
+//	@Failure	409		{object}	signals.ErrorResponse
+//	@Failure	500		{object}	signals.ErrorResponse
+//
+//	@Router		/api/signal_defs [post]
 func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http.Request) {
 	type createSignalDefRequest struct {
-		SchemaURL string `json:"schema_url"`
-		ReadmeURL string `json:"readme_url"`
+		SchemaURL string `json:"schema_url"` // url for a JSON schema file (public github repo)
+		ReadmeURL string `json:"readme_url"` // url for a .md markdown file (public github repo)
 		Title     string `json:"title"`
 		Detail    string `json:"detail"`
-		BumpType  string `json:"bump_type"` // major, minor, patch (used to increment signal_def.sem_ver)
-		Stage     string `json:"stage"`     // ValidSignalDefStages
+		BumpType  string `json:"bump_type"` // major/minor/patch (used to increment signal_def.sem_ver)
+		Stage     string `json:"stage"`     // dev/test/live/deprecated/closed/shuttered
 	}
+
+	type createSignalDefResponse struct {
+		ID        uuid.UUID `json:"id"`
+		CreatedAt time.Time `json:"created_at"`
+		Slug      string    `json:"slug"`
+		SemVer    string    `json:"sem_ver"`
+	}
+	//var res createSignalDefResponse
 	var req createSignalDefRequest
-	var res database.SignalDef
+
 	var createParams database.CreateSignalDefParams
 
 	// these values are calcuated based on supplied req and used as part of the update on the signal_defs tables
@@ -130,20 +157,42 @@ func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http
 		UserID:    userID,
 	}
 
-	res, err = s.cfg.DB.CreateSignalDef(r.Context(), createParams)
+	var returnedUser database.SignalDef
+	returnedUser, err = s.cfg.DB.CreateSignalDef(r.Context(), createParams)
 	if err != nil {
 		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("could not create signal definition: %v", err))
 		return
 	}
 
-	helpers.RespondWithJSON(w, http.StatusCreated, res)
+	helpers.RespondWithJSON(w, http.StatusCreated, createSignalDefResponse{
+		ID:        returnedUser.ID,
+		CreatedAt: returnedUser.CreatedAt,
+		Slug:      returnedUser.Slug,
+		SemVer:    returnedUser.SemVer,
+	})
 }
 
+// UpdateSignalDefHandler godoc
+//
+//	@Summary		Update signal definition
+//	@Description	users can update the detailed description, the stage or the link to the readme md
+//	@Description
+//	@Description	Note that it is not allowed to update the schema url - instead users should create a new declaration with the same title and bump the version
+//	@Tags			signal definitions
+//
+//	@Param			request	body	handlers.UpdateSignalDefHandler.updateSignalDefRequest	true	"signal definition etails"
+//
+//	@Success		204
+//	@Failure		400	{object}	signals.ErrorResponse
+//	@Failure		403	{object}	signals.ErrorResponse
+//	@Failure		500	{object}	signals.ErrorResponse
+//
+//	@Router			/api/signal_defs [put]
 func (s *SignalDefHandler) UpdateSignalDefHandler(w http.ResponseWriter, r *http.Request) {
 	type updateSignalDefRequest struct {
 		ReadmeURL string `json:"readme_url"`
 		Detail    string `json:"detail"`
-		Stage     string `json:"stage"` // signals.ValidSignalDefStages
+		Stage     string `json:"stage"` // dev/test/live/deprecated/closed/shuttered
 	}
 
 	var req = updateSignalDefRequest{}
@@ -183,7 +232,6 @@ func (s *SignalDefHandler) UpdateSignalDefHandler(w http.ResponseWriter, r *http
 	}
 
 	//check body
-
 	defer r.Body.Close()
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()

@@ -23,14 +23,24 @@ func NewUserHandler(cfg *signals.ServiceConfig) *UserHandler {
 	return &UserHandler{cfg: cfg}
 }
 
-// @Subject /api/users
-// @Param request body handlers.CreateUserHandler.createUserRequest true "req bd"
-// @Success 200 {object} handlers.CreateUserHandler.createUserResponse
-// @Failure 400 {object} signals.ErrorResponse
-// @Router /api/users [post]
-// @Description the access_token is needed to use protected end points and is valid for 1 hour
-// @Description Use the refresh_token with the /refresh endpoint to renew the access_token
-// @Description refresh_tokens last 60 days unless they are revoked earlier.  To refresh the refresh_token, log in again.
+// CreateUserHandler godoc
+//
+//	@Summary		Create user
+//	@Description	The response body includes an access token and a refresh_token.
+//	@Description	The access_token is valid for 1 hour.
+//	@Description	Use the refresh_token with the /api/refresh endpoint to renew the access_token.
+//	@Description	The refresh_token lasts 60 days unless it is revoked earlier.
+//	@Description	To renew the refresh_token, log in again.
+//	@Tags			auth
+//
+//	@Param			request	body		handlers.CreateUserHandler.createUserRequest	true	"user details"
+//
+//	@Success		201		{object}	handlers.CreateUserHandler.createUserResponse
+//	@Failure		400		{object}	signals.ErrorResponse
+//	@Failure		409		{object}	signals.ErrorResponse
+//	@Failure		500		{object}	signals.ErrorResponse
+//
+//	@Router			/api/users [post]
 func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 	type createUserRequest struct {
 		Password string `json:"password"`
@@ -68,7 +78,7 @@ func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if exists {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeUserAlreadyExists, "a user already exists this email address")
+		helpers.RespondWithError(w, r, http.StatusConflict, signals.ErrCodeUserAlreadyExists, "a user already exists this email address")
 		return
 	}
 
@@ -94,19 +104,23 @@ func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) 
 	helpers.RespondWithJSON(w, http.StatusCreated, res)
 }
 
-// handlers godoc
+// UpdateUserHandler godoc
 //
 //	@Summary		Update user
-//	@Description	update user email and/or password
-//	@Param 			request body handlers.UpdateUserHandler.updateUserRequest true "user details"
-//	@success 		200 {object} handlers.UpdateUserHandler.updateUserResponse
-//	@Success		200
-//	@Failure		400	{object}	signals.ErrorCode
-//	@Failure		401	{object}	signals.ErrorCode
-//	@Failure		404	{object}	signals.ErrorCode
-//	@Failure		500	{object}	signals.ErrorCode
-//	@Security		BearerAuth
-//	@Router			/admin/users [put]
+//	@Description	update email and/or password
+//	@Tags			auth
+//
+//	@Param			request	body		handlers.UpdateUserHandler.updateUserRequest	true	"user details"
+//
+//	@Success		200		{object}	handlers.UpdateUserHandler.updateUserResponse
+//	@Failure		400		{object}	signals.ErrorResponse
+//	@Failure		401		{object}	signals.ErrorResponse
+//	@Failure		404		{object}	signals.ErrorResponse
+//	@Failure		500		{object}	signals.ErrorResponse
+//
+//	@Security		BearerAccessToken
+//
+//	@Router			/api/users [put]
 func (u *UserHandler) UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 	type updateUserRequest struct {
 		Password string `json:"password"`

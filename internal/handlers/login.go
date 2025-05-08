@@ -21,11 +21,19 @@ func NewLoginHandler(cfg *signals.ServiceConfig) *LoginHandler {
 	return &LoginHandler{cfg: cfg}
 }
 
-// @Param request body handlers.LoginHandler.loginRequest true "req bd"
-// @Success 200 {object} handlers.LoginHandler.loginResponse
-// @Failure 401
-// @Failure 404
-// @Router /api/login [post]
+// LoginHandler godoc
+//
+//	@Summary	Login
+//	@Tags		auth
+//
+//	@Param		request	body		handlers.LoginHandler.loginRequest	true	"user details"
+//
+//	@Success	200		{object}	handlers.LoginHandler.loginResponse
+//	@Failure	400		{object}	signals.ErrorResponse
+//	@Failure	401		{object}	signals.ErrorResponse
+//	@Failure	500		{object}	signals.ErrorResponse
+//
+//	@Router		/api/login [post]
 func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	type loginRequest struct {
 		Password string `json:"password"`

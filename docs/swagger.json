@@ -14,62 +14,15 @@
     },
     "host": "localhost:8080",
     "paths": {
-        "/admin/users": {
-            "put": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
+        "/api/login": {
+            "post": {
+                "tags": [
+                    "auth"
                 ],
-                "description": "update user email and/or password",
-                "summary": "Update user",
+                "summary": "Login",
                 "parameters": [
                     {
                         "description": "user details",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.UpdateUserHandler.updateUserRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/signals.ErrorCode"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/signals.ErrorCode"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/signals.ErrorCode"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/signals.ErrorCode"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/login": {
-            "post": {
-                "parameters": [
-                    {
-                        "description": "req bd",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -85,21 +38,262 @@
                             "$ref": "#/definitions/handlers.LoginHandler.loginResponse"
                         }
                     },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
                     "401": {
-                        "description": "Unauthorized"
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/refresh": {
+            "post": {
+                "security": [
+                    {
+                        "BearerRefreshToken": []
+                    }
+                ],
+                "description": "Returns a new JWT access token.\nAccess tokens are not issued if the refresh token has expired or been revoked.\nUsers must log in again to obtain a new refresh token if the current one has expired or been revoked.",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Refresh access token",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.RefreshAccessTokenHandler.refreshResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/revoke": {
+            "post": {
+                "security": [
+                    {
+                        "BearerRefreshToken": []
+                    }
+                ],
+                "description": "Revoke a refresh token to prevent it being used to create new access tokens.\nNote that any unexpired access tokens issued for this user will continue to work until they expire.\nUsers must log in again to obtain a new refresh token if the current one has been revoked.",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Revoke refresh token",
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
                     },
                     "404": {
-                        "description": "Not Found"
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/signal_defs": {
+            "put": {
+                "description": "users can update the detailed description, the stage or the link to the readme md\n\nNote that it is not allowed to update the schema url - instead users should create a new declaration with the same title and bump the version",
+                "tags": [
+                    "signal definitions"
+                ],
+                "summary": "Update signal definition",
+                "parameters": [
+                    {
+                        "description": "signal definition etails",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdateSignalDefHandler.updateSignalDefRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "The supplied title is converted into a url-friendly slug.\n\nSlugs represent a group of versioned signal definitions.\n\nSlugs are owned by the originating user and can't be reused by other users.\n\nSlugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new def and specify the bump type (major/minor/patch) to increment the semver\n\nSlugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new def and specify the bump type (major/minor/patch) to increment the semver\n",
+                "tags": [
+                    "signal definitions"
+                ],
+                "summary": "Create signal definition",
+                "parameters": [
+                    {
+                        "description": "signal definition etails",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateSignalDefHandler.createSignalDefRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateSignalDefHandler.createSignalDefResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
                     }
                 }
             }
         },
         "/api/users": {
-            "post": {
-                "description": "the access_token is needed to use protected end points and is valid for 1 hour\nUse the refresh_token with the /refresh endpoint to renew the access_token\nrefresh_tokens last 60 days unless they are revoked earlier.  To refresh the refresh_token, log in again.",
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "update email and/or password",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Update user",
                 "parameters": [
                     {
-                        "description": "req bd",
+                        "description": "user details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdateUserHandler.updateUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdateUserHandler.updateUserResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "The response body includes an access token and a refresh_token.\nThe access_token is valid for 1 hour.\nUse the refresh_token with the /api/refresh endpoint to renew the access_token.\nThe refresh_token lasts 60 days unless it is revoked earlier.\nTo renew the refresh_token, log in again.",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Create user",
+                "parameters": [
+                    {
+                        "description": "user details",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -109,8 +303,8 @@
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
+                    "201": {
+                        "description": "Created",
                         "schema": {
                             "$ref": "#/definitions/handlers.CreateUserHandler.createUserResponse"
                         }
@@ -120,12 +314,68 @@
                         "schema": {
                             "$ref": "#/definitions/signals.ErrorResponse"
                         }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
                     }
                 }
             }
         }
     },
     "definitions": {
+        "handlers.CreateSignalDefHandler.createSignalDefRequest": {
+            "type": "object",
+            "properties": {
+                "bump_type": {
+                    "description": "major/minor/patch (used to increment signal_def.sem_ver)",
+                    "type": "string"
+                },
+                "detail": {
+                    "type": "string"
+                },
+                "readme_url": {
+                    "description": "url for a .md markdown file (public github repo)",
+                    "type": "string"
+                },
+                "schema_url": {
+                    "description": "url for a JSON schema file (public github repo)",
+                    "type": "string"
+                },
+                "stage": {
+                    "description": "dev/test/live/deprecated/closed/shuttered",
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.CreateSignalDefHandler.createSignalDefResponse": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "sem_ver": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                }
+            }
+        },
         "handlers.CreateUserHandler.createUserRequest": {
             "type": "object",
             "properties": {
@@ -175,6 +425,29 @@
                     "type": "string"
                 },
                 "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.RefreshAccessTokenHandler.refreshResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.UpdateSignalDefHandler.updateSignalDefRequest": {
+            "type": "object",
+            "properties": {
+                "detail": {
+                    "type": "string"
+                },
+                "readme_url": {
+                    "type": "string"
+                },
+                "stage": {
+                    "description": "dev/test/live/deprecated/closed/shuttered",
                     "type": "string"
                 }
             }
@@ -255,11 +528,27 @@
         }
     },
     "securityDefinitions": {
-        "BearerAuth": {
+        "BearerAccessToken": {
             "description": "Bearer {JWT access token}",
             "type": "apiKey",
             "name": "Authorization",
             "in": "header"
+        },
+        "BearerRefreshToken": {
+            "description": "Bearer { refresh token }",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
-    }
+    },
+    "tags": [
+        {
+            "description": "User and token management endpoints",
+            "name": "auth"
+        },
+        {
+            "description": "Signal defintion management endpoints",
+            "name": "signal definitions"
+        }
+    ]
 }

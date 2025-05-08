@@ -16,23 +16,32 @@ import (
 	_ "github.com/nickabs/signals/docs"
 )
 
-// @title Signals
-// @version v0.0.1
-// @description Signals service API
-// @license MIT
-// @host localhost:8080
-// @accept json
-// @produce json
-//
-// @securityDefinitions.ApiKey  BearerAuth
-// @in header
-// @name Authorization
-// @description Bearer {JWT access token}
-//
-// @externalDocs.description  OpenAPI
+//	@title			Signals
+//	@version		v0.0.1
+//	@description	Signals service API
+//	@license		MIT
+//	@host			localhost:8080
 
-// TODO - will the signal defs ever need to be private? Current implementation assumes 'no'
+//	@accept		json
+//	@produce	json
+
+//	@securityDefinitions.ApiKey	BearerAccessToken
+//	@in							header
+//	@name						Authorization
+//	@description				Bearer {JWT access token}
+
+//	@securityDefinitions.ApiKey	BearerRefreshToken
+//	@in							header
+//	@name						Authorization
+//	@description				Bearer { refresh token }
+
+//	@tag.name			auth
+//	@tag.description	User and token management endpoints
+
+// @tag.name			signal definitions
+// @tag.description	Signal defintion management endpoints
 func main() {
+	// TODO - will the signal defs ever need to be private? Current implementation assumes 'no'
 	logger.ServerLogger.Info().Msg("Starting server")
 
 	cfg := signals.InitConfig()

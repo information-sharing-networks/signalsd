@@ -1,6 +1,36 @@
 consumes:
 - application/json
 definitions:
+  handlers.CreateSignalDefHandler.createSignalDefRequest:
+    properties:
+      bump_type:
+        description: major/minor/patch (used to increment signal_def.sem_ver)
+        type: string
+      detail:
+        type: string
+      readme_url:
+        description: url for a .md markdown file (public github repo)
+        type: string
+      schema_url:
+        description: url for a JSON schema file (public github repo)
+        type: string
+      stage:
+        description: dev/test/live/deprecated/closed/shuttered
+        type: string
+      title:
+        type: string
+    type: object
+  handlers.CreateSignalDefHandler.createSignalDefResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      sem_ver:
+        type: string
+      slug:
+        type: string
+    type: object
   handlers.CreateUserHandler.createUserRequest:
     properties:
       email:
@@ -33,6 +63,21 @@ definitions:
       refresh_token:
         type: string
       updated_at:
+        type: string
+    type: object
+  handlers.RefreshAccessTokenHandler.refreshResponse:
+    properties:
+      access_token:
+        type: string
+    type: object
+  handlers.UpdateSignalDefHandler.updateSignalDefRequest:
+    properties:
+      detail:
+        type: string
+      readme_url:
+        type: string
+      stage:
+        description: dev/test/live/deprecated/closed/shuttered
         type: string
     type: object
   handlers.UpdateUserHandler.updateUserRequest:
@@ -99,42 +144,10 @@ info:
   title: Signals
   version: v0.0.1
 paths:
-  /admin/users:
-    put:
-      description: update user email and/or password
-      parameters:
-      - description: user details
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.UpdateUserHandler.updateUserRequest'
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/signals.ErrorCode'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/signals.ErrorCode'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/signals.ErrorCode'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/signals.ErrorCode'
-      security:
-      - BearerAuth: []
-      summary: Update user
   /api/login:
     post:
       parameters:
-      - description: req bd
+      - description: user details
         in: body
         name: request
         required: true
@@ -145,38 +158,234 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/handlers.LoginHandler.loginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+      summary: Login
+      tags:
+      - auth
+  /api/refresh:
+    post:
+      description: |-
+        Returns a new JWT access token.
+        Access tokens are not issued if the refresh token has expired or been revoked.
+        Users must log in again to obtain a new refresh token if the current one has expired or been revoked.
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.RefreshAccessTokenHandler.refreshResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+      security:
+      - BearerRefreshToken: []
+      summary: Refresh access token
+      tags:
+      - auth
+  /api/revoke:
+    post:
+      description: |-
+        Revoke a refresh token to prevent it being used to create new access tokens.
+        Note that any unexpired access tokens issued for this user will continue to work until they expire.
+        Users must log in again to obtain a new refresh token if the current one has been revoked.
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+      security:
+      - BearerRefreshToken: []
+      summary: Revoke refresh token
+      tags:
+      - auth
+  /api/signal_defs:
+    post:
+      description: |
+        The supplied title is converted into a url-friendly slug.
+
+        Slugs represent a group of versioned signal definitions.
+
+        Slugs are owned by the originating user and can't be reused by other users.
+
+        Slugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new def and specify the bump type (major/minor/patch) to increment the semver
+
+        Slugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new def and specify the bump type (major/minor/patch) to increment the semver
+      parameters:
+      - description: signal definition etails
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateSignalDefHandler.createSignalDefRequest'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.CreateSignalDefHandler.createSignalDefResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+      summary: Create signal definition
+      tags:
+      - signal definitions
+    put:
+      description: |-
+        users can update the detailed description, the stage or the link to the readme md
+
+        Note that it is not allowed to update the schema url - instead users should create a new declaration with the same title and bump the version
+      parameters:
+      - description: signal definition etails
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateSignalDefHandler.updateSignalDefRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+      summary: Update signal definition
+      tags:
+      - signal definitions
   /api/users:
     post:
       description: |-
-        the access_token is needed to use protected end points and is valid for 1 hour
-        Use the refresh_token with the /refresh endpoint to renew the access_token
-        refresh_tokens last 60 days unless they are revoked earlier.  To refresh the refresh_token, log in again.
+        The response body includes an access token and a refresh_token.
+        The access_token is valid for 1 hour.
+        Use the refresh_token with the /api/refresh endpoint to renew the access_token.
+        The refresh_token lasts 60 days unless it is revoked earlier.
+        To renew the refresh_token, log in again.
       parameters:
-      - description: req bd
+      - description: user details
         in: body
         name: request
         required: true
         schema:
           $ref: '#/definitions/handlers.CreateUserHandler.createUserRequest'
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Created
           schema:
             $ref: '#/definitions/handlers.CreateUserHandler.createUserResponse'
         "400":
           description: Bad Request
           schema:
             $ref: '#/definitions/signals.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+      summary: Create user
+      tags:
+      - auth
+    put:
+      description: update email and/or password
+      parameters:
+      - description: user details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateUserHandler.updateUserRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.UpdateUserHandler.updateUserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Update user
+      tags:
+      - auth
 produces:
 - application/json
 securityDefinitions:
-  BearerAuth:
+  BearerAccessToken:
     description: Bearer {JWT access token}
     in: header
     name: Authorization
     type: apiKey
+  BearerRefreshToken:
+    description: Bearer { refresh token }
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"
+tags:
+- description: User and token management endpoints
+  name: auth
+- description: Signal defintion management endpoints
+  name: signal definitions
