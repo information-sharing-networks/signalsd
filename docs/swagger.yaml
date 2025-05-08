@@ -14,8 +14,6 @@ definitions:
         type: string
       id:
         type: string
-      updated_at:
-        type: string
     type: object
   handlers.LoginHandler.loginRequest:
     properties:
@@ -35,6 +33,18 @@ definitions:
       refresh_token:
         type: string
       updated_at:
+        type: string
+    type: object
+  handlers.UpdateUserHandler.updateUserRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  handlers.UpdateUserHandler.updateUserResponse:
+    properties:
+      email:
         type: string
     type: object
   signals.ErrorCode:
@@ -76,12 +86,12 @@ definitions:
   signals.ErrorResponse:
     properties:
       error_code:
-        $ref: '#/definitions/signals.ErrorCode'
+        allOf:
+        - $ref: '#/definitions/signals.ErrorCode'
+        example: example_error_code
       message:
         type: string
     type: object
-externalDocs:
-  description: OpenAPI
 host: localhost:8080
 info:
   contact: {}
@@ -89,6 +99,38 @@ info:
   title: Signals
   version: v0.0.1
 paths:
+  /admin/users:
+    put:
+      description: update user email and/or password
+      parameters:
+      - description: user details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateUserHandler.updateUserRequest'
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/signals.ErrorCode'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/signals.ErrorCode'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/signals.ErrorCode'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/signals.ErrorCode'
+      security:
+      - BearerAuth: []
+      summary: Update user
   /api/login:
     post:
       parameters:
@@ -109,6 +151,10 @@ paths:
           description: Not Found
   /api/users:
     post:
+      description: |-
+        the access_token is needed to use protected end points and is valid for 1 hour
+        Use the refresh_token with the /refresh endpoint to renew the access_token
+        refresh_tokens last 60 days unless they are revoked earlier.  To refresh the refresh_token, log in again.
       parameters:
       - description: req bd
         in: body
@@ -128,6 +174,9 @@ paths:
 produces:
 - application/json
 securityDefinitions:
-  BasicAuth:
-    type: basic
+  BearerAuth:
+    description: Bearer {JWT access token}
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

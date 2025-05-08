@@ -21,6 +21,57 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/admin/users": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "update user email and/or password",
+                "summary": "Update user",
+                "parameters": [
+                    {
+                        "description": "user details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdateUserHandler.updateUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorCode"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorCode"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorCode"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorCode"
+                        }
+                    }
+                }
+            }
+        },
         "/api/login": {
             "post": {
                 "parameters": [
@@ -52,6 +103,7 @@ const docTemplate = `{
         },
         "/api/users": {
             "post": {
+                "description": "the access_token is needed to use protected end points and is valid for 1 hour\nUse the refresh_token with the /refresh endpoint to renew the access_token\nrefresh_tokens last 60 days unless they are revoked earlier.  To refresh the refresh_token, log in again.",
                 "parameters": [
                     {
                         "description": "req bd",
@@ -100,9 +152,6 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
                 }
             }
         },
@@ -133,6 +182,25 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.UpdateUserHandler.updateUserRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.UpdateUserHandler.updateUserResponse": {
+            "type": "object",
+            "properties": {
+                "email": {
                     "type": "string"
                 }
             }
@@ -180,7 +248,12 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "error_code": {
-                    "$ref": "#/definitions/signals.ErrorCode"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/signals.ErrorCode"
+                        }
+                    ],
+                    "example": "example_error_code"
                 },
                 "message": {
                     "type": "string"
@@ -189,12 +262,12 @@ const docTemplate = `{
         }
     },
     "securityDefinitions": {
-        "BasicAuth": {
-            "type": "basic"
+        "BearerAuth": {
+            "description": "Bearer {JWT access token}",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
-    },
-    "externalDocs": {
-        "description": "OpenAPI"
     }
 }`
 

@@ -23,10 +23,14 @@ func NewUserHandler(cfg *signals.ServiceConfig) *UserHandler {
 	return &UserHandler{cfg: cfg}
 }
 
+// @Subject /api/users
 // @Param request body handlers.CreateUserHandler.createUserRequest true "req bd"
 // @Success 200 {object} handlers.CreateUserHandler.createUserResponse
 // @Failure 400 {object} signals.ErrorResponse
 // @Router /api/users [post]
+// @Description the access_token is needed to use protected end points and is valid for 1 hour
+// @Description Use the refresh_token with the /refresh endpoint to renew the access_token
+// @Description refresh_tokens last 60 days unless they are revoked earlier.  To refresh the refresh_token, log in again.
 func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 	type createUserRequest struct {
 		Password string `json:"password"`
@@ -38,7 +42,6 @@ func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) 
 	type createUserResponse struct {
 		ID        uuid.UUID `json:"id"`
 		CreatedAt time.Time `json:"created_at"`
-		UpdatedAt time.Time `json:"updated_at"`
 	}
 
 	var newUser = database.User{}
@@ -87,12 +90,23 @@ func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) 
 	res = createUserResponse{
 		ID:        newUser.ID,
 		CreatedAt: newUser.CreatedAt,
-		UpdatedAt: newUser.UpdatedAt,
 	}
 	helpers.RespondWithJSON(w, http.StatusCreated, res)
 }
 
-// update email or password
+// handlers godoc
+//
+//	@Summary		Update user
+//	@Description	update user email and/or password
+//	@Param 			request body handlers.UpdateUserHandler.updateUserRequest true "user details"
+//	@success 		200 {object} handlers.UpdateUserHandler.updateUserResponse
+//	@Success		200
+//	@Failure		400	{object}	signals.ErrorCode
+//	@Failure		401	{object}	signals.ErrorCode
+//	@Failure		404	{object}	signals.ErrorCode
+//	@Failure		500	{object}	signals.ErrorCode
+//	@Security		BearerAuth
+//	@Router			/admin/users [put]
 func (u *UserHandler) UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
 	type updateUserRequest struct {
 		Password string `json:"password"`

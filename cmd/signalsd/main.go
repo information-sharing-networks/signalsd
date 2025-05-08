@@ -1,14 +1,5 @@
 package main
 
-// @title Signals
-// @version v0.0.1
-// @description Signals service API
-// @host localhost:8080
-// @accept json
-// @produce json
-// @securityDefinitions.basic  BasicAuth
-// @externalDocs.description  OpenAPI
-
 import (
 	"fmt"
 	"net/http"
@@ -24,6 +15,21 @@ import (
 
 	_ "github.com/nickabs/signals/docs"
 )
+
+// @title Signals
+// @version v0.0.1
+// @description Signals service API
+// @license MIT
+// @host localhost:8080
+// @accept json
+// @produce json
+//
+// @securityDefinitions.ApiKey  BearerAuth
+// @in header
+// @name Authorization
+// @description Bearer {JWT access token}
+//
+// @externalDocs.description  OpenAPI
 
 // TODO - will the signal defs ever need to be private? Current implementation assumes 'no'
 func main() {
