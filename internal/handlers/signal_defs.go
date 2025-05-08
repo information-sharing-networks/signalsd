@@ -48,12 +48,12 @@ func NewSignalDefHandler(cfg *signals.ServiceConfig) *SignalDefHandler {
 //	@Router		/api/signal_defs [post]
 func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http.Request) {
 	type createSignalDefRequest struct {
-		SchemaURL string `json:"schema_url"` // url for a JSON schema file (public github repo)
-		ReadmeURL string `json:"readme_url"` // url for a .md markdown file (public github repo)
-		Title     string `json:"title"`
-		Detail    string `json:"detail"`
-		BumpType  string `json:"bump_type"` // major/minor/patch (used to increment signal_def.sem_ver)
-		Stage     string `json:"stage"`     // dev/test/live/deprecated/closed/shuttered
+		SchemaURL string `json:"schema_url" example:"https://github.com/user/project/v0.0.1/locales/filename.json"` // Note file must be on a public github repo
+		ReadmeURL string `json:"readme_url" example:"https://github.com/user/project/v0.0.1/locales/filename.md"`   // Note file must be on a public github repo
+		Title     string `json:"title" example:"Sample Signal"`
+		Detail    string `json:"detail" example:"Sample Signal description"`
+		BumpType  string `json:"bump_type" example:"minor"` // major/minor/patch - this is used to increment semver for this signal def
+		Stage     string `json:"stage" example:"dev"`       // dev/test/live/deprecated/closed/shuttered
 	}
 
 	type createSignalDefResponse struct {
@@ -190,9 +190,9 @@ func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http
 //	@Router			/api/signal_defs [put]
 func (s *SignalDefHandler) UpdateSignalDefHandler(w http.ResponseWriter, r *http.Request) {
 	type updateSignalDefRequest struct {
-		ReadmeURL string `json:"readme_url"`
-		Detail    string `json:"detail"`
-		Stage     string `json:"stage"` // dev/test/live/deprecated/closed/shuttered
+		ReadmeURL string `json:"readme_url" example:"https://github.com/user/project/v0.0.1/locales/new_filename.md"` // Note file must be on a public github repo
+		Detail    string `json:"detail" example:"updated description"`
+		Stage     string `json:"stage" example:"test"` // dev/test/live/deprecated/closed/shuttered
 	}
 
 	var req = updateSignalDefRequest{}

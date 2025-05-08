@@ -336,26 +336,32 @@
             "type": "object",
             "properties": {
                 "bump_type": {
-                    "description": "major/minor/patch (used to increment signal_def.sem_ver)",
-                    "type": "string"
+                    "description": "major/minor/patch - this is used to increment semver for this signal def",
+                    "type": "string",
+                    "example": "minor"
                 },
                 "detail": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Sample Signal description"
                 },
                 "readme_url": {
-                    "description": "url for a .md markdown file (public github repo)",
-                    "type": "string"
+                    "description": "Note file must be on a public github repo",
+                    "type": "string",
+                    "example": "https://github.com/user/project/v0.0.1/locales/filename.md"
                 },
                 "schema_url": {
-                    "description": "url for a JSON schema file (public github repo)",
-                    "type": "string"
+                    "description": "Note file must be on a public github repo",
+                    "type": "string",
+                    "example": "https://github.com/user/project/v0.0.1/locales/filename.json"
                 },
                 "stage": {
                     "description": "dev/test/live/deprecated/closed/shuttered",
-                    "type": "string"
+                    "type": "string",
+                    "example": "dev"
                 },
                 "title": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Sample Signal"
                 }
             }
         },
@@ -441,14 +447,18 @@
             "type": "object",
             "properties": {
                 "detail": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "updated description"
                 },
                 "readme_url": {
-                    "type": "string"
+                    "description": "Note file must be on a public github repo",
+                    "type": "string",
+                    "example": "https://github.com/user/project/v0.0.1/locales/filename.md"
                 },
                 "stage": {
                     "description": "dev/test/live/deprecated/closed/shuttered",
-                    "type": "string"
+                    "type": "string",
+                    "example": "test"
                 }
             }
         },

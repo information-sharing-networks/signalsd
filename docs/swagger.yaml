@@ -4,20 +4,27 @@ definitions:
   handlers.CreateSignalDefHandler.createSignalDefRequest:
     properties:
       bump_type:
-        description: major/minor/patch (used to increment signal_def.sem_ver)
+        description: major/minor/patch - this is used to increment semver for this
+          signal def
+        example: minor
         type: string
       detail:
+        example: Sample Signal description
         type: string
       readme_url:
-        description: url for a .md markdown file (public github repo)
+        description: Note file must be on a public github repo
+        example: https://github.com/user/project/v0.0.1/locales/filename.md
         type: string
       schema_url:
-        description: url for a JSON schema file (public github repo)
+        description: Note file must be on a public github repo
+        example: https://github.com/user/project/v0.0.1/locales/filename.json
         type: string
       stage:
         description: dev/test/live/deprecated/closed/shuttered
+        example: dev
         type: string
       title:
+        example: Sample Signal
         type: string
     type: object
   handlers.CreateSignalDefHandler.createSignalDefResponse:
@@ -73,11 +80,15 @@ definitions:
   handlers.UpdateSignalDefHandler.updateSignalDefRequest:
     properties:
       detail:
+        example: updated description
         type: string
       readme_url:
+        description: Note file must be on a public github repo
+        example: https://github.com/user/project/v0.0.1/locales/filename.md
         type: string
       stage:
         description: dev/test/live/deprecated/closed/shuttered
+        example: test
         type: string
     type: object
   handlers.UpdateUserHandler.updateUserRequest:
