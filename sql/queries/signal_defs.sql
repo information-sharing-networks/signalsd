@@ -21,7 +21,7 @@ ORDER BY u.email,
 
 -- name: GetSignalDef :one
 
-SELECT u.email,
+SELECT u.email user_email,
        sd.*
 FROM signal_defs sd
 JOIN users u ON sd.user_id = u.id

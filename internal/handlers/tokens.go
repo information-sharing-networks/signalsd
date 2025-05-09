@@ -41,7 +41,7 @@ func NewAuthHandler(cfg *signals.ServiceConfig) *AuthHandler {
 func (a *AuthHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.Request) {
 
 	type refreshResponse struct {
-		AccessToken string `json:"access_token"`
+		AccessToken string `json:"access_token" `
 	}
 
 	authService := auth.NewAuthService(a.cfg)

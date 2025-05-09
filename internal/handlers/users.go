@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/nickabs/signals"
@@ -25,33 +24,27 @@ func NewUserHandler(cfg *signals.ServiceConfig) *UserHandler {
 
 // CreateUserHandler godoc
 //
-//	@Summary		Create user
-//	@Description	The response body includes an access token and a refresh_token.
-//	@Description	The access_token is valid for 1 hour.
-//	@Description	Use the refresh_token with the /api/refresh endpoint to renew the access_token.
-//	@Description	The refresh_token lasts 60 days unless it is revoked earlier.
-//	@Description	To renew the refresh_token, log in again.
-//	@Tags			auth
+//	@Summary	Create user
+//	@Tags		auth
 //
-//	@Param			request	body		handlers.CreateUserHandler.createUserRequest	true	"user details"
+//	@Param		request	body		handlers.CreateUserHandler.createUserRequest	true	"user details"
 //
-//	@Success		201		{object}	handlers.CreateUserHandler.createUserResponse
-//	@Failure		400		{object}	signals.ErrorResponse
-//	@Failure		409		{object}	signals.ErrorResponse
-//	@Failure		500		{object}	signals.ErrorResponse
+//	@Success	201		{object}	handlers.CreateUserHandler.createUserResponse
+//	@Failure	400		{object}	signals.ErrorResponse
+//	@Failure	409		{object}	signals.ErrorResponse
+//	@Failure	500		{object}	signals.ErrorResponse
 //
-//	@Router			/api/users [post]
+//	@Router		/api/users [post]
 func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 	type createUserRequest struct {
-		Password string `json:"password"`
-		Email    string `json:"email"`
+		Password string `json:"password" example:"password"`
+		Email    string `json:"email" example:"example@example.com"`
 	}
 
 	var req createUserRequest
 
 	type createUserResponse struct {
-		ID        uuid.UUID `json:"id"`
-		CreatedAt time.Time `json:"created_at"`
+		ID uuid.UUID `json:"id" example:"68fb5f5b-e3f5-4a96-8d35-cd2203a06f73"`
 	}
 
 	var newUser = database.User{}
@@ -98,8 +91,7 @@ func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	res = createUserResponse{
-		ID:        newUser.ID,
-		CreatedAt: newUser.CreatedAt,
+		ID: newUser.ID,
 	}
 	helpers.RespondWithJSON(w, http.StatusCreated, res)
 }

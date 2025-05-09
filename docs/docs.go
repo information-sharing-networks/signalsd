@@ -23,6 +23,7 @@ const docTemplate = `{
     "paths": {
         "/admin/health": {
             "get": {
+                "description": "check if the signals service is running",
                 "tags": [
                     "admin"
                 ],
@@ -65,6 +66,7 @@ const docTemplate = `{
         },
         "/api/login": {
             "post": {
+                "description": "The response body includes an access token and a refresh_token.\nThe access_token is valid for 1 hour.\n\nUse the refresh_token with the /api/refresh endpoint to renew the access_token.\nThe refresh_token lasts 60 days unless it is revoked earlier.\nTo renew the refresh_token, log in again.",
                 "tags": [
                     "auth"
                 ],
@@ -192,23 +194,39 @@ const docTemplate = `{
             }
         },
         "/api/signal_defs": {
-            "put": {
-                "description": "users can update the detailed description, the stage or the link to the readme md\n\nNote that it is not allowed to update the schema url - instead users should create a new declaration with the same title and bump the version",
+            "get": {
                 "tags": [
                     "signal definitions"
                 ],
-                "summary": "Update signal definition",
-                "parameters": [
-                    {
-                        "description": "signal definition etails",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
+                "summary": "Get all of the signal definitions",
+                "responses": {
+                    "200": {
+                        "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.UpdateSignalDefHandler.updateSignalDefRequest"
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/database.GetSignalDefsRow"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
                         }
                     }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
                 ],
+                "tags": [
+                    "signal definitions"
+                ],
+                "summary": "Delete signal definition",
                 "responses": {
                     "204": {
                         "description": "No Content"
@@ -219,8 +237,8 @@ const docTemplate = `{
                             "$ref": "#/definitions/signals.ErrorResponse"
                         }
                     },
-                    "403": {
-                        "description": "Forbidden",
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/signals.ErrorResponse"
                         }
@@ -234,6 +252,11 @@ const docTemplate = `{
                 }
             },
             "post": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
                 "description": "The supplied title is converted into a url-friendly slug.\n\nSlugs represent a group of versioned signal definitions.\n\nSlugs are owned by the originating user and can't be reused by other users.\n\nSlugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new def and specify the bump type (major/minor/patch) to increment the semver\n\nSlugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new def and specify the bump type (major/minor/patch) to increment the semver\n",
                 "tags": [
                     "signal definitions"
@@ -265,6 +288,50 @@ const docTemplate = `{
                     },
                     "409": {
                         "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/signal_defs/{id}": {
+            "get": {
+                "tags": [
+                    "signal definitions"
+                ],
+                "summary": "Get a signal definition",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "6f4eb8dc-1411-4395-93d6-fc316b85aa74",
+                        "description": "ID of the signal definition to retrieve",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/database.GetSignalDefRow"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/signals.ErrorResponse"
                         }
@@ -335,7 +402,6 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "The response body includes an access token and a refresh_token.\nThe access_token is valid for 1 hour.\nUse the refresh_token with the /api/refresh endpoint to renew the access_token.\nThe refresh_token lasts 60 days unless it is revoked earlier.\nTo renew the refresh_token, log in again.",
                 "tags": [
                     "auth"
                 ],
@@ -381,6 +447,88 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "database.GetSignalDefRow": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "detail": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "readme_url": {
+                    "type": "string"
+                },
+                "schema_url": {
+                    "type": "string"
+                },
+                "sem_ver": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "stage": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_email": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "database.GetSignalDefsRow": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "detail": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "readme_url": {
+                    "type": "string"
+                },
+                "schema_url": {
+                    "type": "string"
+                },
+                "sem_ver": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "stage": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
         "handlers.CreateSignalDefHandler.createSignalDefRequest": {
             "type": "object",
             "properties": {
@@ -447,21 +595,21 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "email": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "example@example.com"
                 },
                 "password": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "password"
                 }
             }
         },
         "handlers.CreateUserHandler.createUserResponse": {
             "type": "object",
             "properties": {
-                "created_at": {
-                    "type": "string"
-                },
                 "id": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "68fb5f5b-e3f5-4a96-8d35-cd2203a06f73"
                 }
             }
         },
@@ -480,19 +628,20 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "access_token": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxTZXJ2ZXIiLCJzdWIiOiI2OGZiNWY1Yi1lM2Y1LTRhOTYtOGQzNS1jZDIyMDNhMDZmNzMiLCJleHAiOjE3NDY3NzA2MzQsImlhdCI6MTc0Njc2NzAzNH0.3OdnUNgrvt1Zxs9AlLeaC9DVT6Xwc6uGvFQHb6nDfZs"
                 },
                 "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "2025-05-09T05:41:22.57328+01:00"
                 },
                 "refresh_token": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "fb948e0b74de1f65e801b4e70fc9c047424ab775f2b4dc5226f472f3b6460c37"
                 },
-                "updated_at": {
-                    "type": "string"
+                "user_id": {
+                    "type": "string",
+                    "example": "68fb5f5b-e3f5-4a96-8d35-cd2203a06f73"
                 }
             }
         },

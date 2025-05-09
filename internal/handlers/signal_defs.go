@@ -45,6 +45,8 @@ func NewSignalDefHandler(cfg *signals.ServiceConfig) *SignalDefHandler {
 //	@Failure	409		{object}	signals.ErrorResponse
 //	@Failure	500		{object}	signals.ErrorResponse
 //
+//	@Security	BearerAccessToken
+//
 //	@Router		/api/signal_defs [post]
 func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http.Request) {
 	type createSignalDefRequest struct {
@@ -184,8 +186,10 @@ func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http
 //
 //	@Success		204
 //	@Failure		400	{object}	signals.ErrorResponse
-//	@Failure		403	{object}	signals.ErrorResponse
+//	@Failure		401	{object}	signals.ErrorResponse
 //	@Failure		500	{object}	signals.ErrorResponse
+//
+//	@Security		BearerAccessToken
 //
 //	@Router			/api/signal_defs [put]
 func (s *SignalDefHandler) UpdateSignalDefHandler(w http.ResponseWriter, r *http.Request) {
@@ -227,7 +231,7 @@ func (s *SignalDefHandler) UpdateSignalDefHandler(w http.ResponseWriter, r *http
 		return
 	}
 	if currentSignalDef.UserID != userID {
-		helpers.RespondWithError(w, r, http.StatusForbidden, signals.ErrCodeAuthorizationFailure, "you can't update this signal definition")
+		helpers.RespondWithError(w, r, http.StatusUnauthorized, signals.ErrCodeAuthorizationFailure, "you can't update this signal definition")
 		return
 	}
 
@@ -291,6 +295,18 @@ func (s *SignalDefHandler) UpdateSignalDefHandler(w http.ResponseWriter, r *http
 	helpers.RespondWithJSON(w, http.StatusNoContent, "")
 }
 
+// GetSignalDefHandler godoc
+//
+//	@Summary	Get a signal definition
+//	@Param		id	path	string	true	"ID of the signal definition to retrieve"	example(6f4eb8dc-1411-4395-93d6-fc316b85aa74)
+//	@Tags		signal definitions
+//
+//	@Success	200	{object}	database.GetSignalDefRow
+//	@Failure	400	{object}	signals.ErrorResponse
+//	@Failure	404	{object}	signals.ErrorResponse
+//	@Failure	500	{object}	signals.ErrorResponse
+//
+//	@Router		/api/signal_defs/{id} [get]
 func (s *SignalDefHandler) GetSignalDefHandler(w http.ResponseWriter, r *http.Request) {
 	signalDefIDStr := r.PathValue("SignalDefID")
 	SignalDefID, err := uuid.Parse(signalDefIDStr)
@@ -307,6 +323,16 @@ func (s *SignalDefHandler) GetSignalDefHandler(w http.ResponseWriter, r *http.Re
 	helpers.RespondWithJSON(w, http.StatusOK, res)
 
 }
+
+// GetSignalDefsHandler godoc
+//
+//	@Summary	Get all of the signal definitions
+//	@Tags		signal definitions
+//
+//	@Success	200	{array}	database.GetSignalDefsRow
+//	@Failure	500	{object}	signals.ErrorResponse
+//
+//	@Router		/api/signal_defs [get]
 func (s *SignalDefHandler) GetSignalDefsHandler(w http.ResponseWriter, r *http.Request) {
 
 	res, err := s.cfg.DB.GetSignalDefs(r.Context())
@@ -318,9 +344,21 @@ func (s *SignalDefHandler) GetSignalDefsHandler(w http.ResponseWriter, r *http.R
 
 }
 
-// only delete by signal def id is supported currently
-// TODO - delete by slug; add controls to prevent/warn when deleting active signal defs.
+// DeleteSignalDefHandler godoc
+//
+//	@Summary	Delete signal definition
+//	@Tags		signal definitions
+//
+//	@Success	204
+//	@Failure	400	{object}	signals.ErrorResponse
+//	@Failure	401	{object}	signals.ErrorResponse
+//	@Failure	500	{object}	signals.ErrorResponse
+//
+//	@Security	BearerAccessToken
+//
+//	@Router		/api/signal_defs [put]
 func (s *SignalDefHandler) DeleteSignalDefsHandler(w http.ResponseWriter, r *http.Request) {
+	// TODO - delete by slug; add controls to prevent/warn when deleting active signal defs.
 
 	ctx := r.Context()
 
@@ -351,7 +389,7 @@ func (s *SignalDefHandler) DeleteSignalDefsHandler(w http.ResponseWriter, r *htt
 		return
 	}
 	if signalDef.UserID != userID {
-		helpers.RespondWithError(w, r, http.StatusForbidden, signals.ErrCodeAuthorizationFailure, "you can't delete this signal definition")
+		helpers.RespondWithError(w, r, http.StatusUnauthorized, signals.ErrCodeAuthorizationFailure, "you can't delete this signal definition")
 		return
 	}
 

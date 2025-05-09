@@ -23,17 +23,23 @@ func NewLoginHandler(cfg *signals.ServiceConfig) *LoginHandler {
 
 // LoginHandler godoc
 //
-//	@Summary	Login
-//	@Tags		auth
+//	@Summary		Login
+//	@Description	The response body includes an access token and a refresh_token.
+//	@Description	The access_token is valid for 1 hour.
+//	@Description
+//	@Description	Use the refresh_token with the /api/refresh endpoint to renew the access_token.
+//	@Description	The refresh_token lasts 60 days unless it is revoked earlier.
+//	@Description	To renew the refresh_token, log in again.
+//	@Tags			auth
 //
-//	@Param		request	body		handlers.LoginHandler.loginRequest	true	"user details"
+//	@Param			request	body		handlers.LoginHandler.loginRequest	true	"user details"
 //
-//	@Success	200		{object}	handlers.LoginHandler.loginResponse
-//	@Failure	400		{object}	signals.ErrorResponse
-//	@Failure	401		{object}	signals.ErrorResponse
-//	@Failure	500		{object}	signals.ErrorResponse
+//	@Success		200		{object}	handlers.LoginHandler.loginResponse
+//	@Failure		400		{object}	signals.ErrorResponse
+//	@Failure		401		{object}	signals.ErrorResponse
+//	@Failure		500		{object}	signals.ErrorResponse
 //
-//	@Router		/api/login [post]
+//	@Router			/api/login [post]
 func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	type loginRequest struct {
 		Password string `json:"password"`
@@ -41,11 +47,10 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type loginResponse struct {
-		ID           uuid.UUID `json:"id"`
-		CreatedAt    time.Time `json:"created_at"`
-		UpdatedAt    time.Time `json:"updated_at"`
-		AccessToken  string    `json:"access_token"`
-		RefreshToken string    `json:"refresh_token"`
+		UserID       uuid.UUID `json:"user_id" example:"68fb5f5b-e3f5-4a96-8d35-cd2203a06f73"`
+		CreatedAt    time.Time `json:"created_at" example:"2025-05-09T05:41:22.57328+01:00"`
+		AccessToken  string    `json:"access_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxTZXJ2ZXIiLCJzdWIiOiI2OGZiNWY1Yi1lM2Y1LTRhOTYtOGQzNS1jZDIyMDNhMDZmNzMiLCJleHAiOjE3NDY3NzA2MzQsImlhdCI6MTc0Njc2NzAzNH0.3OdnUNgrvt1Zxs9AlLeaC9DVT6Xwc6uGvFQHb6nDfZs"`
+		RefreshToken string    `json:"refresh_token" example:"fb948e0b74de1f65e801b4e70fc9c047424ab775f2b4dc5226f472f3b6460c37"`
 	}
 
 	var req loginRequest
@@ -104,9 +109,8 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res := loginResponse{
-		ID:           user.ID,
+		UserID:       user.ID,
 		CreatedAt:    user.CreatedAt,
-		UpdatedAt:    user.UpdatedAt,
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 	}

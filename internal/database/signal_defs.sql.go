@@ -126,7 +126,7 @@ func (q *Queries) GetSemVerAndSchemaForLatestSlugVersion(ctx context.Context, sl
 
 const getSignalDef = `-- name: GetSignalDef :one
 
-SELECT u.email,
+SELECT u.email user_email,
        sd.id, sd.created_at, sd.updated_at, sd.slug, sd.schema_url, sd.readme_url, sd.title, sd.detail, sd.sem_ver, sd.stage, sd.user_id
 FROM signal_defs sd
 JOIN users u ON sd.user_id = u.id
@@ -134,7 +134,7 @@ WHERE sd.id = $1
 `
 
 type GetSignalDefRow struct {
-	Email     string    `json:"email"`
+	UserEmail string    `json:"user_email"`
 	ID        uuid.UUID `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -152,7 +152,7 @@ func (q *Queries) GetSignalDef(ctx context.Context, id uuid.UUID) (GetSignalDefR
 	row := q.db.QueryRowContext(ctx, getSignalDef, id)
 	var i GetSignalDefRow
 	err := row.Scan(
-		&i.Email,
+		&i.UserEmail,
 		&i.ID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -176,7 +176,7 @@ FROM signal_defs sd
 JOIN users u ON sd.user_id = u.id
 ORDER BY u.email, 
          sd.slug,
-         sd.sem_ver ASC
+         sd.sem_ver DESC
 `
 
 type GetSignalDefsRow struct {

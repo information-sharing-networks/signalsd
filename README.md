@@ -48,7 +48,10 @@ export SIGNALS_DB_URL="postgres://user:@localhost:5432/signals_admin?sslmode=dis
 # database migrations
 the database schema is managed by [goose](https://github.com/pressly/goose)
 ```
+# drop all database objects
 goose -dir sql/schema postgres $SIGNALS_DB_URL  down-to 0
+
+# update the schema to the current version - run this after pulling code from the github repo
 goose -dir sql/schema postgres $SIGNALS_DB_URL  up
 ```
 
@@ -62,19 +65,24 @@ go build ./cmd/signalsd/
 go run cmd/signalsd/main.go
 ```
 
+# Api documentation
+http://localhost:8080/docs
+
 # Development
 database alterations are made by adding files to sql/schema
 001_foo.sql
 002_bar.sql 
 ...
 
-new sql queries are added in 
-sql/queries
+sql queries are kept in
+`sql/queries`
 
-use `sqlc generate` from the root of the project to regenerate the type safe go code after adding or altering any queries
+run `sqlc generate` from the root of the project to regenerate the type safe go code after adding or altering any queries
 
 # API docs
-generate OpenApi docs
+To generate the OpenApi docs:
 ```bash
-swag init -g cmd/signalsd/main.go # from module root
+swag init -g cmd/signalsd/main.go 
 ```
+
+

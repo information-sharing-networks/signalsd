@@ -1,6 +1,60 @@
 consumes:
 - application/json
 definitions:
+  database.GetSignalDefRow:
+    properties:
+      created_at:
+        type: string
+      detail:
+        type: string
+      id:
+        type: string
+      readme_url:
+        type: string
+      schema_url:
+        type: string
+      sem_ver:
+        type: string
+      slug:
+        type: string
+      stage:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+      user_email:
+        type: string
+      user_id:
+        type: string
+    type: object
+  database.GetSignalDefsRow:
+    properties:
+      created_at:
+        type: string
+      detail:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      readme_url:
+        type: string
+      schema_url:
+        type: string
+      sem_ver:
+        type: string
+      slug:
+        type: string
+      stage:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
   handlers.CreateSignalDefHandler.createSignalDefRequest:
     properties:
       bump_type:
@@ -50,15 +104,16 @@ definitions:
   handlers.CreateUserHandler.createUserRequest:
     properties:
       email:
+        example: example@example.com
         type: string
       password:
+        example: password
         type: string
     type: object
   handlers.CreateUserHandler.createUserResponse:
     properties:
-      created_at:
-        type: string
       id:
+        example: 68fb5f5b-e3f5-4a96-8d35-cd2203a06f73
         type: string
     type: object
   handlers.LoginHandler.loginRequest:
@@ -71,14 +126,16 @@ definitions:
   handlers.LoginHandler.loginResponse:
     properties:
       access_token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxTZXJ2ZXIiLCJzdWIiOiI2OGZiNWY1Yi1lM2Y1LTRhOTYtOGQzNS1jZDIyMDNhMDZmNzMiLCJleHAiOjE3NDY3NzA2MzQsImlhdCI6MTc0Njc2NzAzNH0.3OdnUNgrvt1Zxs9AlLeaC9DVT6Xwc6uGvFQHb6nDfZs
         type: string
       created_at:
-        type: string
-      id:
+        example: "2025-05-09T05:41:22.57328+01:00"
         type: string
       refresh_token:
+        example: fb948e0b74de1f65e801b4e70fc9c047424ab775f2b4dc5226f472f3b6460c37
         type: string
-      updated_at:
+      user_id:
+        example: 68fb5f5b-e3f5-4a96-8d35-cd2203a06f73
         type: string
     type: object
   handlers.RefreshAccessTokenHandler.refreshResponse:
@@ -173,6 +230,7 @@ info:
 paths:
   /admin/health:
     get:
+      description: check if the signals service is running
       responses:
         "200":
           description: OK
@@ -202,6 +260,13 @@ paths:
       - admin
   /api/login:
     post:
+      description: |-
+        The response body includes an access token and a refresh_token.
+        The access_token is valid for 1 hour.
+
+        Use the refresh_token with the /api/refresh endpoint to renew the access_token.
+        The refresh_token lasts 60 days unless it is revoked earlier.
+        To renew the refresh_token, log in again.
       parameters:
       - description: user details
         in: body
@@ -288,6 +353,21 @@ paths:
       tags:
       - auth
   /api/signal_defs:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/database.GetSignalDefsRow'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+      summary: Get all of the signal definitions
+      tags:
+      - signal definitions
     post:
       description: |
         The supplied title is converted into a url-friendly slug.
@@ -323,21 +403,12 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/signals.ErrorResponse'
+      security:
+      - BearerAccessToken: []
       summary: Create signal definition
       tags:
       - signal definitions
     put:
-      description: |-
-        users can update the detailed description, the stage or the link to the readme md
-
-        Note that it is not allowed to update the schema url - instead users should create a new declaration with the same title and bump the version
-      parameters:
-      - description: signal definition etails
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.UpdateSignalDefHandler.updateSignalDefRequest'
       responses:
         "204":
           description: No Content
@@ -345,25 +416,50 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/signals.ErrorResponse'
-        "403":
-          description: Forbidden
+        "401":
+          description: Unauthorized
           schema:
             $ref: '#/definitions/signals.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/signals.ErrorResponse'
-      summary: Update signal definition
+      security:
+      - BearerAccessToken: []
+      summary: Delete signal definition
+      tags:
+      - signal definitions
+  /api/signal_defs/{id}:
+    get:
+      parameters:
+      - description: ID of the signal definition to retrieve
+        example: 6f4eb8dc-1411-4395-93d6-fc316b85aa74
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/database.GetSignalDefRow'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+      summary: Get a signal definition
       tags:
       - signal definitions
   /api/users:
     post:
-      description: |-
-        The response body includes an access token and a refresh_token.
-        The access_token is valid for 1 hour.
-        Use the refresh_token with the /api/refresh endpoint to renew the access_token.
-        The refresh_token lasts 60 days unless it is revoked earlier.
-        To renew the refresh_token, log in again.
       parameters:
       - description: user details
         in: body
