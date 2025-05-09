@@ -4,11 +4,14 @@ definitions:
   handlers.CreateSignalDefHandler.createSignalDefRequest:
     properties:
       bump_type:
-        description: major/minor/patch - this is used to increment semver for this
-          signal def
-        example: minor
+        description: this is used to increment semver for the signal definition
+        enum:
+        - major
+        - minor
+        - patch
         type: string
       detail:
+        description: description
         example: Sample Signal description
         type: string
       readme_url:
@@ -20,10 +23,16 @@ definitions:
         example: https://github.com/user/project/v0.0.1/locales/filename.json
         type: string
       stage:
-        description: dev/test/live/deprecated/closed/shuttered
-        example: dev
+        enum:
+        - dev
+        - test
+        - live
+        - deprecated
+        - closed
+        - shuttered
         type: string
       title:
+        description: unique title
         example: Sample Signal
         type: string
     type: object
@@ -80,15 +89,22 @@ definitions:
   handlers.UpdateSignalDefHandler.updateSignalDefRequest:
     properties:
       detail:
+        description: updated description
         example: updated description
         type: string
       readme_url:
-        description: Note file must be on a public github repo
-        example: https://github.com/user/project/v0.0.1/locales/filename.md
+        description: Updated readem file. Note file must be on a public github repo
+        example: https://github.com/user/project/v0.0.1/locales/new_t pfilename.md
         type: string
       stage:
-        description: dev/test/live/deprecated/closed/shuttered
-        example: test
+        description: updated stage
+        enum:
+        - dev
+        - test
+        - live
+        - deprecated
+        - closed
+        - shuttered
         type: string
     type: object
   handlers.UpdateUserHandler.updateUserRequest:
@@ -155,6 +171,35 @@ info:
   title: Signals
   version: v0.0.1
 paths:
+  /admin/health:
+    get:
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+      summary: Health
+      tags:
+      - admin
+  /admin/reset:
+    post:
+      description: |-
+        Delete all registered users and associated data.
+        This endpoint only works on environments configured as 'dev'
+      responses:
+        "200":
+          description: OK
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+      summary: reset
+      tags:
+      - admin
   /api/login:
     post:
       parameters:

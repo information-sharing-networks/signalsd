@@ -33,11 +33,9 @@ func RegisterRoutes(r *chi.Mux, cfg *signals.ServiceConfig) {
 	r.Delete("/api/signal_defs/{SignalDefID}", signalDefsHandler.DeleteSignalDefsHandler)
 	r.Put("/api/signal_defs/{SignalDefID}", signalDefsHandler.UpdateSignalDefHandler)
 
-	// Health
-	r.Get("/api/health", adminHandler.ReadinessHandler) // health check
-
 	// Admin endpoints
-	r.Post("/admin/reset", adminHandler.ResetHandler) // delete all users and content (dev only)
+	r.Post("/admin/reset", adminHandler.ResetHandler)     // delete all users and content (dev only)
+	r.Get("/admin/health", adminHandler.ReadinessHandler) // health check
 
 	// API doco
 	r.Get("/swagger.json", func(w http.ResponseWriter, r *http.Request) {

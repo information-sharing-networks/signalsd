@@ -21,6 +21,48 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/admin/health": {
+            "get": {
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Health",
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "404": {
+                        "description": "Not Found"
+                    }
+                }
+            }
+        },
+        "/admin/reset": {
+            "post": {
+                "description": "Delete all registered users and associated data.\nThis endpoint only works on environments configured as 'dev'",
+                "tags": [
+                    "admin"
+                ],
+                "summary": "reset",
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/login": {
             "post": {
                 "tags": [
@@ -343,11 +385,16 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "bump_type": {
-                    "description": "major/minor/patch - this is used to increment semver for this signal def",
+                    "description": "this is used to increment semver for the signal definition",
                     "type": "string",
-                    "example": "minor"
+                    "enum": [
+                        "major",
+                        "minor",
+                        "patch"
+                    ]
                 },
                 "detail": {
+                    "description": "description",
                     "type": "string",
                     "example": "Sample Signal description"
                 },
@@ -362,11 +409,18 @@ const docTemplate = `{
                     "example": "https://github.com/user/project/v0.0.1/locales/filename.json"
                 },
                 "stage": {
-                    "description": "dev/test/live/deprecated/closed/shuttered",
                     "type": "string",
-                    "example": "dev"
+                    "enum": [
+                        "dev",
+                        "test",
+                        "live",
+                        "deprecated",
+                        "closed",
+                        "shuttered"
+                    ]
                 },
                 "title": {
+                    "description": "unique title",
                     "type": "string",
                     "example": "Sample Signal"
                 }
@@ -454,18 +508,26 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "detail": {
+                    "description": "updated description",
                     "type": "string",
                     "example": "updated description"
                 },
                 "readme_url": {
-                    "description": "Note file must be on a public github repo",
+                    "description": "Updated readem file. Note file must be on a public github repo",
                     "type": "string",
-                    "example": "https://github.com/user/project/v0.0.1/locales/filename.md"
+                    "example": "https://github.com/user/project/v0.0.1/locales/new_t pfilename.md"
                 },
                 "stage": {
-                    "description": "dev/test/live/deprecated/closed/shuttered",
+                    "description": "updated stage",
                     "type": "string",
-                    "example": "test"
+                    "enum": [
+                        "dev",
+                        "test",
+                        "live",
+                        "deprecated",
+                        "closed",
+                        "shuttered"
+                    ]
                 }
             }
         },

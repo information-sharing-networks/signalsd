@@ -18,9 +18,9 @@ go install github.com/swaggo/swag/cmd/swag@latest #generates OpenApi specs from 
 set the following env variables
 ``` bash
 # sample Signals service config
-export SIGNALS_DB_URL="postgres://nick:@localhost:5432/signals_admin?sslmode=disable"
+export SIGNALS_DB_URL="postgres://username:@localhost:5432/signals_admin?sslmode=disable"
 export SIGNALS_ENVIRONMENT=dev
-export SIGNALS_SECRET_KEY="CiymRYs6eAUEe1ktXhIdjO46e75Yvbjwx+sbYBvMOAITHJKJsMG2CMlM/xWO3ISn9FLsSi4w1lUpx2mv3I5HRQ=="
+export SIGNALS_SECRET_KEY="" # add your secret key here
 export SIGNALS_PORT=8080
 export SIGNALS_LOG_LEVEL=debug
 ```

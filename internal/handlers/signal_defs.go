@@ -50,10 +50,10 @@ func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http
 	type createSignalDefRequest struct {
 		SchemaURL string `json:"schema_url" example:"https://github.com/user/project/v0.0.1/locales/filename.json"` // Note file must be on a public github repo
 		ReadmeURL string `json:"readme_url" example:"https://github.com/user/project/v0.0.1/locales/filename.md"`   // Note file must be on a public github repo
-		Title     string `json:"title" example:"Sample Signal"`
-		Detail    string `json:"detail" example:"Sample Signal description"`
-		BumpType  string `json:"bump_type" example:"minor"` // major/minor/patch - this is used to increment semver for this signal def
-		Stage     string `json:"stage" example:"dev"`       // dev/test/live/deprecated/closed/shuttered
+		Title     string `json:"title" example:"Sample Signal"`                                                     // unique title
+		Detail    string `json:"detail" example:"Sample Signal description"`                                        // description
+		BumpType  string `json:"bump_type" enums:"major,minor,patch"`                                               // this is used to increment semver for the signal definition
+		Stage     string `json:"stage" enums:"dev,test,live,deprecated,closed,shuttered"`
 	}
 
 	type createSignalDefResponse struct {
@@ -190,9 +190,9 @@ func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http
 //	@Router			/api/signal_defs [put]
 func (s *SignalDefHandler) UpdateSignalDefHandler(w http.ResponseWriter, r *http.Request) {
 	type updateSignalDefRequest struct {
-		ReadmeURL string `json:"readme_url" example:"https://github.com/user/project/v0.0.1/locales/new_filename.md"` // Note file must be on a public github repo
-		Detail    string `json:"detail" example:"updated description"`
-		Stage     string `json:"stage" example:"test"` // dev/test/live/deprecated/closed/shuttered
+		ReadmeURL string `json:"readme_url" example:"https://github.com/user/project/v0.0.1/locales/new_t pfilename.md"` // Updated readem file. Note file must be on a public github repo
+		Detail    string `json:"detail" example:"updated description"`                                                   // updated description
+		Stage     string `json:"stage" enums:"dev,test,live,deprecated,closed,shuttered"`                                // updated stage
 	}
 
 	var req = updateSignalDefRequest{}
