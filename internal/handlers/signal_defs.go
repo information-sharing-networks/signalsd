@@ -12,6 +12,7 @@ import (
 	"github.com/nickabs/signals"
 	"github.com/nickabs/signals/internal/database"
 	"github.com/nickabs/signals/internal/helpers"
+	"github.com/rs/zerolog/log"
 )
 
 type SignalDefHandler struct {
@@ -22,47 +23,47 @@ func NewSignalDefHandler(cfg *signals.ServiceConfig) *SignalDefHandler {
 	return &SignalDefHandler{cfg: cfg}
 }
 
-// CreateSignalDefHandler godoc
+// §CreateSignalDefHandler godoc
 //
-//	@Summary		Create signal definition
-//	@Description	The supplied title is converted into a url-friendly slug.
-//	@Description
-//	@Description	Slugs represent a group of versioned signal definitions.
-//	@Description
-//	@Description	Slugs are owned by the originating user and can't be reused by other users.
-//	@Description
-//	@Description	Slugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new def and specify the bump type (major/minor/patch) to increment the semver
-//	@Description
-//	@Description	Slugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new def and specify the bump type (major/minor/patch) to increment the semver
-//	@Description
+// @Summary		Create signal definition
+// @Description A signal definition describes a data set that is sharable over the signals ISN
+// @Description
+// @Description A URL-friendly slug is created based on the title supplied when you load the first version of a definition.
+// @Description The title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.
+// @Description
+// @Description Slugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new definition and specify the bump type (major/minor/patch) to increment the semver
+// @Description
+// @Description The standard way to refer to a signal definition is using a url like this http://{hostname}/signal_defs/{slug}/v{sem_ver}
+// @Description
+// @Description The definitions are also available at http://{hostname}/{signal_id}
 //
-//	@Tags		signal definitions
+// @Tags		signal definitions
 //
-//	@Param		request	body		handlers.CreateSignalDefHandler.createSignalDefRequest	true	"signal definition etails"
+// @Param		request	body		handlers.CreateSignalDefHandler.createSignalDefRequest	true	"signal definition etails"
 //
-//	@Success	201		{object}	handlers.CreateSignalDefHandler.createSignalDefResponse
-//	@Failure	400		{object}	signals.ErrorResponse
-//	@Failure	409		{object}	signals.ErrorResponse
-//	@Failure	500		{object}	signals.ErrorResponse
+// @Success	201		{object}	handlers.CreateSignalDefHandler.createSignalDefResponse
+// @Failure	400		{object}	signals.ErrorResponse
+// @Failure	409		{object}	signals.ErrorResponse
+// @Failure	500		{object}	signals.ErrorResponse
 //
-//	@Security	BearerAccessToken
+// @Security	BearerAccessToken
 //
-//	@Router		/api/signal_defs [post]
+// @Router		/api/signal_defs [post]
 func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http.Request) {
 	type createSignalDefRequest struct {
 		SchemaURL string `json:"schema_url" example:"https://github.com/user/project/v0.0.1/locales/filename.json"` // Note file must be on a public github repo
 		ReadmeURL string `json:"readme_url" example:"https://github.com/user/project/v0.0.1/locales/filename.md"`   // Note file must be on a public github repo
-		Title     string `json:"title" example:"Sample Signal"`                                                     // unique title
+		Title     string `json:"title" example:"Sample Signal (example.org)"`                                       // unique title
 		Detail    string `json:"detail" example:"Sample Signal description"`                                        // description
-		BumpType  string `json:"bump_type" enums:"major,minor,patch"`                                               // this is used to increment semver for the signal definition
-		Stage     string `json:"stage" enums:"dev,test,live,deprecated,closed,shuttered"`
+		BumpType  string `json:"bump_type" example:"patch" enums:"major,minor,patch"`                               // this is used to increment semver for the signal definition
+		Stage     string `json:"stage" example:"dev" enums:"dev,test,live,deprecated,closed,shuttered"`
 	}
 
 	type createSignalDefResponse struct {
-		ID        uuid.UUID `json:"id"`
-		CreatedAt time.Time `json:"created_at"`
-		Slug      string    `json:"slug"`
-		SemVer    string    `json:"sem_ver"`
+		ID        uuid.UUID `json:"id" example:"8e4bf0e9-b962-4707-9639-ef314dcf6fed"`
+		CreatedAt time.Time `json:"created_at" example:"2025-05-09T13:25:44.126721+01:00"`
+		Slug      string    `json:"slug" example:"sample-signal--example-org"`
+		SemVer    string    `json:"sem_ver" example:"0.0.1"`
 	}
 	//var res createSignalDefResponse
 	var req createSignalDefRequest
@@ -221,7 +222,7 @@ func (s *SignalDefHandler) UpdateSignalDefHandler(w http.ResponseWriter, r *http
 		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeInvalidRequest, fmt.Sprintf("Invalid signal definition ID: %v", err))
 		return
 	}
-	currentSignalDef, err := s.cfg.DB.GetSignalDef(r.Context(), signalDefID)
+	currentSignalDef, err := s.cfg.DB.GetSignalDefByID(r.Context(), signalDefID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeResourceNotFound, "Signal def not found")
@@ -295,29 +296,60 @@ func (s *SignalDefHandler) UpdateSignalDefHandler(w http.ResponseWriter, r *http
 	helpers.RespondWithJSON(w, http.StatusNoContent, "")
 }
 
-// GetSignalDefHandler godoc
+// GetSignalDefByIDHandler godoc
 //
-//	@Summary	Get a signal definition
+//	@Summary	Get a signal definition by id
 //	@Param		id	path	string	true	"ID of the signal definition to retrieve"	example(6f4eb8dc-1411-4395-93d6-fc316b85aa74)
 //	@Tags		signal definitions
 //
-//	@Success	200	{object}	database.GetSignalDefRow
+//	@Success	200	{object}	database.GetSignalDefByIDRow
 //	@Failure	400	{object}	signals.ErrorResponse
 //	@Failure	404	{object}	signals.ErrorResponse
 //	@Failure	500	{object}	signals.ErrorResponse
 //
 //	@Router		/api/signal_defs/{id} [get]
-func (s *SignalDefHandler) GetSignalDefHandler(w http.ResponseWriter, r *http.Request) {
-	signalDefIDStr := r.PathValue("SignalDefID")
+func (s *SignalDefHandler) GetSignalDefByIDHandler(w http.ResponseWriter, r *http.Request) {
+	signalDefIDStr := r.PathValue("id")
 	SignalDefID, err := uuid.Parse(signalDefIDStr)
 	if err != nil {
 		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeInvalidRequest, fmt.Sprintf("Invalid signal definition ID: %v", err))
 		return
 	}
 
-	res, err := s.cfg.DB.GetSignalDef(r.Context(), SignalDefID)
+	res, err := s.cfg.DB.GetSignalDefByID(r.Context(), SignalDefID)
 	if err != nil {
 		helpers.RespondWithError(w, r, http.StatusNotFound, signals.ErrCodeDatabaseError, fmt.Sprintf("Could not get signal definition for the supplied id: %v", err))
+		return
+	}
+	helpers.RespondWithJSON(w, http.StatusOK, res)
+
+}
+
+// GetSignalDefBySlugHandler godoc
+//
+//	@Summary	Get a signal definition by slug
+//	@Param		slug	path	string	true	"signal definiton slug"	 example(sample-signal---example-org)
+//	@Param		sem_ver	path	string	true	"version to be recieved"	 example(0.0.1)
+//	@Tags		signal definitions
+//
+//	@Success	200	{object}	database.GetSignalDefBySlugRow
+//	@Failure	400	{object}	signals.ErrorResponse
+//	@Failure	404	{object}	signals.ErrorResponse
+//	@Failure	500	{object}	signals.ErrorResponse
+//
+//	@Router		/api/signal_defs/{slug}/v{sem_ver} [get]
+func (s *SignalDefHandler) GetSignalDefBySlugHandler(w http.ResponseWriter, r *http.Request) {
+	slug := r.PathValue("slug")
+	semVer := r.PathValue("sem_ver")
+
+	log.Debug().Msgf("signalDefSlug %s signalDefSemVer %s", slug, semVer)
+
+	res, err := s.cfg.DB.GetSignalDefBySlug(r.Context(), database.GetSignalDefBySlugParams{
+		Slug:   slug,
+		SemVer: semVer,
+	})
+	if err != nil {
+		helpers.RespondWithError(w, r, http.StatusNotFound, signals.ErrCodeDatabaseError, fmt.Sprintf("Could not get signal definition for the supplied slug and version: %s/v%s :%v", slug, semVer, err))
 		return
 	}
 	helpers.RespondWithJSON(w, http.StatusOK, res)
@@ -379,7 +411,7 @@ func (s *SignalDefHandler) DeleteSignalDefsHandler(w http.ResponseWriter, r *htt
 		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeInvalidRequest, fmt.Sprintf("Invalid signal definition ID: %v", err))
 		return
 	}
-	signalDef, err := s.cfg.DB.GetSignalDef(r.Context(), signalDefID)
+	signalDef, err := s.cfg.DB.GetSignalDefByID(r.Context(), signalDefID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeResourceNotFound, "Signal def not found")

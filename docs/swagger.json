@@ -250,7 +250,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "The supplied title is converted into a url-friendly slug.\n\nSlugs represent a group of versioned signal definitions.\n\nSlugs are owned by the originating user and can't be reused by other users.\n\nSlugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new def and specify the bump type (major/minor/patch) to increment the semver\n\nSlugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new def and specify the bump type (major/minor/patch) to increment the semver\n",
+                "description": "A signal definition describes a data set that is sharable over the signals ISN\n\nA URL-friendly slug is created based on the title supplied when you load the first version of a definition.\nThe title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.\n\nSlugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new definition and specify the bump type (major/minor/patch) to increment the semver\n\nThe standard way to refer to a signal definition is using a url like this http://{hostname}/signal_defs/{slug}/v{sem_ver}\n\nThe definitions are also available at http://{hostname}/{signal_id}",
                 "tags": [
                     "signal definitions"
                 ],
@@ -299,7 +299,7 @@
                 "tags": [
                     "signal definitions"
                 ],
-                "summary": "Get a signal definition",
+                "summary": "Get a signal definition by id",
                 "parameters": [
                     {
                         "type": "string",
@@ -314,7 +314,59 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/database.GetSignalDefRow"
+                            "$ref": "#/definitions/database.GetSignalDefByIDRow"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/signal_defs/{slug}/v{sem_ver}": {
+            "get": {
+                "tags": [
+                    "signal definitions"
+                ],
+                "summary": "Get a signal definition by slug",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-signal---example-org",
+                        "description": "signal definiton slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "0.0.1",
+                        "description": "version to be recieved",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/database.GetSignalDefBySlugRow"
                         }
                     },
                     "400": {
@@ -440,7 +492,48 @@
         }
     },
     "definitions": {
-        "database.GetSignalDefRow": {
+        "database.GetSignalDefByIDRow": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "detail": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "readme_url": {
+                    "type": "string"
+                },
+                "schema_url": {
+                    "type": "string"
+                },
+                "sem_ver": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "stage": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_email": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "database.GetSignalDefBySlugRow": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -532,7 +625,8 @@
                         "major",
                         "minor",
                         "patch"
-                    ]
+                    ],
+                    "example": "patch"
                 },
                 "detail": {
                     "description": "description",
@@ -558,12 +652,13 @@
                         "deprecated",
                         "closed",
                         "shuttered"
-                    ]
+                    ],
+                    "example": "dev"
                 },
                 "title": {
                     "description": "unique title",
                     "type": "string",
-                    "example": "Sample Signal"
+                    "example": "Sample Signal (example.org)"
                 }
             }
         },
@@ -571,16 +666,20 @@
             "type": "object",
             "properties": {
                 "created_at": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "2025-05-09T13:25:44.126721+01:00"
                 },
                 "id": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "8e4bf0e9-b962-4707-9639-ef314dcf6fed"
                 },
                 "sem_ver": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "0.0.1"
                 },
                 "slug": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "sample-signal--example-org"
                 }
             }
         },

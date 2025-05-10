@@ -29,8 +29,9 @@ func RegisterRoutes(r *chi.Mux, cfg *signals.ServiceConfig) {
 	// signal defs
 	r.Post("/api/signal_defs", signalDefsHandler.CreateSignalDefHandler)
 	r.Get("/api/signal_defs", signalDefsHandler.GetSignalDefsHandler)
-	r.Get("/api/signal_defs/{SignalDefID}", signalDefsHandler.GetSignalDefHandler)
-	r.Delete("/api/signal_defs/{SignalDefID}", signalDefsHandler.DeleteSignalDefsHandler)
+	r.Get("/api/signal_defs/{id}", signalDefsHandler.GetSignalDefByIDHandler)
+	r.Get("/api/signal_defs/{slug}/v{sem_ver}", signalDefsHandler.GetSignalDefBySlugHandler)
+	r.Delete("/api/signal_defs/{SignalDefID}", signalDefsHandler.DeleteSignalDefsHandler) //todo
 	r.Put("/api/signal_defs/{SignalDefID}", signalDefsHandler.UpdateSignalDefHandler)
 
 	// Admin endpoints

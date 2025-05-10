@@ -1,7 +1,34 @@
 consumes:
 - application/json
 definitions:
-  database.GetSignalDefRow:
+  database.GetSignalDefByIDRow:
+    properties:
+      created_at:
+        type: string
+      detail:
+        type: string
+      id:
+        type: string
+      readme_url:
+        type: string
+      schema_url:
+        type: string
+      sem_ver:
+        type: string
+      slug:
+        type: string
+      stage:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+      user_email:
+        type: string
+      user_id:
+        type: string
+    type: object
+  database.GetSignalDefBySlugRow:
     properties:
       created_at:
         type: string
@@ -63,6 +90,7 @@ definitions:
         - major
         - minor
         - patch
+        example: patch
         type: string
       detail:
         description: description
@@ -84,21 +112,26 @@ definitions:
         - deprecated
         - closed
         - shuttered
+        example: dev
         type: string
       title:
         description: unique title
-        example: Sample Signal
+        example: Sample Signal (example.org)
         type: string
     type: object
   handlers.CreateSignalDefHandler.createSignalDefResponse:
     properties:
       created_at:
+        example: "2025-05-09T13:25:44.126721+01:00"
         type: string
       id:
+        example: 8e4bf0e9-b962-4707-9639-ef314dcf6fed
         type: string
       sem_ver:
+        example: 0.0.1
         type: string
       slug:
+        example: sample-signal--example-org
         type: string
     type: object
   handlers.CreateUserHandler.createUserRequest:
@@ -369,16 +402,17 @@ paths:
       tags:
       - signal definitions
     post:
-      description: |
-        The supplied title is converted into a url-friendly slug.
+      description: |-
+        A signal definition describes a data set that is sharable over the signals ISN
 
-        Slugs represent a group of versioned signal definitions.
+        A URL-friendly slug is created based on the title supplied when you load the first version of a definition.
+        The title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.
 
-        Slugs are owned by the originating user and can't be reused by other users.
+        Slugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new definition and specify the bump type (major/minor/patch) to increment the semver
 
-        Slugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new def and specify the bump type (major/minor/patch) to increment the semver
+        The standard way to refer to a signal definition is using a url like this http://{hostname}/signal_defs/{slug}/v{sem_ver}
 
-        Slugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new def and specify the bump type (major/minor/patch) to increment the semver
+        The definitions are also available at http://{hostname}/{signal_id}
       parameters:
       - description: signal definition etails
         in: body
@@ -442,7 +476,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/database.GetSignalDefRow'
+            $ref: '#/definitions/database.GetSignalDefByIDRow'
         "400":
           description: Bad Request
           schema:
@@ -455,7 +489,42 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/signals.ErrorResponse'
-      summary: Get a signal definition
+      summary: Get a signal definition by id
+      tags:
+      - signal definitions
+  /api/signal_defs/{slug}/v{sem_ver}:
+    get:
+      parameters:
+      - description: signal definiton slug
+        example: sample-signal---example-org
+        in: path
+        name: slug
+        required: true
+        type: string
+      - description: version to be recieved
+        example: 0.0.1
+        in: path
+        name: sem_ver
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/database.GetSignalDefBySlugRow'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+      summary: Get a signal definition by slug
       tags:
       - signal definitions
   /api/users:

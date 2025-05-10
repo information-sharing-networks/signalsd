@@ -124,7 +124,7 @@ func (q *Queries) GetSemVerAndSchemaForLatestSlugVersion(ctx context.Context, sl
 	return i, err
 }
 
-const getSignalDef = `-- name: GetSignalDef :one
+const getSignalDefByID = `-- name: GetSignalDefByID :one
 
 SELECT u.email user_email,
        sd.id, sd.created_at, sd.updated_at, sd.slug, sd.schema_url, sd.readme_url, sd.title, sd.detail, sd.sem_ver, sd.stage, sd.user_id
@@ -133,7 +133,7 @@ JOIN users u ON sd.user_id = u.id
 WHERE sd.id = $1
 `
 
-type GetSignalDefRow struct {
+type GetSignalDefByIDRow struct {
 	UserEmail string    `json:"user_email"`
 	ID        uuid.UUID `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
@@ -148,9 +148,59 @@ type GetSignalDefRow struct {
 	UserID    uuid.UUID `json:"user_id"`
 }
 
-func (q *Queries) GetSignalDef(ctx context.Context, id uuid.UUID) (GetSignalDefRow, error) {
-	row := q.db.QueryRowContext(ctx, getSignalDef, id)
-	var i GetSignalDefRow
+func (q *Queries) GetSignalDefByID(ctx context.Context, id uuid.UUID) (GetSignalDefByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getSignalDefByID, id)
+	var i GetSignalDefByIDRow
+	err := row.Scan(
+		&i.UserEmail,
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Slug,
+		&i.SchemaURL,
+		&i.ReadmeURL,
+		&i.Title,
+		&i.Detail,
+		&i.SemVer,
+		&i.Stage,
+		&i.UserID,
+	)
+	return i, err
+}
+
+const getSignalDefBySlug = `-- name: GetSignalDefBySlug :one
+
+SELECT u.email user_email,
+       sd.id, sd.created_at, sd.updated_at, sd.slug, sd.schema_url, sd.readme_url, sd.title, sd.detail, sd.sem_ver, sd.stage, sd.user_id
+FROM signal_defs sd
+JOIN users u ON sd.user_id = u.id
+WHERE sd.slug = $1
+AND sd.sem_ver = $2
+`
+
+type GetSignalDefBySlugParams struct {
+	Slug   string `json:"slug"`
+	SemVer string `json:"sem_ver"`
+}
+
+type GetSignalDefBySlugRow struct {
+	UserEmail string    `json:"user_email"`
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Slug      string    `json:"slug"`
+	SchemaURL string    `json:"schema_url"`
+	ReadmeURL string    `json:"readme_url"`
+	Title     string    `json:"title"`
+	Detail    string    `json:"detail"`
+	SemVer    string    `json:"sem_ver"`
+	Stage     string    `json:"stage"`
+	UserID    uuid.UUID `json:"user_id"`
+}
+
+func (q *Queries) GetSignalDefBySlug(ctx context.Context, arg GetSignalDefBySlugParams) (GetSignalDefBySlugRow, error) {
+	row := q.db.QueryRowContext(ctx, getSignalDefBySlug, arg.Slug, arg.SemVer)
+	var i GetSignalDefBySlugRow
 	err := row.Scan(
 		&i.UserEmail,
 		&i.ID,

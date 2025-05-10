@@ -19,13 +19,23 @@ ORDER BY u.email,
          sd.slug,
          sd.sem_ver DESC;
 
--- name: GetSignalDef :one
+-- name: GetSignalDefByID :one
 
 SELECT u.email user_email,
        sd.*
 FROM signal_defs sd
 JOIN users u ON sd.user_id = u.id
 WHERE sd.id = $1;
+
+
+-- name: GetSignalDefBySlug :one
+
+SELECT u.email user_email,
+       sd.*
+FROM signal_defs sd
+JOIN users u ON sd.user_id = u.id
+WHERE sd.slug = $1
+AND sd.sem_ver = $2;
 
 -- name: DeleteSignalDef :execrows
 
