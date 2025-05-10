@@ -7,6 +7,7 @@ package database
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -46,6 +47,88 @@ func (q *Queries) ExistsUserWithEmail(ctx context.Context, email string) (bool, 
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
+}
+
+const getAPIUserByID = `-- name: GetAPIUserByID :one
+SELECT  u.id, u.email, u.created_at  FROM users u WHERE u.id = $1
+`
+
+type GetAPIUserByIDRow struct {
+	ID        uuid.UUID `json:"id"`
+	Email     string    `json:"email"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func (q *Queries) GetAPIUserByID(ctx context.Context, id uuid.UUID) (GetAPIUserByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getAPIUserByID, id)
+	var i GetAPIUserByIDRow
+	err := row.Scan(&i.ID, &i.Email, &i.CreatedAt)
+	return i, err
+}
+
+const getAPIUserBySignalDefID = `-- name: GetAPIUserBySignalDefID :one
+SELECT u.id, u.email, u.created_at , u.updated_at 
+FROM users u 
+JOIN signal_defs sd ON u.id = sd.user_id 
+WHERE sd.id = $1
+`
+
+type GetAPIUserBySignalDefIDRow struct {
+	ID        uuid.UUID `json:"id"`
+	Email     string    `json:"email"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+func (q *Queries) GetAPIUserBySignalDefID(ctx context.Context, id uuid.UUID) (GetAPIUserBySignalDefIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getAPIUserBySignalDefID, id)
+	var i GetAPIUserBySignalDefIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getAPIUsers = `-- name: GetAPIUsers :many
+SELECT u.id, u.email, u.created_at , u.updated_at FROM users u
+`
+
+type GetAPIUsersRow struct {
+	ID        uuid.UUID `json:"id"`
+	Email     string    `json:"email"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+func (q *Queries) GetAPIUsers(ctx context.Context) ([]GetAPIUsersRow, error) {
+	rows, err := q.db.QueryContext(ctx, getAPIUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetAPIUsersRow
+	for rows.Next() {
+		var i GetAPIUsersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Email,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one

@@ -3,7 +3,7 @@
 go 1.24 or above
 PostgresSql@17 or above
 
-# go development dependenicies:
+# go development dependencies:
  [goose](https://github.com/pressly/goose)
  [sqlc](https://github/sqlc-dev/sqlc)
  [swaggo](https://github.com/swaggo/swag)
@@ -85,4 +85,9 @@ To generate the OpenApi docs:
 swag init -g cmd/signalsd/main.go 
 ```
 
+# tech overview
+run the service and then see the [API docs](http://localhost:8080/docs)
+
+
+![ERD](https://github.com/user-attachments/assets/07dad361-bbd7-4502-bc6c-6bb5ec575521)
 

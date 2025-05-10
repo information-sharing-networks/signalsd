@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -41,7 +42,7 @@ func NewAuthHandler(cfg *signals.ServiceConfig) *AuthHandler {
 func (a *AuthHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.Request) {
 
 	type refreshResponse struct {
-		AccessToken string `json:"access_token" `
+		AccessToken string `json:"access_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxTZXJ2ZXIiLCJzdWIiOiI2OGZiNWY1Yi1lM2Y1LTRhOTYtOGQzNS1jZDIyMDNhMDZmNzMiLCJleHAiOjE3NDY3NzA2MzQsImlhdCI6MTc0Njc2NzAzNH0.3OdnUNgrvt1Zxs9AlLeaC9DVT6Xwc6uGvFQHb6nDfZs"`
 	}
 
 	authService := auth.NewAuthService(a.cfg)
@@ -91,34 +92,40 @@ func (a *AuthHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.R
 //
 //	@Summary		Revoke refresh token
 //	@Description	Revoke a refresh token to prevent it being used to create new access tokens.
+//	@Description
 //	@Description	Note that any unexpired access tokens issued for this user will continue to work until they expire.
 //	@Description	Users must log in again to obtain a new refresh token if the current one has been revoked.
+//	@Description
+//	@Description	Anyone in possession of a refresh token can revoke it
 //	@Tags			auth
 //
+//	@Param			request	body	handlers.RevokeRefreshTokenHandler.revokeRefreshTokenRequest	true	"refresh token to be revoked"
 //	@Success		204
 //	@Failure		400	{object}	signals.ErrorResponse
-//	@Failure		401	{object}	signals.ErrorResponse
 //	@Failure		404	{object}	signals.ErrorResponse
 //	@Failure		500	{object}	signals.ErrorResponse
 //
-//	@Security		BearerRefreshToken
-//
 //	@Router			/api/revoke [post]
 func (a *AuthHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
-	if r.ContentLength != 0 {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintln("This endpoint does not expect a request body"))
+	type revokeRefreshTokenRequest struct {
+		RefreshToken string `json:"refresh_token" example:"fb948e0b74de1f65e801b4e70fc9c047424ab775f2b4dc5226f472f3b6460c37"`
+	}
+	var req revokeRefreshTokenRequest
+
+	// todo client authorization?
+
+	defer r.Body.Close()
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, fmt.Sprintf("could not decode request body: %v", err))
+		return
+	}
+	if req.RefreshToken == "" {
+		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, "you must supply a refresh token in the body of the request")
 		return
 	}
 
-	authService := auth.NewAuthService(a.cfg)
-
-	refreshToken, err := authService.BearerTokenFromHeader(r.Header)
-	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusUnauthorized, signals.ErrCodeTokenError, fmt.Sprintf("could not revoke token: %v", err))
-		return
-	}
-
-	rowsAffected, err := a.cfg.DB.RevokeRefreshToken(r.Context(), refreshToken)
+	rowsAffected, err := a.cfg.DB.RevokeRefreshToken(r.Context(), req.RefreshToken)
 	if err != nil {
 		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeTokenError, fmt.Sprintf("error getting token from database: %v", err))
 		return
@@ -128,7 +135,7 @@ func (a *AuthHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 	if rowsAffected != 1 {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, "database error")
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
 	}
 

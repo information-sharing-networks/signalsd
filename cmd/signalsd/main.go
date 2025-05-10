@@ -38,8 +38,16 @@ import (
 //	@tag.name			auth
 //	@tag.description	User and token management endpoints
 
-// @tag.name			signal definitions
-// @tag.description	Signal defintion management endpoints
+//	@tag.name			signal definitions
+//	@tag.description	setup new signal data definitions
+//	@tag.description
+//	@tag.description	GET, POST and DELETE actions on a signal definition can be done using either a {slug}/v{sem_ver} or {id} URL.
+
+//	@tag.name	ISN config
+//	@tag.description
+//	@tag.description	Information sharing networks are used to exchange signals between participating users.
+//	@tag.escription
+
 func main() {
 	// TODO - will the signal defs ever need to be private? Current implementation assumes 'no'
 	logger.ServerLogger.Info().Msg("Starting server")

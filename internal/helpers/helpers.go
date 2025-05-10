@@ -170,3 +170,21 @@ func IncrementSemVer(bump_type string, semVer string) (string, error) {
 	}
 	return fmt.Sprintf("%d.%d.%d", major, minor, patch), nil
 }
+
+func GetScheme(r *http.Request) string {
+	if r.TLS != nil {
+		return "https"
+	}
+
+	// Check common reverse proxy headers
+	if scheme := r.Header.Get("X-Forwarded-Proto"); scheme != "" {
+		return scheme
+	}
+	return "http"
+}
+
+// check for valid origins, e.g http://localhost:8080 , https://example.com etc
+func IsValidOrigin(urlStr string) bool {
+	re := regexp.MustCompile(`^(https?):\/\/([a-zA-Z0-9_\-\.]+)(:\d+)?$`)
+	return re.MatchString(urlStr)
+}

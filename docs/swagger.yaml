@@ -1,58 +1,35 @@
 consumes:
 - application/json
 definitions:
-  database.GetSignalDefByIDRow:
+  database.GetAPIUserByIDRow:
     properties:
       created_at:
         type: string
-      detail:
+      email:
         type: string
       id:
-        type: string
-      readme_url:
-        type: string
-      schema_url:
-        type: string
-      sem_ver:
-        type: string
-      slug:
-        type: string
-      stage:
-        type: string
-      title:
-        type: string
-      updated_at:
-        type: string
-      user_email:
-        type: string
-      user_id:
         type: string
     type: object
-  database.GetSignalDefBySlugRow:
+  database.GetAPIUserBySignalDefIDRow:
     properties:
       created_at:
         type: string
-      detail:
+      email:
         type: string
       id:
         type: string
-      readme_url:
-        type: string
-      schema_url:
-        type: string
-      sem_ver:
-        type: string
-      slug:
-        type: string
-      stage:
-        type: string
-      title:
-        type: string
       updated_at:
         type: string
-      user_email:
+    type: object
+  database.GetAPIUsersRow:
+    properties:
+      created_at:
         type: string
-      user_id:
+      email:
+        type: string
+      id:
+        type: string
+      updated_at:
         type: string
     type: object
   database.GetSignalDefsRow:
@@ -65,6 +42,8 @@ definitions:
         type: string
       id:
         type: string
+      isn_id:
+        type: string
       readme_url:
         type: string
       schema_url:
@@ -82,7 +61,149 @@ definitions:
       user_id:
         type: string
     type: object
-  handlers.CreateSignalDefHandler.createSignalDefRequest:
+  handlers.CreateIsnReceiverRequest:
+    properties:
+      default_rate_limit:
+        description: maximum number of requests per minute
+        example: 600
+        type: integer
+      detail:
+        example: Sample ISN Receiver description
+        type: string
+      isn_slug:
+        example: sample-ISN--example-org
+        type: string
+      max_batch_records:
+        example: 100
+        type: integer
+      max_daily_validation_failures:
+        description: default = 0
+        example: 5
+        type: integer
+      max_payload_kilobytes:
+        example: 50
+        type: integer
+      min_batch_records:
+        example: 10
+        type: integer
+      payload_validation:
+        enum:
+        - always
+        - never
+        - optional
+        example: always
+        type: string
+      receiver_origin:
+        description: do not provide this field if the isn is using local storage
+        example: http://example.com:8080
+        type: string
+      receiver_status:
+        enum:
+        - offline
+        - ' online'
+        - ' error'
+        - ' closed'
+        example: offline
+        type: string
+      title:
+        example: Sample ISN Receiver @example.org
+        type: string
+    type: object
+  handlers.CreateIsnReceiverResponse:
+    properties:
+      id:
+        example: 4f1bc74b-cf79-410f-9c21-dc2cba047385
+        type: string
+      receiver_url:
+        example: http://localhost:8080/signals/receiver/sample-ISN-receiver--example-org
+        type: string
+      resource_url:
+        example: http://localhost:8080/api/isn/receiver/sample-ISN-receiver--example-org
+        type: string
+      slug:
+        example: sample-ISN-receiver--example-org
+        type: string
+    type: object
+  handlers.CreateIsnRequest:
+    properties:
+      detail:
+        example: Sample ISN description
+        type: string
+      is_in_use:
+        example: true
+        type: boolean
+      slug:
+        example: sample-isn--example-org
+        type: string
+      storage_type:
+        example: mq
+        type: string
+      title:
+        example: Sample ISN @example.org
+        type: string
+      visibility:
+        enum:
+        - public
+        - private
+        example: private
+        type: string
+    type: object
+  handlers.CreateIsnResponse:
+    properties:
+      id:
+        example: 67890684-3b14-42cf-b785-df28ce570400
+        type: string
+      resource_url:
+        example: http://localhost:8080/api/isn/{isn_slug}
+        type: string
+      slug:
+        example: sample-ISN--example-org
+        type: string
+    type: object
+  handlers.CreateIsnRetrieverRequest:
+    properties:
+      default_rate_limit:
+        description: maximum number of requests per minute
+        example: 600
+        type: integer
+      detail:
+        example: sample-ISN--example-org
+        type: string
+      isn_slug:
+        example: sample-ISN--example-org
+        type: string
+      retriever_origin:
+        description: do not provide this field if the isn is using local storage
+        example: http://example.com:8080
+        type: string
+      retriever_status:
+        enum:
+        - offline
+        - ' online'
+        - ' error'
+        - ' closed'
+        example: offline
+        type: string
+      title:
+        example: Sample ISN Retriever @example.org
+        type: string
+    type: object
+  handlers.CreateIsnRetrieverResponse:
+    properties:
+      id:
+        example: 4f1bc74b-cf79-410f-9c21-dc2cba047385
+        type: string
+      resource_url:
+        example: http://localhost:8080/api/isn/retriever/sample-ISN-retriever--example-org
+        type: string
+      retriever_url:
+        example: http://localhost:8080/signals/retriever/sample-ISN-retriever--example-org
+        type: string
+      slug:
+        example: sample-ISN-retriever--example-org
+        type: string
+    type: object
+  handlers.CreateSignalDefRequest:
     properties:
       bump_type:
         description: this is used to increment semver for the signal definition
@@ -95,6 +216,9 @@ definitions:
       detail:
         description: description
         example: Sample Signal description
+        type: string
+      isn_slug:
+        example: sample-ISN--example-org
         type: string
       readme_url:
         description: Note file must be on a public github repo
@@ -116,16 +240,15 @@ definitions:
         type: string
       title:
         description: unique title
-        example: Sample Signal (example.org)
+        example: Sample Signal @example.org
         type: string
     type: object
-  handlers.CreateSignalDefHandler.createSignalDefResponse:
+  handlers.CreateSignalDefResponse:
     properties:
-      created_at:
-        example: "2025-05-09T13:25:44.126721+01:00"
-        type: string
       id:
         example: 8e4bf0e9-b962-4707-9639-ef314dcf6fed
+        type: string
+      resource_url:
         type: string
       sem_ver:
         example: 0.0.1
@@ -134,29 +257,50 @@ definitions:
         example: sample-signal--example-org
         type: string
     type: object
-  handlers.CreateUserHandler.createUserRequest:
+  handlers.CreateUserResponse:
+    properties:
+      id:
+        example: 68fb5f5b-e3f5-4a96-8d35-cd2203a06f73
+        type: string
+      resource_url:
+        example: http://localhost:8080/api/users/01a38b82-cbc7-4a24-b61f-e55cb99ac41e
+        type: string
+    type: object
+  handlers.GetAPISignalDef:
+    properties:
+      created_at:
+        type: string
+      detail:
+        type: string
+      id:
+        type: string
+      readme_url:
+        type: string
+      schema_url:
+        type: string
+      sem_ver:
+        type: string
+      slug:
+        type: string
+      stage:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+      user:
+        $ref: '#/definitions/database.GetAPIUserBySignalDefIDRow'
+    type: object
+  handlers.LoginRequest:
     properties:
       email:
         example: example@example.com
         type: string
       password:
-        example: password
+        example: lkIB53@6O^Y
         type: string
     type: object
-  handlers.CreateUserHandler.createUserResponse:
-    properties:
-      id:
-        example: 68fb5f5b-e3f5-4a96-8d35-cd2203a06f73
-        type: string
-    type: object
-  handlers.LoginHandler.loginRequest:
-    properties:
-      email:
-        type: string
-      password:
-        type: string
-    type: object
-  handlers.LoginHandler.loginResponse:
+  handlers.LoginResponse:
     properties:
       access_token:
         example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxTZXJ2ZXIiLCJzdWIiOiI2OGZiNWY1Yi1lM2Y1LTRhOTYtOGQzNS1jZDIyMDNhMDZmNzMiLCJleHAiOjE3NDY3NzA2MzQsImlhdCI6MTc0Njc2NzAzNH0.3OdnUNgrvt1Zxs9AlLeaC9DVT6Xwc6uGvFQHb6nDfZs
@@ -174,9 +318,98 @@ definitions:
   handlers.RefreshAccessTokenHandler.refreshResponse:
     properties:
       access_token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxTZXJ2ZXIiLCJzdWIiOiI2OGZiNWY1Yi1lM2Y1LTRhOTYtOGQzNS1jZDIyMDNhMDZmNzMiLCJleHAiOjE3NDY3NzA2MzQsImlhdCI6MTc0Njc2NzAzNH0.3OdnUNgrvt1Zxs9AlLeaC9DVT6Xwc6uGvFQHb6nDfZs
         type: string
     type: object
-  handlers.UpdateSignalDefHandler.updateSignalDefRequest:
+  handlers.RevokeRefreshTokenHandler.revokeRefreshTokenRequest:
+    properties:
+      refresh_token:
+        example: fb948e0b74de1f65e801b4e70fc9c047424ab775f2b4dc5226f472f3b6460c37
+        type: string
+    type: object
+  handlers.UpdateIsnReceiverRequest:
+    properties:
+      default_rate_limit:
+        description: maximum number of requests per minute
+        example: 600
+        type: integer
+      detail:
+        example: Sample ISN Receiver description
+        type: string
+      max_batch_records:
+        example: 100
+        type: integer
+      max_daily_validation_failures:
+        description: default = 0
+        example: 5
+        type: integer
+      max_payload_kilobytes:
+        example: 50
+        type: integer
+      min_batch_records:
+        example: 10
+        type: integer
+      payload_validation:
+        enum:
+        - always
+        - never
+        - optional
+        example: always
+        type: string
+      receiver_origin:
+        description: do not provide this field if the isn is using local storage
+        example: http://example.com:8080
+        type: string
+      receiver_status:
+        enum:
+        - offline
+        - ' online'
+        - ' error'
+        - ' closed'
+        example: offline
+        type: string
+    type: object
+  handlers.UpdateIsnRequest:
+    properties:
+      detail:
+        example: Sample ISN description
+        type: string
+      is_in_use:
+        example: true
+        type: boolean
+      storage_type:
+        example: mq
+        type: string
+      visibility:
+        enum:
+        - public
+        - private
+        example: private
+        type: string
+    type: object
+  handlers.UpdateIsnRetrieverRequest:
+    properties:
+      default_rate_limit:
+        description: maximum number of requests per minute
+        example: 600
+        type: integer
+      detail:
+        example: sample-ISN--example-org
+        type: string
+      retriever_origin:
+        description: do not provide this field if the isn is using local storage
+        example: http://example.com:8080
+        type: string
+      retriever_status:
+        enum:
+        - offline
+        - ' online'
+        - ' error'
+        - ' closed'
+        example: offline
+        type: string
+    type: object
+  handlers.UpdateSignalDefRequest:
     properties:
       detail:
         description: updated description
@@ -197,16 +430,13 @@ definitions:
         - shuttered
         type: string
     type: object
-  handlers.UpdateUserHandler.updateUserRequest:
+  handlers.UserLoginDetails:
     properties:
       email:
+        example: example@example.com
         type: string
       password:
-        type: string
-    type: object
-  handlers.UpdateUserHandler.updateUserResponse:
-    properties:
-      email:
+        example: lkIB53@6O^Y
         type: string
     type: object
   signals.ErrorCode:
@@ -224,6 +454,7 @@ definitions:
     - refresh_token_revoked
     - resource_already_exists
     - resource_not_found
+    - signal_def_closed
     - token_error
     - user_alread_exists
     - user_not_found
@@ -242,6 +473,7 @@ definitions:
     - ErrCodeRefreshTokenRevoked
     - ErrCodeResourceAlreadyExists
     - ErrCodeResourceNotFound
+    - ErrCodeSignalDefClosed
     - ErrCodeTokenError
     - ErrCodeUserAlreadyExists
     - ErrCodeUserNotFound
@@ -291,6 +523,214 @@ paths:
       summary: reset
       tags:
       - admin
+  /api/isn/{isn_slug}:
+    post:
+      description: |-
+        The standard way to refer to an ISN config is using a url like this http://{hostname}/api/isn/{slug}
+
+        The definitions are also available at http://{hostname}/api/isn/{id}
+
+        when storage_type = "local" the signals are stored in the relational database used by the API service to store the admin configuration
+      parameters:
+      - description: ISN details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateIsnRequest'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.CreateIsnResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Create an Information Sharing Network (ISN)
+      tags:
+      - ISN config
+    put:
+      description: Update ISN details
+      parameters:
+      - description: isn slug
+        example: sample-ISN--example-org
+        in: path
+        name: isn_slug
+        required: true
+        type: string
+      - description: ISN details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateIsnRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Update an ISN
+      tags:
+      - ISN config
+  /api/isn/receiver/{isn_receivers_slug}:
+    put:
+      description: the receiver service should be hosted on {receiver_origin}/signals/receiver/{receiver_slug}
+      parameters:
+      - description: isn receiver slug
+        example: sample-ISN-receiver--example-org
+        in: path
+        name: isn_receivers_slug
+        required: true
+        type: string
+      - description: ISN receiver details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateIsnReceiverRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Update an ISN Receiver
+      tags:
+      - ISN config
+  /api/isn/receiver/{receiver_slug}:
+    post:
+      description: the receiver service should be hosted on {receiver_origin}/signals/receiver/{receiver_slug}
+      parameters:
+      - description: ISN receiver details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateIsnReceiverRequest'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.CreateIsnReceiverResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Create an ISN Receiver
+      tags:
+      - ISN config
+  /api/isn/retriever/{isn_retrievers_slug}:
+    put:
+      description: the retriever service should be hosted on {retriever_origin}/signals/retriever/{retriever_slug}
+      parameters:
+      - description: isn retriever slug
+        example: sample-ISN-retriever--example-org
+        in: path
+        name: isn_retrievers_slug
+        required: true
+        type: string
+      - description: ISN retriever details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateIsnRetrieverRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Update an ISN Retriever
+      tags:
+      - ISN config
+  /api/isn/retriever/{retriever_slug}:
+    post:
+      description: the retriever service should be hosted on {retriever_origin}/signals/retriever/{retriever_slug}
+      parameters:
+      - description: ISN retriever details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateIsnRetrieverRequest'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.CreateIsnRetrieverResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Create an ISN Retriever
+      tags:
+      - ISN config
   /api/login:
     post:
       description: |-
@@ -301,17 +741,17 @@ paths:
         The refresh_token lasts 60 days unless it is revoked earlier.
         To renew the refresh_token, log in again.
       parameters:
-      - description: user details
+      - description: email and password
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/handlers.LoginHandler.loginRequest'
+          $ref: '#/definitions/handlers.LoginRequest'
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.LoginHandler.loginResponse'
+            $ref: '#/definitions/handlers.LoginResponse'
         "400":
           description: Bad Request
           schema:
@@ -359,17 +799,23 @@ paths:
     post:
       description: |-
         Revoke a refresh token to prevent it being used to create new access tokens.
+
         Note that any unexpired access tokens issued for this user will continue to work until they expire.
         Users must log in again to obtain a new refresh token if the current one has been revoked.
+
+        Anyone in possession of a refresh token can revoke it
+      parameters:
+      - description: refresh token to be revoked
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RevokeRefreshTokenHandler.revokeRefreshTokenRequest'
       responses:
         "204":
           description: No Content
         "400":
           description: Bad Request
-          schema:
-            $ref: '#/definitions/signals.ErrorResponse'
-        "401":
-          description: Unauthorized
           schema:
             $ref: '#/definitions/signals.ErrorResponse'
         "404":
@@ -380,8 +826,6 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/signals.ErrorResponse'
-      security:
-      - BearerRefreshToken: []
       summary: Revoke refresh token
       tags:
       - auth
@@ -398,7 +842,7 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/signals.ErrorResponse'
-      summary: Get all of the signal definitions
+      summary: Get the signal definitions
       tags:
       - signal definitions
     post:
@@ -410,21 +854,21 @@ paths:
 
         Slugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new definition and specify the bump type (major/minor/patch) to increment the semver
 
-        The standard way to refer to a signal definition is using a url like this http://{hostname}/signal_defs/{slug}/v{sem_ver}
+        The standard way to refer to a signal definition is using a url like this http://{hostname}/api/signal_defs/{slug}/v{sem_ver}
 
-        The definitions are also available at http://{hostname}/{signal_id}
+        The definitions are also available at http://{hostname}/api/signal_defs/{signal_def_id}
       parameters:
-      - description: signal definition etails
+      - description: signal definition details
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/handlers.CreateSignalDefHandler.createSignalDefRequest'
+          $ref: '#/definitions/handlers.CreateSignalDefRequest'
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/handlers.CreateSignalDefHandler.createSignalDefResponse'
+            $ref: '#/definitions/handlers.CreateSignalDefResponse'
         "400":
           description: Bad Request
           schema:
@@ -442,7 +886,21 @@ paths:
       summary: Create signal definition
       tags:
       - signal definitions
-    put:
+  /api/signal_defs/{slug}/v{sem_ver}:
+    delete:
+      parameters:
+      - description: signal definiton slug
+        example: sample-signal--example-org
+        in: path
+        name: slug
+        required: true
+        type: string
+      - description: version to be recieved
+        example: 0.0.1
+        in: path
+        name: sem_ver
+        required: true
+        type: string
       responses:
         "204":
           description: No Content
@@ -463,40 +921,10 @@ paths:
       summary: Delete signal definition
       tags:
       - signal definitions
-  /api/signal_defs/{id}:
-    get:
-      parameters:
-      - description: ID of the signal definition to retrieve
-        example: 6f4eb8dc-1411-4395-93d6-fc316b85aa74
-        in: path
-        name: id
-        required: true
-        type: string
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/database.GetSignalDefByIDRow'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/signals.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/signals.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/signals.ErrorResponse'
-      summary: Get a signal definition by id
-      tags:
-      - signal definitions
-  /api/signal_defs/{slug}/v{sem_ver}:
     get:
       parameters:
       - description: signal definiton slug
-        example: sample-signal---example-org
+        example: sample-signal--example-org
         in: path
         name: slug
         required: true
@@ -511,7 +939,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/database.GetSignalDefBySlugRow'
+            $ref: '#/definitions/handlers.GetAPISignalDef'
         "400":
           description: Bad Request
           schema:
@@ -524,10 +952,69 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/signals.ErrorResponse'
-      summary: Get a signal definition by slug
+      summary: Get a signal definition
+      tags:
+      - signal definitions
+    put:
+      description: |-
+        users can update the detailed description, the stage or the link to the readme md
+
+        It is not allowed to update the schema url - instead users should create a new declaration with the same title and bump the version
+      parameters:
+      - description: signal definiton slug
+        example: sample-signal--example-org
+        in: path
+        name: slug
+        required: true
+        type: string
+      - description: version to be recieved
+        example: 0.0.1
+        in: path
+        name: sem_ver
+        required: true
+        type: string
+      - description: signal definition details to be updated
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateSignalDefRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Update signal definition
       tags:
       - signal definitions
   /api/users:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/database.GetAPIUsersRow'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+      summary: Get the registered users
+      tags:
+      - auth
     post:
       parameters:
       - description: user details
@@ -535,12 +1022,12 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/handlers.CreateUserHandler.createUserRequest'
+          $ref: '#/definitions/handlers.UserLoginDetails'
       responses:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/handlers.CreateUserHandler.createUserResponse'
+            $ref: '#/definitions/handlers.CreateUserResponse'
         "400":
           description: Bad Request
           schema:
@@ -564,12 +1051,10 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/handlers.UpdateUserHandler.updateUserRequest'
+          $ref: '#/definitions/handlers.UserLoginDetails'
       responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.UpdateUserHandler.updateUserResponse'
+        "204":
+          description: No Content
         "400":
           description: Bad Request
           schema:
@@ -591,6 +1076,29 @@ paths:
       summary: Update user
       tags:
       - auth
+  /api/users/{id}:
+    get:
+      parameters:
+      - description: user id
+        example: 68fb5f5b-e3f5-4a96-8d35-cd2203a06f73
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/database.GetAPIUserByIDRow'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+      summary: Get registered user
+      tags:
+      - auth
 produces:
 - application/json
 securityDefinitions:
@@ -608,5 +1116,9 @@ swagger: "2.0"
 tags:
 - description: User and token management endpoints
   name: auth
-- description: Signal defintion management endpoints
+- description: GET, POST and DELETE actions on a signal definition can be done using
+    either a {slug}/v{sem_ver} or {id} URL.
   name: signal definitions
+- description: Information sharing networks are used to exchange signals between participating
+    users.
+  name: ISN config

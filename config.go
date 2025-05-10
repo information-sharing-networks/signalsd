@@ -35,7 +35,13 @@ const (
 	RefreshTokenExpiry = 60 * 24 * time.Hour
 )
 
-// common maps
+// common maps - used to validate enum values
+var validEnvs = map[string]bool{
+	"dev":     true,
+	"prod":    true,
+	"test":    true,
+	"staging": true,
+}
 var ValidSignalDefStages = map[string]bool{ // stored in the signal_defs.stage column
 	"dev":        true,
 	"test":       true,
@@ -44,11 +50,26 @@ var ValidSignalDefStages = map[string]bool{ // stored in the signal_defs.stage c
 	"closed":     true,
 	"shuttered":  true,
 }
-var validEnvs = map[string]bool{
-	"dev":     true,
-	"prod":    true,
-	"test":    true,
-	"staging": true,
+var ValidPayloadValidations = map[string]bool{ //stored in the isn_receivers.payload_validation column
+	"always":   true,
+	"never":    true,
+	"optional": true,
+}
+var ValidVisibilities = map[string]bool{ //stored in the isn.visibility column
+	"public":  true,
+	"private": true,
+}
+var ValidRetrieverStatus = map[string]bool{ // ins_retriever.retriever_status
+	"offline": true,
+	"online":  true,
+	"error":   true,
+	"closed":  true,
+}
+var ValidReceiverStatus = map[string]bool{ // ins_receiver.receiver_status
+	"offline": true,
+	"online":  true,
+	"error":   true,
+	"closed":  true,
 }
 
 // Common context keys
@@ -59,6 +80,7 @@ type ContextKey struct {
 var (
 	RequestLoggerKey = ContextKey{"request-logger"}
 	UserIDKey        = ContextKey{"user-id"}
+	SignalDefIDKey   = ContextKey{"signal-def-id"}
 )
 
 // InitConfig loads environment variables, establishes database connection and returns a ServiceConfig struct

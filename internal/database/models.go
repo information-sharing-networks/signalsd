@@ -11,6 +11,52 @@ import (
 	"github.com/google/uuid"
 )
 
+type Isn struct {
+	ID          uuid.UUID `json:"id"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	UserID      uuid.UUID `json:"user_id"`
+	Title       string    `json:"title"`
+	Slug        string    `json:"slug"`
+	Detail      string    `json:"detail"`
+	IsInUse     bool      `json:"is_in_use"`
+	Visibility  string    `json:"visibility"`
+	StorageType string    `json:"storage_type"`
+}
+
+type IsnReceiver struct {
+	ID                         uuid.UUID `json:"id"`
+	CreatedAt                  time.Time `json:"created_at"`
+	UpdatedAt                  time.Time `json:"updated_at"`
+	UserID                     uuid.UUID `json:"user_id"`
+	IsnID                      uuid.UUID `json:"isn_id"`
+	Title                      string    `json:"title"`
+	Detail                     string    `json:"detail"`
+	Slug                       string    `json:"slug"`
+	ReceiverOrigin             string    `json:"receiver_origin"`
+	MinBatchRecords            int32     `json:"min_batch_records"`
+	MaxBatchRecords            int32     `json:"max_batch_records"`
+	MaxDailyValidationFailures int32     `json:"max_daily_validation_failures"`
+	MaxPayloadKilobytes        int32     `json:"max_payload_kilobytes"`
+	PayloadValidation          string    `json:"payload_validation"`
+	DefaultRateLimit           int32     `json:"default_rate_limit"`
+	ReceiverStatus             string    `json:"receiver_status"`
+}
+
+type IsnRetriever struct {
+	ID               uuid.UUID `json:"id"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
+	UserID           uuid.UUID `json:"user_id"`
+	IsnID            uuid.UUID `json:"isn_id"`
+	Title            string    `json:"title"`
+	Detail           string    `json:"detail"`
+	Slug             string    `json:"slug"`
+	RetrieverOrigin  string    `json:"retriever_origin"`
+	RetrieverStatus  string    `json:"retriever_status"`
+	DefaultRateLimit int32     `json:"default_rate_limit"`
+}
+
 type RefreshToken struct {
 	Token     string       `json:"token"`
 	UserID    uuid.UUID    `json:"user_id"`
@@ -24,6 +70,8 @@ type SignalDef struct {
 	ID        uuid.UUID `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+	UserID    uuid.UUID `json:"user_id"`
+	IsnID     uuid.UUID `json:"isn_id"`
 	Slug      string    `json:"slug"`
 	SchemaURL string    `json:"schema_url"`
 	ReadmeURL string    `json:"readme_url"`
@@ -31,7 +79,6 @@ type SignalDef struct {
 	Detail    string    `json:"detail"`
 	SemVer    string    `json:"sem_ver"`
 	Stage     string    `json:"stage"`
-	UserID    uuid.UUID `json:"user_id"`
 }
 
 type User struct {

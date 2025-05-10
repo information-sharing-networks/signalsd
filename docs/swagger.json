@@ -57,6 +57,325 @@
                 }
             }
         },
+        "/api/isn/receiver/{isn_receivers_slug}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "the receiver service should be hosted on {receiver_origin}/signals/receiver/{receiver_slug}",
+                "tags": [
+                    "ISN config"
+                ],
+                "summary": "Update an ISN Receiver",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-ISN-receiver--example-org",
+                        "description": "isn receiver slug",
+                        "name": "isn_receivers_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "ISN receiver details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdateIsnReceiverRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/isn/receiver/{receiver_slug}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "the receiver service should be hosted on {receiver_origin}/signals/receiver/{receiver_slug}",
+                "tags": [
+                    "ISN config"
+                ],
+                "summary": "Create an ISN Receiver",
+                "parameters": [
+                    {
+                        "description": "ISN receiver details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateIsnReceiverRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateIsnReceiverResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/isn/retriever/{isn_retrievers_slug}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "the retriever service should be hosted on {retriever_origin}/signals/retriever/{retriever_slug}",
+                "tags": [
+                    "ISN config"
+                ],
+                "summary": "Update an ISN Retriever",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-ISN-retriever--example-org",
+                        "description": "isn retriever slug",
+                        "name": "isn_retrievers_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "ISN retriever details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdateIsnRetrieverRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/isn/retriever/{retriever_slug}": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "the retriever service should be hosted on {retriever_origin}/signals/retriever/{retriever_slug}",
+                "tags": [
+                    "ISN config"
+                ],
+                "summary": "Create an ISN Retriever",
+                "parameters": [
+                    {
+                        "description": "ISN retriever details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateIsnRetrieverRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateIsnRetrieverResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/isn/{isn_slug}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Update ISN details",
+                "tags": [
+                    "ISN config"
+                ],
+                "summary": "Update an ISN",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-ISN--example-org",
+                        "description": "isn slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "ISN details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdateIsnRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "The standard way to refer to an ISN config is using a url like this http://{hostname}/api/isn/{slug}\n\nThe definitions are also available at http://{hostname}/api/isn/{id}\n\nwhen storage_type = \"local\" the signals are stored in the relational database used by the API service to store the admin configuration",
+                "tags": [
+                    "ISN config"
+                ],
+                "summary": "Create an Information Sharing Network (ISN)",
+                "parameters": [
+                    {
+                        "description": "ISN details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateIsnRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateIsnResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/login": {
             "post": {
                 "description": "The response body includes an access token and a refresh_token.\nThe access_token is valid for 1 hour.\n\nUse the refresh_token with the /api/refresh endpoint to renew the access_token.\nThe refresh_token lasts 60 days unless it is revoked earlier.\nTo renew the refresh_token, log in again.",
@@ -66,12 +385,12 @@
                 "summary": "Login",
                 "parameters": [
                     {
-                        "description": "user details",
+                        "description": "email and password",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.LoginHandler.loginRequest"
+                            "$ref": "#/definitions/handlers.LoginRequest"
                         }
                     }
                 ],
@@ -79,7 +398,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.LoginHandler.loginResponse"
+                            "$ref": "#/definitions/handlers.LoginResponse"
                         }
                     },
                     "400": {
@@ -145,28 +464,28 @@
         },
         "/api/revoke": {
             "post": {
-                "security": [
-                    {
-                        "BearerRefreshToken": []
-                    }
-                ],
-                "description": "Revoke a refresh token to prevent it being used to create new access tokens.\nNote that any unexpired access tokens issued for this user will continue to work until they expire.\nUsers must log in again to obtain a new refresh token if the current one has been revoked.",
+                "description": "Revoke a refresh token to prevent it being used to create new access tokens.\n\nNote that any unexpired access tokens issued for this user will continue to work until they expire.\nUsers must log in again to obtain a new refresh token if the current one has been revoked.\n\nAnyone in possession of a refresh token can revoke it",
                 "tags": [
                     "auth"
                 ],
                 "summary": "Revoke refresh token",
+                "parameters": [
+                    {
+                        "description": "refresh token to be revoked",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.RevokeRefreshTokenHandler.revokeRefreshTokenRequest"
+                        }
+                    }
+                ],
                 "responses": {
                     "204": {
                         "description": "No Content"
                     },
                     "400": {
                         "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/signals.ErrorResponse"
                         }
@@ -191,7 +510,7 @@
                 "tags": [
                     "signal definitions"
                 ],
-                "summary": "Get all of the signal definitions",
+                "summary": "Get the signal definitions",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -210,16 +529,145 @@
                     }
                 }
             },
+            "post": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "A signal definition describes a data set that is sharable over the signals ISN\n\nA URL-friendly slug is created based on the title supplied when you load the first version of a definition.\nThe title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.\n\nSlugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new definition and specify the bump type (major/minor/patch) to increment the semver\n\nThe standard way to refer to a signal definition is using a url like this http://{hostname}/api/signal_defs/{slug}/v{sem_ver}\n\nThe definitions are also available at http://{hostname}/api/signal_defs/{signal_def_id}",
+                "tags": [
+                    "signal definitions"
+                ],
+                "summary": "Create signal definition",
+                "parameters": [
+                    {
+                        "description": "signal definition details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateSignalDefRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateSignalDefResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/signal_defs/{slug}/v{sem_ver}": {
+            "get": {
+                "tags": [
+                    "signal definitions"
+                ],
+                "summary": "Get a signal definition",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-signal--example-org",
+                        "description": "signal definiton slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "0.0.1",
+                        "description": "version to be recieved",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.GetAPISignalDef"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    }
+                }
+            },
             "put": {
                 "security": [
                     {
                         "BearerAccessToken": []
                     }
                 ],
+                "description": "users can update the detailed description, the stage or the link to the readme md\n\nIt is not allowed to update the schema url - instead users should create a new declaration with the same title and bump the version",
                 "tags": [
                     "signal definitions"
                 ],
-                "summary": "Delete signal definition",
+                "summary": "Update signal definition",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-signal--example-org",
+                        "description": "signal definiton slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "0.0.1",
+                        "description": "version to be recieved",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "signal definition details to be updated",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdateSignalDefRequest"
+                        }
+                    }
+                ],
                 "responses": {
                     "204": {
                         "description": "No Content"
@@ -244,110 +692,20 @@
                     }
                 }
             },
-            "post": {
+            "delete": {
                 "security": [
                     {
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "A signal definition describes a data set that is sharable over the signals ISN\n\nA URL-friendly slug is created based on the title supplied when you load the first version of a definition.\nThe title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.\n\nSlugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new definition and specify the bump type (major/minor/patch) to increment the semver\n\nThe standard way to refer to a signal definition is using a url like this http://{hostname}/signal_defs/{slug}/v{sem_ver}\n\nThe definitions are also available at http://{hostname}/{signal_id}",
                 "tags": [
                     "signal definitions"
                 ],
-                "summary": "Create signal definition",
-                "parameters": [
-                    {
-                        "description": "signal definition etails",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateSignalDefHandler.createSignalDefRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateSignalDefHandler.createSignalDefResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/signal_defs/{id}": {
-            "get": {
-                "tags": [
-                    "signal definitions"
-                ],
-                "summary": "Get a signal definition by id",
+                "summary": "Delete signal definition",
                 "parameters": [
                     {
                         "type": "string",
-                        "example": "6f4eb8dc-1411-4395-93d6-fc316b85aa74",
-                        "description": "ID of the signal definition to retrieve",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/database.GetSignalDefByIDRow"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/signal_defs/{slug}/v{sem_ver}": {
-            "get": {
-                "tags": [
-                    "signal definitions"
-                ],
-                "summary": "Get a signal definition by slug",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "sample-signal---example-org",
+                        "example": "sample-signal--example-org",
                         "description": "signal definiton slug",
                         "name": "slug",
                         "in": "path",
@@ -363,11 +721,8 @@
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/database.GetSignalDefBySlugRow"
-                        }
+                    "204": {
+                        "description": "No Content"
                     },
                     "400": {
                         "description": "Bad Request",
@@ -375,8 +730,8 @@
                             "$ref": "#/definitions/signals.ErrorResponse"
                         }
                     },
-                    "404": {
-                        "description": "Not Found",
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/signals.ErrorResponse"
                         }
@@ -391,6 +746,29 @@
             }
         },
         "/api/users": {
+            "get": {
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Get the registered users",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/database.GetAPIUsersRow"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    }
+                }
+            },
             "put": {
                 "security": [
                     {
@@ -409,16 +787,13 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.UpdateUserHandler.updateUserRequest"
+                            "$ref": "#/definitions/handlers.UserLoginDetails"
                         }
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.UpdateUserHandler.updateUserResponse"
-                        }
+                    "204": {
+                        "description": "No Content"
                     },
                     "400": {
                         "description": "Bad Request",
@@ -458,7 +833,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.CreateUserHandler.createUserRequest"
+                            "$ref": "#/definitions/handlers.UserLoginDetails"
                         }
                     }
                 ],
@@ -466,7 +841,7 @@
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/handlers.CreateUserHandler.createUserResponse"
+                            "$ref": "#/definitions/handlers.CreateUserResponse"
                         }
                     },
                     "400": {
@@ -489,87 +864,88 @@
                     }
                 }
             }
+        },
+        "/api/users/{id}": {
+            "get": {
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Get registered user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "68fb5f5b-e3f5-4a96-8d35-cd2203a06f73",
+                        "description": "user id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/database.GetAPIUserByIDRow"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
-        "database.GetSignalDefByIDRow": {
+        "database.GetAPIUserByIDRow": {
             "type": "object",
             "properties": {
                 "created_at": {
                     "type": "string"
                 },
-                "detail": {
+                "email": {
                     "type": "string"
                 },
                 "id": {
-                    "type": "string"
-                },
-                "readme_url": {
-                    "type": "string"
-                },
-                "schema_url": {
-                    "type": "string"
-                },
-                "sem_ver": {
-                    "type": "string"
-                },
-                "slug": {
-                    "type": "string"
-                },
-                "stage": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "user_email": {
-                    "type": "string"
-                },
-                "user_id": {
                     "type": "string"
                 }
             }
         },
-        "database.GetSignalDefBySlugRow": {
+        "database.GetAPIUserBySignalDefIDRow": {
             "type": "object",
             "properties": {
                 "created_at": {
                     "type": "string"
                 },
-                "detail": {
+                "email": {
                     "type": "string"
                 },
                 "id": {
                     "type": "string"
                 },
-                "readme_url": {
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "database.GetAPIUsersRow": {
+            "type": "object",
+            "properties": {
+                "created_at": {
                     "type": "string"
                 },
-                "schema_url": {
+                "email": {
                     "type": "string"
                 },
-                "sem_ver": {
-                    "type": "string"
-                },
-                "slug": {
-                    "type": "string"
-                },
-                "stage": {
-                    "type": "string"
-                },
-                "title": {
+                "id": {
                     "type": "string"
                 },
                 "updated_at": {
-                    "type": "string"
-                },
-                "user_email": {
-                    "type": "string"
-                },
-                "user_id": {
                     "type": "string"
                 }
             }
@@ -589,6 +965,9 @@
                 "id": {
                     "type": "string"
                 },
+                "isn_id": {
+                    "type": "string"
+                },
                 "readme_url": {
                     "type": "string"
                 },
@@ -615,7 +994,199 @@
                 }
             }
         },
-        "handlers.CreateSignalDefHandler.createSignalDefRequest": {
+        "handlers.CreateIsnReceiverRequest": {
+            "type": "object",
+            "properties": {
+                "default_rate_limit": {
+                    "description": "maximum number of requests per minute",
+                    "type": "integer",
+                    "example": 600
+                },
+                "detail": {
+                    "type": "string",
+                    "example": "Sample ISN Receiver description"
+                },
+                "isn_slug": {
+                    "type": "string",
+                    "example": "sample-ISN--example-org"
+                },
+                "max_batch_records": {
+                    "type": "integer",
+                    "example": 100
+                },
+                "max_daily_validation_failures": {
+                    "description": "default = 0",
+                    "type": "integer",
+                    "example": 5
+                },
+                "max_payload_kilobytes": {
+                    "type": "integer",
+                    "example": 50
+                },
+                "min_batch_records": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "payload_validation": {
+                    "type": "string",
+                    "enum": [
+                        "always",
+                        "never",
+                        "optional"
+                    ],
+                    "example": "always"
+                },
+                "receiver_origin": {
+                    "description": "do not provide this field if the isn is using local storage",
+                    "type": "string",
+                    "example": "http://example.com:8080"
+                },
+                "receiver_status": {
+                    "type": "string",
+                    "enum": [
+                        "offline",
+                        " online",
+                        " error",
+                        " closed"
+                    ],
+                    "example": "offline"
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Sample ISN Receiver @example.org"
+                }
+            }
+        },
+        "handlers.CreateIsnReceiverResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "example": "4f1bc74b-cf79-410f-9c21-dc2cba047385"
+                },
+                "receiver_url": {
+                    "type": "string",
+                    "example": "http://localhost:8080/signals/receiver/sample-ISN-receiver--example-org"
+                },
+                "resource_url": {
+                    "type": "string",
+                    "example": "http://localhost:8080/api/isn/receiver/sample-ISN-receiver--example-org"
+                },
+                "slug": {
+                    "type": "string",
+                    "example": "sample-ISN-receiver--example-org"
+                }
+            }
+        },
+        "handlers.CreateIsnRequest": {
+            "type": "object",
+            "properties": {
+                "detail": {
+                    "type": "string",
+                    "example": "Sample ISN description"
+                },
+                "is_in_use": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "slug": {
+                    "type": "string",
+                    "example": "sample-isn--example-org"
+                },
+                "storage_type": {
+                    "type": "string",
+                    "example": "mq"
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Sample ISN @example.org"
+                },
+                "visibility": {
+                    "type": "string",
+                    "enum": [
+                        "public",
+                        "private"
+                    ],
+                    "example": "private"
+                }
+            }
+        },
+        "handlers.CreateIsnResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "example": "67890684-3b14-42cf-b785-df28ce570400"
+                },
+                "resource_url": {
+                    "type": "string",
+                    "example": "http://localhost:8080/api/isn/{isn_slug}"
+                },
+                "slug": {
+                    "type": "string",
+                    "example": "sample-ISN--example-org"
+                }
+            }
+        },
+        "handlers.CreateIsnRetrieverRequest": {
+            "type": "object",
+            "properties": {
+                "default_rate_limit": {
+                    "description": "maximum number of requests per minute",
+                    "type": "integer",
+                    "example": 600
+                },
+                "detail": {
+                    "type": "string",
+                    "example": "sample-ISN--example-org"
+                },
+                "isn_slug": {
+                    "type": "string",
+                    "example": "sample-ISN--example-org"
+                },
+                "retriever_origin": {
+                    "description": "do not provide this field if the isn is using local storage",
+                    "type": "string",
+                    "example": "http://example.com:8080"
+                },
+                "retriever_status": {
+                    "type": "string",
+                    "enum": [
+                        "offline",
+                        " online",
+                        " error",
+                        " closed"
+                    ],
+                    "example": "offline"
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Sample ISN Retriever @example.org"
+                }
+            }
+        },
+        "handlers.CreateIsnRetrieverResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "example": "4f1bc74b-cf79-410f-9c21-dc2cba047385"
+                },
+                "resource_url": {
+                    "type": "string",
+                    "example": "http://localhost:8080/api/isn/retriever/sample-ISN-retriever--example-org"
+                },
+                "retriever_url": {
+                    "type": "string",
+                    "example": "http://localhost:8080/signals/retriever/sample-ISN-retriever--example-org"
+                },
+                "slug": {
+                    "type": "string",
+                    "example": "sample-ISN-retriever--example-org"
+                }
+            }
+        },
+        "handlers.CreateSignalDefRequest": {
             "type": "object",
             "properties": {
                 "bump_type": {
@@ -632,6 +1203,10 @@
                     "description": "description",
                     "type": "string",
                     "example": "Sample Signal description"
+                },
+                "isn_slug": {
+                    "type": "string",
+                    "example": "sample-ISN--example-org"
                 },
                 "readme_url": {
                     "description": "Note file must be on a public github repo",
@@ -658,20 +1233,19 @@
                 "title": {
                     "description": "unique title",
                     "type": "string",
-                    "example": "Sample Signal (example.org)"
+                    "example": "Sample Signal @example.org"
                 }
             }
         },
-        "handlers.CreateSignalDefHandler.createSignalDefResponse": {
+        "handlers.CreateSignalDefResponse": {
             "type": "object",
             "properties": {
-                "created_at": {
-                    "type": "string",
-                    "example": "2025-05-09T13:25:44.126721+01:00"
-                },
                 "id": {
                     "type": "string",
                     "example": "8e4bf0e9-b962-4707-9639-ef314dcf6fed"
+                },
+                "resource_url": {
+                    "type": "string"
                 },
                 "sem_ver": {
                     "type": "string",
@@ -683,7 +1257,58 @@
                 }
             }
         },
-        "handlers.CreateUserHandler.createUserRequest": {
+        "handlers.CreateUserResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "example": "68fb5f5b-e3f5-4a96-8d35-cd2203a06f73"
+                },
+                "resource_url": {
+                    "type": "string",
+                    "example": "http://localhost:8080/api/users/01a38b82-cbc7-4a24-b61f-e55cb99ac41e"
+                }
+            }
+        },
+        "handlers.GetAPISignalDef": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "detail": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "readme_url": {
+                    "type": "string"
+                },
+                "schema_url": {
+                    "type": "string"
+                },
+                "sem_ver": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "stage": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/database.GetAPIUserBySignalDefIDRow"
+                }
+            }
+        },
+        "handlers.LoginRequest": {
             "type": "object",
             "properties": {
                 "email": {
@@ -692,31 +1317,11 @@
                 },
                 "password": {
                     "type": "string",
-                    "example": "password"
+                    "example": "lkIB53@6O^Y"
                 }
             }
         },
-        "handlers.CreateUserHandler.createUserResponse": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "string",
-                    "example": "68fb5f5b-e3f5-4a96-8d35-cd2203a06f73"
-                }
-            }
-        },
-        "handlers.LoginHandler.loginRequest": {
-            "type": "object",
-            "properties": {
-                "email": {
-                    "type": "string"
-                },
-                "password": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.LoginHandler.loginResponse": {
+        "handlers.LoginResponse": {
             "type": "object",
             "properties": {
                 "access_token": {
@@ -741,11 +1346,130 @@
             "type": "object",
             "properties": {
                 "access_token": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxTZXJ2ZXIiLCJzdWIiOiI2OGZiNWY1Yi1lM2Y1LTRhOTYtOGQzNS1jZDIyMDNhMDZmNzMiLCJleHAiOjE3NDY3NzA2MzQsImlhdCI6MTc0Njc2NzAzNH0.3OdnUNgrvt1Zxs9AlLeaC9DVT6Xwc6uGvFQHb6nDfZs"
                 }
             }
         },
-        "handlers.UpdateSignalDefHandler.updateSignalDefRequest": {
+        "handlers.RevokeRefreshTokenHandler.revokeRefreshTokenRequest": {
+            "type": "object",
+            "properties": {
+                "refresh_token": {
+                    "type": "string",
+                    "example": "fb948e0b74de1f65e801b4e70fc9c047424ab775f2b4dc5226f472f3b6460c37"
+                }
+            }
+        },
+        "handlers.UpdateIsnReceiverRequest": {
+            "type": "object",
+            "properties": {
+                "default_rate_limit": {
+                    "description": "maximum number of requests per minute",
+                    "type": "integer",
+                    "example": 600
+                },
+                "detail": {
+                    "type": "string",
+                    "example": "Sample ISN Receiver description"
+                },
+                "max_batch_records": {
+                    "type": "integer",
+                    "example": 100
+                },
+                "max_daily_validation_failures": {
+                    "description": "default = 0",
+                    "type": "integer",
+                    "example": 5
+                },
+                "max_payload_kilobytes": {
+                    "type": "integer",
+                    "example": 50
+                },
+                "min_batch_records": {
+                    "type": "integer",
+                    "example": 10
+                },
+                "payload_validation": {
+                    "type": "string",
+                    "enum": [
+                        "always",
+                        "never",
+                        "optional"
+                    ],
+                    "example": "always"
+                },
+                "receiver_origin": {
+                    "description": "do not provide this field if the isn is using local storage",
+                    "type": "string",
+                    "example": "http://example.com:8080"
+                },
+                "receiver_status": {
+                    "type": "string",
+                    "enum": [
+                        "offline",
+                        " online",
+                        " error",
+                        " closed"
+                    ],
+                    "example": "offline"
+                }
+            }
+        },
+        "handlers.UpdateIsnRequest": {
+            "type": "object",
+            "properties": {
+                "detail": {
+                    "type": "string",
+                    "example": "Sample ISN description"
+                },
+                "is_in_use": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "storage_type": {
+                    "type": "string",
+                    "example": "mq"
+                },
+                "visibility": {
+                    "type": "string",
+                    "enum": [
+                        "public",
+                        "private"
+                    ],
+                    "example": "private"
+                }
+            }
+        },
+        "handlers.UpdateIsnRetrieverRequest": {
+            "type": "object",
+            "properties": {
+                "default_rate_limit": {
+                    "description": "maximum number of requests per minute",
+                    "type": "integer",
+                    "example": 600
+                },
+                "detail": {
+                    "type": "string",
+                    "example": "sample-ISN--example-org"
+                },
+                "retriever_origin": {
+                    "description": "do not provide this field if the isn is using local storage",
+                    "type": "string",
+                    "example": "http://example.com:8080"
+                },
+                "retriever_status": {
+                    "type": "string",
+                    "enum": [
+                        "offline",
+                        " online",
+                        " error",
+                        " closed"
+                    ],
+                    "example": "offline"
+                }
+            }
+        },
+        "handlers.UpdateSignalDefRequest": {
             "type": "object",
             "properties": {
                 "detail": {
@@ -772,22 +1496,16 @@
                 }
             }
         },
-        "handlers.UpdateUserHandler.updateUserRequest": {
+        "handlers.UserLoginDetails": {
             "type": "object",
             "properties": {
                 "email": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "example@example.com"
                 },
                 "password": {
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.UpdateUserHandler.updateUserResponse": {
-            "type": "object",
-            "properties": {
-                "email": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "lkIB53@6O^Y"
                 }
             }
         },
@@ -807,6 +1525,7 @@
                 "refresh_token_revoked",
                 "resource_already_exists",
                 "resource_not_found",
+                "signal_def_closed",
                 "token_error",
                 "user_alread_exists",
                 "user_not_found"
@@ -825,6 +1544,7 @@
                 "ErrCodeRefreshTokenRevoked",
                 "ErrCodeResourceAlreadyExists",
                 "ErrCodeResourceNotFound",
+                "ErrCodeSignalDefClosed",
                 "ErrCodeTokenError",
                 "ErrCodeUserAlreadyExists",
                 "ErrCodeUserNotFound"
@@ -867,8 +1587,12 @@
             "name": "auth"
         },
         {
-            "description": "Signal defintion management endpoints",
+            "description": "GET, POST and DELETE actions on a signal definition can be done using either a {slug}/v{sem_ver} or {id} URL.",
             "name": "signal definitions"
+        },
+        {
+            "description": "Information sharing networks are used to exchange signals between participating users.",
+            "name": "ISN config"
         }
     ]
 }

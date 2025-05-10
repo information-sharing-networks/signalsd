@@ -1,6 +1,6 @@
 notes.md
 /.env
 /.psqlrc
-.vscode
+/.vscode
 /signalsd
 tmp/

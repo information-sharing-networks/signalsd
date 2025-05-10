@@ -14,11 +14,26 @@ import (
 
 const createSignalDef = `-- name: CreateSignalDef :one
 
-INSERT INTO signal_defs (id, created_at, updated_at, slug, schema_url, readme_url, title, detail, sem_ver, stage, user_id)
-VALUES (gen_random_uuid(), now(), now(), $1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, created_at, updated_at, slug, schema_url, readme_url, title, detail, sem_ver, stage, user_id
+INSERT INTO signal_defs (
+    id,
+    created_at,
+    updated_at,
+    user_id,
+    isn_id,
+    slug,
+    schema_url,
+    readme_url,
+    title,
+    detail,
+    sem_ver,
+    stage
+) VALUES (gen_random_uuid(), now(), now(), $1, $2, $3, $4, $5, $6, $7, $8, $9) 
+RETURNING id, created_at, updated_at, user_id, isn_id, slug, schema_url, readme_url, title, detail, sem_ver, stage
 `
 
 type CreateSignalDefParams struct {
+	UserID    uuid.UUID `json:"user_id"`
+	IsnID     uuid.UUID `json:"isn_id"`
 	Slug      string    `json:"slug"`
 	SchemaURL string    `json:"schema_url"`
 	ReadmeURL string    `json:"readme_url"`
@@ -26,11 +41,12 @@ type CreateSignalDefParams struct {
 	Detail    string    `json:"detail"`
 	SemVer    string    `json:"sem_ver"`
 	Stage     string    `json:"stage"`
-	UserID    uuid.UUID `json:"user_id"`
 }
 
 func (q *Queries) CreateSignalDef(ctx context.Context, arg CreateSignalDefParams) (SignalDef, error) {
 	row := q.db.QueryRowContext(ctx, createSignalDef,
+		arg.UserID,
+		arg.IsnID,
 		arg.Slug,
 		arg.SchemaURL,
 		arg.ReadmeURL,
@@ -38,13 +54,14 @@ func (q *Queries) CreateSignalDef(ctx context.Context, arg CreateSignalDefParams
 		arg.Detail,
 		arg.SemVer,
 		arg.Stage,
-		arg.UserID,
 	)
 	var i SignalDef
 	err := row.Scan(
 		&i.ID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.UserID,
+		&i.IsnID,
 		&i.Slug,
 		&i.SchemaURL,
 		&i.ReadmeURL,
@@ -52,7 +69,6 @@ func (q *Queries) CreateSignalDef(ctx context.Context, arg CreateSignalDefParams
 		&i.Detail,
 		&i.SemVer,
 		&i.Stage,
-		&i.UserID,
 	)
 	return i, err
 }
@@ -93,6 +109,53 @@ func (q *Queries) ExistsSignalDefWithSlugAndDifferentUser(ctx context.Context, a
 	return exists, err
 }
 
+const getAPISignalDefByID = `-- name: GetAPISignalDefByID :one
+SELECT 
+    sd.id,
+    sd.created_at,
+    sd.updated_at,
+    sd.slug,
+    sd.schema_url,
+    sd.readme_url,
+    sd.title,
+    sd.detail,
+    sd.sem_ver,
+    sd.stage
+FROM signal_defs sd
+WHERE sd.id = $1
+`
+
+type GetAPISignalDefByIDRow struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Slug      string    `json:"slug"`
+	SchemaURL string    `json:"schema_url"`
+	ReadmeURL string    `json:"readme_url"`
+	Title     string    `json:"title"`
+	Detail    string    `json:"detail"`
+	SemVer    string    `json:"sem_ver"`
+	Stage     string    `json:"stage"`
+}
+
+func (q *Queries) GetAPISignalDefByID(ctx context.Context, id uuid.UUID) (GetAPISignalDefByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getAPISignalDefByID, id)
+	var i GetAPISignalDefByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Slug,
+		&i.SchemaURL,
+		&i.ReadmeURL,
+		&i.Title,
+		&i.Detail,
+		&i.SemVer,
+		&i.Stage,
+	)
+	return i, err
+}
+
 const getSemVerAndSchemaForLatestSlugVersion = `-- name: GetSemVerAndSchemaForLatestSlugVersion :one
 SELECT '0.0.0' AS sem_ver,
        '' AS schema_url
@@ -116,7 +179,7 @@ type GetSemVerAndSchemaForLatestSlugVersionRow struct {
 	SchemaURL string `json:"schema_url"`
 }
 
-// this query will return an empty string for schema_url and a sem_ver of '0.0.0'if there are no signals defs for the supplied slug
+// if there are no signals defs for the supplied slug, this query returns an empty string for schema_url and a sem_ver of '0.0.0'
 func (q *Queries) GetSemVerAndSchemaForLatestSlugVersion(ctx context.Context, slug string) (GetSemVerAndSchemaForLatestSlugVersionRow, error) {
 	row := q.db.QueryRowContext(ctx, getSemVerAndSchemaForLatestSlugVersion, slug)
 	var i GetSemVerAndSchemaForLatestSlugVersionRow
@@ -127,7 +190,7 @@ func (q *Queries) GetSemVerAndSchemaForLatestSlugVersion(ctx context.Context, sl
 const getSignalDefByID = `-- name: GetSignalDefByID :one
 
 SELECT u.email user_email,
-       sd.id, sd.created_at, sd.updated_at, sd.slug, sd.schema_url, sd.readme_url, sd.title, sd.detail, sd.sem_ver, sd.stage, sd.user_id
+       sd.id, sd.created_at, sd.updated_at, sd.user_id, sd.isn_id, sd.slug, sd.schema_url, sd.readme_url, sd.title, sd.detail, sd.sem_ver, sd.stage
 FROM signal_defs sd
 JOIN users u ON sd.user_id = u.id
 WHERE sd.id = $1
@@ -138,6 +201,8 @@ type GetSignalDefByIDRow struct {
 	ID        uuid.UUID `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+	UserID    uuid.UUID `json:"user_id"`
+	IsnID     uuid.UUID `json:"isn_id"`
 	Slug      string    `json:"slug"`
 	SchemaURL string    `json:"schema_url"`
 	ReadmeURL string    `json:"readme_url"`
@@ -145,7 +210,6 @@ type GetSignalDefByIDRow struct {
 	Detail    string    `json:"detail"`
 	SemVer    string    `json:"sem_ver"`
 	Stage     string    `json:"stage"`
-	UserID    uuid.UUID `json:"user_id"`
 }
 
 func (q *Queries) GetSignalDefByID(ctx context.Context, id uuid.UUID) (GetSignalDefByIDRow, error) {
@@ -156,6 +220,8 @@ func (q *Queries) GetSignalDefByID(ctx context.Context, id uuid.UUID) (GetSignal
 		&i.ID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.UserID,
+		&i.IsnID,
 		&i.Slug,
 		&i.SchemaURL,
 		&i.ReadmeURL,
@@ -163,7 +229,6 @@ func (q *Queries) GetSignalDefByID(ctx context.Context, id uuid.UUID) (GetSignal
 		&i.Detail,
 		&i.SemVer,
 		&i.Stage,
-		&i.UserID,
 	)
 	return i, err
 }
@@ -171,7 +236,7 @@ func (q *Queries) GetSignalDefByID(ctx context.Context, id uuid.UUID) (GetSignal
 const getSignalDefBySlug = `-- name: GetSignalDefBySlug :one
 
 SELECT u.email user_email,
-       sd.id, sd.created_at, sd.updated_at, sd.slug, sd.schema_url, sd.readme_url, sd.title, sd.detail, sd.sem_ver, sd.stage, sd.user_id
+       sd.id, sd.created_at, sd.updated_at, sd.user_id, sd.isn_id, sd.slug, sd.schema_url, sd.readme_url, sd.title, sd.detail, sd.sem_ver, sd.stage
 FROM signal_defs sd
 JOIN users u ON sd.user_id = u.id
 WHERE sd.slug = $1
@@ -188,6 +253,8 @@ type GetSignalDefBySlugRow struct {
 	ID        uuid.UUID `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+	UserID    uuid.UUID `json:"user_id"`
+	IsnID     uuid.UUID `json:"isn_id"`
 	Slug      string    `json:"slug"`
 	SchemaURL string    `json:"schema_url"`
 	ReadmeURL string    `json:"readme_url"`
@@ -195,7 +262,6 @@ type GetSignalDefBySlugRow struct {
 	Detail    string    `json:"detail"`
 	SemVer    string    `json:"sem_ver"`
 	Stage     string    `json:"stage"`
-	UserID    uuid.UUID `json:"user_id"`
 }
 
 func (q *Queries) GetSignalDefBySlug(ctx context.Context, arg GetSignalDefBySlugParams) (GetSignalDefBySlugRow, error) {
@@ -206,6 +272,8 @@ func (q *Queries) GetSignalDefBySlug(ctx context.Context, arg GetSignalDefBySlug
 		&i.ID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.UserID,
+		&i.IsnID,
 		&i.Slug,
 		&i.SchemaURL,
 		&i.ReadmeURL,
@@ -213,7 +281,6 @@ func (q *Queries) GetSignalDefBySlug(ctx context.Context, arg GetSignalDefBySlug
 		&i.Detail,
 		&i.SemVer,
 		&i.Stage,
-		&i.UserID,
 	)
 	return i, err
 }
@@ -221,7 +288,7 @@ func (q *Queries) GetSignalDefBySlug(ctx context.Context, arg GetSignalDefBySlug
 const getSignalDefs = `-- name: GetSignalDefs :many
 
 SELECT u.email,
-       sd.id, sd.created_at, sd.updated_at, sd.slug, sd.schema_url, sd.readme_url, sd.title, sd.detail, sd.sem_ver, sd.stage, sd.user_id
+       sd.id, sd.created_at, sd.updated_at, sd.user_id, sd.isn_id, sd.slug, sd.schema_url, sd.readme_url, sd.title, sd.detail, sd.sem_ver, sd.stage
 FROM signal_defs sd
 JOIN users u ON sd.user_id = u.id
 ORDER BY u.email, 
@@ -234,6 +301,8 @@ type GetSignalDefsRow struct {
 	ID        uuid.UUID `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+	UserID    uuid.UUID `json:"user_id"`
+	IsnID     uuid.UUID `json:"isn_id"`
 	Slug      string    `json:"slug"`
 	SchemaURL string    `json:"schema_url"`
 	ReadmeURL string    `json:"readme_url"`
@@ -241,7 +310,6 @@ type GetSignalDefsRow struct {
 	Detail    string    `json:"detail"`
 	SemVer    string    `json:"sem_ver"`
 	Stage     string    `json:"stage"`
-	UserID    uuid.UUID `json:"user_id"`
 }
 
 func (q *Queries) GetSignalDefs(ctx context.Context) ([]GetSignalDefsRow, error) {
@@ -258,6 +326,8 @@ func (q *Queries) GetSignalDefs(ctx context.Context) ([]GetSignalDefsRow, error)
 			&i.ID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.UserID,
+			&i.IsnID,
 			&i.Slug,
 			&i.SchemaURL,
 			&i.ReadmeURL,
@@ -265,7 +335,6 @@ func (q *Queries) GetSignalDefs(ctx context.Context) ([]GetSignalDefsRow, error)
 			&i.Detail,
 			&i.SemVer,
 			&i.Stage,
-			&i.UserID,
 		); err != nil {
 			return nil, err
 		}

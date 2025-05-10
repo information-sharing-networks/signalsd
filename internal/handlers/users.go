@@ -22,34 +22,33 @@ func NewUserHandler(cfg *signals.ServiceConfig) *UserHandler {
 	return &UserHandler{cfg: cfg}
 }
 
+type UserLoginDetails struct {
+	Password string `json:"password" example:"lkIB53@6O^Y"`
+	Email    string `json:"email" example:"example@example.com"`
+}
+
+type CreateUserResponse struct {
+	ID          uuid.UUID `json:"id" example:"68fb5f5b-e3f5-4a96-8d35-cd2203a06f73"`
+	ResourceURL string    `json:"resource_url" example:"http://localhost:8080/api/users/01a38b82-cbc7-4a24-b61f-e55cb99ac41e"`
+}
+
 // CreateUserHandler godoc
 //
 //	@Summary	Create user
 //	@Tags		auth
 //
-//	@Param		request	body		handlers.CreateUserHandler.createUserRequest	true	"user details"
+//	@Param		request	body		handlers.UserLoginDetails	true	"user details"
 //
-//	@Success	201		{object}	handlers.CreateUserHandler.createUserResponse
+//	@Success	201		{object}	handlers.CreateUserResponse
 //	@Failure	400		{object}	signals.ErrorResponse
 //	@Failure	409		{object}	signals.ErrorResponse
 //	@Failure	500		{object}	signals.ErrorResponse
 //
 //	@Router		/api/users [post]
 func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) {
-	type createUserRequest struct {
-		Password string `json:"password" example:"password"`
-		Email    string `json:"email" example:"example@example.com"`
-	}
-
-	var req createUserRequest
-
-	type createUserResponse struct {
-		ID uuid.UUID `json:"id" example:"68fb5f5b-e3f5-4a96-8d35-cd2203a06f73"`
-	}
+	var req UserLoginDetails
 
 	var newUser = database.User{}
-
-	var res = createUserResponse{}
 
 	authService := auth.NewAuthService(u.cfg)
 
@@ -90,10 +89,16 @@ func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	res = createUserResponse{
-		ID: newUser.ID,
-	}
-	helpers.RespondWithJSON(w, http.StatusCreated, res)
+	resourceURL := fmt.Sprintf("%s://%s/api/users/%s",
+		helpers.GetScheme(r),
+		r.Host,
+		newUser.ID,
+	)
+
+	helpers.RespondWithJSON(w, http.StatusCreated, CreateUserResponse{
+		ID:          newUser.ID,
+		ResourceURL: resourceURL,
+	})
 }
 
 // UpdateUserHandler godoc
@@ -102,26 +107,18 @@ func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) 
 //	@Description	update email and/or password
 //	@Tags			auth
 //
-//	@Param			request	body		handlers.UpdateUserHandler.updateUserRequest	true	"user details"
+//	@Param			request	body	handlers.UserLoginDetails	true	"user details"
 //
-//	@Success		200		{object}	handlers.UpdateUserHandler.updateUserResponse
-//	@Failure		400		{object}	signals.ErrorResponse
-//	@Failure		401		{object}	signals.ErrorResponse
-//	@Failure		404		{object}	signals.ErrorResponse
-//	@Failure		500		{object}	signals.ErrorResponse
+//	@Success		204
+//	@Failure		400	{object}	signals.ErrorResponse
+//	@Failure		401	{object}	signals.ErrorResponse
+//	@Failure		404	{object}	signals.ErrorResponse
+//	@Failure		500	{object}	signals.ErrorResponse
 //
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/users [put]
 func (u *UserHandler) UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
-	type updateUserRequest struct {
-		Password string `json:"password"`
-		Email    string `json:"email"`
-	}
-	type updateUserResponse struct {
-		Email string `json:"email"`
-	}
-
 	authService := auth.NewAuthService(u.cfg)
 
 	ctx := r.Context()
@@ -133,7 +130,7 @@ func (u *UserHandler) UpdateUserHandler(w http.ResponseWriter, r *http.Request) 
 
 	defer r.Body.Close()
 
-	req := updateUserRequest{}
+	req := UserLoginDetails{}
 
 	defer r.Body.Close()
 	decoder := json.NewDecoder(r.Body)
@@ -151,11 +148,11 @@ func (u *UserHandler) UpdateUserHandler(w http.ResponseWriter, r *http.Request) 
 
 	currentUser, err := u.cfg.DB.GetUserByID(r.Context(), userID)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusUnauthorized, signals.ErrCodeResourceNotFound, fmt.Sprintf("could not find a user with the token UUID: %v", userID))
+		helpers.RespondWithError(w, r, http.StatusUnauthorized, signals.ErrCodeResourceNotFound, fmt.Sprintf("could not find the user with the id in this access token: %v", userID))
 		return
 	}
 
-	// prepare update params
+	//prepare update params based on current field values
 	updateParams := database.UpdateUserEmailAndPasswordParams{
 		ID:             currentUser.ID,
 		Email:          currentUser.Email,
@@ -187,8 +184,57 @@ func (u *UserHandler) UpdateUserHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	helpers.RespondWithJSON(w, http.StatusOK, updateUserResponse{
-		Email: updateParams.Email,
-	})
+	helpers.RespondWithJSON(w, http.StatusNoContent, "")
 
+}
+
+// GetUserbyIDHandler godoc
+//
+//	@Summary	Get registered user
+//	@Tags		auth
+//
+//	@Param		id	path		string	true	"user id"	example(68fb5f5b-e3f5-4a96-8d35-cd2203a06f73)
+//	@Success	200	{array}		database.GetAPIUserByIDRow
+//	@Failure	500	{object}	signals.ErrorResponse
+//
+//	@Router		/api/users/{id} [get]
+func (u *UserHandler) GetUserByIDHandler(w http.ResponseWriter, r *http.Request) {
+
+	userIDstring := r.PathValue("id")
+	userID, err := uuid.Parse(userIDstring)
+	if err != nil {
+		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeInvalidRequest, fmt.Sprintf("Invalid user ID: %v", err))
+		return
+	}
+
+	res, err := u.cfg.DB.GetAPIUserByID(r.Context(), userID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			helpers.RespondWithError(w, r, http.StatusNotFound, signals.ErrCodeResourceNotFound, fmt.Sprintf("No user found for id %v", userID))
+			return
+		}
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the user from the database %v", err))
+		return
+	}
+	//
+	helpers.RespondWithJSON(w, http.StatusOK, res)
+}
+
+// GetUsersHandler godoc
+//
+//	@Summary	Get the registered users
+//	@Tags		auth
+//
+//	@Success	200	{array}		database.GetAPIUsersRow
+//	@Failure	500	{object}	signals.ErrorResponse
+//
+//	@Router		/api/users [get]
+func (u *UserHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
+
+	res, err := u.cfg.DB.GetAPIUsers(r.Context())
+	if err != nil {
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("error getting user from database: %v", err))
+		return
+	}
+	helpers.RespondWithJSON(w, http.StatusOK, res)
 }

@@ -25,7 +25,7 @@ func NewAuthService(cfg *signals.ServiceConfig) *AuthService {
 
 // get the bearer token from http header, validate the token.
 // if the token is a valid JWT, parse the claims and return the user id
-func (a AuthService) CheckAuthorization(headers http.Header) (uuid.UUID, error) {
+func (a AuthService) CheckAccessTokenAuthorization(headers http.Header) (uuid.UUID, error) {
 
 	bearerToken, err := a.BearerTokenFromHeader(headers)
 	if err != nil {
