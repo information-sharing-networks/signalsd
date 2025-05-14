@@ -22,8 +22,8 @@ func NewUserHandler(cfg *signals.ServiceConfig) *UserHandler {
 	return &UserHandler{cfg: cfg}
 }
 
-type UserLoginDetails struct {
-	Password string `json:"password" example:"lkIB53@6O^Y"`
+type CreateUserRequest struct {
+	Password string `json:"password" example:"lkIB53@6O^Y"` // passwords must be at least 11 chars long
 	Email    string `json:"email" example:"example@example.com"`
 }
 
@@ -32,21 +32,27 @@ type CreateUserResponse struct {
 	ResourceURL string    `json:"resource_url" example:"http://localhost:8080/api/users/01a38b82-cbc7-4a24-b61f-e55cb99ac41e"`
 }
 
+// todo forgotten password
+type UpdatePasswordRequest struct {
+	CurrentPassword string `json:"current_password" example:"lkIB53@6O^Y"`
+	NewPassword     string `json:"new_password" example:"ue6U>&X3j570"`
+}
+
 // CreateUserHandler godoc
 //
 //	@Summary	Create user
 //	@Tags		auth
 //
-//	@Param		request	body		handlers.UserLoginDetails	true	"user details"
+//	@Param		request	body		handlers.UpdatePasswordRequest	true	"user details"
 //
 //	@Success	201		{object}	handlers.CreateUserResponse
 //	@Failure	400		{object}	signals.ErrorResponse
 //	@Failure	409		{object}	signals.ErrorResponse
 //	@Failure	500		{object}	signals.ErrorResponse
 //
-//	@Router		/api/users [post]
+//	@Router		/auth/register [post]
 func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) {
-	var req UserLoginDetails
+	var req CreateUserRequest
 
 	var newUser = database.User{}
 
@@ -71,6 +77,11 @@ func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) 
 	}
 	if exists {
 		helpers.RespondWithError(w, r, http.StatusConflict, signals.ErrCodeUserAlreadyExists, "a user already exists this email address")
+		return
+	}
+
+	if len(req.Password) < signals.MinimumPasswordLength {
+		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodePasswordTooShort, fmt.Sprintf("password must be at least %d chars", signals.MinimumPasswordLength))
 		return
 	}
 
@@ -101,14 +112,15 @@ func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) 
 	})
 }
 
-// UpdateUserHandler godoc
+// UpdatePasswordHandler godoc
 //
-//	@Summary		Update user
-//	@Description	update email and/or password
+//	@Summary		Update password
+//	@Description	Use this api to reset the users password.  Requires a valid access token and the current password
+//	@Description	TODO - forgotten password facility
 //	@Tags			auth
 //
-//	@Param			request	body	handlers.UserLoginDetails	true	"user details"
-//
+//	@Param			request	body	handlers.UpdatePasswordRequest	true	"user details"
+//	@Param			id	path	string								true	"user id"	example(sample-ISN--example-org)
 //	@Success		204
 //	@Failure		400	{object}	signals.ErrorResponse
 //	@Failure		401	{object}	signals.ErrorResponse
@@ -117,20 +129,18 @@ func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) 
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/api/users [put]
-func (u *UserHandler) UpdateUserHandler(w http.ResponseWriter, r *http.Request) {
+//	@Router			/auth/password/reset [put]
+func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Request) {
+	req := UpdatePasswordRequest{}
 	authService := auth.NewAuthService(u.cfg)
 
 	ctx := r.Context()
 
+	// this request was already authenticated by the middleware
 	userID, ok := ctx.Value(signals.UserIDKey).(uuid.UUID)
 	if !ok {
 		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, "did not receive userID from middleware")
 	}
-
-	defer r.Body.Close()
-
-	req := UserLoginDetails{}
 
 	defer r.Body.Close()
 	decoder := json.NewDecoder(r.Body)
@@ -141,42 +151,46 @@ func (u *UserHandler) UpdateUserHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if req.Email == "" || req.Password == "" {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, "expecting a email or password in http body")
+	if req.NewPassword == "" || req.CurrentPassword == "" {
+		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, "you must supply current and new password in the request")
 		return
 	}
 
-	currentUser, err := u.cfg.DB.GetUserByID(r.Context(), userID)
+	user, err := u.cfg.DB.GetUserByID(r.Context(), userID)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusUnauthorized, signals.ErrCodeResourceNotFound, fmt.Sprintf("could not find the user with the id in this access token: %v", userID))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, fmt.Sprintf("database error: %v", userID))
 		return
 	}
 
-	//prepare update params based on current field values
-	updateParams := database.UpdateUserEmailAndPasswordParams{
-		ID:             currentUser.ID,
-		Email:          currentUser.Email,
-		HashedPassword: currentUser.HashedPassword,
-	}
-
-	if req.Email != "" {
-		updateParams.Email = req.Email
-	}
-
-	if req.Password != "" {
-		updateParams.HashedPassword, err = authService.HashPassword(req.Password)
-		if err != nil {
-			helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, fmt.Sprintf("server error: %v", err))
-			return
-		}
-	}
-	rowsAffected, err := u.cfg.DB.UpdateUserEmailAndPassword(r.Context(), updateParams)
+	currentPasswordHash, err := authService.HashPassword(req.CurrentPassword)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeUserNotFound, "user not found")
-			return
-		}
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, fmt.Sprintf("server error: %v", err))
+		return
+	}
+
+	err = authService.CheckPasswordHash(currentPasswordHash, req.CurrentPassword)
+	if err != nil {
+		helpers.RespondWithError(w, r, http.StatusUnauthorized, signals.ErrCodeAuthenticationFailure, "Incorrect email or password")
+		return
+	}
+
+	if len(req.NewPassword) < signals.MinimumPasswordLength {
+		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodePasswordTooShort, fmt.Sprintf("password must be at least %d chars", signals.MinimumPasswordLength))
+		return
+	}
+
+	newPasswordHash, err := authService.HashPassword(req.NewPassword)
+	if err != nil {
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, fmt.Sprintf("server error: %v", err))
+		return
+	}
+
+	rowsAffected, err := u.cfg.DB.UpdatePassword(r.Context(), database.UpdatePasswordParams{
+		ID:             user.ID,
+		HashedPassword: newPasswordHash,
+	})
+	if err != nil {
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, fmt.Sprintf("database error: %v", err))
 		return
 	}
 	if rowsAffected != 1 {
@@ -188,6 +202,7 @@ func (u *UserHandler) UpdateUserHandler(w http.ResponseWriter, r *http.Request) 
 
 }
 
+// todo query by email (admin only)
 // GetUserbyIDHandler godoc
 //
 //	@Summary	Get registered user
@@ -217,24 +232,5 @@ func (u *UserHandler) GetUserByIDHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	//
-	helpers.RespondWithJSON(w, http.StatusOK, res)
-}
-
-// GetUsersHandler godoc
-//
-//	@Summary	Get the registered users
-//	@Tags		auth
-//
-//	@Success	200	{array}		database.GetForDisplayUsersRow
-//	@Failure	500	{object}	signals.ErrorResponse
-//
-//	@Router		/api/users [get]
-func (u *UserHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
-
-	res, err := u.cfg.DB.GetForDisplayUsers(r.Context())
-	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("error getting user from database: %v", err))
-		return
-	}
 	helpers.RespondWithJSON(w, http.StatusOK, res)
 }

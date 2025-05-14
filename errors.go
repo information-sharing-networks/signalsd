@@ -12,6 +12,7 @@ const (
 	ErrCodeInvalidRequest        ErrorCode = "invalid_request"
 	ErrCodeMalformedBody         ErrorCode = "malformed_body"
 	ErrCodeNotImplemented        ErrorCode = "not_implemented"
+	ErrCodePasswordTooShort      ErrorCode = "password_too_short"
 	ErrCodeRefreshTokenExpired   ErrorCode = "refresh_token_expired"
 	ErrCodeRefreshTokenRevoked   ErrorCode = "refresh_token_revoked"
 	ErrCodeResourceAlreadyExists ErrorCode = "resource_already_exists"

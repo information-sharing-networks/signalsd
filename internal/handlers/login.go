@@ -22,7 +22,7 @@ func NewLoginHandler(cfg *signals.ServiceConfig) *LoginHandler {
 }
 
 type LoginRequest struct {
-	UserLoginDetails
+	CreateUserRequest
 }
 
 type LoginResponse struct {
@@ -38,7 +38,7 @@ type LoginResponse struct {
 //	@Description	The response body includes an access token and a refresh_token.
 //	@Description	The access_token is valid for 1 hour.
 //	@Description
-//	@Description	Use the refresh_token with the /api/refresh endpoint to renew the access_token.
+//	@Description	Use the refresh_token with the /auth/refresh-token endpoint to renew the access_token.
 //	@Description	The refresh_token lasts 60 days unless it is revoked earlier.
 //	@Description	To renew the refresh_token, log in again.
 //	@Tags			auth
@@ -50,7 +50,7 @@ type LoginResponse struct {
 //	@Failure		401		{object}	signals.ErrorResponse
 //	@Failure		500		{object}	signals.ErrorResponse
 //
-//	@Router			/api/login [post]
+//	@Router			/auth/login [post]
 func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
 

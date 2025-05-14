@@ -36,10 +36,11 @@ type CreateSignalDefResponse struct {
 	ResourceURL string    `json:"resource_url"`
 }
 
+// these are the only fields that can be updated after a signal is defined
 type UpdateSignalDefRequest struct {
-	ReadmeURL string `json:"readme_url" example:"https://github.com/user/project/v0.0.1/locales/new_t pfilename.md"` // Updated readem file. Note file must be on a public github repo
-	Detail    string `json:"detail" example:"updated description"`                                                   // updated description
-	Stage     string `json:"stage" enums:"dev,test,live,deprecated,closed,shuttered"`                                // updated stage
+	ReadmeURL *string `json:"readme_url" example:"https://github.com/user/project/v0.0.1/locales/new_t pfilename.md"` // Updated readem file. Note file must be on a public github repo
+	Detail    *string `json:"detail" example:"updated description"`                                                   // updated description
+	Stage     *string `json:"stage" enums:"dev,test,live,deprecated,closed,shuttered"`                                // updated stage
 }
 
 // used in GET handler
@@ -94,7 +95,19 @@ func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http
 		return
 	}
 
-	// check isn exists and is owned by user
+	// validate fields
+	if req.SchemaURL == "" ||
+		req.Title == "" ||
+		req.BumpType == "" ||
+		req.IsnSlug == "" ||
+		req.ReadmeURL == nil ||
+		req.Detail == nil ||
+		req.Stage == nil {
+		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, "one or missing field in the body of the requet")
+		return
+	}
+
+	// check isn exists, owned by user and is flagged as 'in use'
 	isn, err := s.cfg.DB.GetIsnBySlug(r.Context(), req.IsnSlug)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -108,16 +121,8 @@ func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http
 		helpers.RespondWithError(w, r, http.StatusForbidden, signals.ErrCodeForbidden, "you are not the owner of this ISN")
 		return
 	}
-
-	// check the isn is in use
 	if !isn.IsInUse {
 		helpers.RespondWithError(w, r, http.StatusForbidden, signals.ErrCodeForbidden, "this ISN is marked as 'not in use'")
-		return
-	}
-	// validate fields
-	if req.BumpType == "" || req.Detail == "" || req.ReadmeURL == "" || req.SchemaURL == "" ||
-		req.Title == "" || req.Stage == "" {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, "one or missing field in the body of the requet")
 		return
 	}
 
@@ -125,11 +130,12 @@ func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http
 		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("invalid schema url: %v", err))
 		return
 	}
-	if err := helpers.CheckSignalDefURL(req.ReadmeURL, "readme"); err != nil {
+	if err := helpers.CheckSignalDefURL(*req.ReadmeURL, "readme"); err != nil {
 		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("invalid readme url: %v", err))
 		return
 	}
-	if !signals.ValidSignalDefStages[req.Stage] {
+
+	if !signals.ValidSignalDefStages[*req.Stage] {
 		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeInvalidRequest, "invalid stage supplied")
 		return
 	}
@@ -173,17 +179,18 @@ func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http
 		return
 	}
 
+	// create signal def
 	var returnedSignalDef database.SignalDef
 	returnedSignalDef, err = s.cfg.DB.CreateSignalDef(r.Context(), database.CreateSignalDefParams{
 		UserID:    userID,
 		IsnID:     isn.ID,
 		Slug:      slug,
-		SchemaURL: req.SchemaURL,
-		ReadmeURL: req.ReadmeURL,
-		Title:     req.Title,
-		Detail:    req.Detail,
 		SemVer:    semVer,
-		Stage:     req.Stage,
+		SchemaURL: req.SchemaURL,
+		Title:     req.Title,
+		Detail:    *req.Detail,
+		ReadmeURL: *req.ReadmeURL,
+		Stage:     *req.Stage,
 	})
 	if err != nil {
 		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("could not create signal definition: %v", err))
@@ -251,17 +258,7 @@ func (s *SignalDefHandler) UpdateSignalDefHandler(w http.ResponseWriter, r *http
 		return
 	}
 
-	currentSignalDef, err := s.cfg.DB.GetSignalDefByID(r.Context(), signalDef.ID)
-
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeResourceNotFound, "Signal def not found")
-			return
-		}
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
-		return
-	}
-	if currentSignalDef.UserID != userID {
+	if signalDef.UserID != userID {
 		helpers.RespondWithError(w, r, http.StatusUnauthorized, signals.ErrCodeAuthorizationFailure, "you can't update this signal definition")
 		return
 	}
@@ -276,44 +273,39 @@ func (s *SignalDefHandler) UpdateSignalDefHandler(w http.ResponseWriter, r *http
 		return
 	}
 
-	if req.Detail == "" && req.ReadmeURL == "" && req.Stage == "" {
+	if req.Detail == nil &&
+		req.ReadmeURL == nil &&
+		req.Stage == nil {
 		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, "no updateable fields found in body of request")
 		return
 	}
-
-	if req.Stage != "" {
-		if !signals.ValidSignalDefStages[req.Stage] {
-			helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeInvalidRequest, "invalid stage supplied")
-			return
-		}
-	}
-
-	if req.ReadmeURL != "" {
-		if err := helpers.CheckSignalDefURL(req.ReadmeURL, "readme"); err != nil {
+	// prepare struct for update
+	if req.ReadmeURL != nil {
+		if err := helpers.CheckSignalDefURL(*req.ReadmeURL, "readme"); err != nil {
 			helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("invalid readme url: %v", err))
 			return
 		}
+		signalDef.ReadmeURL = *req.ReadmeURL
 	}
 
-	// if values not supplied in json then use the currentValues
-	if req.ReadmeURL == "" {
-		req.ReadmeURL = currentSignalDef.ReadmeURL
+	if req.Detail != nil {
+		signalDef.Detail = *req.Detail
 	}
 
-	if req.Detail == "" {
-		req.Detail = currentSignalDef.Detail
-	}
-
-	if req.Stage == "" {
-		req.Stage = currentSignalDef.Stage
+	if req.Stage != nil {
+		if !signals.ValidSignalDefStages[*req.Stage] {
+			helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeInvalidRequest, "invalid stage supplied")
+			return
+		}
+		signalDef.Stage = *req.Stage
 	}
 
 	// update signal_defs
 	rowsAffected, err := s.cfg.DB.UpdateSignalDefDetails(r.Context(), database.UpdateSignalDefDetailsParams{
 		ID:        signalDef.ID,
-		ReadmeURL: req.ReadmeURL,
-		Detail:    req.Detail,
-		Stage:     req.Stage,
+		ReadmeURL: signalDef.ReadmeURL,
+		Detail:    signalDef.Detail,
+		Stage:     signalDef.Stage,
 	})
 	if err != nil {
 		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("database error %v", err))

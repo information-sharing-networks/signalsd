@@ -165,19 +165,18 @@ func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (User, error) {
 	return i, err
 }
 
-const updateUserEmailAndPassword = `-- name: UpdateUserEmailAndPassword :execrows
-UPDATE users SET (updated_at, email, hashed_password) = (NOW(), $2, $3)
+const updatePassword = `-- name: UpdatePassword :execrows
+UPDATE users SET (updated_at, hashed_password) = (NOW(), $2)
 WHERE id = $1
 `
 
-type UpdateUserEmailAndPasswordParams struct {
+type UpdatePasswordParams struct {
 	ID             uuid.UUID `json:"id"`
-	Email          string    `json:"email"`
 	HashedPassword string    `json:"hashed_password"`
 }
 
-func (q *Queries) UpdateUserEmailAndPassword(ctx context.Context, arg UpdateUserEmailAndPasswordParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, updateUserEmailAndPassword, arg.ID, arg.Email, arg.HashedPassword)
+func (q *Queries) UpdatePassword(ctx context.Context, arg UpdatePasswordParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updatePassword, arg.ID, arg.HashedPassword)
 	if err != nil {
 		return 0, err
 	}

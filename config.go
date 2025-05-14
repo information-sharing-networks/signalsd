@@ -31,8 +31,9 @@ type ServiceConfig struct {
 
 // common constants
 const (
-	AccessTokenExpiry  = time.Hour
-	RefreshTokenExpiry = 60 * 24 * time.Hour
+	AccessTokenExpiry     = time.Hour
+	RefreshTokenExpiry    = 60 * 24 * time.Hour
+	MinimumPasswordLength = 11
 )
 
 // common maps - used to validate enum values

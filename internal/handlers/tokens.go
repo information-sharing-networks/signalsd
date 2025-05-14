@@ -36,7 +36,7 @@ func NewAuthHandler(cfg *signals.ServiceConfig) *AuthHandler {
 //
 //	@Security		BearerRefreshToken
 //
-//	@Router			/api/refresh [post]
+//	@Router			/auth/refresh-token [post]
 //
 // note refresh tokens are random 256b strings, not JWTs
 func (a *AuthHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.Request) {
@@ -105,7 +105,7 @@ func (a *AuthHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.R
 //	@Failure		404	{object}	signals.ErrorResponse
 //	@Failure		500	{object}	signals.ErrorResponse
 //
-//	@Router			/api/revoke [post]
+//	@Router			/auth/revoke-token [post]
 func (a *AuthHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 	type revokeRefreshTokenRequest struct {
 		RefreshToken string `json:"refresh_token" example:"fb948e0b74de1f65e801b4e70fc9c047424ab775f2b4dc5226f472f3b6460c37"`

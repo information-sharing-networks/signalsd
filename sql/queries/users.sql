@@ -3,8 +3,8 @@ INSERT INTO users (id, created_at, updated_at, email, hashed_password)
 VALUES ( gen_random_uuid(), NOW(), NOW(), $1, $2)
 RETURNING *;
 
--- name: UpdateUserEmailAndPassword :execrows
-UPDATE users SET (updated_at, email, hashed_password) = (NOW(), $2, $3)
+-- name: UpdatePassword :execrows
+UPDATE users SET (updated_at, hashed_password) = (NOW(), $2)
 WHERE id = $1;
 
 -- name: GetUserByEmail :one

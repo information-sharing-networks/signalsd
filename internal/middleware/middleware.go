@@ -62,16 +62,16 @@ func AuthorizationMiddleware(authService auth.AuthService) func(http.Handler) ht
 			case r.Method == http.MethodGet:
 				reqLogger.Info().Msg("GET request, skipping authorization check")
 
-			case r.Method == http.MethodPost && r.URL.Path == "/api/login":
+			case r.Method == http.MethodPost && r.URL.Path == "/auth/login":
 				reqLogger.Info().Msg("login, password check")
 
-			case r.Method == http.MethodPost && r.URL.Path == "/api/refresh":
+			case r.Method == http.MethodPost && r.URL.Path == "/auth/refresh-token":
 				reqLogger.Info().Msg("refresh access code, refresh token") // todo middleware
 
-			case r.Method == http.MethodPost && r.URL.Path == "/api/revoke":
+			case r.Method == http.MethodPost && r.URL.Path == "/auth/revoke-token":
 				reqLogger.Info().Msg("revoke refresh code, skipping authorization check")
 
-			case r.Method == http.MethodPost && r.URL.Path == "/api/users":
+			case r.Method == http.MethodPost && r.URL.Path == "/auth/register":
 				reqLogger.Info().Msg("creating user, skipping authorization check")
 
 			// reset is unprotected but will only work on dev

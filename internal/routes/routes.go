@@ -23,14 +23,14 @@ func RegisterRoutes(r *chi.Mux, cfg *signals.ServiceConfig) {
 	isnReceiverHandler := handlers.NewIsnReceiverHandler(cfg)
 	isnRetrieverHandler := handlers.NewIsnRetrieverHandler(cfg)
 
-	// User Management & Authentication
-	r.Post("/api/users", usersHandler.CreateUserHandler)
-	r.Put("/api/users", usersHandler.UpdateUserHandler)
-	r.Get("/api/users", usersHandler.GetUsersHandler)
-	r.Get("/api/users/{id}", usersHandler.GetUserByIDHandler)
-	r.Post("/api/login", loginHandler.LoginHandler)
-	r.Post("/api/refresh", authHandler.RefreshAccessTokenHandler)
-	r.Post("/api/revoke", authHandler.RevokeRefreshTokenHandler)
+	// auth
+	r.Post("/auth/register", usersHandler.CreateUserHandler)
+	r.Put("/auth/pasword/reset", usersHandler.UpdatePasswordHandler)
+	r.Post("/auth/login", loginHandler.LoginHandler)
+	r.Post("/auth/refresh-token", authHandler.RefreshAccessTokenHandler)
+	r.Post("/auth/revoke-token", authHandler.RevokeRefreshTokenHandler)
+	// todo protect get user endpoint so as not to expose email addresses (server admin account only)
+	r.Get("/auth/users/{id}", usersHandler.GetUserByIDHandler)
 
 	// signal defs
 	r.Post("/api/signal_defs", signalDefsHandler.CreateSignalDefHandler)

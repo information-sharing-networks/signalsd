@@ -21,17 +21,6 @@ definitions:
       updated_at:
         type: string
     type: object
-  database.GetForDisplayUsersRow:
-    properties:
-      created_at:
-        type: string
-      email:
-        type: string
-      id:
-        type: string
-      updated_at:
-        type: string
-    type: object
   database.GetSignalDefsRow:
     properties:
       created_at:
@@ -292,6 +281,7 @@ definitions:
         example: example@example.com
         type: string
       password:
+        description: passwords must be at least 11 chars long
         example: lkIB53@6O^Y
         type: string
     type: object
@@ -431,6 +421,15 @@ definitions:
         example: offline
         type: string
     type: object
+  handlers.UpdatePasswordRequest:
+    properties:
+      current_password:
+        example: lkIB53@6O^Y
+        type: string
+      new_password:
+        example: ue6U>&X3j570
+        type: string
+    type: object
   handlers.UpdateSignalDefRequest:
     properties:
       detail:
@@ -452,15 +451,6 @@ definitions:
         - shuttered
         type: string
     type: object
-  handlers.UserLoginDetails:
-    properties:
-      email:
-        example: example@example.com
-        type: string
-      password:
-        example: lkIB53@6O^Y
-        type: string
-    type: object
   signals.ErrorCode:
     enum:
     - access_token_expired
@@ -472,6 +462,7 @@ definitions:
     - invalid_request
     - malformed_body
     - not_implemented
+    - password_too_short
     - refresh_token_expired
     - refresh_token_revoked
     - resource_already_exists
@@ -491,6 +482,7 @@ definitions:
     - ErrCodeInvalidRequest
     - ErrCodeMalformedBody
     - ErrCodeNotImplemented
+    - ErrCodePasswordTooShort
     - ErrCodeRefreshTokenExpired
     - ErrCodeRefreshTokenRevoked
     - ErrCodeResourceAlreadyExists
@@ -761,104 +753,6 @@ paths:
       summary: Create an ISN Retriever
       tags:
       - ISN config
-  /api/login:
-    post:
-      description: |-
-        The response body includes an access token and a refresh_token.
-        The access_token is valid for 1 hour.
-
-        Use the refresh_token with the /api/refresh endpoint to renew the access_token.
-        The refresh_token lasts 60 days unless it is revoked earlier.
-        To renew the refresh_token, log in again.
-      parameters:
-      - description: email and password
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.LoginRequest'
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.LoginResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/signals.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/signals.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/signals.ErrorResponse'
-      summary: Login
-      tags:
-      - auth
-  /api/refresh:
-    post:
-      description: |-
-        Returns a new JWT access token.
-        Access tokens are not issued if the refresh token has expired or been revoked.
-        Users must log in again to obtain a new refresh token if the current one has expired or been revoked.
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.RefreshAccessTokenHandler.refreshResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/signals.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/signals.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/signals.ErrorResponse'
-      security:
-      - BearerRefreshToken: []
-      summary: Refresh access token
-      tags:
-      - auth
-  /api/revoke:
-    post:
-      description: |-
-        Revoke a refresh token to prevent it being used to create new access tokens.
-
-        Note that any unexpired access tokens issued for this user will continue to work until they expire.
-        Users must log in again to obtain a new refresh token if the current one has been revoked.
-
-        Anyone in possession of a refresh token can revoke it
-      parameters:
-      - description: refresh token to be revoked
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.RevokeRefreshTokenHandler.revokeRefreshTokenRequest'
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/signals.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/signals.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/signals.ErrorResponse'
-      summary: Revoke refresh token
-      tags:
-      - auth
   /api/signal_defs:
     get:
       responses:
@@ -1027,83 +921,6 @@ paths:
       summary: Update signal definition
       tags:
       - signal definitions
-  /api/users:
-    get:
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/database.GetForDisplayUsersRow'
-            type: array
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/signals.ErrorResponse'
-      summary: Get the registered users
-      tags:
-      - auth
-    post:
-      parameters:
-      - description: user details
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.UserLoginDetails'
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/handlers.CreateUserResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/signals.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/signals.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/signals.ErrorResponse'
-      summary: Create user
-      tags:
-      - auth
-    put:
-      description: update email and/or password
-      parameters:
-      - description: user details
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.UserLoginDetails'
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/signals.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/signals.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/signals.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/signals.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Update user
-      tags:
-      - auth
   /api/users/{id}:
     get:
       parameters:
@@ -1125,6 +942,175 @@ paths:
           schema:
             $ref: '#/definitions/signals.ErrorResponse'
       summary: Get registered user
+      tags:
+      - auth
+  /auth/login:
+    post:
+      description: |-
+        The response body includes an access token and a refresh_token.
+        The access_token is valid for 1 hour.
+
+        Use the refresh_token with the /auth/refresh-token endpoint to renew the access_token.
+        The refresh_token lasts 60 days unless it is revoked earlier.
+        To renew the refresh_token, log in again.
+      parameters:
+      - description: email and password
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.LoginRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.LoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+      summary: Login
+      tags:
+      - auth
+  /auth/password/reset:
+    put:
+      description: |-
+        Use this api to reset the users password.  Requires a valid access token and the current password
+        TODO - forgotten password facility
+      parameters:
+      - description: user details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdatePasswordRequest'
+      - description: user id
+        example: sample-ISN--example-org
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Update password
+      tags:
+      - auth
+  /auth/refresh-token:
+    post:
+      description: |-
+        Returns a new JWT access token.
+        Access tokens are not issued if the refresh token has expired or been revoked.
+        Users must log in again to obtain a new refresh token if the current one has expired or been revoked.
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.RefreshAccessTokenHandler.refreshResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+      security:
+      - BearerRefreshToken: []
+      summary: Refresh access token
+      tags:
+      - auth
+  /auth/register:
+    post:
+      parameters:
+      - description: user details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdatePasswordRequest'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.CreateUserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+      summary: Create user
+      tags:
+      - auth
+  /auth/revoke-token:
+    post:
+      description: |-
+        Revoke a refresh token to prevent it being used to create new access tokens.
+
+        Note that any unexpired access tokens issued for this user will continue to work until they expire.
+        Users must log in again to obtain a new refresh token if the current one has been revoked.
+
+        Anyone in possession of a refresh token can revoke it
+      parameters:
+      - description: refresh token to be revoked
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RevokeRefreshTokenHandler.revokeRefreshTokenRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/signals.ErrorResponse'
+      summary: Revoke refresh token
       tags:
       - auth
 produces:

@@ -382,135 +382,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/login": {
-            "post": {
-                "description": "The response body includes an access token and a refresh_token.\nThe access_token is valid for 1 hour.\n\nUse the refresh_token with the /api/refresh endpoint to renew the access_token.\nThe refresh_token lasts 60 days unless it is revoked earlier.\nTo renew the refresh_token, log in again.",
-                "tags": [
-                    "auth"
-                ],
-                "summary": "Login",
-                "parameters": [
-                    {
-                        "description": "email and password",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.LoginRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.LoginResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/refresh": {
-            "post": {
-                "security": [
-                    {
-                        "BearerRefreshToken": []
-                    }
-                ],
-                "description": "Returns a new JWT access token.\nAccess tokens are not issued if the refresh token has expired or been revoked.\nUsers must log in again to obtain a new refresh token if the current one has expired or been revoked.",
-                "tags": [
-                    "auth"
-                ],
-                "summary": "Refresh access token",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.RefreshAccessTokenHandler.refreshResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/revoke": {
-            "post": {
-                "description": "Revoke a refresh token to prevent it being used to create new access tokens.\n\nNote that any unexpired access tokens issued for this user will continue to work until they expire.\nUsers must log in again to obtain a new refresh token if the current one has been revoked.\n\nAnyone in possession of a refresh token can revoke it",
-                "tags": [
-                    "auth"
-                ],
-                "summary": "Revoke refresh token",
-                "parameters": [
-                    {
-                        "description": "refresh token to be revoked",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.RevokeRefreshTokenHandler.revokeRefreshTokenRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/api/signal_defs": {
             "get": {
                 "tags": [
@@ -751,126 +622,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/users": {
-            "get": {
-                "tags": [
-                    "auth"
-                ],
-                "summary": "Get the registered users",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/database.GetForDisplayUsersRow"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "update email and/or password",
-                "tags": [
-                    "auth"
-                ],
-                "summary": "Update user",
-                "parameters": [
-                    {
-                        "description": "user details",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.UserLoginDetails"
-                        }
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "tags": [
-                    "auth"
-                ],
-                "summary": "Create user",
-                "parameters": [
-                    {
-                        "description": "user details",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.UserLoginDetails"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateUserResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/api/users/{id}": {
             "get": {
                 "tags": [
@@ -905,6 +656,242 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/auth/login": {
+            "post": {
+                "description": "The response body includes an access token and a refresh_token.\nThe access_token is valid for 1 hour.\n\nUse the refresh_token with the /auth/refresh-token endpoint to renew the access_token.\nThe refresh_token lasts 60 days unless it is revoked earlier.\nTo renew the refresh_token, log in again.",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Login",
+                "parameters": [
+                    {
+                        "description": "email and password",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.LoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.LoginResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/password/reset": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Use this api to reset the users password.  Requires a valid access token and the current password\nTODO - forgotten password facility",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Update password",
+                "parameters": [
+                    {
+                        "description": "user details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdatePasswordRequest"
+                        }
+                    },
+                    {
+                        "type": "string",
+                        "example": "sample-ISN--example-org",
+                        "description": "user id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/refresh-token": {
+            "post": {
+                "security": [
+                    {
+                        "BearerRefreshToken": []
+                    }
+                ],
+                "description": "Returns a new JWT access token.\nAccess tokens are not issued if the refresh token has expired or been revoked.\nUsers must log in again to obtain a new refresh token if the current one has expired or been revoked.",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Refresh access token",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.RefreshAccessTokenHandler.refreshResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/register": {
+            "post": {
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Create user",
+                "parameters": [
+                    {
+                        "description": "user details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdatePasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateUserResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/revoke-token": {
+            "post": {
+                "description": "Revoke a refresh token to prevent it being used to create new access tokens.\n\nNote that any unexpired access tokens issued for this user will continue to work until they expire.\nUsers must log in again to obtain a new refresh token if the current one has been revoked.\n\nAnyone in possession of a refresh token can revoke it",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Revoke refresh token",
+                "parameters": [
+                    {
+                        "description": "refresh token to be revoked",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.RevokeRefreshTokenHandler.revokeRefreshTokenRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/signals.ErrorResponse"
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -923,23 +910,6 @@ const docTemplate = `{
             }
         },
         "database.GetForDisplayUserBySignalDefIDRow": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "email": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "database.GetForDisplayUsersRow": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -1315,6 +1285,7 @@ const docTemplate = `{
                     "example": "example@example.com"
                 },
                 "password": {
+                    "description": "passwords must be at least 11 chars long",
                     "type": "string",
                     "example": "lkIB53@6O^Y"
                 }
@@ -1509,6 +1480,19 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.UpdatePasswordRequest": {
+            "type": "object",
+            "properties": {
+                "current_password": {
+                    "type": "string",
+                    "example": "lkIB53@6O^Y"
+                },
+                "new_password": {
+                    "type": "string",
+                    "example": "ue6U\u003e\u0026X3j570"
+                }
+            }
+        },
         "handlers.UpdateSignalDefRequest": {
             "type": "object",
             "properties": {
@@ -1536,19 +1520,6 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.UserLoginDetails": {
-            "type": "object",
-            "properties": {
-                "email": {
-                    "type": "string",
-                    "example": "example@example.com"
-                },
-                "password": {
-                    "type": "string",
-                    "example": "lkIB53@6O^Y"
-                }
-            }
-        },
         "signals.ErrorCode": {
             "type": "string",
             "enum": [
@@ -1561,6 +1532,7 @@ const docTemplate = `{
                 "invalid_request",
                 "malformed_body",
                 "not_implemented",
+                "password_too_short",
                 "refresh_token_expired",
                 "refresh_token_revoked",
                 "resource_already_exists",
@@ -1580,6 +1552,7 @@ const docTemplate = `{
                 "ErrCodeInvalidRequest",
                 "ErrCodeMalformedBody",
                 "ErrCodeNotImplemented",
+                "ErrCodePasswordTooShort",
                 "ErrCodeRefreshTokenExpired",
                 "ErrCodeRefreshTokenRevoked",
                 "ErrCodeResourceAlreadyExists",
