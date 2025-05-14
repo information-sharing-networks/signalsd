@@ -1237,18 +1237,18 @@ const docTemplate = `{
                     "example": "patch"
                 },
                 "detail": {
-                    "description": "description",
+                    "description": "updated description",
                     "type": "string",
-                    "example": "Sample Signal description"
+                    "example": "updated description"
                 },
                 "isn_slug": {
                     "type": "string",
                     "example": "sample-ISN--example-org"
                 },
                 "readme_url": {
-                    "description": "Note file must be on a public github repo",
+                    "description": "Updated readem file. Note file must be on a public github repo",
                     "type": "string",
-                    "example": "https://github.com/user/project/v0.0.1/locales/filename.md"
+                    "example": "https://github.com/user/project/v0.0.1/locales/new_t pfilename.md"
                 },
                 "schema_url": {
                     "description": "Note file must be on a public github repo",
@@ -1256,6 +1256,7 @@ const docTemplate = `{
                     "example": "https://github.com/user/project/v0.0.1/locales/filename.json"
                 },
                 "stage": {
+                    "description": "updated stage",
                     "type": "string",
                     "enum": [
                         "dev",
@@ -1264,8 +1265,7 @@ const docTemplate = `{
                         "deprecated",
                         "closed",
                         "shuttered"
-                    ],
-                    "example": "dev"
+                    ]
                 },
                 "title": {
                     "description": "unique title",

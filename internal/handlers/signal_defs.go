@@ -23,12 +23,10 @@ func NewSignalDefHandler(cfg *signals.ServiceConfig) *SignalDefHandler {
 
 type CreateSignalDefRequest struct {
 	SchemaURL string `json:"schema_url" example:"https://github.com/user/project/v0.0.1/locales/filename.json"` // Note file must be on a public github repo
-	ReadmeURL string `json:"readme_url" example:"https://github.com/user/project/v0.0.1/locales/filename.md"`   // Note file must be on a public github repo
 	Title     string `json:"title" example:"Sample Signal @example.org"`                                        // unique title
-	Detail    string `json:"detail" example:"Sample Signal description"`                                        // description
 	BumpType  string `json:"bump_type" example:"patch" enums:"major,minor,patch"`                               // this is used to increment semver for the signal definition
-	Stage     string `json:"stage" example:"dev" enums:"dev,test,live,deprecated,closed,shuttered"`
 	IsnSlug   string `json:"isn_slug" example:"sample-ISN--example-org"`
+	UpdateSignalDefRequest
 }
 
 type CreateSignalDefResponse struct {
@@ -47,7 +45,7 @@ type UpdateSignalDefRequest struct {
 // used in GET handler
 type SignalDefAndLinkedInfo struct {
 	database.GetForDisplaySignalDefBySlugRow
-	Isn  database.Isn                               `jon "isn"`
+	Isn  database.Isn                               `json:"isn"`
 	User database.GetForDisplayUserBySignalDefIDRow `json:"user"`
 }
 
@@ -236,13 +234,24 @@ func (s *SignalDefHandler) UpdateSignalDefHandler(w http.ResponseWriter, r *http
 		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, "did not receive userID from middleware")
 	}
 
-	signalDefID, ok := r.Context().Value(signals.SignalDefIDKey).(uuid.UUID)
-	if !ok {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, "signal_def_id not found in cotext")
+	slug := r.PathValue("slug")
+	semVer := r.PathValue("sem_ver")
+
+	// check signal def eists
+	signalDef, err := s.cfg.DB.GetSignalDefBySlug(r.Context(), database.GetSignalDefBySlugParams{
+		Slug:   slug,
+		SemVer: semVer,
+	})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			helpers.RespondWithError(w, r, http.StatusNotFound, signals.ErrCodeResourceNotFound, fmt.Sprintf("No signal definition found for %s/v%s", slug, semVer))
+			return
+		}
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("database error %v", err))
 		return
 	}
 
-	currentSignalDef, err := s.cfg.DB.GetSignalDefByID(r.Context(), signalDefID)
+	currentSignalDef, err := s.cfg.DB.GetSignalDefByID(r.Context(), signalDef.ID)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -301,7 +310,7 @@ func (s *SignalDefHandler) UpdateSignalDefHandler(w http.ResponseWriter, r *http
 
 	// update signal_defs
 	rowsAffected, err := s.cfg.DB.UpdateSignalDefDetails(r.Context(), database.UpdateSignalDefDetailsParams{
-		ID:        signalDefID,
+		ID:        signalDef.ID,
 		ReadmeURL: req.ReadmeURL,
 		Detail:    req.Detail,
 		Stage:     req.Stage,
@@ -339,21 +348,23 @@ func (s *SignalDefHandler) DeleteSignalDefHandler(w http.ResponseWriter, r *http
 		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, "did not receive userID from middleware")
 	}
 
-	signalDefID, ok := r.Context().Value(signals.SignalDefIDKey).(uuid.UUID)
-	if !ok {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, "signal_def_id not found in cotext")
+	slug := r.PathValue("slug")
+	semVer := r.PathValue("sem_ver")
+
+	// check signal def eists
+	signalDef, err := s.cfg.DB.GetSignalDefBySlug(r.Context(), database.GetSignalDefBySlugParams{
+		Slug:   slug,
+		SemVer: semVer,
+	})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			helpers.RespondWithError(w, r, http.StatusNotFound, signals.ErrCodeResourceNotFound, fmt.Sprintf("No signal definition found for %s/v%s", slug, semVer))
+			return
+		}
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("database error %v", err))
 		return
 	}
 
-	signalDef, err := s.cfg.DB.GetSignalDefByID(r.Context(), signalDefID)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeResourceNotFound, "Signal def not found")
-			return
-		}
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
-		return
-	}
 	if signalDef.UserID != userID {
 		helpers.RespondWithError(w, r, http.StatusUnauthorized, signals.ErrCodeAuthorizationFailure, "you can't delete this signal definition")
 		return

@@ -234,21 +234,22 @@ definitions:
         example: patch
         type: string
       detail:
-        description: description
-        example: Sample Signal description
+        description: updated description
+        example: updated description
         type: string
       isn_slug:
         example: sample-ISN--example-org
         type: string
       readme_url:
-        description: Note file must be on a public github repo
-        example: https://github.com/user/project/v0.0.1/locales/filename.md
+        description: Updated readem file. Note file must be on a public github repo
+        example: https://github.com/user/project/v0.0.1/locales/new_t pfilename.md
         type: string
       schema_url:
         description: Note file must be on a public github repo
         example: https://github.com/user/project/v0.0.1/locales/filename.json
         type: string
       stage:
+        description: updated stage
         enum:
         - dev
         - test
@@ -256,7 +257,6 @@ definitions:
         - deprecated
         - closed
         - shuttered
-        example: dev
         type: string
       title:
         description: unique title

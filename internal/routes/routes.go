@@ -6,7 +6,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/nickabs/signals"
 	"github.com/nickabs/signals/internal/handlers"
-	internalMiddleware "github.com/nickabs/signals/internal/middleware"
 
 	_ "github.com/nickabs/signals/docs"
 )
@@ -35,10 +34,9 @@ func RegisterRoutes(r *chi.Mux, cfg *signals.ServiceConfig) {
 
 	// signal defs
 	r.Post("/api/signal_defs", signalDefsHandler.CreateSignalDefHandler)
-	r.With(internalMiddleware.GetWithSignalDefSlug(cfg)).Put("/api/signal_defs/{slug}/v{sem_ver}", signalDefsHandler.UpdateSignalDefHandler)
-	r.With(internalMiddleware.GetWithSignalDefSlug(cfg)).Delete("/api/signal_defs/{slug}/v{sem_ver}", signalDefsHandler.DeleteSignalDefHandler)
+	r.Put("/api/signal_defs/{slug}/v{sem_ver}", signalDefsHandler.UpdateSignalDefHandler)
+	r.Delete("/api/signal_defs/{slug}/v{sem_ver}", signalDefsHandler.DeleteSignalDefHandler)
 	r.Get("/api/signal_defs", signalDefsHandler.GetSignalDefsHandler)
-	//r.With(internalMiddleware.GetWithSignalDefSlug(cfg)).Get("/api/signal_defs/{slug}/v{sem_ver}", signalDefsHandler.GetSignalDefHandler)
 	r.Get("/api/signal_defs/{slug}/v{sem_ver}", signalDefsHandler.GetSignalDefHandler)
 
 	// ISN management
