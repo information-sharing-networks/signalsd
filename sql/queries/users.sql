@@ -14,13 +14,13 @@ SELECT * FROM users WHERE email = $1;
 SELECT * FROM users WHERE id = $1;
 
 
--- name: GetAPIUsers :many
+-- name: GetForDisplayUsers :many
 SELECT u.id, u.email, u.created_at , u.updated_at FROM users u;
 
--- name: GetAPIUserByID :one
+-- name: GetForDisplayUserByID :one
 SELECT  u.id, u.email, u.created_at  FROM users u WHERE u.id = $1;
 
--- name: GetAPIUserBySignalDefID :one
+-- name: GetForDisplayUserBySignalDefID :one
 SELECT u.id, u.email, u.created_at , u.updated_at 
 FROM users u 
 JOIN signal_defs sd ON u.id = sd.user_id 

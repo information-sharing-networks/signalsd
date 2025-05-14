@@ -127,7 +127,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "the receiver service should be hosted on {receiver_origin}/signals/receiver/{receiver_slug}",
+                "description": "A receiver service handles incoming signals and will be hosted on {receiver_origin}/signals/receiver/{receiver_slug}\n\nWhen the ISN storage_type is set to \"local\", the receiver_origin must also be \"local\", indicating that the signals are stored in the relational database used by the API service.\n\nthe receiver service should be hosted on {receiver_origin}/signals/receiver/{receiver_slug}",
                 "tags": [
                     "ISN config"
                 ],
@@ -178,7 +178,6 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "the retriever service should be hosted on {retriever_origin}/signals/retriever/{retriever_slug}",
                 "tags": [
                     "ISN config"
                 ],
@@ -234,7 +233,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "the retriever service should be hosted on {retriever_origin}/signals/retriever/{retriever_slug}",
+                "description": "the retriever service handles requests to get signals and will be hosted on {retriever_origin}/signals/retriever/{retriever_slug}\n\nWhen the ISN storage_type is set to \"local\", the retriever_origin must also be \"local\", indicating that the signals are retieved from the relational database used by the API service.\n",
                 "tags": [
                     "ISN config"
                 ],
@@ -285,7 +284,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Update ISN details",
+                "description": "Update the ISN details",
                 "tags": [
                     "ISN config"
                 ],
@@ -339,11 +338,11 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "The standard way to refer to an ISN config is using a url like this http://{hostname}/api/isn/{slug}\n\nThe definitions are also available at http://{hostname}/api/isn/{id}\n\nwhen storage_type = \"local\" the signals are stored in the relational database used by the API service to store the admin configuration",
+                "description": "Create an Information Sharing Network (ISN)\n\nvisibility = \"private\" means that signals on the network can only be seen by network participants.\n\nThe only storage_type currently supported is \"local\"\nwhen storage_type = \"local\" the signals are stored in the relational database used by the API service to store the admin configuration",
                 "tags": [
                     "ISN config"
                 ],
-                "summary": "Create an Information Sharing Network (ISN)",
+                "summary": "Create an ISN",
                 "parameters": [
                     {
                         "description": "ISN details",
@@ -542,7 +541,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "A signal definition describes a data set that is sharable over the signals ISN\n\nA URL-friendly slug is created based on the title supplied when you load the first version of a definition.\nThe title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.\n\nSlugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new definition and specify the bump type (major/minor/patch) to increment the semver\n\nThe standard way to refer to a signal definition is using a url like this http://{hostname}/api/signal_defs/{slug}/v{sem_ver}\n\nThe definitions are also available at http://{hostname}/api/signal_defs/{signal_def_id}",
+                "description": "A signal definition describes a data set that is sharable over an ISN.  Setup the ISN before defining any signal defs.\n\nA URL-friendly slug is created based on the title supplied when you load the first version of a definition.\nThe title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.\n\nSlugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new definition and specify the bump type (major/minor/patch) to increment the semver\n\nSignal definitions are referred to with a url like this http://{hostname}/api/signal_defs/{slug}/v{sem_ver}\n",
                 "tags": [
                     "signal definitions"
                 ],
@@ -614,7 +613,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.GetAPISignalDef"
+                            "$ref": "#/definitions/handlers.SignalDefAndLinkedInfo"
                         }
                     },
                     "400": {
@@ -764,7 +763,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/database.GetAPIUsersRow"
+                                "$ref": "#/definitions/database.GetForDisplayUsersRow"
                             }
                         }
                     },
@@ -894,7 +893,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/database.GetAPIUserByIDRow"
+                                "$ref": "#/definitions/database.GetForDisplayUserByIDRow"
                             }
                         }
                     },
@@ -909,7 +908,7 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "database.GetAPIUserByIDRow": {
+        "database.GetForDisplayUserByIDRow": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -923,7 +922,7 @@ const docTemplate = `{
                 }
             }
         },
-        "database.GetAPIUserBySignalDefIDRow": {
+        "database.GetForDisplayUserBySignalDefIDRow": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -940,7 +939,7 @@ const docTemplate = `{
                 }
             }
         },
-        "database.GetAPIUsersRow": {
+        "database.GetForDisplayUsersRow": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -997,6 +996,41 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "database.Isn": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "detail": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_in_use": {
+                    "type": "boolean"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "storage_type": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                },
+                "visibility": {
                     "type": "string"
                 }
             }
@@ -1096,10 +1130,6 @@ const docTemplate = `{
                     "type": "boolean",
                     "example": true
                 },
-                "slug": {
-                    "type": "string",
-                    "example": "sample-isn--example-org"
-                },
                 "storage_type": {
                     "type": "string",
                     "example": "mq"
@@ -1127,7 +1157,7 @@ const docTemplate = `{
                 },
                 "resource_url": {
                     "type": "string",
-                    "example": "http://localhost:8080/api/isn/{isn_slug}"
+                    "example": "http://localhost:8080/api/isn/sample-ISN--example-org"
                 },
                 "slug": {
                     "type": "string",
@@ -1277,44 +1307,6 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.GetAPISignalDef": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "detail": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "readme_url": {
-                    "type": "string"
-                },
-                "schema_url": {
-                    "type": "string"
-                },
-                "sem_ver": {
-                    "type": "string"
-                },
-                "slug": {
-                    "type": "string"
-                },
-                "stage": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "user": {
-                    "$ref": "#/definitions/database.GetAPIUserBySignalDefIDRow"
-                }
-            }
-        },
         "handlers.LoginRequest": {
             "type": "object",
             "properties": {
@@ -1364,6 +1356,47 @@ const docTemplate = `{
                 "refresh_token": {
                     "type": "string",
                     "example": "fb948e0b74de1f65e801b4e70fc9c047424ab775f2b4dc5226f472f3b6460c37"
+                }
+            }
+        },
+        "handlers.SignalDefAndLinkedInfo": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "detail": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "isn": {
+                    "$ref": "#/definitions/database.Isn"
+                },
+                "readme_url": {
+                    "type": "string"
+                },
+                "schema_url": {
+                    "type": "string"
+                },
+                "sem_ver": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "stage": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/database.GetForDisplayUserBySignalDefIDRow"
                 }
             }
         },

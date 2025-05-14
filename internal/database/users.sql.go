@@ -49,40 +49,40 @@ func (q *Queries) ExistsUserWithEmail(ctx context.Context, email string) (bool, 
 	return exists, err
 }
 
-const getAPIUserByID = `-- name: GetAPIUserByID :one
+const getForDisplayUserByID = `-- name: GetForDisplayUserByID :one
 SELECT  u.id, u.email, u.created_at  FROM users u WHERE u.id = $1
 `
 
-type GetAPIUserByIDRow struct {
+type GetForDisplayUserByIDRow struct {
 	ID        uuid.UUID `json:"id"`
 	Email     string    `json:"email"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
-func (q *Queries) GetAPIUserByID(ctx context.Context, id uuid.UUID) (GetAPIUserByIDRow, error) {
-	row := q.db.QueryRowContext(ctx, getAPIUserByID, id)
-	var i GetAPIUserByIDRow
+func (q *Queries) GetForDisplayUserByID(ctx context.Context, id uuid.UUID) (GetForDisplayUserByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getForDisplayUserByID, id)
+	var i GetForDisplayUserByIDRow
 	err := row.Scan(&i.ID, &i.Email, &i.CreatedAt)
 	return i, err
 }
 
-const getAPIUserBySignalDefID = `-- name: GetAPIUserBySignalDefID :one
+const getForDisplayUserBySignalDefID = `-- name: GetForDisplayUserBySignalDefID :one
 SELECT u.id, u.email, u.created_at , u.updated_at 
 FROM users u 
 JOIN signal_defs sd ON u.id = sd.user_id 
 WHERE sd.id = $1
 `
 
-type GetAPIUserBySignalDefIDRow struct {
+type GetForDisplayUserBySignalDefIDRow struct {
 	ID        uuid.UUID `json:"id"`
 	Email     string    `json:"email"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-func (q *Queries) GetAPIUserBySignalDefID(ctx context.Context, id uuid.UUID) (GetAPIUserBySignalDefIDRow, error) {
-	row := q.db.QueryRowContext(ctx, getAPIUserBySignalDefID, id)
-	var i GetAPIUserBySignalDefIDRow
+func (q *Queries) GetForDisplayUserBySignalDefID(ctx context.Context, id uuid.UUID) (GetForDisplayUserBySignalDefIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getForDisplayUserBySignalDefID, id)
+	var i GetForDisplayUserBySignalDefIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.Email,
@@ -92,26 +92,26 @@ func (q *Queries) GetAPIUserBySignalDefID(ctx context.Context, id uuid.UUID) (Ge
 	return i, err
 }
 
-const getAPIUsers = `-- name: GetAPIUsers :many
+const getForDisplayUsers = `-- name: GetForDisplayUsers :many
 SELECT u.id, u.email, u.created_at , u.updated_at FROM users u
 `
 
-type GetAPIUsersRow struct {
+type GetForDisplayUsersRow struct {
 	ID        uuid.UUID `json:"id"`
 	Email     string    `json:"email"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-func (q *Queries) GetAPIUsers(ctx context.Context) ([]GetAPIUsersRow, error) {
-	rows, err := q.db.QueryContext(ctx, getAPIUsers)
+func (q *Queries) GetForDisplayUsers(ctx context.Context) ([]GetForDisplayUsersRow, error) {
+	rows, err := q.db.QueryContext(ctx, getForDisplayUsers)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetAPIUsersRow
+	var items []GetForDisplayUsersRow
 	for rows.Next() {
-		var i GetAPIUsersRow
+		var i GetForDisplayUsersRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Email,

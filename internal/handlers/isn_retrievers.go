@@ -44,7 +44,10 @@ type UpdateIsnRetrieverRequest struct {
 // CreateIsnRetrieverHandler godoc
 //
 //	@Summary		Create an ISN Retriever
-//	@Description	the retriever service should be hosted on {retriever_origin}/signals/retriever/{retriever_slug}
+//	@Description	the retriever service handles requests to get signals and will be hosted on {retriever_origin}/signals/retriever/{retriever_slug}
+//	@Description
+//	@Description	When the ISN storage_type is set to "local", the retriever_origin must also be "local", indicating that the signals are retieved from the relational database used by the API service.
+//	@Description
 //
 //	@Tags			ISN config
 //
@@ -176,7 +179,6 @@ func (i *IsnRetrieverHandler) CreateIsnRetrieverHandler(w http.ResponseWriter, r
 // UpdateIsnRetrieverHandler godoc
 //
 //	@Summary		Update an ISN Retriever
-//	@Description	the retriever service should be hosted on {retriever_origin}/signals/retriever/{retriever_slug}
 //
 //	@Tags			ISN config
 //

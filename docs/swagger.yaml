@@ -1,7 +1,7 @@
 consumes:
 - application/json
 definitions:
-  database.GetAPIUserByIDRow:
+  database.GetForDisplayUserByIDRow:
     properties:
       created_at:
         type: string
@@ -10,7 +10,7 @@ definitions:
       id:
         type: string
     type: object
-  database.GetAPIUserBySignalDefIDRow:
+  database.GetForDisplayUserBySignalDefIDRow:
     properties:
       created_at:
         type: string
@@ -21,7 +21,7 @@ definitions:
       updated_at:
         type: string
     type: object
-  database.GetAPIUsersRow:
+  database.GetForDisplayUsersRow:
     properties:
       created_at:
         type: string
@@ -59,6 +59,29 @@ definitions:
       updated_at:
         type: string
       user_id:
+        type: string
+    type: object
+  database.Isn:
+    properties:
+      created_at:
+        type: string
+      detail:
+        type: string
+      id:
+        type: string
+      is_in_use:
+        type: boolean
+      slug:
+        type: string
+      storage_type:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+      visibility:
         type: string
     type: object
   handlers.CreateIsnReceiverRequest:
@@ -132,9 +155,6 @@ definitions:
       is_in_use:
         example: true
         type: boolean
-      slug:
-        example: sample-isn--example-org
-        type: string
       storage_type:
         example: mq
         type: string
@@ -154,7 +174,7 @@ definitions:
         example: 67890684-3b14-42cf-b785-df28ce570400
         type: string
       resource_url:
-        example: http://localhost:8080/api/isn/{isn_slug}
+        example: http://localhost:8080/api/isn/sample-ISN--example-org
         type: string
       slug:
         example: sample-ISN--example-org
@@ -266,31 +286,6 @@ definitions:
         example: http://localhost:8080/api/users/01a38b82-cbc7-4a24-b61f-e55cb99ac41e
         type: string
     type: object
-  handlers.GetAPISignalDef:
-    properties:
-      created_at:
-        type: string
-      detail:
-        type: string
-      id:
-        type: string
-      readme_url:
-        type: string
-      schema_url:
-        type: string
-      sem_ver:
-        type: string
-      slug:
-        type: string
-      stage:
-        type: string
-      title:
-        type: string
-      updated_at:
-        type: string
-      user:
-        $ref: '#/definitions/database.GetAPIUserBySignalDefIDRow'
-    type: object
   handlers.LoginRequest:
     properties:
       email:
@@ -326,6 +321,33 @@ definitions:
       refresh_token:
         example: fb948e0b74de1f65e801b4e70fc9c047424ab775f2b4dc5226f472f3b6460c37
         type: string
+    type: object
+  handlers.SignalDefAndLinkedInfo:
+    properties:
+      created_at:
+        type: string
+      detail:
+        type: string
+      id:
+        type: string
+      isn:
+        $ref: '#/definitions/database.Isn'
+      readme_url:
+        type: string
+      schema_url:
+        type: string
+      sem_ver:
+        type: string
+      slug:
+        type: string
+      stage:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+      user:
+        $ref: '#/definitions/database.GetForDisplayUserBySignalDefIDRow'
     type: object
   handlers.UpdateIsnReceiverRequest:
     properties:
@@ -526,10 +548,11 @@ paths:
   /api/isn/{isn_slug}:
     post:
       description: |-
-        The standard way to refer to an ISN config is using a url like this http://{hostname}/api/isn/{slug}
+        Create an Information Sharing Network (ISN)
 
-        The definitions are also available at http://{hostname}/api/isn/{id}
+        visibility = "private" means that signals on the network can only be seen by network participants.
 
+        The only storage_type currently supported is "local"
         when storage_type = "local" the signals are stored in the relational database used by the API service to store the admin configuration
       parameters:
       - description: ISN details
@@ -557,11 +580,11 @@ paths:
             $ref: '#/definitions/signals.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Create an Information Sharing Network (ISN)
+      summary: Create an ISN
       tags:
       - ISN config
     put:
-      description: Update ISN details
+      description: Update the ISN details
       parameters:
       - description: isn slug
         example: sample-ISN--example-org
@@ -633,7 +656,12 @@ paths:
       - ISN config
   /api/isn/receiver/{receiver_slug}:
     post:
-      description: the receiver service should be hosted on {receiver_origin}/signals/receiver/{receiver_slug}
+      description: |-
+        A receiver service handles incoming signals and will be hosted on {receiver_origin}/signals/receiver/{receiver_slug}
+
+        When the ISN storage_type is set to "local", the receiver_origin must also be "local", indicating that the signals are stored in the relational database used by the API service.
+
+        the receiver service should be hosted on {receiver_origin}/signals/receiver/{receiver_slug}
       parameters:
       - description: ISN receiver details
         in: body
@@ -665,7 +693,6 @@ paths:
       - ISN config
   /api/isn/retriever/{isn_retrievers_slug}:
     put:
-      description: the retriever service should be hosted on {retriever_origin}/signals/retriever/{retriever_slug}
       parameters:
       - description: isn retriever slug
         example: sample-ISN-retriever--example-org
@@ -701,7 +728,10 @@ paths:
       - ISN config
   /api/isn/retriever/{retriever_slug}:
     post:
-      description: the retriever service should be hosted on {retriever_origin}/signals/retriever/{retriever_slug}
+      description: |
+        the retriever service handles requests to get signals and will be hosted on {retriever_origin}/signals/retriever/{retriever_slug}
+
+        When the ISN storage_type is set to "local", the retriever_origin must also be "local", indicating that the signals are retieved from the relational database used by the API service.
       parameters:
       - description: ISN retriever details
         in: body
@@ -846,17 +876,15 @@ paths:
       tags:
       - signal definitions
     post:
-      description: |-
-        A signal definition describes a data set that is sharable over the signals ISN
+      description: |
+        A signal definition describes a data set that is sharable over an ISN.  Setup the ISN before defining any signal defs.
 
         A URL-friendly slug is created based on the title supplied when you load the first version of a definition.
         The title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.
 
         Slugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new definition and specify the bump type (major/minor/patch) to increment the semver
 
-        The standard way to refer to a signal definition is using a url like this http://{hostname}/api/signal_defs/{slug}/v{sem_ver}
-
-        The definitions are also available at http://{hostname}/api/signal_defs/{signal_def_id}
+        Signal definitions are referred to with a url like this http://{hostname}/api/signal_defs/{slug}/v{sem_ver}
       parameters:
       - description: signal definition details
         in: body
@@ -939,7 +967,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.GetAPISignalDef'
+            $ref: '#/definitions/handlers.SignalDefAndLinkedInfo'
         "400":
           description: Bad Request
           schema:
@@ -1006,7 +1034,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/database.GetAPIUsersRow'
+              $ref: '#/definitions/database.GetForDisplayUsersRow'
             type: array
         "500":
           description: Internal Server Error
@@ -1090,7 +1118,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/database.GetAPIUserByIDRow'
+              $ref: '#/definitions/database.GetForDisplayUserByIDRow'
             type: array
         "500":
           description: Internal Server Error

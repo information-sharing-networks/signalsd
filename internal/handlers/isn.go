@@ -23,7 +23,6 @@ func NewIsnHandler(cfg *signals.ServiceConfig) *IsnHandler {
 
 type CreateIsnRequest struct {
 	Title string `json:"title" example:"Sample ISN @example.org"`
-	Slug  string `json:"slug" example:"sample-isn--example-org"`
 	UpdateIsnRequest
 }
 
@@ -37,14 +36,17 @@ type UpdateIsnRequest struct {
 type CreateIsnResponse struct {
 	ID          uuid.UUID `json:"id" example:"67890684-3b14-42cf-b785-df28ce570400"`
 	Slug        string    `json:"slug" example:"sample-ISN--example-org"`
-	ResourceURL string    `json:"resource_url" example:"http://localhost:8080/api/isn/{isn_slug}"`
+	ResourceURL string    `json:"resource_url" example:"http://localhost:8080/api/isn/sample-ISN--example-org"`
 }
 
 // CreateIsnHandler godoc
 //
-//	@Summary		Create an Information Sharing Network (ISN)
-//	@Description	The standard way to refer to an ISN config is with a url like this http://{hostname}/api/isn/{isn_slug}
+//	@Summary		Create an ISN
+//	@Description	Create an Information Sharing Network (ISN)
 //	@Description
+//	@Description	visibility = "private" means that signals on the network can only be seen by network participants.
+//	@Description
+//	@Description	The only storage_type currently supported is "local"
 //	@Description	when storage_type = "local" the signals are stored in the relational database used by the API service to store the admin configuration
 //
 //	@Tags			ISN config
@@ -94,7 +96,7 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	exists, err := i.cfg.DB.ExistsIsnWithSlug(r.Context(), slug)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, fmt.Sprintf("database error: %v", err))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, "database error")
 		return
 	}
 	if exists {

@@ -109,7 +109,7 @@ func (q *Queries) ExistsSignalDefWithSlugAndDifferentUser(ctx context.Context, a
 	return exists, err
 }
 
-const getAPISignalDefByID = `-- name: GetAPISignalDefByID :one
+const getForDisplaySignalDefByID = `-- name: GetForDisplaySignalDefByID :one
 SELECT 
     sd.id,
     sd.created_at,
@@ -125,7 +125,7 @@ FROM signal_defs sd
 WHERE sd.id = $1
 `
 
-type GetAPISignalDefByIDRow struct {
+type GetForDisplaySignalDefByIDRow struct {
 	ID        uuid.UUID `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -138,9 +138,62 @@ type GetAPISignalDefByIDRow struct {
 	Stage     string    `json:"stage"`
 }
 
-func (q *Queries) GetAPISignalDefByID(ctx context.Context, id uuid.UUID) (GetAPISignalDefByIDRow, error) {
-	row := q.db.QueryRowContext(ctx, getAPISignalDefByID, id)
-	var i GetAPISignalDefByIDRow
+func (q *Queries) GetForDisplaySignalDefByID(ctx context.Context, id uuid.UUID) (GetForDisplaySignalDefByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getForDisplaySignalDefByID, id)
+	var i GetForDisplaySignalDefByIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Slug,
+		&i.SchemaURL,
+		&i.ReadmeURL,
+		&i.Title,
+		&i.Detail,
+		&i.SemVer,
+		&i.Stage,
+	)
+	return i, err
+}
+
+const getForDisplaySignalDefBySlug = `-- name: GetForDisplaySignalDefBySlug :one
+SELECT 
+    sd.id,
+    sd.created_at,
+    sd.updated_at,
+    sd.slug,
+    sd.schema_url,
+    sd.readme_url,
+    sd.title,
+    sd.detail,
+    sd.sem_ver,
+    sd.stage
+FROM signal_defs sd
+WHERE sd.slug = $1
+  AND sd.sem_ver = $2
+`
+
+type GetForDisplaySignalDefBySlugParams struct {
+	Slug   string `json:"slug"`
+	SemVer string `json:"sem_ver"`
+}
+
+type GetForDisplaySignalDefBySlugRow struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Slug      string    `json:"slug"`
+	SchemaURL string    `json:"schema_url"`
+	ReadmeURL string    `json:"readme_url"`
+	Title     string    `json:"title"`
+	Detail    string    `json:"detail"`
+	SemVer    string    `json:"sem_ver"`
+	Stage     string    `json:"stage"`
+}
+
+func (q *Queries) GetForDisplaySignalDefBySlug(ctx context.Context, arg GetForDisplaySignalDefBySlugParams) (GetForDisplaySignalDefBySlugRow, error) {
+	row := q.db.QueryRowContext(ctx, getForDisplaySignalDefBySlug, arg.Slug, arg.SemVer)
+	var i GetForDisplaySignalDefBySlugRow
 	err := row.Scan(
 		&i.ID,
 		&i.CreatedAt,

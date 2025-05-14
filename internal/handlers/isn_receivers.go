@@ -49,6 +49,10 @@ type UpdateIsnReceiverRequest struct {
 // CreateIsnReceiverHandler godoc
 //
 //	@Summary		Create an ISN Receiver
+//	@Description	A receiver service handles incoming signals and will be hosted on {receiver_origin}/signals/receiver/{receiver_slug}
+//	@Description
+//	@Description	When the ISN storage_type is set to "local", the receiver_origin must also be "local", indicating that the signals are stored in the relational database used by the API service.
+//	@Description
 //	@Description	the receiver service should be hosted on {receiver_origin}/signals/receiver/{receiver_slug}
 //
 //	@Tags			ISN config

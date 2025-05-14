@@ -35,13 +35,11 @@ func RegisterRoutes(r *chi.Mux, cfg *signals.ServiceConfig) {
 
 	// signal defs
 	r.Post("/api/signal_defs", signalDefsHandler.CreateSignalDefHandler)
-	r.With(internalMiddleware.GetWithSignalDefID()).Put("/api/signal_defs/{signal_def_id}", signalDefsHandler.UpdateSignalDefHandler)
 	r.With(internalMiddleware.GetWithSignalDefSlug(cfg)).Put("/api/signal_defs/{slug}/v{sem_ver}", signalDefsHandler.UpdateSignalDefHandler)
-	r.With(internalMiddleware.GetWithSignalDefID()).Delete("/api/signal_defs/{signal_def_id}", signalDefsHandler.DeleteSignalDefHandler)
 	r.With(internalMiddleware.GetWithSignalDefSlug(cfg)).Delete("/api/signal_defs/{slug}/v{sem_ver}", signalDefsHandler.DeleteSignalDefHandler)
 	r.Get("/api/signal_defs", signalDefsHandler.GetSignalDefsHandler)
-	r.With(internalMiddleware.GetWithSignalDefID()).Get("/api/signal_defs/{signal_def_id}", signalDefsHandler.GetSignalDefHandler)
-	r.With(internalMiddleware.GetWithSignalDefSlug(cfg)).Get("/api/signal_defs/{slug}/v{sem_ver}", signalDefsHandler.GetSignalDefHandler)
+	//r.With(internalMiddleware.GetWithSignalDefSlug(cfg)).Get("/api/signal_defs/{slug}/v{sem_ver}", signalDefsHandler.GetSignalDefHandler)
+	r.Get("/api/signal_defs/{slug}/v{sem_ver}", signalDefsHandler.GetSignalDefHandler)
 
 	// ISN management
 	r.Post("/api/isn", isnHandler.CreateIsnHandler)

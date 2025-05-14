@@ -44,24 +44,25 @@ type UpdateSignalDefRequest struct {
 	Stage     string `json:"stage" enums:"dev,test,live,deprecated,closed,shuttered"`                                // updated stage
 }
 
-type GetAPISignalDef struct {
-	database.GetAPISignalDefByIDRow
-	User database.GetAPIUserBySignalDefIDRow `json:"user"`
+// used in GET handler
+type SignalDefAndLinkedInfo struct {
+	database.GetForDisplaySignalDefBySlugRow
+	Isn  database.Isn                               `jon "isn"`
+	User database.GetForDisplayUserBySignalDefIDRow `json:"user"`
 }
 
 // CreateSignalDefHandler godoc
 //
 //	@Summary		Create signal definition
-//	@Description	A signal definition describes a data set that is sharable over the signals ISN
+//	@Description	A signal definition describes a data set that is sharable over an ISN.  Setup the ISN before defining any signal defs.
 //	@Description
 //	@Description	A URL-friendly slug is created based on the title supplied when you load the first version of a definition.
 //	@Description	The title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.
 //	@Description
 //	@Description	Slugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new definition and specify the bump type (major/minor/patch) to increment the semver
 //	@Description
-//	@Description	The standard way to refer to a signal definition is using a url like this http://{hostname}/api/signal_defs/{slug}/v{sem_ver}
+//	@Description	Signal definitions are referred to with a url like this http://{hostname}/api/signal_defs/{slug}/v{sem_ver}
 //	@Description
-//	@Description	The definitions are also available at http://{hostname}/api/signal_defs/{signal_def_id}
 //
 //	@Tags			signal definitions
 //
@@ -378,7 +379,7 @@ func (s *SignalDefHandler) DeleteSignalDefHandler(w http.ResponseWriter, r *http
 //
 //	@Tags		signal definitions
 //
-//	@Success	200	{object}	handlers.GetAPISignalDef
+//	@Success	200	{object}	handlers.SignalDefAndLinkedInfo
 //	@Failure	400	{object}	signals.ErrorResponse
 //	@Failure	404	{object}	signals.ErrorResponse
 //	@Failure	500	{object}	signals.ErrorResponse
@@ -386,33 +387,40 @@ func (s *SignalDefHandler) DeleteSignalDefHandler(w http.ResponseWriter, r *http
 //	@Router		/api/signal_defs/{slug}/v{sem_ver} [get]
 func (s *SignalDefHandler) GetSignalDefHandler(w http.ResponseWriter, r *http.Request) {
 
-	signalDefID, ok := r.Context().Value(signals.SignalDefIDKey).(uuid.UUID)
-	if !ok {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, "signal_def_id not found in cotext")
-		return
-	}
+	slug := r.PathValue("slug")
+	semVer := r.PathValue("sem_ver")
 
-	signalDef, err := s.cfg.DB.GetAPISignalDefByID(r.Context(), signalDefID)
+	// check signal def eists
+	signalDef, err := s.cfg.DB.GetForDisplaySignalDefBySlug(r.Context(), database.GetForDisplaySignalDefBySlugParams{
+		Slug:   slug,
+		SemVer: semVer,
+	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			helpers.RespondWithError(w, r, http.StatusNotFound, signals.ErrCodeResourceNotFound, fmt.Sprintf("No signal definition found for id %v", signalDefID))
+			helpers.RespondWithError(w, r, http.StatusNotFound, signals.ErrCodeResourceNotFound, fmt.Sprintf("No signal definition found for %s/v%s", slug, semVer))
 			return
 		}
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the signal definition from the database %v", err))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("database error %v", err))
 		return
 	}
-	var res GetAPISignalDef
+
+	isn, err := s.cfg.DB.GetIsnBySignalDefID(r.Context(), signalDef.ID)
+	if err != nil {
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("database error %v", err))
+		return
+	}
 
 	// get the owner of the signal def
-	user, err := s.cfg.DB.GetAPIUserBySignalDefID(r.Context(), signalDefID)
+	user, err := s.cfg.DB.GetForDisplayUserBySignalDefID(r.Context(), signalDef.ID)
 	if err != nil {
 		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the user for this signal definition: %v", err))
 		return
 	}
 
-	res = GetAPISignalDef{
-		GetAPISignalDefByIDRow: signalDef,
-		User:                   user,
+	res := SignalDefAndLinkedInfo{
+		GetForDisplaySignalDefBySlugRow: signalDef,
+		Isn:                             isn,
+		User:                            user,
 	}
 	helpers.RespondWithJSON(w, http.StatusOK, res)
 }

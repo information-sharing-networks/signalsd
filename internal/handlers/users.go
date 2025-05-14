@@ -194,7 +194,7 @@ func (u *UserHandler) UpdateUserHandler(w http.ResponseWriter, r *http.Request) 
 //	@Tags		auth
 //
 //	@Param		id	path		string	true	"user id"	example(68fb5f5b-e3f5-4a96-8d35-cd2203a06f73)
-//	@Success	200	{array}		database.GetAPIUserByIDRow
+//	@Success	200	{array}		database.GetForDisplayUserByIDRow
 //	@Failure	500	{object}	signals.ErrorResponse
 //
 //	@Router		/api/users/{id} [get]
@@ -207,7 +207,7 @@ func (u *UserHandler) GetUserByIDHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	res, err := u.cfg.DB.GetAPIUserByID(r.Context(), userID)
+	res, err := u.cfg.DB.GetForDisplayUserByID(r.Context(), userID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			helpers.RespondWithError(w, r, http.StatusNotFound, signals.ErrCodeResourceNotFound, fmt.Sprintf("No user found for id %v", userID))
@@ -225,13 +225,13 @@ func (u *UserHandler) GetUserByIDHandler(w http.ResponseWriter, r *http.Request)
 //	@Summary	Get the registered users
 //	@Tags		auth
 //
-//	@Success	200	{array}		database.GetAPIUsersRow
+//	@Success	200	{array}		database.GetForDisplayUsersRow
 //	@Failure	500	{object}	signals.ErrorResponse
 //
 //	@Router		/api/users [get]
 func (u *UserHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 
-	res, err := u.cfg.DB.GetAPIUsers(r.Context())
+	res, err := u.cfg.DB.GetForDisplayUsers(r.Context())
 	if err != nil {
 		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("error getting user from database: %v", err))
 		return

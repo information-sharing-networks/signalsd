@@ -34,6 +34,12 @@ SELECT *
 FROM isn i
 WHERE i.slug = $1;
 
+-- name: GetIsnBySignalDefID :one
+SELECT i.* 
+FROM isn i
+JOIN signal_defs sd on sd.isn_id = i.id
+WHERE sd.id = $1;
+
 -- name: ExistsIsnWithSlug :one
 
 SELECT EXISTS

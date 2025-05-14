@@ -55,7 +55,7 @@ JOIN users u ON sd.user_id = u.id
 WHERE sd.slug = $1
 AND sd.sem_ver = $2;
 
--- name: GetAPISignalDefByID :one
+-- name: GetForDisplaySignalDefByID :one
 SELECT 
     sd.id,
     sd.created_at,
@@ -70,6 +70,21 @@ SELECT
 FROM signal_defs sd
 WHERE sd.id = $1;
 
+-- name: GetForDisplaySignalDefBySlug :one
+SELECT 
+    sd.id,
+    sd.created_at,
+    sd.updated_at,
+    sd.slug,
+    sd.schema_url,
+    sd.readme_url,
+    sd.title,
+    sd.detail,
+    sd.sem_ver,
+    sd.stage
+FROM signal_defs sd
+WHERE sd.slug = $1
+  AND sd.sem_ver = $2;
 
 -- name: GetSemVerAndSchemaForLatestSlugVersion :one
 -- if there are no signals defs for the supplied slug, this query returns an empty string for schema_url and a sem_ver of '0.0.0' 
