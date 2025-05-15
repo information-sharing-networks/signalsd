@@ -106,7 +106,7 @@ func (a *AuthHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.R
 //	@Failure		404	{object}	apperrors.ErrorResponse
 //	@Failure		500	{object}	apperrors.ErrorResponse
 //
-//	@Router			/auth/revoke-token [post]
+//	@Router			/auth/revoke-refresh-token [post]
 func (a *AuthHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 	type revokeRefreshTokenRequest struct {
 		RefreshToken string `json:"refresh_token" example:"fb948e0b74de1f65e801b4e70fc9c047424ab775f2b4dc5226f472f3b6460c37"`

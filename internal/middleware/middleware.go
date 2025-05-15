@@ -64,7 +64,7 @@ func AuthorizationMiddleware(authService auth.AuthService) func(http.Handler) ht
 			case r.Method == http.MethodPost && r.URL.Path == "/auth/refresh-token":
 				reqLogger.Info().Msg("refresh access code, refresh token") // todo middleware
 
-			case r.Method == http.MethodPost && r.URL.Path == "/auth/revoke-token":
+			case r.Method == http.MethodPost && r.URL.Path == "/auth/revoke-refresh-token":
 				reqLogger.Info().Msg("revoke refresh code, skipping authorization check")
 
 			case r.Method == http.MethodPost && r.URL.Path == "/auth/register":

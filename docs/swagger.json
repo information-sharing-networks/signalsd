@@ -7,10 +7,8 @@
     ],
     "swagger": "2.0",
     "info": {
-        "description": "Signals service API",
-        "title": "Signals",
-        "contact": {},
-        "version": "v0.0.1"
+        "description": "Signals ISN service API",
+        "contact": {}
     },
     "host": "localhost:8080",
     "paths": {
@@ -843,7 +841,7 @@
                 }
             }
         },
-        "/auth/revoke-token": {
+        "/auth/revoke-refresh-token": {
             "post": {
                 "description": "Revoke a refresh token to prevent it being used to create new access tokens.\n\nNote that any unexpired access tokens issued for this user will continue to work until they expire.\nUsers must log in again to obtain a new refresh token if the current one has been revoked.\n\nAnyone in possession of a refresh token can revoke it",
                 "tags": [

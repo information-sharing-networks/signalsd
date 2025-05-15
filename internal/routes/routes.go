@@ -28,7 +28,7 @@ func RegisterRoutes(r *chi.Mux, cfg *signals.ServiceConfig) {
 	r.Put("/auth/pasword/reset", usersHandler.UpdatePasswordHandler)
 	r.Post("/auth/login", loginHandler.LoginHandler)
 	r.Post("/auth/refresh-token", authHandler.RefreshAccessTokenHandler)
-	r.Post("/auth/revoke-token", authHandler.RevokeRefreshTokenHandler)
+	r.Post("/auth/revoke-refresh-token", authHandler.RevokeRefreshTokenHandler)
 	// todo protect get user endpoint so as not to expose email addresses (server admin account only)
 	r.Get("/auth/users/{id}", usersHandler.GetUserByIDHandler)
 
@@ -52,11 +52,17 @@ func RegisterRoutes(r *chi.Mux, cfg *signals.ServiceConfig) {
 	r.Get("/admin/health", adminHandler.ReadinessHandler) // health check
 	r.Post("/api/webhooks", webhookHandler.HandlerWebhook)
 
-	// API doco
-	r.Get("/swagger.json", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./docs/swagger.json")
+	// documentation
+	r.Route("/assets", func(r chi.Router) {
+		r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
+			http.StripPrefix("/assets/", http.FileServer(http.Dir("assets"))).ServeHTTP(w, r)
+		})
 	})
-	r.Get("/docs", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "./docs/redoc.html")
-	})
+
+	// Route for the home page
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./assets/home.html") })
+
+	r.Get("/docs", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./docs/redoc.html") })
+	r.Get("/swagger.json", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./docs/swagger.json") })
+
 }

@@ -16,9 +16,7 @@ import (
 	_ "github.com/nickabs/signals/docs"
 )
 
-//	@title			Signals
-//	@version		v0.0.1
-//	@description	Signals service API
+//	@description	Signals ISN service API
 //	@license		MIT
 //	@host			localhost:8080
 

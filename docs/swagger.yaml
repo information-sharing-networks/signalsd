@@ -503,9 +503,7 @@ definitions:
 host: localhost:8080
 info:
   contact: {}
-  description: Signals service API
-  title: Signals
-  version: v0.0.1
+  description: Signals ISN service API
 paths:
   /admin/health:
     get:
@@ -1079,7 +1077,7 @@ paths:
       summary: Create user
       tags:
       - auth
-  /auth/revoke-token:
+  /auth/revoke-refresh-token:
     post:
       description: |-
         Revoke a refresh token to prevent it being used to create new access tokens.

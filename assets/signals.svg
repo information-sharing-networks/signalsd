@@ -1,0 +1,15 @@
+
+<svg width="200" height="60" viewBox="0 0 200 60" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Signals logo">
+  <style>
+    .text { font: bold 24px sans-serif; fill: #2E3A59; }
+    .wave {
+      fill: none;
+      stroke: #4FD1C5;
+      stroke-width: 2;
+      stroke-linecap: round;
+    }
+  </style>
+  <text x="60" y="38" class="text">Signals ISN</text>
+  <path class="wave" d="M10 30 q5 -15 10 0 t10 0 t10 0 t10 0"></path>
+</svg>
+

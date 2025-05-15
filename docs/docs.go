@@ -850,7 +850,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/auth/revoke-token": {
+        "/auth/revoke-refresh-token": {
             "post": {
                 "description": "Revoke a refresh token to prevent it being used to create new access tokens.\n\nNote that any unexpired access tokens issued for this user will continue to work until they expire.\nUsers must log in again to obtain a new refresh token if the current one has been revoked.\n\nAnyone in possession of a refresh token can revoke it",
                 "tags": [
@@ -1612,12 +1612,12 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "v0.0.1",
+	Version:          "",
 	Host:             "localhost:8080",
 	BasePath:         "",
 	Schemes:          []string{},
-	Title:            "Signals",
-	Description:      "Signals service API",
+	Title:            "",
+	Description:      "Signals ISN service API",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",
