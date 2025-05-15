@@ -17,7 +17,6 @@ config sets up shared variables for the service:
 - ServiceConfig: main calls initConfig() and gets a pointer to the newly initialized config struct - the config is then passed to all handlers as a parameter.
 - common constants - e.g token expiry times
 - common maps - used to list valid values for certain fields e.g signalDefs.Stage
-- common context keys
 */
 
 // service configuration
@@ -72,17 +71,6 @@ var ValidReceiverStatus = map[string]bool{ // ins_receiver.receiver_status
 	"error":   true,
 	"closed":  true,
 }
-
-// Common context keys
-type ContextKey struct {
-	Name string
-}
-
-var (
-	RequestLoggerKey = ContextKey{"request-logger"}
-	UserIDKey        = ContextKey{"user-id"}
-	SignalDefIDKey   = ContextKey{"signal-def-id"}
-)
 
 // InitConfig loads environment variables, establishes database connection and returns a ServiceConfig struct
 func InitConfig() *ServiceConfig {

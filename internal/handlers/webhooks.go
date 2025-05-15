@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/nickabs/signals"
+	"github.com/nickabs/signals/internal/apperrors"
 	"github.com/nickabs/signals/internal/helpers"
 )
 
@@ -28,8 +29,8 @@ func (wh *WebhookHandler) HandlerWebhook(w http.ResponseWriter, r *http.Request)
 	defer r.Body.Close()
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
+		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
 		return
 	}
-	helpers.RespondWithError(w, r, http.StatusNoContent, signals.ErrCodeNotImplemented, "todo - webhooks not yet implemented")
+	helpers.RespondWithError(w, r, http.StatusNoContent, apperrors.ErrCodeNotImplemented, "todo - webhooks not yet implemented")
 }

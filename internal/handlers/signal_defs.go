@@ -9,6 +9,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/nickabs/signals"
+	"github.com/nickabs/signals/internal/apperrors"
+	"github.com/nickabs/signals/internal/context"
 	"github.com/nickabs/signals/internal/database"
 	"github.com/nickabs/signals/internal/helpers"
 )
@@ -68,9 +70,9 @@ type SignalDefAndLinkedInfo struct {
 //	@Param			request	body		handlers.CreateSignalDefRequest	true	"signal definition details"
 //
 //	@Success		201		{object}	handlers.CreateSignalDefResponse
-//	@Failure		400		{object}	signals.ErrorResponse
-//	@Failure		409		{object}	signals.ErrorResponse
-//	@Failure		500		{object}	signals.ErrorResponse
+//	@Failure		400		{object}	apperrors.ErrorResponse
+//	@Failure		409		{object}	apperrors.ErrorResponse
+//	@Failure		500		{object}	apperrors.ErrorResponse
 //
 //	@Security		BearerAccessToken
 //
@@ -82,16 +84,16 @@ func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http
 	var slug string
 	var semVer string
 
-	userID, ok := r.Context().Value(signals.UserIDKey).(uuid.UUID)
+	userID, ok := context.UserID(r.Context())
 	if !ok {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, "did not receive userID from middleware")
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userID from middleware")
 		return
 	}
 
 	defer r.Body.Close()
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
+		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
 		return
 	}
 
@@ -103,7 +105,7 @@ func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http
 		req.ReadmeURL == nil ||
 		req.Detail == nil ||
 		req.Stage == nil {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, "one or missing field in the body of the requet")
+		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "one or missing field in the body of the requet")
 		return
 	}
 
@@ -111,39 +113,39 @@ func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http
 	isn, err := s.cfg.DB.GetIsnBySlug(r.Context(), req.IsnSlug)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			helpers.RespondWithError(w, r, http.StatusNotFound, signals.ErrCodeResourceNotFound, "ISN not found")
+			helpers.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
 			return
 		}
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
 	}
 	if isn.UserID != userID {
-		helpers.RespondWithError(w, r, http.StatusForbidden, signals.ErrCodeForbidden, "you are not the owner of this ISN")
+		helpers.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you are not the owner of this ISN")
 		return
 	}
 	if !isn.IsInUse {
-		helpers.RespondWithError(w, r, http.StatusForbidden, signals.ErrCodeForbidden, "this ISN is marked as 'not in use'")
+		helpers.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "this ISN is marked as 'not in use'")
 		return
 	}
 
 	if err := helpers.CheckSignalDefURL(req.SchemaURL, "schema"); err != nil {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("invalid schema url: %v", err))
+		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("invalid schema url: %v", err))
 		return
 	}
 	if err := helpers.CheckSignalDefURL(*req.ReadmeURL, "readme"); err != nil {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("invalid readme url: %v", err))
+		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("invalid readme url: %v", err))
 		return
 	}
 
 	if !signals.ValidSignalDefStages[*req.Stage] {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeInvalidRequest, "invalid stage supplied")
+		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "invalid stage supplied")
 		return
 	}
 
 	// generate slug.
 	slug, err = helpers.GenerateSlug(req.Title)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, "could not create slug from title")
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not create slug from title")
 		return
 	}
 
@@ -153,29 +155,29 @@ func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http
 		UserID: userID,
 	})
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, fmt.Sprintf("database error: %v", err))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("database error: %v", err))
 		return
 	}
 	if exists {
-		helpers.RespondWithError(w, r, http.StatusConflict, signals.ErrCodeResourceAlreadyExists, fmt.Sprintf("the {%s} slug is already in use - pick a new title for your signal def", slug))
+		helpers.RespondWithError(w, r, http.StatusConflict, apperrors.ErrCodeResourceAlreadyExists, fmt.Sprintf("the {%s} slug is already in use - pick a new title for your signal def", slug))
 		return
 	}
 
 	//  increment the semver using the supplied bump instruction supplied in the
 	currentSignalDef, err := s.cfg.DB.GetSemVerAndSchemaForLatestSlugVersion(r.Context(), slug)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, fmt.Sprintf("database error: %v", err))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("database error: %v", err))
 		return
 	}
 
 	if currentSignalDef.SchemaURL == req.SchemaURL {
-		helpers.RespondWithError(w, r, http.StatusConflict, signals.ErrCodeResourceAlreadyExists, "you must supply an updated schemaURL if you want to bump the version")
+		helpers.RespondWithError(w, r, http.StatusConflict, apperrors.ErrCodeResourceAlreadyExists, "you must supply an updated schemaURL if you want to bump the version")
 		return
 	}
 
 	semVer, err = helpers.IncrementSemVer(req.BumpType, currentSignalDef.SemVer)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, fmt.Sprintf("could not bump sem ver : %v", err))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("could not bump sem ver : %v", err))
 		return
 	}
 
@@ -193,7 +195,7 @@ func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http
 		Stage:     *req.Stage,
 	})
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("could not create signal definition: %v", err))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not create signal definition: %v", err))
 		return
 	}
 
@@ -225,9 +227,9 @@ func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http
 //	@Tags			signal definitions
 //
 //	@Success		204
-//	@Failure		400	{object}	signals.ErrorResponse
-//	@Failure		401	{object}	signals.ErrorResponse
-//	@Failure		500	{object}	signals.ErrorResponse
+//	@Failure		400	{object}	apperrors.ErrorResponse
+//	@Failure		401	{object}	apperrors.ErrorResponse
+//	@Failure		500	{object}	apperrors.ErrorResponse
 //
 //	@Security		BearerAccessToken
 //
@@ -236,9 +238,9 @@ func (s *SignalDefHandler) UpdateSignalDefHandler(w http.ResponseWriter, r *http
 
 	var req = UpdateSignalDefRequest{}
 
-	userID, ok := r.Context().Value(signals.UserIDKey).(uuid.UUID)
+	userID, ok := context.UserID(r.Context())
 	if !ok {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, "did not receive userID from middleware")
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userID from middleware")
 	}
 
 	slug := r.PathValue("slug")
@@ -251,15 +253,15 @@ func (s *SignalDefHandler) UpdateSignalDefHandler(w http.ResponseWriter, r *http
 	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			helpers.RespondWithError(w, r, http.StatusNotFound, signals.ErrCodeResourceNotFound, fmt.Sprintf("No signal definition found for %s/v%s", slug, semVer))
+			helpers.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No signal definition found for %s/v%s", slug, semVer))
 			return
 		}
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("database error %v", err))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error %v", err))
 		return
 	}
 
 	if signalDef.UserID != userID {
-		helpers.RespondWithError(w, r, http.StatusUnauthorized, signals.ErrCodeAuthorizationFailure, "you can't update this signal definition")
+		helpers.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthorizationFailure, "you can't update this signal definition")
 		return
 	}
 
@@ -269,20 +271,20 @@ func (s *SignalDefHandler) UpdateSignalDefHandler(w http.ResponseWriter, r *http
 	decoder.DisallowUnknownFields()
 	err = decoder.Decode(&req)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
+		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
 		return
 	}
 
 	if req.Detail == nil &&
 		req.ReadmeURL == nil &&
 		req.Stage == nil {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, "no updateable fields found in body of request")
+		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "no updateable fields found in body of request")
 		return
 	}
 	// prepare struct for update
 	if req.ReadmeURL != nil {
 		if err := helpers.CheckSignalDefURL(*req.ReadmeURL, "readme"); err != nil {
-			helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("invalid readme url: %v", err))
+			helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("invalid readme url: %v", err))
 			return
 		}
 		signalDef.ReadmeURL = *req.ReadmeURL
@@ -294,7 +296,7 @@ func (s *SignalDefHandler) UpdateSignalDefHandler(w http.ResponseWriter, r *http
 
 	if req.Stage != nil {
 		if !signals.ValidSignalDefStages[*req.Stage] {
-			helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeInvalidRequest, "invalid stage supplied")
+			helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "invalid stage supplied")
 			return
 		}
 		signalDef.Stage = *req.Stage
@@ -308,11 +310,11 @@ func (s *SignalDefHandler) UpdateSignalDefHandler(w http.ResponseWriter, r *http
 		Stage:     signalDef.Stage,
 	})
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("database error %v", err))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error %v", err))
 		return
 	}
 	if rowsAffected != 1 {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, "database error - more than one signal definition deleted")
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error - more than one signal definition deleted")
 		return
 	}
 	helpers.RespondWithJSON(w, http.StatusNoContent, "")
@@ -326,18 +328,18 @@ func (s *SignalDefHandler) UpdateSignalDefHandler(w http.ResponseWriter, r *http
 //	@Param		sem_ver	path	string	true	"version to be recieved"	example(0.0.1)
 //
 //	@Success	204
-//	@Failure	400	{object}	signals.ErrorResponse
-//	@Failure	401	{object}	signals.ErrorResponse
-//	@Failure	500	{object}	signals.ErrorResponse
+//	@Failure	400	{object}	apperrors.ErrorResponse
+//	@Failure	401	{object}	apperrors.ErrorResponse
+//	@Failure	500	{object}	apperrors.ErrorResponse
 //
 //	@Security	BearerAccessToken
 //
 //	@Router		/api/signal_defs/{slug}/v{sem_ver} [delete]
 func (s *SignalDefHandler) DeleteSignalDefHandler(w http.ResponseWriter, r *http.Request) {
 
-	userID, ok := r.Context().Value(signals.UserIDKey).(uuid.UUID)
+	userID, ok := context.UserID(r.Context())
 	if !ok {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, "did not receive userID from middleware")
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userID from middleware")
 	}
 
 	slug := r.PathValue("slug")
@@ -350,25 +352,25 @@ func (s *SignalDefHandler) DeleteSignalDefHandler(w http.ResponseWriter, r *http
 	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			helpers.RespondWithError(w, r, http.StatusNotFound, signals.ErrCodeResourceNotFound, fmt.Sprintf("No signal definition found for %s/v%s", slug, semVer))
+			helpers.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No signal definition found for %s/v%s", slug, semVer))
 			return
 		}
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("database error %v", err))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error %v", err))
 		return
 	}
 
 	if signalDef.UserID != userID {
-		helpers.RespondWithError(w, r, http.StatusUnauthorized, signals.ErrCodeAuthorizationFailure, "you can't delete this signal definition")
+		helpers.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthorizationFailure, "you can't delete this signal definition")
 		return
 	}
 
 	rowsAffected, err := s.cfg.DB.DeleteSignalDef(r.Context(), signalDef.ID)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("database error %v", err))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error %v", err))
 		return
 	}
 	if rowsAffected > 1 {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, "database error - more than one signal definition deleted")
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error - more than one signal definition deleted")
 		return
 	}
 	helpers.RespondWithJSON(w, http.StatusNoContent, "")
@@ -383,9 +385,9 @@ func (s *SignalDefHandler) DeleteSignalDefHandler(w http.ResponseWriter, r *http
 //	@Tags		signal definitions
 //
 //	@Success	200	{object}	handlers.SignalDefAndLinkedInfo
-//	@Failure	400	{object}	signals.ErrorResponse
-//	@Failure	404	{object}	signals.ErrorResponse
-//	@Failure	500	{object}	signals.ErrorResponse
+//	@Failure	400	{object}	apperrors.ErrorResponse
+//	@Failure	404	{object}	apperrors.ErrorResponse
+//	@Failure	500	{object}	apperrors.ErrorResponse
 //
 //	@Router		/api/signal_defs/{slug}/v{sem_ver} [get]
 func (s *SignalDefHandler) GetSignalDefHandler(w http.ResponseWriter, r *http.Request) {
@@ -400,23 +402,23 @@ func (s *SignalDefHandler) GetSignalDefHandler(w http.ResponseWriter, r *http.Re
 	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			helpers.RespondWithError(w, r, http.StatusNotFound, signals.ErrCodeResourceNotFound, fmt.Sprintf("No signal definition found for %s/v%s", slug, semVer))
+			helpers.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No signal definition found for %s/v%s", slug, semVer))
 			return
 		}
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("database error %v", err))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error %v", err))
 		return
 	}
 
 	isn, err := s.cfg.DB.GetIsnBySignalDefID(r.Context(), signalDef.ID)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("database error %v", err))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error %v", err))
 		return
 	}
 
 	// get the owner of the signal def
 	user, err := s.cfg.DB.GetForDisplayUserBySignalDefID(r.Context(), signalDef.ID)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the user for this signal definition: %v", err))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the user for this signal definition: %v", err))
 		return
 	}
 
@@ -435,14 +437,14 @@ func (s *SignalDefHandler) GetSignalDefHandler(w http.ResponseWriter, r *http.Re
 //	@Tags		signal definitions
 //
 //	@Success	200	{array}		database.GetSignalDefsRow
-//	@Failure	500	{object}	signals.ErrorResponse
+//	@Failure	500	{object}	apperrors.ErrorResponse
 //
 //	@Router		/api/signal_defs [get]
 func (s *SignalDefHandler) GetSignalDefsHandler(w http.ResponseWriter, r *http.Request) {
 
 	res, err := s.cfg.DB.GetSignalDefs(r.Context())
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("error getting signalDefs from database: %v", err))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("error getting signalDefs from database: %v", err))
 		return
 	}
 	helpers.RespondWithJSON(w, http.StatusOK, res)

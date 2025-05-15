@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/nickabs/signals"
+	"github.com/nickabs/signals/internal/apperrors"
 	"github.com/nickabs/signals/internal/helpers"
 )
 
@@ -24,18 +25,18 @@ func NewAdminHandler(cfg *signals.ServiceConfig) *AdminHandler {
 //	@Tags			admin
 //
 //	@Success		200
-//	@Failure		403	{object}	signals.ErrorResponse
-//	@Failure		500	{object}	signals.ErrorResponse
+//	@Failure		403	{object}	apperrors.ErrorResponse
+//	@Failure		500	{object}	apperrors.ErrorResponse
 //
 //	@Router			/admin/reset [post]
 func (a *AdminHandler) ResetHandler(w http.ResponseWriter, r *http.Request) {
 	if a.cfg.Environment != "dev" {
-		helpers.RespondWithError(w, r, http.StatusForbidden, signals.ErrCodeForbidden, "this api can only be used in the dev environment")
+		helpers.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "this api can only be used in the dev environment")
 		return
 	}
 	deletedUserCount, err := a.cfg.DB.DeleteUsers(r.Context())
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("could not delete users: %v", err))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not delete users: %v", err))
 		return
 	}
 	w.WriteHeader(http.StatusOK)

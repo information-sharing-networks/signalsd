@@ -11,8 +11,8 @@ import (
 	"unicode"
 
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/nickabs/signals"
-	"github.com/rs/zerolog"
+	"github.com/nickabs/signals/internal/apperrors"
+	"github.com/nickabs/signals/internal/context"
 	"github.com/rs/zerolog/log"
 
 	"golang.org/x/text/runes"
@@ -21,8 +21,9 @@ import (
 )
 
 // RespondWithError logs the details of the error and writes a json response containing an error code and message
-func RespondWithError(w http.ResponseWriter, r *http.Request, statusCode int, errorCode signals.ErrorCode, message string) {
-	reqLog, ok := r.Context().Value(signals.RequestLoggerKey).(*zerolog.Logger)
+func RespondWithError(w http.ResponseWriter, r *http.Request, statusCode int, errorCode apperrors.ErrorCode, message string) {
+	//reqLog, ok := r.Context().Value(signals.RequestLoggerKey).(*zerolog.Logger)
+	reqLog, ok := context.RequestLogger(r.Context())
 	if !ok {
 		reqLog = &log.Logger
 	}
@@ -35,7 +36,7 @@ func RespondWithError(w http.ResponseWriter, r *http.Request, statusCode int, er
 		Str("request_id", reqID).
 		Msg("Error response")
 
-	errResponse := signals.ErrorResponse{
+	errResponse := apperrors.ErrorResponse{
 		StatusCode: statusCode,
 		ErrorCode:  errorCode,
 		Message:    message,

@@ -1,4 +1,4 @@
-package signals
+package apperrors
 
 type ErrorCode string
 

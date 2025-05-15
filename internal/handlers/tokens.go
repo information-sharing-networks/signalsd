@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/nickabs/signals"
+	"github.com/nickabs/signals/internal/apperrors"
 	"github.com/nickabs/signals/internal/auth"
 	"github.com/nickabs/signals/internal/helpers"
 )
@@ -30,9 +31,9 @@ func NewAuthHandler(cfg *signals.ServiceConfig) *AuthHandler {
 //	@Tags			auth
 //
 //	@Success		200	{object}	handlers.RefreshAccessTokenHandler.refreshResponse
-//	@Failure		400	{object}	signals.ErrorResponse
-//	@Failure		401	{object}	signals.ErrorResponse
-//	@Failure		500	{object}	signals.ErrorResponse
+//	@Failure		400	{object}	apperrors.ErrorResponse
+//	@Failure		401	{object}	apperrors.ErrorResponse
+//	@Failure		500	{object}	apperrors.ErrorResponse
 //
 //	@Security		BearerRefreshToken
 //
@@ -48,37 +49,37 @@ func (a *AuthHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.R
 	authService := auth.NewAuthService(a.cfg)
 
 	if r.ContentLength != 0 {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintln("This endpoint does not expect a request body"))
+		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintln("This endpoint does not expect a request body"))
 		return
 	}
 
 	refreshToken, err := authService.BearerTokenFromHeader(r.Header)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeTokenError, fmt.Sprintf("could not refresh token: %v", err))
+		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeTokenError, fmt.Sprintf("could not refresh token: %v", err))
 		return
 	}
 
 	refreshTokenRow, err := a.cfg.DB.GetRefreshToken(r.Context(), refreshToken)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			helpers.RespondWithError(w, r, http.StatusUnauthorized, signals.ErrCodeTokenError, "Invalid token")
+			helpers.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeTokenError, "Invalid token")
 			return
 		}
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeTokenError, "could not refresh the token")
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenError, "could not refresh the token")
 		return
 	}
 	if refreshTokenRow.ExpiresAt.In(time.UTC).Before(time.Now().In(time.UTC)) {
-		helpers.RespondWithError(w, r, http.StatusUnauthorized, signals.ErrCodeRefreshTokenExpired, "the supplied token has expired - please login again ")
+		helpers.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeRefreshTokenExpired, "the supplied token has expired - please login again ")
 		return
 	}
 	if refreshTokenRow.RevokedAt.Valid {
-		helpers.RespondWithError(w, r, http.StatusUnauthorized, signals.ErrCodeRefreshTokenRevoked, "the supplied token was revoked previously")
+		helpers.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeRefreshTokenRevoked, "the supplied token was revoked previously")
 		return
 	}
 
 	accessToken, err := authService.GenerateAccessToken(refreshTokenRow.UserID, a.cfg.SecretKey, signals.AccessTokenExpiry)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, "could not generate access token")
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not generate access token")
 		return
 	}
 
@@ -101,9 +102,9 @@ func (a *AuthHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.R
 //
 //	@Param			request	body	handlers.RevokeRefreshTokenHandler.revokeRefreshTokenRequest	true	"refresh token to be revoked"
 //	@Success		204
-//	@Failure		400	{object}	signals.ErrorResponse
-//	@Failure		404	{object}	signals.ErrorResponse
-//	@Failure		500	{object}	signals.ErrorResponse
+//	@Failure		400	{object}	apperrors.ErrorResponse
+//	@Failure		404	{object}	apperrors.ErrorResponse
+//	@Failure		500	{object}	apperrors.ErrorResponse
 //
 //	@Router			/auth/revoke-token [post]
 func (a *AuthHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
@@ -117,25 +118,25 @@ func (a *AuthHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.R
 	defer r.Body.Close()
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, fmt.Sprintf("could not decode request body: %v", err))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("could not decode request body: %v", err))
 		return
 	}
 	if req.RefreshToken == "" {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, "you must supply a refresh token in the body of the request")
+		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must supply a refresh token in the body of the request")
 		return
 	}
 
 	rowsAffected, err := a.cfg.DB.RevokeRefreshToken(r.Context(), req.RefreshToken)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeTokenError, fmt.Sprintf("error getting token from database: %v", err))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenError, fmt.Sprintf("error getting token from database: %v", err))
 		return
 	}
 	if rowsAffected == 0 {
-		helpers.RespondWithError(w, r, http.StatusNotFound, signals.ErrCodeTokenError, "refresh token not found")
+		helpers.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeTokenError, "refresh token not found")
 		return
 	}
 	if rowsAffected != 1 {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
 	}
 

@@ -52,13 +52,13 @@ const docTemplate = `{
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     }
                 }
@@ -102,19 +102,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     }
                 }
@@ -153,19 +153,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     }
                 }
@@ -208,19 +208,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     }
                 }
@@ -259,19 +259,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     }
                 }
@@ -315,19 +315,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     }
                 }
@@ -364,19 +364,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     }
                 }
@@ -401,7 +401,7 @@ const docTemplate = `{
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     }
                 }
@@ -438,19 +438,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     }
                 }
@@ -490,19 +490,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     }
                 }
@@ -552,19 +552,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     }
                 }
@@ -604,19 +604,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     }
                 }
@@ -651,7 +651,7 @@ const docTemplate = `{
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     }
                 }
@@ -685,19 +685,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     }
                 }
@@ -741,25 +741,25 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     }
                 }
@@ -787,19 +787,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     }
                 }
@@ -832,19 +832,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     }
                 }
@@ -875,19 +875,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/signals.ErrorResponse"
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
                     }
                 }
@@ -895,6 +895,65 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "apperrors.ErrorCode": {
+            "type": "string",
+            "enum": [
+                "access_token_expired",
+                "authentication_error",
+                "authorization_error",
+                "database_error",
+                "forbidden",
+                "internal_error",
+                "invalid_request",
+                "malformed_body",
+                "not_implemented",
+                "password_too_short",
+                "refresh_token_expired",
+                "refresh_token_revoked",
+                "resource_already_exists",
+                "resource_not_found",
+                "signal_def_closed",
+                "token_error",
+                "user_alread_exists",
+                "user_not_found"
+            ],
+            "x-enum-varnames": [
+                "ErrCodeAccessTokenExpired",
+                "ErrCodeAuthenticationFailure",
+                "ErrCodeAuthorizationFailure",
+                "ErrCodeDatabaseError",
+                "ErrCodeForbidden",
+                "ErrCodeInternalError",
+                "ErrCodeInvalidRequest",
+                "ErrCodeMalformedBody",
+                "ErrCodeNotImplemented",
+                "ErrCodePasswordTooShort",
+                "ErrCodeRefreshTokenExpired",
+                "ErrCodeRefreshTokenRevoked",
+                "ErrCodeResourceAlreadyExists",
+                "ErrCodeResourceNotFound",
+                "ErrCodeSignalDefClosed",
+                "ErrCodeTokenError",
+                "ErrCodeUserAlreadyExists",
+                "ErrCodeUserNotFound"
+            ]
+        },
+        "apperrors.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error_code": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/apperrors.ErrorCode"
+                        }
+                    ],
+                    "example": "example_error_code"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
         "database.GetForDisplayUserByIDRow": {
             "type": "object",
             "properties": {
@@ -1517,65 +1576,6 @@ const docTemplate = `{
                         "closed",
                         "shuttered"
                     ]
-                }
-            }
-        },
-        "signals.ErrorCode": {
-            "type": "string",
-            "enum": [
-                "access_token_expired",
-                "authentication_error",
-                "authorization_error",
-                "database_error",
-                "forbidden",
-                "internal_error",
-                "invalid_request",
-                "malformed_body",
-                "not_implemented",
-                "password_too_short",
-                "refresh_token_expired",
-                "refresh_token_revoked",
-                "resource_already_exists",
-                "resource_not_found",
-                "signal_def_closed",
-                "token_error",
-                "user_alread_exists",
-                "user_not_found"
-            ],
-            "x-enum-varnames": [
-                "ErrCodeAccessTokenExpired",
-                "ErrCodeAuthenticationFailure",
-                "ErrCodeAuthorizationFailure",
-                "ErrCodeDatabaseError",
-                "ErrCodeForbidden",
-                "ErrCodeInternalError",
-                "ErrCodeInvalidRequest",
-                "ErrCodeMalformedBody",
-                "ErrCodeNotImplemented",
-                "ErrCodePasswordTooShort",
-                "ErrCodeRefreshTokenExpired",
-                "ErrCodeRefreshTokenRevoked",
-                "ErrCodeResourceAlreadyExists",
-                "ErrCodeResourceNotFound",
-                "ErrCodeSignalDefClosed",
-                "ErrCodeTokenError",
-                "ErrCodeUserAlreadyExists",
-                "ErrCodeUserNotFound"
-            ]
-        },
-        "signals.ErrorResponse": {
-            "type": "object",
-            "properties": {
-                "error_code": {
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/signals.ErrorCode"
-                        }
-                    ],
-                    "example": "example_error_code"
-                },
-                "message": {
-                    "type": "string"
                 }
             }
         }

@@ -9,7 +9,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/nickabs/signals"
+	"github.com/nickabs/signals/internal/apperrors"
 	"github.com/nickabs/signals/internal/auth"
+	"github.com/nickabs/signals/internal/context"
 	"github.com/nickabs/signals/internal/database"
 	"github.com/nickabs/signals/internal/helpers"
 )
@@ -46,9 +48,9 @@ type UpdatePasswordRequest struct {
 //	@Param		request	body		handlers.UpdatePasswordRequest	true	"user details"
 //
 //	@Success	201		{object}	handlers.CreateUserResponse
-//	@Failure	400		{object}	signals.ErrorResponse
-//	@Failure	409		{object}	signals.ErrorResponse
-//	@Failure	500		{object}	signals.ErrorResponse
+//	@Failure	400		{object}	apperrors.ErrorResponse
+//	@Failure	409		{object}	apperrors.ErrorResponse
+//	@Failure	500		{object}	apperrors.ErrorResponse
 //
 //	@Router		/auth/register [post]
 func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -61,33 +63,33 @@ func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) 
 	defer r.Body.Close()
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
+		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
 		return
 	}
 
 	if req.Email == "" || req.Password == "" {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, "you must supply {email} and {password}")
+		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must supply {email} and {password}")
 		return
 	}
 
 	exists, err := u.cfg.DB.ExistsUserWithEmail(r.Context(), req.Email)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
 	}
 	if exists {
-		helpers.RespondWithError(w, r, http.StatusConflict, signals.ErrCodeUserAlreadyExists, "a user already exists this email address")
+		helpers.RespondWithError(w, r, http.StatusConflict, apperrors.ErrCodeUserAlreadyExists, "a user already exists this email address")
 		return
 	}
 
 	if len(req.Password) < signals.MinimumPasswordLength {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodePasswordTooShort, fmt.Sprintf("password must be at least %d chars", signals.MinimumPasswordLength))
+		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodePasswordTooShort, fmt.Sprintf("password must be at least %d chars", signals.MinimumPasswordLength))
 		return
 	}
 
 	hashedPassword, err := authService.HashPassword(req.Password)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, fmt.Sprintf("could not hash password: %v", err))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("could not hash password: %v", err))
 		return
 	}
 
@@ -96,7 +98,7 @@ func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) 
 		Email:          req.Email,
 	})
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("could not create user: %v", err))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not create user: %v", err))
 		return
 	}
 
@@ -122,10 +124,10 @@ func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) 
 //	@Param			request	body	handlers.UpdatePasswordRequest	true	"user details"
 //	@Param			id	path	string								true	"user id"	example(sample-ISN--example-org)
 //	@Success		204
-//	@Failure		400	{object}	signals.ErrorResponse
-//	@Failure		401	{object}	signals.ErrorResponse
-//	@Failure		404	{object}	signals.ErrorResponse
-//	@Failure		500	{object}	signals.ErrorResponse
+//	@Failure		400	{object}	apperrors.ErrorResponse
+//	@Failure		401	{object}	apperrors.ErrorResponse
+//	@Failure		404	{object}	apperrors.ErrorResponse
+//	@Failure		500	{object}	apperrors.ErrorResponse
 //
 //	@Security		BearerAccessToken
 //
@@ -134,12 +136,10 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 	req := UpdatePasswordRequest{}
 	authService := auth.NewAuthService(u.cfg)
 
-	ctx := r.Context()
-
 	// this request was already authenticated by the middleware
-	userID, ok := ctx.Value(signals.UserIDKey).(uuid.UUID)
+	userID, ok := context.UserID(r.Context())
 	if !ok {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, "did not receive userID from middleware")
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userID from middleware")
 	}
 
 	defer r.Body.Close()
@@ -147,41 +147,41 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 	decoder.DisallowUnknownFields()
 	err := decoder.Decode(&req)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
+		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
 		return
 	}
 
 	if req.NewPassword == "" || req.CurrentPassword == "" {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeMalformedBody, "you must supply current and new password in the request")
+		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must supply current and new password in the request")
 		return
 	}
 
 	user, err := u.cfg.DB.GetUserByID(r.Context(), userID)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, fmt.Sprintf("database error: %v", userID))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("database error: %v", userID))
 		return
 	}
 
 	currentPasswordHash, err := authService.HashPassword(req.CurrentPassword)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, fmt.Sprintf("server error: %v", err))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("server error: %v", err))
 		return
 	}
 
 	err = authService.CheckPasswordHash(currentPasswordHash, req.CurrentPassword)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusUnauthorized, signals.ErrCodeAuthenticationFailure, "Incorrect email or password")
+		helpers.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "Incorrect email or password")
 		return
 	}
 
 	if len(req.NewPassword) < signals.MinimumPasswordLength {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodePasswordTooShort, fmt.Sprintf("password must be at least %d chars", signals.MinimumPasswordLength))
+		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodePasswordTooShort, fmt.Sprintf("password must be at least %d chars", signals.MinimumPasswordLength))
 		return
 	}
 
 	newPasswordHash, err := authService.HashPassword(req.NewPassword)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, fmt.Sprintf("server error: %v", err))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("server error: %v", err))
 		return
 	}
 
@@ -190,11 +190,11 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 		HashedPassword: newPasswordHash,
 	})
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeInternalError, fmt.Sprintf("database error: %v", err))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("database error: %v", err))
 		return
 	}
 	if rowsAffected != 1 {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, "error updating user")
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "error updating user")
 		return
 	}
 
@@ -210,7 +210,7 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 //
 //	@Param		id	path		string	true	"user id"	example(68fb5f5b-e3f5-4a96-8d35-cd2203a06f73)
 //	@Success	200	{array}		database.GetForDisplayUserByIDRow
-//	@Failure	500	{object}	signals.ErrorResponse
+//	@Failure	500	{object}	apperrors.ErrorResponse
 //
 //	@Router		/api/users/{id} [get]
 func (u *UserHandler) GetUserByIDHandler(w http.ResponseWriter, r *http.Request) {
@@ -218,17 +218,17 @@ func (u *UserHandler) GetUserByIDHandler(w http.ResponseWriter, r *http.Request)
 	userIDstring := r.PathValue("id")
 	userID, err := uuid.Parse(userIDstring)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, signals.ErrCodeInvalidRequest, fmt.Sprintf("Invalid user ID: %v", err))
+		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, fmt.Sprintf("Invalid user ID: %v", err))
 		return
 	}
 
 	res, err := u.cfg.DB.GetForDisplayUserByID(r.Context(), userID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			helpers.RespondWithError(w, r, http.StatusNotFound, signals.ErrCodeResourceNotFound, fmt.Sprintf("No user found for id %v", userID))
+			helpers.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No user found for id %v", userID))
 			return
 		}
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, signals.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the user from the database %v", err))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the user from the database %v", err))
 		return
 	}
 	//
