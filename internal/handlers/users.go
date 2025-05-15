@@ -25,7 +25,7 @@ func NewUserHandler(cfg *signals.ServiceConfig) *UserHandler {
 }
 
 type CreateUserRequest struct {
-	Password string `json:"password" example:"lkIB53@6O^Y"` // passwords must be at least 11 chars long
+	Password string `json:"password" example:"lkIB53@6O^Y"` // passwords must be at least 11 characters long
 	Email    string `json:"email" example:"example@example.com"`
 }
 
@@ -47,7 +47,7 @@ type UpdatePasswordRequest struct {
 //
 //	@Param		request	body		handlers.CreateUserRequest	true	"user details"
 //
-//	@Success	201		{object}	handlers.CreateUserResponse
+//	@Success	204
 //	@Failure	400		{object}	apperrors.ErrorResponse
 //	@Failure	409		{object}	apperrors.ErrorResponse
 //	@Failure	500		{object}	apperrors.ErrorResponse
@@ -55,8 +55,6 @@ type UpdatePasswordRequest struct {
 //	@Router		/auth/register [post]
 func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 	var req CreateUserRequest
-
-	var newUser = database.User{}
 
 	authService := auth.NewAuthService(u.cfg)
 
@@ -93,7 +91,7 @@ func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	newUser, err = u.cfg.DB.CreateUser(r.Context(), database.CreateUserParams{
+	_, err = u.cfg.DB.CreateUser(r.Context(), database.CreateUserParams{
 		HashedPassword: hashedPassword,
 		Email:          req.Email,
 	})
@@ -102,16 +100,7 @@ func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	resourceURL := fmt.Sprintf("%s://%s/api/users/%s",
-		helpers.GetScheme(r),
-		r.Host,
-		newUser.ID,
-	)
-
-	helpers.RespondWithJSON(w, http.StatusCreated, CreateUserResponse{
-		ID:          newUser.ID,
-		ResourceURL: resourceURL,
-	})
+	helpers.RespondWithJSON(w, http.StatusCreated, "")
 }
 
 // UpdatePasswordHandler godoc
@@ -206,6 +195,7 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 // GetUserbyIDHandler godoc
 //
 //	@Summary	Get registered user
+//	@Description	This API is protected (includes email addresses in the response) - currently only available on dev envs, pending implementation of admin roles.
 //	@Tags		auth
 //
 //	@Param		id	path		string	true	"user id"	example(68fb5f5b-e3f5-4a96-8d35-cd2203a06f73)

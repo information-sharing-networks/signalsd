@@ -325,15 +325,6 @@ definitions:
         example: lkIB53@6O^Y
         type: string
     type: object
-  handlers.CreateUserResponse:
-    properties:
-      id:
-        example: 68fb5f5b-e3f5-4a96-8d35-cd2203a06f73
-        type: string
-      resource_url:
-        example: http://localhost:8080/api/users/01a38b82-cbc7-4a24-b61f-e55cb99ac41e
-        type: string
-    type: object
   handlers.LoginRequest:
     properties:
       email:
@@ -931,6 +922,8 @@ paths:
       - signal definitions
   /api/users/{id}:
     get:
+      description: This API is protected (includes email addresses in the response)
+        - currently only available on dev envs, pending implementation of admin roles.
       parameters:
       - description: user id
         example: 68fb5f5b-e3f5-4a96-8d35-cd2203a06f73
@@ -1070,10 +1063,8 @@ paths:
         schema:
           $ref: '#/definitions/handlers.CreateUserRequest'
       responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/handlers.CreateUserResponse'
+        "204":
+          description: No Content
         "400":
           description: Bad Request
           schema:

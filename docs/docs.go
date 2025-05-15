@@ -624,6 +624,7 @@ const docTemplate = `{
         },
         "/api/users/{id}": {
             "get": {
+                "description": "This API is protected (includes email addresses in the response) - currently only available on dev envs, pending implementation of admin roles.",
                 "tags": [
                     "auth"
                 ],
@@ -823,11 +824,8 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateUserResponse"
-                        }
+                    "204": {
+                        "description": "No Content"
                     },
                     "400": {
                         "description": "Bad Request",
@@ -1334,19 +1332,6 @@ const docTemplate = `{
                     "description": "passwords must be at least 11 chars long",
                     "type": "string",
                     "example": "lkIB53@6O^Y"
-                }
-            }
-        },
-        "handlers.CreateUserResponse": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "string",
-                    "example": "68fb5f5b-e3f5-4a96-8d35-cd2203a06f73"
-                },
-                "resource_url": {
-                    "type": "string",
-                    "example": "http://localhost:8080/api/users/01a38b82-cbc7-4a24-b61f-e55cb99ac41e"
                 }
             }
         },
