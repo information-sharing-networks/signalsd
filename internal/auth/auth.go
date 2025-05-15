@@ -103,7 +103,7 @@ func (a AuthService) ValidateJWT(tokenString, secret string) (jwt.RegisteredClai
 		return []byte(secret), nil
 	})
 	if err != nil {
-		return claims, fmt.Errorf("invalid or expired token: %v", err)
+		return claims, err
 	}
 
 	return claims, nil

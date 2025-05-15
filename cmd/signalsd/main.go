@@ -8,7 +8,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/nickabs/signals"
-	"github.com/nickabs/signals/internal/auth"
 	"github.com/nickabs/signals/internal/logger"
 	internalMiddleware "github.com/nickabs/signals/internal/middleware"
 	"github.com/nickabs/signals/internal/routes"
@@ -50,11 +49,11 @@ func main() {
 
 	r := chi.NewRouter()
 
-	authService := auth.NewAuthService(cfg)
+	//todoauthService := auth.NewAuthService(cfg)
 
 	r.Use(chiMiddleware.RequestID)
 	r.Use(internalMiddleware.LoggerMiddleware)
-	r.Use(internalMiddleware.AuthorizationMiddleware(*authService))
+	//todor.Use(internalMiddleware.AuthorizationMiddleware(*authService))
 
 	//TODO
 	//r.Use(chiMiddleware.Recoverer)
