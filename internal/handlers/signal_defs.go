@@ -40,9 +40,9 @@ type CreateSignalDefResponse struct {
 
 // these are the only fields that can be updated after a signal is defined
 type UpdateSignalDefRequest struct {
-	ReadmeURL *string `json:"readme_url" example:"https://github.com/user/project/v0.0.1/locales/new_t pfilename.md"` // Updated readem file. Note file must be on a public github repo
-	Detail    *string `json:"detail" example:"updated description"`                                                   // updated description
-	Stage     *string `json:"stage" enums:"dev,test,live,deprecated,closed,shuttered"`                                // updated stage
+	ReadmeURL *string `json:"readme_url" example:"https://github.com/user/project/v0.0.1/locales/filename.md"` // Updated readem file. Note file must be on a public github repo
+	Detail    *string `json:"detail" example:"description"`                                                    // updated description
+	Stage     *string `json:"stage" enums:"dev,test,live,deprecated,closed,shuttered"`                         // updated stage
 }
 
 // used in GET handler

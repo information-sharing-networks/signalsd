@@ -1268,7 +1268,7 @@ const docTemplate = `{
                 "detail": {
                     "description": "updated description",
                     "type": "string",
-                    "example": "updated description"
+                    "example": "description"
                 },
                 "isn_slug": {
                     "type": "string",
@@ -1277,7 +1277,7 @@ const docTemplate = `{
                 "readme_url": {
                     "description": "Updated readem file. Note file must be on a public github repo",
                     "type": "string",
-                    "example": "https://github.com/user/project/v0.0.1/locales/new_t pfilename.md"
+                    "example": "https://github.com/user/project/v0.0.1/locales/filename.md"
                 },
                 "schema_url": {
                     "description": "Note file must be on a public github repo",
@@ -1558,12 +1558,12 @@ const docTemplate = `{
                 "detail": {
                     "description": "updated description",
                     "type": "string",
-                    "example": "updated description"
+                    "example": "description"
                 },
                 "readme_url": {
                     "description": "Updated readem file. Note file must be on a public github repo",
                     "type": "string",
-                    "example": "https://github.com/user/project/v0.0.1/locales/new_t pfilename.md"
+                    "example": "https://github.com/user/project/v0.0.1/locales/filename.md"
                 },
                 "stage": {
                     "description": "updated stage",
@@ -1600,7 +1600,7 @@ const docTemplate = `{
             "name": "auth"
         },
         {
-            "description": "GET, POST and DELETE actions on a signal definition can be done using either a {slug}/v{sem_ver} or {id} URL.",
+            "description": "signal definitions describe the format of the data being shared in an ISN",
             "name": "signal definitions"
         },
         {
