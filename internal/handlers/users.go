@@ -45,7 +45,7 @@ type UpdatePasswordRequest struct {
 //	@Summary	Create user
 //	@Tags		auth
 //
-//	@Param		request	body		handlers.UpdatePasswordRequest	true	"user details"
+//	@Param		request	body		handlers.CreateUserRequest	true	"user details"
 //
 //	@Success	201		{object}	handlers.CreateUserResponse
 //	@Failure	400		{object}	apperrors.ErrorResponse

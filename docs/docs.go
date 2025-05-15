@@ -818,7 +818,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.UpdatePasswordRequest"
+                            "$ref": "#/definitions/handlers.CreateUserRequest"
                         }
                     }
                 ],
@@ -1320,6 +1320,20 @@ const docTemplate = `{
                 "slug": {
                     "type": "string",
                     "example": "sample-signal--example-org"
+                }
+            }
+        },
+        "handlers.CreateUserRequest": {
+            "type": "object",
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "example": "example@example.com"
+                },
+                "password": {
+                    "description": "passwords must be at least 11 chars long",
+                    "type": "string",
+                    "example": "lkIB53@6O^Y"
                 }
             }
         },

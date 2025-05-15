@@ -315,6 +315,16 @@ definitions:
         example: sample-signal--example-org
         type: string
     type: object
+  handlers.CreateUserRequest:
+    properties:
+      email:
+        example: example@example.com
+        type: string
+      password:
+        description: passwords must be at least 11 chars long
+        example: lkIB53@6O^Y
+        type: string
+    type: object
   handlers.CreateUserResponse:
     properties:
       id:
@@ -1056,7 +1066,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/handlers.UpdatePasswordRequest'
+          $ref: '#/definitions/handlers.CreateUserRequest'
       responses:
         "201":
           description: Created
