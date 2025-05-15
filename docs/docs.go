@@ -64,6 +64,58 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/isn": {
+            "get": {
+                "description": "get a list of the configured ISNs",
+                "tags": [
+                    "ISN view"
+                ],
+                "summary": "Get the ISNs",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/database.Isn"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/isn/receiver": {
+            "get": {
+                "description": "get a list of the  ISN Receivers",
+                "tags": [
+                    "ISN view"
+                ],
+                "summary": "Get the ISN Receivers",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/database.IsnReceiver"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/isn/receiver/{isn_receivers_slug}": {
             "put": {
                 "security": [
@@ -160,6 +212,32 @@ const docTemplate = `{
                         "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/apperrors.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/isn/retriever": {
+            "get": {
+                "description": "get a list of the configured ISN Retrievers",
+                "tags": [
+                    "ISN view"
+                ],
+                "summary": "Get the ISN Retrievers",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/database.IsnRetriever"
+                            }
                         }
                     },
                     "500": {
@@ -385,7 +463,7 @@ const docTemplate = `{
         "/api/signal_defs": {
             "get": {
                 "tags": [
-                    "signal definitions"
+                    "ISN view"
                 ],
                 "summary": "Get the signal definitions",
                 "responses": {
@@ -414,7 +492,7 @@ const docTemplate = `{
                 ],
                 "description": "A signal definition describes a data set that is sharable over an ISN.  Setup the ISN before defining any signal defs.\n\nA URL-friendly slug is created based on the title supplied when you load the first version of a definition.\nThe title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.\n\nSlugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new definition and specify the bump type (major/minor/patch) to increment the semver\n\nSignal definitions are referred to with a url like this http://{hostname}/api/signal_defs/{slug}/v{sem_ver}\n",
                 "tags": [
-                    "signal definitions"
+                    "signal config"
                 ],
                 "summary": "Create signal definition",
                 "parameters": [
@@ -459,7 +537,7 @@ const docTemplate = `{
         "/api/signal_defs/{slug}/v{sem_ver}": {
             "get": {
                 "tags": [
-                    "signal definitions"
+                    "ISN view"
                 ],
                 "summary": "Get a signal definition",
                 "parameters": [
@@ -515,7 +593,7 @@ const docTemplate = `{
                 ],
                 "description": "users can update the detailed description, the stage or the link to the readme md\n\nIt is not allowed to update the schema url - instead users should create a new declaration with the same title and bump the version",
                 "tags": [
-                    "signal definitions"
+                    "signal config"
                 ],
                 "summary": "Update signal definition",
                 "parameters": [
@@ -576,7 +654,7 @@ const docTemplate = `{
                     }
                 ],
                 "tags": [
-                    "signal definitions"
+                    "signal config"
                 ],
                 "summary": "Delete signal definition",
                 "parameters": [
@@ -711,11 +789,11 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Use this api to reset the users password.  Requires a valid access token and the current password\nTODO - forgotten password facility",
+                "description": "Use this api to reset the user's password.  Requires a valid access token and the current password\n\nTODO - forgotten password facility",
                 "tags": [
                     "auth"
                 ],
-                "summary": "Update password",
+                "summary": "Reset password",
                 "parameters": [
                     {
                         "description": "user details",
@@ -725,14 +803,6 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/handlers.UpdatePasswordRequest"
                         }
-                    },
-                    {
-                        "type": "string",
-                        "example": "sample-ISN--example-org",
-                        "description": "user id",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
                     }
                 ],
                 "responses": {
@@ -1062,6 +1132,97 @@ const docTemplate = `{
                 }
             }
         },
+        "database.IsnReceiver": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "default_rate_limit": {
+                    "type": "integer"
+                },
+                "detail": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "isn_id": {
+                    "type": "string"
+                },
+                "max_batch_records": {
+                    "type": "integer"
+                },
+                "max_daily_validation_failures": {
+                    "type": "integer"
+                },
+                "max_payload_kilobytes": {
+                    "type": "integer"
+                },
+                "min_batch_records": {
+                    "type": "integer"
+                },
+                "payload_validation": {
+                    "type": "string"
+                },
+                "receiver_origin": {
+                    "type": "string"
+                },
+                "receiver_status": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "database.IsnRetriever": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "default_rate_limit": {
+                    "type": "integer"
+                },
+                "detail": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "isn_id": {
+                    "type": "string"
+                },
+                "retriever_origin": {
+                    "type": "string"
+                },
+                "retriever_status": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
         "handlers.CreateIsnReceiverRequest": {
             "type": "object",
             "properties": {
@@ -1273,7 +1434,7 @@ const docTemplate = `{
                     "example": "sample-ISN--example-org"
                 },
                 "readme_url": {
-                    "description": "Updated readem file. Note file must be on a public github repo",
+                    "description": "Updated readme file. Note file must be on a public github repo",
                     "type": "string",
                     "example": "https://github.com/user/project/v0.0.1/locales/filename.md"
                 },
@@ -1329,7 +1490,7 @@ const docTemplate = `{
                     "example": "example@example.com"
                 },
                 "password": {
-                    "description": "passwords must be at least 11 chars long",
+                    "description": "passwords must be at least 11 characters long",
                     "type": "string",
                     "example": "lkIB53@6O^Y"
                 }
@@ -1343,7 +1504,7 @@ const docTemplate = `{
                     "example": "example@example.com"
                 },
                 "password": {
-                    "description": "passwords must be at least 11 chars long",
+                    "description": "passwords must be at least 11 characters long",
                     "type": "string",
                     "example": "lkIB53@6O^Y"
                 }
@@ -1560,7 +1721,7 @@ const docTemplate = `{
                     "example": "description"
                 },
                 "readme_url": {
-                    "description": "Updated readem file. Note file must be on a public github repo",
+                    "description": "Updated readme file. Note file must be on a public github repo",
                     "type": "string",
                     "example": "https://github.com/user/project/v0.0.1/locales/filename.md"
                 },
@@ -1600,11 +1761,15 @@ const docTemplate = `{
         },
         {
             "description": "signal definitions describe the format of the data being shared in an ISN",
-            "name": "signal definitions"
+            "name": "signal config"
         },
         {
             "description": "Information sharing networks are used to exchange signals between participating users.",
             "name": "ISN config"
+        },
+        {
+            "description": "View information about the configured ISNs",
+            "name": "ISN view"
         }
     ]
 }`

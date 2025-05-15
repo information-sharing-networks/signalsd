@@ -46,15 +46,19 @@ func RegisterRoutes(r *chi.Mux, cfg *signals.ServiceConfig) {
 			// webhooks
 			r.Post("/api/webhooks", webhookHandler.HandlerWebhook)
 		})
+		// TODO may need some controls on the endpoints that can display email addresses (or hide emails? get okay from user on sharing them?)
 		r.Get("/signal_defs", signalDefsHandler.GetSignalDefsHandler)
 		r.Get("/signal_defs/{slug}/v{sem_ver}", signalDefsHandler.GetSignalDefHandler)
+		r.Get("/isn", isnHandler.GetIsnsHandler)
+		r.Get("/isn/receivers", isnReceiverHandler.GetIsnReceiversHandler)
+		r.Get("/isn/retrievers", isnRetrieverHandler.GetIsnRetrieversHandler)
 	})
 
 	// auth
 	r.Route("/auth", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
 			r.Use(authService.ValidateAccessToken)
-			r.Put("/pasword/reset", usersHandler.UpdatePasswordHandler)
+			r.Put("/password/reset", usersHandler.UpdatePasswordHandler)
 		})
 		r.Group(func(r chi.Router) {
 			r.Use(authService.ValidateRefreshToken)

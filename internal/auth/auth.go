@@ -24,7 +24,7 @@ func NewAuthService(cfg *signals.ServiceConfig) *AuthService {
 }
 
 func (a AuthService) HashPassword(password string) (string, error) {
-	dat, err := bcrypt.GenerateFromPassword([]byte(password), 1)
+	dat, err := bcrypt.GenerateFromPassword([]byte(password), 10)
 	if err != nil {
 		return "", err
 	}

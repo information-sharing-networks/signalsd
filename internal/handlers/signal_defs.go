@@ -40,7 +40,7 @@ type CreateSignalDefResponse struct {
 
 // these are the only fields that can be updated after a signal is defined
 type UpdateSignalDefRequest struct {
-	ReadmeURL *string `json:"readme_url" example:"https://github.com/user/project/v0.0.1/locales/filename.md"` // Updated readem file. Note file must be on a public github repo
+	ReadmeURL *string `json:"readme_url" example:"https://github.com/user/project/v0.0.1/locales/filename.md"` // Updated readme file. Note file must be on a public github repo
 	Detail    *string `json:"detail" example:"description"`                                                    // updated description
 	Stage     *string `json:"stage" enums:"dev,test,live,deprecated,closed,shuttered"`                         // updated stage
 }
@@ -65,7 +65,7 @@ type SignalDefAndLinkedInfo struct {
 //	@Description	Signal definitions are referred to with a url like this http://{hostname}/api/signal_defs/{slug}/v{sem_ver}
 //	@Description
 //
-//	@Tags			signal definitions
+//	@Tags			signal config
 //
 //	@Param			request	body		handlers.CreateSignalDefRequest	true	"signal definition details"
 //
@@ -224,7 +224,7 @@ func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http
 //	@Param			sem_ver	path	string							true	"version to be recieved"	example(0.0.1)
 //	@Param			request	body	handlers.UpdateSignalDefRequest	true	"signal definition details to be updated"
 //
-//	@Tags			signal definitions
+//	@Tags			signal config
 //
 //	@Success		204
 //	@Failure		400	{object}	apperrors.ErrorResponse
@@ -323,7 +323,7 @@ func (s *SignalDefHandler) UpdateSignalDefHandler(w http.ResponseWriter, r *http
 // DeleteSignalDefHandler godoc
 //
 //	@Summary	Delete signal definition
-//	@Tags		signal definitions
+//	@Tags		signal config
 //	@Param		slug	path	string	true	"signal definiton slug"		example(sample-signal--example-org)
 //	@Param		sem_ver	path	string	true	"version to be recieved"	example(0.0.1)
 //
@@ -382,7 +382,7 @@ func (s *SignalDefHandler) DeleteSignalDefHandler(w http.ResponseWriter, r *http
 //	@Param		slug	path	string	true	"signal definiton slug"		example(sample-signal--example-org)
 //	@Param		sem_ver	path	string	true	"version to be recieved"	example(0.0.1)
 //
-//	@Tags		signal definitions
+//	@Tags		ISN view
 //
 //	@Success	200	{object}	handlers.SignalDefAndLinkedInfo
 //	@Failure	400	{object}	apperrors.ErrorResponse
@@ -430,11 +430,10 @@ func (s *SignalDefHandler) GetSignalDefHandler(w http.ResponseWriter, r *http.Re
 	helpers.RespondWithJSON(w, http.StatusOK, res)
 }
 
-// todo - full records in this handler ...
 // GetSignalDefsHandler godoc
 //
 //	@Summary	Get the signal definitions
-//	@Tags		signal definitions
+//	@Tags		ISN view
 //
 //	@Success	200	{array}		database.GetSignalDefsRow
 //	@Failure	500	{object}	apperrors.ErrorResponse

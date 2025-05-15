@@ -151,6 +151,51 @@ func (q *Queries) GetIsnReceiverBySlug(ctx context.Context, slug string) (GetIsn
 	return i, err
 }
 
+const getIsnReceivers = `-- name: GetIsnReceivers :many
+SELECT ir.id, ir.created_at, ir.updated_at, ir.user_id, ir.isn_id, ir.title, ir.detail, ir.slug, ir.receiver_origin, ir.min_batch_records, ir.max_batch_records, ir.max_daily_validation_failures, ir.max_payload_kilobytes, ir.payload_validation, ir.default_rate_limit, ir.receiver_status 
+FROM isn_receivers ir
+`
+
+func (q *Queries) GetIsnReceivers(ctx context.Context) ([]IsnReceiver, error) {
+	rows, err := q.db.QueryContext(ctx, getIsnReceivers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []IsnReceiver
+	for rows.Next() {
+		var i IsnReceiver
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.UserID,
+			&i.IsnID,
+			&i.Title,
+			&i.Detail,
+			&i.Slug,
+			&i.ReceiverOrigin,
+			&i.MinBatchRecords,
+			&i.MaxBatchRecords,
+			&i.MaxDailyValidationFailures,
+			&i.MaxPayloadKilobytes,
+			&i.PayloadValidation,
+			&i.DefaultRateLimit,
+			&i.ReceiverStatus,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateIsnReceiver = `-- name: UpdateIsnReceiver :execrows
 UPDATE isn_receivers SET (
   updated_at, 

@@ -74,7 +74,7 @@ func (q *Queries) ExistsIsnWithSlug(ctx context.Context, slug string) (bool, err
 }
 
 const getIsnByID = `-- name: GetIsnByID :one
-SELECT id, created_at, updated_at, user_id, title, slug, detail, is_in_use, visibility, storage_type 
+SELECT i.id, i.created_at, i.updated_at, i.user_id, i.title, i.slug, i.detail, i.is_in_use, i.visibility, i.storage_type 
 FROM isn i
 WHERE i.id = $1
 `
@@ -123,7 +123,7 @@ func (q *Queries) GetIsnBySignalDefID(ctx context.Context, id uuid.UUID) (Isn, e
 }
 
 const getIsnBySlug = `-- name: GetIsnBySlug :one
-SELECT id, created_at, updated_at, user_id, title, slug, detail, is_in_use, visibility, storage_type 
+SELECT i.id, i.created_at, i.updated_at, i.user_id, i.title, i.slug, i.detail, i.is_in_use, i.visibility, i.storage_type 
 FROM isn i
 WHERE i.slug = $1
 `
@@ -144,6 +144,45 @@ func (q *Queries) GetIsnBySlug(ctx context.Context, slug string) (Isn, error) {
 		&i.StorageType,
 	)
 	return i, err
+}
+
+const getIsns = `-- name: GetIsns :many
+SELECT i.id, i.created_at, i.updated_at, i.user_id, i.title, i.slug, i.detail, i.is_in_use, i.visibility, i.storage_type 
+FROM isn i
+`
+
+func (q *Queries) GetIsns(ctx context.Context) ([]Isn, error) {
+	rows, err := q.db.QueryContext(ctx, getIsns)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Isn
+	for rows.Next() {
+		var i Isn
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.UserID,
+			&i.Title,
+			&i.Slug,
+			&i.Detail,
+			&i.IsInUse,
+			&i.Visibility,
+			&i.StorageType,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const updateIsn = `-- name: UpdateIsn :execrows

@@ -126,6 +126,46 @@ func (q *Queries) GetIsnRetrieverWithSlug(ctx context.Context, slug string) (Get
 	return i, err
 }
 
+const getIsnRetrievers = `-- name: GetIsnRetrievers :many
+SELECT ir.id, ir.created_at, ir.updated_at, ir.user_id, ir.isn_id, ir.title, ir.detail, ir.slug, ir.retriever_origin, ir.retriever_status, ir.default_rate_limit 
+FROM isn_retrievers ir
+`
+
+func (q *Queries) GetIsnRetrievers(ctx context.Context) ([]IsnRetriever, error) {
+	rows, err := q.db.QueryContext(ctx, getIsnRetrievers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []IsnRetriever
+	for rows.Next() {
+		var i IsnRetriever
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.UserID,
+			&i.IsnID,
+			&i.Title,
+			&i.Detail,
+			&i.Slug,
+			&i.RetrieverOrigin,
+			&i.RetrieverStatus,
+			&i.DefaultRateLimit,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateIsnRetriever = `-- name: UpdateIsnRetriever :execrows
 UPDATE isn_retrievers SET (
   updated_at, 

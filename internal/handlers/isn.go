@@ -224,3 +224,24 @@ func (i *IsnHandler) UpdateIsnHandler(w http.ResponseWriter, r *http.Request) {
 
 	helpers.RespondWithJSON(w, http.StatusNoContent, "")
 }
+
+// GetIsnsHandler godoc
+//
+//	@Summary	Get the ISNs
+//	@Description		get a list of the configured ISNs
+//	@Tags	ISN view
+//
+//	@Success	200	{array}		database.Isn
+//	@Failure	500	{object}	apperrors.ErrorResponse
+//
+//	@Router		/api/isn [get]
+func (s *IsnHandler) GetIsnsHandler(w http.ResponseWriter, r *http.Request) {
+
+	res, err := s.cfg.DB.GetIsns(r.Context())
+	if err != nil {
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("error getting ISNs from database: %v", err))
+		return
+	}
+	helpers.RespondWithJSON(w, http.StatusOK, res)
+
+}

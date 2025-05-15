@@ -25,12 +25,12 @@ UPDATE isn SET (
 WHERE id = $1;
 
 -- name: GetIsnByID :one
-SELECT * 
+SELECT i.* 
 FROM isn i
 WHERE i.id = $1;
 
 -- name: GetIsnBySlug :one
-SELECT * 
+SELECT i.* 
 FROM isn i
 WHERE i.slug = $1;
 
@@ -39,6 +39,10 @@ SELECT i.*
 FROM isn i
 JOIN signal_defs sd on sd.isn_id = i.id
 WHERE sd.id = $1;
+
+-- name: GetIsns :many
+SELECT i.* 
+FROM isn i;
 
 -- name: ExistsIsnWithSlug :one
 

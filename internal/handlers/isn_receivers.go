@@ -326,3 +326,24 @@ func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *
 
 	helpers.RespondWithJSON(w, http.StatusNoContent, "")
 }
+
+// GetIsnReceiversHandler godoc
+//
+//	@Summary	Get the ISN Receivers
+//	@Description		get a list of the  ISN Receivers
+//	@Tags	ISN view
+//
+//	@Success	200	{array}		database.IsnReceiver
+//	@Failure	500	{object}	apperrors.ErrorResponse
+//
+//	@Router		/api/isn/receiver [get]
+func (s *IsnReceiverHandler) GetIsnReceiversHandler(w http.ResponseWriter, r *http.Request) {
+
+	res, err := s.cfg.DB.GetIsnReceivers(r.Context())
+	if err != nil {
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("error getting ISN Receivers from database: %v", err))
+		return
+	}
+	helpers.RespondWithJSON(w, http.StatusOK, res)
+
+}

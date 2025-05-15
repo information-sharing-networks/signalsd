@@ -29,11 +29,6 @@ type CreateUserRequest struct {
 	Email    string `json:"email" example:"example@example.com"`
 }
 
-type CreateUserResponse struct {
-	ID          uuid.UUID `json:"id" example:"68fb5f5b-e3f5-4a96-8d35-cd2203a06f73"`
-	ResourceURL string    `json:"resource_url" example:"http://localhost:8080/api/users/01a38b82-cbc7-4a24-b61f-e55cb99ac41e"`
-}
-
 // todo forgotten password
 type UpdatePasswordRequest struct {
 	CurrentPassword string `json:"current_password" example:"lkIB53@6O^Y"`
@@ -105,13 +100,13 @@ func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) 
 
 // UpdatePasswordHandler godoc
 //
-//	@Summary		Update password
-//	@Description	Use this api to reset the users password.  Requires a valid access token and the current password
+//	@Summary		Reset password
+//	@Description	Use this api to reset the user's password.  Requires a valid access token and the current password
+//	@Description
 //	@Description	TODO - forgotten password facility
 //	@Tags			auth
 //
 //	@Param			request	body	handlers.UpdatePasswordRequest	true	"user details"
-//	@Param			id	path	string								true	"user id"	example(sample-ISN--example-org)
 //	@Success		204
 //	@Failure		400	{object}	apperrors.ErrorResponse
 //	@Failure		401	{object}	apperrors.ErrorResponse
@@ -147,7 +142,7 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 
 	user, err := u.cfg.DB.GetUserByID(r.Context(), userID)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("database error: %v", userID))
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("database error retreiving user from access code (%v) %v", userID, err))
 		return
 	}
 

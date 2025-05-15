@@ -35,11 +35,14 @@ import (
 //	@tag.name			auth
 //	@tag.description	User and token management endpoints
 
-//	@tag.name			signal definitions
+//	@tag.name			signal config
 //	@tag.description	signal definitions describe the format of the data being shared in an ISN
 
 //	@tag.name	ISN config
 //	@tag.description	Information sharing networks are used to exchange signals between participating users.
+
+//	@tag.name	ISN view
+//	@tag.description	View information about the configured ISNs
 
 func main() {
 	// TODO - will the signal defs ever need to be private? Current implementation assumes 'no'
