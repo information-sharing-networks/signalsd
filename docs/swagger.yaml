@@ -50,6 +50,58 @@ definitions:
       message:
         type: string
     type: object
+  database.GetForDisplayIsnReceiversByIsnIDRow:
+    properties:
+      created_at:
+        type: string
+      default_rate_limit:
+        type: integer
+      detail:
+        type: string
+      id:
+        type: string
+      max_batch_records:
+        type: integer
+      max_daily_validation_failures:
+        type: integer
+      max_payload_kilobytes:
+        type: integer
+      min_batch_records:
+        type: integer
+      payload_validation:
+        type: string
+      receiver_origin:
+        type: string
+      receiver_status:
+        type: string
+      slug:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  database.GetForDisplayIsnRetrieversByIsnIDRow:
+    properties:
+      created_at:
+        type: string
+      default_rate_limit:
+        type: integer
+      detail:
+        type: string
+      id:
+        type: string
+      retriever_origin:
+        type: string
+      retriever_status:
+        type: string
+      slug:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
   database.GetForDisplayUserByIDRow:
     properties:
       created_at:
@@ -57,6 +109,17 @@ definitions:
       email:
         type: string
       id:
+        type: string
+    type: object
+  database.GetForDisplayUserByIsnIDRow:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      updated_at:
         type: string
     type: object
   database.GetForDisplayUserBySignalDefIDRow:
@@ -68,6 +131,78 @@ definitions:
       id:
         type: string
       updated_at:
+        type: string
+    type: object
+  database.GetIsnReceiverBySlugRow:
+    properties:
+      created_at:
+        type: string
+      default_rate_limit:
+        type: integer
+      detail:
+        type: string
+      id:
+        type: string
+      isn_id:
+        type: string
+      isn_is_in_use:
+        type: boolean
+      isn_slug:
+        type: string
+      isn_storage_type:
+        type: string
+      max_batch_records:
+        type: integer
+      max_daily_validation_failures:
+        type: integer
+      max_payload_kilobytes:
+        type: integer
+      min_batch_records:
+        type: integer
+      payload_validation:
+        type: string
+      receiver_origin:
+        type: string
+      receiver_status:
+        type: string
+      slug:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: string
+    type: object
+  database.GetIsnRetrieverBySlugRow:
+    properties:
+      created_at:
+        type: string
+      default_rate_limit:
+        type: integer
+      detail:
+        type: string
+      id:
+        type: string
+      isn_id:
+        type: string
+      isn_is_in_use:
+        type: boolean
+      isn_slug:
+        type: string
+      isn_storage_type:
+        type: string
+      retriever_origin:
+        type: string
+      retriever_status:
+        type: string
+      slug:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+      user_id:
         type: string
     type: object
   database.GetSignalDefsRow:
@@ -192,7 +327,7 @@ definitions:
         example: Sample ISN Receiver description
         type: string
       isn_slug:
-        example: sample-ISN--example-org
+        example: sample-isn--example-org
         type: string
       max_batch_records:
         example: 100
@@ -236,13 +371,13 @@ definitions:
         example: 4f1bc74b-cf79-410f-9c21-dc2cba047385
         type: string
       receiver_url:
-        example: http://localhost:8080/signals/receiver/sample-ISN-receiver--example-org
+        example: http://localhost:8080/signals/receiver/sample-isn-receiver--example-org
         type: string
       resource_url:
-        example: http://localhost:8080/api/isn/receiver/sample-ISN-receiver--example-org
+        example: http://localhost:8080/api/isn/receiver/sample-isn-receiver--example-org
         type: string
       slug:
-        example: sample-ISN-receiver--example-org
+        example: sample-isn-receiver--example-org
         type: string
     type: object
   handlers.CreateIsnRequest:
@@ -272,10 +407,10 @@ definitions:
         example: 67890684-3b14-42cf-b785-df28ce570400
         type: string
       resource_url:
-        example: http://localhost:8080/api/isn/sample-ISN--example-org
+        example: http://localhost:8080/api/isn/sample-isn--example-org
         type: string
       slug:
-        example: sample-ISN--example-org
+        example: sample-isn--example-org
         type: string
     type: object
   handlers.CreateIsnRetrieverRequest:
@@ -285,10 +420,10 @@ definitions:
         example: 600
         type: integer
       detail:
-        example: sample-ISN--example-org
+        example: sample-isn--example-org
         type: string
       isn_slug:
-        example: sample-ISN--example-org
+        example: sample-isn--example-org
         type: string
       retriever_origin:
         description: do not provide this field if the isn is using local storage
@@ -312,13 +447,13 @@ definitions:
         example: 4f1bc74b-cf79-410f-9c21-dc2cba047385
         type: string
       resource_url:
-        example: http://localhost:8080/api/isn/retriever/sample-ISN-retriever--example-org
+        example: http://localhost:8080/api/isn/retriever/sample-isn-retriever--example-org
         type: string
       retriever_url:
-        example: http://localhost:8080/signals/retriever/sample-ISN-retriever--example-org
+        example: http://localhost:8080/signals/retriever/sample-isn-retriever--example-org
         type: string
       slug:
-        example: sample-ISN-retriever--example-org
+        example: sample-isn-retriever--example-org
         type: string
     type: object
   handlers.CreateSignalDefRequest:
@@ -336,7 +471,7 @@ definitions:
         example: description
         type: string
       isn_slug:
-        example: sample-ISN--example-org
+        example: sample-isn--example-org
         type: string
       readme_url:
         description: Updated readme file. Note file must be on a public github repo
@@ -383,6 +518,37 @@ definitions:
       password:
         description: passwords must be at least 11 characters long
         example: lkIB53@6O^Y
+        type: string
+    type: object
+  handlers.IsnAndLinkedInfo:
+    properties:
+      created_at:
+        type: string
+      detail:
+        type: string
+      id:
+        type: string
+      is_in_use:
+        type: boolean
+      isn_receivers:
+        items:
+          $ref: '#/definitions/database.GetForDisplayIsnReceiversByIsnIDRow'
+        type: array
+      isn_rectrievers:
+        items:
+          $ref: '#/definitions/database.GetForDisplayIsnRetrieversByIsnIDRow'
+        type: array
+      slug:
+        type: string
+      storage_type:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+      user:
+        $ref: '#/definitions/database.GetForDisplayUserByIsnIDRow'
+      visibility:
         type: string
     type: object
   handlers.LoginRequest:
@@ -516,7 +682,7 @@ definitions:
         example: 600
         type: integer
       detail:
-        example: sample-ISN--example-org
+        example: sample-isn--example-org
         type: string
       retriever_origin:
         description: do not provide this field if the isn is using local storage
@@ -655,7 +821,7 @@ paths:
       description: Update the ISN details
       parameters:
       - description: isn slug
-        example: sample-ISN--example-org
+        example: sample-isn--example-org
         in: path
         name: isn_slug
         required: true
@@ -686,6 +852,35 @@ paths:
       summary: Update an ISN
       tags:
       - ISN config
+  /api/isn/{slug}:
+    get:
+      parameters:
+      - description: isn slug
+        example: sample-isn--example-org
+        in: path
+        name: isn_slug
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.IsnAndLinkedInfo'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apperrors.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/apperrors.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apperrors.ErrorResponse'
+      summary: Get an ISN configuration
+      tags:
+      - ISN view
   /api/isn/receiver:
     get:
       description: get a list of the  ISN Receivers
@@ -708,7 +903,7 @@ paths:
       description: the receiver service should be hosted on {receiver_origin}/signals/receiver/{receiver_slug}
       parameters:
       - description: isn receiver slug
-        example: sample-ISN-receiver--example-org
+        example: sample-isn-receiver--example-org
         in: path
         name: isn_receivers_slug
         required: true
@@ -797,7 +992,7 @@ paths:
     put:
       parameters:
       - description: isn retriever slug
-        example: sample-ISN-retriever--example-org
+        example: sample-isn-retriever--example-org
         in: path
         name: isn_retrievers_slug
         required: true
@@ -863,6 +1058,29 @@ paths:
       summary: Create an ISN Retriever
       tags:
       - ISN config
+  /api/isn/retriever/{slug}:
+    get:
+      parameters:
+      - description: isn retriever slug
+        example: sample-isn-retriever--example-org
+        in: path
+        name: slug
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/database.GetIsnRetrieverBySlugRow'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apperrors.ErrorResponse'
+      summary: Get an ISN retriever config
+      tags:
+      - auth
   /api/signal_defs:
     get:
       responses:

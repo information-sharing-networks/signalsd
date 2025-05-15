@@ -27,7 +27,7 @@ type CreateSignalDefRequest struct {
 	SchemaURL string `json:"schema_url" example:"https://github.com/user/project/v0.0.1/locales/filename.json"` // Note file must be on a public github repo
 	Title     string `json:"title" example:"Sample Signal @example.org"`                                        // unique title
 	BumpType  string `json:"bump_type" example:"patch" enums:"major,minor,patch"`                               // this is used to increment semver for the signal definition
-	IsnSlug   string `json:"isn_slug" example:"sample-ISN--example-org"`
+	IsnSlug   string `json:"isn_slug" example:"sample-isn--example-org"`
 	UpdateSignalDefRequest
 }
 
@@ -65,18 +65,18 @@ type SignalDefAndLinkedInfo struct {
 //	@Description	Signal definitions are referred to with a url like this http://{hostname}/api/signal_defs/{slug}/v{sem_ver}
 //	@Description
 //
-//	@Tags			signal config
+//	@Tags		signal config
 //
-//	@Param			request	body		handlers.CreateSignalDefRequest	true	"signal definition details"
+//	@Param		request	body		handlers.CreateSignalDefRequest	true	"signal definition details"
 //
-//	@Success		201		{object}	handlers.CreateSignalDefResponse
-//	@Failure		400		{object}	apperrors.ErrorResponse
-//	@Failure		409		{object}	apperrors.ErrorResponse
-//	@Failure		500		{object}	apperrors.ErrorResponse
+//	@Success	201		{object}	handlers.CreateSignalDefResponse
+//	@Failure	400		{object}	apperrors.ErrorResponse
+//	@Failure	409		{object}	apperrors.ErrorResponse
+//	@Failure	500		{object}	apperrors.ErrorResponse
 //
-//	@Security		BearerAccessToken
+//	@Security	BearerAccessToken
 //
-//	@Router			/api/signal_defs [post]
+//	@Router		/api/signal_defs [post]
 func (s *SignalDefHandler) CreateSignalDefHandler(w http.ResponseWriter, r *http.Request) {
 	//var res createSignalDefResponse
 	var req CreateSignalDefRequest

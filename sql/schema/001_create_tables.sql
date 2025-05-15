@@ -123,9 +123,9 @@ CREATE TABLE isn_retrievers (
 
 -- +goose Down
 
-DROP table IF EXISTS signal_defs;
-DROP table IF EXISTS refresh_tokens;
-DROP table IF EXISTS isn_receivers;
-DROP table IF EXISTS isn_retrievers;
-DROP table IF EXISTS isn;
-DROP table IF EXISTS users;
+DROP table IF EXISTS isn_receivers CASCADE;
+DROP table IF EXISTS isn_retrievers CASCADE;
+DROP table IF EXISTS signal_defs CASCADE;
+DROP table IF EXISTS refresh_tokens CASCADE;
+DROP table IF EXISTS isn CASCADE;
+DROP table IF EXISTS users CASCADE;

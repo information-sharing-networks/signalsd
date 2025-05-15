@@ -91,6 +91,112 @@ func (q *Queries) ExistsIsnReceiverWithSlug(ctx context.Context, slug string) (b
 	return exists, err
 }
 
+const getForDisplayIsnReceiverBySlug = `-- name: GetForDisplayIsnReceiverBySlug :one
+SELECT
+    ir.id, ir.created_at, ir.updated_at, ir.user_id, ir.isn_id, ir.title, ir.detail, ir.slug, ir.receiver_origin, ir.min_batch_records, ir.max_batch_records, ir.max_daily_validation_failures, ir.max_payload_kilobytes, ir.payload_validation, ir.default_rate_limit, ir.receiver_status
+FROM isn_receivers ir
+WHERE ir.slug = $1
+`
+
+func (q *Queries) GetForDisplayIsnReceiverBySlug(ctx context.Context, slug string) (IsnReceiver, error) {
+	row := q.db.QueryRowContext(ctx, getForDisplayIsnReceiverBySlug, slug)
+	var i IsnReceiver
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.UserID,
+		&i.IsnID,
+		&i.Title,
+		&i.Detail,
+		&i.Slug,
+		&i.ReceiverOrigin,
+		&i.MinBatchRecords,
+		&i.MaxBatchRecords,
+		&i.MaxDailyValidationFailures,
+		&i.MaxPayloadKilobytes,
+		&i.PayloadValidation,
+		&i.DefaultRateLimit,
+		&i.ReceiverStatus,
+	)
+	return i, err
+}
+
+const getForDisplayIsnReceiversByIsnID = `-- name: GetForDisplayIsnReceiversByIsnID :many
+SELECT
+    ir.id,
+    ir.created_at,
+    ir.updated_at,
+    ir.title,
+    ir.detail,
+    ir.slug,
+    ir.receiver_origin,
+    ir.min_batch_records,
+    ir.max_batch_records,
+    ir.max_daily_validation_failures,
+    ir.max_payload_kilobytes,
+    ir.payload_validation,
+    ir.default_rate_limit,
+    ir.receiver_status
+FROM isn_receivers ir
+WHERE ir.isn_id = $1
+`
+
+type GetForDisplayIsnReceiversByIsnIDRow struct {
+	ID                         uuid.UUID `json:"id"`
+	CreatedAt                  time.Time `json:"created_at"`
+	UpdatedAt                  time.Time `json:"updated_at"`
+	Title                      string    `json:"title"`
+	Detail                     string    `json:"detail"`
+	Slug                       string    `json:"slug"`
+	ReceiverOrigin             string    `json:"receiver_origin"`
+	MinBatchRecords            int32     `json:"min_batch_records"`
+	MaxBatchRecords            int32     `json:"max_batch_records"`
+	MaxDailyValidationFailures int32     `json:"max_daily_validation_failures"`
+	MaxPayloadKilobytes        int32     `json:"max_payload_kilobytes"`
+	PayloadValidation          string    `json:"payload_validation"`
+	DefaultRateLimit           int32     `json:"default_rate_limit"`
+	ReceiverStatus             string    `json:"receiver_status"`
+}
+
+func (q *Queries) GetForDisplayIsnReceiversByIsnID(ctx context.Context, isnID uuid.UUID) ([]GetForDisplayIsnReceiversByIsnIDRow, error) {
+	rows, err := q.db.QueryContext(ctx, getForDisplayIsnReceiversByIsnID, isnID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetForDisplayIsnReceiversByIsnIDRow
+	for rows.Next() {
+		var i GetForDisplayIsnReceiversByIsnIDRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Title,
+			&i.Detail,
+			&i.Slug,
+			&i.ReceiverOrigin,
+			&i.MinBatchRecords,
+			&i.MaxBatchRecords,
+			&i.MaxDailyValidationFailures,
+			&i.MaxPayloadKilobytes,
+			&i.PayloadValidation,
+			&i.DefaultRateLimit,
+			&i.ReceiverStatus,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getIsnReceiverBySlug = `-- name: GetIsnReceiverBySlug :one
 SELECT
     i.slug AS isn_slug,

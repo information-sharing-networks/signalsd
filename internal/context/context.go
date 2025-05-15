@@ -7,7 +7,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// Common context keys
+// Common context keys - use a struct to prevent conflicts
 type contextKey struct {
 	name string
 }

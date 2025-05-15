@@ -66,6 +66,32 @@ func (q *Queries) GetForDisplayUserByID(ctx context.Context, id uuid.UUID) (GetF
 	return i, err
 }
 
+const getForDisplayUserByIsnID = `-- name: GetForDisplayUserByIsnID :one
+SELECT u.id, u.email, u.created_at , u.updated_at 
+FROM users u 
+JOIN isn i ON u.id = i.user_id 
+WHERE i.id = $1
+`
+
+type GetForDisplayUserByIsnIDRow struct {
+	ID        uuid.UUID `json:"id"`
+	Email     string    `json:"email"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+func (q *Queries) GetForDisplayUserByIsnID(ctx context.Context, id uuid.UUID) (GetForDisplayUserByIsnIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getForDisplayUserByIsnID, id)
+	var i GetForDisplayUserByIsnIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const getForDisplayUserBySignalDefID = `-- name: GetForDisplayUserBySignalDefID :one
 SELECT u.id, u.email, u.created_at , u.updated_at 
 FROM users u 

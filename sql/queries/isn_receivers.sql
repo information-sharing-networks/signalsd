@@ -48,6 +48,32 @@ WHERE ir.slug = $1;
 SELECT ir.* 
 FROM isn_receivers ir;
 
+
+-- name: GetForDisplayIsnReceiverBySlug :one
+SELECT
+    ir.*
+FROM isn_receivers ir
+WHERE ir.slug = $1;
+
+-- name: GetForDisplayIsnReceiversByIsnID :many
+SELECT
+    ir.id,
+    ir.created_at,
+    ir.updated_at,
+    ir.title,
+    ir.detail,
+    ir.slug,
+    ir.receiver_origin,
+    ir.min_batch_records,
+    ir.max_batch_records,
+    ir.max_daily_validation_failures,
+    ir.max_payload_kilobytes,
+    ir.payload_validation,
+    ir.default_rate_limit,
+    ir.receiver_status
+FROM isn_receivers ir
+WHERE ir.isn_id = $1;
+
 -- name: ExistsIsnReceiverWithSlug :one
 
 SELECT EXISTS

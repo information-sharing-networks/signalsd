@@ -26,6 +26,12 @@ FROM users u
 JOIN signal_defs sd ON u.id = sd.user_id 
 WHERE sd.id = $1;
 
+-- name: GetForDisplayUserByIsnID :one
+SELECT u.id, u.email, u.created_at , u.updated_at 
+FROM users u 
+JOIN isn i ON u.id = i.user_id 
+WHERE i.id = $1;
+
 -- name: ExistsUserWithEmail :one 
 SELECT EXISTS (
     SELECT 1 FROM users WHERE email = $1

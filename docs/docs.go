@@ -131,7 +131,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "example": "sample-ISN-receiver--example-org",
+                        "example": "sample-isn-receiver--example-org",
                         "description": "isn receiver slug",
                         "name": "isn_receivers_slug",
                         "in": "path",
@@ -263,7 +263,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "example": "sample-ISN-retriever--example-org",
+                        "example": "sample-isn-retriever--example-org",
                         "description": "isn retriever slug",
                         "name": "isn_retrievers_slug",
                         "in": "path",
@@ -355,6 +355,41 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/isn/retriever/{slug}": {
+            "get": {
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Get an ISN retriever config",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn-retriever--example-org",
+                        "description": "isn retriever slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/database.GetIsnRetrieverBySlugRow"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/isn/{isn_slug}": {
             "put": {
                 "security": [
@@ -370,7 +405,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "example": "sample-ISN--example-org",
+                        "example": "sample-isn--example-org",
                         "description": "isn slug",
                         "name": "isn_slug",
                         "in": "path",
@@ -447,6 +482,50 @@ const docTemplate = `{
                     },
                     "409": {
                         "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/isn/{slug}": {
+            "get": {
+                "tags": [
+                    "ISN view"
+                ],
+                "summary": "Get an ISN configuration",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn--example-org",
+                        "description": "isn slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.IsnAndLinkedInfo"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/apperrors.ErrorResponse"
                         }
@@ -1022,6 +1101,85 @@ const docTemplate = `{
                 }
             }
         },
+        "database.GetForDisplayIsnReceiversByIsnIDRow": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "default_rate_limit": {
+                    "type": "integer"
+                },
+                "detail": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "max_batch_records": {
+                    "type": "integer"
+                },
+                "max_daily_validation_failures": {
+                    "type": "integer"
+                },
+                "max_payload_kilobytes": {
+                    "type": "integer"
+                },
+                "min_batch_records": {
+                    "type": "integer"
+                },
+                "payload_validation": {
+                    "type": "string"
+                },
+                "receiver_origin": {
+                    "type": "string"
+                },
+                "receiver_status": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "database.GetForDisplayIsnRetrieversByIsnIDRow": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "default_rate_limit": {
+                    "type": "integer"
+                },
+                "detail": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "retriever_origin": {
+                    "type": "string"
+                },
+                "retriever_status": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "database.GetForDisplayUserByIDRow": {
             "type": "object",
             "properties": {
@@ -1032,6 +1190,23 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "id": {
+                    "type": "string"
+                }
+            }
+        },
+        "database.GetForDisplayUserByIsnIDRow": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "updated_at": {
                     "type": "string"
                 }
             }
@@ -1049,6 +1224,115 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "database.GetIsnReceiverBySlugRow": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "default_rate_limit": {
+                    "type": "integer"
+                },
+                "detail": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "isn_id": {
+                    "type": "string"
+                },
+                "isn_is_in_use": {
+                    "type": "boolean"
+                },
+                "isn_slug": {
+                    "type": "string"
+                },
+                "isn_storage_type": {
+                    "type": "string"
+                },
+                "max_batch_records": {
+                    "type": "integer"
+                },
+                "max_daily_validation_failures": {
+                    "type": "integer"
+                },
+                "max_payload_kilobytes": {
+                    "type": "integer"
+                },
+                "min_batch_records": {
+                    "type": "integer"
+                },
+                "payload_validation": {
+                    "type": "string"
+                },
+                "receiver_origin": {
+                    "type": "string"
+                },
+                "receiver_status": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "database.GetIsnRetrieverBySlugRow": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "default_rate_limit": {
+                    "type": "integer"
+                },
+                "detail": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "isn_id": {
+                    "type": "string"
+                },
+                "isn_is_in_use": {
+                    "type": "boolean"
+                },
+                "isn_slug": {
+                    "type": "string"
+                },
+                "isn_storage_type": {
+                    "type": "string"
+                },
+                "retriever_origin": {
+                    "type": "string"
+                },
+                "retriever_status": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user_id": {
                     "type": "string"
                 }
             }
@@ -1237,7 +1521,7 @@ const docTemplate = `{
                 },
                 "isn_slug": {
                     "type": "string",
-                    "example": "sample-ISN--example-org"
+                    "example": "sample-isn--example-org"
                 },
                 "max_batch_records": {
                     "type": "integer",
@@ -1295,15 +1579,15 @@ const docTemplate = `{
                 },
                 "receiver_url": {
                     "type": "string",
-                    "example": "http://localhost:8080/signals/receiver/sample-ISN-receiver--example-org"
+                    "example": "http://localhost:8080/signals/receiver/sample-isn-receiver--example-org"
                 },
                 "resource_url": {
                     "type": "string",
-                    "example": "http://localhost:8080/api/isn/receiver/sample-ISN-receiver--example-org"
+                    "example": "http://localhost:8080/api/isn/receiver/sample-isn-receiver--example-org"
                 },
                 "slug": {
                     "type": "string",
-                    "example": "sample-ISN-receiver--example-org"
+                    "example": "sample-isn-receiver--example-org"
                 }
             }
         },
@@ -1345,11 +1629,11 @@ const docTemplate = `{
                 },
                 "resource_url": {
                     "type": "string",
-                    "example": "http://localhost:8080/api/isn/sample-ISN--example-org"
+                    "example": "http://localhost:8080/api/isn/sample-isn--example-org"
                 },
                 "slug": {
                     "type": "string",
-                    "example": "sample-ISN--example-org"
+                    "example": "sample-isn--example-org"
                 }
             }
         },
@@ -1363,11 +1647,11 @@ const docTemplate = `{
                 },
                 "detail": {
                     "type": "string",
-                    "example": "sample-ISN--example-org"
+                    "example": "sample-isn--example-org"
                 },
                 "isn_slug": {
                     "type": "string",
-                    "example": "sample-ISN--example-org"
+                    "example": "sample-isn--example-org"
                 },
                 "retriever_origin": {
                     "description": "do not provide this field if the isn is using local storage",
@@ -1399,15 +1683,15 @@ const docTemplate = `{
                 },
                 "resource_url": {
                     "type": "string",
-                    "example": "http://localhost:8080/api/isn/retriever/sample-ISN-retriever--example-org"
+                    "example": "http://localhost:8080/api/isn/retriever/sample-isn-retriever--example-org"
                 },
                 "retriever_url": {
                     "type": "string",
-                    "example": "http://localhost:8080/signals/retriever/sample-ISN-retriever--example-org"
+                    "example": "http://localhost:8080/signals/retriever/sample-isn-retriever--example-org"
                 },
                 "slug": {
                     "type": "string",
-                    "example": "sample-ISN-retriever--example-org"
+                    "example": "sample-isn-retriever--example-org"
                 }
             }
         },
@@ -1431,7 +1715,7 @@ const docTemplate = `{
                 },
                 "isn_slug": {
                     "type": "string",
-                    "example": "sample-ISN--example-org"
+                    "example": "sample-isn--example-org"
                 },
                 "readme_url": {
                     "description": "Updated readme file. Note file must be on a public github repo",
@@ -1493,6 +1777,53 @@ const docTemplate = `{
                     "description": "passwords must be at least 11 characters long",
                     "type": "string",
                     "example": "lkIB53@6O^Y"
+                }
+            }
+        },
+        "handlers.IsnAndLinkedInfo": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "detail": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_in_use": {
+                    "type": "boolean"
+                },
+                "isn_receivers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/database.GetForDisplayIsnReceiversByIsnIDRow"
+                    }
+                },
+                "isn_rectrievers": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/database.GetForDisplayIsnRetrieversByIsnIDRow"
+                    }
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "storage_type": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/database.GetForDisplayUserByIsnIDRow"
+                },
+                "visibility": {
+                    "type": "string"
                 }
             }
         },
@@ -1680,7 +2011,7 @@ const docTemplate = `{
                 },
                 "detail": {
                     "type": "string",
-                    "example": "sample-ISN--example-org"
+                    "example": "sample-isn--example-org"
                 },
                 "retriever_origin": {
                     "description": "do not provide this field if the isn is using local storage",

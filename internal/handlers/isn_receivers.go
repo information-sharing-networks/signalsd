@@ -25,15 +25,15 @@ func NewIsnReceiverHandler(cfg *signals.ServiceConfig) *IsnReceiverHandler {
 
 type CreateIsnReceiverRequest struct {
 	Title   string `json:"title" example:"Sample ISN Receiver @example.org"`
-	IsnSlug string `json:"isn_slug" example:"sample-ISN--example-org"`
+	IsnSlug string `json:"isn_slug" example:"sample-isn--example-org"`
 	UpdateIsnReceiverRequest
 }
 
 type CreateIsnReceiverResponse struct {
 	ID          uuid.UUID `json:"id" example:"4f1bc74b-cf79-410f-9c21-dc2cba047385"`
-	Slug        string    `json:"slug" example:"sample-ISN-receiver--example-org"`
-	ResourceURL string    `json:"resource_url" example:"http://localhost:8080/api/isn/receiver/sample-ISN-receiver--example-org"`
-	ReceiverURL string    `json:"receiver_url" example:"http://localhost:8080/signals/receiver/sample-ISN-receiver--example-org"`
+	Slug        string    `json:"slug" example:"sample-isn-receiver--example-org"`
+	ResourceURL string    `json:"resource_url" example:"http://localhost:8080/api/isn/receiver/sample-isn-receiver--example-org"`
+	ReceiverURL string    `json:"receiver_url" example:"http://localhost:8080/signals/receiver/sample-isn-receiver--example-org"`
 }
 
 type UpdateIsnReceiverRequest struct {
@@ -207,7 +207,7 @@ func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *
 //
 //	@Tags			ISN config
 //
-//	@Param			isn_receivers_slug	path	string								true	"isn receiver slug"	example(sample-ISN-receiver--example-org)
+//	@Param			isn_receivers_slug	path	string								true	"isn receiver slug"	example(sample-isn-receiver--example-org)
 //	@Param			request				body	handlers.UpdateIsnReceiverRequest	true	"ISN receiver details"
 //
 //	@Success		204
@@ -329,14 +329,14 @@ func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *
 
 // GetIsnReceiversHandler godoc
 //
-//	@Summary	Get the ISN Receivers
-//	@Description		get a list of the  ISN Receivers
-//	@Tags	ISN view
+//	@Summary		Get the ISN Receivers
+//	@Description	get a list of the  ISN Receivers
+//	@Tags			ISN view
 //
-//	@Success	200	{array}		database.IsnReceiver
-//	@Failure	500	{object}	apperrors.ErrorResponse
+//	@Success		200	{array}		database.IsnReceiver
+//	@Failure		500	{object}	apperrors.ErrorResponse
 //
-//	@Router		/api/isn/receiver [get]
+//	@Router			/api/isn/receiver [get]
 func (s *IsnReceiverHandler) GetIsnReceiversHandler(w http.ResponseWriter, r *http.Request) {
 
 	res, err := s.cfg.DB.GetIsnReceivers(r.Context())
@@ -346,4 +346,31 @@ func (s *IsnReceiverHandler) GetIsnReceiversHandler(w http.ResponseWriter, r *ht
 	}
 	helpers.RespondWithJSON(w, http.StatusOK, res)
 
+}
+
+// GetIsnReceiverHandler godoc
+//
+//	@Summary		Get an ISN receiver config
+//	@Tags			auth
+//
+//	@Param			slug	path		string	true	"isn receiver slug"	example(sample-isn-receiver--example-org)
+//	@Success		200	{array}		database.GetIsnReceiverBySlugRow
+//	@Failure		500	{object}	apperrors.ErrorResponse
+//
+//	@Router			/api/isn/retriever/{slug} [get]
+func (u *IsnReceiverHandler) GetIsnReceiverHandler(w http.ResponseWriter, r *http.Request) {
+
+	slug := r.PathValue("slug")
+
+	res, err := u.cfg.DB.GetIsnReceiverBySlug(r.Context(), slug)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			helpers.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No isn_receiver found for id %v", slug))
+			return
+		}
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the user from the database %v", err))
+		return
+	}
+	//
+	helpers.RespondWithJSON(w, http.StatusOK, res)
 }

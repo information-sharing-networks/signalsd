@@ -25,22 +25,25 @@ func NewIsnRetrieverHandler(cfg *signals.ServiceConfig) *IsnRetrieverHandler {
 
 type CreateIsnRetrieverRequest struct {
 	Title   string `json:"title" example:"Sample ISN Retriever @example.org"`
-	IsnSlug string `json:"isn_slug" example:"sample-ISN--example-org"`
+	IsnSlug string `json:"isn_slug" example:"sample-isn--example-org"`
 	UpdateIsnRetrieverRequest
 }
 
 type CreateIsnRetrieverResponse struct {
 	ID           uuid.UUID `json:"id" example:"4f1bc74b-cf79-410f-9c21-dc2cba047385"`
-	Slug         string    `json:"slug" example:"sample-ISN-retriever--example-org"`
-	ResourceURL  string    `json:"resource_url" example:"http://localhost:8080/api/isn/retriever/sample-ISN-retriever--example-org"`
-	RetrieverURL string    `json:"retriever_url" example:"http://localhost:8080/signals/retriever/sample-ISN-retriever--example-org"`
+	Slug         string    `json:"slug" example:"sample-isn-retriever--example-org"`
+	ResourceURL  string    `json:"resource_url" example:"http://localhost:8080/api/isn/retriever/sample-isn-retriever--example-org"`
+	RetrieverURL string    `json:"retriever_url" example:"http://localhost:8080/signals/retriever/sample-isn-retriever--example-org"`
 }
 
 type UpdateIsnRetrieverRequest struct {
-	Detail           *string `json:"detail" example:"sample-ISN--example-org"`
+	Detail           *string `json:"detail" example:"sample-isn--example-org"`
 	RetrieverOrigin  *string `json:"retriever_origin" example:"http://example.com:8080"` // do not provide this field if the isn is using local storage
 	DefaultRateLimit *int32  `json:"default_rate_limit" example:"600"`                   //maximum number of requests per minute
 	RetrieverStatus  *string `json:"retriever_status" example:"offline" enums:"offline, online, error, closed"`
+}
+type IsnRetrieverAndLinkedInfo struct {
+	database.IsnReceiver `json:"isn_receiver"`
 }
 
 // CreateIsnRetrieverHandler godoc
@@ -51,18 +54,18 @@ type UpdateIsnRetrieverRequest struct {
 //	@Description	When the ISN storage_type is set to "local", the retriever_origin must also be "local", indicating that the signals are retieved from the relational database used by the API service.
 //	@Description
 //
-//	@Tags			ISN config
+//	@Tags		ISN config
 //
-//	@Param			request	body		handlers.CreateIsnRetrieverRequest	true	"ISN retriever details"
+//	@Param		request	body		handlers.CreateIsnRetrieverRequest	true	"ISN retriever details"
 //
-//	@Success		201		{object}	handlers.CreateIsnRetrieverResponse
-//	@Failure		400		{object}	apperrors.ErrorResponse
-//	@Failure		409		{object}	apperrors.ErrorResponse
-//	@Failure		500		{object}	apperrors.ErrorResponse
+//	@Success	201		{object}	handlers.CreateIsnRetrieverResponse
+//	@Failure	400		{object}	apperrors.ErrorResponse
+//	@Failure	409		{object}	apperrors.ErrorResponse
+//	@Failure	500		{object}	apperrors.ErrorResponse
 //
-//	@Security		BearerAccessToken
+//	@Security	BearerAccessToken
 //
-//	@Router			/api/isn/retriever/{retriever_slug} [post]
+//	@Router		/api/isn/retriever/{retriever_slug} [post]
 func (i *IsnRetrieverHandler) CreateIsnRetrieverHandler(w http.ResponseWriter, r *http.Request) {
 	var req CreateIsnRetrieverRequest
 
@@ -180,23 +183,23 @@ func (i *IsnRetrieverHandler) CreateIsnRetrieverHandler(w http.ResponseWriter, r
 
 // UpdateIsnRetrieverHandler godoc
 //
-//	@Summary		Update an ISN Retriever
+//	@Summary	Update an ISN Retriever
 //
-//	@Tags			ISN config
+//	@Tags		ISN config
 //
-//	@Param			isn_retrievers_slug	path	string								true	"isn retriever slug"	example(sample-ISN-retriever--example-org)
-//	@Param			request				body	handlers.UpdateIsnRetrieverRequest	true	"ISN retriever details"
+//	@Param		isn_retrievers_slug	path	string								true	"isn retriever slug"	example(sample-isn-retriever--example-org)
+//	@Param		request				body	handlers.UpdateIsnRetrieverRequest	true	"ISN retriever details"
 //
-//	@Success		204
-//	@Failure		400	{object}	apperrors.ErrorResponse
-//	@Failure		401	{object}	apperrors.ErrorResponse
-//	@Failure		500	{object}	apperrors.ErrorResponse
+//	@Success	204
+//	@Failure	400	{object}	apperrors.ErrorResponse
+//	@Failure	401	{object}	apperrors.ErrorResponse
+//	@Failure	500	{object}	apperrors.ErrorResponse
 //
 // //
 //
-//	@Security		BearerAccessToken
+//	@Security	BearerAccessToken
 //
-//	@Router			/api/isn/retriever/{isn_retrievers_slug} [put]
+//	@Router		/api/isn/retriever/{isn_retrievers_slug} [put]
 func (i *IsnRetrieverHandler) UpdateIsnRetrieverHandler(w http.ResponseWriter, r *http.Request) {
 	var req UpdateIsnRetrieverRequest
 
@@ -207,8 +210,9 @@ func (i *IsnRetrieverHandler) UpdateIsnRetrieverHandler(w http.ResponseWriter, r
 	}
 
 	isnRetrieverSlug := r.PathValue("isn_retrievers_slug")
+
 	// check retriever exists and is owned by user
-	isnRetriever, err := i.cfg.DB.GetIsnRetrieverWithSlug(r.Context(), isnRetrieverSlug)
+	isnRetriever, err := i.cfg.DB.GetIsnRetrieverBySlug(r.Context(), isnRetrieverSlug)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			helpers.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN retriever not found")
@@ -285,14 +289,14 @@ func (i *IsnRetrieverHandler) UpdateIsnRetrieverHandler(w http.ResponseWriter, r
 
 // GetIsnRetrieversHandler godoc
 //
-//	@Summary	Get the ISN Retrievers
-//	@Description		get a list of the configured ISN Retrievers
-//	@Tags	ISN view
+//	@Summary		Get the ISN Retrievers
+//	@Description	get a list of the configured ISN Retrievers
+//	@Tags			ISN view
 //
-//	@Success	200	{array}		database.IsnRetriever
-//	@Failure	500	{object}	apperrors.ErrorResponse
+//	@Success		200	{array}		database.IsnRetriever
+//	@Failure		500	{object}	apperrors.ErrorResponse
 //
-//	@Router		/api/isn/retriever [get]
+//	@Router			/api/isn/retriever [get]
 func (s *IsnRetrieverHandler) GetIsnRetrieversHandler(w http.ResponseWriter, r *http.Request) {
 
 	res, err := s.cfg.DB.GetIsnRetrievers(r.Context())
@@ -302,4 +306,31 @@ func (s *IsnRetrieverHandler) GetIsnRetrieversHandler(w http.ResponseWriter, r *
 	}
 	helpers.RespondWithJSON(w, http.StatusOK, res)
 
+}
+
+// GetIsnRetrieverHandler godoc
+//
+//	@Summary		Get an ISN retriever config
+//	@Tags			auth
+//
+//	@Param			slug	path		string	true	"isn retriever slug"	example(sample-isn-retriever--example-org)
+//	@Success		200	{array}		database.GetIsnRetrieverBySlugRow
+//	@Failure		500	{object}	apperrors.ErrorResponse
+//
+//	@Router			/api/isn/retriever/{slug} [get]
+func (u *IsnRetrieverHandler) GetIsnRetrieverHandler(w http.ResponseWriter, r *http.Request) {
+
+	slug := r.PathValue("slug")
+
+	res, err := u.cfg.DB.GetIsnRetrieverBySlug(r.Context(), slug)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			helpers.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No isn_retriever found for id %v", slug))
+			return
+		}
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the user from the database %v", err))
+		return
+	}
+	//
+	helpers.RespondWithJSON(w, http.StatusOK, res)
 }

@@ -37,8 +37,16 @@ type UpdateIsnRequest struct {
 
 type CreateIsnResponse struct {
 	ID          uuid.UUID `json:"id" example:"67890684-3b14-42cf-b785-df28ce570400"`
-	Slug        string    `json:"slug" example:"sample-ISN--example-org"`
-	ResourceURL string    `json:"resource_url" example:"http://localhost:8080/api/isn/sample-ISN--example-org"`
+	Slug        string    `json:"slug" example:"sample-isn--example-org"`
+	ResourceURL string    `json:"resource_url" example:"http://localhost:8080/api/isn/sample-isn--example-org"`
+}
+
+// used in GET handler
+type IsnAndLinkedInfo struct {
+	database.GetForDisplayIsnBySlugRow
+	User          database.GetForDisplayUserByIsnIDRow            `json:"user"`
+	IsnReceivers  []database.GetForDisplayIsnReceiversByIsnIDRow  `json:"isn_receivers"`
+	IsnRetrievers []database.GetForDisplayIsnRetrieversByIsnIDRow `json:"isn_rectrievers"`
 }
 
 // CreateIsnHandler godoc
@@ -146,8 +154,8 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 //
 //	@Tags			ISN config
 //
-//	@Param			isn_slug	path	string								true	"isn slug"	example(sample-ISN--example-org)
-//	@Param			request				body	handlers.UpdateIsnRequest	true	"ISN details"
+//	@Param			isn_slug	path	string						true	"isn slug"	example(sample-isn--example-org)
+//	@Param			request		body	handlers.UpdateIsnRequest	true	"ISN details"
 //
 //	@Success		204
 //	@Failure		400	{object}	apperrors.ErrorResponse
@@ -227,14 +235,14 @@ func (i *IsnHandler) UpdateIsnHandler(w http.ResponseWriter, r *http.Request) {
 
 // GetIsnsHandler godoc
 //
-//	@Summary	Get the ISNs
-//	@Description		get a list of the configured ISNs
-//	@Tags	ISN view
+//	@Summary		Get the ISNs
+//	@Description	get a list of the configured ISNs
+//	@Tags			ISN view
 //
-//	@Success	200	{array}		database.Isn
-//	@Failure	500	{object}	apperrors.ErrorResponse
+//	@Success		200	{array}		database.Isn
+//	@Failure		500	{object}	apperrors.ErrorResponse
 //
-//	@Router		/api/isn [get]
+//	@Router			/api/isn [get]
 func (s *IsnHandler) GetIsnsHandler(w http.ResponseWriter, r *http.Request) {
 
 	res, err := s.cfg.DB.GetIsns(r.Context())
@@ -244,4 +252,59 @@ func (s *IsnHandler) GetIsnsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	helpers.RespondWithJSON(w, http.StatusOK, res)
 
+}
+
+// GetIsnHandler godoc
+//
+//	@Summary	Get an ISN configuration
+//	@Param		isn_slug	path	string	true	"isn slug"	example(sample-isn--example-org)
+//
+//	@Tags		ISN view
+//
+//	@Success	200	{object}	handlers.IsnAndLinkedInfo
+//	@Failure	400	{object}	apperrors.ErrorResponse
+//	@Failure	404	{object}	apperrors.ErrorResponse
+//	@Failure	500	{object}	apperrors.ErrorResponse
+//
+//	@Router		/api/isn/{slug} [get]
+func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
+
+	slug := r.PathValue("isn_slug")
+
+	// check isn exists
+	isn, err := s.cfg.DB.GetForDisplayIsnBySlug(r.Context(), slug)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			helpers.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No isn found for %s", slug))
+			return
+		}
+	}
+
+	// get the owner of the isn
+	user, err := s.cfg.DB.GetForDisplayUserByIsnID(r.Context(), isn.ID)
+	if err != nil {
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the user for this isn: %v", err))
+		return
+	}
+
+	// get any defined receivers
+	isnReceivers, err := s.cfg.DB.GetForDisplayIsnReceiversByIsnID(r.Context(), isn.ID)
+	if err != nil {
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the receivers for this isn: %v", err))
+		return
+	}
+
+	// get any defined retrievers
+	isnRetrievers, err := s.cfg.DB.GetForDisplayIsnRetrieversByIsnID(r.Context(), isn.ID)
+	if err != nil {
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the retrievers for this isn: %v", err))
+		return
+	}
+	res := IsnAndLinkedInfo{
+		GetForDisplayIsnBySlugRow: isn,
+		User:                      user,
+		IsnReceivers:              isnReceivers,
+		IsnRetrievers:             isnRetrievers,
+	}
+	helpers.RespondWithJSON(w, http.StatusOK, res)
 }

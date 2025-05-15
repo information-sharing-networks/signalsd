@@ -52,6 +52,9 @@ func RegisterRoutes(r *chi.Mux, cfg *signals.ServiceConfig) {
 		r.Get("/isn", isnHandler.GetIsnsHandler)
 		r.Get("/isn/receivers", isnReceiverHandler.GetIsnReceiversHandler)
 		r.Get("/isn/retrievers", isnRetrieverHandler.GetIsnRetrieversHandler)
+		r.Get("/isn/{isn_slug}", isnHandler.GetIsnHandler)
+		r.Get("/isn/receiver/{slug}", isnReceiverHandler.GetIsnReceiverHandler)
+		r.Get("/isn/retriever/{slug}", isnRetrieverHandler.GetIsnRetrieverHandler)
 	})
 
 	// auth

@@ -24,7 +24,7 @@ UPDATE isn_retrievers SET (
 ) = (Now(), $2, $3, $4, $5)
 WHERE id = $1;
 
--- name: GetIsnRetrieverWithSlug :one
+-- name: GetIsnRetrieverBySlug :one
 SELECT
     i.slug AS isn_slug,
     i.is_in_use AS isn_is_in_use,
@@ -38,6 +38,20 @@ WHERE ir.slug = $1;
 -- name: GetIsnRetrievers :many 
 SELECT ir.* 
 FROM isn_retrievers ir;
+
+-- name: GetForDisplayIsnRetrieversByIsnID :many
+SELECT
+    ir.id,
+    ir.created_at,
+    ir.updated_at,
+    ir.title,
+    ir.detail,
+    ir.slug,
+    ir.retriever_origin,
+    ir.retriever_status,
+    ir.default_rate_limit
+FROM isn_retrievers ir
+WHERE ir.isn_id = $1;
 
 -- name: ExistsIsnRetrieverWithSlug :one
 
