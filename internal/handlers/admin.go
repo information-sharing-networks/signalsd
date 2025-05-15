@@ -30,10 +30,7 @@ func NewAdminHandler(cfg *signals.ServiceConfig) *AdminHandler {
 //
 //	@Router			/admin/reset [post]
 func (a *AdminHandler) ResetHandler(w http.ResponseWriter, r *http.Request) {
-	if a.cfg.Environment != "dev" {
-		helpers.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "this api can only be used in the dev environment")
-		return
-	}
+
 	deletedUserCount, err := a.cfg.DB.DeleteUsers(r.Context())
 	if err != nil {
 		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not delete users: %v", err))

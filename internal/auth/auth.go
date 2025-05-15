@@ -23,27 +23,6 @@ func NewAuthService(cfg *signals.ServiceConfig) *AuthService {
 	return &AuthService{cfg: cfg}
 }
 
-// get the bearer token from http header, validate the token.
-// if the token is a valid JWT, parse the claims and return the user id
-func (a AuthService) CheckAccessTokenAuthorization(headers http.Header) (uuid.UUID, error) {
-
-	bearerToken, err := a.BearerTokenFromHeader(headers)
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("problem with bearer token")
-	}
-	claims, err := a.ValidateJWT(bearerToken, a.cfg.SecretKey)
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("invalid access token")
-	}
-
-	rawID := claims.Subject
-	userID, err := uuid.Parse(rawID)
-	if err != nil {
-		return uuid.Nil, fmt.Errorf("could not parse ID in token")
-	}
-	return userID, nil
-}
-
 func (a AuthService) HashPassword(password string) (string, error) {
 	dat, err := bcrypt.GenerateFromPassword([]byte(password), 1)
 	if err != nil {
@@ -52,6 +31,7 @@ func (a AuthService) HashPassword(password string) (string, error) {
 	return string(dat), nil
 
 }
+
 func (a AuthService) CheckPasswordHash(hash, password string) error {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 }
@@ -92,21 +72,6 @@ func (a AuthService) BearerTokenFromHeader(headers http.Header) (string, error) 
 	}
 
 	return bearerToken, nil
-}
-
-// validate a JWT token using the supplied secret, extract and return the claims
-func (a AuthService) ValidateJWT(tokenString, secret string) (jwt.RegisteredClaims, error) {
-	claims := jwt.RegisteredClaims{}
-
-	_, err := jwt.ParseWithClaims(tokenString, &claims, func(token *jwt.Token) (interface{}, error) {
-		// key used to sign the token
-		return []byte(secret), nil
-	})
-	if err != nil {
-		return claims, err
-	}
-
-	return claims, nil
 }
 
 func (a AuthService) GenerateRefreshToken() (string, error) {

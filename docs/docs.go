@@ -772,7 +772,7 @@ const docTemplate = `{
                         "BearerRefreshToken": []
                     }
                 ],
-                "description": "Returns a new JWT access token.\nAccess tokens are not issued if the refresh token has expired or been revoked.\nUsers must log in again to obtain a new refresh token if the current one has expired or been revoked.",
+                "description": "Use this endpoint to get a new access token.\nAccess tokens expire after an hour and subsequent requests using the token will fail with an error_code of \"access_token_expired\"\n\nYou need to supply a vaild refresh_token to use this API.\nIf the refresh token has expired (\"refresh_token_expired\") or been revoked (\"refresh_token_revoked\") the user must login again to get a new one.",
                 "tags": [
                     "auth"
                 ],

@@ -1,16 +1,14 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/nickabs/signals"
 	"github.com/nickabs/signals/internal/apperrors"
 	"github.com/nickabs/signals/internal/auth"
+	"github.com/nickabs/signals/internal/context"
 	"github.com/nickabs/signals/internal/helpers"
 )
 
@@ -25,9 +23,11 @@ func NewAuthHandler(cfg *signals.ServiceConfig) *AuthHandler {
 // RefreshAccessTokenHandler godoc
 //
 //	@Summary		Refresh access token
-//	@Description	Returns a new JWT access token.
-//	@Description	Access tokens are not issued if the refresh token has expired or been revoked.
-//	@Description	Users must log in again to obtain a new refresh token if the current one has expired or been revoked.
+//	@Description	Use this endpoint to get a new access token.
+//	@Description	Access tokens expire after an hour and subsequent requests using the token will fail with an error_code of "access_token_expired"
+//	@Description
+//	@Description	You need to supply a vaild refresh_token to use this API.
+//	@Description	If the refresh token has expired ("refresh_token_expired") or been revoked ("refresh_token_revoked") the user must login again to get a new one.
 //	@Tags			auth
 //
 //	@Success		200	{object}	handlers.RefreshAccessTokenHandler.refreshResponse
@@ -48,36 +48,13 @@ func (a *AuthHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.R
 
 	authService := auth.NewAuthService(a.cfg)
 
-	if r.ContentLength != 0 {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintln("This endpoint does not expect a request body"))
+	userID, ok := context.UserID(r.Context())
+	if !ok {
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userID from middleware")
 		return
 	}
 
-	refreshToken, err := authService.BearerTokenFromHeader(r.Header)
-	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeTokenError, fmt.Sprintf("could not refresh token: %v", err))
-		return
-	}
-
-	refreshTokenRow, err := a.cfg.DB.GetRefreshToken(r.Context(), refreshToken)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			helpers.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeTokenError, "Invalid token")
-			return
-		}
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenError, "could not refresh the token")
-		return
-	}
-	if refreshTokenRow.ExpiresAt.In(time.UTC).Before(time.Now().In(time.UTC)) {
-		helpers.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeRefreshTokenExpired, "the supplied token has expired - please login again ")
-		return
-	}
-	if refreshTokenRow.RevokedAt.Valid {
-		helpers.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeRefreshTokenRevoked, "the supplied token was revoked previously")
-		return
-	}
-
-	accessToken, err := authService.GenerateAccessToken(refreshTokenRow.UserID, a.cfg.SecretKey, signals.AccessTokenExpiry)
+	accessToken, err := authService.GenerateAccessToken(userID, a.cfg.SecretKey, signals.AccessTokenExpiry)
 	if err != nil {
 		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not generate access token")
 		return

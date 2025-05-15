@@ -26,6 +26,7 @@ func RegisterRoutes(r *chi.Mux, cfg *signals.ServiceConfig) {
 
 	authService := auth.NewAuthService(cfg)
 
+	// api
 	r.Route("/api", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
 			// signal defs
@@ -42,24 +43,41 @@ func RegisterRoutes(r *chi.Mux, cfg *signals.ServiceConfig) {
 			r.Post("/isn/retriever", isnRetrieverHandler.CreateIsnRetrieverHandler)
 			r.Put("/isn/retriever/{isn_retrievers_slug}", isnRetrieverHandler.UpdateIsnRetrieverHandler)
 
+			// webhooks
+			r.Post("/api/webhooks", webhookHandler.HandlerWebhook)
 		})
 		r.Get("/signal_defs", signalDefsHandler.GetSignalDefsHandler)
 		r.Get("/signal_defs/{slug}/v{sem_ver}", signalDefsHandler.GetSignalDefHandler)
 	})
 
 	// auth
-	r.Post("/auth/register", usersHandler.CreateUserHandler)
-	r.Put("/auth/pasword/reset", usersHandler.UpdatePasswordHandler)
-	r.Post("/auth/login", loginHandler.LoginHandler)
-	r.Post("/auth/refresh-token", authHandler.RefreshAccessTokenHandler)
-	r.Post("/auth/revoke-refresh-token", authHandler.RevokeRefreshTokenHandler)
-	// todo protect get user endpoint so as not to expose email addresses (server admin account only)
-	r.Get("/auth/users/{id}", usersHandler.GetUserByIDHandler)
+	r.Route("/auth", func(r chi.Router) {
+		r.Group(func(r chi.Router) {
+			r.Use(authService.ValidateAccessToken)
+			r.Put("/pasword/reset", usersHandler.UpdatePasswordHandler)
+		})
+		r.Group(func(r chi.Router) {
+			r.Use(authService.ValidateRefreshToken)
+			r.Post("/refresh-token", authHandler.RefreshAccessTokenHandler)
+		})
+		r.Post("/register", usersHandler.CreateUserHandler)
+		r.Post("/login", loginHandler.LoginHandler)
+		r.Post("/revoke-refresh-token", authHandler.RevokeRefreshTokenHandler)
+	})
 
-	// Admin endpoints
-	r.Post("/admin/reset", adminHandler.ResetHandler)     // delete all users and content (dev only)
-	r.Get("/admin/health", adminHandler.ReadinessHandler) // health check
-	r.Post("/api/webhooks", webhookHandler.HandlerWebhook)
+	// todo protect get user endpoint so as not to expose email addresses (server admin account only)
+
+	// Admin
+	r.Route("/admin", func(r chi.Router) {
+		r.Group(func(r chi.Router) {
+			r.Use(authService.ValidateDevEnv)
+			r.Post("/reset", adminHandler.ResetHandler) // delete all users and content  (dev env only)
+
+			// pending implementation of admin role
+			r.Get("/admin/users/{id}", usersHandler.GetUserByIDHandler)
+		})
+		r.Get("/health", adminHandler.ReadinessHandler) // health check
+	})
 
 	// documentation
 	r.Route("/assets", func(r chi.Router) {
@@ -67,12 +85,8 @@ func RegisterRoutes(r *chi.Mux, cfg *signals.ServiceConfig) {
 			http.StripPrefix("/assets/", http.FileServer(http.Dir("assets"))).ServeHTTP(w, r)
 		})
 	})
-
-	// Route for the home page
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./assets/home.html") })
-
 	r.Get("/docs", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./docs/redoc.html") })
-
 	r.Get("/swagger.json", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./docs/swagger.json") })
 
 }

@@ -7,9 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
-	"time"
 
-	"github.com/google/uuid"
 	"github.com/nickabs/signals"
 )
 
@@ -57,72 +55,6 @@ func TestHashPassword(t *testing.T) {
 			err := authService.CheckPasswordHash(tt.hash, tt.password)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("CheckPasswordHash() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
-}
-
-// Make sure that you can create and validate JWTs, and that expired tokens are rejected and JWTs signed with the wrong secret are rejected.
-func TestParseBearerToken(t *testing.T) {
-
-	authService := NewAuthService(signals.InitConfig())
-	const tokenSecret = "secret"
-	testUUID, err := uuid.NewRandom()
-	duration := 60 * time.Second
-
-	if err != nil {
-		t.Fatalf("failed to generate test UUID: %v", err)
-	}
-
-	validToken, err := authService.GenerateAccessToken(testUUID, tokenSecret, duration)
-	if err != nil {
-		t.Fatalf("failed to create token for test: %v", err)
-	}
-	expiredToken, err := authService.GenerateAccessToken(testUUID, tokenSecret, duration*-1)
-	if err != nil {
-		t.Fatalf("failed to create token for test: %v", err)
-	}
-
-	tests := []struct {
-		name        string
-		tokenString string
-		tokenSecret string
-		duration    time.Duration
-		wantUUID    uuid.UUID
-		wantErr     bool
-	}{{
-		name:        "Valid Token",
-		tokenString: validToken,
-		tokenSecret: tokenSecret,
-		duration:    duration,
-		wantUUID:    testUUID,
-		wantErr:     false,
-	}, {
-		name:        "Wrong Secret",
-		tokenString: validToken,
-		tokenSecret: "wrongsecret",
-		duration:    duration,
-		wantUUID:    testUUID,
-		wantErr:     true,
-	}, {
-		name:        "Expired Token",
-		tokenString: expiredToken,
-		tokenSecret: tokenSecret,
-		duration:    duration,
-		wantUUID:    testUUID,
-		wantErr:     true,
-	}}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			claims, err := authService.ValidateJWT(tt.tokenString, tt.tokenSecret)
-			if err != nil && !tt.wantErr {
-				t.Errorf("ValidateAndParseBearerToken() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			rawID := claims.Subject
-			userID, err := uuid.Parse(rawID)
-			if err == nil && userID != tt.wantUUID {
-				t.Errorf("ValidateAndParseBearerToken() gotUserID = %v, want %v", userID, tt.wantUUID)
 			}
 		})
 	}
