@@ -22,10 +22,3 @@ const (
 	ErrCodeUserAlreadyExists     ErrorCode = "user_alread_exists"
 	ErrCodeUserNotFound          ErrorCode = "user_not_found"
 )
-
-type ErrorResponse struct {
-	StatusCode int       `json:"-"`
-	ErrorCode  ErrorCode `json:"error_code" example:"example_error_code"`
-	Message    string    `json:"message"`
-	ReqID      string    `json:"-"`
-}
