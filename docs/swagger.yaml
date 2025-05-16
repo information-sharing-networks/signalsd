@@ -102,20 +102,9 @@ definitions:
       updated_at:
         type: string
     type: object
-  database.GetForDisplayUserByIDRow:
-    properties:
-      created_at:
-        type: string
-      email:
-        type: string
-      id:
-        type: string
-    type: object
   database.GetForDisplayUserByIsnIDRow:
     properties:
       created_at:
-        type: string
-      email:
         type: string
       id:
         type: string
@@ -125,8 +114,6 @@ definitions:
   database.GetForDisplayUserBySignalDefIDRow:
     properties:
       created_at:
-        type: string
-      email:
         type: string
       id:
         type: string
@@ -234,6 +221,26 @@ definitions:
       user_id:
         type: string
     type: object
+  database.GetUserByIDRow:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+    type: object
+  database.GetUsersRow:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      updated_at:
+        type: string
+    type: object
   database.Isn:
     properties:
       created_at:
@@ -255,66 +262,6 @@ definitions:
       user_id:
         type: string
       visibility:
-        type: string
-    type: object
-  database.IsnReceiver:
-    properties:
-      created_at:
-        type: string
-      default_rate_limit:
-        type: integer
-      detail:
-        type: string
-      id:
-        type: string
-      isn_id:
-        type: string
-      max_batch_records:
-        type: integer
-      max_daily_validation_failures:
-        type: integer
-      max_payload_kilobytes:
-        type: integer
-      min_batch_records:
-        type: integer
-      payload_validation:
-        type: string
-      receiver_origin:
-        type: string
-      receiver_status:
-        type: string
-      slug:
-        type: string
-      title:
-        type: string
-      updated_at:
-        type: string
-      user_id:
-        type: string
-    type: object
-  database.IsnRetriever:
-    properties:
-      created_at:
-        type: string
-      default_rate_limit:
-        type: integer
-      detail:
-        type: string
-      id:
-        type: string
-      isn_id:
-        type: string
-      retriever_origin:
-        type: string
-      retriever_status:
-        type: string
-      slug:
-        type: string
-      title:
-        type: string
-      updated_at:
-        type: string
-      user_id:
         type: string
     type: object
   handlers.CreateIsnReceiverRequest:
@@ -881,21 +828,27 @@ paths:
       summary: Get an ISN configuration
       tags:
       - ISN view
-  /api/isn/receiver:
+  /api/isn/receiever/{slug}:
     get:
-      description: get a list of the  ISN Receivers
+      parameters:
+      - description: isn receiver slug
+        example: sample-isn-receiver--example-org
+        in: path
+        name: slug
+        required: true
+        type: string
       responses:
         "200":
           description: OK
           schema:
             items:
-              $ref: '#/definitions/database.IsnReceiver'
+              $ref: '#/definitions/database.GetIsnReceiverBySlugRow'
             type: array
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/apperrors.ErrorResponse'
-      summary: Get the ISN Receivers
+      summary: Get an ISN receiver config
       tags:
       - ISN view
   /api/isn/receiver/{isn_receivers_slug}:
@@ -971,23 +924,6 @@ paths:
       summary: Create an ISN Receiver
       tags:
       - ISN config
-  /api/isn/retriever:
-    get:
-      description: get a list of the configured ISN Retrievers
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/database.IsnRetriever'
-            type: array
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
-      summary: Get the ISN Retrievers
-      tags:
-      - ISN view
   /api/isn/retriever/{isn_retrievers_slug}:
     put:
       parameters:
@@ -1080,7 +1016,7 @@ paths:
             $ref: '#/definitions/apperrors.ErrorResponse'
       summary: Get an ISN retriever config
       tags:
-      - auth
+      - ISN view
   /api/signal_defs:
     get:
       responses:
@@ -1249,6 +1185,24 @@ paths:
       summary: Update signal definition
       tags:
       - signal config
+  /api/users:
+    get:
+      description: This api displays email addresses and is currently only available
+        on dev env pending implementation of role based access
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/database.GetUsersRow'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apperrors.ErrorResponse'
+      summary: Get the registered users
+      tags:
+      - auth
   /api/users/{id}:
     get:
       description: This API is protected (includes email addresses in the response)
@@ -1265,7 +1219,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/database.GetForDisplayUserByIDRow'
+              $ref: '#/definitions/database.GetUserByIDRow'
             type: array
         "500":
           description: Internal Server Error

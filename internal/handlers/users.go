@@ -186,7 +186,6 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 
 }
 
-// todo query by email (admin only)
 // GetUserbyIDHandler godoc
 //
 //	@Summary		Get registered user
@@ -194,11 +193,11 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 //	@Tags			auth
 //
 //	@Param			id	path		string	true	"user id"	example(68fb5f5b-e3f5-4a96-8d35-cd2203a06f73)
-//	@Success		200	{array}		database.GetForDisplayUserByIDRow
+//	@Success		200	{array}		database.GetUserByIDRow
 //	@Failure		500	{object}	apperrors.ErrorResponse
 //
 //	@Router			/api/users/{id} [get]
-func (u *UserHandler) GetUserByIDHandler(w http.ResponseWriter, r *http.Request) {
+func (u *UserHandler) GetUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	userIDstring := r.PathValue("id")
 	userID, err := uuid.Parse(userIDstring)
@@ -207,7 +206,7 @@ func (u *UserHandler) GetUserByIDHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	res, err := u.cfg.DB.GetForDisplayUserByID(r.Context(), userID)
+	res, err := u.cfg.DB.GetUserByID(r.Context(), userID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			helpers.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No user found for id %v", userID))
@@ -217,5 +216,25 @@ func (u *UserHandler) GetUserByIDHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	//
+	helpers.RespondWithJSON(w, http.StatusOK, res)
+}
+
+// GetUsersHandler godoc
+//
+//	@Summary		Get the registered users
+//	@Description	This api displays email addresses and is currently only available on dev env pending implementation of role based access
+//	@Tags			auth
+//
+//	@Success		200	{array}		database.GetUsersRow
+//	@Failure		500	{object}	apperrors.ErrorResponse
+//
+//	@Router			/api/users [get]
+func (u *UserHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
+
+	res, err := u.cfg.DB.GetUsers(r.Context())
+	if err != nil {
+		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("error getting user from database: %v", err))
+		return
+	}
 	helpers.RespondWithJSON(w, http.StatusOK, res)
 }

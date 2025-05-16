@@ -45,8 +45,8 @@ type CreateIsnResponse struct {
 type IsnAndLinkedInfo struct {
 	database.GetForDisplayIsnBySlugRow
 	User          database.GetForDisplayUserByIsnIDRow            `json:"user"`
-	IsnReceivers  []database.GetForDisplayIsnReceiversByIsnIDRow  `json:"isn_receivers"`
-	IsnRetrievers []database.GetForDisplayIsnRetrieversByIsnIDRow `json:"isn_rectrievers"`
+	IsnReceivers  []database.GetForDisplayIsnReceiversByIsnIDRow  `json:"isn_receivers,omitempty"`
+	IsnRetrievers []database.GetForDisplayIsnRetrieversByIsnIDRow `json:"isn_rectrievers,omitempty"`
 }
 
 // CreateIsnHandler godoc

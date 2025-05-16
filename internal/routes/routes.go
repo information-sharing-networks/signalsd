@@ -46,12 +46,10 @@ func RegisterRoutes(r *chi.Mux, cfg *signals.ServiceConfig) {
 			// webhooks
 			r.Post("/api/webhooks", webhookHandler.HandlerWebhook)
 		})
-		// TODO may need some controls on the endpoints that can display email addresses (or hide emails? get okay from user on sharing them?)
+		// note do not show emails in the public apis (use users.id instead)
 		r.Get("/signal_defs", signalDefsHandler.GetSignalDefsHandler)
 		r.Get("/signal_defs/{slug}/v{sem_ver}", signalDefsHandler.GetSignalDefHandler)
 		r.Get("/isn", isnHandler.GetIsnsHandler)
-		r.Get("/isn/receivers", isnReceiverHandler.GetIsnReceiversHandler)
-		r.Get("/isn/retrievers", isnRetrieverHandler.GetIsnRetrieversHandler)
 		r.Get("/isn/{isn_slug}", isnHandler.GetIsnHandler)
 		r.Get("/isn/receiver/{slug}", isnReceiverHandler.GetIsnReceiverHandler)
 		r.Get("/isn/retriever/{slug}", isnRetrieverHandler.GetIsnRetrieverHandler)
@@ -72,7 +70,7 @@ func RegisterRoutes(r *chi.Mux, cfg *signals.ServiceConfig) {
 		r.Post("/revoke-refresh-token", authHandler.RevokeRefreshTokenHandler)
 	})
 
-	// todo protect get user endpoint so as not to expose email addresses (server admin account only)
+	// todo protect get user endpoint so as not to expose email addresses (server admin account + isn participants only)
 
 	// Admin
 	r.Route("/admin", func(r chi.Router) {
@@ -81,7 +79,8 @@ func RegisterRoutes(r *chi.Mux, cfg *signals.ServiceConfig) {
 			r.Post("/reset", adminHandler.ResetHandler) // delete all users and content  (dev env only)
 
 			// pending implementation of admin role
-			r.Get("/admin/users/{id}", usersHandler.GetUserByIDHandler)
+			r.Get("/users/{id}", usersHandler.GetUserHandler)
+			r.Get("/users", usersHandler.GetUsersHandler)
 		})
 		r.Get("/health", adminHandler.ReadinessHandler) // health check
 	})
@@ -95,5 +94,4 @@ func RegisterRoutes(r *chi.Mux, cfg *signals.ServiceConfig) {
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./assets/home.html") })
 	r.Get("/docs", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./docs/redoc.html") })
 	r.Get("/swagger.json", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./docs/swagger.json") })
-
 }

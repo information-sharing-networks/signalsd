@@ -34,11 +34,6 @@ FROM isn_retrievers ir
 JOIN isn i ON i.id = ir.isn_id
 WHERE ir.slug = $1;
 
-
--- name: GetIsnRetrievers :many 
-SELECT ir.* 
-FROM isn_retrievers ir;
-
 -- name: GetForDisplayIsnRetrieversByIsnID :many
 SELECT
     ir.id,

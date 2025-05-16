@@ -44,11 +44,6 @@ FROM isn_receivers ir
 JOIN isn i ON i.id = ir.isn_id
 WHERE ir.slug = $1;
 
--- name: GetIsnReceivers :many 
-SELECT ir.* 
-FROM isn_receivers ir;
-
-
 -- name: GetForDisplayIsnReceiverBySlug :one
 SELECT
     ir.*

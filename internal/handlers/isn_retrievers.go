@@ -287,37 +287,16 @@ func (i *IsnRetrieverHandler) UpdateIsnRetrieverHandler(w http.ResponseWriter, r
 	helpers.RespondWithJSON(w, http.StatusNoContent, "")
 }
 
-// GetIsnRetrieversHandler godoc
-//
-//	@Summary		Get the ISN Retrievers
-//	@Description	get a list of the configured ISN Retrievers
-//	@Tags			ISN view
-//
-//	@Success		200	{array}		database.IsnRetriever
-//	@Failure		500	{object}	apperrors.ErrorResponse
-//
-//	@Router			/api/isn/retriever [get]
-func (s *IsnRetrieverHandler) GetIsnRetrieversHandler(w http.ResponseWriter, r *http.Request) {
-
-	res, err := s.cfg.DB.GetIsnRetrievers(r.Context())
-	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("error getting ISN Retrievers from database: %v", err))
-		return
-	}
-	helpers.RespondWithJSON(w, http.StatusOK, res)
-
-}
-
 // GetIsnRetrieverHandler godoc
 //
-//	@Summary		Get an ISN retriever config
-//	@Tags			auth
+//	@Summary	Get an ISN retriever config
+//	@Tags		ISN view
 //
-//	@Param			slug	path		string	true	"isn retriever slug"	example(sample-isn-retriever--example-org)
-//	@Success		200	{array}		database.GetIsnRetrieverBySlugRow
-//	@Failure		500	{object}	apperrors.ErrorResponse
+//	@Param		slug	path		string	true	"isn retriever slug"	example(sample-isn-retriever--example-org)
+//	@Success	200		{array}		database.GetIsnRetrieverBySlugRow
+//	@Failure	500		{object}	apperrors.ErrorResponse
 //
-//	@Router			/api/isn/retriever/{slug} [get]
+//	@Router		/api/isn/retriever/{slug} [get]
 func (u *IsnRetrieverHandler) GetIsnRetrieverHandler(w http.ResponseWriter, r *http.Request) {
 
 	slug := r.PathValue("slug")

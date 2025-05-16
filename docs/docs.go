@@ -90,20 +90,29 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/isn/receiver": {
+        "/api/isn/receiever/{slug}": {
             "get": {
-                "description": "get a list of the  ISN Receivers",
                 "tags": [
                     "ISN view"
                 ],
-                "summary": "Get the ISN Receivers",
+                "summary": "Get an ISN receiver config",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn-receiver--example-org",
+                        "description": "isn receiver slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/database.IsnReceiver"
+                                "$ref": "#/definitions/database.GetIsnReceiverBySlugRow"
                             }
                         }
                     },
@@ -212,32 +221,6 @@ const docTemplate = `{
                         "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/apperrors.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/apperrors.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/isn/retriever": {
-            "get": {
-                "description": "get a list of the configured ISN Retrievers",
-                "tags": [
-                    "ISN view"
-                ],
-                "summary": "Get the ISN Retrievers",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/database.IsnRetriever"
-                            }
                         }
                     },
                     "500": {
@@ -358,7 +341,7 @@ const docTemplate = `{
         "/api/isn/retriever/{slug}": {
             "get": {
                 "tags": [
-                    "auth"
+                    "ISN view"
                 ],
                 "summary": "Get an ISN retriever config",
                 "parameters": [
@@ -779,6 +762,32 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/users": {
+            "get": {
+                "description": "This api displays email addresses and is currently only available on dev env pending implementation of role based access",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Get the registered users",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/database.GetUsersRow"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apperrors.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/users/{id}": {
             "get": {
                 "description": "This API is protected (includes email addresses in the response) - currently only available on dev envs, pending implementation of admin roles.",
@@ -802,7 +811,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/database.GetForDisplayUserByIDRow"
+                                "$ref": "#/definitions/database.GetUserByIDRow"
                             }
                         }
                     },
@@ -1180,27 +1189,10 @@ const docTemplate = `{
                 }
             }
         },
-        "database.GetForDisplayUserByIDRow": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "email": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                }
-            }
-        },
         "database.GetForDisplayUserByIsnIDRow": {
             "type": "object",
             "properties": {
                 "created_at": {
-                    "type": "string"
-                },
-                "email": {
                     "type": "string"
                 },
                 "id": {
@@ -1215,9 +1207,6 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "created_at": {
-                    "type": "string"
-                },
-                "email": {
                     "type": "string"
                 },
                 "id": {
@@ -1381,6 +1370,37 @@ const docTemplate = `{
                 }
             }
         },
+        "database.GetUserByIDRow": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                }
+            }
+        },
+        "database.GetUsersRow": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "database.Isn": {
             "type": "object",
             "properties": {
@@ -1412,97 +1432,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "visibility": {
-                    "type": "string"
-                }
-            }
-        },
-        "database.IsnReceiver": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "default_rate_limit": {
-                    "type": "integer"
-                },
-                "detail": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "isn_id": {
-                    "type": "string"
-                },
-                "max_batch_records": {
-                    "type": "integer"
-                },
-                "max_daily_validation_failures": {
-                    "type": "integer"
-                },
-                "max_payload_kilobytes": {
-                    "type": "integer"
-                },
-                "min_batch_records": {
-                    "type": "integer"
-                },
-                "payload_validation": {
-                    "type": "string"
-                },
-                "receiver_origin": {
-                    "type": "string"
-                },
-                "receiver_status": {
-                    "type": "string"
-                },
-                "slug": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "user_id": {
-                    "type": "string"
-                }
-            }
-        },
-        "database.IsnRetriever": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "default_rate_limit": {
-                    "type": "integer"
-                },
-                "detail": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "isn_id": {
-                    "type": "string"
-                },
-                "retriever_origin": {
-                    "type": "string"
-                },
-                "retriever_status": {
-                    "type": "string"
-                },
-                "slug": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "user_id": {
                     "type": "string"
                 }
             }

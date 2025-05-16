@@ -327,37 +327,16 @@ func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *
 	helpers.RespondWithJSON(w, http.StatusNoContent, "")
 }
 
-// GetIsnReceiversHandler godoc
-//
-//	@Summary		Get the ISN Receivers
-//	@Description	get a list of the  ISN Receivers
-//	@Tags			ISN view
-//
-//	@Success		200	{array}		database.IsnReceiver
-//	@Failure		500	{object}	apperrors.ErrorResponse
-//
-//	@Router			/api/isn/receiver [get]
-func (s *IsnReceiverHandler) GetIsnReceiversHandler(w http.ResponseWriter, r *http.Request) {
-
-	res, err := s.cfg.DB.GetIsnReceivers(r.Context())
-	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("error getting ISN Receivers from database: %v", err))
-		return
-	}
-	helpers.RespondWithJSON(w, http.StatusOK, res)
-
-}
-
 // GetIsnReceiverHandler godoc
 //
-//	@Summary		Get an ISN receiver config
-//	@Tags			auth
+//	@Summary	Get an ISN receiver config
+//	@Tags		ISN view
 //
-//	@Param			slug	path		string	true	"isn receiver slug"	example(sample-isn-receiver--example-org)
-//	@Success		200	{array}		database.GetIsnReceiverBySlugRow
-//	@Failure		500	{object}	apperrors.ErrorResponse
+//	@Param		slug	path		string	true	"isn receiver slug"	example(sample-isn-receiver--example-org)
+//	@Success	200		{array}		database.GetIsnReceiverBySlugRow
+//	@Failure	500		{object}	apperrors.ErrorResponse
 //
-//	@Router			/api/isn/retriever/{slug} [get]
+//	@Router		/api/isn/receiever/{slug} [get]
 func (u *IsnReceiverHandler) GetIsnReceiverHandler(w http.ResponseWriter, r *http.Request) {
 
 	slug := r.PathValue("slug")
