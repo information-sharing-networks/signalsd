@@ -11,7 +11,7 @@ import (
 	"github.com/nickabs/signals/internal/apperrors"
 	"github.com/nickabs/signals/internal/auth"
 	"github.com/nickabs/signals/internal/database"
-	"github.com/nickabs/signals/internal/helpers"
+	"github.com/nickabs/signals/internal/response"
 )
 
 type LoginHandler struct {
@@ -47,9 +47,9 @@ type LoginResponse struct {
 //	@Param			request	body		handlers.LoginRequest	true	"email and password"
 //
 //	@Success		200		{object}	handlers.LoginResponse
-//	@Failure		400		{object}	apperrors.ErrorResponse
-//	@Failure		401		{object}	apperrors.ErrorResponse
-//	@Failure		500		{object}	apperrors.ErrorResponse
+//	@Failure		400		{object}	response.ErrorResponse
+//	@Failure		401		{object}	response.ErrorResponse
+//	@Failure		500		{object}	response.ErrorResponse
 //
 //	@Router			/auth/login [post]
 func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
@@ -60,41 +60,41 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
+		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
 		return
 	}
 
 	exists, err := l.cfg.DB.ExistsUserWithEmail(r.Context(), req.Email)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
 	}
 	if !exists {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeUserNotFound, "no user found with this email address")
+		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeUserNotFound, "no user found with this email address")
 		return
 	}
 
 	user, err := l.cfg.DB.GetUserByEmail(r.Context(), req.Email)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
 	}
 
 	err = authService.CheckPasswordHash(user.HashedPassword, req.Password)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "Incorrect email or password")
+		response.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "Incorrect email or password")
 		return
 	}
 
 	accessToken, err := authService.GenerateAccessToken(user.ID, l.cfg.SecretKey, signals.AccessTokenExpiry)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenError, fmt.Sprintf("error creating access token: %v", err))
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenError, fmt.Sprintf("error creating access token: %v", err))
 		return
 	}
 
 	refreshToken, err := authService.GenerateRefreshToken()
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenError, fmt.Sprintf("error creating refresh token: %v", err))
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenError, fmt.Sprintf("error creating refresh token: %v", err))
 		return
 	}
 
@@ -104,11 +104,11 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		ExpiresAt: time.Now().Add(signals.RefreshTokenExpiry),
 	})
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not create user: %v", err))
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not create user: %v", err))
 		return
 	}
 
-	helpers.RespondWithJSON(w, http.StatusOK, LoginResponse{
+	response.RespondWithJSON(w, http.StatusOK, LoginResponse{
 		UserID:       user.ID,
 		CreatedAt:    user.CreatedAt,
 		AccessToken:  accessToken,

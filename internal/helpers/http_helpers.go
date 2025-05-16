@@ -1,7 +1,6 @@
 package helpers
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -10,68 +9,10 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/go-chi/chi/v5/middleware"
-	"github.com/nickabs/signals/internal/apperrors"
-	"github.com/nickabs/signals/internal/context"
-	"github.com/rs/zerolog/log"
-
 	"golang.org/x/text/runes"
 	"golang.org/x/text/transform"
 	"golang.org/x/text/unicode/norm"
 )
-
-// RespondWithError logs the details of the error and writes a json response containing an error code and message
-func RespondWithError(w http.ResponseWriter, r *http.Request, statusCode int, errorCode apperrors.ErrorCode, message string) {
-	//reqLog, ok := r.Context().Value(signals.RequestLoggerKey).(*zerolog.Logger)
-	reqLog, ok := context.RequestLogger(r.Context())
-	if !ok {
-		reqLog = &log.Logger
-	}
-	reqID := middleware.GetReqID(r.Context())
-
-	reqLog.Error().
-		Int("status", statusCode).
-		Any("error_code", errorCode).
-		Str("error_message", message).
-		Str("request_id", reqID).
-		Msg("Error response")
-
-	errResponse := apperrors.ErrorResponse{
-		StatusCode: statusCode,
-		ErrorCode:  errorCode,
-		Message:    message,
-		ReqID:      reqID,
-	}
-
-	dat, err := json.Marshal(errResponse)
-	if err != nil {
-		reqLog.Error().
-			Err(err).
-			Str("request_id", reqID).
-			Msg("error marshaling error response")
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(`{"code":"internal_error","message":"Internal Server Error"}`))
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(statusCode)
-	w.Write(dat)
-}
-
-func RespondWithJSON(w http.ResponseWriter, status int, payload any) {
-
-	dat, err := json.Marshal(payload)
-	if err != nil {
-		fmt.Println("error: could not decode the response payload")
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Internal Server Error"))
-		return
-	}
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	w.WriteHeader(status)
-	w.Write(dat)
-}
 
 // GenerateSlug generates a URL-friendly slug from a given string.
 // slugs identify a set of versioned signal_defs describing the same data set.

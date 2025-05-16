@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/nickabs/signals/internal/apperrors"
 	"github.com/nickabs/signals/internal/context"
-	"github.com/nickabs/signals/internal/helpers"
+	"github.com/nickabs/signals/internal/response"
 	"github.com/rs/zerolog/log"
 )
 
@@ -27,7 +27,7 @@ func (a AuthService) ValidateAccessToken(next http.Handler) http.Handler {
 
 		bearerToken, err := a.BearerTokenFromHeader(r.Header)
 		if err != nil {
-			helpers.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthorizationFailure, fmt.Sprintf("unauthorized: %v", err))
+			response.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthorizationFailure, fmt.Sprintf("unauthorized: %v", err))
 			return
 		}
 
@@ -38,17 +38,17 @@ func (a AuthService) ValidateAccessToken(next http.Handler) http.Handler {
 		})
 		if err != nil {
 			if errors.Is(err, jwt.ErrTokenExpired) {
-				helpers.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAccessTokenExpired, "access token expired, please use the refresh api to renew it")
+				response.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAccessTokenExpired, "access token expired, please use the refresh api to renew it")
 				return
 			}
-			helpers.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthorizationFailure, fmt.Sprintf("unauthorized: %v", err))
+			response.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthorizationFailure, fmt.Sprintf("unauthorized: %v", err))
 			return
 		}
 
 		rawID := claims.Subject
 		userID, err := uuid.Parse(rawID)
 		if err != nil {
-			helpers.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthorizationFailure, fmt.Sprintf("unauthorized: %v", err))
+			response.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthorizationFailure, fmt.Sprintf("unauthorized: %v", err))
 			return
 		}
 
@@ -71,25 +71,25 @@ func (a AuthService) ValidateRefreshToken(next http.Handler) http.Handler {
 
 		refreshToken, err := a.BearerTokenFromHeader(r.Header)
 		if err != nil {
-			helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeTokenError, fmt.Sprintf("unauthorized: %v", err))
+			response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeTokenError, fmt.Sprintf("unauthorized: %v", err))
 			return
 		}
 
 		refreshTokenRow, err := a.cfg.DB.GetRefreshToken(r.Context(), refreshToken)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				helpers.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeTokenError, "unauthorized: Invalid token")
+				response.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeTokenError, "unauthorized: Invalid token")
 				return
 			}
-			helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenError, fmt.Sprintf("database error: %v", err))
+			response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenError, fmt.Sprintf("database error: %v", err))
 			return
 		}
 		if refreshTokenRow.ExpiresAt.In(time.UTC).Before(time.Now().In(time.UTC)) {
-			helpers.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeRefreshTokenExpired, "the supplied token has expired - please login again ")
+			response.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeRefreshTokenExpired, "the supplied token has expired - please login again ")
 			return
 		}
 		if refreshTokenRow.RevokedAt.Valid {
-			helpers.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeRefreshTokenRevoked, "the supplied token was revoked previously - please login again")
+			response.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeRefreshTokenRevoked, "the supplied token was revoked previously - please login again")
 			return
 		}
 
@@ -112,7 +112,7 @@ func (a AuthService) ValidateDevEnv(next http.Handler) http.Handler {
 		reqLogger.Info().Msg("Dev environment confirmed")
 
 		if a.cfg.Environment != "dev" {
-			helpers.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "this api can only be used in the dev environment")
+			response.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "this api can only be used in the dev environment")
 			return
 		}
 		next.ServeHTTP(w, r.WithContext(r.Context()))

@@ -41,15 +41,6 @@ definitions:
     - ErrCodeTokenError
     - ErrCodeUserAlreadyExists
     - ErrCodeUserNotFound
-  apperrors.ErrorResponse:
-    properties:
-      error_code:
-        allOf:
-        - $ref: '#/definitions/apperrors.ErrorCode'
-        example: example_error_code
-      message:
-        type: string
-    type: object
   database.GetForDisplayIsnReceiversByIsnIDRow:
     properties:
       created_at:
@@ -674,6 +665,15 @@ definitions:
         - shuttered
         type: string
     type: object
+  response.ErrorResponse:
+    properties:
+      error_code:
+        allOf:
+        - $ref: '#/definitions/apperrors.ErrorCode'
+        example: example_error_code
+      message:
+        type: string
+    type: object
 host: localhost:8080
 info:
   contact: {}
@@ -701,11 +701,11 @@ paths:
         "403":
           description: Forbidden
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       summary: reset
       tags:
       - admin
@@ -722,7 +722,7 @@ paths:
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       summary: Get the ISNs
       tags:
       - ISN view
@@ -750,15 +750,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAccessToken: []
       summary: Create an ISN
@@ -785,15 +785,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAccessToken: []
       summary: Update an ISN
@@ -801,6 +801,7 @@ paths:
       - ISN config
   /api/isn/{slug}:
     get:
+      description: Returns details about the ISN plus details of any configured receivers/retrievers
       parameters:
       - description: isn slug
         example: sample-isn--example-org
@@ -816,15 +817,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       summary: Get an ISN configuration
       tags:
       - ISN view
@@ -847,7 +848,7 @@ paths:
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       summary: Get an ISN receiver config
       tags:
       - ISN view
@@ -873,15 +874,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAccessToken: []
       summary: Update an ISN Receiver
@@ -910,15 +911,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAccessToken: []
       summary: Create an ISN Receiver
@@ -945,15 +946,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAccessToken: []
       summary: Update an ISN Retriever
@@ -980,15 +981,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAccessToken: []
       summary: Create an ISN Retriever
@@ -1013,7 +1014,7 @@ paths:
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       summary: Get an ISN retriever config
       tags:
       - ISN view
@@ -1029,7 +1030,7 @@ paths:
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       summary: Get the signal definitions
       tags:
       - ISN view
@@ -1058,15 +1059,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAccessToken: []
       summary: Create signal definition
@@ -1093,15 +1094,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAccessToken: []
       summary: Delete signal definition
@@ -1129,15 +1130,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       summary: Get a signal definition
       tags:
       - ISN view
@@ -1171,15 +1172,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAccessToken: []
       summary: Update signal definition
@@ -1199,7 +1200,7 @@ paths:
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       summary: Get the registered users
       tags:
       - auth
@@ -1224,7 +1225,7 @@ paths:
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       summary: Get registered user
       tags:
       - auth
@@ -1252,15 +1253,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       summary: Login
       tags:
       - auth
@@ -1283,19 +1284,19 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAccessToken: []
       summary: Reset password
@@ -1317,15 +1318,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerRefreshToken: []
       summary: Refresh access token
@@ -1341,20 +1342,20 @@ paths:
         schema:
           $ref: '#/definitions/handlers.CreateUserRequest'
       responses:
-        "204":
-          description: No Content
+        "201":
+          description: Created
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "409":
           description: Conflict
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       summary: Create user
       tags:
       - auth
@@ -1380,15 +1381,15 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/apperrors.ErrorResponse'
+            $ref: '#/definitions/response.ErrorResponse'
       summary: Revoke refresh token
       tags:
       - auth

@@ -13,6 +13,7 @@ import (
 	"github.com/nickabs/signals/internal/context"
 	"github.com/nickabs/signals/internal/database"
 	"github.com/nickabs/signals/internal/helpers"
+	"github.com/nickabs/signals/internal/response"
 )
 
 type IsnReceiverHandler struct {
@@ -62,9 +63,9 @@ type UpdateIsnReceiverRequest struct {
 //	@Param			request	body		handlers.CreateIsnReceiverRequest	true	"ISN receiver details"
 //
 //	@Success		201		{object}	handlers.CreateIsnReceiverResponse
-//	@Failure		400		{object}	apperrors.ErrorResponse
-//	@Failure		409		{object}	apperrors.ErrorResponse
-//	@Failure		500		{object}	apperrors.ErrorResponse
+//	@Failure		400		{object}	response.ErrorResponse
+//	@Failure		409		{object}	response.ErrorResponse
+//	@Failure		500		{object}	response.ErrorResponse
 //
 //	@Security		BearerAccessToken
 //
@@ -74,13 +75,13 @@ func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *
 
 	userID, ok := context.UserID(r.Context())
 	if !ok {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userID from middleware")
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userID from middleware")
 		return
 	}
 	defer r.Body.Close()
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
+		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
 		return
 	}
 
@@ -88,20 +89,20 @@ func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *
 	isn, err := i.cfg.DB.GetIsnBySlug(r.Context(), req.IsnSlug)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			helpers.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
+			response.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
 			return
 		}
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
 	}
 	if isn.UserID != userID {
-		helpers.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you are not the owner of this ISN")
+		response.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you are not the owner of this ISN")
 		return
 	}
 
 	// check the isn is in use
 	if !isn.IsInUse {
-		helpers.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "this ISN is marked as 'not in use'")
+		response.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "this ISN is marked as 'not in use'")
 		return
 	}
 
@@ -113,48 +114,48 @@ func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *
 		req.MaxPayloadKilobytes == nil ||
 		req.DefaultRateLimit == nil ||
 		req.ReceiverStatus == nil {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must supply a value for all fields")
+		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must supply a value for all fields")
 		return
 	}
 
 	if isn.StorageType == "local" {
 		if req.ReceiverOrigin != nil {
-			helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "do not specify a receiver_origin when using local storage")
+			response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "do not specify a receiver_origin when using local storage")
 			return
 		}
 		req.ReceiverOrigin = new(string)
 		*req.ReceiverOrigin = "local"
 	} else {
 		if req.ReceiverOrigin != nil || !helpers.IsValidOrigin(*req.ReceiverOrigin) {
-			helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must specify a receiver_origin when using anything other than local storage, e.g https://example.com")
+			response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must specify a receiver_origin when using anything other than local storage, e.g https://example.com")
 			return
 		}
 	}
 
 	if !signals.ValidReceiverStatus[*req.ReceiverStatus] {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid receiver status")
+		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid receiver status")
 		return
 	}
 
 	if !signals.ValidPayloadValidations[*req.PayloadValidation] {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid payload validation")
+		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid payload validation")
 		return
 	}
 
 	// generate slug and check it is not already in use.
 	slug, err := helpers.GenerateSlug(req.Title)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not create slug from title")
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not create slug from title")
 		return
 	}
 
 	exists, err := i.cfg.DB.ExistsIsnReceiverWithSlug(r.Context(), slug)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("database error: %v", err))
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("database error: %v", err))
 		return
 	}
 	if exists {
-		helpers.RespondWithError(w, r, http.StatusConflict, apperrors.ErrCodeResourceAlreadyExists, fmt.Sprintf("the {%s} slug is already in use - pick a new title for your ISN receiver", slug))
+		response.RespondWithError(w, r, http.StatusConflict, apperrors.ErrCodeResourceAlreadyExists, fmt.Sprintf("the {%s} slug is already in use - pick a new title for your ISN receiver", slug))
 		return
 	}
 
@@ -175,7 +176,7 @@ func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *
 		ReceiverStatus:             *req.ReceiverStatus,
 	})
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not create ISN receiver: %v", err))
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not create ISN receiver: %v", err))
 		return
 	}
 
@@ -192,7 +193,7 @@ func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *
 		receiverURL = fmt.Sprintf("%s/signals/receiver/%s", *req.ReceiverOrigin, slug)
 	}
 
-	helpers.RespondWithJSON(w, http.StatusCreated, CreateIsnReceiverResponse{
+	response.RespondWithJSON(w, http.StatusCreated, CreateIsnReceiverResponse{
 		ID:          returnedIsnReceiver.ID,
 		Slug:        returnedIsnReceiver.Slug,
 		ResourceURL: resourceURL,
@@ -211,9 +212,9 @@ func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *
 //	@Param			request				body	handlers.UpdateIsnReceiverRequest	true	"ISN receiver details"
 //
 //	@Success		204
-//	@Failure		400	{object}	apperrors.ErrorResponse
-//	@Failure		401	{object}	apperrors.ErrorResponse
-//	@Failure		500	{object}	apperrors.ErrorResponse
+//	@Failure		400	{object}	response.ErrorResponse
+//	@Failure		401	{object}	response.ErrorResponse
+//	@Failure		500	{object}	response.ErrorResponse
 //
 // //
 //
@@ -225,7 +226,7 @@ func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *
 
 	userID, ok := context.UserID(r.Context())
 	if !ok {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userID from middleware")
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userID from middleware")
 		return
 	}
 
@@ -234,20 +235,20 @@ func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *
 	isnReceiver, err := i.cfg.DB.GetIsnReceiverBySlug(r.Context(), isnReceiverSlug)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			helpers.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN receiver not found")
+			response.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN receiver not found")
 			return
 		}
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
 	}
 
 	if !isnReceiver.IsnIsInUse {
-		helpers.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, fmt.Sprintf("Can't update ISN receiver because ISN %s is not in use", isnReceiver.IsnSlug))
+		response.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, fmt.Sprintf("Can't update ISN receiver because ISN %s is not in use", isnReceiver.IsnSlug))
 		return
 	}
 
 	if isnReceiver.UserID != userID {
-		helpers.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you are not the owner of this ISN receiver")
+		response.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you are not the owner of this ISN receiver")
 		return
 	}
 
@@ -256,7 +257,7 @@ func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *
 	decoder.DisallowUnknownFields()
 	err = decoder.Decode(&req)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
+		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
 		return
 	}
 
@@ -278,7 +279,7 @@ func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *
 	}
 	if req.PayloadValidation != nil {
 		if !signals.ValidPayloadValidations[*req.PayloadValidation] {
-			helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid payload validation")
+			response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid payload validation")
 			return
 		}
 		isnReceiver.PayloadValidation = *req.PayloadValidation
@@ -288,7 +289,7 @@ func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *
 	}
 	if req.ReceiverStatus != nil {
 		if !signals.ValidReceiverStatus[*req.ReceiverStatus] {
-			helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid payload validation")
+			response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid payload validation")
 			return
 		}
 		isnReceiver.ReceiverStatus = *req.ReceiverStatus
@@ -296,11 +297,11 @@ func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *
 
 	if req.ReceiverOrigin != nil {
 		if *req.ReceiverOrigin != "local" && isnReceiver.IsnStorageType == "local" {
-			helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "do not specify a receiver_origin when using local storage")
+			response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "do not specify a receiver_origin when using local storage")
 			return
 		}
 		if !helpers.IsValidOrigin(*req.ReceiverOrigin) {
-			helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must specify a receiver_origin when using anything other than local storage, e.g https://example.com")
+			response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must specify a receiver_origin when using anything other than local storage, e.g https://example.com")
 			return
 		}
 		isnReceiver.ReceiverOrigin = *req.ReceiverOrigin
@@ -320,11 +321,11 @@ func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *
 		ReceiverStatus:             isnReceiver.ReceiverStatus,
 	})
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not create ISN receiver: %v", err))
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not create ISN receiver: %v", err))
 		return
 	}
 
-	helpers.RespondWithJSON(w, http.StatusNoContent, "")
+	response.RespondWithJSON(w, http.StatusNoContent, "")
 }
 
 // GetIsnReceiverHandler godoc
@@ -334,7 +335,7 @@ func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *
 //
 //	@Param		slug	path		string	true	"isn receiver slug"	example(sample-isn-receiver--example-org)
 //	@Success	200		{array}		database.GetIsnReceiverBySlugRow
-//	@Failure	500		{object}	apperrors.ErrorResponse
+//	@Failure	500		{object}	response.ErrorResponse
 //
 //	@Router		/api/isn/receiever/{slug} [get]
 func (u *IsnReceiverHandler) GetIsnReceiverHandler(w http.ResponseWriter, r *http.Request) {
@@ -344,12 +345,12 @@ func (u *IsnReceiverHandler) GetIsnReceiverHandler(w http.ResponseWriter, r *htt
 	res, err := u.cfg.DB.GetIsnReceiverBySlug(r.Context(), slug)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			helpers.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No isn_receiver found for id %v", slug))
+			response.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No isn_receiver found for id %v", slug))
 			return
 		}
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the user from the database %v", err))
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the user from the database %v", err))
 		return
 	}
 	//
-	helpers.RespondWithJSON(w, http.StatusOK, res)
+	response.RespondWithJSON(w, http.StatusOK, res)
 }

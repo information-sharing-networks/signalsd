@@ -9,7 +9,7 @@ import (
 	"github.com/nickabs/signals/internal/apperrors"
 	"github.com/nickabs/signals/internal/auth"
 	"github.com/nickabs/signals/internal/context"
-	"github.com/nickabs/signals/internal/helpers"
+	"github.com/nickabs/signals/internal/response"
 )
 
 type AuthHandler struct {
@@ -31,9 +31,9 @@ func NewAuthHandler(cfg *signals.ServiceConfig) *AuthHandler {
 //	@Tags			auth
 //
 //	@Success		200	{object}	handlers.RefreshAccessTokenHandler.refreshResponse
-//	@Failure		400	{object}	apperrors.ErrorResponse
-//	@Failure		401	{object}	apperrors.ErrorResponse
-//	@Failure		500	{object}	apperrors.ErrorResponse
+//	@Failure		400	{object}	response.ErrorResponse
+//	@Failure		401	{object}	response.ErrorResponse
+//	@Failure		500	{object}	response.ErrorResponse
 //
 //	@Security		BearerRefreshToken
 //
@@ -50,20 +50,20 @@ func (a *AuthHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.R
 
 	userID, ok := context.UserID(r.Context())
 	if !ok {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userID from middleware")
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userID from middleware")
 		return
 	}
 
 	accessToken, err := authService.GenerateAccessToken(userID, a.cfg.SecretKey, signals.AccessTokenExpiry)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not generate access token")
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not generate access token")
 		return
 	}
 
 	res := refreshResponse{
 		AccessToken: accessToken,
 	}
-	helpers.RespondWithJSON(w, http.StatusOK, res)
+	response.RespondWithJSON(w, http.StatusOK, res)
 }
 
 // RevokeRefreshTokenHandler godoc
@@ -79,9 +79,9 @@ func (a *AuthHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.R
 //
 //	@Param			request	body	handlers.RevokeRefreshTokenHandler.revokeRefreshTokenRequest	true	"refresh token to be revoked"
 //	@Success		204
-//	@Failure		400	{object}	apperrors.ErrorResponse
-//	@Failure		404	{object}	apperrors.ErrorResponse
-//	@Failure		500	{object}	apperrors.ErrorResponse
+//	@Failure		400	{object}	response.ErrorResponse
+//	@Failure		404	{object}	response.ErrorResponse
+//	@Failure		500	{object}	response.ErrorResponse
 //
 //	@Router			/auth/revoke-refresh-token [post]
 func (a *AuthHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
@@ -95,28 +95,28 @@ func (a *AuthHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.R
 	defer r.Body.Close()
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("could not decode request body: %v", err))
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("could not decode request body: %v", err))
 		return
 	}
 	if req.RefreshToken == "" {
-		helpers.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must supply a refresh token in the body of the request")
+		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must supply a refresh token in the body of the request")
 		return
 	}
 
 	rowsAffected, err := a.cfg.DB.RevokeRefreshToken(r.Context(), req.RefreshToken)
 	if err != nil {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenError, fmt.Sprintf("error getting token from database: %v", err))
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenError, fmt.Sprintf("error getting token from database: %v", err))
 		return
 	}
 	if rowsAffected == 0 {
-		helpers.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeTokenError, "refresh token not found")
+		response.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeTokenError, "refresh token not found")
 		return
 	}
 	if rowsAffected != 1 {
-		helpers.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
 	}
 
-	helpers.RespondWithJSON(w, http.StatusNoContent, "")
+	response.RespondWithJSON(w, http.StatusNoContent, "")
 
 }
