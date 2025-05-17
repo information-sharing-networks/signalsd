@@ -1,3 +1,25 @@
+# Information Sharing Networks
+ISNs are networks that enable interested parties to share information. The information is shared by way of "signals".
+
+# Signals
+
+Signals are simple messages that can be exchanged between organisations to share data, indicate that an action has been taken or that something has been decided or agreed upon. Siganls are
+- light-weight, with simple payloads and a straightforward version control system. 
+- can be delivered as soon as a corresponding event occurs in the originating business process.
+- can move in any direction, creating the potential for feedback loops.
+  
+# Reference Implementations
+The [initial implementation](https://github.com/information-sharing-networks/isn-ref-impl) was a proof of concept and use to test the ideas as part of the UK govs Border Trade Demonstrator initiative (BTDs).  The BTDs established ISNs that were used by several goverment agencies and industry groups to make process improvements at the border by sharing supply chain information. 
+
+The second version (work in progress) develops the ISN administration facilities and will scale to higher volumes of data.
+
+There are three components
+- an [API](https://nickabs.github.io/signalsd/) used to configure ISNs, register participants and deploy the data sharing infrastructure 
+- an associated [framework agreement](https://github.com/information-sharing-networks/Framework) that establishes the responsibilities of the participants in an ISN
+- a demonstration UI 
+
+# Credits
+Many thanks to Ross McDonald who came up with the concept and created the initial reference implemenation.
 
 # go service dependencies
 go 1.24 or above
