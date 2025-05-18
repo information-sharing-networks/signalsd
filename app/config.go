@@ -7,8 +7,8 @@ import (
 	"time"
 
 	_ "github.com/lib/pq"
-	"github.com/nickabs/signals/internal/database"
-	"github.com/nickabs/signals/internal/logger"
+	"github.com/nickabs/signalsd/app/internal/database"
+	"github.com/nickabs/signalsd/app/internal/logger"
 	"github.com/rs/zerolog"
 )
 
@@ -23,6 +23,7 @@ config sets up shared variables for the service:
 type ServiceConfig struct {
 	DB          *database.Queries
 	Environment string
+	Host        string
 	Port        int
 	SecretKey   string
 	LogLevel    zerolog.Level
@@ -75,6 +76,7 @@ var ValidReceiverStatus = map[string]bool{ // ins_receiver.receiver_status
 // InitConfig loads environment variables, establishes database connection and returns a ServiceConfig struct
 func InitConfig() *ServiceConfig {
 	const (
+		defaultHost        = "127.0.0.1"
 		defaultPort        = 8080
 		defaultEnviromnent = "dev"
 		defaultLogLevelStr = "debug"
@@ -128,6 +130,13 @@ func InitConfig() *ServiceConfig {
 	dbQueries := database.New(dbConn)
 
 	// http
+
+	host := os.Getenv("SIGNALS_HOST")
+
+	if host == "" {
+		logger.ServerLogger.Warn().Msgf("SIGNALS_HOST environment variable is not set, defaulting to '%s'", defaultHost)
+		host = defaultHost
+	}
 	portString := os.Getenv("SIGNALS_PORT")
 	var port int
 
@@ -150,6 +159,7 @@ func InitConfig() *ServiceConfig {
 	return &ServiceConfig{
 		DB:          dbQueries,
 		Environment: environment,
+		Host:        host,
 		Port:        port,
 		SecretKey:   secretKey,
 		LogLevel:    logLevel,

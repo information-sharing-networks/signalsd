@@ -45,6 +45,7 @@ export SIGNALS_ENVIRONMENT=dev
 export SIGNALS_SECRET_KEY="" # add your secret key here
 export SIGNALS_PORT=8080
 export SIGNALS_LOG_LEVEL=debug
+export SIGNALS_HOST=127.0.0.1
 ```
 
 the secret key is used to sign the JWT access tokens used by the service.  You can create a strong key using
@@ -80,6 +81,7 @@ goose -dir sql/schema postgres $SIGNALS_DB_URL  up
 
 # build and run
 ``` bash
+cd app
 go build ./cmd/signalsd/
 ./signalsd
 

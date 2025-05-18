@@ -4,11 +4,11 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/nickabs/signals"
-	"github.com/nickabs/signals/internal/auth"
-	"github.com/nickabs/signals/internal/handlers"
+	signals "github.com/nickabs/signalsd/app"
+	"github.com/nickabs/signalsd/app/internal/auth"
+	"github.com/nickabs/signalsd/app/internal/handlers"
 
-	_ "github.com/nickabs/signals/docs"
+	_ "github.com/nickabs/signalsd/app/docs"
 )
 
 func RegisterRoutes(r *chi.Mux, cfg *signals.ServiceConfig) {

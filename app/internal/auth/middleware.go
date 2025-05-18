@@ -10,9 +10,9 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/nickabs/signals/internal/apperrors"
-	"github.com/nickabs/signals/internal/context"
-	"github.com/nickabs/signals/internal/response"
+	"github.com/nickabs/signalsd/app/internal/apperrors"
+	"github.com/nickabs/signalsd/app/internal/context"
+	"github.com/nickabs/signalsd/app/internal/response"
 	"github.com/rs/zerolog/log"
 )
 

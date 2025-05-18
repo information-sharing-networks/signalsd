@@ -3,5 +3,5 @@ notes.md
 /.psqlrc
 /.vscode
 .DS_store
-/signalsd
+/app/signalsd
 tmp/

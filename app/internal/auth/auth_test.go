@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/nickabs/signals"
+	signals "github.com/nickabs/signalsd/app"
 )
 
 func TestHashPassword(t *testing.T) {

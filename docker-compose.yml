@@ -1,0 +1,58 @@
+# docker-compose.yml (Local)
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    container_name: signalsd-db
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_USER: signalsd
+      POSTGRES_DB: signalsd_admin
+    healthcheck:
+      test: ["CMD-SHELL", "psql -U signalsd -d signalsd_admin -c 'select 1;'"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+
+  app:
+    build: ./app
+    container_name: signalsd-app
+    entrypoint: ["/app/entrypoint.sh"]
+    environment:
+      - SIGNALS_ENVIRONMENT=dev
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  db-data:

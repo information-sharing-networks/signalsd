@@ -1,4 +1,4 @@
-module github.com/nickabs/signals
+module github.com/nickabs/signalsd/app
 
 go 1.24.2
 

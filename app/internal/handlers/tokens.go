@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/nickabs/signals"
-	"github.com/nickabs/signals/internal/apperrors"
-	"github.com/nickabs/signals/internal/auth"
-	"github.com/nickabs/signals/internal/context"
-	"github.com/nickabs/signals/internal/response"
+	signals "github.com/nickabs/signalsd/app"
+	"github.com/nickabs/signalsd/app/internal/apperrors"
+	"github.com/nickabs/signalsd/app/internal/auth"
+	"github.com/nickabs/signalsd/app/internal/context"
+	"github.com/nickabs/signalsd/app/internal/response"
 )
 
 type AuthHandler struct {

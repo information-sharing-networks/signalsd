@@ -11,7 +11,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/nickabs/signals"
+	signals "github.com/nickabs/signalsd/app"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -54,6 +55,7 @@ func (a AuthService) GenerateAccessToken(userID uuid.UUID, secret string, expire
 	if err != nil {
 		return "", fmt.Errorf("could not sign JWT: %v", err)
 	}
+	log.Debug().Msgf("debug creating token: secret key %s token %s", a.cfg.SecretKey, signedAccessToken)
 	return signedAccessToken, nil
 }
 

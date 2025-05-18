@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/nickabs/signals"
-	"github.com/nickabs/signals/internal/apperrors"
-	"github.com/nickabs/signals/internal/response"
+	signals "github.com/nickabs/signalsd/app"
+	"github.com/nickabs/signalsd/app/internal/apperrors"
+	"github.com/nickabs/signalsd/app/internal/response"
 )
 
 type WebhookHandler struct {

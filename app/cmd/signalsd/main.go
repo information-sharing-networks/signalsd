@@ -7,12 +7,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
-	"github.com/nickabs/signals"
-	"github.com/nickabs/signals/internal/logger"
-	internalMiddleware "github.com/nickabs/signals/internal/middleware"
-	"github.com/nickabs/signals/internal/routes"
+	internalMiddleware "github.com/nickabs/signalsd/app/internal/middleware"
+	"github.com/nickabs/signalsd/app/internal/routes"
+	"github.com/rs/zerolog/log"
 
-	_ "github.com/nickabs/signals/docs"
+	signals "github.com/nickabs/signalsd/app"
+	_ "github.com/nickabs/signalsd/app/docs"
 )
 
 //	@description	Signals ISN service API
@@ -46,7 +46,6 @@ import (
 
 func main() {
 	// TODO - will the signal defs ever need to be private? Current implementation assumes 'no'
-	logger.ServerLogger.Info().Msg("Starting server")
 
 	cfg := signals.InitConfig()
 
@@ -56,15 +55,12 @@ func main() {
 
 	r.Use(chiMiddleware.RequestID)
 	r.Use(internalMiddleware.LoggerMiddleware)
-	//todor.Use(internalMiddleware.AuthorizationMiddleware(*authService))
 
-	//TODO
-	//r.Use(chiMiddleware.Recoverer)
-	//r.Use(chiMiddleware.Timeout(60 * time.Second))
+	log.Info().Msg("Starting server")
 
 	routes.RegisterRoutes(r, cfg)
 
-	serverAddr := fmt.Sprintf("localhost:%d", cfg.Port)
+	serverAddr := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
 	server := &http.Server{
 		Addr:         serverAddr,
 		Handler:      r,
@@ -73,10 +69,10 @@ func main() {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	logger.ServerLogger.Info().Msgf("%s service listening on %s \n", cfg.Environment, serverAddr)
+	log.Info().Msgf("%s service listening on %s \n", cfg.Environment, serverAddr)
 
 	err := server.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
-		logger.ServerLogger.Fatal().Err(err).Msg("Server failed to start")
+		log.Fatal().Err(err).Msg("Server failed to start")
 	}
 }

@@ -7,11 +7,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/nickabs/signals"
-	"github.com/nickabs/signals/internal/apperrors"
-	"github.com/nickabs/signals/internal/auth"
-	"github.com/nickabs/signals/internal/database"
-	"github.com/nickabs/signals/internal/response"
+	signals "github.com/nickabs/signalsd/app"
+	"github.com/nickabs/signalsd/app/internal/apperrors"
+	"github.com/nickabs/signalsd/app/internal/auth"
+	"github.com/nickabs/signalsd/app/internal/database"
+	"github.com/nickabs/signalsd/app/internal/response"
 )
 
 type LoginHandler struct {
