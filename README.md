@@ -1,4 +1,3 @@
-# Transmission
 [ISN intro](#information-sharing-networks) |
 [Try it out](#try-it-out) |
 [Developers](#developers) |
