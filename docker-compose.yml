@@ -26,9 +26,11 @@ services:
           memory: 256M
 
   app:
-    build: ./app
+    build: 
+      context: .
+      dockerfile: app/Dockerfile
     container_name: signalsd-app
-    entrypoint: ["/app/entrypoint.sh"]
+    entrypoint: ["/app/entrypoint.sh", "-e", "local"]
     environment:
       - SIGNALS_ENVIRONMENT=dev
     ports:

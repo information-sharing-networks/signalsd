@@ -68,6 +68,7 @@ func RegisterRoutes(r *chi.Mux, cfg *signals.ServiceConfig) {
 		r.Post("/register", usersHandler.CreateUserHandler)
 		r.Post("/login", loginHandler.LoginHandler)
 		r.Post("/revoke-refresh-token", authHandler.RevokeRefreshTokenHandler)
+		r.Get("/users", usersHandler.GetUsersHandler)
 	})
 
 	// todo protect get user endpoint so as not to expose email addresses (server admin account + isn participants only)
@@ -80,7 +81,6 @@ func RegisterRoutes(r *chi.Mux, cfg *signals.ServiceConfig) {
 
 			// pending implementation of admin role
 			r.Get("/users/{id}", usersHandler.GetUserHandler)
-			r.Get("/users", usersHandler.GetUsersHandler)
 		})
 		r.Get("/health", adminHandler.ReadinessHandler) // health check
 	})

@@ -9,10 +9,14 @@ RUN go install github.com/pressly/goose/v3/cmd/goose@latest && \
 
 WORKDIR /app
 
-COPY go.mod go.sum ./
+COPY app/go.mod .
+COPY app/go.sum .
+
 RUN go mod download
 
-COPY . .
+COPY app .
+
+COPY ../entrypoint.sh .
 
 # Generate code and documentation
 RUN sqlc generate && \
@@ -26,15 +30,14 @@ FROM alpine:3.21
 # non-root user 
 RUN addgroup -S signalsd && adduser -S -G signalsd signalsd
 
-WORKDIR /app
-
-COPY entrypoint.sh /app/entrypoint.sh
-
-RUN chmod +x /app/entrypoint.sh
-
-RUN chown -R signalsd:signalsd /app
 
 COPY --from=builder /go/bin/goose /usr/local/bin/
+
+WORKDIR /app
+COPY --from=builder /app/entrypoint.sh .
+RUN chmod +x ./entrypoint.sh
+
+RUN chown -R signalsd:signalsd .
 
 USER signalsd
 

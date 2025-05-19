@@ -1,0 +1,64 @@
+# docker-compose.yml (Local)
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    container_name: signalsd-db-dev
+    volumes:
+      - db-data-dev:/var/lib/postgresql/data
+    ports:
+      - "15432:5432"
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_USER: signalsd-dev
+      POSTGRES_DB: signalsd_admin
+    healthcheck:
+      test: ["CMD-SHELL", "psql -U signalsd-dev -d signalsd_admin -c 'select 1;'"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+  app:
+    image: golang:1.24-alpine
+    container_name: signalsd-app-dev
+    volumes:
+      - ./:/signalsd # project dir
+      - go-modules:/go/pkg/mod # persist downloaded modules
+    working_dir:
+      /signalsd
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./app/.env
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/admin/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command: >
+      sh -c "apk add --no-cache bash postgresql-client curl jq vim && /signalsd/entrypoint.sh -e local-dev"
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1024M
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  db-data-dev:
+  go-modules:
