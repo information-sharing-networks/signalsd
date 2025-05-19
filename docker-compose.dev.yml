@@ -31,6 +31,8 @@ services:
     volumes:
       - ./:/signalsd # project dir
       - go-modules:/go/pkg/mod # persist downloaded modules
+    environment:
+      DOCKER_ENV: true
     working_dir:
       /signalsd
     ports:

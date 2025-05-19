@@ -1,5 +1,4 @@
 #!/bin/sh
-set -eu
 
 function launchLocal() {
     # entryfile for local dev docker app 
@@ -66,6 +65,11 @@ fi
 }
 
 ENV=""
+
+if [ -z "$DOCKER_ENV" ]; then
+    echo "error: this script is only used inside docker" >&2
+    exit 1
+fi
 while getopts "e:r" arg; do
   case $arg in
     e) export ENV=$OPTARG ;;
@@ -73,7 +77,7 @@ while getopts "e:r" arg; do
 done
 
 if [ "$ENV" != "local-dev" ] && [ "$ENV" != "local" ] ; then
-    echo "usage $0 -e environment (local or local-dev) [ -r (restart local-dev signalsd)]" 
+    echo "usage $0 -e environment (local or local-dev) [ -r (restart local-dev signalsd)]" >&2
     exit 1
 fi
 

@@ -32,7 +32,8 @@ services:
     container_name: signalsd-app
     entrypoint: ["/app/entrypoint.sh", "-e", "local"]
     environment:
-      - SIGNALS_ENVIRONMENT=dev
+      DOCKER_ENV: true
+      SIGNALS_ENVIRONMENT: dev
     ports:
       - "8080:8080"
     depends_on:
