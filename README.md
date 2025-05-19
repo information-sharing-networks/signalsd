@@ -78,7 +78,7 @@ docker compose restart app
 docker compose -f docker-compose.dev.yml down
 
 # to stop and remove all docker related images and storage:
-docker compose -f docker-compose.dev.yml down -rmi local -v 
+docker compose -f docker-compose.dev.yml down --rmi local -v 
 ```
 the service starts on [http://localhost:8080](http://localhost:8080)
 
