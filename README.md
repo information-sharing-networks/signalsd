@@ -19,7 +19,7 @@ The [initial implementation](https://github.com/information-sharing-networks/isn
 The second version (work in progress) develops the ISN administration facilities and will scale to higher volumes of data.
 
 There are three components
-- an [API](https://nickabs.github.io/signalsd/) used to configure ISNs, register participants and deploy the data sharing infrastructure 
+- an [API](https://nickabs.github.io/signalsd/app/docs/index.html) used to configure ISNs, register participants and deploy the data sharing infrastructure 
 - an associated [framework agreement](https://github.com/information-sharing-networks/Framework) that establishes the responsibilities of the participants in an ISN
 - a demonstration UI 
 
@@ -61,7 +61,8 @@ First, clone the repo. There is only one required env variable for the docker en
 export SIGNALS_SECRET_KEY="" # add a random secret key here (used to sign the JWT tokens used in the service)
 ```
 
-Run the service 
+Run the API admin service 
+you can preview the API specs [here](https://nickabs.github.io/signalsd/app/docs/index.html)
 
 ```sh
 cd signalsd
