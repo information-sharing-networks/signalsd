@@ -1,77 +1,53 @@
 -- name: CreateIsnReceiver :one
 INSERT INTO isn_receivers (
-    id,
+    isn_id,
     created_at,
     updated_at,
-    user_id,
-    isn_id,
-    title,
-    detail,
-    slug,
-    receiver_origin,
-    min_batch_records,
-    max_batch_records,
     max_daily_validation_failures,
     max_payload_kilobytes,
     payload_validation,
     default_rate_limit,
-    receiver_status
-) VALUES (gen_random_uuid(), now(), now(), $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) 
-RETURNING id, slug;
+    receiver_status, 
+    listener_count
+) VALUES ($1, now(), now(), $2, $3, $4, $5, $6, $7)
+RETURNING *;
 
 -- name: UpdateIsnReceiver :execrows
 UPDATE isn_receivers SET (
   updated_at, 
-  detail,
-  receiver_origin,
-  min_batch_records,
-  max_batch_records,
   max_daily_validation_failures,
   max_payload_kilobytes,
   payload_validation,
   default_rate_limit,
-  receiver_status
-) = (Now(), $2, $3, $4, $5, $6, $7, $8, $9, $10)
-WHERE id = $1;
+  receiver_status,
+  listener_count
+) = (Now(), $2, $3, $4, $5, $6, $7)
+WHERE isn_id = $1;
 
--- name: GetIsnReceiverBySlug :one
+-- name: GetForDisplayIsnReceiversByIsnID :one
 SELECT
-    i.slug AS isn_slug,
-    i.is_in_use AS isn_is_in_use,
-    i.storage_type AS isn_storage_type,
-    ir.*
-FROM isn_receivers ir
-JOIN isn i ON i.id = ir.isn_id
-WHERE ir.slug = $1;
-
--- name: GetForDisplayIsnReceiverBySlug :one
-SELECT
-    ir.*
-FROM isn_receivers ir
-WHERE ir.slug = $1;
-
--- name: GetForDisplayIsnReceiversByIsnID :many
-SELECT
-    ir.id,
     ir.created_at,
     ir.updated_at,
-    ir.title,
-    ir.detail,
-    ir.slug,
-    ir.receiver_origin,
-    ir.min_batch_records,
-    ir.max_batch_records,
     ir.max_daily_validation_failures,
     ir.max_payload_kilobytes,
     ir.payload_validation,
     ir.default_rate_limit,
-    ir.receiver_status
+    ir.receiver_status,
+    ir.listener_count
 FROM isn_receivers ir
 WHERE ir.isn_id = $1;
 
--- name: ExistsIsnReceiverWithSlug :one
+-- name: GetIsnReceiverByIsnID :one
+
+SELECT ir.* , i.is_in_use as isn_is_in_use
+FROM isn_receivers ir
+JOIN isn i
+ON i.id = ir.isn_id
+WHERE i.slug = $1;
+
+-- name: ExistsIsnReceiver :one
 
 SELECT EXISTS
   (SELECT 1
-   FROM isn_receivers
-   WHERE slug = $1) AS EXISTS;
+   FROM isn_receivers ir
+   WHERE ir.isn_id = $1) AS EXISTS;

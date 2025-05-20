@@ -90,148 +90,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/isn/receiever/{slug}": {
-            "get": {
-                "tags": [
-                    "ISN view"
-                ],
-                "summary": "Get an ISN receiver config",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "sample-isn-receiver--example-org",
-                        "description": "isn receiver slug",
-                        "name": "slug",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/database.GetIsnReceiverBySlugRow"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/isn/receiver/{isn_receivers_slug}": {
-            "put": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "the receiver service should be hosted on {receiver_origin}/signals/receiver/{receiver_slug}",
-                "tags": [
-                    "ISN config"
-                ],
-                "summary": "Update an ISN Receiver",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "sample-isn-receiver--example-org",
-                        "description": "isn receiver slug",
-                        "name": "isn_receivers_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "ISN receiver details",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.UpdateIsnReceiverRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/isn/receiver/{receiver_slug}": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "A receiver service handles incoming signals and will be hosted on {receiver_origin}/signals/receiver/{receiver_slug}\n\nWhen the ISN storage_type is set to \"local\", the receiver_origin must also be \"local\", indicating that the signals are stored in the relational database used by the API service.\n\nthe receiver service should be hosted on {receiver_origin}/signals/receiver/{receiver_slug}",
-                "tags": [
-                    "ISN config"
-                ],
-                "summary": "Create an ISN Receiver",
-                "parameters": [
-                    {
-                        "description": "ISN receiver details",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateIsnReceiverRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateIsnReceiverResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/api/isn/retriever/{isn_retrievers_slug}": {
             "put": {
                 "security": [
@@ -294,7 +152,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "the retriever service handles requests to get signals and will be hosted on {retriever_origin}/signals/retriever/{retriever_slug}\n\nWhen the ISN storage_type is set to \"local\", the retriever_origin must also be \"local\", indicating that the signals are retieved from the relational database used by the API service.\n",
+                "description": "the retriever service handles requests to get signals and will be hosted on {retriever_origin}/signals/retriever/{retriever_slug}\n\nWhen the ISN storage_type is set to \"admin_db\", the retriever_origin must also be \"admin_db\", indicating that the signals are retieved from the relational database used by the API service.\n",
                 "tags": [
                     "ISN config"
                 ],
@@ -434,7 +292,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Create an Information Sharing Network (ISN)\n\nvisibility = \"private\" means that signals on the network can only be seen by network participants.\n\nThe only storage_type currently supported is \"local\"\nwhen storage_type = \"local\" the signals are stored in the relational database used by the API service to store the admin configuration",
+                "description": "Create an Information Sharing Network (ISN)\n\nvisibility = \"private\" means that signals on the network can only be seen by network participants.\n\nThe only storage_type currently supported is \"admin_db\"\nwhen storage_type = \"admin_db\" the signals are stored in the relational database used by the API service to store the admin configuration\nSpecify \"admin_db\" for storage_connection_url in this case (anything else is overriwtten with this value)",
                 "tags": [
                     "ISN config"
                 ],
@@ -455,6 +313,145 @@ const docTemplate = `{
                         "description": "Created",
                         "schema": {
                             "$ref": "#/definitions/handlers.CreateIsnResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/isn/{isn_slug}/signals/receiever": {
+            "get": {
+                "tags": [
+                    "ISN view"
+                ],
+                "summary": "Get an ISN receiver config",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn--example-org",
+                        "description": "isn slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/database.GetIsnReceiverByIsnIDRow"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/isn/{isn_slug}/signals/receiver": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "tags": [
+                    "ISN config"
+                ],
+                "summary": "Update an ISN Receiver",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn--example-org",
+                        "description": "isn slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "ISN receiver details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdateIsnReceiverRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "An ISN receiver handles the http requests sent by clients that pass Signals to the ISN\n\nYou can specify how many receivers should be started for the ISN and they will listen on an automatically generted port, starting at 8081\n\nThe public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/signals/receiver\nthe isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services",
+                "tags": [
+                    "ISN config"
+                ],
+                "summary": "Create an ISN Receiver definition",
+                "parameters": [
+                    {
+                        "description": "ISN receiver details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateIsnReceiverRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateIsnReceiverResponse"
                         }
                     },
                     "400": {
@@ -1104,13 +1101,7 @@ const docTemplate = `{
                 "default_rate_limit": {
                     "type": "integer"
                 },
-                "detail": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "max_batch_records": {
+                "listener_count": {
                     "type": "integer"
                 },
                 "max_daily_validation_failures": {
@@ -1119,22 +1110,10 @@ const docTemplate = `{
                 "max_payload_kilobytes": {
                     "type": "integer"
                 },
-                "min_batch_records": {
-                    "type": "integer"
-                },
                 "payload_validation": {
                     "type": "string"
                 },
-                "receiver_origin": {
-                    "type": "string"
-                },
                 "receiver_status": {
-                    "type": "string"
-                },
-                "slug": {
-                    "type": "string"
-                },
-                "title": {
                     "type": "string"
                 },
                 "updated_at": {
@@ -1202,7 +1181,7 @@ const docTemplate = `{
                 }
             }
         },
-        "database.GetIsnReceiverBySlugRow": {
+        "database.GetIsnReceiverByIsnIDRow": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -1211,25 +1190,13 @@ const docTemplate = `{
                 "default_rate_limit": {
                     "type": "integer"
                 },
-                "detail": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
                 "isn_id": {
                     "type": "string"
                 },
                 "isn_is_in_use": {
                     "type": "boolean"
                 },
-                "isn_slug": {
-                    "type": "string"
-                },
-                "isn_storage_type": {
-                    "type": "string"
-                },
-                "max_batch_records": {
+                "listener_count": {
                     "type": "integer"
                 },
                 "max_daily_validation_failures": {
@@ -1238,28 +1205,13 @@ const docTemplate = `{
                 "max_payload_kilobytes": {
                     "type": "integer"
                 },
-                "min_batch_records": {
-                    "type": "integer"
-                },
                 "payload_validation": {
-                    "type": "string"
-                },
-                "receiver_origin": {
                     "type": "string"
                 },
                 "receiver_status": {
                     "type": "string"
                 },
-                "slug": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                },
                 "updated_at": {
-                    "type": "string"
-                },
-                "user_id": {
                     "type": "string"
                 }
             }
@@ -1404,6 +1356,9 @@ const docTemplate = `{
                 "slug": {
                     "type": "string"
                 },
+                "storage_connection_url": {
+                    "type": "string"
+                },
                 "storage_type": {
                     "type": "string"
                 },
@@ -1425,21 +1380,17 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "default_rate_limit": {
-                    "description": "maximum number of requests per minute",
+                    "description": "maximum number of requests per minute per session",
                     "type": "integer",
                     "example": 600
-                },
-                "detail": {
-                    "type": "string",
-                    "example": "Sample ISN Receiver description"
                 },
                 "isn_slug": {
                     "type": "string",
                     "example": "sample-isn--example-org"
                 },
-                "max_batch_records": {
+                "listener_count": {
                     "type": "integer",
-                    "example": 100
+                    "example": 1
                 },
                 "max_daily_validation_failures": {
                     "description": "default = 0",
@@ -1450,10 +1401,6 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 50
                 },
-                "min_batch_records": {
-                    "type": "integer",
-                    "example": 10
-                },
                 "payload_validation": {
                     "type": "string",
                     "enum": [
@@ -1463,45 +1410,28 @@ const docTemplate = `{
                     ],
                     "example": "always"
                 },
-                "receiver_origin": {
-                    "description": "do not provide this field if the isn is using local storage",
-                    "type": "string",
-                    "example": "http://example.com:8080"
-                },
                 "receiver_status": {
                     "type": "string",
                     "enum": [
                         "offline",
-                        " online",
-                        " error",
-                        " closed"
+                        "online",
+                        "error",
+                        "closed"
                     ],
                     "example": "offline"
-                },
-                "title": {
-                    "type": "string",
-                    "example": "Sample ISN Receiver @example.org"
                 }
             }
         },
         "handlers.CreateIsnReceiverResponse": {
             "type": "object",
             "properties": {
-                "id": {
-                    "type": "string",
-                    "example": "4f1bc74b-cf79-410f-9c21-dc2cba047385"
-                },
                 "receiver_url": {
                     "type": "string",
-                    "example": "http://localhost:8080/signals/receiver/sample-isn-receiver--example-org"
+                    "example": "http://localhost:8080/isn/sample-isn--example-org/signals/receiver/"
                 },
                 "resource_url": {
                     "type": "string",
-                    "example": "http://localhost:8080/api/isn/receiver/sample-isn-receiver--example-org"
-                },
-                "slug": {
-                    "type": "string",
-                    "example": "sample-isn-receiver--example-org"
+                    "example": "http://localhost:8080/api/isn/sample-isn--example-org/signals/receiver"
                 }
             }
         },
@@ -1515,6 +1445,10 @@ const docTemplate = `{
                 "is_in_use": {
                     "type": "boolean",
                     "example": true
+                },
+                "storage_connection_url": {
+                    "type": "string",
+                    "example": "postgres:/signalsd:@localhost:5432/signals?sslmode=disable"
                 },
                 "storage_type": {
                     "type": "string",
@@ -1709,19 +1643,16 @@ const docTemplate = `{
                 "is_in_use": {
                     "type": "boolean"
                 },
-                "isn_receivers": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/database.GetForDisplayIsnReceiversByIsnIDRow"
-                    }
+                "isn_receiver": {
+                    "$ref": "#/definitions/database.GetForDisplayIsnReceiversByIsnIDRow"
                 },
-                "isn_rectrievers": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/database.GetForDisplayIsnRetrieversByIsnIDRow"
-                    }
+                "isn_rectriever": {
+                    "$ref": "#/definitions/database.GetForDisplayIsnRetrieversByIsnIDRow"
                 },
                 "slug": {
+                    "type": "string"
+                },
+                "storage_connection_url": {
                     "type": "string"
                 },
                 "storage_type": {
@@ -1839,17 +1770,13 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "default_rate_limit": {
-                    "description": "maximum number of requests per minute",
+                    "description": "maximum number of requests per minute per session",
                     "type": "integer",
                     "example": 600
                 },
-                "detail": {
-                    "type": "string",
-                    "example": "Sample ISN Receiver description"
-                },
-                "max_batch_records": {
+                "listener_count": {
                     "type": "integer",
-                    "example": 100
+                    "example": 1
                 },
                 "max_daily_validation_failures": {
                     "description": "default = 0",
@@ -1860,10 +1787,6 @@ const docTemplate = `{
                     "type": "integer",
                     "example": 50
                 },
-                "min_batch_records": {
-                    "type": "integer",
-                    "example": 10
-                },
                 "payload_validation": {
                     "type": "string",
                     "enum": [
@@ -1873,18 +1796,13 @@ const docTemplate = `{
                     ],
                     "example": "always"
                 },
-                "receiver_origin": {
-                    "description": "do not provide this field if the isn is using local storage",
-                    "type": "string",
-                    "example": "http://example.com:8080"
-                },
                 "receiver_status": {
                     "type": "string",
                     "enum": [
                         "offline",
-                        " online",
-                        " error",
-                        " closed"
+                        "online",
+                        "error",
+                        "closed"
                     ],
                     "example": "offline"
                 }
@@ -1900,6 +1818,10 @@ const docTemplate = `{
                 "is_in_use": {
                     "type": "boolean",
                     "example": true
+                },
+                "storage_connection_url": {
+                    "type": "string",
+                    "example": "postgres:/signalsd:@localhost:5432/signals?sslmode=disable"
                 },
                 "storage_type": {
                     "type": "string",

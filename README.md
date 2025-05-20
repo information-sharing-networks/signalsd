@@ -145,10 +145,10 @@ export SIGNALS_DB_URL="postgres://user:@localhost:5432/signalsd_admin?sslmode=di
 the database schema is managed by [goose](https://github.com/pressly/goose)
 ```
 # drop all database objects
-goose -dir sql/schema postgres $SIGNALS_DB_URL  down-to 0
+goose -dir app/sql/schema postgres $SIGNALS_DB_URL  down-to 0
 
 # update the schema to the current version - run this after pulling code from the github repo
-goose -dir sql/schema postgres $SIGNALS_DB_URL  up
+goose -dir app/sql/schema postgres $SIGNALS_DB_URL  up
 ```
 
 
@@ -177,7 +177,7 @@ database schema alterations are made by adding files to sql/schema
 goose will run the changes in the order the files are sorted.
 
 sql queries are kept in
-`sql/queries`
+`app/sql/queries`
 
 run `sqlc generate` from the root of the project to regenerate the type safe go code after adding or altering any queries
 

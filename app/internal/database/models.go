@@ -12,35 +12,29 @@ import (
 )
 
 type Isn struct {
-	ID          uuid.UUID `json:"id"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	UserID      uuid.UUID `json:"user_id"`
-	Title       string    `json:"title"`
-	Slug        string    `json:"slug"`
-	Detail      string    `json:"detail"`
-	IsInUse     bool      `json:"is_in_use"`
-	Visibility  string    `json:"visibility"`
-	StorageType string    `json:"storage_type"`
+	ID                   uuid.UUID `json:"id"`
+	CreatedAt            time.Time `json:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at"`
+	UserID               uuid.UUID `json:"user_id"`
+	Title                string    `json:"title"`
+	Slug                 string    `json:"slug"`
+	Detail               string    `json:"detail"`
+	IsInUse              bool      `json:"is_in_use"`
+	Visibility           string    `json:"visibility"`
+	StorageType          string    `json:"storage_type"`
+	StorageConnectionURL string    `json:"storage_connection_url"`
 }
 
 type IsnReceiver struct {
-	ID                         uuid.UUID `json:"id"`
+	IsnID                      uuid.UUID `json:"isn_id"`
 	CreatedAt                  time.Time `json:"created_at"`
 	UpdatedAt                  time.Time `json:"updated_at"`
-	UserID                     uuid.UUID `json:"user_id"`
-	IsnID                      uuid.UUID `json:"isn_id"`
-	Title                      string    `json:"title"`
-	Detail                     string    `json:"detail"`
-	Slug                       string    `json:"slug"`
-	ReceiverOrigin             string    `json:"receiver_origin"`
-	MinBatchRecords            int32     `json:"min_batch_records"`
-	MaxBatchRecords            int32     `json:"max_batch_records"`
 	MaxDailyValidationFailures int32     `json:"max_daily_validation_failures"`
 	MaxPayloadKilobytes        int32     `json:"max_payload_kilobytes"`
 	PayloadValidation          string    `json:"payload_validation"`
 	DefaultRateLimit           int32     `json:"default_rate_limit"`
 	ReceiverStatus             string    `json:"receiver_status"`
+	ListenerCount              int32     `json:"listener_count"`
 }
 
 type IsnRetriever struct {

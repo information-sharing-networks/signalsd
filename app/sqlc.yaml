@@ -12,3 +12,4 @@ sql:
         rename:
           schema_url: "SchemaURL"
           readme_url: "ReadmeURL"
+          storage_connection_url: "StorageConnectionURL"

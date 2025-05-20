@@ -34,7 +34,7 @@ FROM isn_retrievers ir
 JOIN isn i ON i.id = ir.isn_id
 WHERE ir.slug = $1;
 
--- name: GetForDisplayIsnRetrieversByIsnID :many
+-- name: GetForDisplayIsnRetrieversByIsnID :one
 SELECT
     ir.id,
     ir.created_at,

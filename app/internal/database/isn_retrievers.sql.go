@@ -76,7 +76,7 @@ func (q *Queries) ExistsIsnRetrieverWithSlug(ctx context.Context, slug string) (
 	return exists, err
 }
 
-const getForDisplayIsnRetrieversByIsnID = `-- name: GetForDisplayIsnRetrieversByIsnID :many
+const getForDisplayIsnRetrieversByIsnID = `-- name: GetForDisplayIsnRetrieversByIsnID :one
 SELECT
     ir.id,
     ir.created_at,
@@ -103,37 +103,21 @@ type GetForDisplayIsnRetrieversByIsnIDRow struct {
 	DefaultRateLimit int32     `json:"default_rate_limit"`
 }
 
-func (q *Queries) GetForDisplayIsnRetrieversByIsnID(ctx context.Context, isnID uuid.UUID) ([]GetForDisplayIsnRetrieversByIsnIDRow, error) {
-	rows, err := q.db.QueryContext(ctx, getForDisplayIsnRetrieversByIsnID, isnID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetForDisplayIsnRetrieversByIsnIDRow
-	for rows.Next() {
-		var i GetForDisplayIsnRetrieversByIsnIDRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.Title,
-			&i.Detail,
-			&i.Slug,
-			&i.RetrieverOrigin,
-			&i.RetrieverStatus,
-			&i.DefaultRateLimit,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+func (q *Queries) GetForDisplayIsnRetrieversByIsnID(ctx context.Context, isnID uuid.UUID) (GetForDisplayIsnRetrieversByIsnIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getForDisplayIsnRetrieversByIsnID, isnID)
+	var i GetForDisplayIsnRetrieversByIsnIDRow
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Title,
+		&i.Detail,
+		&i.Slug,
+		&i.RetrieverOrigin,
+		&i.RetrieverStatus,
+		&i.DefaultRateLimit,
+	)
+	return i, err
 }
 
 const getIsnRetrieverBySlug = `-- name: GetIsnRetrieverBySlug :one

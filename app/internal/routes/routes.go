@@ -38,8 +38,8 @@ func RegisterRoutes(r *chi.Mux, cfg *signals.ServiceConfig) {
 			// ISN management
 			r.Post("/isn", isnHandler.CreateIsnHandler)
 			r.Put("/isn/{isn_slug}", isnHandler.UpdateIsnHandler)
-			r.Post("/isn/receiver", isnReceiverHandler.CreateIsnReceiverHandler)
-			r.Put("/isn/receiver/{isn_receivers_slug}", isnReceiverHandler.UpdateIsnReceiverHandler)
+			r.Post("/isn/{isn_slug}/signals/receiver", isnReceiverHandler.CreateIsnReceiverHandler)
+			r.Put("/isn/{isn_slug}/signals/receiver", isnReceiverHandler.UpdateIsnReceiverHandler)
 			r.Post("/isn/retriever", isnRetrieverHandler.CreateIsnRetrieverHandler)
 			r.Put("/isn/retriever/{isn_retrievers_slug}", isnRetrieverHandler.UpdateIsnRetrieverHandler)
 
@@ -51,7 +51,7 @@ func RegisterRoutes(r *chi.Mux, cfg *signals.ServiceConfig) {
 		r.Get("/signal_defs/{slug}/v{sem_ver}", signalDefsHandler.GetSignalDefHandler)
 		r.Get("/isn", isnHandler.GetIsnsHandler)
 		r.Get("/isn/{isn_slug}", isnHandler.GetIsnHandler)
-		r.Get("/isn/receiver/{slug}", isnReceiverHandler.GetIsnReceiverHandler)
+		r.Get("/isn/{isn_slug}/signals/receiver", isnReceiverHandler.GetIsnReceiverHandler)
 		r.Get("/isn/retriever/{slug}", isnRetrieverHandler.GetIsnRetrieverHandler)
 	})
 

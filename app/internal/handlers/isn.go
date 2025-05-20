@@ -30,10 +30,11 @@ type CreateIsnRequest struct {
 }
 
 type UpdateIsnRequest struct {
-	Detail      *string `json:"detail" example:"Sample ISN description"`
-	IsInUse     *bool   `json:"is_in_use" example:"true"`
-	Visibility  *string `json:"visibility" example:"private" enums:"public,private"`
-	StorageType *string `json:"storage_type" example:"mq"`
+	Detail               *string `json:"detail" example:"Sample ISN description"`
+	IsInUse              *bool   `json:"is_in_use" example:"true"`
+	Visibility           *string `json:"visibility" example:"private" enums:"public,private"`
+	StorageType          *string `json:"storage_type" example:"mq"`
+	StorageConnectionURL *string `json:"storage_connection_url" example:"postgres:/signalsd:@localhost:5432/signals?sslmode=disable"`
 }
 
 type CreateIsnResponse struct {
@@ -45,9 +46,9 @@ type CreateIsnResponse struct {
 // used in GET handler
 type IsnAndLinkedInfo struct {
 	database.GetForDisplayIsnBySlugRow
-	User          database.GetForDisplayUserByIsnIDRow            `json:"user"`
-	IsnReceivers  []database.GetForDisplayIsnReceiversByIsnIDRow  `json:"isn_receivers,omitempty"`
-	IsnRetrievers []database.GetForDisplayIsnRetrieversByIsnIDRow `json:"isn_rectrievers,omitempty"`
+	User         database.GetForDisplayUserByIsnIDRow          `json:"user"`
+	IsnReceiver  database.GetForDisplayIsnReceiversByIsnIDRow  `json:"isn_receiver,omitempty"`
+	IsnRetriever database.GetForDisplayIsnRetrieversByIsnIDRow `json:"isn_rectriever,omitempty"`
 }
 
 // CreateIsnHandler godoc
@@ -57,8 +58,9 @@ type IsnAndLinkedInfo struct {
 //	@Description
 //	@Description	visibility = "private" means that signals on the network can only be seen by network participants.
 //	@Description
-//	@Description	The only storage_type currently supported is "local"
-//	@Description	when storage_type = "local" the signals are stored in the relational database used by the API service to store the admin configuration
+//	@Description	The only storage_type currently supported is "admin_db"
+//	@Description	when storage_type = "admin_db" the signals are stored in the relational database used by the API service to store the admin configuration
+//	@Description	Specify "admin_db" for storage_connection_url in this case (anything else is overriwtten with this value)
 //
 //	@Tags			ISN config
 //
@@ -94,7 +96,8 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 		req.Detail == nil ||
 		req.IsInUse == nil ||
 		req.Visibility == nil ||
-		req.StorageType == nil {
+		req.StorageType == nil ||
+		req.StorageConnectionURL == nil {
 		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you have not supplied all the required fields in the payload")
 		return
 	}
@@ -120,15 +123,19 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if *req.StorageType == "admin_db" {
+		*req.StorageConnectionURL = "admin_db"
+	}
 	// create isn
 	returnedIsn, err := i.cfg.DB.CreateIsn(r.Context(), database.CreateIsnParams{
-		UserID:      userID,
-		Title:       req.Title,
-		Slug:        slug,
-		Detail:      *req.Detail,
-		IsInUse:     *req.IsInUse,
-		Visibility:  *req.Visibility,
-		StorageType: *req.StorageType,
+		UserID:               userID,
+		Title:                req.Title,
+		Slug:                 slug,
+		Detail:               *req.Detail,
+		IsInUse:              *req.IsInUse,
+		Visibility:           *req.Visibility,
+		StorageType:          *req.StorageType,
+		StorageConnectionURL: *req.StorageConnectionURL,
 	})
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not create ISN: %v", err))
@@ -217,14 +224,22 @@ func (i *IsnHandler) UpdateIsnHandler(w http.ResponseWriter, r *http.Request) {
 	if req.StorageType != nil {
 		isn.StorageType = *req.StorageType
 	}
+	if req.StorageConnectionURL != nil {
+		isn.StorageConnectionURL = *req.StorageConnectionURL
+	}
+
+	if isn.StorageType == "admin_db" {
+		isn.StorageConnectionURL = "admin_db"
+	}
 
 	// update isn_receiever
 	_, err = i.cfg.DB.UpdateIsn(r.Context(), database.UpdateIsnParams{
-		ID:          isn.ID,
-		Detail:      isn.Detail,
-		IsInUse:     isn.IsInUse,
-		Visibility:  isn.Visibility,
-		StorageType: isn.StorageType,
+		ID:                   isn.ID,
+		Detail:               isn.Detail,
+		IsInUse:              isn.IsInUse,
+		Visibility:           isn.Visibility,
+		StorageType:          isn.StorageType,
+		StorageConnectionURL: isn.StorageConnectionURL,
 	})
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not create ISN: %v", err))
@@ -257,18 +272,18 @@ func (s *IsnHandler) GetIsnsHandler(w http.ResponseWriter, r *http.Request) {
 
 // GetIsnHandler godoc
 //
-//	@Summary	Get an ISN configuration
-//	@Description Returns details about the ISN plus details of any configured receivers/retrievers
-//	@Param		isn_slug	path	string	true	"isn slug"	example(sample-isn--example-org)
+//	@Summary		Get an ISN configuration
+//	@Description	Returns details about the ISN plus details of any configured receivers/retrievers
+//	@Param			isn_slug	path	string	true	"isn slug"	example(sample-isn--example-org)
 //
-//	@Tags		ISN view
+//	@Tags			ISN view
 //
-//	@Success	200	{object}	handlers.IsnAndLinkedInfo
-//	@Failure	400	{object}	response.ErrorResponse
-//	@Failure	404	{object}	response.ErrorResponse
-//	@Failure	500	{object}	response.ErrorResponse
+//	@Success		200	{object}	handlers.IsnAndLinkedInfo
+//	@Failure		400	{object}	response.ErrorResponse
+//	@Failure		404	{object}	response.ErrorResponse
+//	@Failure		500	{object}	response.ErrorResponse
 //
-//	@Router		/api/isn/{slug} [get]
+//	@Router			/api/isn/{slug} [get]
 func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 
 	slug := r.PathValue("isn_slug")
@@ -290,14 +305,14 @@ func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// get any defined receivers
-	isnReceivers, err := s.cfg.DB.GetForDisplayIsnReceiversByIsnID(r.Context(), isn.ID)
+	isnReceiver, err := s.cfg.DB.GetForDisplayIsnReceiversByIsnID(r.Context(), isn.ID)
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the receivers for this isn: %v", err))
 		return
 	}
 
 	// get any defined retrievers
-	isnRetrievers, err := s.cfg.DB.GetForDisplayIsnRetrieversByIsnID(r.Context(), isn.ID)
+	isnRetriever, err := s.cfg.DB.GetForDisplayIsnRetrieversByIsnID(r.Context(), isn.ID)
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the retrievers for this isn: %v", err))
 		return
@@ -305,8 +320,8 @@ func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 	res := IsnAndLinkedInfo{
 		GetForDisplayIsnBySlugRow: isn,
 		User:                      user,
-		IsnReceivers:              isnReceivers,
-		IsnRetrievers:             isnRetrievers,
+		IsnReceiver:               isnReceiver,
+		IsnRetriever:              isnRetriever,
 	}
 	response.RespondWithJSON(w, http.StatusOK, res)
 }

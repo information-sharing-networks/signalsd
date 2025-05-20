@@ -10,8 +10,9 @@ INSERT INTO isn (
     detail,
     is_in_use,
     visibility,
-    storage_type
-) VALUES (gen_random_uuid(), now(), now(), $1, $2, $3, $4, $5, $6 ,$7) 
+    storage_type,
+    storage_connection_url 
+) VALUES (gen_random_uuid(), now(), now(), $1, $2, $3, $4, $5, $6 ,$7, $8) 
 RETURNING id, slug;
 
 -- name: UpdateIsn :execrows
@@ -20,8 +21,9 @@ UPDATE isn SET (
     detail,
     is_in_use,
     visibility,
-    storage_type
-) = (Now(), $2, $3, $4, $5)
+    storage_type,
+    storage_connection_url
+) = (Now(), $2, $3, $4, $5, $6)
 WHERE id = $1;
 
 -- name: GetIsnByID :one
@@ -55,7 +57,8 @@ SELECT
     detail,
     is_in_use,
     visibility,
-    storage_type 
+    storage_type,
+    storage_connection_url
 FROM isn 
 WHERE slug = $1;
 

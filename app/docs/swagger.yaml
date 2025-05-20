@@ -47,27 +47,15 @@ definitions:
         type: string
       default_rate_limit:
         type: integer
-      detail:
-        type: string
-      id:
-        type: string
-      max_batch_records:
+      listener_count:
         type: integer
       max_daily_validation_failures:
         type: integer
       max_payload_kilobytes:
         type: integer
-      min_batch_records:
-        type: integer
       payload_validation:
         type: string
-      receiver_origin:
-        type: string
       receiver_status:
-        type: string
-      slug:
-        type: string
-      title:
         type: string
       updated_at:
         type: string
@@ -111,45 +99,27 @@ definitions:
       updated_at:
         type: string
     type: object
-  database.GetIsnReceiverBySlugRow:
+  database.GetIsnReceiverByIsnIDRow:
     properties:
       created_at:
         type: string
       default_rate_limit:
         type: integer
-      detail:
-        type: string
-      id:
-        type: string
       isn_id:
         type: string
       isn_is_in_use:
         type: boolean
-      isn_slug:
-        type: string
-      isn_storage_type:
-        type: string
-      max_batch_records:
+      listener_count:
         type: integer
       max_daily_validation_failures:
         type: integer
       max_payload_kilobytes:
         type: integer
-      min_batch_records:
-        type: integer
       payload_validation:
-        type: string
-      receiver_origin:
         type: string
       receiver_status:
         type: string
-      slug:
-        type: string
-      title:
-        type: string
       updated_at:
-        type: string
-      user_id:
         type: string
     type: object
   database.GetIsnRetrieverBySlugRow:
@@ -244,6 +214,8 @@ definitions:
         type: boolean
       slug:
         type: string
+      storage_connection_url:
+        type: string
       storage_type:
         type: string
       title:
@@ -258,17 +230,14 @@ definitions:
   handlers.CreateIsnReceiverRequest:
     properties:
       default_rate_limit:
-        description: maximum number of requests per minute
+        description: maximum number of requests per minute per session
         example: 600
         type: integer
-      detail:
-        example: Sample ISN Receiver description
-        type: string
       isn_slug:
         example: sample-isn--example-org
         type: string
-      max_batch_records:
-        example: 100
+      listener_count:
+        example: 1
         type: integer
       max_daily_validation_failures:
         description: default = 0
@@ -277,9 +246,6 @@ definitions:
       max_payload_kilobytes:
         example: 50
         type: integer
-      min_batch_records:
-        example: 10
-        type: integer
       payload_validation:
         enum:
         - always
@@ -287,35 +253,22 @@ definitions:
         - optional
         example: always
         type: string
-      receiver_origin:
-        description: do not provide this field if the isn is using local storage
-        example: http://example.com:8080
-        type: string
       receiver_status:
         enum:
         - offline
-        - ' online'
-        - ' error'
-        - ' closed'
+        - online
+        - error
+        - closed
         example: offline
-        type: string
-      title:
-        example: Sample ISN Receiver @example.org
         type: string
     type: object
   handlers.CreateIsnReceiverResponse:
     properties:
-      id:
-        example: 4f1bc74b-cf79-410f-9c21-dc2cba047385
-        type: string
       receiver_url:
-        example: http://localhost:8080/signals/receiver/sample-isn-receiver--example-org
+        example: http://localhost:8080/isn/sample-isn--example-org/signals/receiver/
         type: string
       resource_url:
-        example: http://localhost:8080/api/isn/receiver/sample-isn-receiver--example-org
-        type: string
-      slug:
-        example: sample-isn-receiver--example-org
+        example: http://localhost:8080/api/isn/sample-isn--example-org/signals/receiver
         type: string
     type: object
   handlers.CreateIsnRequest:
@@ -326,6 +279,9 @@ definitions:
       is_in_use:
         example: true
         type: boolean
+      storage_connection_url:
+        example: postgres:/signalsd:@localhost:5432/signals?sslmode=disable
+        type: string
       storage_type:
         example: mq
         type: string
@@ -468,15 +424,13 @@ definitions:
         type: string
       is_in_use:
         type: boolean
-      isn_receivers:
-        items:
-          $ref: '#/definitions/database.GetForDisplayIsnReceiversByIsnIDRow'
-        type: array
-      isn_rectrievers:
-        items:
-          $ref: '#/definitions/database.GetForDisplayIsnRetrieversByIsnIDRow'
-        type: array
+      isn_receiver:
+        $ref: '#/definitions/database.GetForDisplayIsnReceiversByIsnIDRow'
+      isn_rectriever:
+        $ref: '#/definitions/database.GetForDisplayIsnRetrieversByIsnIDRow'
       slug:
+        type: string
+      storage_connection_url:
         type: string
       storage_type:
         type: string
@@ -556,14 +510,11 @@ definitions:
   handlers.UpdateIsnReceiverRequest:
     properties:
       default_rate_limit:
-        description: maximum number of requests per minute
+        description: maximum number of requests per minute per session
         example: 600
         type: integer
-      detail:
-        example: Sample ISN Receiver description
-        type: string
-      max_batch_records:
-        example: 100
+      listener_count:
+        example: 1
         type: integer
       max_daily_validation_failures:
         description: default = 0
@@ -572,9 +523,6 @@ definitions:
       max_payload_kilobytes:
         example: 50
         type: integer
-      min_batch_records:
-        example: 10
-        type: integer
       payload_validation:
         enum:
         - always
@@ -582,16 +530,12 @@ definitions:
         - optional
         example: always
         type: string
-      receiver_origin:
-        description: do not provide this field if the isn is using local storage
-        example: http://example.com:8080
-        type: string
       receiver_status:
         enum:
         - offline
-        - ' online'
-        - ' error'
-        - ' closed'
+        - online
+        - error
+        - closed
         example: offline
         type: string
     type: object
@@ -603,6 +547,9 @@ definitions:
       is_in_use:
         example: true
         type: boolean
+      storage_connection_url:
+        example: postgres:/signalsd:@localhost:5432/signals?sslmode=disable
+        type: string
       storage_type:
         example: mq
         type: string
@@ -733,8 +680,9 @@ paths:
 
         visibility = "private" means that signals on the network can only be seen by network participants.
 
-        The only storage_type currently supported is "local"
-        when storage_type = "local" the signals are stored in the relational database used by the API service to store the admin configuration
+        The only storage_type currently supported is "admin_db"
+        when storage_type = "admin_db" the signals are stored in the relational database used by the API service to store the admin configuration
+        Specify "admin_db" for storage_connection_url in this case (anything else is overriwtten with this value)
       parameters:
       - description: ISN details
         in: body
@@ -799,6 +747,101 @@ paths:
       summary: Update an ISN
       tags:
       - ISN config
+  /api/isn/{isn_slug}/signals/receiever:
+    get:
+      parameters:
+      - description: isn slug
+        example: sample-isn--example-org
+        in: path
+        name: slug
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/database.GetIsnReceiverByIsnIDRow'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Get an ISN receiver config
+      tags:
+      - ISN view
+  /api/isn/{isn_slug}/signals/receiver:
+    post:
+      description: |-
+        An ISN receiver handles the http requests sent by clients that pass Signals to the ISN
+
+        You can specify how many receivers should be started for the ISN and they will listen on an automatically generted port, starting at 8081
+
+        The public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/signals/receiver
+        the isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services
+      parameters:
+      - description: ISN receiver details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateIsnReceiverRequest'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.CreateIsnReceiverResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Create an ISN Receiver definition
+      tags:
+      - ISN config
+    put:
+      parameters:
+      - description: isn slug
+        example: sample-isn--example-org
+        in: path
+        name: isn_slug
+        required: true
+        type: string
+      - description: ISN receiver details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateIsnReceiverRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Update an ISN Receiver
+      tags:
+      - ISN config
   /api/isn/{slug}:
     get:
       description: Returns details about the ISN plus details of any configured receivers/retrievers
@@ -829,102 +872,6 @@ paths:
       summary: Get an ISN configuration
       tags:
       - ISN view
-  /api/isn/receiever/{slug}:
-    get:
-      parameters:
-      - description: isn receiver slug
-        example: sample-isn-receiver--example-org
-        in: path
-        name: slug
-        required: true
-        type: string
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/database.GetIsnReceiverBySlugRow'
-            type: array
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-      summary: Get an ISN receiver config
-      tags:
-      - ISN view
-  /api/isn/receiver/{isn_receivers_slug}:
-    put:
-      description: the receiver service should be hosted on {receiver_origin}/signals/receiver/{receiver_slug}
-      parameters:
-      - description: isn receiver slug
-        example: sample-isn-receiver--example-org
-        in: path
-        name: isn_receivers_slug
-        required: true
-        type: string
-      - description: ISN receiver details
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.UpdateIsnReceiverRequest'
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Update an ISN Receiver
-      tags:
-      - ISN config
-  /api/isn/receiver/{receiver_slug}:
-    post:
-      description: |-
-        A receiver service handles incoming signals and will be hosted on {receiver_origin}/signals/receiver/{receiver_slug}
-
-        When the ISN storage_type is set to "local", the receiver_origin must also be "local", indicating that the signals are stored in the relational database used by the API service.
-
-        the receiver service should be hosted on {receiver_origin}/signals/receiver/{receiver_slug}
-      parameters:
-      - description: ISN receiver details
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.CreateIsnReceiverRequest'
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/handlers.CreateIsnReceiverResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Create an ISN Receiver
-      tags:
-      - ISN config
   /api/isn/retriever/{isn_retrievers_slug}:
     put:
       parameters:
@@ -965,7 +912,7 @@ paths:
       description: |
         the retriever service handles requests to get signals and will be hosted on {retriever_origin}/signals/retriever/{retriever_slug}
 
-        When the ISN storage_type is set to "local", the retriever_origin must also be "local", indicating that the signals are retieved from the relational database used by the API service.
+        When the ISN storage_type is set to "admin_db", the retriever_origin must also be "admin_db", indicating that the signals are retieved from the relational database used by the API service.
       parameters:
       - description: ISN retriever details
         in: body

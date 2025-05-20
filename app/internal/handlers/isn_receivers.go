@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/google/uuid"
 	signals "github.com/nickabs/signalsd/app"
 	"github.com/nickabs/signalsd/app/internal/apperrors"
 	"github.com/nickabs/signalsd/app/internal/context"
@@ -25,38 +24,33 @@ func NewIsnReceiverHandler(cfg *signals.ServiceConfig) *IsnReceiverHandler {
 }
 
 type CreateIsnReceiverRequest struct {
-	Title   string `json:"title" example:"Sample ISN Receiver @example.org"`
 	IsnSlug string `json:"isn_slug" example:"sample-isn--example-org"`
 	UpdateIsnReceiverRequest
 }
 
 type CreateIsnReceiverResponse struct {
-	ID          uuid.UUID `json:"id" example:"4f1bc74b-cf79-410f-9c21-dc2cba047385"`
-	Slug        string    `json:"slug" example:"sample-isn-receiver--example-org"`
-	ResourceURL string    `json:"resource_url" example:"http://localhost:8080/api/isn/receiver/sample-isn-receiver--example-org"`
-	ReceiverURL string    `json:"receiver_url" example:"http://localhost:8080/signals/receiver/sample-isn-receiver--example-org"`
+	ResourceURL string `json:"resource_url" example:"http://localhost:8080/api/isn/sample-isn--example-org/signals/receiver"`
+	ReceiverURL string `json:"receiver_url" example:"http://localhost:8080/isn/sample-isn--example-org/signals/receiver/"`
 }
 
 type UpdateIsnReceiverRequest struct {
-	Detail                     *string `json:"detail" example:"Sample ISN Receiver description"`
-	ReceiverOrigin             *string `json:"receiver_origin" example:"http://example.com:8080"` // do not provide this field if the isn is using local storage
-	MinBatchRecords            *int32  `json:"min_batch_records" example:"10"`
-	MaxBatchRecords            *int32  `json:"max_batch_records" example:"100"`
 	MaxDailyValidationFailures *int32  `json:"max_daily_validation_failures" example:"5"` //default = 0
 	MaxPayloadKilobytes        *int32  `json:"max_payload_kilobytes" example:"50"`
 	PayloadValidation          *string `json:"payload_validation" example:"always" enums:"always,never,optional"`
-	DefaultRateLimit           *int32  `json:"default_rate_limit" example:"600"` //maximum number of requests per minute
-	ReceiverStatus             *string `json:"receiver_status" example:"offline" enums:"offline, online, error, closed"`
+	DefaultRateLimit           *int32  `json:"default_rate_limit" example:"600"` //maximum number of requests per minute per session
+	ReceiverStatus             *string `json:"receiver_status" example:"offline" enums:"offline,online,error,closed"`
+	ListenerCount              *int32  `json:"listener_count" example:"1"`
 }
 
 // CreateIsnReceiverHandler godoc
 //
-//	@Summary		Create an ISN Receiver
-//	@Description	A receiver service handles incoming signals and will be hosted on {receiver_origin}/signals/receiver/{receiver_slug}
+//	@Summary		Create an ISN Receiver definition
+//	@Description	An ISN receiver handles the http requests sent by clients that pass Signals to the ISN
 //	@Description
-//	@Description	When the ISN storage_type is set to "local", the receiver_origin must also be "local", indicating that the signals are stored in the relational database used by the API service.
+//	@Description	You can specify how many receivers should be started for the ISN and they will listen on an automatically generted port, starting at 8081
 //	@Description
-//	@Description	the receiver service should be hosted on {receiver_origin}/signals/receiver/{receiver_slug}
+//	@Description	The public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/signals/receiver
+//	@Description	the isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services
 //
 //	@Tags			ISN config
 //
@@ -69,9 +63,11 @@ type UpdateIsnReceiverRequest struct {
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/api/isn/receiver/{receiver_slug} [post]
+//	@Router			/api/isn/{isn_slug}/signals/receiver [post]
 func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *http.Request) {
 	var req CreateIsnReceiverRequest
+
+	isnSlug := r.PathValue("isn_slug")
 
 	userID, ok := context.UserID(r.Context())
 	if !ok {
@@ -86,7 +82,7 @@ func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *
 	}
 
 	// check isn exists and is owned by user
-	isn, err := i.cfg.DB.GetIsnBySlug(r.Context(), req.IsnSlug)
+	isn, err := i.cfg.DB.GetIsnBySlug(r.Context(), isnSlug)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			response.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
@@ -106,30 +102,25 @@ func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *
 		return
 	}
 
-	// check all fields were supplied
-	if req.Detail == nil ||
-		req.MinBatchRecords == nil ||
-		req.MaxBatchRecords == nil ||
-		req.MaxDailyValidationFailures == nil ||
-		req.MaxPayloadKilobytes == nil ||
-		req.DefaultRateLimit == nil ||
-		req.ReceiverStatus == nil {
-		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must supply a value for all fields")
+	// check if the isn receiver already exists
+	exists, err := i.cfg.DB.ExistsIsnReceiver(r.Context(), isn.ID)
+	if err != nil {
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("database error: %v", err))
+		return
+	}
+	if exists {
+		response.RespondWithError(w, r, http.StatusConflict, apperrors.ErrCodeResourceAlreadyExists, fmt.Sprintf("Receiver already exists for isn %s", isn.Slug))
 		return
 	}
 
-	if isn.StorageType == "local" {
-		if req.ReceiverOrigin != nil {
-			response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "do not specify a receiver_origin when using local storage")
-			return
-		}
-		req.ReceiverOrigin = new(string)
-		*req.ReceiverOrigin = "local"
-	} else {
-		if req.ReceiverOrigin != nil || !helpers.IsValidOrigin(*req.ReceiverOrigin) {
-			response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must specify a receiver_origin when using anything other than local storage, e.g https://example.com")
-			return
-		}
+	// check all fields were supplied
+	if req.MaxDailyValidationFailures == nil ||
+		req.MaxPayloadKilobytes == nil ||
+		req.DefaultRateLimit == nil ||
+		req.ReceiverStatus == nil ||
+		req.ListenerCount == nil {
+		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must supply a value for all fields")
+		return
 	}
 
 	if !signals.ValidReceiverStatus[*req.ReceiverStatus] {
@@ -142,60 +133,31 @@ func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *
 		return
 	}
 
-	// generate slug and check it is not already in use.
-	slug, err := helpers.GenerateSlug(req.Title)
-	if err != nil {
-		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not create slug from title")
-		return
-	}
-
-	exists, err := i.cfg.DB.ExistsIsnReceiverWithSlug(r.Context(), slug)
-	if err != nil {
-		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("database error: %v", err))
-		return
-	}
-	if exists {
-		response.RespondWithError(w, r, http.StatusConflict, apperrors.ErrCodeResourceAlreadyExists, fmt.Sprintf("the {%s} slug is already in use - pick a new title for your ISN receiver", slug))
-		return
-	}
-
 	// create isn receiever
-	returnedIsnReceiver, err := i.cfg.DB.CreateIsnReceiver(r.Context(), database.CreateIsnReceiverParams{
-		UserID:                     userID,
+	_, err = i.cfg.DB.CreateIsnReceiver(r.Context(), database.CreateIsnReceiverParams{
 		IsnID:                      isn.ID,
-		Title:                      req.Title,
-		Slug:                       slug,
-		Detail:                     *req.Detail,
-		ReceiverOrigin:             *req.ReceiverOrigin,
-		MinBatchRecords:            *req.MinBatchRecords,
-		MaxBatchRecords:            *req.MaxBatchRecords,
 		MaxDailyValidationFailures: *req.MaxDailyValidationFailures,
 		MaxPayloadKilobytes:        *req.MaxPayloadKilobytes,
 		PayloadValidation:          *req.PayloadValidation,
 		DefaultRateLimit:           *req.DefaultRateLimit,
 		ReceiverStatus:             *req.ReceiverStatus,
+		ListenerCount:              *req.ListenerCount,
 	})
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not create ISN receiver: %v", err))
 		return
 	}
 
-	resourceURL := fmt.Sprintf("%s://%s/api/isn/receiver/%s",
-		helpers.GetScheme(r),
-		r.Host,
-		slug,
-	)
+	resourceURL := fmt.Sprintf("%s://%s/api/isn/%s/signals/receiver", helpers.GetScheme(r), r.Host, isn.Slug)
 
 	var receiverURL string
-	if isn.StorageType == "local" {
-		receiverURL = "local"
+	if isn.StorageType == "admin_db" {
+		receiverURL = "admin_db"
 	} else {
-		receiverURL = fmt.Sprintf("%s/signals/receiver/%s", *req.ReceiverOrigin, slug)
+		receiverURL = fmt.Sprintf("%s://%s/isn/%s/signals/receiver", helpers.GetScheme(r), r.Host, isn.Slug)
 	}
 
 	response.RespondWithJSON(w, http.StatusCreated, CreateIsnReceiverResponse{
-		ID:          returnedIsnReceiver.ID,
-		Slug:        returnedIsnReceiver.Slug,
 		ResourceURL: resourceURL,
 		ReceiverURL: receiverURL,
 	})
@@ -203,24 +165,21 @@ func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *
 
 // UpdateIsnReceiverHandler godoc
 //
-//	@Summary		Update an ISN Receiver
-//	@Description	the receiver service should be hosted on {receiver_origin}/signals/receiver/{receiver_slug}
+//	@Summary	Update an ISN Receiver
 //
-//	@Tags			ISN config
+//	@Tags		ISN config
 //
-//	@Param			isn_receivers_slug	path	string								true	"isn receiver slug"	example(sample-isn-receiver--example-org)
-//	@Param			request				body	handlers.UpdateIsnReceiverRequest	true	"ISN receiver details"
+//	@Param		isn_slug	path	string								true	"isn slug"	example(sample-isn--example-org)
+//	@Param		request		body	handlers.UpdateIsnReceiverRequest	true	"ISN receiver details"
 //
-//	@Success		204
-//	@Failure		400	{object}	response.ErrorResponse
-//	@Failure		401	{object}	response.ErrorResponse
-//	@Failure		500	{object}	response.ErrorResponse
+//	@Success	204
+//	@Failure	400	{object}	response.ErrorResponse
+//	@Failure	401	{object}	response.ErrorResponse
+//	@Failure	500	{object}	response.ErrorResponse
 //
-// //
+//	@Security	BearerAccessToken
 //
-//	@Security		BearerAccessToken
-//
-//	@Router			/api/isn/receiver/{isn_receivers_slug} [put]
+//	@Router		/api/isn/{isn_slug}/signals/receiver [put]
 func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *http.Request) {
 	var req UpdateIsnReceiverRequest
 
@@ -230,25 +189,36 @@ func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *
 		return
 	}
 
+	isnSlug := r.PathValue("isn_slug")
+
+	// check isn exists and is owned by user
+	isn, err := i.cfg.DB.GetIsnBySlug(r.Context(), isnSlug)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			response.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
+			return
+		}
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		return
+	}
+	if isn.UserID != userID {
+		response.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you are not the owner of this ISN")
+		return
+	}
+
+	if !isn.IsInUse {
+		response.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, fmt.Sprintf("Can't update ISN receiver because ISN %s is not in use", isnSlug))
+		return
+	}
+
 	// check receiver exists and is owned by user
-	isnReceiverSlug := r.PathValue("isn_receivers_slug")
-	isnReceiver, err := i.cfg.DB.GetIsnReceiverBySlug(r.Context(), isnReceiverSlug)
+	isnReceiver, err := i.cfg.DB.GetIsnReceiverByIsnID(r.Context(), isnSlug)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			response.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN receiver not found")
 			return
 		}
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
-		return
-	}
-
-	if !isnReceiver.IsnIsInUse {
-		response.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, fmt.Sprintf("Can't update ISN receiver because ISN %s is not in use", isnReceiver.IsnSlug))
-		return
-	}
-
-	if isnReceiver.UserID != userID {
-		response.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you are not the owner of this ISN receiver")
 		return
 	}
 
@@ -262,15 +232,6 @@ func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *
 	}
 
 	// prepare update fields
-	if req.Detail != nil {
-		isnReceiver.Detail = *req.Detail
-	}
-	if req.MinBatchRecords != nil {
-		isnReceiver.MinBatchRecords = *req.MinBatchRecords
-	}
-	if req.MaxBatchRecords != nil {
-		isnReceiver.MaxBatchRecords = *req.MaxBatchRecords
-	}
 	if req.MaxDailyValidationFailures != nil {
 		isnReceiver.MaxDailyValidationFailures = *req.MaxDailyValidationFailures
 	}
@@ -295,33 +256,21 @@ func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *
 		isnReceiver.ReceiverStatus = *req.ReceiverStatus
 	}
 
-	if req.ReceiverOrigin != nil {
-		if *req.ReceiverOrigin != "local" && isnReceiver.IsnStorageType == "local" {
-			response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "do not specify a receiver_origin when using local storage")
-			return
-		}
-		if !helpers.IsValidOrigin(*req.ReceiverOrigin) {
-			response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must specify a receiver_origin when using anything other than local storage, e.g https://example.com")
-			return
-		}
-		isnReceiver.ReceiverOrigin = *req.ReceiverOrigin
+	if req.ListenerCount != nil {
+		isnReceiver.ListenerCount = *req.ListenerCount
 	}
-
 	// update isn receiever - todo checks on rows updated
 	_, err = i.cfg.DB.UpdateIsnReceiver(r.Context(), database.UpdateIsnReceiverParams{
-		ID:                         isnReceiver.ID,
-		Detail:                     isnReceiver.Detail,
-		ReceiverOrigin:             isnReceiver.ReceiverOrigin,
-		MinBatchRecords:            isnReceiver.MinBatchRecords,
-		MaxBatchRecords:            isnReceiver.MaxBatchRecords,
+		IsnID:                      isn.ID,
 		MaxDailyValidationFailures: isnReceiver.MaxDailyValidationFailures,
 		MaxPayloadKilobytes:        isnReceiver.MaxPayloadKilobytes,
 		PayloadValidation:          isnReceiver.PayloadValidation,
 		DefaultRateLimit:           isnReceiver.DefaultRateLimit,
 		ReceiverStatus:             isnReceiver.ReceiverStatus,
+		ListenerCount:              isnReceiver.ListenerCount,
 	})
 	if err != nil {
-		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not create ISN receiver: %v", err))
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not update ISN receiver: %v", err))
 		return
 	}
 
@@ -333,19 +282,19 @@ func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *
 //	@Summary	Get an ISN receiver config
 //	@Tags		ISN view
 //
-//	@Param		slug	path		string	true	"isn receiver slug"	example(sample-isn-receiver--example-org)
-//	@Success	200		{array}		database.GetIsnReceiverBySlugRow
+//	@Param		slug	path		string	true	"isn slug"	example(sample-isn--example-org)
+//	@Success	200		{array}		database.GetIsnReceiverByIsnIDRow
 //	@Failure	500		{object}	response.ErrorResponse
 //
-//	@Router		/api/isn/receiever/{slug} [get]
+//	@Router		/api/isn/{isn_slug}/signals/receiever [get]
 func (u *IsnReceiverHandler) GetIsnReceiverHandler(w http.ResponseWriter, r *http.Request) {
 
-	slug := r.PathValue("slug")
+	isnSlug := r.PathValue("isn_slug")
 
-	res, err := u.cfg.DB.GetIsnReceiverBySlug(r.Context(), slug)
+	res, err := u.cfg.DB.GetIsnReceiverByIsnID(r.Context(), isnSlug)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			response.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No isn_receiver found for id %v", slug))
+			response.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No isn_receiver found for id %v", isnSlug))
 			return
 		}
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the user from the database %v", err))

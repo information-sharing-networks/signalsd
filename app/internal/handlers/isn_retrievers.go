@@ -52,7 +52,7 @@ type IsnRetrieverAndLinkedInfo struct {
 //	@Summary		Create an ISN Retriever
 //	@Description	the retriever service handles requests to get signals and will be hosted on {retriever_origin}/signals/retriever/{retriever_slug}
 //	@Description
-//	@Description	When the ISN storage_type is set to "local", the retriever_origin must also be "local", indicating that the signals are retieved from the relational database used by the API service.
+//	@Description	When the ISN storage_type is set to "admin_db", the retriever_origin must also be "admin_db", indicating that the signals are retieved from the relational database used by the API service.
 //	@Description
 //
 //	@Tags		ISN config
@@ -109,13 +109,13 @@ func (i *IsnRetrieverHandler) CreateIsnRetrieverHandler(w http.ResponseWriter, r
 		return
 	}
 
-	if isn.StorageType == "local" {
+	if isn.StorageType == "admin_db" {
 		if req.RetrieverOrigin != nil {
 			response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "do not specify a retriever_origin when using local storage")
 			return
 		}
 		req.RetrieverOrigin = new(string)
-		*req.RetrieverOrigin = "local"
+		*req.RetrieverOrigin = "admin_db"
 	} else {
 		if req.RetrieverOrigin != nil || !helpers.IsValidOrigin(*req.RetrieverOrigin) {
 			response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must specify a retriever_origin when using local storage, e.g https://example.com")
@@ -168,8 +168,8 @@ func (i *IsnRetrieverHandler) CreateIsnRetrieverHandler(w http.ResponseWriter, r
 	)
 
 	var retrieverURL string
-	if isn.StorageType == "local" {
-		retrieverURL = "local"
+	if isn.StorageType == "admin_db" {
+		retrieverURL = "admin_db"
 	} else {
 		retrieverURL = fmt.Sprintf("%s/signals/retriever/%s", *req.RetrieverOrigin, slug)
 	}
@@ -253,7 +253,7 @@ func (i *IsnRetrieverHandler) UpdateIsnRetrieverHandler(w http.ResponseWriter, r
 	}
 
 	if req.RetrieverOrigin != nil {
-		if *req.RetrieverOrigin != "local" && isnRetriever.IsnStorageType == "local" {
+		if *req.RetrieverOrigin != "admin_db" && isnRetriever.IsnStorageType == "admin_db" {
 			response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "do not specify a retriever_origin when using local storage")
 			return
 		}

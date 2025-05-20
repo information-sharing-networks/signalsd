@@ -24,19 +24,21 @@ INSERT INTO isn (
     detail,
     is_in_use,
     visibility,
-    storage_type
-) VALUES (gen_random_uuid(), now(), now(), $1, $2, $3, $4, $5, $6 ,$7) 
+    storage_type,
+    storage_connection_url 
+) VALUES (gen_random_uuid(), now(), now(), $1, $2, $3, $4, $5, $6 ,$7, $8) 
 RETURNING id, slug
 `
 
 type CreateIsnParams struct {
-	UserID      uuid.UUID `json:"user_id"`
-	Title       string    `json:"title"`
-	Slug        string    `json:"slug"`
-	Detail      string    `json:"detail"`
-	IsInUse     bool      `json:"is_in_use"`
-	Visibility  string    `json:"visibility"`
-	StorageType string    `json:"storage_type"`
+	UserID               uuid.UUID `json:"user_id"`
+	Title                string    `json:"title"`
+	Slug                 string    `json:"slug"`
+	Detail               string    `json:"detail"`
+	IsInUse              bool      `json:"is_in_use"`
+	Visibility           string    `json:"visibility"`
+	StorageType          string    `json:"storage_type"`
+	StorageConnectionURL string    `json:"storage_connection_url"`
 }
 
 type CreateIsnRow struct {
@@ -53,6 +55,7 @@ func (q *Queries) CreateIsn(ctx context.Context, arg CreateIsnParams) (CreateIsn
 		arg.IsInUse,
 		arg.Visibility,
 		arg.StorageType,
+		arg.StorageConnectionURL,
 	)
 	var i CreateIsnRow
 	err := row.Scan(&i.ID, &i.Slug)
@@ -84,21 +87,23 @@ SELECT
     detail,
     is_in_use,
     visibility,
-    storage_type 
+    storage_type,
+    storage_connection_url
 FROM isn 
 WHERE slug = $1
 `
 
 type GetForDisplayIsnBySlugRow struct {
-	ID          uuid.UUID `json:"id"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	Title       string    `json:"title"`
-	Slug        string    `json:"slug"`
-	Detail      string    `json:"detail"`
-	IsInUse     bool      `json:"is_in_use"`
-	Visibility  string    `json:"visibility"`
-	StorageType string    `json:"storage_type"`
+	ID                   uuid.UUID `json:"id"`
+	CreatedAt            time.Time `json:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at"`
+	Title                string    `json:"title"`
+	Slug                 string    `json:"slug"`
+	Detail               string    `json:"detail"`
+	IsInUse              bool      `json:"is_in_use"`
+	Visibility           string    `json:"visibility"`
+	StorageType          string    `json:"storage_type"`
+	StorageConnectionURL string    `json:"storage_connection_url"`
 }
 
 func (q *Queries) GetForDisplayIsnBySlug(ctx context.Context, slug string) (GetForDisplayIsnBySlugRow, error) {
@@ -114,12 +119,13 @@ func (q *Queries) GetForDisplayIsnBySlug(ctx context.Context, slug string) (GetF
 		&i.IsInUse,
 		&i.Visibility,
 		&i.StorageType,
+		&i.StorageConnectionURL,
 	)
 	return i, err
 }
 
 const getIsnByID = `-- name: GetIsnByID :one
-SELECT i.id, i.created_at, i.updated_at, i.user_id, i.title, i.slug, i.detail, i.is_in_use, i.visibility, i.storage_type 
+SELECT i.id, i.created_at, i.updated_at, i.user_id, i.title, i.slug, i.detail, i.is_in_use, i.visibility, i.storage_type, i.storage_connection_url 
 FROM isn i
 WHERE i.id = $1
 `
@@ -138,12 +144,13 @@ func (q *Queries) GetIsnByID(ctx context.Context, id uuid.UUID) (Isn, error) {
 		&i.IsInUse,
 		&i.Visibility,
 		&i.StorageType,
+		&i.StorageConnectionURL,
 	)
 	return i, err
 }
 
 const getIsnBySignalDefID = `-- name: GetIsnBySignalDefID :one
-SELECT i.id, i.created_at, i.updated_at, i.user_id, i.title, i.slug, i.detail, i.is_in_use, i.visibility, i.storage_type 
+SELECT i.id, i.created_at, i.updated_at, i.user_id, i.title, i.slug, i.detail, i.is_in_use, i.visibility, i.storage_type, i.storage_connection_url 
 FROM isn i
 JOIN signal_defs sd on sd.isn_id = i.id
 WHERE sd.id = $1
@@ -163,12 +170,13 @@ func (q *Queries) GetIsnBySignalDefID(ctx context.Context, id uuid.UUID) (Isn, e
 		&i.IsInUse,
 		&i.Visibility,
 		&i.StorageType,
+		&i.StorageConnectionURL,
 	)
 	return i, err
 }
 
 const getIsnBySlug = `-- name: GetIsnBySlug :one
-SELECT i.id, i.created_at, i.updated_at, i.user_id, i.title, i.slug, i.detail, i.is_in_use, i.visibility, i.storage_type 
+SELECT i.id, i.created_at, i.updated_at, i.user_id, i.title, i.slug, i.detail, i.is_in_use, i.visibility, i.storage_type, i.storage_connection_url 
 FROM isn i
 WHERE i.slug = $1
 `
@@ -187,12 +195,13 @@ func (q *Queries) GetIsnBySlug(ctx context.Context, slug string) (Isn, error) {
 		&i.IsInUse,
 		&i.Visibility,
 		&i.StorageType,
+		&i.StorageConnectionURL,
 	)
 	return i, err
 }
 
 const getIsns = `-- name: GetIsns :many
-SELECT i.id, i.created_at, i.updated_at, i.user_id, i.title, i.slug, i.detail, i.is_in_use, i.visibility, i.storage_type 
+SELECT i.id, i.created_at, i.updated_at, i.user_id, i.title, i.slug, i.detail, i.is_in_use, i.visibility, i.storage_type, i.storage_connection_url 
 FROM isn i
 `
 
@@ -216,6 +225,7 @@ func (q *Queries) GetIsns(ctx context.Context) ([]Isn, error) {
 			&i.IsInUse,
 			&i.Visibility,
 			&i.StorageType,
+			&i.StorageConnectionURL,
 		); err != nil {
 			return nil, err
 		}
@@ -236,17 +246,19 @@ UPDATE isn SET (
     detail,
     is_in_use,
     visibility,
-    storage_type
-) = (Now(), $2, $3, $4, $5)
+    storage_type,
+    storage_connection_url
+) = (Now(), $2, $3, $4, $5, $6)
 WHERE id = $1
 `
 
 type UpdateIsnParams struct {
-	ID          uuid.UUID `json:"id"`
-	Detail      string    `json:"detail"`
-	IsInUse     bool      `json:"is_in_use"`
-	Visibility  string    `json:"visibility"`
-	StorageType string    `json:"storage_type"`
+	ID                   uuid.UUID `json:"id"`
+	Detail               string    `json:"detail"`
+	IsInUse              bool      `json:"is_in_use"`
+	Visibility           string    `json:"visibility"`
+	StorageType          string    `json:"storage_type"`
+	StorageConnectionURL string    `json:"storage_connection_url"`
 }
 
 func (q *Queries) UpdateIsn(ctx context.Context, arg UpdateIsnParams) (int64, error) {
@@ -256,6 +268,7 @@ func (q *Queries) UpdateIsn(ctx context.Context, arg UpdateIsnParams) (int64, er
 		arg.IsInUse,
 		arg.Visibility,
 		arg.StorageType,
+		arg.StorageConnectionURL,
 	)
 	if err != nil {
 		return 0, err
