@@ -61,8 +61,12 @@ First, clone the repo. There is only one required env variable for the docker en
 export SIGNALS_SECRET_KEY="" # add a random secret key here (used to sign the JWT tokens used in the service)
 ```
 
-Run the API admin service 
-you can preview the API specs [here](https://nickabs.github.io/signalsd/app/docs/index.html)
+Follow the instructions below to run the signalsd service.  This service handles 
+- user registration
+- ISN configuration
+- running the receivers and retrievers that marshal the exchange of signal over the ISN
+
+The API documentation is hosted as part of the service (alternatively you can see the documenation [here](https://nickabs.github.io/signalsd/app/docs/index.html))
 
 ```sh
 cd signalsd
@@ -184,6 +188,6 @@ run `sqlc generate` from the root of the project to regenerate the type safe go 
 
 
 ## database overview
+### ISN set-up
 
-![ERD](https://github.com/user-attachments/assets/07dad361-bbd7-4502-bc6c-6bb5ec575521)
-
+![signalsd_isn](https://github.com/user-attachments/assets/484dc2e1-7c79-4948-9bbb-3bbe0c5a8f81)
