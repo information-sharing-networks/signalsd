@@ -19,7 +19,7 @@ UPDATE isn_retrievers SET (
 WHERE isn_id = $1;
 
 
--- name: GetForDisplayIsnRetrieversByIsnID :one
+-- name: GetForDisplayIsnRetrieverByIsnID :one
 SELECT
     ir.created_at,
     ir.updated_at,

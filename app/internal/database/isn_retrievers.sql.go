@@ -65,7 +65,7 @@ func (q *Queries) ExistsIsnRetriever(ctx context.Context, isnID uuid.UUID) (bool
 	return exists, err
 }
 
-const getForDisplayIsnRetrieversByIsnID = `-- name: GetForDisplayIsnRetrieversByIsnID :one
+const getForDisplayIsnRetrieverByIsnID = `-- name: GetForDisplayIsnRetrieverByIsnID :one
 SELECT
     ir.created_at,
     ir.updated_at,
@@ -76,7 +76,7 @@ FROM isn_retrievers ir
 WHERE ir.isn_id = $1
 `
 
-type GetForDisplayIsnRetrieversByIsnIDRow struct {
+type GetForDisplayIsnRetrieverByIsnIDRow struct {
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
 	RetrieverStatus  string    `json:"retriever_status"`
@@ -84,9 +84,9 @@ type GetForDisplayIsnRetrieversByIsnIDRow struct {
 	ListenerCount    int32     `json:"listener_count"`
 }
 
-func (q *Queries) GetForDisplayIsnRetrieversByIsnID(ctx context.Context, isnID uuid.UUID) (GetForDisplayIsnRetrieversByIsnIDRow, error) {
-	row := q.db.QueryRowContext(ctx, getForDisplayIsnRetrieversByIsnID, isnID)
-	var i GetForDisplayIsnRetrieversByIsnIDRow
+func (q *Queries) GetForDisplayIsnRetrieverByIsnID(ctx context.Context, isnID uuid.UUID) (GetForDisplayIsnRetrieverByIsnIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getForDisplayIsnRetrieverByIsnID, isnID)
+	var i GetForDisplayIsnRetrieverByIsnIDRow
 	err := row.Scan(
 		&i.CreatedAt,
 		&i.UpdatedAt,

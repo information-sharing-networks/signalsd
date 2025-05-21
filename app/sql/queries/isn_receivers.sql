@@ -24,7 +24,7 @@ UPDATE isn_receivers SET (
 ) = (Now(), $2, $3, $4, $5, $6, $7)
 WHERE isn_id = $1;
 
--- name: GetForDisplayIsnReceiversByIsnID :one
+-- name: GetForDisplayIsnReceiverByIsnID :one
 SELECT
     ir.created_at,
     ir.updated_at,

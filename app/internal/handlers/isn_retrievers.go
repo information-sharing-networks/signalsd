@@ -29,8 +29,7 @@ type CreateIsnRetrieverRequest struct {
 }
 
 type CreateIsnRetrieverResponse struct {
-	ResourceURL  string `json:"resource_url" example:"http://localhost:8080/api/isn/sample-isn--example-org/signals/retriever"`
-	RetrieverURL string `json:"retriever_url" example:"http://localhost:8080/isn/sample-isn--example-org/signals/retriever/"`
+	ResourceURL string `json:"resource_url" example:"http://localhost:8080/api/isn/sample-isn--example-org/signals/retriever"`
 }
 
 type UpdateIsnRetrieverRequest struct {
@@ -137,16 +136,8 @@ func (i *IsnRetrieverHandler) CreateIsnRetrieverHandler(w http.ResponseWriter, r
 
 	resourceURL := fmt.Sprintf("%s://%s/api/isn/%s/signals/retriever", helpers.GetScheme(r), r.Host, isn.Slug)
 
-	var retrieverURL string
-	if isn.StorageType == "admin_db" {
-		retrieverURL = "admin_db"
-	} else {
-		retrieverURL = fmt.Sprintf("%s://%s/isn/%s/signals/retriever", helpers.GetScheme(r), r.Host, isn.Slug)
-	}
-
 	response.RespondWithJSON(w, http.StatusCreated, CreateIsnRetrieverResponse{
-		ResourceURL:  resourceURL,
-		RetrieverURL: retrieverURL,
+		ResourceURL: resourceURL,
 	})
 }
 

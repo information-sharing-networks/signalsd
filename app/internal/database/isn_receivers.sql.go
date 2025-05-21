@@ -77,7 +77,7 @@ func (q *Queries) ExistsIsnReceiver(ctx context.Context, isnID uuid.UUID) (bool,
 	return exists, err
 }
 
-const getForDisplayIsnReceiversByIsnID = `-- name: GetForDisplayIsnReceiversByIsnID :one
+const getForDisplayIsnReceiverByIsnID = `-- name: GetForDisplayIsnReceiverByIsnID :one
 SELECT
     ir.created_at,
     ir.updated_at,
@@ -91,7 +91,7 @@ FROM isn_receivers ir
 WHERE ir.isn_id = $1
 `
 
-type GetForDisplayIsnReceiversByIsnIDRow struct {
+type GetForDisplayIsnReceiverByIsnIDRow struct {
 	CreatedAt                  time.Time `json:"created_at"`
 	UpdatedAt                  time.Time `json:"updated_at"`
 	MaxDailyValidationFailures int32     `json:"max_daily_validation_failures"`
@@ -102,9 +102,9 @@ type GetForDisplayIsnReceiversByIsnIDRow struct {
 	ListenerCount              int32     `json:"listener_count"`
 }
 
-func (q *Queries) GetForDisplayIsnReceiversByIsnID(ctx context.Context, isnID uuid.UUID) (GetForDisplayIsnReceiversByIsnIDRow, error) {
-	row := q.db.QueryRowContext(ctx, getForDisplayIsnReceiversByIsnID, isnID)
-	var i GetForDisplayIsnReceiversByIsnIDRow
+func (q *Queries) GetForDisplayIsnReceiverByIsnID(ctx context.Context, isnID uuid.UUID) (GetForDisplayIsnReceiverByIsnIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getForDisplayIsnReceiverByIsnID, isnID)
+	var i GetForDisplayIsnReceiverByIsnIDRow
 	err := row.Scan(
 		&i.CreatedAt,
 		&i.UpdatedAt,

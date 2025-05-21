@@ -47,8 +47,8 @@ type CreateIsnResponse struct {
 type IsnAndLinkedInfo struct {
 	database.GetForDisplayIsnBySlugRow
 	User         database.GetForDisplayUserByIsnIDRow          `json:"user"`
-	IsnReceiver  database.GetForDisplayIsnReceiversByIsnIDRow  `json:"isn_receiver,omitempty"`
-	IsnRetriever database.GetForDisplayIsnRetrieversByIsnIDRow `json:"isn_rectriever,omitempty"`
+	IsnReceiver  *database.GetForDisplayIsnReceiverByIsnIDRow  `json:"isn_receiver,omitempty"`
+	IsnRetriever *database.GetForDisplayIsnRetrieverByIsnIDRow `json:"isn_rectriever,omitempty"`
 }
 
 // CreateIsnHandler godoc
@@ -304,24 +304,35 @@ func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// get any defined receivers
-	isnReceiver, err := s.cfg.DB.GetForDisplayIsnReceiversByIsnID(r.Context(), isn.ID)
+	// get receiver and retriever if they were defined
+
+	var isnRetceiverRes *database.GetForDisplayIsnReceiverByIsnIDRow
+	isnReceiver, err := s.cfg.DB.GetForDisplayIsnReceiverByIsnID(r.Context(), isn.ID)
 	if err != nil {
-		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the receivers for this isn: %v", err))
-		return
+		if !errors.Is(err, sql.ErrNoRows) {
+			response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the receiver for this isn: %v", err))
+			return
+		}
+	} else {
+		isnRetceiverRes = &isnReceiver
 	}
 
-	// get any defined retrievers
-	isnRetriever, err := s.cfg.DB.GetForDisplayIsnRetrieversByIsnID(r.Context(), isn.ID)
+	var isnRetrieverRes *database.GetForDisplayIsnRetrieverByIsnIDRow
+	isnRetriever, err := s.cfg.DB.GetForDisplayIsnRetrieverByIsnID(r.Context(), isn.ID)
 	if err != nil {
-		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the retrievers for this isn: %v", err))
-		return
+		if !errors.Is(err, sql.ErrNoRows) {
+			response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the retriever for this isn: %v", err))
+			return
+		}
+	} else {
+		isnRetrieverRes = &isnRetriever
 	}
+	//send response
 	res := IsnAndLinkedInfo{
 		GetForDisplayIsnBySlugRow: isn,
 		User:                      user,
-		IsnReceiver:               isnReceiver,
-		IsnRetriever:              isnRetriever,
+		IsnReceiver:               isnRetceiverRes,
+		IsnRetriever:              isnRetrieverRes,
 	}
 	response.RespondWithJSON(w, http.StatusOK, res)
 }

@@ -30,7 +30,6 @@ type CreateIsnReceiverRequest struct {
 
 type CreateIsnReceiverResponse struct {
 	ResourceURL string `json:"resource_url" example:"http://localhost:8080/api/isn/sample-isn--example-org/signals/receiver"`
-	ReceiverURL string `json:"receiver_url" example:"http://localhost:8080/isn/sample-isn--example-org/signals/receiver/"`
 }
 
 type UpdateIsnReceiverRequest struct {
@@ -150,16 +149,8 @@ func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *
 
 	resourceURL := fmt.Sprintf("%s://%s/api/isn/%s/signals/receiver", helpers.GetScheme(r), r.Host, isn.Slug)
 
-	var receiverURL string
-	if isn.StorageType == "admin_db" {
-		receiverURL = "admin_db"
-	} else {
-		receiverURL = fmt.Sprintf("%s://%s/isn/%s/signals/receiver", helpers.GetScheme(r), r.Host, isn.Slug)
-	}
-
 	response.RespondWithJSON(w, http.StatusCreated, CreateIsnReceiverResponse{
 		ResourceURL: resourceURL,
-		ReceiverURL: receiverURL,
 	})
 }
 

@@ -1086,7 +1086,7 @@ const docTemplate = `{
                 "ErrCodeUserNotFound"
             ]
         },
-        "database.GetForDisplayIsnReceiversByIsnIDRow": {
+        "database.GetForDisplayIsnReceiverByIsnIDRow": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -1115,7 +1115,7 @@ const docTemplate = `{
                 }
             }
         },
-        "database.GetForDisplayIsnRetrieversByIsnIDRow": {
+        "database.GetForDisplayIsnRetrieverByIsnIDRow": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -1386,10 +1386,6 @@ const docTemplate = `{
         "handlers.CreateIsnReceiverResponse": {
             "type": "object",
             "properties": {
-                "receiver_url": {
-                    "type": "string",
-                    "example": "http://localhost:8080/isn/sample-isn--example-org/signals/receiver/"
-                },
                 "resource_url": {
                     "type": "string",
                     "example": "http://localhost:8080/api/isn/sample-isn--example-org/signals/receiver"
@@ -1480,10 +1476,6 @@ const docTemplate = `{
                 "resource_url": {
                     "type": "string",
                     "example": "http://localhost:8080/api/isn/sample-isn--example-org/signals/retriever"
-                },
-                "retriever_url": {
-                    "type": "string",
-                    "example": "http://localhost:8080/isn/sample-isn--example-org/signals/retriever/"
                 }
             }
         },
@@ -1588,10 +1580,10 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "isn_receiver": {
-                    "$ref": "#/definitions/database.GetForDisplayIsnReceiversByIsnIDRow"
+                    "$ref": "#/definitions/database.GetForDisplayIsnReceiverByIsnIDRow"
                 },
                 "isn_rectriever": {
-                    "$ref": "#/definitions/database.GetForDisplayIsnRetrieversByIsnIDRow"
+                    "$ref": "#/definitions/database.GetForDisplayIsnRetrieverByIsnIDRow"
                 },
                 "slug": {
                     "type": "string"

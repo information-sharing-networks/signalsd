@@ -41,7 +41,7 @@ definitions:
     - ErrCodeTokenError
     - ErrCodeUserAlreadyExists
     - ErrCodeUserNotFound
-  database.GetForDisplayIsnReceiversByIsnIDRow:
+  database.GetForDisplayIsnReceiverByIsnIDRow:
     properties:
       created_at:
         type: string
@@ -60,7 +60,7 @@ definitions:
       updated_at:
         type: string
     type: object
-  database.GetForDisplayIsnRetrieversByIsnIDRow:
+  database.GetForDisplayIsnRetrieverByIsnIDRow:
     properties:
       created_at:
         type: string
@@ -242,9 +242,6 @@ definitions:
     type: object
   handlers.CreateIsnReceiverResponse:
     properties:
-      receiver_url:
-        example: http://localhost:8080/isn/sample-isn--example-org/signals/receiver/
-        type: string
       resource_url:
         example: http://localhost:8080/api/isn/sample-isn--example-org/signals/receiver
         type: string
@@ -310,9 +307,6 @@ definitions:
     properties:
       resource_url:
         example: http://localhost:8080/api/isn/sample-isn--example-org/signals/retriever
-        type: string
-      retriever_url:
-        example: http://localhost:8080/isn/sample-isn--example-org/signals/retriever/
         type: string
     type: object
   handlers.CreateSignalDefRequest:
@@ -390,9 +384,9 @@ definitions:
       is_in_use:
         type: boolean
       isn_receiver:
-        $ref: '#/definitions/database.GetForDisplayIsnReceiversByIsnIDRow'
+        $ref: '#/definitions/database.GetForDisplayIsnReceiverByIsnIDRow'
       isn_rectriever:
-        $ref: '#/definitions/database.GetForDisplayIsnRetrieversByIsnIDRow'
+        $ref: '#/definitions/database.GetForDisplayIsnRetrieverByIsnIDRow'
       slug:
         type: string
       storage_connection_url:
