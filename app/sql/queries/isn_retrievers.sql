@@ -4,9 +4,8 @@ INSERT INTO isn_retrievers (
     created_at,
     updated_at,
     default_rate_limit,
-    retriever_status,
     listener_count
-) VALUES ($1, now(), now(), $2, $3, $4)
+) VALUES ($1, now(), now(), $2, $3)
 RETURNING *;
 
 -- name: UpdateIsnRetriever :execrows

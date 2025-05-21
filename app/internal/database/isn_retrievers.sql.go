@@ -18,26 +18,19 @@ INSERT INTO isn_retrievers (
     created_at,
     updated_at,
     default_rate_limit,
-    retriever_status,
     listener_count
-) VALUES ($1, now(), now(), $2, $3, $4)
+) VALUES ($1, now(), now(), $2, $3)
 RETURNING isn_id, created_at, updated_at, default_rate_limit, retriever_status, listener_count
 `
 
 type CreateIsnRetrieverParams struct {
 	IsnID            uuid.UUID `json:"isn_id"`
 	DefaultRateLimit int32     `json:"default_rate_limit"`
-	RetrieverStatus  string    `json:"retriever_status"`
 	ListenerCount    int32     `json:"listener_count"`
 }
 
 func (q *Queries) CreateIsnRetriever(ctx context.Context, arg CreateIsnRetrieverParams) (IsnRetriever, error) {
-	row := q.db.QueryRowContext(ctx, createIsnRetriever,
-		arg.IsnID,
-		arg.DefaultRateLimit,
-		arg.RetrieverStatus,
-		arg.ListenerCount,
-	)
+	row := q.db.QueryRowContext(ctx, createIsnRetriever, arg.IsnID, arg.DefaultRateLimit, arg.ListenerCount)
 	var i IsnRetriever
 	err := row.Scan(
 		&i.IsnID,

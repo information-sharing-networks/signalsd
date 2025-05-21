@@ -231,14 +231,6 @@ definitions:
         - optional
         example: always
         type: string
-      receiver_status:
-        enum:
-        - offline
-        - online
-        - error
-        - closed
-        example: offline
-        type: string
     type: object
   handlers.CreateIsnReceiverResponse:
     properties:
@@ -294,14 +286,6 @@ definitions:
       listener_count:
         example: 1
         type: integer
-      retriever_status:
-        enum:
-        - offline
-        - online
-        - error
-        - closed
-        example: offline
-        type: string
     type: object
   handlers.CreateIsnRetrieverResponse:
     properties:
@@ -733,6 +717,8 @@ paths:
 
         The public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/signals/receiver
         the isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services
+
+        note receivers are always created in 'offline' mode.
       parameters:
       - description: ISN receiver details
         in: body
@@ -827,6 +813,8 @@ paths:
 
         The public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/signals/retriever
         the isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services
+
+        note retrievers are created in 'offline' mode.
       parameters:
       - description: ISN retriever details
         in: body

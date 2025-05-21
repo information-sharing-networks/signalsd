@@ -24,8 +24,12 @@ func NewIsnReceiverHandler(cfg *signals.ServiceConfig) *IsnReceiverHandler {
 }
 
 type CreateIsnReceiverRequest struct {
-	IsnSlug string `json:"isn_slug" example:"sample-isn--example-org"`
-	UpdateIsnReceiverRequest
+	IsnSlug                    string  `json:"isn_slug" example:"sample-isn--example-org"`
+	MaxDailyValidationFailures *int32  `json:"max_daily_validation_failures" example:"5"` //default = 0
+	MaxPayloadKilobytes        *int32  `json:"max_payload_kilobytes" example:"50"`
+	PayloadValidation          *string `json:"payload_validation" example:"always" enums:"always,never,optional"`
+	DefaultRateLimit           *int32  `json:"default_rate_limit" example:"600"` //maximum number of requests per minute per session
+	ListenerCount              *int32  `json:"listener_count" example:"1"`
 }
 
 type CreateIsnReceiverResponse struct {
@@ -50,6 +54,8 @@ type UpdateIsnReceiverRequest struct {
 //	@Description
 //	@Description	The public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/signals/receiver
 //	@Description	the isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services
+//	@Description
+//	@Description	note receivers are always created in 'offline' mode.
 //
 //	@Tags			ISN config
 //
@@ -116,14 +122,8 @@ func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *
 	if req.MaxDailyValidationFailures == nil ||
 		req.MaxPayloadKilobytes == nil ||
 		req.DefaultRateLimit == nil ||
-		req.ReceiverStatus == nil ||
 		req.ListenerCount == nil {
 		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must supply a value for all fields")
-		return
-	}
-
-	if !signals.ValidReceiverStatus[*req.ReceiverStatus] {
-		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid receiver status")
 		return
 	}
 
@@ -139,7 +139,6 @@ func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *
 		MaxPayloadKilobytes:        *req.MaxPayloadKilobytes,
 		PayloadValidation:          *req.PayloadValidation,
 		DefaultRateLimit:           *req.DefaultRateLimit,
-		ReceiverStatus:             *req.ReceiverStatus,
 		ListenerCount:              *req.ListenerCount,
 	})
 	if err != nil {

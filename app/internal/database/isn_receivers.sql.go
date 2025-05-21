@@ -21,9 +21,8 @@ INSERT INTO isn_receivers (
     max_payload_kilobytes,
     payload_validation,
     default_rate_limit,
-    receiver_status, 
     listener_count
-) VALUES ($1, now(), now(), $2, $3, $4, $5, $6, $7)
+) VALUES ($1, now(), now(), $2, $3, $4, $5, $6)
 RETURNING isn_id, created_at, updated_at, max_daily_validation_failures, max_payload_kilobytes, payload_validation, default_rate_limit, receiver_status, listener_count
 `
 
@@ -33,7 +32,6 @@ type CreateIsnReceiverParams struct {
 	MaxPayloadKilobytes        int32     `json:"max_payload_kilobytes"`
 	PayloadValidation          string    `json:"payload_validation"`
 	DefaultRateLimit           int32     `json:"default_rate_limit"`
-	ReceiverStatus             string    `json:"receiver_status"`
 	ListenerCount              int32     `json:"listener_count"`
 }
 
@@ -44,7 +42,6 @@ func (q *Queries) CreateIsnReceiver(ctx context.Context, arg CreateIsnReceiverPa
 		arg.MaxPayloadKilobytes,
 		arg.PayloadValidation,
 		arg.DefaultRateLimit,
-		arg.ReceiverStatus,
 		arg.ListenerCount,
 	)
 	var i IsnReceiver

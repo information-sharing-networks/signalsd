@@ -7,9 +7,8 @@ INSERT INTO isn_receivers (
     max_payload_kilobytes,
     payload_validation,
     default_rate_limit,
-    receiver_status, 
     listener_count
-) VALUES ($1, now(), now(), $2, $3, $4, $5, $6, $7)
+) VALUES ($1, now(), now(), $2, $3, $4, $5, $6)
 RETURNING *;
 
 -- name: UpdateIsnReceiver :execrows

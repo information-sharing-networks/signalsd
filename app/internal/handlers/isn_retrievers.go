@@ -24,8 +24,9 @@ func NewIsnRetrieverHandler(cfg *signals.ServiceConfig) *IsnRetrieverHandler {
 }
 
 type CreateIsnRetrieverRequest struct {
-	IsnSlug string `json:"isn_slug" example:"sample-isn--example-org"`
-	UpdateIsnRetrieverRequest
+	IsnSlug          string `json:"isn_slug" example:"sample-isn--example-org"`
+	DefaultRateLimit *int32 `json:"default_rate_limit" example:"600"` //maximum number of requests per minute per session
+	ListenerCount    *int32 `json:"listener_count" example:"1"`
 }
 
 type CreateIsnRetrieverResponse struct {
@@ -47,6 +48,8 @@ type UpdateIsnRetrieverRequest struct {
 //	@Description
 //	@Description	The public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/signals/retriever
 //	@Description	the isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services
+//	@Description
+//	@Description	note retrievers are created in 'offline' mode.
 //
 //	@Tags			ISN config
 //
@@ -111,14 +114,8 @@ func (i *IsnRetrieverHandler) CreateIsnRetrieverHandler(w http.ResponseWriter, r
 
 	// check all fields were supplied
 	if req.DefaultRateLimit == nil ||
-		req.RetrieverStatus == nil ||
 		req.ListenerCount == nil {
 		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must supply a value for all fields")
-		return
-	}
-
-	if !signals.ValidRetrieverStatus[*req.RetrieverStatus] {
-		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid retriever status")
 		return
 	}
 
@@ -126,7 +123,6 @@ func (i *IsnRetrieverHandler) CreateIsnRetrieverHandler(w http.ResponseWriter, r
 	_, err = i.cfg.DB.CreateIsnRetriever(r.Context(), database.CreateIsnRetrieverParams{
 		IsnID:            isn.ID,
 		DefaultRateLimit: *req.DefaultRateLimit,
-		RetrieverStatus:  *req.RetrieverStatus,
 		ListenerCount:    *req.ListenerCount,
 	})
 	if err != nil {

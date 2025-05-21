@@ -288,7 +288,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "An ISN receiver handles the http requests sent by clients that pass Signals to the ISN\n\nYou can specify how many receivers should be started for the ISN and they will listen on an automatically generted port, starting at 8081\n\nThe public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/signals/receiver\nthe isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services",
+                "description": "An ISN receiver handles the http requests sent by clients that pass Signals to the ISN\n\nYou can specify how many receivers should be started for the ISN and they will listen on an automatically generted port, starting at 8081\n\nThe public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/signals/receiver\nthe isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services\n\nnote receivers are always created in 'offline' mode.",
                 "tags": [
                     "ISN config"
                 ],
@@ -425,7 +425,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "An ISN retriever handles the http requests sent by clients to get Signals from the ISN\n\nYou can specify how many retrievers should be started for the ISN and they will listen on an automatically generted port\n\nThe public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/signals/retriever\nthe isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services",
+                "description": "An ISN retriever handles the http requests sent by clients to get Signals from the ISN\n\nYou can specify how many retrievers should be started for the ISN and they will listen on an automatically generted port\n\nThe public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/signals/retriever\nthe isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services\n\nnote retrievers are created in 'offline' mode.",
                 "tags": [
                     "ISN config"
                 ],
@@ -1370,16 +1370,6 @@ const docTemplate = `{
                         "optional"
                     ],
                     "example": "always"
-                },
-                "receiver_status": {
-                    "type": "string",
-                    "enum": [
-                        "offline",
-                        "online",
-                        "error",
-                        "closed"
-                    ],
-                    "example": "offline"
                 }
             }
         },
@@ -1457,16 +1447,6 @@ const docTemplate = `{
                 "listener_count": {
                     "type": "integer",
                     "example": 1
-                },
-                "retriever_status": {
-                    "type": "string",
-                    "enum": [
-                        "offline",
-                        "online",
-                        "error",
-                        "closed"
-                    ],
-                    "example": "offline"
                 }
             }
         },
