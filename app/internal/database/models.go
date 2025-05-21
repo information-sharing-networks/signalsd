@@ -38,17 +38,12 @@ type IsnReceiver struct {
 }
 
 type IsnRetriever struct {
-	ID               uuid.UUID `json:"id"`
+	IsnID            uuid.UUID `json:"isn_id"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
-	UserID           uuid.UUID `json:"user_id"`
-	IsnID            uuid.UUID `json:"isn_id"`
-	Title            string    `json:"title"`
-	Detail           string    `json:"detail"`
-	Slug             string    `json:"slug"`
-	RetrieverOrigin  string    `json:"retriever_origin"`
-	RetrieverStatus  string    `json:"retriever_status"`
 	DefaultRateLimit int32     `json:"default_rate_limit"`
+	RetrieverStatus  string    `json:"retriever_status"`
+	ListenerCount    int32     `json:"listener_count"`
 }
 
 type RefreshToken struct {

@@ -232,7 +232,7 @@ func (i *IsnHandler) UpdateIsnHandler(w http.ResponseWriter, r *http.Request) {
 		isn.StorageConnectionURL = "admin_db"
 	}
 
-	// update isn_receiever
+	// update isn_receiver
 	_, err = i.cfg.DB.UpdateIsn(r.Context(), database.UpdateIsnParams{
 		ID:                   isn.ID,
 		Detail:               isn.Detail,

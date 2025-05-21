@@ -118,7 +118,7 @@ func (q *Queries) GetForDisplayIsnReceiversByIsnID(ctx context.Context, isnID uu
 	return i, err
 }
 
-const getIsnReceiverByIsnID = `-- name: GetIsnReceiverByIsnID :one
+const getIsnReceiverByIsnSlug = `-- name: GetIsnReceiverByIsnSlug :one
 
 SELECT ir.isn_id, ir.created_at, ir.updated_at, ir.max_daily_validation_failures, ir.max_payload_kilobytes, ir.payload_validation, ir.default_rate_limit, ir.receiver_status, ir.listener_count , i.is_in_use as isn_is_in_use
 FROM isn_receivers ir
@@ -127,7 +127,7 @@ ON i.id = ir.isn_id
 WHERE i.slug = $1
 `
 
-type GetIsnReceiverByIsnIDRow struct {
+type GetIsnReceiverByIsnSlugRow struct {
 	IsnID                      uuid.UUID `json:"isn_id"`
 	CreatedAt                  time.Time `json:"created_at"`
 	UpdatedAt                  time.Time `json:"updated_at"`
@@ -140,9 +140,9 @@ type GetIsnReceiverByIsnIDRow struct {
 	IsnIsInUse                 bool      `json:"isn_is_in_use"`
 }
 
-func (q *Queries) GetIsnReceiverByIsnID(ctx context.Context, slug string) (GetIsnReceiverByIsnIDRow, error) {
-	row := q.db.QueryRowContext(ctx, getIsnReceiverByIsnID, slug)
-	var i GetIsnReceiverByIsnIDRow
+func (q *Queries) GetIsnReceiverByIsnSlug(ctx context.Context, slug string) (GetIsnReceiverByIsnSlugRow, error) {
+	row := q.db.QueryRowContext(ctx, getIsnReceiverByIsnSlug, slug)
+	var i GetIsnReceiverByIsnSlugRow
 	err := row.Scan(
 		&i.IsnID,
 		&i.CreatedAt,

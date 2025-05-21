@@ -40,8 +40,8 @@ func RegisterRoutes(r *chi.Mux, cfg *signals.ServiceConfig) {
 			r.Put("/isn/{isn_slug}", isnHandler.UpdateIsnHandler)
 			r.Post("/isn/{isn_slug}/signals/receiver", isnReceiverHandler.CreateIsnReceiverHandler)
 			r.Put("/isn/{isn_slug}/signals/receiver", isnReceiverHandler.UpdateIsnReceiverHandler)
-			r.Post("/isn/retriever", isnRetrieverHandler.CreateIsnRetrieverHandler)
-			r.Put("/isn/retriever/{isn_retrievers_slug}", isnRetrieverHandler.UpdateIsnRetrieverHandler)
+			r.Post("/isn/{isn_slug}/signals/retriever", isnRetrieverHandler.CreateIsnRetrieverHandler)
+			r.Put("/isn/{isn_slug}/signals/retriever", isnRetrieverHandler.UpdateIsnRetrieverHandler)
 
 			// webhooks
 			r.Post("/api/webhooks", webhookHandler.HandlerWebhook)
@@ -52,7 +52,7 @@ func RegisterRoutes(r *chi.Mux, cfg *signals.ServiceConfig) {
 		r.Get("/isn", isnHandler.GetIsnsHandler)
 		r.Get("/isn/{isn_slug}", isnHandler.GetIsnHandler)
 		r.Get("/isn/{isn_slug}/signals/receiver", isnReceiverHandler.GetIsnReceiverHandler)
-		r.Get("/isn/retriever/{slug}", isnRetrieverHandler.GetIsnRetrieverHandler)
+		r.Get("/isn/{isn_slug}/signals/retriever", isnRetrieverHandler.GetIsnRetrieverHandler)
 	})
 
 	// auth

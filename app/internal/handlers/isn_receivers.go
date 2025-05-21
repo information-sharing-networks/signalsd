@@ -133,7 +133,7 @@ func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *
 		return
 	}
 
-	// create isn receiever
+	// create isn receiver
 	_, err = i.cfg.DB.CreateIsnReceiver(r.Context(), database.CreateIsnReceiverParams{
 		IsnID:                      isn.ID,
 		MaxDailyValidationFailures: *req.MaxDailyValidationFailures,
@@ -212,7 +212,7 @@ func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *
 	}
 
 	// check receiver exists and is owned by user
-	isnReceiver, err := i.cfg.DB.GetIsnReceiverByIsnID(r.Context(), isnSlug)
+	isnReceiver, err := i.cfg.DB.GetIsnReceiverByIsnSlug(r.Context(), isnSlug)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			response.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN receiver not found")
@@ -259,7 +259,7 @@ func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *
 	if req.ListenerCount != nil {
 		isnReceiver.ListenerCount = *req.ListenerCount
 	}
-	// update isn receiever - todo checks on rows updated
+	// update isn receiver - todo checks on rows updated
 	_, err = i.cfg.DB.UpdateIsnReceiver(r.Context(), database.UpdateIsnReceiverParams{
 		IsnID:                      isn.ID,
 		MaxDailyValidationFailures: isnReceiver.MaxDailyValidationFailures,
@@ -283,15 +283,15 @@ func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *
 //	@Tags		ISN view
 //
 //	@Param		slug	path		string	true	"isn slug"	example(sample-isn--example-org)
-//	@Success	200		{array}		database.GetIsnReceiverByIsnIDRow
+//	@Success	200		{array}		database.GetIsnReceiverByIsnSlugRow
 //	@Failure	500		{object}	response.ErrorResponse
 //
-//	@Router		/api/isn/{isn_slug}/signals/receiever [get]
+//	@Router		/api/isn/{isn_slug}/signals/receiver [get]
 func (u *IsnReceiverHandler) GetIsnReceiverHandler(w http.ResponseWriter, r *http.Request) {
 
 	isnSlug := r.PathValue("isn_slug")
 
-	res, err := u.cfg.DB.GetIsnReceiverByIsnID(r.Context(), isnSlug)
+	res, err := u.cfg.DB.GetIsnReceiverByIsnSlug(r.Context(), isnSlug)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			response.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No isn_receiver found for id %v", isnSlug))

@@ -14,63 +14,52 @@ import (
 
 const createIsnRetriever = `-- name: CreateIsnRetriever :one
 INSERT INTO isn_retrievers (
-    id,
+    isn_id,
     created_at,
     updated_at,
-    user_id,
-    isn_id,
-    title,
-    detail,
-    slug,
-    retriever_origin,
+    default_rate_limit,
     retriever_status,
-    default_rate_limit
-) VALUES (gen_random_uuid(), now(), now(), $1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, slug
+    listener_count
+) VALUES ($1, now(), now(), $2, $3, $4)
+RETURNING isn_id, created_at, updated_at, default_rate_limit, retriever_status, listener_count
 `
 
 type CreateIsnRetrieverParams struct {
-	UserID           uuid.UUID `json:"user_id"`
 	IsnID            uuid.UUID `json:"isn_id"`
-	Title            string    `json:"title"`
-	Detail           string    `json:"detail"`
-	Slug             string    `json:"slug"`
-	RetrieverOrigin  string    `json:"retriever_origin"`
-	RetrieverStatus  string    `json:"retriever_status"`
 	DefaultRateLimit int32     `json:"default_rate_limit"`
+	RetrieverStatus  string    `json:"retriever_status"`
+	ListenerCount    int32     `json:"listener_count"`
 }
 
-type CreateIsnRetrieverRow struct {
-	ID   uuid.UUID `json:"id"`
-	Slug string    `json:"slug"`
-}
-
-func (q *Queries) CreateIsnRetriever(ctx context.Context, arg CreateIsnRetrieverParams) (CreateIsnRetrieverRow, error) {
+func (q *Queries) CreateIsnRetriever(ctx context.Context, arg CreateIsnRetrieverParams) (IsnRetriever, error) {
 	row := q.db.QueryRowContext(ctx, createIsnRetriever,
-		arg.UserID,
 		arg.IsnID,
-		arg.Title,
-		arg.Detail,
-		arg.Slug,
-		arg.RetrieverOrigin,
-		arg.RetrieverStatus,
 		arg.DefaultRateLimit,
+		arg.RetrieverStatus,
+		arg.ListenerCount,
 	)
-	var i CreateIsnRetrieverRow
-	err := row.Scan(&i.ID, &i.Slug)
+	var i IsnRetriever
+	err := row.Scan(
+		&i.IsnID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DefaultRateLimit,
+		&i.RetrieverStatus,
+		&i.ListenerCount,
+	)
 	return i, err
 }
 
-const existsIsnRetrieverWithSlug = `-- name: ExistsIsnRetrieverWithSlug :one
+const existsIsnRetriever = `-- name: ExistsIsnRetriever :one
 
 SELECT EXISTS
   (SELECT 1
-   FROM isn_retrievers
-   WHERE slug = $1) AS EXISTS
+   FROM isn_retrievers ir
+   WHERE ir.isn_id = $1) AS EXISTS
 `
 
-func (q *Queries) ExistsIsnRetrieverWithSlug(ctx context.Context, slug string) (bool, error) {
-	row := q.db.QueryRowContext(ctx, existsIsnRetrieverWithSlug, slug)
+func (q *Queries) ExistsIsnRetriever(ctx context.Context, isnID uuid.UUID) (bool, error) {
+	row := q.db.QueryRowContext(ctx, existsIsnRetriever, isnID)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
@@ -78,94 +67,67 @@ func (q *Queries) ExistsIsnRetrieverWithSlug(ctx context.Context, slug string) (
 
 const getForDisplayIsnRetrieversByIsnID = `-- name: GetForDisplayIsnRetrieversByIsnID :one
 SELECT
-    ir.id,
     ir.created_at,
     ir.updated_at,
-    ir.title,
-    ir.detail,
-    ir.slug,
-    ir.retriever_origin,
     ir.retriever_status,
-    ir.default_rate_limit
+    ir.default_rate_limit,
+    ir.listener_count
 FROM isn_retrievers ir
 WHERE ir.isn_id = $1
 `
 
 type GetForDisplayIsnRetrieversByIsnIDRow struct {
-	ID               uuid.UUID `json:"id"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
-	Title            string    `json:"title"`
-	Detail           string    `json:"detail"`
-	Slug             string    `json:"slug"`
-	RetrieverOrigin  string    `json:"retriever_origin"`
 	RetrieverStatus  string    `json:"retriever_status"`
 	DefaultRateLimit int32     `json:"default_rate_limit"`
+	ListenerCount    int32     `json:"listener_count"`
 }
 
 func (q *Queries) GetForDisplayIsnRetrieversByIsnID(ctx context.Context, isnID uuid.UUID) (GetForDisplayIsnRetrieversByIsnIDRow, error) {
 	row := q.db.QueryRowContext(ctx, getForDisplayIsnRetrieversByIsnID, isnID)
 	var i GetForDisplayIsnRetrieversByIsnIDRow
 	err := row.Scan(
-		&i.ID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.Title,
-		&i.Detail,
-		&i.Slug,
-		&i.RetrieverOrigin,
 		&i.RetrieverStatus,
 		&i.DefaultRateLimit,
+		&i.ListenerCount,
 	)
 	return i, err
 }
 
-const getIsnRetrieverBySlug = `-- name: GetIsnRetrieverBySlug :one
+const getIsnRetrieverByIsnSlug = `-- name: GetIsnRetrieverByIsnSlug :one
 SELECT
-    i.slug AS isn_slug,
-    i.is_in_use AS isn_is_in_use,
-    i.storage_type AS isn_storage_type,
-    ir.id, ir.created_at, ir.updated_at, ir.user_id, ir.isn_id, ir.title, ir.detail, ir.slug, ir.retriever_origin, ir.retriever_status, ir.default_rate_limit
+    ir.isn_id, ir.created_at, ir.updated_at, ir.default_rate_limit, ir.retriever_status, ir.listener_count,
+    i.is_in_use AS isn_is_in_use
 FROM isn_retrievers ir
-JOIN isn i ON i.id = ir.isn_id
-WHERE ir.slug = $1
+JOIN isn i 
+ON i.id = ir.isn_id
+WHERE i.slug = $1
 `
 
-type GetIsnRetrieverBySlugRow struct {
-	IsnSlug          string    `json:"isn_slug"`
-	IsnIsInUse       bool      `json:"isn_is_in_use"`
-	IsnStorageType   string    `json:"isn_storage_type"`
-	ID               uuid.UUID `json:"id"`
+type GetIsnRetrieverByIsnSlugRow struct {
+	IsnID            uuid.UUID `json:"isn_id"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
-	UserID           uuid.UUID `json:"user_id"`
-	IsnID            uuid.UUID `json:"isn_id"`
-	Title            string    `json:"title"`
-	Detail           string    `json:"detail"`
-	Slug             string    `json:"slug"`
-	RetrieverOrigin  string    `json:"retriever_origin"`
-	RetrieverStatus  string    `json:"retriever_status"`
 	DefaultRateLimit int32     `json:"default_rate_limit"`
+	RetrieverStatus  string    `json:"retriever_status"`
+	ListenerCount    int32     `json:"listener_count"`
+	IsnIsInUse       bool      `json:"isn_is_in_use"`
 }
 
-func (q *Queries) GetIsnRetrieverBySlug(ctx context.Context, slug string) (GetIsnRetrieverBySlugRow, error) {
-	row := q.db.QueryRowContext(ctx, getIsnRetrieverBySlug, slug)
-	var i GetIsnRetrieverBySlugRow
+func (q *Queries) GetIsnRetrieverByIsnSlug(ctx context.Context, slug string) (GetIsnRetrieverByIsnSlugRow, error) {
+	row := q.db.QueryRowContext(ctx, getIsnRetrieverByIsnSlug, slug)
+	var i GetIsnRetrieverByIsnSlugRow
 	err := row.Scan(
-		&i.IsnSlug,
-		&i.IsnIsInUse,
-		&i.IsnStorageType,
-		&i.ID,
+		&i.IsnID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.UserID,
-		&i.IsnID,
-		&i.Title,
-		&i.Detail,
-		&i.Slug,
-		&i.RetrieverOrigin,
-		&i.RetrieverStatus,
 		&i.DefaultRateLimit,
+		&i.RetrieverStatus,
+		&i.ListenerCount,
+		&i.IsnIsInUse,
 	)
 	return i, err
 }
@@ -173,29 +135,26 @@ func (q *Queries) GetIsnRetrieverBySlug(ctx context.Context, slug string) (GetIs
 const updateIsnRetriever = `-- name: UpdateIsnRetriever :execrows
 UPDATE isn_retrievers SET (
   updated_at, 
-  detail,
-  retriever_origin,
   default_rate_limit,
-  retriever_status
-) = (Now(), $2, $3, $4, $5)
-WHERE id = $1
+  retriever_status,
+  listener_count
+) = (Now(), $2, $3, $4)
+WHERE isn_id = $1
 `
 
 type UpdateIsnRetrieverParams struct {
-	ID               uuid.UUID `json:"id"`
-	Detail           string    `json:"detail"`
-	RetrieverOrigin  string    `json:"retriever_origin"`
+	IsnID            uuid.UUID `json:"isn_id"`
 	DefaultRateLimit int32     `json:"default_rate_limit"`
 	RetrieverStatus  string    `json:"retriever_status"`
+	ListenerCount    int32     `json:"listener_count"`
 }
 
 func (q *Queries) UpdateIsnRetriever(ctx context.Context, arg UpdateIsnRetrieverParams) (int64, error) {
 	result, err := q.db.ExecContext(ctx, updateIsnRetriever,
-		arg.ID,
-		arg.Detail,
-		arg.RetrieverOrigin,
+		arg.IsnID,
 		arg.DefaultRateLimit,
 		arg.RetrieverStatus,
+		arg.ListenerCount,
 	)
 	if err != nil {
 		return 0, err

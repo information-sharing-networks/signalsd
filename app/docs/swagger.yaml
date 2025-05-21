@@ -66,17 +66,9 @@ definitions:
         type: string
       default_rate_limit:
         type: integer
-      detail:
-        type: string
-      id:
-        type: string
-      retriever_origin:
-        type: string
+      listener_count:
+        type: integer
       retriever_status:
-        type: string
-      slug:
-        type: string
-      title:
         type: string
       updated_at:
         type: string
@@ -99,7 +91,7 @@ definitions:
       updated_at:
         type: string
     type: object
-  database.GetIsnReceiverByIsnIDRow:
+  database.GetIsnReceiverByIsnSlugRow:
     properties:
       created_at:
         type: string
@@ -122,35 +114,21 @@ definitions:
       updated_at:
         type: string
     type: object
-  database.GetIsnRetrieverBySlugRow:
+  database.GetIsnRetrieverByIsnSlugRow:
     properties:
       created_at:
         type: string
       default_rate_limit:
         type: integer
-      detail:
-        type: string
-      id:
-        type: string
       isn_id:
         type: string
       isn_is_in_use:
         type: boolean
-      isn_slug:
-        type: string
-      isn_storage_type:
-        type: string
-      retriever_origin:
-        type: string
+      listener_count:
+        type: integer
       retriever_status:
         type: string
-      slug:
-        type: string
-      title:
-        type: string
       updated_at:
-        type: string
-      user_id:
         type: string
     type: object
   database.GetSignalDefsRow:
@@ -310,44 +288,31 @@ definitions:
   handlers.CreateIsnRetrieverRequest:
     properties:
       default_rate_limit:
-        description: maximum number of requests per minute
+        description: maximum number of requests per minute per session
         example: 600
         type: integer
-      detail:
-        example: sample-isn--example-org
-        type: string
       isn_slug:
         example: sample-isn--example-org
         type: string
-      retriever_origin:
-        description: do not provide this field if the isn is using local storage
-        example: http://example.com:8080
-        type: string
+      listener_count:
+        example: 1
+        type: integer
       retriever_status:
         enum:
         - offline
-        - ' online'
-        - ' error'
-        - ' closed'
+        - online
+        - error
+        - closed
         example: offline
-        type: string
-      title:
-        example: Sample ISN Retriever @example.org
         type: string
     type: object
   handlers.CreateIsnRetrieverResponse:
     properties:
-      id:
-        example: 4f1bc74b-cf79-410f-9c21-dc2cba047385
-        type: string
       resource_url:
-        example: http://localhost:8080/api/isn/retriever/sample-isn-retriever--example-org
+        example: http://localhost:8080/api/isn/sample-isn--example-org/signals/retriever
         type: string
       retriever_url:
-        example: http://localhost:8080/signals/retriever/sample-isn-retriever--example-org
-        type: string
-      slug:
-        example: sample-isn-retriever--example-org
+        example: http://localhost:8080/isn/sample-isn--example-org/signals/retriever/
         type: string
     type: object
   handlers.CreateSignalDefRequest:
@@ -563,22 +528,18 @@ definitions:
   handlers.UpdateIsnRetrieverRequest:
     properties:
       default_rate_limit:
-        description: maximum number of requests per minute
+        description: maximum number of requests per minute per session
         example: 600
         type: integer
-      detail:
-        example: sample-isn--example-org
-        type: string
-      retriever_origin:
-        description: do not provide this field if the isn is using local storage
-        example: http://example.com:8080
-        type: string
+      listener_count:
+        example: 1
+        type: integer
       retriever_status:
         enum:
         - offline
-        - ' online'
-        - ' error'
-        - ' closed'
+        - online
+        - error
+        - closed
         example: offline
         type: string
     type: object
@@ -747,7 +708,7 @@ paths:
       summary: Update an ISN
       tags:
       - ISN config
-  /api/isn/{isn_slug}/signals/receiever:
+  /api/isn/{isn_slug}/signals/receiver:
     get:
       parameters:
       - description: isn slug
@@ -761,7 +722,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/database.GetIsnReceiverByIsnIDRow'
+              $ref: '#/definitions/database.GetIsnReceiverByIsnSlugRow'
             type: array
         "500":
           description: Internal Server Error
@@ -770,7 +731,6 @@ paths:
       summary: Get an ISN receiver config
       tags:
       - ISN view
-  /api/isn/{isn_slug}/signals/receiver:
     post:
       description: |-
         An ISN receiver handles the http requests sent by clients that pass Signals to the ISN
@@ -842,43 +802,72 @@ paths:
       summary: Update an ISN Receiver
       tags:
       - ISN config
-  /api/isn/{slug}:
+  /api/isn/{isn_slug}/signals/retriever:
     get:
-      description: Returns details about the ISN plus details of any configured receivers/retrievers
       parameters:
       - description: isn slug
         example: sample-isn--example-org
         in: path
-        name: isn_slug
+        name: slug
         required: true
         type: string
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.IsnAndLinkedInfo'
+            items:
+              $ref: '#/definitions/database.GetIsnRetrieverByIsnSlugRow'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Get an ISN retriever config
+      tags:
+      - ISN view
+    post:
+      description: |-
+        An ISN retriever handles the http requests sent by clients to get Signals from the ISN
+
+        You can specify how many retrievers should be started for the ISN and they will listen on an automatically generted port
+
+        The public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/signals/retriever
+        the isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services
+      parameters:
+      - description: ISN retriever details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateIsnRetrieverRequest'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.CreateIsnRetrieverResponse'
         "400":
           description: Bad Request
           schema:
             $ref: '#/definitions/response.ErrorResponse'
-        "404":
-          description: Not Found
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorResponse'
-      summary: Get an ISN configuration
+      security:
+      - BearerAccessToken: []
+      summary: Create an ISN Retriever definition
       tags:
-      - ISN view
-  /api/isn/retriever/{isn_retrievers_slug}:
+      - ISN config
     put:
       parameters:
-      - description: isn retriever slug
-        example: sample-isn-retriever--example-org
+      - description: isn slug
+        example: sample-isn--example-org
         in: path
-        name: isn_retrievers_slug
+        name: isn_slug
         required: true
         type: string
       - description: ISN retriever details
@@ -907,62 +896,34 @@ paths:
       summary: Update an ISN Retriever
       tags:
       - ISN config
-  /api/isn/retriever/{retriever_slug}:
-    post:
-      description: |
-        the retriever service handles requests to get signals and will be hosted on {retriever_origin}/signals/retriever/{retriever_slug}
-
-        When the ISN storage_type is set to "admin_db", the retriever_origin must also be "admin_db", indicating that the signals are retieved from the relational database used by the API service.
-      parameters:
-      - description: ISN retriever details
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.CreateIsnRetrieverRequest'
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/handlers.CreateIsnRetrieverResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Create an ISN Retriever
-      tags:
-      - ISN config
-  /api/isn/retriever/{slug}:
+  /api/isn/{slug}:
     get:
+      description: Returns details about the ISN plus details of any configured receivers/retrievers
       parameters:
-      - description: isn retriever slug
-        example: sample-isn-retriever--example-org
+      - description: isn slug
+        example: sample-isn--example-org
         in: path
-        name: slug
+        name: isn_slug
         required: true
         type: string
       responses:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/database.GetIsnRetrieverBySlugRow'
-            type: array
+            $ref: '#/definitions/handlers.IsnAndLinkedInfo'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorResponse'
-      summary: Get an ISN retriever config
+      summary: Get an ISN configuration
       tags:
       - ISN view
   /api/signal_defs:

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/google/uuid"
 	signals "github.com/nickabs/signalsd/app"
 	"github.com/nickabs/signalsd/app/internal/apperrors"
 	"github.com/nickabs/signalsd/app/internal/context"
@@ -25,50 +24,47 @@ func NewIsnRetrieverHandler(cfg *signals.ServiceConfig) *IsnRetrieverHandler {
 }
 
 type CreateIsnRetrieverRequest struct {
-	Title   string `json:"title" example:"Sample ISN Retriever @example.org"`
 	IsnSlug string `json:"isn_slug" example:"sample-isn--example-org"`
 	UpdateIsnRetrieverRequest
 }
 
 type CreateIsnRetrieverResponse struct {
-	ID           uuid.UUID `json:"id" example:"4f1bc74b-cf79-410f-9c21-dc2cba047385"`
-	Slug         string    `json:"slug" example:"sample-isn-retriever--example-org"`
-	ResourceURL  string    `json:"resource_url" example:"http://localhost:8080/api/isn/retriever/sample-isn-retriever--example-org"`
-	RetrieverURL string    `json:"retriever_url" example:"http://localhost:8080/signals/retriever/sample-isn-retriever--example-org"`
+	ResourceURL  string `json:"resource_url" example:"http://localhost:8080/api/isn/sample-isn--example-org/signals/retriever"`
+	RetrieverURL string `json:"retriever_url" example:"http://localhost:8080/isn/sample-isn--example-org/signals/retriever/"`
 }
 
 type UpdateIsnRetrieverRequest struct {
-	Detail           *string `json:"detail" example:"sample-isn--example-org"`
-	RetrieverOrigin  *string `json:"retriever_origin" example:"http://example.com:8080"` // do not provide this field if the isn is using local storage
-	DefaultRateLimit *int32  `json:"default_rate_limit" example:"600"`                   //maximum number of requests per minute
-	RetrieverStatus  *string `json:"retriever_status" example:"offline" enums:"offline, online, error, closed"`
-}
-type IsnRetrieverAndLinkedInfo struct {
-	database.IsnReceiver `json:"isn_receiver"`
+	DefaultRateLimit *int32  `json:"default_rate_limit" example:"600"` //maximum number of requests per minute per session
+	RetrieverStatus  *string `json:"retriever_status" example:"offline" enums:"offline,online,error,closed"`
+	ListenerCount    *int32  `json:"listener_count" example:"1"`
 }
 
 // CreateIsnRetrieverHandler godoc
 //
-//	@Summary		Create an ISN Retriever
-//	@Description	the retriever service handles requests to get signals and will be hosted on {retriever_origin}/signals/retriever/{retriever_slug}
+//	@Summary		Create an ISN Retriever definition
+//	@Description	An ISN retriever handles the http requests sent by clients to get Signals from the ISN
 //	@Description
-//	@Description	When the ISN storage_type is set to "admin_db", the retriever_origin must also be "admin_db", indicating that the signals are retieved from the relational database used by the API service.
+//	@Description	You can specify how many retrievers should be started for the ISN and they will listen on an automatically generted port
 //	@Description
+//	@Description	The public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/signals/retriever
+//	@Description	the isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services
 //
-//	@Tags		ISN config
+//	@Tags			ISN config
 //
-//	@Param		request	body		handlers.CreateIsnRetrieverRequest	true	"ISN retriever details"
+//	@Param			request	body		handlers.CreateIsnRetrieverRequest	true	"ISN retriever details"
 //
-//	@Success	201		{object}	handlers.CreateIsnRetrieverResponse
-//	@Failure	400		{object}	response.ErrorResponse
-//	@Failure	409		{object}	response.ErrorResponse
-//	@Failure	500		{object}	response.ErrorResponse
+//	@Success		201		{object}	handlers.CreateIsnRetrieverResponse
+//	@Failure		400		{object}	response.ErrorResponse
+//	@Failure		409		{object}	response.ErrorResponse
+//	@Failure		500		{object}	response.ErrorResponse
 //
-//	@Security	BearerAccessToken
+//	@Security		BearerAccessToken
 //
-//	@Router		/api/isn/retriever/{retriever_slug} [post]
+//	@Router			/api/isn/{isn_slug}/signals/retriever [post]
 func (i *IsnRetrieverHandler) CreateIsnRetrieverHandler(w http.ResponseWriter, r *http.Request) {
 	var req CreateIsnRetrieverRequest
+
+	isnSlug := r.PathValue("isn_slug")
 
 	userID, ok := context.UserID(r.Context())
 	if !ok {
@@ -83,7 +79,7 @@ func (i *IsnRetrieverHandler) CreateIsnRetrieverHandler(w http.ResponseWriter, r
 	}
 
 	// check isn exists and is owned by user
-	isn, err := i.cfg.DB.GetIsnBySlug(r.Context(), req.IsnSlug)
+	isn, err := i.cfg.DB.GetIsnBySlug(r.Context(), isnSlug)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			response.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
@@ -103,80 +99,52 @@ func (i *IsnRetrieverHandler) CreateIsnRetrieverHandler(w http.ResponseWriter, r
 		return
 	}
 
-	// check mandatory fields
-	if req.DefaultRateLimit == nil || req.RetrieverStatus == nil {
-		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must supply a value for all fields")
-		return
-	}
-
-	if isn.StorageType == "admin_db" {
-		if req.RetrieverOrigin != nil {
-			response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "do not specify a retriever_origin when using local storage")
-			return
-		}
-		req.RetrieverOrigin = new(string)
-		*req.RetrieverOrigin = "admin_db"
-	} else {
-		if req.RetrieverOrigin != nil || !helpers.IsValidOrigin(*req.RetrieverOrigin) {
-			response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must specify a retriever_origin when using local storage, e.g https://example.com")
-			return
-		}
-	}
-	if !signals.ValidRetrieverStatus[*req.RetrieverStatus] {
-		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid retriever_status")
-		return
-	}
-
-	// generate slug.
-	slug, err := helpers.GenerateSlug(req.Title)
-	if err != nil {
-		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not create slug from title")
-		return
-	}
-
-	// check if slug has already been used
-	exists, err := i.cfg.DB.ExistsIsnRetrieverWithSlug(r.Context(), slug)
+	// check if the isn retriever already exists
+	exists, err := i.cfg.DB.ExistsIsnRetriever(r.Context(), isn.ID)
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("database error: %v", err))
 		return
 	}
 	if exists {
-		response.RespondWithError(w, r, http.StatusConflict, apperrors.ErrCodeResourceAlreadyExists, fmt.Sprintf("the {%s} slug is already in use - pick a new title for your ISN retriever", slug))
+		response.RespondWithError(w, r, http.StatusConflict, apperrors.ErrCodeResourceAlreadyExists, fmt.Sprintf("Retriever already exists for isn %s", isn.Slug))
 		return
 	}
 
-	// create isn receiever
-	returnedIsnRetriever, err := i.cfg.DB.CreateIsnRetriever(r.Context(), database.CreateIsnRetrieverParams{
-		UserID:           userID,
+	// check all fields were supplied
+	if req.DefaultRateLimit == nil ||
+		req.RetrieverStatus == nil ||
+		req.ListenerCount == nil {
+		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must supply a value for all fields")
+		return
+	}
+
+	if !signals.ValidRetrieverStatus[*req.RetrieverStatus] {
+		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid retriever status")
+		return
+	}
+
+	// create isn retriever
+	_, err = i.cfg.DB.CreateIsnRetriever(r.Context(), database.CreateIsnRetrieverParams{
 		IsnID:            isn.ID,
-		Title:            req.Title,
-		Slug:             slug,
-		Detail:           *req.Detail,
-		RetrieverOrigin:  *req.RetrieverOrigin,
 		DefaultRateLimit: *req.DefaultRateLimit,
 		RetrieverStatus:  *req.RetrieverStatus,
+		ListenerCount:    *req.ListenerCount,
 	})
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not create ISN retriever: %v", err))
 		return
 	}
 
-	resourceURL := fmt.Sprintf("%s://%s/api/isn/retriever/%s",
-		helpers.GetScheme(r),
-		r.Host,
-		slug,
-	)
+	resourceURL := fmt.Sprintf("%s://%s/api/isn/%s/signals/retriever", helpers.GetScheme(r), r.Host, isn.Slug)
 
 	var retrieverURL string
 	if isn.StorageType == "admin_db" {
 		retrieverURL = "admin_db"
 	} else {
-		retrieverURL = fmt.Sprintf("%s/signals/retriever/%s", *req.RetrieverOrigin, slug)
+		retrieverURL = fmt.Sprintf("%s://%s/isn/%s/signals/retriever", helpers.GetScheme(r), r.Host, isn.Slug)
 	}
 
 	response.RespondWithJSON(w, http.StatusCreated, CreateIsnRetrieverResponse{
-		ID:           returnedIsnRetriever.ID,
-		Slug:         returnedIsnRetriever.Slug,
 		ResourceURL:  resourceURL,
 		RetrieverURL: retrieverURL,
 	})
@@ -188,19 +156,17 @@ func (i *IsnRetrieverHandler) CreateIsnRetrieverHandler(w http.ResponseWriter, r
 //
 //	@Tags		ISN config
 //
-//	@Param		isn_retrievers_slug	path	string								true	"isn retriever slug"	example(sample-isn-retriever--example-org)
-//	@Param		request				body	handlers.UpdateIsnRetrieverRequest	true	"ISN retriever details"
+//	@Param		isn_slug	path	string								true	"isn slug"	example(sample-isn--example-org)
+//	@Param		request		body	handlers.UpdateIsnRetrieverRequest	true	"ISN retriever details"
 //
 //	@Success	204
 //	@Failure	400	{object}	response.ErrorResponse
 //	@Failure	401	{object}	response.ErrorResponse
 //	@Failure	500	{object}	response.ErrorResponse
 //
-// //
-//
 //	@Security	BearerAccessToken
 //
-//	@Router		/api/isn/retriever/{isn_retrievers_slug} [put]
+//	@Router		/api/isn/{isn_slug}/signals/retriever [put]
 func (i *IsnRetrieverHandler) UpdateIsnRetrieverHandler(w http.ResponseWriter, r *http.Request) {
 	var req UpdateIsnRetrieverRequest
 
@@ -210,10 +176,30 @@ func (i *IsnRetrieverHandler) UpdateIsnRetrieverHandler(w http.ResponseWriter, r
 		return
 	}
 
-	isnRetrieverSlug := r.PathValue("isn_retrievers_slug")
+	isnSlug := r.PathValue("isn_slug")
+
+	// check isn exists and is owned by user
+	isn, err := i.cfg.DB.GetIsnBySlug(r.Context(), isnSlug)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			response.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
+			return
+		}
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		return
+	}
+	if isn.UserID != userID {
+		response.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you are not the owner of this ISN")
+		return
+	}
+
+	if !isn.IsInUse {
+		response.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, fmt.Sprintf("Can't update ISN retriever because ISN %s is not in use", isnSlug))
+		return
+	}
 
 	// check retriever exists and is owned by user
-	isnRetriever, err := i.cfg.DB.GetIsnRetrieverBySlug(r.Context(), isnRetrieverSlug)
+	isnRetriever, err := i.cfg.DB.GetIsnRetrieverByIsnSlug(r.Context(), isnSlug)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			response.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN retriever not found")
@@ -223,18 +209,7 @@ func (i *IsnRetrieverHandler) UpdateIsnRetrieverHandler(w http.ResponseWriter, r
 		return
 	}
 
-	if !isnRetriever.IsnIsInUse {
-		response.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, fmt.Sprintf("Can't update ISN retriever because ISN %s is not in use", isnRetriever.IsnSlug))
-		return
-	}
-
-	if isnRetriever.UserID != userID {
-		response.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you are not the owner of this ISN retriever")
-		return
-	}
-
 	defer r.Body.Close()
-
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	err = decoder.Decode(&req)
@@ -243,45 +218,30 @@ func (i *IsnRetrieverHandler) UpdateIsnRetrieverHandler(w http.ResponseWriter, r
 		return
 	}
 
-	// set up values for update
-	if req.Detail != nil {
-		isnRetriever.Detail = *req.Detail
-	}
-
+	// prepare update fields
 	if req.DefaultRateLimit != nil {
 		isnRetriever.DefaultRateLimit = *req.DefaultRateLimit
 	}
-
-	if req.RetrieverOrigin != nil {
-		if *req.RetrieverOrigin != "admin_db" && isnRetriever.IsnStorageType == "admin_db" {
-			response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "do not specify a retriever_origin when using local storage")
-			return
-		}
-		if !helpers.IsValidOrigin(*req.RetrieverOrigin) {
-			response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must specify a retriever_origin when using anything other than local storage, e.g https://example.com")
-			return
-		}
-		isnRetriever.RetrieverOrigin = *req.RetrieverOrigin
-	}
-
 	if req.RetrieverStatus != nil {
 		if !signals.ValidRetrieverStatus[*req.RetrieverStatus] {
-			response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid retriever status")
+			response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid payload validation")
 			return
 		}
 		isnRetriever.RetrieverStatus = *req.RetrieverStatus
 	}
 
-	// update isn_receiever
+	if req.ListenerCount != nil {
+		isnRetriever.ListenerCount = *req.ListenerCount
+	}
+	// update isn retriever - todo checks on rows updated
 	_, err = i.cfg.DB.UpdateIsnRetriever(r.Context(), database.UpdateIsnRetrieverParams{
-		ID:               isnRetriever.ID,
-		Detail:           isnRetriever.Detail,
-		RetrieverOrigin:  isnRetriever.RetrieverOrigin,
+		IsnID:            isn.ID,
 		DefaultRateLimit: isnRetriever.DefaultRateLimit,
 		RetrieverStatus:  isnRetriever.RetrieverStatus,
+		ListenerCount:    isnRetriever.ListenerCount,
 	})
 	if err != nil {
-		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not create ISN retriever: %v", err))
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not update ISN retriever: %v", err))
 		return
 	}
 
@@ -293,19 +253,19 @@ func (i *IsnRetrieverHandler) UpdateIsnRetrieverHandler(w http.ResponseWriter, r
 //	@Summary	Get an ISN retriever config
 //	@Tags		ISN view
 //
-//	@Param		slug	path		string	true	"isn retriever slug"	example(sample-isn-retriever--example-org)
-//	@Success	200		{array}		database.GetIsnRetrieverBySlugRow
+//	@Param		slug	path		string	true	"isn slug"	example(sample-isn--example-org)
+//	@Success	200		{array}		database.GetIsnRetrieverByIsnSlugRow
 //	@Failure	500		{object}	response.ErrorResponse
 //
-//	@Router		/api/isn/retriever/{slug} [get]
+//	@Router		/api/isn/{isn_slug}/signals/retriever [get]
 func (u *IsnRetrieverHandler) GetIsnRetrieverHandler(w http.ResponseWriter, r *http.Request) {
 
-	slug := r.PathValue("slug")
+	isnSlug := r.PathValue("isn_slug")
 
-	res, err := u.cfg.DB.GetIsnRetrieverBySlug(r.Context(), slug)
+	res, err := u.cfg.DB.GetIsnRetrieverByIsnSlug(r.Context(), isnSlug)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			response.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No isn_retriever found for id %v", slug))
+			response.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No isn_retriever found for id %v", isnSlug))
 			return
 		}
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the user from the database %v", err))

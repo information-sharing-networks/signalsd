@@ -37,7 +37,7 @@ SELECT
 FROM isn_receivers ir
 WHERE ir.isn_id = $1;
 
--- name: GetIsnReceiverByIsnID :one
+-- name: GetIsnReceiverByIsnSlug :one
 
 SELECT ir.* , i.is_in_use as isn_is_in_use
 FROM isn_receivers ir

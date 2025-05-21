@@ -90,147 +90,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/isn/retriever/{isn_retrievers_slug}": {
-            "put": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "tags": [
-                    "ISN config"
-                ],
-                "summary": "Update an ISN Retriever",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "sample-isn-retriever--example-org",
-                        "description": "isn retriever slug",
-                        "name": "isn_retrievers_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "ISN retriever details",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.UpdateIsnRetrieverRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/isn/retriever/{retriever_slug}": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "the retriever service handles requests to get signals and will be hosted on {retriever_origin}/signals/retriever/{retriever_slug}\n\nWhen the ISN storage_type is set to \"admin_db\", the retriever_origin must also be \"admin_db\", indicating that the signals are retieved from the relational database used by the API service.\n",
-                "tags": [
-                    "ISN config"
-                ],
-                "summary": "Create an ISN Retriever",
-                "parameters": [
-                    {
-                        "description": "ISN retriever details",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateIsnRetrieverRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateIsnRetrieverResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/isn/retriever/{slug}": {
-            "get": {
-                "tags": [
-                    "ISN view"
-                ],
-                "summary": "Get an ISN retriever config",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "sample-isn-retriever--example-org",
-                        "description": "isn retriever slug",
-                        "name": "slug",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/database.GetIsnRetrieverBySlugRow"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/api/isn/{isn_slug}": {
             "put": {
                 "security": [
@@ -336,7 +195,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/isn/{isn_slug}/signals/receiever": {
+        "/api/isn/{isn_slug}/signals/receiver": {
             "get": {
                 "tags": [
                     "ISN view"
@@ -358,7 +217,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/database.GetIsnReceiverByIsnIDRow"
+                                "$ref": "#/definitions/database.GetIsnReceiverByIsnSlugRow"
                             }
                         }
                     },
@@ -369,9 +228,7 @@ const docTemplate = `{
                         }
                     }
                 }
-            }
-        },
-        "/api/isn/{isn_slug}/signals/receiver": {
+            },
             "put": {
                 "security": [
                     {
@@ -452,6 +309,143 @@ const docTemplate = `{
                         "description": "Created",
                         "schema": {
                             "$ref": "#/definitions/handlers.CreateIsnReceiverResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/isn/{isn_slug}/signals/retriever": {
+            "get": {
+                "tags": [
+                    "ISN view"
+                ],
+                "summary": "Get an ISN retriever config",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn--example-org",
+                        "description": "isn slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/database.GetIsnRetrieverByIsnSlugRow"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "tags": [
+                    "ISN config"
+                ],
+                "summary": "Update an ISN Retriever",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn--example-org",
+                        "description": "isn slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "ISN retriever details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdateIsnRetrieverRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "An ISN retriever handles the http requests sent by clients to get Signals from the ISN\n\nYou can specify how many retrievers should be started for the ISN and they will listen on an automatically generted port\n\nThe public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/signals/retriever\nthe isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services",
+                "tags": [
+                    "ISN config"
+                ],
+                "summary": "Create an ISN Retriever definition",
+                "parameters": [
+                    {
+                        "description": "ISN retriever details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateIsnRetrieverRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateIsnRetrieverResponse"
                         }
                     },
                     "400": {
@@ -1130,22 +1124,10 @@ const docTemplate = `{
                 "default_rate_limit": {
                     "type": "integer"
                 },
-                "detail": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "retriever_origin": {
-                    "type": "string"
+                "listener_count": {
+                    "type": "integer"
                 },
                 "retriever_status": {
-                    "type": "string"
-                },
-                "slug": {
-                    "type": "string"
-                },
-                "title": {
                     "type": "string"
                 },
                 "updated_at": {
@@ -1181,7 +1163,7 @@ const docTemplate = `{
                 }
             }
         },
-        "database.GetIsnReceiverByIsnIDRow": {
+        "database.GetIsnReceiverByIsnSlugRow": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -1216,7 +1198,7 @@ const docTemplate = `{
                 }
             }
         },
-        "database.GetIsnRetrieverBySlugRow": {
+        "database.GetIsnRetrieverByIsnSlugRow": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -1225,40 +1207,19 @@ const docTemplate = `{
                 "default_rate_limit": {
                     "type": "integer"
                 },
-                "detail": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
                 "isn_id": {
                     "type": "string"
                 },
                 "isn_is_in_use": {
                     "type": "boolean"
                 },
-                "isn_slug": {
-                    "type": "string"
-                },
-                "isn_storage_type": {
-                    "type": "string"
-                },
-                "retriever_origin": {
-                    "type": "string"
+                "listener_count": {
+                    "type": "integer"
                 },
                 "retriever_status": {
                     "type": "string"
                 },
-                "slug": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                },
                 "updated_at": {
-                    "type": "string"
-                },
-                "user_id": {
                     "type": "string"
                 }
             }
@@ -1489,57 +1450,40 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "default_rate_limit": {
-                    "description": "maximum number of requests per minute",
+                    "description": "maximum number of requests per minute per session",
                     "type": "integer",
                     "example": 600
-                },
-                "detail": {
-                    "type": "string",
-                    "example": "sample-isn--example-org"
                 },
                 "isn_slug": {
                     "type": "string",
                     "example": "sample-isn--example-org"
                 },
-                "retriever_origin": {
-                    "description": "do not provide this field if the isn is using local storage",
-                    "type": "string",
-                    "example": "http://example.com:8080"
+                "listener_count": {
+                    "type": "integer",
+                    "example": 1
                 },
                 "retriever_status": {
                     "type": "string",
                     "enum": [
                         "offline",
-                        " online",
-                        " error",
-                        " closed"
+                        "online",
+                        "error",
+                        "closed"
                     ],
                     "example": "offline"
-                },
-                "title": {
-                    "type": "string",
-                    "example": "Sample ISN Retriever @example.org"
                 }
             }
         },
         "handlers.CreateIsnRetrieverResponse": {
             "type": "object",
             "properties": {
-                "id": {
-                    "type": "string",
-                    "example": "4f1bc74b-cf79-410f-9c21-dc2cba047385"
-                },
                 "resource_url": {
                     "type": "string",
-                    "example": "http://localhost:8080/api/isn/retriever/sample-isn-retriever--example-org"
+                    "example": "http://localhost:8080/api/isn/sample-isn--example-org/signals/retriever"
                 },
                 "retriever_url": {
                     "type": "string",
-                    "example": "http://localhost:8080/signals/retriever/sample-isn-retriever--example-org"
-                },
-                "slug": {
-                    "type": "string",
-                    "example": "sample-isn-retriever--example-org"
+                    "example": "http://localhost:8080/isn/sample-isn--example-org/signals/retriever/"
                 }
             }
         },
@@ -1841,26 +1785,21 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "default_rate_limit": {
-                    "description": "maximum number of requests per minute",
+                    "description": "maximum number of requests per minute per session",
                     "type": "integer",
                     "example": 600
                 },
-                "detail": {
-                    "type": "string",
-                    "example": "sample-isn--example-org"
-                },
-                "retriever_origin": {
-                    "description": "do not provide this field if the isn is using local storage",
-                    "type": "string",
-                    "example": "http://example.com:8080"
+                "listener_count": {
+                    "type": "integer",
+                    "example": 1
                 },
                 "retriever_status": {
                     "type": "string",
                     "enum": [
                         "offline",
-                        " online",
-                        " error",
-                        " closed"
+                        "online",
+                        "error",
+                        "closed"
                     ],
                     "example": "offline"
                 }
