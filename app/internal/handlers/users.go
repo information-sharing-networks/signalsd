@@ -196,7 +196,7 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 //	@Success		200	{array}		database.GetUserByIDRow
 //	@Failure		500	{object}	response.ErrorResponse
 //
-//	@Router			/api/users/{id} [get]
+//	@Router			/admin/users/{id} [get]
 func (u *UserHandler) GetUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	userIDstring := r.PathValue("id")
