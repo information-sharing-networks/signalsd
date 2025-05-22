@@ -1,2 +1,2 @@
--- name: DeleteUsers :execrows
-DELETE FROM USERS;
+-- name: DeleteAccounts :execrows
+DELETE FROM Accounts;

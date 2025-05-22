@@ -9,12 +9,12 @@ import (
 	"context"
 )
 
-const deleteUsers = `-- name: DeleteUsers :execrows
-DELETE FROM USERS
+const deleteAccounts = `-- name: DeleteAccounts :execrows
+DELETE FROM Accounts
 `
 
-func (q *Queries) DeleteUsers(ctx context.Context) (int64, error) {
-	result, err := q.db.ExecContext(ctx, deleteUsers)
+func (q *Queries) DeleteAccounts(ctx context.Context) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deleteAccounts)
 	if err != nil {
 		return 0, err
 	}

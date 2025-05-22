@@ -11,11 +11,18 @@ import (
 	"github.com/google/uuid"
 )
 
+type Account struct {
+	ID          uuid.UUID `json:"id"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	AccountType string    `json:"account_type"`
+}
+
 type Isn struct {
 	ID                   uuid.UUID `json:"id"`
 	CreatedAt            time.Time `json:"created_at"`
 	UpdatedAt            time.Time `json:"updated_at"`
-	UserID               uuid.UUID `json:"user_id"`
+	UserAccountID        uuid.UUID `json:"user_account_id"`
 	Title                string    `json:"title"`
 	Slug                 string    `json:"slug"`
 	Detail               string    `json:"detail"`
@@ -47,19 +54,27 @@ type IsnRetriever struct {
 }
 
 type RefreshToken struct {
-	Token     string       `json:"token"`
-	UserID    uuid.UUID    `json:"user_id"`
-	CreatedAt time.Time    `json:"created_at"`
-	UpdatedAt time.Time    `json:"updated_at"`
-	ExpiresAt time.Time    `json:"expires_at"`
-	RevokedAt sql.NullTime `json:"revoked_at"`
+	Token         string       `json:"token"`
+	UserAccountID uuid.UUID    `json:"user_account_id"`
+	CreatedAt     time.Time    `json:"created_at"`
+	UpdatedAt     time.Time    `json:"updated_at"`
+	ExpiresAt     time.Time    `json:"expires_at"`
+	RevokedAt     sql.NullTime `json:"revoked_at"`
 }
 
-type SignalDef struct {
+type ServiceIdentity struct {
+	AccountID          uuid.UUID `json:"account_id"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
+	ClientID           string    `json:"client_id"`
+	ClientSecret       string    `json:"client_secret"`
+	ClientContactEmail string    `json:"client_contact_email"`
+}
+
+type SignalType struct {
 	ID        uuid.UUID `json:"id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
-	UserID    uuid.UUID `json:"user_id"`
 	IsnID     uuid.UUID `json:"isn_id"`
 	Slug      string    `json:"slug"`
 	SchemaURL string    `json:"schema_url"`
@@ -71,9 +86,10 @@ type SignalDef struct {
 }
 
 type User struct {
-	ID             uuid.UUID `json:"id"`
+	AccountID      uuid.UUID `json:"account_id"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 	Email          string    `json:"email"`
 	HashedPassword string    `json:"hashed_password"`
+	UserRole       string    `json:"user_role"`
 }

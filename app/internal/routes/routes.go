@@ -4,71 +4,57 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	signals "github.com/nickabs/signalsd/app"
-	"github.com/nickabs/signalsd/app/internal/auth"
-	"github.com/nickabs/signalsd/app/internal/handlers"
 
 	_ "github.com/nickabs/signalsd/app/docs"
+	"github.com/nickabs/signalsd/app/internal/services"
 )
 
-func RegisterRoutes(r *chi.Mux, cfg *signals.ServiceConfig) {
-
-	// see middleware for authentication
-	adminHandler := handlers.NewAdminHandler(cfg)
-	usersHandler := handlers.NewUserHandler(cfg)
-	loginHandler := handlers.NewLoginHandler(cfg)
-	authHandler := handlers.NewAuthHandler(cfg)
-	webhookHandler := handlers.NewWebhookHandler(cfg)
-	signalDefsHandler := handlers.NewSignalDefHandler(cfg)
-	isnHandler := handlers.NewIsnHandler(cfg)
-	isnReceiverHandler := handlers.NewIsnReceiverHandler(cfg)
-	isnRetrieverHandler := handlers.NewIsnRetrieverHandler(cfg)
-
-	authService := auth.NewAuthService(cfg)
+func RegisterRoutes(r *chi.Mux, services services.Services) {
 
 	// api
 	r.Route("/api", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
-			// signal defs
-			r.Use(authService.ValidateAccessToken)
-			r.Put("/signal_defs/{slug}/v{sem_ver}", signalDefsHandler.UpdateSignalDefHandler)
-			r.Post("/signal_defs", signalDefsHandler.CreateSignalDefHandler)
-			r.Delete("/signal_defs/{slug}/v{sem_ver}", signalDefsHandler.DeleteSignalDefHandler)
+
+			r.Use(services.AuthService.ValidateAccessToken)
 
 			// ISN management
-			r.Post("/isn", isnHandler.CreateIsnHandler)
-			r.Put("/isn/{isn_slug}", isnHandler.UpdateIsnHandler)
-			r.Post("/isn/{isn_slug}/signals/receiver", isnReceiverHandler.CreateIsnReceiverHandler)
-			r.Put("/isn/{isn_slug}/signals/receiver", isnReceiverHandler.UpdateIsnReceiverHandler)
-			r.Post("/isn/{isn_slug}/signals/retriever", isnRetrieverHandler.CreateIsnRetrieverHandler)
-			r.Put("/isn/{isn_slug}/signals/retriever", isnRetrieverHandler.UpdateIsnRetrieverHandler)
+			r.Post("/isn", services.Isn.CreateIsnHandler)
+			r.Put("/isn/{isn_slug}", services.Isn.UpdateIsnHandler)
+			r.Post("/isn/{isn_slug}/signals/receiver", services.IsnReceiver.CreateIsnReceiverHandler)
+			r.Put("/isn/{isn_slug}/signals/receiver", services.IsnReceiver.UpdateIsnReceiverHandler)
+			r.Post("/isn/{isn_slug}/signals/retriever", services.IsnRetriever.CreateIsnRetrieverHandler)
+			r.Put("/isn/{isn_slug}/signals/retriever", services.IsnRetriever.UpdateIsnRetrieverHandler)
+
+			// signal defs
+			r.Post("/isn/{isn_slug}/signal_types", services.SignalType.CreateSignalTypeHandler)
+			r.Put("/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}", services.SignalType.UpdateSignalTypeHandler)
+			r.Delete("/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}", services.SignalType.DeleteSignalTypeHandler)
 
 			// webhooks
-			r.Post("/api/webhooks", webhookHandler.HandlerWebhook)
+			r.Post("/api/webhooks", services.Webhook.HandlerWebhook)
 		})
-		// note do not show emails in the public apis (use users.id instead)
-		r.Get("/signal_defs", signalDefsHandler.GetSignalDefsHandler)
-		r.Get("/signal_defs/{slug}/v{sem_ver}", signalDefsHandler.GetSignalDefHandler)
-		r.Get("/isn", isnHandler.GetIsnsHandler)
-		r.Get("/isn/{isn_slug}", isnHandler.GetIsnHandler)
-		r.Get("/isn/{isn_slug}/signals/receiver", isnReceiverHandler.GetIsnReceiverHandler)
-		r.Get("/isn/{isn_slug}/signals/retriever", isnRetrieverHandler.GetIsnRetrieverHandler)
+		r.Get("/isn", services.Isn.GetIsnsHandler)
+		r.Get("/isn/{isn_slug}", services.Isn.GetIsnHandler)
+		r.Get("/isn/{isn_slug}/signals/receiver", services.IsnReceiver.GetIsnReceiverHandler)
+		r.Get("/isn/{isn_slug}/signals/retriever", services.IsnRetriever.GetIsnRetrieverHandler)
+		r.Get("/isn/{isn_slug}/signal_types", services.SignalType.GetSignalTypesHandler)
+		r.Get("/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}", services.SignalType.GetSignalTypeHandler)
 	})
 
 	// auth
 	r.Route("/auth", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
-			r.Use(authService.ValidateAccessToken)
-			r.Put("/password/reset", usersHandler.UpdatePasswordHandler)
+			r.Use(services.AuthService.ValidateAccessToken)
+			r.Put("/password/reset", services.Users.UpdatePasswordHandler)
 		})
 		r.Group(func(r chi.Router) {
-			r.Use(authService.ValidateRefreshToken)
-			r.Post("/refresh-token", authHandler.RefreshAccessTokenHandler)
+			r.Use(services.AuthService.ValidateRefreshToken)
+			r.Post("/refresh-token", services.Token.RefreshAccessTokenHandler)
 		})
-		r.Post("/register", usersHandler.CreateUserHandler)
-		r.Post("/login", loginHandler.LoginHandler)
-		r.Post("/revoke-refresh-token", authHandler.RevokeRefreshTokenHandler)
-		r.Get("/users", usersHandler.GetUsersHandler)
+		r.Post("/register", services.Users.CreateUserHandler)
+		r.Post("/login", services.Login.LoginHandler)
+		r.Post("/revoke-refresh-token", services.Token.RevokeRefreshTokenHandler)
+		r.Get("/users", services.Users.GetUsersHandler)
 	})
 
 	// todo protect get user endpoint so as not to expose email addresses (server admin account + isn participants only)
@@ -76,13 +62,13 @@ func RegisterRoutes(r *chi.Mux, cfg *signals.ServiceConfig) {
 	// Admin
 	r.Route("/admin", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
-			r.Use(authService.ValidateDevEnv)
-			r.Post("/reset", adminHandler.ResetHandler) // delete all users and content  (dev env only)
+			r.Use(services.AuthService.ValidateDevEnv)
+			r.Post("/reset", services.Admin.ResetHandler) // delete all users and content  (dev env only)
 
 			// pending implementation of admin role
-			r.Get("/users/{id}", usersHandler.GetUserHandler)
+			r.Get("/users/{id}", services.Users.GetUserHandler)
 		})
-		r.Get("/health", adminHandler.ReadinessHandler) // health check
+		r.Get("/health", services.Admin.ReadinessHandler) // health check
 	})
 
 	// documentation

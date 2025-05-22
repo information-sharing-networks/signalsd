@@ -15,7 +15,7 @@ import (
 )
 
 // GenerateSlug generates a URL-friendly slug from a given string.
-// slugs identify a set of versioned signal_defs describing the same data set.
+// slugs identify a set of versioned signal_types describing the same data set.
 // Only the owner of the inital slug can update it or add new versions.
 // A slug can't be owned by more than one user.
 func GenerateSlug(input string) (string, error) {
@@ -45,7 +45,7 @@ func GenerateSlug(input string) (string, error) {
 
 // currently links to files in files in public github repos are supported - it is recommended to link to a tagged version of the file,
 // e.g https://github.com/nickabs/transmission/blob/v2.21.2/locales/af.json
-func CheckSignalDefURL(rawURL string, urlType string) error {
+func CheckSignalTypeURL(rawURL string, urlType string) error {
 	// TODO - additional checks, e.g checking the file exists and - in case of scheam urls - is a valid json schema.
 	parsedURL, err := url.ParseRequestURI(rawURL)
 	if err != nil {

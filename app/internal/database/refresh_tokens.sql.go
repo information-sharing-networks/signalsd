@@ -14,54 +14,54 @@ import (
 )
 
 const getRefreshToken = `-- name: GetRefreshToken :one
-SELECT user_id, expires_at, revoked_at FROM refresh_tokens where token = $1
+SELECT user_account_id, expires_at, revoked_at FROM refresh_tokens where token = $1
 `
 
 type GetRefreshTokenRow struct {
-	UserID    uuid.UUID    `json:"user_id"`
-	ExpiresAt time.Time    `json:"expires_at"`
-	RevokedAt sql.NullTime `json:"revoked_at"`
+	UserAccountID uuid.UUID    `json:"user_account_id"`
+	ExpiresAt     time.Time    `json:"expires_at"`
+	RevokedAt     sql.NullTime `json:"revoked_at"`
 }
 
 func (q *Queries) GetRefreshToken(ctx context.Context, token string) (GetRefreshTokenRow, error) {
 	row := q.db.QueryRowContext(ctx, getRefreshToken, token)
 	var i GetRefreshTokenRow
-	err := row.Scan(&i.UserID, &i.ExpiresAt, &i.RevokedAt)
+	err := row.Scan(&i.UserAccountID, &i.ExpiresAt, &i.RevokedAt)
 	return i, err
 }
 
 const insertRefreshToken = `-- name: InsertRefreshToken :one
-INSERT INTO refresh_tokens (token, user_id, created_at, updated_at, expires_at)
+INSERT INTO refresh_tokens (token, user_account_id, created_at, updated_at, expires_at)
 VALUES ( $1,$2, NOW(), NOW(), $3)
-RETURNING token, user_id
+RETURNING token, user_account_id
 `
 
 type InsertRefreshTokenParams struct {
-	Token     string    `json:"token"`
-	UserID    uuid.UUID `json:"user_id"`
-	ExpiresAt time.Time `json:"expires_at"`
+	Token         string    `json:"token"`
+	UserAccountID uuid.UUID `json:"user_account_id"`
+	ExpiresAt     time.Time `json:"expires_at"`
 }
 
 type InsertRefreshTokenRow struct {
-	Token  string    `json:"token"`
-	UserID uuid.UUID `json:"user_id"`
+	Token         string    `json:"token"`
+	UserAccountID uuid.UUID `json:"user_account_id"`
 }
 
 func (q *Queries) InsertRefreshToken(ctx context.Context, arg InsertRefreshTokenParams) (InsertRefreshTokenRow, error) {
-	row := q.db.QueryRowContext(ctx, insertRefreshToken, arg.Token, arg.UserID, arg.ExpiresAt)
+	row := q.db.QueryRowContext(ctx, insertRefreshToken, arg.Token, arg.UserAccountID, arg.ExpiresAt)
 	var i InsertRefreshTokenRow
-	err := row.Scan(&i.Token, &i.UserID)
+	err := row.Scan(&i.Token, &i.UserAccountID)
 	return i, err
 }
 
 const revokeAllRefreshTokensForUser = `-- name: RevokeAllRefreshTokensForUser :execrows
 UPDATE refresh_tokens SET (updated_at, revoked_at) = (NOW(), NOW()) 
-WHERE user_id = $1
+WHERE user_account_id = $1
 AND revoked_at IS NULL
 `
 
-func (q *Queries) RevokeAllRefreshTokensForUser(ctx context.Context, userID uuid.UUID) (int64, error) {
-	result, err := q.db.ExecContext(ctx, revokeAllRefreshTokensForUser, userID)
+func (q *Queries) RevokeAllRefreshTokensForUser(ctx context.Context, userAccountID uuid.UUID) (int64, error) {
+	result, err := q.db.ExecContext(ctx, revokeAllRefreshTokensForUser, userAccountID)
 	if err != nil {
 		return 0, err
 	}

@@ -5,19 +5,24 @@ import (
 	"fmt"
 	"net/http"
 
-	signals "github.com/nickabs/signalsd/app"
+	signalsd "github.com/nickabs/signalsd/app"
 	"github.com/nickabs/signalsd/app/internal/apperrors"
 	"github.com/nickabs/signalsd/app/internal/auth"
 	"github.com/nickabs/signalsd/app/internal/context"
+	"github.com/nickabs/signalsd/app/internal/database"
 	"github.com/nickabs/signalsd/app/internal/response"
 )
 
-type AuthHandler struct {
-	cfg *signals.ServiceConfig
+type TokenHandler struct {
+	queries     *database.Queries
+	authService *auth.AuthService
 }
 
-func NewAuthHandler(cfg *signals.ServiceConfig) *AuthHandler {
-	return &AuthHandler{cfg: cfg}
+func NewTokenHandler(queries *database.Queries, authService *auth.AuthService) *TokenHandler {
+	return &TokenHandler{
+		queries:     queries,
+		authService: authService,
+	}
 }
 
 // RefreshAccessTokenHandler godoc
@@ -40,21 +45,19 @@ func NewAuthHandler(cfg *signals.ServiceConfig) *AuthHandler {
 //	@Router			/auth/refresh-token [post]
 //
 // note refresh tokens are random 256b strings, not JWTs
-func (a *AuthHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.Request) {
+func (a *TokenHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.Request) {
 
 	type refreshResponse struct {
 		AccessToken string `json:"access_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxTZXJ2ZXIiLCJzdWIiOiI2OGZiNWY1Yi1lM2Y1LTRhOTYtOGQzNS1jZDIyMDNhMDZmNzMiLCJleHAiOjE3NDY3NzA2MzQsImlhdCI6MTc0Njc2NzAzNH0.3OdnUNgrvt1Zxs9AlLeaC9DVT6Xwc6uGvFQHb6nDfZs"`
 	}
 
-	authService := auth.NewAuthService(a.cfg)
-
-	userID, ok := context.UserID(r.Context())
+	userAccountID, ok := context.UserAccountID(r.Context())
 	if !ok {
-		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userID from middleware")
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
 		return
 	}
 
-	accessToken, err := authService.GenerateAccessToken(userID, a.cfg.SecretKey, signals.AccessTokenExpiry)
+	accessToken, err := a.authService.GenerateAccessToken(userAccountID, signalsd.AccessTokenExpiry)
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not generate access token")
 		return
@@ -84,7 +87,7 @@ func (a *AuthHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.R
 //	@Failure		500	{object}	response.ErrorResponse
 //
 //	@Router			/auth/revoke-refresh-token [post]
-func (a *AuthHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
+func (a *TokenHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 	type revokeRefreshTokenRequest struct {
 		RefreshToken string `json:"refresh_token" example:"fb948e0b74de1f65e801b4e70fc9c047424ab775f2b4dc5226f472f3b6460c37"`
 	}
@@ -103,7 +106,7 @@ func (a *AuthHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	rowsAffected, err := a.cfg.DB.RevokeRefreshToken(r.Context(), req.RefreshToken)
+	rowsAffected, err := a.queries.RevokeRefreshToken(r.Context(), req.RefreshToken)
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenError, fmt.Sprintf("error getting token from database: %v", err))
 		return

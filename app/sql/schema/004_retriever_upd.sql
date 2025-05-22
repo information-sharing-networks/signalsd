@@ -19,7 +19,7 @@ CREATE TABLE isn_retrievers (
     id UUID PRIMARY KEY,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    user_id UUID NOT NULL,
+    user_account_id UUID NOT NULL,
     isn_id UUID NOT NULL,
     title TEXT NOT NULL,
     detail TEXT NOT NULL,
@@ -32,6 +32,6 @@ CREATE TABLE isn_retrievers (
         REFERENCES isn(id)
         ON DELETE CASCADE,
     CONSTRAINT fk_isn_retrievers_user
-        FOREIGN KEY (user_id)
+        FOREIGN KEY (user_account_id)
         REFERENCES users(id)
         ON DELETE CASCADE);

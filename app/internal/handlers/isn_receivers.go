@@ -7,20 +7,21 @@ import (
 	"fmt"
 	"net/http"
 
-	signals "github.com/nickabs/signalsd/app"
 	"github.com/nickabs/signalsd/app/internal/apperrors"
 	"github.com/nickabs/signalsd/app/internal/context"
 	"github.com/nickabs/signalsd/app/internal/database"
 	"github.com/nickabs/signalsd/app/internal/helpers"
 	"github.com/nickabs/signalsd/app/internal/response"
+
+	signalsd "github.com/nickabs/signalsd/app"
 )
 
 type IsnReceiverHandler struct {
-	cfg *signals.ServiceConfig
+	queries *database.Queries
 }
 
-func NewIsnReceiverHandler(cfg *signals.ServiceConfig) *IsnReceiverHandler {
-	return &IsnReceiverHandler{cfg: cfg}
+func NewIsnReceiverHandler(queries *database.Queries) *IsnReceiverHandler {
+	return &IsnReceiverHandler{queries: queries}
 }
 
 type CreateIsnReceiverRequest struct {
@@ -74,9 +75,9 @@ func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *
 
 	isnSlug := r.PathValue("isn_slug")
 
-	userID, ok := context.UserID(r.Context())
+	userAccountID, ok := context.UserAccountID(r.Context())
 	if !ok {
-		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userID from middleware")
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
 		return
 	}
 	defer r.Body.Close()
@@ -87,7 +88,7 @@ func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *
 	}
 
 	// check isn exists and is owned by user
-	isn, err := i.cfg.DB.GetIsnBySlug(r.Context(), isnSlug)
+	isn, err := i.queries.GetIsnBySlug(r.Context(), isnSlug)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			response.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
@@ -96,7 +97,7 @@ func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
 	}
-	if isn.UserID != userID {
+	if isn.UserAccountID != userAccountID {
 		response.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you are not the owner of this ISN")
 		return
 	}
@@ -108,7 +109,7 @@ func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *
 	}
 
 	// check if the isn receiver already exists
-	exists, err := i.cfg.DB.ExistsIsnReceiver(r.Context(), isn.ID)
+	exists, err := i.queries.ExistsIsnReceiver(r.Context(), isn.ID)
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("database error: %v", err))
 		return
@@ -127,13 +128,13 @@ func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *
 		return
 	}
 
-	if !signals.ValidPayloadValidations[*req.PayloadValidation] {
+	if !signalsd.ValidPayloadValidations[*req.PayloadValidation] {
 		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid payload validation")
 		return
 	}
 
 	// create isn receiver
-	_, err = i.cfg.DB.CreateIsnReceiver(r.Context(), database.CreateIsnReceiverParams{
+	_, err = i.queries.CreateIsnReceiver(r.Context(), database.CreateIsnReceiverParams{
 		IsnID:                      isn.ID,
 		MaxDailyValidationFailures: *req.MaxDailyValidationFailures,
 		MaxPayloadKilobytes:        *req.MaxPayloadKilobytes,
@@ -173,16 +174,16 @@ func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *
 func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *http.Request) {
 	var req UpdateIsnReceiverRequest
 
-	userID, ok := context.UserID(r.Context())
+	userAccountID, ok := context.UserAccountID(r.Context())
 	if !ok {
-		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userID from middleware")
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
 		return
 	}
 
 	isnSlug := r.PathValue("isn_slug")
 
 	// check isn exists and is owned by user
-	isn, err := i.cfg.DB.GetIsnBySlug(r.Context(), isnSlug)
+	isn, err := i.queries.GetIsnBySlug(r.Context(), isnSlug)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			response.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
@@ -191,7 +192,7 @@ func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
 	}
-	if isn.UserID != userID {
+	if isn.UserAccountID != userAccountID {
 		response.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you are not the owner of this ISN")
 		return
 	}
@@ -202,7 +203,7 @@ func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *
 	}
 
 	// check receiver exists and is owned by user
-	isnReceiver, err := i.cfg.DB.GetIsnReceiverByIsnSlug(r.Context(), isnSlug)
+	isnReceiver, err := i.queries.GetIsnReceiverByIsnSlug(r.Context(), isnSlug)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			response.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN receiver not found")
@@ -229,7 +230,7 @@ func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *
 		isnReceiver.MaxPayloadKilobytes = *req.MaxPayloadKilobytes
 	}
 	if req.PayloadValidation != nil {
-		if !signals.ValidPayloadValidations[*req.PayloadValidation] {
+		if !signalsd.ValidPayloadValidations[*req.PayloadValidation] {
 			response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid payload validation")
 			return
 		}
@@ -239,7 +240,7 @@ func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *
 		isnReceiver.DefaultRateLimit = *req.DefaultRateLimit
 	}
 	if req.ReceiverStatus != nil {
-		if !signals.ValidReceiverStatus[*req.ReceiverStatus] {
+		if !signalsd.ValidReceiverStatus[*req.ReceiverStatus] {
 			response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid payload validation")
 			return
 		}
@@ -250,7 +251,7 @@ func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *
 		isnReceiver.ListenerCount = *req.ListenerCount
 	}
 	// update isn receiver - todo checks on rows updated
-	_, err = i.cfg.DB.UpdateIsnReceiver(r.Context(), database.UpdateIsnReceiverParams{
+	_, err = i.queries.UpdateIsnReceiver(r.Context(), database.UpdateIsnReceiverParams{
 		IsnID:                      isn.ID,
 		MaxDailyValidationFailures: isnReceiver.MaxDailyValidationFailures,
 		MaxPayloadKilobytes:        isnReceiver.MaxPayloadKilobytes,
@@ -281,7 +282,7 @@ func (u *IsnReceiverHandler) GetIsnReceiverHandler(w http.ResponseWriter, r *htt
 
 	isnSlug := r.PathValue("isn_slug")
 
-	res, err := u.cfg.DB.GetIsnReceiverByIsnSlug(r.Context(), isnSlug)
+	res, err := u.queries.GetIsnReceiverByIsnSlug(r.Context(), isnSlug)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			response.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No isn_receiver found for id %v", isnSlug))

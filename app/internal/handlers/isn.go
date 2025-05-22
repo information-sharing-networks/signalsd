@@ -8,20 +8,21 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	signals "github.com/nickabs/signalsd/app"
 	"github.com/nickabs/signalsd/app/internal/apperrors"
 	"github.com/nickabs/signalsd/app/internal/context"
 	"github.com/nickabs/signalsd/app/internal/database"
 	"github.com/nickabs/signalsd/app/internal/helpers"
 	"github.com/nickabs/signalsd/app/internal/response"
+
+	signalsd "github.com/nickabs/signalsd/app"
 )
 
 type IsnHandler struct {
-	cfg *signals.ServiceConfig
+	queries *database.Queries
 }
 
-func NewIsnHandler(cfg *signals.ServiceConfig) *IsnHandler {
-	return &IsnHandler{cfg: cfg}
+func NewIsnHandler(queries *database.Queries) *IsnHandler {
+	return &IsnHandler{queries: queries}
 }
 
 type CreateIsnRequest struct {
@@ -56,10 +57,10 @@ type IsnAndLinkedInfo struct {
 //	@Summary		Create an ISN
 //	@Description	Create an Information Sharing Network (ISN)
 //	@Description
-//	@Description	visibility = "private" means that signals on the network can only be seen by network participants.
+//	@Description	visibility = "private" means that signalsd on the network can only be seen by network participants.
 //	@Description
 //	@Description	The only storage_type currently supported is "admin_db"
-//	@Description	when storage_type = "admin_db" the signals are stored in the relational database used by the API service to store the admin configuration
+//	@Description	when storage_type = "admin_db" the signalsd are stored in the relational database used by the API service to store the admin configuration
 //	@Description	Specify "admin_db" for storage_connection_url in this case (anything else is overriwtten with this value)
 //
 //	@Tags			ISN config
@@ -79,9 +80,9 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 
 	var slug string
 
-	userID, ok := context.UserID(r.Context())
+	userAccountID, ok := context.UserAccountID(r.Context())
 	if !ok {
-		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userID from middleware")
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
 		return
 	}
 	defer r.Body.Close()
@@ -108,7 +109,7 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not create slug from title")
 		return
 	}
-	exists, err := i.cfg.DB.ExistsIsnWithSlug(r.Context(), slug)
+	exists, err := i.queries.ExistsIsnWithSlug(r.Context(), slug)
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "database error")
 		return
@@ -118,7 +119,7 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !signals.ValidVisibilities[*req.Visibility] {
+	if !signalsd.ValidVisibilities[*req.Visibility] {
 		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("invalid visiblity value: %s", *req.Visibility))
 		return
 	}
@@ -127,8 +128,8 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 		*req.StorageConnectionURL = "admin_db"
 	}
 	// create isn
-	returnedIsn, err := i.cfg.DB.CreateIsn(r.Context(), database.CreateIsnParams{
-		UserID:               userID,
+	returnedIsn, err := i.queries.CreateIsn(r.Context(), database.CreateIsnParams{
+		UserAccountID:        userAccountID,
 		Title:                req.Title,
 		Slug:                 slug,
 		Detail:               *req.Detail,
@@ -178,16 +179,16 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 func (i *IsnHandler) UpdateIsnHandler(w http.ResponseWriter, r *http.Request) {
 	var req UpdateIsnRequest
 
-	userID, ok := context.UserID(r.Context())
+	userAccountID, ok := context.UserAccountID(r.Context())
 	if !ok {
-		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userID from middleware")
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
 		return
 	}
 
 	isnSlug := r.PathValue("isn_slug")
 
 	// check ISN exists and is owned by user
-	isn, err := i.cfg.DB.GetIsnBySlug(r.Context(), isnSlug)
+	isn, err := i.queries.GetIsnBySlug(r.Context(), isnSlug)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			response.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
@@ -197,7 +198,7 @@ func (i *IsnHandler) UpdateIsnHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if isn.UserID != userID {
+	if isn.UserAccountID != userAccountID {
 		response.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you are not the owner of this ISN")
 		return
 	}
@@ -233,7 +234,7 @@ func (i *IsnHandler) UpdateIsnHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// update isn_receiver
-	_, err = i.cfg.DB.UpdateIsn(r.Context(), database.UpdateIsnParams{
+	_, err = i.queries.UpdateIsn(r.Context(), database.UpdateIsnParams{
 		ID:                   isn.ID,
 		Detail:               isn.Detail,
 		IsInUse:              isn.IsInUse,
@@ -261,7 +262,7 @@ func (i *IsnHandler) UpdateIsnHandler(w http.ResponseWriter, r *http.Request) {
 //	@Router			/api/isn [get]
 func (s *IsnHandler) GetIsnsHandler(w http.ResponseWriter, r *http.Request) {
 
-	res, err := s.cfg.DB.GetIsns(r.Context())
+	res, err := s.queries.GetIsns(r.Context())
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("error getting ISNs from database: %v", err))
 		return
@@ -289,7 +290,7 @@ func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("isn_slug")
 
 	// check isn exists
-	isn, err := s.cfg.DB.GetForDisplayIsnBySlug(r.Context(), slug)
+	isn, err := s.queries.GetForDisplayIsnBySlug(r.Context(), slug)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			response.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No isn found for %s", slug))
@@ -298,7 +299,7 @@ func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// get the owner of the isn
-	user, err := s.cfg.DB.GetForDisplayUserByIsnID(r.Context(), isn.ID)
+	user, err := s.queries.GetForDisplayUserByIsnID(r.Context(), isn.ID)
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the user for this isn: %v", err))
 		return
@@ -307,7 +308,7 @@ func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 	// get receiver and retriever if they were defined
 
 	var isnRetceiverRes *database.GetForDisplayIsnReceiverByIsnIDRow
-	isnReceiver, err := s.cfg.DB.GetForDisplayIsnReceiverByIsnID(r.Context(), isn.ID)
+	isnReceiver, err := s.queries.GetForDisplayIsnReceiverByIsnID(r.Context(), isn.ID)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the receiver for this isn: %v", err))
@@ -318,7 +319,7 @@ func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var isnRetrieverRes *database.GetForDisplayIsnRetrieverByIsnIDRow
-	isnRetriever, err := s.cfg.DB.GetForDisplayIsnRetrieverByIsnID(r.Context(), isn.ID)
+	isnRetriever, err := s.queries.GetForDisplayIsnRetrieverByIsnID(r.Context(), isn.ID)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the retriever for this isn: %v", err))

@@ -14,15 +14,15 @@ type contextKey struct {
 
 var (
 	requestLogger = contextKey{"request-logger"}
-	userID        = contextKey{"user-id"}
+	userAccountID = contextKey{"user-id"}
 )
 
-func WithUserID(ctx context.Context, id uuid.UUID) context.Context {
-	return context.WithValue(ctx, userID, id)
+func WithUserAccountID(ctx context.Context, id uuid.UUID) context.Context {
+	return context.WithValue(ctx, userAccountID, id)
 }
 
-func UserID(ctx context.Context) (uuid.UUID, bool) {
-	id, ok := ctx.Value(userID).(uuid.UUID)
+func UserAccountID(ctx context.Context) (uuid.UUID, bool) {
+	id, ok := ctx.Value(userAccountID).(uuid.UUID)
 	return id, ok
 }
 

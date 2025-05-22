@@ -8,20 +8,27 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
-	signals "github.com/nickabs/signalsd/app"
 	"github.com/nickabs/signalsd/app/internal/apperrors"
 	"github.com/nickabs/signalsd/app/internal/auth"
 	"github.com/nickabs/signalsd/app/internal/context"
 	"github.com/nickabs/signalsd/app/internal/database"
 	"github.com/nickabs/signalsd/app/internal/response"
+
+	signalsd "github.com/nickabs/signalsd/app"
 )
 
 type UserHandler struct {
-	cfg *signals.ServiceConfig
+	queries     *database.Queries
+	authService *auth.AuthService
+	db          *sql.DB
 }
 
-func NewUserHandler(cfg *signals.ServiceConfig) *UserHandler {
-	return &UserHandler{cfg: cfg}
+func NewUserHandler(queries *database.Queries, authService *auth.AuthService, db *sql.DB) *UserHandler {
+	return &UserHandler{
+		queries:     queries,
+		authService: authService,
+		db:          db,
+	}
 }
 
 type CreateUserRequest struct {
@@ -37,21 +44,21 @@ type UpdatePasswordRequest struct {
 
 // CreateUserHandler godoc
 //
-//	@Summary	Create user
-//	@Tags		auth
+//	@Summary		Create user
+//	@Tags			auth
 //
-//	@Param		request	body	handlers.CreateUserRequest	true	"user details"
+//	@Param			request	body	handlers.CreateUserRequest	true	"user details"
+//	@Description	The first user to be created for this service will be created with an admin role.
+//	@Description	Subsequent accounts default to standard user roles.
 //
-//	@Success	201
-//	@Failure	400	{object}	response.ErrorResponse
-//	@Failure	409	{object}	response.ErrorResponse
-//	@Failure	500	{object}	response.ErrorResponse
+//	@Success		201
+//	@Failure		400	{object}	response.ErrorResponse
+//	@Failure		409	{object}	response.ErrorResponse
+//	@Failure		500	{object}	response.ErrorResponse
 //
-//	@Router		/auth/register [post]
+//	@Router			/auth/register [post]
 func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) {
 	var req CreateUserRequest
-
-	authService := auth.NewAuthService(u.cfg)
 
 	defer r.Body.Close()
 
@@ -65,7 +72,7 @@ func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	exists, err := u.cfg.DB.ExistsUserWithEmail(r.Context(), req.Email)
+	exists, err := u.queries.ExistsUserWithEmail(r.Context(), req.Email)
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
@@ -75,23 +82,60 @@ func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	if len(req.Password) < signals.MinimumPasswordLength {
-		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodePasswordTooShort, fmt.Sprintf("password must be at least %d chars", signals.MinimumPasswordLength))
+	if len(req.Password) < signalsd.MinimumPasswordLength {
+		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodePasswordTooShort, fmt.Sprintf("password must be at least %d chars", signalsd.MinimumPasswordLength))
 		return
 	}
 
-	hashedPassword, err := authService.HashPassword(req.Password)
+	hashedPassword, err := u.authService.HashPassword(req.Password)
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("could not hash password: %v", err))
 		return
 	}
 
-	_, err = u.cfg.DB.CreateUser(r.Context(), database.CreateUserParams{
-		HashedPassword: hashedPassword,
-		Email:          req.Email,
-	})
+	// create the account record followed by the user (note transaction needed to ensure both records are created together)
+	tx, err := u.db.BeginTx(r.Context(), nil)
+	if err != nil {
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to being transaction: %v", err))
+		return
+	}
+
+	defer tx.Rollback()
+
+	txQueries := u.queries.WithTx(tx)
+
+	account, err := txQueries.CreateUserAccount(r.Context())
+	if err != nil {
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not insert account record: %v", err))
+		return
+	}
+
+	// first user is granted the owner role
+	isFirstUser, err := u.queries.IsFirstUser(r.Context())
+	if err != nil {
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		return
+	}
+	if isFirstUser {
+		_, err = txQueries.CreateOwnerUser(r.Context(), database.CreateOwnerUserParams{
+			AccountID:      account.ID,
+			HashedPassword: hashedPassword,
+			Email:          req.Email,
+		})
+	} else {
+		_, err = txQueries.CreateUser(r.Context(), database.CreateUserParams{
+			AccountID:      account.ID,
+			HashedPassword: hashedPassword,
+			Email:          req.Email,
+		})
+	}
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not create user: %v", err))
+		return
+	}
+
+	if err := tx.Commit(); err != nil {
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to commit transaction: %v", err))
 		return
 	}
 
@@ -118,12 +162,11 @@ func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) 
 //	@Router			/auth/password/reset [put]
 func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Request) {
 	req := UpdatePasswordRequest{}
-	authService := auth.NewAuthService(u.cfg)
 
 	// this request was already authenticated by the middleware
-	userID, ok := context.UserID(r.Context())
+	userAccountID, ok := context.UserAccountID(r.Context())
 	if !ok {
-		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userID from middleware")
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
 	}
 
 	defer r.Body.Close()
@@ -140,37 +183,37 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	user, err := u.cfg.DB.GetUserByID(r.Context(), userID)
+	user, err := u.queries.GetUserByID(r.Context(), userAccountID)
 	if err != nil {
-		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("database error retreiving user from access code (%v) %v", userID, err))
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("database error retreiving user from access code (%v) %v", userAccountID, err))
 		return
 	}
 
-	currentPasswordHash, err := authService.HashPassword(req.CurrentPassword)
+	currentPasswordHash, err := u.authService.HashPassword(req.CurrentPassword)
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("server error: %v", err))
 		return
 	}
 
-	err = authService.CheckPasswordHash(currentPasswordHash, req.CurrentPassword)
+	err = u.authService.CheckPasswordHash(currentPasswordHash, req.CurrentPassword)
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "Incorrect email or password")
 		return
 	}
 
-	if len(req.NewPassword) < signals.MinimumPasswordLength {
-		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodePasswordTooShort, fmt.Sprintf("password must be at least %d chars", signals.MinimumPasswordLength))
+	if len(req.NewPassword) < signalsd.MinimumPasswordLength {
+		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodePasswordTooShort, fmt.Sprintf("password must be at least %d chars", signalsd.MinimumPasswordLength))
 		return
 	}
 
-	newPasswordHash, err := authService.HashPassword(req.NewPassword)
+	newPasswordHash, err := u.authService.HashPassword(req.NewPassword)
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("server error: %v", err))
 		return
 	}
 
-	rowsAffected, err := u.cfg.DB.UpdatePassword(r.Context(), database.UpdatePasswordParams{
-		ID:             user.ID,
+	rowsAffected, err := u.queries.UpdatePassword(r.Context(), database.UpdatePasswordParams{
+		AccountID:      user.AccountID,
 		HashedPassword: newPasswordHash,
 	})
 	if err != nil {
@@ -199,17 +242,17 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 //	@Router			/admin/users/{id} [get]
 func (u *UserHandler) GetUserHandler(w http.ResponseWriter, r *http.Request) {
 
-	userIDstring := r.PathValue("id")
-	userID, err := uuid.Parse(userIDstring)
+	userAccountIDstring := r.PathValue("id")
+	userAccountID, err := uuid.Parse(userAccountIDstring)
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, fmt.Sprintf("Invalid user ID: %v", err))
 		return
 	}
 
-	res, err := u.cfg.DB.GetUserByID(r.Context(), userID)
+	res, err := u.queries.GetUserByID(r.Context(), userAccountID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			response.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No user found for id %v", userID))
+			response.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No user found for id %v", userAccountID))
 			return
 		}
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the user from the database %v", err))
@@ -231,7 +274,7 @@ func (u *UserHandler) GetUserHandler(w http.ResponseWriter, r *http.Request) {
 //	@Router			/api/users [get]
 func (u *UserHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 
-	res, err := u.cfg.DB.GetUsers(r.Context())
+	res, err := u.queries.GetUsers(r.Context())
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("error getting user from database: %v", err))
 		return

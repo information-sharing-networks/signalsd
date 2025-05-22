@@ -4,7 +4,7 @@ INSERT INTO isn (
     id,
     created_at,
     updated_at,
-    user_id,
+    user_account_id,
     title,
     slug,
     detail,
@@ -36,10 +36,10 @@ SELECT i.*
 FROM isn i
 WHERE i.slug = $1;
 
--- name: GetIsnBySignalDefID :one
+-- name: GetIsnBySignalTypeID :one
 SELECT i.* 
 FROM isn i
-JOIN signal_defs sd on sd.isn_id = i.id
+JOIN signal_types sd on sd.isn_id = i.id
 WHERE sd.id = $1;
 
 -- name: GetIsns :many

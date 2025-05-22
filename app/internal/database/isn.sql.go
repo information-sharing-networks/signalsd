@@ -18,7 +18,7 @@ INSERT INTO isn (
     id,
     created_at,
     updated_at,
-    user_id,
+    user_account_id,
     title,
     slug,
     detail,
@@ -31,7 +31,7 @@ RETURNING id, slug
 `
 
 type CreateIsnParams struct {
-	UserID               uuid.UUID `json:"user_id"`
+	UserAccountID        uuid.UUID `json:"user_account_id"`
 	Title                string    `json:"title"`
 	Slug                 string    `json:"slug"`
 	Detail               string    `json:"detail"`
@@ -48,7 +48,7 @@ type CreateIsnRow struct {
 
 func (q *Queries) CreateIsn(ctx context.Context, arg CreateIsnParams) (CreateIsnRow, error) {
 	row := q.db.QueryRowContext(ctx, createIsn,
-		arg.UserID,
+		arg.UserAccountID,
 		arg.Title,
 		arg.Slug,
 		arg.Detail,
@@ -125,7 +125,7 @@ func (q *Queries) GetForDisplayIsnBySlug(ctx context.Context, slug string) (GetF
 }
 
 const getIsnByID = `-- name: GetIsnByID :one
-SELECT i.id, i.created_at, i.updated_at, i.user_id, i.title, i.slug, i.detail, i.is_in_use, i.visibility, i.storage_type, i.storage_connection_url 
+SELECT i.id, i.created_at, i.updated_at, i.user_account_id, i.title, i.slug, i.detail, i.is_in_use, i.visibility, i.storage_type, i.storage_connection_url 
 FROM isn i
 WHERE i.id = $1
 `
@@ -137,7 +137,7 @@ func (q *Queries) GetIsnByID(ctx context.Context, id uuid.UUID) (Isn, error) {
 		&i.ID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.UserID,
+		&i.UserAccountID,
 		&i.Title,
 		&i.Slug,
 		&i.Detail,
@@ -149,21 +149,21 @@ func (q *Queries) GetIsnByID(ctx context.Context, id uuid.UUID) (Isn, error) {
 	return i, err
 }
 
-const getIsnBySignalDefID = `-- name: GetIsnBySignalDefID :one
-SELECT i.id, i.created_at, i.updated_at, i.user_id, i.title, i.slug, i.detail, i.is_in_use, i.visibility, i.storage_type, i.storage_connection_url 
+const getIsnBySignalTypeID = `-- name: GetIsnBySignalTypeID :one
+SELECT i.id, i.created_at, i.updated_at, i.user_account_id, i.title, i.slug, i.detail, i.is_in_use, i.visibility, i.storage_type, i.storage_connection_url 
 FROM isn i
-JOIN signal_defs sd on sd.isn_id = i.id
+JOIN signal_types sd on sd.isn_id = i.id
 WHERE sd.id = $1
 `
 
-func (q *Queries) GetIsnBySignalDefID(ctx context.Context, id uuid.UUID) (Isn, error) {
-	row := q.db.QueryRowContext(ctx, getIsnBySignalDefID, id)
+func (q *Queries) GetIsnBySignalTypeID(ctx context.Context, id uuid.UUID) (Isn, error) {
+	row := q.db.QueryRowContext(ctx, getIsnBySignalTypeID, id)
 	var i Isn
 	err := row.Scan(
 		&i.ID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.UserID,
+		&i.UserAccountID,
 		&i.Title,
 		&i.Slug,
 		&i.Detail,
@@ -176,7 +176,7 @@ func (q *Queries) GetIsnBySignalDefID(ctx context.Context, id uuid.UUID) (Isn, e
 }
 
 const getIsnBySlug = `-- name: GetIsnBySlug :one
-SELECT i.id, i.created_at, i.updated_at, i.user_id, i.title, i.slug, i.detail, i.is_in_use, i.visibility, i.storage_type, i.storage_connection_url 
+SELECT i.id, i.created_at, i.updated_at, i.user_account_id, i.title, i.slug, i.detail, i.is_in_use, i.visibility, i.storage_type, i.storage_connection_url 
 FROM isn i
 WHERE i.slug = $1
 `
@@ -188,7 +188,7 @@ func (q *Queries) GetIsnBySlug(ctx context.Context, slug string) (Isn, error) {
 		&i.ID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
-		&i.UserID,
+		&i.UserAccountID,
 		&i.Title,
 		&i.Slug,
 		&i.Detail,
@@ -201,7 +201,7 @@ func (q *Queries) GetIsnBySlug(ctx context.Context, slug string) (Isn, error) {
 }
 
 const getIsns = `-- name: GetIsns :many
-SELECT i.id, i.created_at, i.updated_at, i.user_id, i.title, i.slug, i.detail, i.is_in_use, i.visibility, i.storage_type, i.storage_connection_url 
+SELECT i.id, i.created_at, i.updated_at, i.user_account_id, i.title, i.slug, i.detail, i.is_in_use, i.visibility, i.storage_type, i.storage_connection_url 
 FROM isn i
 `
 
@@ -218,7 +218,7 @@ func (q *Queries) GetIsns(ctx context.Context) ([]Isn, error) {
 			&i.ID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.UserID,
+			&i.UserAccountID,
 			&i.Title,
 			&i.Slug,
 			&i.Detail,
