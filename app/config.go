@@ -1,13 +1,11 @@
 package signals
 
 import (
-	"database/sql"
 	"os"
 	"strconv"
 	"time"
 
 	_ "github.com/lib/pq"
-	"github.com/nickabs/signalsd/app/internal/database"
 	"github.com/nickabs/signalsd/app/internal/logger"
 	"github.com/rs/zerolog"
 )
@@ -16,15 +14,15 @@ import (
 config sets up shared variables for the service:
 - ServiceConfig: main calls initConfig() and gets a pointer to the newly initialized config struct - the config is then passed to all handlers as a parameter.
 - common constants - e.g token expiry times
-- common maps - used to list valid values for certain fields e.g signalDefs.Stage
+- common maps - used to list valid values for certain fields e.g signalTypes.Stage
 */
 
 // service configuration
 type ServiceConfig struct {
-	DB          *database.Queries
 	Environment string
 	Host        string
 	Port        int
+	DatabaseURL string
 	SecretKey   string
 	LogLevel    zerolog.Level
 }
@@ -43,7 +41,7 @@ var validEnvs = map[string]bool{
 	"test":    true,
 	"staging": true,
 }
-var ValidSignalDefStages = map[string]bool{ // stored in the signal_defs.stage column
+var ValidSignalTypeStages = map[string]bool{ // stored in the signal_types.stage column
 	"dev":        true,
 	"test":       true,
 	"live":       true,
@@ -73,7 +71,7 @@ var ValidReceiverStatus = map[string]bool{ // ins_receiver.receiver_status
 	"closed":  true,
 }
 
-// InitConfig loads environment variables, establishes database connection and returns a ServiceConfig struct
+// InitConfig loads environment variables and returns a ServiceConfig struct
 func InitConfig() *ServiceConfig {
 	const (
 		defaultHost        = "127.0.0.1"
@@ -113,24 +111,12 @@ func InitConfig() *ServiceConfig {
 	}
 
 	// database
-	dbURL := os.Getenv("SIGNALS_DB_URL")
-	if dbURL == "" {
+	databaseURL := os.Getenv("SIGNALS_DB_URL")
+	if databaseURL == "" {
 		logger.ServerLogger.Fatal().Msg("SIGNALS_DB_URL environment variable is not set")
 	}
 
-	dbConn, err := sql.Open("postgres", dbURL)
-	if err != nil {
-		logger.ServerLogger.Fatal().Err(err).Msg("Error opening database connection")
-	}
-
-	if err = dbConn.Ping(); err != nil {
-		logger.ServerLogger.Fatal().Err(err).Msg("Error pinging database")
-	}
-
-	dbQueries := database.New(dbConn)
-
 	// http
-
 	host := os.Getenv("SIGNALS_HOST")
 
 	if host == "" {
@@ -157,10 +143,10 @@ func InitConfig() *ServiceConfig {
 	}
 
 	return &ServiceConfig{
-		DB:          dbQueries,
 		Environment: environment,
 		Host:        host,
 		Port:        port,
+		DatabaseURL: databaseURL,
 		SecretKey:   secretKey,
 		LogLevel:    logLevel,
 	}

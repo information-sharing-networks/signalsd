@@ -12,28 +12,56 @@ import (
 	"github.com/google/uuid"
 )
 
-const createUser = `-- name: CreateUser :one
-
-INSERT INTO users (id, created_at, updated_at, email, hashed_password)
-VALUES ( gen_random_uuid(), NOW(), NOW(), $1, $2)
-RETURNING id, created_at, updated_at, email, hashed_password
+const createOwnerUser = `-- name: CreateOwnerUser :one
+INSERT INTO users (account_id, created_at, updated_at, email, hashed_password, user_role)
+VALUES ( $1, NOW(), NOW(), $2, $3, 'owner')
+RETURNING account_id, created_at, updated_at, email, hashed_password, user_role
 `
 
-type CreateUserParams struct {
-	Email          string `json:"email"`
-	HashedPassword string `json:"hashed_password"`
+type CreateOwnerUserParams struct {
+	AccountID      uuid.UUID `json:"account_id"`
+	Email          string    `json:"email"`
+	HashedPassword string    `json:"hashed_password"`
 }
 
-// note: don't display emails on public apis ("GetForDisplay*").
-func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, createUser, arg.Email, arg.HashedPassword)
+func (q *Queries) CreateOwnerUser(ctx context.Context, arg CreateOwnerUserParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, createOwnerUser, arg.AccountID, arg.Email, arg.HashedPassword)
 	var i User
 	err := row.Scan(
-		&i.ID,
+		&i.AccountID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Email,
 		&i.HashedPassword,
+		&i.UserRole,
+	)
+	return i, err
+}
+
+const createUser = `-- name: CreateUser :one
+
+INSERT INTO users (account_id, created_at, updated_at, email, hashed_password)
+VALUES ( $1, NOW(), NOW(), $2, $3)
+RETURNING account_id, created_at, updated_at, email, hashed_password, user_role
+`
+
+type CreateUserParams struct {
+	AccountID      uuid.UUID `json:"account_id"`
+	Email          string    `json:"email"`
+	HashedPassword string    `json:"hashed_password"`
+}
+
+// note: don't display emails on public apis ("GetForDisplay*").
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
+	row := q.db.QueryRowContext(ctx, createUser, arg.AccountID, arg.Email, arg.HashedPassword)
+	var i User
+	err := row.Scan(
+		&i.AccountID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Email,
+		&i.HashedPassword,
+		&i.UserRole,
 	)
 	return i, err
 }
@@ -52,14 +80,14 @@ func (q *Queries) ExistsUserWithEmail(ctx context.Context, email string) (bool, 
 }
 
 const getForDisplayUserByIsnID = `-- name: GetForDisplayUserByIsnID :one
-SELECT u.id, u.created_at , u.updated_at 
+SELECT u.account_id, u.created_at , u.updated_at 
 FROM users u 
-JOIN isn i ON u.id = i.user_id 
+JOIN isn i ON u.account_id = i.user_account_id 
 WHERE i.id = $1
 `
 
 type GetForDisplayUserByIsnIDRow struct {
-	ID        uuid.UUID `json:"id"`
+	AccountID uuid.UUID `json:"account_id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -67,19 +95,19 @@ type GetForDisplayUserByIsnIDRow struct {
 func (q *Queries) GetForDisplayUserByIsnID(ctx context.Context, id uuid.UUID) (GetForDisplayUserByIsnIDRow, error) {
 	row := q.db.QueryRowContext(ctx, getForDisplayUserByIsnID, id)
 	var i GetForDisplayUserByIsnIDRow
-	err := row.Scan(&i.ID, &i.CreatedAt, &i.UpdatedAt)
+	err := row.Scan(&i.AccountID, &i.CreatedAt, &i.UpdatedAt)
 	return i, err
 }
 
 const getForDisplayUserBySignalDefID = `-- name: GetForDisplayUserBySignalDefID :one
-SELECT u.id, u.created_at , u.updated_at 
+SELECT u.account_id, u.created_at , u.updated_at 
 FROM users u 
-JOIN signal_defs sd ON u.id = sd.user_id 
+JOIN signal_types sd ON u.account_id = sd.user_account_id 
 WHERE sd.id = $1
 `
 
 type GetForDisplayUserBySignalDefIDRow struct {
-	ID        uuid.UUID `json:"id"`
+	AccountID uuid.UUID `json:"account_id"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -87,50 +115,51 @@ type GetForDisplayUserBySignalDefIDRow struct {
 func (q *Queries) GetForDisplayUserBySignalDefID(ctx context.Context, id uuid.UUID) (GetForDisplayUserBySignalDefIDRow, error) {
 	row := q.db.QueryRowContext(ctx, getForDisplayUserBySignalDefID, id)
 	var i GetForDisplayUserBySignalDefIDRow
-	err := row.Scan(&i.ID, &i.CreatedAt, &i.UpdatedAt)
+	err := row.Scan(&i.AccountID, &i.CreatedAt, &i.UpdatedAt)
 	return i, err
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, created_at, updated_at, email, hashed_password FROM users WHERE email = $1
+SELECT account_id, created_at, updated_at, email, hashed_password, user_role FROM users WHERE email = $1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
 	row := q.db.QueryRowContext(ctx, getUserByEmail, email)
 	var i User
 	err := row.Scan(
-		&i.ID,
+		&i.AccountID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Email,
 		&i.HashedPassword,
+		&i.UserRole,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT  u.id, u.email, u.created_at  FROM users u WHERE u.id = $1
+SELECT  u.account_id, u.email, u.created_at  FROM users u WHERE u.account_id = $1
 `
 
 type GetUserByIDRow struct {
-	ID        uuid.UUID `json:"id"`
+	AccountID uuid.UUID `json:"account_id"`
 	Email     string    `json:"email"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
-func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow, error) {
-	row := q.db.QueryRowContext(ctx, getUserByID, id)
+func (q *Queries) GetUserByID(ctx context.Context, accountID uuid.UUID) (GetUserByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getUserByID, accountID)
 	var i GetUserByIDRow
-	err := row.Scan(&i.ID, &i.Email, &i.CreatedAt)
+	err := row.Scan(&i.AccountID, &i.Email, &i.CreatedAt)
 	return i, err
 }
 
 const getUsers = `-- name: GetUsers :many
-SELECT u.id, u.email, u.created_at , u.updated_at FROM users u
+SELECT u.account_id, u.email, u.created_at , u.updated_at FROM users u
 `
 
 type GetUsersRow struct {
-	ID        uuid.UUID `json:"id"`
+	AccountID uuid.UUID `json:"account_id"`
 	Email     string    `json:"email"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
@@ -146,7 +175,7 @@ func (q *Queries) GetUsers(ctx context.Context) ([]GetUsersRow, error) {
 	for rows.Next() {
 		var i GetUsersRow
 		if err := rows.Scan(
-			&i.ID,
+			&i.AccountID,
 			&i.Email,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -164,18 +193,30 @@ func (q *Queries) GetUsers(ctx context.Context) ([]GetUsersRow, error) {
 	return items, nil
 }
 
+const isFirstUser = `-- name: IsFirstUser :one
+SELECT COUNT(*) = 0 AS is_empty
+FROM users
+`
+
+func (q *Queries) IsFirstUser(ctx context.Context) (bool, error) {
+	row := q.db.QueryRowContext(ctx, isFirstUser)
+	var is_empty bool
+	err := row.Scan(&is_empty)
+	return is_empty, err
+}
+
 const updatePassword = `-- name: UpdatePassword :execrows
 UPDATE users SET (updated_at, hashed_password) = (NOW(), $2)
-WHERE id = $1
+WHERE account_id = $1
 `
 
 type UpdatePasswordParams struct {
-	ID             uuid.UUID `json:"id"`
+	AccountID      uuid.UUID `json:"account_id"`
 	HashedPassword string    `json:"hashed_password"`
 }
 
 func (q *Queries) UpdatePassword(ctx context.Context, arg UpdatePasswordParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, updatePassword, arg.ID, arg.HashedPassword)
+	result, err := q.db.ExecContext(ctx, updatePassword, arg.AccountID, arg.HashedPassword)
 	if err != nil {
 		return 0, err
 	}

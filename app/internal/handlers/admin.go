@@ -4,17 +4,17 @@ import (
 	"fmt"
 	"net/http"
 
-	signals "github.com/nickabs/signalsd/app"
 	"github.com/nickabs/signalsd/app/internal/apperrors"
+	"github.com/nickabs/signalsd/app/internal/database"
 	"github.com/nickabs/signalsd/app/internal/response"
 )
 
 type AdminHandler struct {
-	cfg *signals.ServiceConfig
+	queries *database.Queries
 }
 
-func NewAdminHandler(cfg *signals.ServiceConfig) *AdminHandler {
-	return &AdminHandler{cfg: cfg}
+func NewAdminHandler(queries *database.Queries) *AdminHandler {
+	return &AdminHandler{queries: queries}
 }
 
 // ResetHandler godoc
@@ -31,19 +31,19 @@ func NewAdminHandler(cfg *signals.ServiceConfig) *AdminHandler {
 //	@Router			/admin/reset [post]
 func (a *AdminHandler) ResetHandler(w http.ResponseWriter, r *http.Request) {
 
-	deletedUserCount, err := a.cfg.DB.DeleteUsers(r.Context())
+	deletedAccountsCount, err := a.queries.DeleteAccounts(r.Context())
 	if err != nil {
-		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not delete users: %v", err))
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not delete accounts: %v", err))
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(fmt.Sprintf("%d users deleted", deletedUserCount)))
+	w.Write([]byte(fmt.Sprintf("%d accounts deleted", deletedAccountsCount)))
 }
 
 // ReadinessHandler godoc
 //
 //	@Summary		Health
-//	@Description	check if the signals service is running
+//	@Description	check if the signalsd service is running
 //	@Tags			admin
 //
 //	@Success		200

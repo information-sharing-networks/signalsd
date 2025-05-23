@@ -34,7 +34,7 @@ func (a AuthService) ValidateAccessToken(next http.Handler) http.Handler {
 		claims := jwt.RegisteredClaims{}
 
 		_, err = jwt.ParseWithClaims(bearerToken, &claims, func(token *jwt.Token) (interface{}, error) {
-			return []byte(a.cfg.SecretKey), nil
+			return []byte(a.secretKey), nil
 		})
 		if err != nil {
 			if errors.Is(err, jwt.ErrTokenExpired) {
@@ -46,16 +46,16 @@ func (a AuthService) ValidateAccessToken(next http.Handler) http.Handler {
 		}
 
 		rawID := claims.Subject
-		userID, err := uuid.Parse(rawID)
+		userAccountID, err := uuid.Parse(rawID)
 		if err != nil {
 			response.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthorizationFailure, fmt.Sprintf("unauthorized: %v", err))
 			return
 		}
 
-		reqLogger.Info().Msgf("user %v authorized ", userID)
+		reqLogger.Info().Msgf("user %v authorized ", userAccountID)
 
 		// add user to context
-		ctx := context.WithUserID(r.Context(), userID)
+		ctx := context.WithUserAccountID(r.Context(), userAccountID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -75,7 +75,7 @@ func (a AuthService) ValidateRefreshToken(next http.Handler) http.Handler {
 			return
 		}
 
-		refreshTokenRow, err := a.cfg.DB.GetRefreshToken(r.Context(), refreshToken)
+		refreshTokenRow, err := a.queries.GetRefreshToken(r.Context(), refreshToken)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				response.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeTokenError, "unauthorized: Invalid token")
@@ -93,9 +93,9 @@ func (a AuthService) ValidateRefreshToken(next http.Handler) http.Handler {
 			return
 		}
 
-		reqLogger.Info().Msgf("user %v refresh_token validated", refreshTokenRow.UserID)
+		reqLogger.Info().Msgf("user %v refresh_token validated", refreshTokenRow.UserAccountID)
 
-		ctx := context.WithUserID(r.Context(), refreshTokenRow.UserID)
+		ctx := context.WithUserAccountID(r.Context(), refreshTokenRow.UserAccountID)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -109,12 +109,11 @@ func (a AuthService) ValidateDevEnv(next http.Handler) http.Handler {
 			Str("path", r.URL.Path).
 			Logger()
 
-		reqLogger.Info().Msg("Dev environment confirmed")
-
-		if a.cfg.Environment != "dev" {
+		if a.environment != "dev" {
 			response.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "this api can only be used in the dev environment")
 			return
 		}
+		reqLogger.Info().Msg("Dev environment confirmed")
 		next.ServeHTTP(w, r.WithContext(r.Context()))
 	})
 }

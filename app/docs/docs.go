@@ -23,7 +23,7 @@ const docTemplate = `{
     "paths": {
         "/admin/health": {
             "get": {
-                "description": "check if the signals service is running",
+                "description": "check if the signalsd service is running",
                 "tags": [
                     "admin"
                 ],
@@ -53,6 +53,42 @@ const docTemplate = `{
                         "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/users/{id}": {
+            "get": {
+                "description": "This API is protected (includes email addresses in the response) - currently only available on dev envs, pending implementation of admin roles.",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Get registered user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "68fb5f5b-e3f5-4a96-8d35-cd2203a06f73",
+                        "description": "user id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/database.GetUserByIDRow"
+                            }
                         }
                     },
                     "500": {
@@ -151,7 +187,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Create an Information Sharing Network (ISN)\n\nvisibility = \"private\" means that signals on the network can only be seen by network participants.\n\nThe only storage_type currently supported is \"admin_db\"\nwhen storage_type = \"admin_db\" the signals are stored in the relational database used by the API service to store the admin configuration\nSpecify \"admin_db\" for storage_connection_url in this case (anything else is overriwtten with this value)",
+                "description": "Create an Information Sharing Network (ISN)\n\nvisibility = \"private\" means that signalsd on the network can only be seen by network participants.\n\nThe only storage_type currently supported is \"admin_db\"\nwhen storage_type = \"admin_db\" the signalsd are stored in the relational database used by the API service to store the admin configuration\nSpecify \"admin_db\" for storage_connection_url in this case (anything else is overriwtten with this value)",
                 "tags": [
                     "ISN config"
                 ],
@@ -182,6 +218,246 @@ const docTemplate = `{
                     },
                     "409": {
                         "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/isn/{isn_slug}/signal_types": {
+            "get": {
+                "tags": [
+                    "ISN view"
+                ],
+                "summary": "Get the signal definitions",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/database.SignalType"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "A signal definition describes a data set that is sharable over an ISN.  Setup the ISN before defining any signal defs.\n\nA URL-friendly slug is created based on the title supplied when you load the first version of a definition.\nThe title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.\n\nSlugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new definition and specify the bump type (major/minor/patch) to increment the semver\n\nSignal definitions are referred to with a url like this http://{hostname}/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}\n",
+                "tags": [
+                    "signal config"
+                ],
+                "summary": "Create signal definition",
+                "parameters": [
+                    {
+                        "description": "signal definition details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateSignalTypeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateSignalTypeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}": {
+            "get": {
+                "tags": [
+                    "ISN view"
+                ],
+                "summary": "Get a signal definition",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-signal--example-org",
+                        "description": "signal definiton slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "0.0.1",
+                        "description": "version to be recieved",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.SignalTypeAndLinkedInfo"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "users can update the detailed description, the stage or the link to the readme md\n\nIt is not allowed to update the schema url - instead users should create a new declaration with the same title and bump the version",
+                "tags": [
+                    "signal config"
+                ],
+                "summary": "Update signal definition",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-signal--example-org",
+                        "description": "signal definiton slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "0.0.1",
+                        "description": "version to be recieved",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "signal definition details to be updated",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdateSignalTypeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "tags": [
+                    "signal config"
+                ],
+                "summary": "Delete signal definition",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-signal--example-org",
+                        "description": "signal definiton slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "0.0.1",
+                        "description": "version to be recieved",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/response.ErrorResponse"
                         }
@@ -514,246 +790,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/signal_defs": {
-            "get": {
-                "tags": [
-                    "ISN view"
-                ],
-                "summary": "Get the signal definitions",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/database.GetSignalDefsRow"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "A signal definition describes a data set that is sharable over an ISN.  Setup the ISN before defining any signal defs.\n\nA URL-friendly slug is created based on the title supplied when you load the first version of a definition.\nThe title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.\n\nSlugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new definition and specify the bump type (major/minor/patch) to increment the semver\n\nSignal definitions are referred to with a url like this http://{hostname}/api/signal_defs/{slug}/v{sem_ver}\n",
-                "tags": [
-                    "signal config"
-                ],
-                "summary": "Create signal definition",
-                "parameters": [
-                    {
-                        "description": "signal definition details",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateSignalDefRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateSignalDefResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/signal_defs/{slug}/v{sem_ver}": {
-            "get": {
-                "tags": [
-                    "ISN view"
-                ],
-                "summary": "Get a signal definition",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "sample-signal--example-org",
-                        "description": "signal definiton slug",
-                        "name": "slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "example": "0.0.1",
-                        "description": "version to be recieved",
-                        "name": "sem_ver",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.SignalDefAndLinkedInfo"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "users can update the detailed description, the stage or the link to the readme md\n\nIt is not allowed to update the schema url - instead users should create a new declaration with the same title and bump the version",
-                "tags": [
-                    "signal config"
-                ],
-                "summary": "Update signal definition",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "sample-signal--example-org",
-                        "description": "signal definiton slug",
-                        "name": "slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "example": "0.0.1",
-                        "description": "version to be recieved",
-                        "name": "sem_ver",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "signal definition details to be updated",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.UpdateSignalDefRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "tags": [
-                    "signal config"
-                ],
-                "summary": "Delete signal definition",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "sample-signal--example-org",
-                        "description": "signal definiton slug",
-                        "name": "slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "example": "0.0.1",
-                        "description": "version to be recieved",
-                        "name": "sem_ver",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/api/users": {
             "get": {
                 "description": "This api displays email addresses and is currently only available on dev env pending implementation of role based access",
@@ -768,42 +804,6 @@ const docTemplate = `{
                             "type": "array",
                             "items": {
                                 "$ref": "#/definitions/database.GetUsersRow"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/users/{id}": {
-            "get": {
-                "description": "This API is protected (includes email addresses in the response) - currently only available on dev envs, pending implementation of admin roles.",
-                "tags": [
-                    "auth"
-                ],
-                "summary": "Get registered user",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "68fb5f5b-e3f5-4a96-8d35-cd2203a06f73",
-                        "description": "user id",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/database.GetUserByIDRow"
                             }
                         }
                     },
@@ -958,6 +958,7 @@ const docTemplate = `{
         },
         "/auth/register": {
             "post": {
+                "description": "The first user to be created for this service will be created with an admin role.\nSubsequent accounts default to standard user roles.",
                 "tags": [
                     "auth"
                 ],
@@ -1060,7 +1061,7 @@ const docTemplate = `{
                 "refresh_token_revoked",
                 "resource_already_exists",
                 "resource_not_found",
-                "signal_def_closed",
+                "signal_type_closed",
                 "token_error",
                 "user_alread_exists",
                 "user_not_found"
@@ -1080,7 +1081,7 @@ const docTemplate = `{
                 "ErrCodeRefreshTokenRevoked",
                 "ErrCodeResourceAlreadyExists",
                 "ErrCodeResourceNotFound",
-                "ErrCodeSignalDefClosed",
+                "ErrCodeSignalTypeClosed",
                 "ErrCodeTokenError",
                 "ErrCodeUserAlreadyExists",
                 "ErrCodeUserNotFound"
@@ -1138,24 +1139,10 @@ const docTemplate = `{
         "database.GetForDisplayUserByIsnIDRow": {
             "type": "object",
             "properties": {
+                "account_id": {
+                    "type": "string"
+                },
                 "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "database.GetForDisplayUserBySignalDefIDRow": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
                     "type": "string"
                 },
                 "updated_at": {
@@ -1224,60 +1211,16 @@ const docTemplate = `{
                 }
             }
         },
-        "database.GetSignalDefsRow": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "detail": {
-                    "type": "string"
-                },
-                "email": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "isn_id": {
-                    "type": "string"
-                },
-                "readme_url": {
-                    "type": "string"
-                },
-                "schema_url": {
-                    "type": "string"
-                },
-                "sem_ver": {
-                    "type": "string"
-                },
-                "slug": {
-                    "type": "string"
-                },
-                "stage": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "user_id": {
-                    "type": "string"
-                }
-            }
-        },
         "database.GetUserByIDRow": {
             "type": "object",
             "properties": {
+                "account_id": {
+                    "type": "string"
+                },
                 "created_at": {
                     "type": "string"
                 },
                 "email": {
-                    "type": "string"
-                },
-                "id": {
                     "type": "string"
                 }
             }
@@ -1285,13 +1228,13 @@ const docTemplate = `{
         "database.GetUsersRow": {
             "type": "object",
             "properties": {
+                "account_id": {
+                    "type": "string"
+                },
                 "created_at": {
                     "type": "string"
                 },
                 "email": {
-                    "type": "string"
-                },
-                "id": {
                     "type": "string"
                 },
                 "updated_at": {
@@ -1329,10 +1272,48 @@ const docTemplate = `{
                 "updated_at": {
                     "type": "string"
                 },
-                "user_id": {
+                "user_account_id": {
                     "type": "string"
                 },
                 "visibility": {
+                    "type": "string"
+                }
+            }
+        },
+        "database.SignalType": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "detail": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "isn_id": {
+                    "type": "string"
+                },
+                "readme_url": {
+                    "type": "string"
+                },
+                "schema_url": {
+                    "type": "string"
+                },
+                "sem_ver": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "stage": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
                     "type": "string"
                 }
             }
@@ -1459,7 +1440,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.CreateSignalDefRequest": {
+        "handlers.CreateSignalTypeRequest": {
             "type": "object",
             "properties": {
                 "bump_type": {
@@ -1510,15 +1491,12 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.CreateSignalDefResponse": {
+        "handlers.CreateSignalTypeResponse": {
             "type": "object",
             "properties": {
-                "id": {
-                    "type": "string",
-                    "example": "8e4bf0e9-b962-4707-9639-ef314dcf6fed"
-                },
                 "resource_url": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "http://localhost:8080/api/isn/sample-isn--example-org/signals_types/sample-signal--example-org/v0.0.1"
                 },
                 "sem_ver": {
                     "type": "string",
@@ -1609,6 +1587,10 @@ const docTemplate = `{
                     "type": "string",
                     "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxTZXJ2ZXIiLCJzdWIiOiI2OGZiNWY1Yi1lM2Y1LTRhOTYtOGQzNS1jZDIyMDNhMDZmNzMiLCJleHAiOjE3NDY3NzA2MzQsImlhdCI6MTc0Njc2NzAzNH0.3OdnUNgrvt1Zxs9AlLeaC9DVT6Xwc6uGvFQHb6nDfZs"
                 },
+                "account_id": {
+                    "type": "string",
+                    "example": "68fb5f5b-e3f5-4a96-8d35-cd2203a06f73"
+                },
                 "created_at": {
                     "type": "string",
                     "example": "2025-05-09T05:41:22.57328+01:00"
@@ -1616,10 +1598,6 @@ const docTemplate = `{
                 "refresh_token": {
                     "type": "string",
                     "example": "fb948e0b74de1f65e801b4e70fc9c047424ab775f2b4dc5226f472f3b6460c37"
-                },
-                "user_id": {
-                    "type": "string",
-                    "example": "68fb5f5b-e3f5-4a96-8d35-cd2203a06f73"
                 }
             }
         },
@@ -1641,7 +1619,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.SignalDefAndLinkedInfo": {
+        "handlers.SignalTypeAndLinkedInfo": {
             "type": "object",
             "properties": {
                 "created_at": {
@@ -1676,9 +1654,6 @@ const docTemplate = `{
                 },
                 "updated_at": {
                     "type": "string"
-                },
-                "user": {
-                    "$ref": "#/definitions/database.GetForDisplayUserBySignalDefIDRow"
                 }
             }
         },
@@ -1790,7 +1765,7 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.UpdateSignalDefRequest": {
+        "handlers.UpdateSignalTypeRequest": {
             "type": "object",
             "properties": {
                 "detail": {
@@ -1858,7 +1833,7 @@ const docTemplate = `{
             "name": "signal config"
         },
         {
-            "description": "Information sharing networks are used to exchange signals between participating users.",
+            "description": "Information sharing networks are used to exchange signalsd between participating users.",
             "name": "ISN config"
         },
         {

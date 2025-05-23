@@ -17,7 +17,7 @@ definitions:
     - refresh_token_revoked
     - resource_already_exists
     - resource_not_found
-    - signal_def_closed
+    - signal_type_closed
     - token_error
     - user_alread_exists
     - user_not_found
@@ -37,7 +37,7 @@ definitions:
     - ErrCodeRefreshTokenRevoked
     - ErrCodeResourceAlreadyExists
     - ErrCodeResourceNotFound
-    - ErrCodeSignalDefClosed
+    - ErrCodeSignalTypeClosed
     - ErrCodeTokenError
     - ErrCodeUserAlreadyExists
     - ErrCodeUserNotFound
@@ -75,18 +75,9 @@ definitions:
     type: object
   database.GetForDisplayUserByIsnIDRow:
     properties:
+      account_id:
+        type: string
       created_at:
-        type: string
-      id:
-        type: string
-      updated_at:
-        type: string
-    type: object
-  database.GetForDisplayUserBySignalDefIDRow:
-    properties:
-      created_at:
-        type: string
-      id:
         type: string
       updated_at:
         type: string
@@ -131,51 +122,22 @@ definitions:
       updated_at:
         type: string
     type: object
-  database.GetSignalDefsRow:
-    properties:
-      created_at:
-        type: string
-      detail:
-        type: string
-      email:
-        type: string
-      id:
-        type: string
-      isn_id:
-        type: string
-      readme_url:
-        type: string
-      schema_url:
-        type: string
-      sem_ver:
-        type: string
-      slug:
-        type: string
-      stage:
-        type: string
-      title:
-        type: string
-      updated_at:
-        type: string
-      user_id:
-        type: string
-    type: object
   database.GetUserByIDRow:
     properties:
+      account_id:
+        type: string
       created_at:
         type: string
       email:
-        type: string
-      id:
         type: string
     type: object
   database.GetUsersRow:
     properties:
+      account_id:
+        type: string
       created_at:
         type: string
       email:
-        type: string
-      id:
         type: string
       updated_at:
         type: string
@@ -200,9 +162,34 @@ definitions:
         type: string
       updated_at:
         type: string
-      user_id:
+      user_account_id:
         type: string
       visibility:
+        type: string
+    type: object
+  database.SignalType:
+    properties:
+      created_at:
+        type: string
+      detail:
+        type: string
+      id:
+        type: string
+      isn_id:
+        type: string
+      readme_url:
+        type: string
+      schema_url:
+        type: string
+      sem_ver:
+        type: string
+      slug:
+        type: string
+      stage:
+        type: string
+      title:
+        type: string
+      updated_at:
         type: string
     type: object
   handlers.CreateIsnReceiverRequest:
@@ -293,7 +280,7 @@ definitions:
         example: http://localhost:8080/api/isn/sample-isn--example-org/signals/retriever
         type: string
     type: object
-  handlers.CreateSignalDefRequest:
+  handlers.CreateSignalTypeRequest:
     properties:
       bump_type:
         description: this is used to increment semver for the signal definition
@@ -333,12 +320,10 @@ definitions:
         example: Sample Signal @example.org
         type: string
     type: object
-  handlers.CreateSignalDefResponse:
+  handlers.CreateSignalTypeResponse:
     properties:
-      id:
-        example: 8e4bf0e9-b962-4707-9639-ef314dcf6fed
-        type: string
       resource_url:
+        example: http://localhost:8080/api/isn/sample-isn--example-org/signals_types/sample-signal--example-org/v0.0.1
         type: string
       sem_ver:
         example: 0.0.1
@@ -401,14 +386,14 @@ definitions:
       access_token:
         example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxTZXJ2ZXIiLCJzdWIiOiI2OGZiNWY1Yi1lM2Y1LTRhOTYtOGQzNS1jZDIyMDNhMDZmNzMiLCJleHAiOjE3NDY3NzA2MzQsImlhdCI6MTc0Njc2NzAzNH0.3OdnUNgrvt1Zxs9AlLeaC9DVT6Xwc6uGvFQHb6nDfZs
         type: string
+      account_id:
+        example: 68fb5f5b-e3f5-4a96-8d35-cd2203a06f73
+        type: string
       created_at:
         example: "2025-05-09T05:41:22.57328+01:00"
         type: string
       refresh_token:
         example: fb948e0b74de1f65e801b4e70fc9c047424ab775f2b4dc5226f472f3b6460c37
-        type: string
-      user_id:
-        example: 68fb5f5b-e3f5-4a96-8d35-cd2203a06f73
         type: string
     type: object
   handlers.RefreshAccessTokenHandler.refreshResponse:
@@ -423,7 +408,7 @@ definitions:
         example: fb948e0b74de1f65e801b4e70fc9c047424ab775f2b4dc5226f472f3b6460c37
         type: string
     type: object
-  handlers.SignalDefAndLinkedInfo:
+  handlers.SignalTypeAndLinkedInfo:
     properties:
       created_at:
         type: string
@@ -447,8 +432,6 @@ definitions:
         type: string
       updated_at:
         type: string
-      user:
-        $ref: '#/definitions/database.GetForDisplayUserBySignalDefIDRow'
     type: object
   handlers.UpdateIsnReceiverRequest:
     properties:
@@ -530,7 +513,7 @@ definitions:
         example: ue6U>&X3j570
         type: string
     type: object
-  handlers.UpdateSignalDefRequest:
+  handlers.UpdateSignalTypeRequest:
     properties:
       detail:
         description: updated description
@@ -567,7 +550,7 @@ info:
 paths:
   /admin/health:
     get:
-      description: check if the signals service is running
+      description: check if the signalsd service is running
       responses:
         "200":
           description: OK
@@ -595,6 +578,31 @@ paths:
       summary: reset
       tags:
       - admin
+  /admin/users/{id}:
+    get:
+      description: This API is protected (includes email addresses in the response)
+        - currently only available on dev envs, pending implementation of admin roles.
+      parameters:
+      - description: user id
+        example: 68fb5f5b-e3f5-4a96-8d35-cd2203a06f73
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/database.GetUserByIDRow'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Get registered user
+      tags:
+      - auth
   /api/isn:
     get:
       description: get a list of the configured ISNs
@@ -617,10 +625,10 @@ paths:
       description: |-
         Create an Information Sharing Network (ISN)
 
-        visibility = "private" means that signals on the network can only be seen by network participants.
+        visibility = "private" means that signalsd on the network can only be seen by network participants.
 
         The only storage_type currently supported is "admin_db"
-        when storage_type = "admin_db" the signals are stored in the relational database used by the API service to store the admin configuration
+        when storage_type = "admin_db" the signalsd are stored in the relational database used by the API service to store the admin configuration
         Specify "admin_db" for storage_connection_url in this case (anything else is overriwtten with this value)
       parameters:
       - description: ISN details
@@ -686,6 +694,174 @@ paths:
       summary: Update an ISN
       tags:
       - ISN config
+  /api/isn/{isn_slug}/signal_types:
+    get:
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/database.SignalType'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Get the signal definitions
+      tags:
+      - ISN view
+    post:
+      description: |
+        A signal definition describes a data set that is sharable over an ISN.  Setup the ISN before defining any signal defs.
+
+        A URL-friendly slug is created based on the title supplied when you load the first version of a definition.
+        The title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.
+
+        Slugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new definition and specify the bump type (major/minor/patch) to increment the semver
+
+        Signal definitions are referred to with a url like this http://{hostname}/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}
+      parameters:
+      - description: signal definition details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateSignalTypeRequest'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.CreateSignalTypeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Create signal definition
+      tags:
+      - signal config
+  /api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}:
+    delete:
+      parameters:
+      - description: signal definiton slug
+        example: sample-signal--example-org
+        in: path
+        name: slug
+        required: true
+        type: string
+      - description: version to be recieved
+        example: 0.0.1
+        in: path
+        name: sem_ver
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Delete signal definition
+      tags:
+      - signal config
+    get:
+      parameters:
+      - description: signal definiton slug
+        example: sample-signal--example-org
+        in: path
+        name: slug
+        required: true
+        type: string
+      - description: version to be recieved
+        example: 0.0.1
+        in: path
+        name: sem_ver
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.SignalTypeAndLinkedInfo'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      summary: Get a signal definition
+      tags:
+      - ISN view
+    put:
+      description: |-
+        users can update the detailed description, the stage or the link to the readme md
+
+        It is not allowed to update the schema url - instead users should create a new declaration with the same title and bump the version
+      parameters:
+      - description: signal definiton slug
+        example: sample-signal--example-org
+        in: path
+        name: slug
+        required: true
+        type: string
+      - description: version to be recieved
+        example: 0.0.1
+        in: path
+        name: sem_ver
+        required: true
+        type: string
+      - description: signal definition details to be updated
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateSignalTypeRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Update signal definition
+      tags:
+      - signal config
   /api/isn/{isn_slug}/signals/receiver:
     get:
       parameters:
@@ -908,174 +1084,6 @@ paths:
       summary: Get an ISN configuration
       tags:
       - ISN view
-  /api/signal_defs:
-    get:
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/database.GetSignalDefsRow'
-            type: array
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-      summary: Get the signal definitions
-      tags:
-      - ISN view
-    post:
-      description: |
-        A signal definition describes a data set that is sharable over an ISN.  Setup the ISN before defining any signal defs.
-
-        A URL-friendly slug is created based on the title supplied when you load the first version of a definition.
-        The title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.
-
-        Slugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new definition and specify the bump type (major/minor/patch) to increment the semver
-
-        Signal definitions are referred to with a url like this http://{hostname}/api/signal_defs/{slug}/v{sem_ver}
-      parameters:
-      - description: signal definition details
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.CreateSignalDefRequest'
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/handlers.CreateSignalDefResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Create signal definition
-      tags:
-      - signal config
-  /api/signal_defs/{slug}/v{sem_ver}:
-    delete:
-      parameters:
-      - description: signal definiton slug
-        example: sample-signal--example-org
-        in: path
-        name: slug
-        required: true
-        type: string
-      - description: version to be recieved
-        example: 0.0.1
-        in: path
-        name: sem_ver
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Delete signal definition
-      tags:
-      - signal config
-    get:
-      parameters:
-      - description: signal definiton slug
-        example: sample-signal--example-org
-        in: path
-        name: slug
-        required: true
-        type: string
-      - description: version to be recieved
-        example: 0.0.1
-        in: path
-        name: sem_ver
-        required: true
-        type: string
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.SignalDefAndLinkedInfo'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-      summary: Get a signal definition
-      tags:
-      - ISN view
-    put:
-      description: |-
-        users can update the detailed description, the stage or the link to the readme md
-
-        It is not allowed to update the schema url - instead users should create a new declaration with the same title and bump the version
-      parameters:
-      - description: signal definiton slug
-        example: sample-signal--example-org
-        in: path
-        name: slug
-        required: true
-        type: string
-      - description: version to be recieved
-        example: 0.0.1
-        in: path
-        name: sem_ver
-        required: true
-        type: string
-      - description: signal definition details to be updated
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.UpdateSignalDefRequest'
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Update signal definition
-      tags:
-      - signal config
   /api/users:
     get:
       description: This api displays email addresses and is currently only available
@@ -1092,31 +1100,6 @@ paths:
           schema:
             $ref: '#/definitions/response.ErrorResponse'
       summary: Get the registered users
-      tags:
-      - auth
-  /api/users/{id}:
-    get:
-      description: This API is protected (includes email addresses in the response)
-        - currently only available on dev envs, pending implementation of admin roles.
-      parameters:
-      - description: user id
-        example: 68fb5f5b-e3f5-4a96-8d35-cd2203a06f73
-        in: path
-        name: id
-        required: true
-        type: string
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/database.GetUserByIDRow'
-            type: array
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-      summary: Get registered user
       tags:
       - auth
   /auth/login:
@@ -1224,6 +1207,9 @@ paths:
       - auth
   /auth/register:
     post:
+      description: |-
+        The first user to be created for this service will be created with an admin role.
+        Subsequent accounts default to standard user roles.
       parameters:
       - description: user details
         in: body
@@ -1303,8 +1289,8 @@ tags:
 - description: signal definitions describe the format of the data being shared in
     an ISN
   name: signal config
-- description: Information sharing networks are used to exchange signals between participating
-    users.
+- description: Information sharing networks are used to exchange signalsd between
+    participating users.
   name: ISN config
 - description: View information about the configured ISNs
   name: ISN view

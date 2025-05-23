@@ -7,19 +7,24 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	signals "github.com/nickabs/signalsd/app"
 	"github.com/nickabs/signalsd/app/internal/apperrors"
 	"github.com/nickabs/signalsd/app/internal/auth"
 	"github.com/nickabs/signalsd/app/internal/database"
 	"github.com/nickabs/signalsd/app/internal/response"
+
+	signalsd "github.com/nickabs/signalsd/app"
 )
 
 type LoginHandler struct {
-	cfg *signals.ServiceConfig
+	queries     *database.Queries
+	authService *auth.AuthService
 }
 
-func NewLoginHandler(cfg *signals.ServiceConfig) *LoginHandler {
-	return &LoginHandler{cfg: cfg}
+func NewLoginHandler(queries *database.Queries, authService *auth.AuthService) *LoginHandler {
+	return &LoginHandler{
+		queries:     queries,
+		authService: authService,
+	}
 }
 
 type LoginRequest struct {
@@ -27,7 +32,7 @@ type LoginRequest struct {
 }
 
 type LoginResponse struct {
-	UserID       uuid.UUID `json:"user_id" example:"68fb5f5b-e3f5-4a96-8d35-cd2203a06f73"`
+	AccountID    uuid.UUID `json:"account_id" example:"68fb5f5b-e3f5-4a96-8d35-cd2203a06f73"`
 	CreatedAt    time.Time `json:"created_at" example:"2025-05-09T05:41:22.57328+01:00"`
 	AccessToken  string    `json:"access_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxTZXJ2ZXIiLCJzdWIiOiI2OGZiNWY1Yi1lM2Y1LTRhOTYtOGQzNS1jZDIyMDNhMDZmNzMiLCJleHAiOjE3NDY3NzA2MzQsImlhdCI6MTc0Njc2NzAzNH0.3OdnUNgrvt1Zxs9AlLeaC9DVT6Xwc6uGvFQHb6nDfZs"`
 	RefreshToken string    `json:"refresh_token" example:"fb948e0b74de1f65e801b4e70fc9c047424ab775f2b4dc5226f472f3b6460c37"`
@@ -55,8 +60,6 @@ type LoginResponse struct {
 func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
 
-	authService := auth.NewAuthService(l.cfg)
-
 	defer r.Body.Close()
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -64,7 +67,7 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	exists, err := l.cfg.DB.ExistsUserWithEmail(r.Context(), req.Email)
+	exists, err := l.queries.ExistsUserWithEmail(r.Context(), req.Email)
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
@@ -74,42 +77,42 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := l.cfg.DB.GetUserByEmail(r.Context(), req.Email)
+	user, err := l.queries.GetUserByEmail(r.Context(), req.Email)
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
 	}
 
-	err = authService.CheckPasswordHash(user.HashedPassword, req.Password)
+	err = l.authService.CheckPasswordHash(user.HashedPassword, req.Password)
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "Incorrect email or password")
 		return
 	}
 
-	accessToken, err := authService.GenerateAccessToken(user.ID, l.cfg.SecretKey, signals.AccessTokenExpiry)
+	accessToken, err := l.authService.GenerateAccessToken(user.AccountID, signalsd.AccessTokenExpiry)
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenError, fmt.Sprintf("error creating access token: %v", err))
 		return
 	}
 
-	refreshToken, err := authService.GenerateRefreshToken()
+	refreshToken, err := l.authService.GenerateRefreshToken()
 	if err != nil {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenError, fmt.Sprintf("error creating refresh token: %v", err))
 		return
 	}
 
-	_, err = l.cfg.DB.InsertRefreshToken(r.Context(), database.InsertRefreshTokenParams{
-		Token:     refreshToken,
-		UserID:    user.ID,
-		ExpiresAt: time.Now().Add(signals.RefreshTokenExpiry),
+	_, err = l.queries.InsertRefreshToken(r.Context(), database.InsertRefreshTokenParams{
+		Token:         refreshToken,
+		UserAccountID: user.AccountID,
+		ExpiresAt:     time.Now().Add(signalsd.RefreshTokenExpiry),
 	})
 	if err != nil {
-		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not create user: %v", err))
+		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not insert refresh token: %v", err))
 		return
 	}
 
 	response.RespondWithJSON(w, http.StatusOK, LoginResponse{
-		UserID:       user.ID,
+		AccountID:    user.AccountID,
 		CreatedAt:    user.CreatedAt,
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,

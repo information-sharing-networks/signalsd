@@ -11,17 +11,22 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	signals "github.com/nickabs/signalsd/app"
-	"github.com/rs/zerolog/log"
+	"github.com/nickabs/signalsd/app/internal/database"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type AuthService struct {
-	cfg *signals.ServiceConfig
+	secretKey   string
+	environment string
+	queries     *database.Queries
 }
 
-func NewAuthService(cfg *signals.ServiceConfig) *AuthService {
-	return &AuthService{cfg: cfg}
+func NewAuthService(secretKey string, environment string, queries *database.Queries) *AuthService {
+	return &AuthService{
+		secretKey:   secretKey,
+		environment: environment,
+		queries:     queries,
+	}
 }
 
 func (a AuthService) HashPassword(password string) (string, error) {
@@ -38,7 +43,7 @@ func (a AuthService) CheckPasswordHash(hash, password string) error {
 }
 
 // create a JWT signed with HS256 using the supplied secret
-func (a AuthService) GenerateAccessToken(userID uuid.UUID, secret string, expiresIn time.Duration) (string, error) {
+func (a AuthService) GenerateAccessToken(userAccountID uuid.UUID, expiresIn time.Duration) (string, error) {
 	issuedAt := time.Now()
 	expiresAt := issuedAt.Add(expiresIn)
 
@@ -47,15 +52,14 @@ func (a AuthService) GenerateAccessToken(userID uuid.UUID, secret string, expire
 		Issuer:    "SignalServer",
 		IssuedAt:  jwt.NewNumericDate(issuedAt),
 		ExpiresAt: jwt.NewNumericDate(expiresAt),
-		Subject:   userID.String(),
+		Subject:   userAccountID.String(),
 	}
 	unsignedAccessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	signedAccessToken, err := unsignedAccessToken.SignedString([]byte(secret))
+	signedAccessToken, err := unsignedAccessToken.SignedString([]byte(a.secretKey))
 	if err != nil {
 		return "", fmt.Errorf("could not sign JWT: %v", err)
 	}
-	log.Debug().Msgf("debug creating token: secret key %s token %s", a.cfg.SecretKey, signedAccessToken)
 	return signedAccessToken, nil
 }
 

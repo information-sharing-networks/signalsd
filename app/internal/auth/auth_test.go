@@ -8,12 +8,14 @@ import (
 	"net/http"
 	"testing"
 
-	signals "github.com/nickabs/signalsd/app"
+	signalsd "github.com/nickabs/signalsd/app"
+	"github.com/nickabs/signalsd/app/internal/database"
 )
 
 func TestHashPassword(t *testing.T) {
-	cfg := signals.InitConfig()
-	authService := NewAuthService(cfg)
+	cfg := signalsd.InitConfig()
+	var queries *database.Queries
+	authService := NewAuthService(cfg.SecretKey, cfg.Environment, queries)
 	password1 := "testpassword"
 	hash1, _ := authService.HashPassword(password1)
 
@@ -61,7 +63,9 @@ func TestHashPassword(t *testing.T) {
 }
 
 func TestGetBearerToken(t *testing.T) {
-	authService := NewAuthService(signals.InitConfig())
+	cfg := signalsd.InitConfig()
+	var queries *database.Queries
+	authService := NewAuthService(cfg.SecretKey, cfg.Environment, queries)
 	bearerToken := "token123"
 
 	tests := []struct {
@@ -115,7 +119,9 @@ func TestGetBearerToken(t *testing.T) {
 }
 
 func TestCreateRefreshToken(t *testing.T) {
-	authService := NewAuthService(signals.InitConfig())
+	cfg := signalsd.InitConfig()
+	var queries *database.Queries
+	authService := NewAuthService(cfg.SecretKey, cfg.Environment, queries)
 	token, err := authService.GenerateRefreshToken()
 
 	if err != nil {

@@ -27,7 +27,7 @@ CREATE TABLE isn (
         ON DELETE CASCADE);
 
 
-CREATE TABLE signal_defs (
+CREATE TABLE signal_types (
     id UUID PRIMARY KEY,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -40,8 +40,8 @@ CREATE TABLE signal_defs (
     detail TEXT NOT NULL,
     sem_ver TEXT NOT NULL,
     stage TEXT NOT NULL,
-    CONSTRAINT unique_signal_defs UNIQUE (slug, sem_ver),
-    CONSTRAINT valid_signal_defs_slug_format
+    CONSTRAINT unique_signal_types UNIQUE (slug, sem_ver),
+    CONSTRAINT valid_signal_types_slug_format
         CHECK (slug ~ '^[a-z0-9-]+$'),
     CONSTRAINT valid_schma_json_url 
         CHECK (schema_url ~ '^https://github\.com/[a-zA-Z0-9_-]+/[a-zA-Z0-9_.-]+.*\.json$'),
@@ -49,11 +49,11 @@ CREATE TABLE signal_defs (
         CHECK (readme_url ~ '^https://github\.com/[a-zA-Z0-9_-]+/[a-zA-Z0-9_.-]+.*\.md$'),
     CONSTRAINT stage_check
     CHECK (stage IN ('dev','test', 'live', 'deprecated', 'closed','shuttered')),
-    CONSTRAINT fk_signal_defs_isn
+    CONSTRAINT fk_signal_types_isn
         FOREIGN KEY (isn_id)
         REFERENCES isn(id)
         ON DELETE CASCADE,
-    CONSTRAINT fk_signal_defs_user
+    CONSTRAINT fk_signal_types_user
         FOREIGN KEY (user_id)
         REFERENCES users(id)
         ON DELETE CASCADE);
@@ -125,7 +125,7 @@ CREATE TABLE isn_retrievers (
 
 DROP table IF EXISTS isn_receivers CASCADE;
 DROP table IF EXISTS isn_retrievers CASCADE;
-DROP table IF EXISTS signal_defs CASCADE;
+DROP table IF EXISTS signal_types CASCADE;
 DROP table IF EXISTS refresh_tokens CASCADE;
 DROP table IF EXISTS isn CASCADE;
 DROP table IF EXISTS users CASCADE;

@@ -1,10 +1,9 @@
--- name: CreateSignalDef :one
+-- name: CreateSignalType :one
 
-INSERT INTO signal_defs (
+INSERT INTO signal_types (
     id,
     created_at,
     updated_at,
-    user_id,
     isn_id,
     slug,
     schema_url,
@@ -13,49 +12,39 @@ INSERT INTO signal_defs (
     detail,
     sem_ver,
     stage
-) VALUES (gen_random_uuid(), now(), now(), $1, $2, $3, $4, $5, $6, $7, $8, $9) 
+) VALUES (gen_random_uuid(), now(), now(), $1, $2, $3, $4, $5, $6, $7, $8) 
 RETURNING *;
 
 
--- name: UpdateSignalDefDetails :execrows
-UPDATE signal_defs SET (updated_at, readme_url, detail, stage) = (NOW(), $2, $3, $4)
+-- name: UpdateSignalTypeDetails :execrows
+UPDATE signal_types SET (updated_at, readme_url, detail, stage) = (NOW(), $2, $3, $4)
 WHERE id = $1;
 
--- name: DeleteSignalDef :execrows
+-- name: DeleteSignalType :execrows
 
 DELETE
-FROM signal_defs
+FROM signal_types
 WHERE id = $1;
 
--- name: GetSignalDefs :many
+-- name: GetSignalTypes :many
 
-SELECT u.email,
-       sd.*
-FROM signal_defs sd
-JOIN users u ON sd.user_id = u.id
-ORDER BY u.email, 
-         sd.slug,
-         sd.sem_ver DESC;
+SELECT sd.*
+FROM signal_types sd;
 
--- name: GetSignalDefByID :one
+-- name: GetSignalTypeByID :one
 
-SELECT u.email user_email,
-       sd.*
-FROM signal_defs sd
-JOIN users u ON sd.user_id = u.id
+SELECT sd.*
+FROM signal_types sd
 WHERE sd.id = $1;
 
+-- name: GetSignalTypeBySlug :one
 
--- name: GetSignalDefBySlug :one
-
-SELECT u.email user_email,
-       sd.*
-FROM signal_defs sd
-JOIN users u ON sd.user_id = u.id
+SELECT sd.*
+FROM signal_types sd
 WHERE sd.slug = $1
 AND sd.sem_ver = $2;
 
--- name: GetForDisplaySignalDefByID :one
+-- name: GetForDisplaySignalTypeByID :one
 SELECT 
     sd.id,
     sd.created_at,
@@ -67,10 +56,10 @@ SELECT
     sd.detail,
     sd.sem_ver,
     sd.stage
-FROM signal_defs sd
+FROM signal_types sd
 WHERE sd.id = $1;
 
--- name: GetForDisplaySignalDefBySlug :one
+-- name: GetForDisplaySignalTypeBySlug :one
 SELECT 
     sd.id,
     sd.created_at,
@@ -82,7 +71,7 @@ SELECT
     sd.detail,
     sd.sem_ver,
     sd.stage
-FROM signal_defs sd
+FROM signal_types sd
 WHERE sd.slug = $1
   AND sd.sem_ver = $2;
 
@@ -92,23 +81,22 @@ SELECT '0.0.0' AS sem_ver,
        '' AS schema_url
 WHERE NOT EXISTS
     (SELECT 1
-     FROM signal_defs sd1
+     FROM signal_types sd1
      WHERE sd1.slug = $1)
 UNION ALL
 SELECT sd2.sem_ver,
        sd2.schema_url
-FROM signal_defs sd2
+FROM signal_types sd2
 WHERE sd2.slug = $1
   AND sd2.sem_ver =
     (SELECT max(sd3.sem_ver)
-     FROM signal_defs sd3
+     FROM signal_types sd3
      WHERE sd3.slug = $1);
 
 
--- name: ExistsSignalDefWithSlugAndDifferentUser :one
+-- name: ExistsSignalTypeWithSlug :one
 
 SELECT EXISTS
   (SELECT 1
-   FROM signal_defs
-   WHERE slug = $1
-     AND user_id != $2) AS EXISTS;
+   FROM signal_types
+   WHERE slug = $1) AS EXISTS;
