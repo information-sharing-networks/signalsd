@@ -24,10 +24,12 @@ func LoggerMiddleware(next http.Handler) http.Handler {
 		start := time.Now()
 		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 
+		/* todo
 		if r.URL.Path == "/admin/health" {
 			next.ServeHTTP(ww, r.WithContext(ctx))
 			return
 		}
+		*/
 		reqLogger.Info().
 			Int("status", ww.Status()).
 			Dur("duration_ms", time.Since(start)).
