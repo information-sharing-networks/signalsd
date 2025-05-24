@@ -13,8 +13,7 @@ definitions:
     - malformed_body
     - not_implemented
     - password_too_short
-    - refresh_token_expired
-    - refresh_token_revoked
+    - refresh_token_invalid
     - resource_already_exists
     - resource_not_found
     - signal_type_closed
@@ -33,14 +32,37 @@ definitions:
     - ErrCodeMalformedBody
     - ErrCodeNotImplemented
     - ErrCodePasswordTooShort
-    - ErrCodeRefreshTokenExpired
-    - ErrCodeRefreshTokenRevoked
+    - ErrCodeRefreshTokenInvalid
     - ErrCodeResourceAlreadyExists
     - ErrCodeResourceNotFound
     - ErrCodeSignalTypeClosed
     - ErrCodeTokenError
     - ErrCodeUserAlreadyExists
     - ErrCodeUserNotFound
+  auth.AccessTokenResponse:
+    properties:
+      access_token:
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxTZXJ2ZXIiLCJzdWIiOiI2OGZiNWY1Yi1lM2Y1LTRhOTYtOGQzNS1jZDIyMDNhMDZmNzMiLCJleHAiOjE3NDY3NzA2MzQsImlhdCI6MTc0Njc2NzAzNH0.3OdnUNgrvt1Zxs9AlLeaC9DVT6Xwc6uGvFQHb6nDfZs
+        type: string
+      expires_in:
+        description: seconds
+        example: 1800
+        type: integer
+      isn_perms:
+        additionalProperties:
+          type: string
+        type: object
+      role:
+        enum:
+        - owner
+        - admin
+        - member
+        example: admin
+        type: string
+      token_type:
+        example: Bearer
+        type: string
+    type: object
   database.GetForDisplayIsnReceiverByIsnIDRow:
     properties:
       created_at:
@@ -130,6 +152,8 @@ definitions:
         type: string
       email:
         type: string
+      user_role:
+        type: string
     type: object
   database.GetUsersRow:
     properties:
@@ -140,6 +164,8 @@ definitions:
       email:
         type: string
       updated_at:
+        type: string
+      user_role:
         type: string
     type: object
   database.Isn:
@@ -379,33 +405,6 @@ definitions:
       password:
         description: passwords must be at least 11 characters long
         example: lkIB53@6O^Y
-        type: string
-    type: object
-  handlers.LoginResponse:
-    properties:
-      access_token:
-        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxTZXJ2ZXIiLCJzdWIiOiI2OGZiNWY1Yi1lM2Y1LTRhOTYtOGQzNS1jZDIyMDNhMDZmNzMiLCJleHAiOjE3NDY3NzA2MzQsImlhdCI6MTc0Njc2NzAzNH0.3OdnUNgrvt1Zxs9AlLeaC9DVT6Xwc6uGvFQHb6nDfZs
-        type: string
-      account_id:
-        example: 68fb5f5b-e3f5-4a96-8d35-cd2203a06f73
-        type: string
-      created_at:
-        example: "2025-05-09T05:41:22.57328+01:00"
-        type: string
-      refresh_token:
-        example: fb948e0b74de1f65e801b4e70fc9c047424ab775f2b4dc5226f472f3b6460c37
-        type: string
-    type: object
-  handlers.RefreshAccessTokenHandler.refreshResponse:
-    properties:
-      access_token:
-        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxTZXJ2ZXIiLCJzdWIiOiI2OGZiNWY1Yi1lM2Y1LTRhOTYtOGQzNS1jZDIyMDNhMDZmNzMiLCJleHAiOjE3NDY3NzA2MzQsImlhdCI6MTc0Njc2NzAzNH0.3OdnUNgrvt1Zxs9AlLeaC9DVT6Xwc6uGvFQHb6nDfZs
-        type: string
-    type: object
-  handlers.RevokeRefreshTokenHandler.revokeRefreshTokenRequest:
-    properties:
-      refresh_token:
-        example: fb948e0b74de1f65e801b4e70fc9c047424ab775f2b4dc5226f472f3b6460c37
         type: string
     type: object
   handlers.SignalTypeAndLinkedInfo:
@@ -656,6 +655,7 @@ paths:
             $ref: '#/definitions/response.ErrorResponse'
       security:
       - BearerAccessToken: []
+      - RefreshTokenCookieAuth: []
       summary: Create an ISN
       tags:
       - ISN config
@@ -1105,11 +1105,12 @@ paths:
   /auth/login:
     post:
       description: |-
-        The response body includes an access token and a refresh_token.
-        The access_token is valid for 1 hour.
+        The response body includes an access token. A refresh token is included in a http-only cookie named refresh_token
+        The access_token is valid for 30 mins.
 
-        Use the refresh_token with the /auth/refresh-token endpoint to renew the access_token.
-        The refresh_token lasts 60 days unless it is revoked earlier.
+        Use the refresh_token with the /auth/refresh endpoint to renew the access_token.
+
+        The refresh_token lasts 30 days unless it is revoked earlier.
         To renew the refresh_token, log in again.
       parameters:
       - description: email and password
@@ -1122,7 +1123,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.LoginResponse'
+            $ref: '#/definitions/auth.AccessTokenResponse'
         "400":
           description: Bad Request
           schema:
@@ -1175,36 +1176,6 @@ paths:
       summary: Reset password
       tags:
       - auth
-  /auth/refresh-token:
-    post:
-      description: |-
-        Use this endpoint to get a new access token.
-        Access tokens expire after an hour and subsequent requests using the token will fail with an error_code of "access_token_expired"
-
-        You need to supply a vaild refresh_token to use this API.
-        If the refresh token has expired ("refresh_token_expired") or been revoked ("refresh_token_revoked") the user must login again to get a new one.
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.RefreshAccessTokenHandler.refreshResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/response.ErrorResponse'
-      security:
-      - BearerRefreshToken: []
-      summary: Refresh access token
-      tags:
-      - auth
   /auth/register:
     post:
       description: |-
@@ -1235,22 +1206,20 @@ paths:
       summary: Create user
       tags:
       - auth
-  /auth/revoke-refresh-token:
+  /auth/revoke:
     post:
-      description: |-
+      description: |
         Revoke a refresh token to prevent it being used to create new access tokens.
+
+        You need to supply a vaild refresh token to use this API - if the refresh token has expired or been revoked the user must login again to get a new one.
+
+        The refresh token should be supplied in a http-only cookie called refresh_token.
+
+        You must also provide a previously issued bearer access token - it does not matter if it has expired
+        (the token is not used to authenticate the request but is needed to establish the ID of the user making the request)
 
         Note that any unexpired access tokens issued for this user will continue to work until they expire.
         Users must log in again to obtain a new refresh token if the current one has been revoked.
-
-        Anyone in possession of a refresh token can revoke it
-      parameters:
-      - description: refresh token to be revoked
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.RevokeRefreshTokenHandler.revokeRefreshTokenRequest'
       responses:
         "204":
           description: No Content
@@ -1266,7 +1235,49 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerRefreshToken: []
       summary: Revoke refresh token
+      tags:
+      - auth
+  /auth/token:
+    post:
+      description: |
+        Use this endpoint to get a new access token.
+
+        You need to supply a vaild refresh token to use this API - if the refresh token has expired or been revoked the user must login again to get a new one.
+
+        The refresh token should be supplied in a http-only cookie called refresh_token.
+
+        You must also provide a previously issued bearer access token - it does not matter if it has expired
+        (the token is not used to authenticate the request but is needed to establish the ID of the user making the request)
+
+        Note this action automatically revokes the current refresh_token and issues a new one.
+
+        The new refresh token is sent in an http-only cookie named refresh_token.
+        In production deployments the secure flag (https only) on the cookie will be set to true
+
+        Access tokens expire after 30 mins and subsequent requests using the token will fail with an error_code of "access_token_expired"
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.AccessTokenResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.ErrorResponse'
+      security:
+      - BearerRefreshToken: []
+      summary: Refresh access token
       tags:
       - auth
   /health/ready:
@@ -1285,11 +1296,6 @@ produces:
 securityDefinitions:
   BearerAccessToken:
     description: Bearer {JWT access token}
-    in: header
-    name: Authorization
-    type: apiKey
-  BearerRefreshToken:
-    description: Bearer { refresh token }
     in: header
     name: Authorization
     type: apiKey

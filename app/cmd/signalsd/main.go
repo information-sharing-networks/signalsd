@@ -11,15 +11,12 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/nickabs/signalsd/app/internal/auth"
 	"github.com/nickabs/signalsd/app/internal/database"
 	"github.com/nickabs/signalsd/app/internal/handlers"
 	"github.com/nickabs/signalsd/app/internal/logger"
-	internalMiddleware "github.com/nickabs/signalsd/app/internal/middleware"
 	"github.com/nickabs/signalsd/app/internal/routes"
 	"github.com/nickabs/signalsd/app/internal/services"
-	"github.com/rs/zerolog/log"
 
 	signalsd "github.com/nickabs/signalsd/app"
 
@@ -38,11 +35,6 @@ import (
 //	@name						Authorization
 //	@description				Bearer {JWT access token}
 
-//	@securityDefinitions.ApiKey	BearerRefreshToken
-//	@in							header
-//	@name						Authorization
-//	@description				Bearer { refresh token }
-
 //	@tag.name			auth
 //	@tag.description	User and token management endpoints
 
@@ -57,16 +49,20 @@ import (
 
 func main() {
 
-	cfg := signalsd.InitConfig()
+	serverLogger := logger.InitServerLogger()
+
+	cfg := signalsd.InitConfig(serverLogger)
+
+	httpLogger := logger.InitHttpLogger(cfg.LogLevel)
 
 	// db connection
 	db, err := sql.Open("postgres", cfg.DatabaseURL)
 	if err != nil {
-		logger.ServerLogger.Fatal().Err(err).Msg("Error opening database connection")
+		serverLogger.Fatal().Err(err).Msg("Error opening database connection")
 	}
 
 	if err = db.Ping(); err != nil {
-		logger.ServerLogger.Fatal().Err(err).Msg("Error pinging database")
+		serverLogger.Fatal().Err(err).Msg("Error pinging database")
 	}
 
 	queries := database.New(db)
@@ -76,8 +72,8 @@ func main() {
 
 	// user definintion and authentication services
 	usersHandler := handlers.NewUserHandler(queries, authService, db)
-	loginHandler := handlers.NewLoginHandler(queries, authService)
-	tokenHandler := handlers.NewTokenHandler(queries, authService)
+	loginHandler := handlers.NewLoginHandler(queries, authService, cfg.Environment)
+	tokenHandler := handlers.NewTokenHandler(queries, authService, cfg.Environment)
 
 	// site admin services - tood authServices with admin/owner role
 	adminHandler := handlers.NewAdminHandler(queries)
@@ -107,12 +103,9 @@ func main() {
 	}
 	r := chi.NewRouter()
 
-	r.Use(chiMiddleware.RequestID)
-	r.Use(internalMiddleware.LoggerMiddleware)
+	serverLogger.Info().Msg("Starting server")
 
-	log.Info().Msg("Starting server")
-
-	routes.RegisterRoutes(r, services)
+	routes.RegisterRoutes(r, services, httpLogger)
 
 	serverAddr := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
 	server := &http.Server{
@@ -127,16 +120,18 @@ func main() {
 	defer func() {
 		err := db.Close()
 		if err != nil {
-			log.Warn().Msgf("error closing database connections: %v", err)
+			serverLogger.Warn().Msgf("error closing database connections: %v", err)
+		} else {
+			serverLogger.Info().Msg("database connect closed")
 		}
 	}()
 
 	go func() {
-		log.Info().Msgf("%s service listening on %s \n", cfg.Environment, serverAddr)
+		serverLogger.Info().Msgf("%s service listening on %s \n", cfg.Environment, serverAddr)
 
 		err := server.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
-			log.Fatal().Err(err).Msg("Server failed to start")
+			serverLogger.Fatal().Err(err).Msg("Server failed to start")
 		}
 	}()
 
@@ -148,7 +143,7 @@ func main() {
 
 	<-sigint
 
-	log.Info().Msg("service shutting down")
+	serverLogger.Info().Msg("service shutting down")
 
 	// force an exit if server does not shutdown within 10 seconds
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -158,15 +153,13 @@ func main() {
 
 	err = server.Shutdown(ctx)
 	if err != nil {
-		log.Warn().Msgf("shutdown error: %v", err)
+		serverLogger.Warn().Msgf("shutdown error: %v", err)
 	}
-	//todo close DB connection
 
 	close(idleConnsClosed)
-	log.Info().Msg("database connect closed debug")
 
 	<-idleConnsClosed
 
-	log.Info().Msg("server shutdown complete")
+	serverLogger.Info().Msg("server shutdown complete")
 
 }
