@@ -548,15 +548,15 @@ info:
   contact: {}
   description: Signals ISN service API
 paths:
-  /admin/health:
+  /admin/live:
     get:
-      description: check if the signalsd service is running
+      description: check if the signalsd service is up
       responses:
         "200":
           description: OK
         "404":
           description: Not Found
-      summary: Health
+      summary: Liveness check
       tags:
       - admin
   /admin/reset:
@@ -1269,6 +1269,17 @@ paths:
       summary: Revoke refresh token
       tags:
       - auth
+  /health/ready:
+    get:
+      description: check if the signalsd service is ready
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+      summary: Readiness
+      tags:
+      - admin
 produces:
 - application/json
 securityDefinitions:
