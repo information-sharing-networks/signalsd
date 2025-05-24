@@ -68,9 +68,13 @@ func RegisterRoutes(r *chi.Mux, services services.Services) {
 			// pending implementation of admin role
 			r.Get("/users/{id}", services.Users.GetUserHandler)
 		})
-		r.Get("/health", services.Admin.ReadinessHandler) // health check
 	})
-
+	r.Route("/health", func(r chi.Router) {
+		r.Group(func(r chi.Router) {
+			r.Get("/ready", services.Admin.ReadinessHandler) // health check on database
+			r.Get("/live", services.Admin.LivenessHandler)
+		})
+	})
 	// documentation
 	r.Route("/assets", func(r chi.Router) {
 		r.Get("/*", func(w http.ResponseWriter, r *http.Request) {

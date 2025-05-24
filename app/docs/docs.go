@@ -21,13 +21,13 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/admin/health": {
+        "/admin/live": {
             "get": {
-                "description": "check if the signalsd service is running",
+                "description": "check if the signalsd service is up",
                 "tags": [
                     "admin"
                 ],
-                "summary": "Health",
+                "summary": "Liveness check",
                 "responses": {
                     "200": {
                         "description": "OK"
@@ -1038,6 +1038,23 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/response.ErrorResponse"
                         }
+                    }
+                }
+            }
+        },
+        "/health/ready": {
+            "get": {
+                "description": "check if the signalsd service is ready",
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Readiness",
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "404": {
+                        "description": "Not Found"
                     }
                 }
             }
