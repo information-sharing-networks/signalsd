@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/nickabs/signalsd/app/internal/apperrors"
-	"github.com/nickabs/signalsd/app/internal/context"
+	"github.com/nickabs/signalsd/app/internal/auth"
 	"github.com/nickabs/signalsd/app/internal/database"
 	"github.com/nickabs/signalsd/app/internal/helpers"
 	"github.com/nickabs/signalsd/app/internal/response"
@@ -75,7 +75,7 @@ func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *
 
 	isnSlug := r.PathValue("isn_slug")
 
-	userAccountID, ok := context.UserAccountID(r.Context())
+	userAccountID, ok := auth.ContextUserAccountID(r.Context())
 	if !ok {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
 		return
@@ -174,7 +174,7 @@ func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *
 func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *http.Request) {
 	var req UpdateIsnReceiverRequest
 
-	userAccountID, ok := context.UserAccountID(r.Context())
+	userAccountID, ok := auth.ContextUserAccountID(r.Context())
 	if !ok {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
 		return
@@ -250,7 +250,7 @@ func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *
 	if req.ListenerCount != nil {
 		isnReceiver.ListenerCount = *req.ListenerCount
 	}
-	// update isn receiver - todo checks on rows updated
+
 	_, err = i.queries.UpdateIsnReceiver(r.Context(), database.UpdateIsnReceiverParams{
 		IsnID:                      isn.ID,
 		MaxDailyValidationFailures: isnReceiver.MaxDailyValidationFailures,

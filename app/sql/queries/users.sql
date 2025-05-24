@@ -18,10 +18,10 @@ WHERE account_id = $1;
 SELECT * FROM users WHERE email = $1;
 
 -- name: GetUsers :many
-SELECT u.account_id, u.email, u.created_at , u.updated_at FROM users u;
+SELECT u.account_id, u.email, u.user_role, u.created_at , u.updated_at FROM users u;
 
 -- name: GetUserByID :one
-SELECT  u.account_id, u.email, u.created_at  FROM users u WHERE u.account_id = $1;
+SELECT  u.account_id, u.email, u.user_role, u.created_at  FROM users u WHERE u.account_id = $1;
 
 -- name: GetForDisplayUserBySignalDefID :one
 SELECT u.account_id, u.created_at , u.updated_at 

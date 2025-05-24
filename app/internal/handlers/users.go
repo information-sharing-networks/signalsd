@@ -10,7 +10,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/nickabs/signalsd/app/internal/apperrors"
 	"github.com/nickabs/signalsd/app/internal/auth"
-	"github.com/nickabs/signalsd/app/internal/context"
 	"github.com/nickabs/signalsd/app/internal/database"
 	"github.com/nickabs/signalsd/app/internal/response"
 
@@ -42,7 +41,7 @@ type UpdatePasswordRequest struct {
 	NewPassword     string `json:"new_password" example:"ue6U>&X3j570"`
 }
 
-// CreateUserHandler godoc
+// RegisterUserHandler godoc
 //
 //	@Summary		Create user
 //	@Tags			auth
@@ -57,7 +56,7 @@ type UpdatePasswordRequest struct {
 //	@Failure		500	{object}	response.ErrorResponse
 //
 //	@Router			/auth/register [post]
-func (u *UserHandler) CreateUserHandler(w http.ResponseWriter, r *http.Request) {
+func (u *UserHandler) RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 	var req CreateUserRequest
 
 	defer r.Body.Close()
@@ -164,7 +163,7 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 	req := UpdatePasswordRequest{}
 
 	// this request was already authenticated by the middleware
-	userAccountID, ok := context.UserAccountID(r.Context())
+	userAccountID, ok := auth.ContextUserAccountID(r.Context())
 	if !ok {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
 	}
