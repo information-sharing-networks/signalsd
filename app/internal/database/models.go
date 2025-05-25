@@ -54,7 +54,7 @@ type IsnRetriever struct {
 }
 
 type RefreshToken struct {
-	Token         string       `json:"token"`
+	HashedToken   string       `json:"hashed_token"`
 	UserAccountID uuid.UUID    `json:"user_account_id"`
 	CreatedAt     time.Time    `json:"created_at"`
 	UpdatedAt     time.Time    `json:"updated_at"`

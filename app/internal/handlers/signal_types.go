@@ -8,7 +8,7 @@ import (
 	"net/http"
 
 	"github.com/nickabs/signalsd/app/internal/apperrors"
-	"github.com/nickabs/signalsd/app/internal/context"
+	"github.com/nickabs/signalsd/app/internal/auth"
 	"github.com/nickabs/signalsd/app/internal/database"
 	"github.com/nickabs/signalsd/app/internal/helpers"
 	"github.com/nickabs/signalsd/app/internal/response"
@@ -83,7 +83,7 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 	var slug string
 	var semVer string
 
-	userAccountID, ok := context.UserAccountID(r.Context())
+	userAccountID, ok := auth.ContextUserAccountID(r.Context())
 	if !ok {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
 		return
@@ -241,7 +241,7 @@ func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *ht
 
 	var req = UpdateSignalTypeRequest{}
 
-	userAccountID, ok := context.UserAccountID(r.Context())
+	userAccountID, ok := auth.ContextUserAccountID(r.Context())
 	if !ok {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
 	}
@@ -357,7 +357,7 @@ func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *ht
 //	@Router		/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver} [delete]
 func (s *SignalTypeHandler) DeleteSignalTypeHandler(w http.ResponseWriter, r *http.Request) {
 
-	userAccountID, ok := context.UserAccountID(r.Context())
+	userAccountID, ok := auth.ContextUserAccountID(r.Context())
 	if !ok {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
 	}

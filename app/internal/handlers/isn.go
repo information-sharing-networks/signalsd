@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/nickabs/signalsd/app/internal/apperrors"
-	"github.com/nickabs/signalsd/app/internal/context"
+	"github.com/nickabs/signalsd/app/internal/auth"
 	"github.com/nickabs/signalsd/app/internal/database"
 	"github.com/nickabs/signalsd/app/internal/helpers"
 	"github.com/nickabs/signalsd/app/internal/response"
@@ -73,6 +73,7 @@ type IsnAndLinkedInfo struct {
 //	@Failure		500		{object}	response.ErrorResponse
 //
 //	@Security		BearerAccessToken
+//	@Security		RefreshTokenCookieAuth
 //
 //	@Router			/api/isn/{isn_slug} [post]
 func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
@@ -80,7 +81,7 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 
 	var slug string
 
-	userAccountID, ok := context.UserAccountID(r.Context())
+	userAccountID, ok := auth.ContextUserAccountID(r.Context())
 	if !ok {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
 		return
@@ -179,7 +180,7 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 func (i *IsnHandler) UpdateIsnHandler(w http.ResponseWriter, r *http.Request) {
 	var req UpdateIsnRequest
 
-	userAccountID, ok := context.UserAccountID(r.Context())
+	userAccountID, ok := auth.ContextUserAccountID(r.Context())
 	if !ok {
 		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
 		return

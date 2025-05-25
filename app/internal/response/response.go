@@ -6,8 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/nickabs/signalsd/app/internal/apperrors"
-	"github.com/nickabs/signalsd/app/internal/context"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 )
 
 type ErrorResponse struct {
@@ -18,31 +17,31 @@ type ErrorResponse struct {
 }
 
 func RespondWithError(w http.ResponseWriter, r *http.Request, statusCode int, errorCode apperrors.ErrorCode, message string) {
-	reqLog, ok := context.RequestLogger(r.Context())
-	if !ok {
-		reqLog = &log.Logger
-	}
-	reqID := middleware.GetReqID(r.Context())
+	requestLogger := zerolog.Ctx(r.Context())
+	requestID := middleware.GetReqID(r.Context())
 
-	reqLog.Error().
-		Int("status", statusCode).
-		Any("error_code", errorCode).
-		Str("error_message", message).
-		Str("request_id", reqID).
-		Msg("Error response")
+	// Only log real server errors
+	if statusCode >= 500 {
+		requestLogger.Error().
+			Int("status", statusCode).
+			Any("error_code", errorCode).
+			Str("error_message", message).
+			Str("request_id", requestID).
+			Msg("Request failed")
+	}
 
 	errResponse := ErrorResponse{
 		StatusCode: statusCode,
 		ErrorCode:  errorCode,
 		Message:    message,
-		ReqID:      reqID,
+		ReqID:      requestID,
 	}
 
 	dat, err := json.Marshal(errResponse)
 	if err != nil {
-		reqLog.Error().
+		requestLogger.Error().
 			Err(err).
-			Str("request_id", reqID).
+			Str("request_id", requestID).
 			Msg("error marshaling error response")
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(`{"error_code":"internal_error","message":"Internal Server Error"}`))
@@ -55,19 +54,19 @@ func RespondWithError(w http.ResponseWriter, r *http.Request, statusCode int, er
 }
 
 func RespondWithJSON(w http.ResponseWriter, status int, payload any) {
-
 	if status == http.StatusNoContent {
 		w.WriteHeader(status)
 		return
 	}
 
-	dat, err := json.Marshal(payload)
+	data, err := json.Marshal(payload)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Internal Server Error"))
+		w.Write([]byte(`{"error_code":"marshal_error","message":"Internal Server Error"}`))
 		return
 	}
+
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
-	w.Write(dat)
+	w.Write(data)
 }

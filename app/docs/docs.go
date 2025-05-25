@@ -185,6 +185,9 @@ const docTemplate = `{
                 "security": [
                     {
                         "BearerAccessToken": []
+                    },
+                    {
+                        "RefreshTokenCookieAuth": []
                     }
                 ],
                 "description": "Create an Information Sharing Network (ISN)\n\nvisibility = \"private\" means that signalsd on the network can only be seen by network participants.\n\nThe only storage_type currently supported is \"admin_db\"\nwhen storage_type = \"admin_db\" the signalsd are stored in the relational database used by the API service to store the admin configuration\nSpecify \"admin_db\" for storage_connection_url in this case (anything else is overriwtten with this value)",
@@ -818,7 +821,7 @@ const docTemplate = `{
         },
         "/auth/login": {
             "post": {
-                "description": "The response body includes an access token and a refresh_token.\nThe access_token is valid for 1 hour.\n\nUse the refresh_token with the /auth/refresh-token endpoint to renew the access_token.\nThe refresh_token lasts 60 days unless it is revoked earlier.\nTo renew the refresh_token, log in again.",
+                "description": "The response body includes an access token. A refresh token is included in a http-only cookie named refresh_token\nThe access_token is valid for 30 mins.\n\nUse the refresh_token with the /auth/refresh endpoint to renew the access_token.\n\nThe refresh_token lasts 30 days unless it is revoked earlier.\nTo renew the refresh_token, log in again.",
                 "tags": [
                     "auth"
                 ],
@@ -838,7 +841,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.LoginResponse"
+                            "$ref": "#/definitions/auth.AccessTokenResponse"
                         }
                     },
                     "400": {
@@ -916,46 +919,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/auth/refresh-token": {
-            "post": {
-                "security": [
-                    {
-                        "BearerRefreshToken": []
-                    }
-                ],
-                "description": "Use this endpoint to get a new access token.\nAccess tokens expire after an hour and subsequent requests using the token will fail with an error_code of \"access_token_expired\"\n\nYou need to supply a vaild refresh_token to use this API.\nIf the refresh token has expired (\"refresh_token_expired\") or been revoked (\"refresh_token_revoked\") the user must login again to get a new one.",
-                "tags": [
-                    "auth"
-                ],
-                "summary": "Refresh access token",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.RefreshAccessTokenHandler.refreshResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/response.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/auth/register": {
             "post": {
                 "description": "The first user to be created for this service will be created with an admin role.\nSubsequent accounts default to standard user roles.",
@@ -999,24 +962,18 @@ const docTemplate = `{
                 }
             }
         },
-        "/auth/revoke-refresh-token": {
+        "/auth/revoke": {
             "post": {
-                "description": "Revoke a refresh token to prevent it being used to create new access tokens.\n\nNote that any unexpired access tokens issued for this user will continue to work until they expire.\nUsers must log in again to obtain a new refresh token if the current one has been revoked.\n\nAnyone in possession of a refresh token can revoke it",
+                "security": [
+                    {
+                        "BearerRefreshToken": []
+                    }
+                ],
+                "description": "Revoke a refresh token to prevent it being used to create new access tokens.\n\nYou need to supply a vaild refresh token to use this API - if the refresh token has expired or been revoked the user must login again to get a new one.\n\nThe refresh token should be supplied in a http-only cookie called refresh_token.\n\nYou must also provide a previously issued bearer access token - it does not matter if it has expired\n(the token is not used to authenticate the request but is needed to establish the ID of the user making the request)\n\nNote that any unexpired access tokens issued for this user will continue to work until they expire.\nUsers must log in again to obtain a new refresh token if the current one has been revoked.\n",
                 "tags": [
                     "auth"
                 ],
                 "summary": "Revoke refresh token",
-                "parameters": [
-                    {
-                        "description": "refresh token to be revoked",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.RevokeRefreshTokenHandler.revokeRefreshTokenRequest"
-                        }
-                    }
-                ],
                 "responses": {
                     "204": {
                         "description": "No Content"
@@ -1029,6 +986,46 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/token": {
+            "post": {
+                "security": [
+                    {
+                        "BearerRefreshToken": []
+                    }
+                ],
+                "description": "Use this endpoint to get a new access token.\n\nYou need to supply a vaild refresh token to use this API - if the refresh token has expired or been revoked the user must login again to get a new one.\n\nThe refresh token should be supplied in a http-only cookie called refresh_token.\n\nYou must also provide a previously issued bearer access token - it does not matter if it has expired\n(the token is not used to authenticate the request but is needed to establish the ID of the user making the request)\n\nNote this action automatically revokes the current refresh_token and issues a new one.\n\nThe new refresh token is sent in an http-only cookie named refresh_token.\nIn production deployments the secure flag (https only) on the cookie will be set to true\n\nAccess tokens expire after 30 mins and subsequent requests using the token will fail with an error_code of \"access_token_expired\"\n",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Refresh access token",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/auth.AccessTokenResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/response.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
                         "schema": {
                             "$ref": "#/definitions/response.ErrorResponse"
                         }
@@ -1074,8 +1071,7 @@ const docTemplate = `{
                 "malformed_body",
                 "not_implemented",
                 "password_too_short",
-                "refresh_token_expired",
-                "refresh_token_revoked",
+                "refresh_token_invalid",
                 "resource_already_exists",
                 "resource_not_found",
                 "signal_type_closed",
@@ -1094,8 +1090,7 @@ const docTemplate = `{
                 "ErrCodeMalformedBody",
                 "ErrCodeNotImplemented",
                 "ErrCodePasswordTooShort",
-                "ErrCodeRefreshTokenExpired",
-                "ErrCodeRefreshTokenRevoked",
+                "ErrCodeRefreshTokenInvalid",
                 "ErrCodeResourceAlreadyExists",
                 "ErrCodeResourceNotFound",
                 "ErrCodeSignalTypeClosed",
@@ -1103,6 +1098,39 @@ const docTemplate = `{
                 "ErrCodeUserAlreadyExists",
                 "ErrCodeUserNotFound"
             ]
+        },
+        "auth.AccessTokenResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string",
+                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxTZXJ2ZXIiLCJzdWIiOiI2OGZiNWY1Yi1lM2Y1LTRhOTYtOGQzNS1jZDIyMDNhMDZmNzMiLCJleHAiOjE3NDY3NzA2MzQsImlhdCI6MTc0Njc2NzAzNH0.3OdnUNgrvt1Zxs9AlLeaC9DVT6Xwc6uGvFQHb6nDfZs"
+                },
+                "expires_in": {
+                    "description": "seconds",
+                    "type": "integer",
+                    "example": 1800
+                },
+                "isn_perms": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "role": {
+                    "type": "string",
+                    "enum": [
+                        "owner",
+                        "admin",
+                        "member"
+                    ],
+                    "example": "admin"
+                },
+                "token_type": {
+                    "type": "string",
+                    "example": "Bearer"
+                }
+            }
         },
         "database.GetForDisplayIsnReceiverByIsnIDRow": {
             "type": "object",
@@ -1239,6 +1267,9 @@ const docTemplate = `{
                 },
                 "email": {
                     "type": "string"
+                },
+                "user_role": {
+                    "type": "string"
                 }
             }
         },
@@ -1255,6 +1286,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "updated_at": {
+                    "type": "string"
+                },
+                "user_role": {
                     "type": "string"
                 }
             }
@@ -1597,45 +1631,6 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.LoginResponse": {
-            "type": "object",
-            "properties": {
-                "access_token": {
-                    "type": "string",
-                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxTZXJ2ZXIiLCJzdWIiOiI2OGZiNWY1Yi1lM2Y1LTRhOTYtOGQzNS1jZDIyMDNhMDZmNzMiLCJleHAiOjE3NDY3NzA2MzQsImlhdCI6MTc0Njc2NzAzNH0.3OdnUNgrvt1Zxs9AlLeaC9DVT6Xwc6uGvFQHb6nDfZs"
-                },
-                "account_id": {
-                    "type": "string",
-                    "example": "68fb5f5b-e3f5-4a96-8d35-cd2203a06f73"
-                },
-                "created_at": {
-                    "type": "string",
-                    "example": "2025-05-09T05:41:22.57328+01:00"
-                },
-                "refresh_token": {
-                    "type": "string",
-                    "example": "fb948e0b74de1f65e801b4e70fc9c047424ab775f2b4dc5226f472f3b6460c37"
-                }
-            }
-        },
-        "handlers.RefreshAccessTokenHandler.refreshResponse": {
-            "type": "object",
-            "properties": {
-                "access_token": {
-                    "type": "string",
-                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxTZXJ2ZXIiLCJzdWIiOiI2OGZiNWY1Yi1lM2Y1LTRhOTYtOGQzNS1jZDIyMDNhMDZmNzMiLCJleHAiOjE3NDY3NzA2MzQsImlhdCI6MTc0Njc2NzAzNH0.3OdnUNgrvt1Zxs9AlLeaC9DVT6Xwc6uGvFQHb6nDfZs"
-                }
-            }
-        },
-        "handlers.RevokeRefreshTokenHandler.revokeRefreshTokenRequest": {
-            "type": "object",
-            "properties": {
-                "refresh_token": {
-                    "type": "string",
-                    "example": "fb948e0b74de1f65e801b4e70fc9c047424ab775f2b4dc5226f472f3b6460c37"
-                }
-            }
-        },
         "handlers.SignalTypeAndLinkedInfo": {
             "type": "object",
             "properties": {
@@ -1829,12 +1824,6 @@ const docTemplate = `{
     "securityDefinitions": {
         "BearerAccessToken": {
             "description": "Bearer {JWT access token}",
-            "type": "apiKey",
-            "name": "Authorization",
-            "in": "header"
-        },
-        "BearerRefreshToken": {
-            "description": "Bearer { refresh token }",
             "type": "apiKey",
             "name": "Authorization",
             "in": "header"

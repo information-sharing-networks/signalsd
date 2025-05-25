@@ -1,4 +1,4 @@
-package signals
+package signalsd
 
 import (
 	"os"
@@ -6,7 +6,6 @@ import (
 	"time"
 
 	_ "github.com/lib/pq"
-	"github.com/nickabs/signalsd/app/internal/logger"
 	"github.com/rs/zerolog"
 )
 
@@ -29,9 +28,11 @@ type ServiceConfig struct {
 
 // common constants
 const (
-	AccessTokenExpiry     = time.Hour
-	RefreshTokenExpiry    = 60 * 24 * time.Hour
-	MinimumPasswordLength = 11
+	AccessTokenExpiry      = 30 * time.Minute
+	RefreshTokenExpiry     = 30 * 24 * time.Hour
+	MinimumPasswordLength  = 11
+	RefreshTokenCookieName = "refresh_token"
+	TokenIssuerName        = "Signalsd"
 )
 
 // common maps - used to validate enum values
@@ -71,8 +72,14 @@ var ValidReceiverStatus = map[string]bool{ // ins_receiver.receiver_status
 	"closed":  true,
 }
 
+var ValidRoles = map[string]bool{ // users.user_role
+	"owner":  true,
+	"admin":  true,
+	"member": true,
+}
+
 // InitConfig loads environment variables and returns a ServiceConfig struct
-func InitConfig() *ServiceConfig {
+func InitConfig(logger zerolog.Logger) *ServiceConfig {
 	const (
 		defaultHost        = "127.0.0.1"
 		defaultPort        = 8080
@@ -85,61 +92,60 @@ func InitConfig() *ServiceConfig {
 
 	logLevelStr := os.Getenv("SIGNALS_LOG_LEVEL")
 	if logLevelStr == "" {
-		logger.ServerLogger.Warn().Msgf("SIGNALS_LOG_LEVEL not set, defaulting to %s", defaultLogLevelStr)
+		logger.Warn().Msgf("SIGNALS_LOG_LEVEL not set, defaulting to %s", defaultLogLevelStr)
 		logLevelStr = defaultLogLevelStr
 	}
 	logLevel, err := zerolog.ParseLevel(logLevelStr)
 	if err != nil {
 		logLevel = zerolog.DebugLevel
-		logger.ServerLogger.Warn().Msg("SIGNALS_LOG_LEVEL not valid, defaulting to debug")
+		logger.Warn().Msg("SIGNALS_LOG_LEVEL not valid, defaulting to debug")
 	}
 
-	logger.ServerLogger.Info().Msgf("log level set to {%v} \n", logLevel)
+	logger.Info().Msgf("log level set to {%v} \n", logLevel)
 	zerolog.SetGlobalLevel(logLevel)
-	logger.InitLogger(logLevel)
 
 	// environment
 	environment := os.Getenv("SIGNALS_ENVIRONMENT")
 	if environment == "" {
-		logger.ServerLogger.Warn().Msgf("SIGNALS_ENVIRONMENT environment variable is not set, defaulting to '%s'", defaultEnviromnent)
+		logger.Warn().Msgf("SIGNALS_ENVIRONMENT environment variable is not set, defaulting to '%s'", defaultEnviromnent)
 		environment = defaultEnviromnent
 	}
 
 	_, ok := validEnvs[environment]
 	if !ok {
-		logger.ServerLogger.Fatal().Msgf("invalid SIGNALS_ENVIRONMENT environment variable (expects %v)", validEnvs)
+		logger.Fatal().Msgf("invalid SIGNALS_ENVIRONMENT environment variable (expects %v)", validEnvs)
 	}
 
 	// database
 	databaseURL := os.Getenv("SIGNALS_DB_URL")
 	if databaseURL == "" {
-		logger.ServerLogger.Fatal().Msg("SIGNALS_DB_URL environment variable is not set")
+		logger.Fatal().Msg("SIGNALS_DB_URL environment variable is not set")
 	}
 
 	// http
 	host := os.Getenv("SIGNALS_HOST")
 
 	if host == "" {
-		logger.ServerLogger.Warn().Msgf("SIGNALS_HOST environment variable is not set, defaulting to '%s'", defaultHost)
+		logger.Warn().Msgf("SIGNALS_HOST environment variable is not set, defaulting to '%s'", defaultHost)
 		host = defaultHost
 	}
 	portString := os.Getenv("SIGNALS_PORT")
 	var port int
 
 	if portString == "" {
-		logger.ServerLogger.Warn().Msgf("SIGNALS_PORT environment variable is not set, defaulting to '%d'", defaultPort)
+		logger.Warn().Msgf("SIGNALS_PORT environment variable is not set, defaulting to '%d'", defaultPort)
 		port = defaultPort
 	} else {
 		port, err = strconv.Atoi(portString)
 		if err != nil {
-			logger.ServerLogger.Fatal().Msg("invalid SIGNALS_PORT environment variable")
+			logger.Fatal().Msg("invalid SIGNALS_PORT environment variable")
 		}
 	}
 
 	// secrets
 	secretKey := os.Getenv("SIGNALS_SECRET_KEY")
 	if secretKey == "" {
-		logger.ServerLogger.Fatal().Msg("SIGNALS_SECRET_KEY environment variable is not set")
+		logger.Fatal().Msg("SIGNALS_SECRET_KEY environment variable is not set")
 	}
 
 	return &ServiceConfig{

@@ -138,29 +138,36 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT  u.account_id, u.email, u.created_at  FROM users u WHERE u.account_id = $1
+SELECT  u.account_id, u.email, u.user_role, u.created_at  FROM users u WHERE u.account_id = $1
 `
 
 type GetUserByIDRow struct {
 	AccountID uuid.UUID `json:"account_id"`
 	Email     string    `json:"email"`
+	UserRole  string    `json:"user_role"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
 func (q *Queries) GetUserByID(ctx context.Context, accountID uuid.UUID) (GetUserByIDRow, error) {
 	row := q.db.QueryRowContext(ctx, getUserByID, accountID)
 	var i GetUserByIDRow
-	err := row.Scan(&i.AccountID, &i.Email, &i.CreatedAt)
+	err := row.Scan(
+		&i.AccountID,
+		&i.Email,
+		&i.UserRole,
+		&i.CreatedAt,
+	)
 	return i, err
 }
 
 const getUsers = `-- name: GetUsers :many
-SELECT u.account_id, u.email, u.created_at , u.updated_at FROM users u
+SELECT u.account_id, u.email, u.user_role, u.created_at , u.updated_at FROM users u
 `
 
 type GetUsersRow struct {
 	AccountID uuid.UUID `json:"account_id"`
 	Email     string    `json:"email"`
+	UserRole  string    `json:"user_role"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
@@ -177,6 +184,7 @@ func (q *Queries) GetUsers(ctx context.Context) ([]GetUsersRow, error) {
 		if err := rows.Scan(
 			&i.AccountID,
 			&i.Email,
+			&i.UserRole,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {

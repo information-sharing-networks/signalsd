@@ -4,30 +4,34 @@ import (
 	"os"
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
-var ServerLogger zerolog.Logger
-
-func InitLogger(logLevel zerolog.Level) {
-
-	// default api logger (json)
-	log.Logger = zerolog.New(os.Stdout).
-		Output(os.Stdout).
+func InitServerLogger() zerolog.Logger {
+	logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr}).
+		Level(zerolog.DebugLevel).
 		With().
 		Timestamp().
-		Caller().
 		Logger()
 
-	// server logs
-	ServerLogger = zerolog.New(os.Stdout).
-		Output(zerolog.ConsoleWriter{Out: os.Stdout}).
-		With().
-		Timestamp().
-		Caller().
-		Logger() //std log
+	return logger
+}
+
+func InitHttpLogger(logLevel zerolog.Level) zerolog.Logger {
+	var logger zerolog.Logger
 
 	if logLevel == zerolog.DebugLevel {
-		log.Logger = ServerLogger //user standard console log when in debug mode
+		logger = zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr}).
+			Level(logLevel).
+			With().
+			Timestamp().
+			Logger()
+	} else {
+		logger = zerolog.New(os.Stdout).
+			Level(logLevel).
+			With().
+			Timestamp().
+			Logger()
 	}
+
+	return logger
 }
