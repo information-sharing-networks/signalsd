@@ -6,25 +6,26 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	signalsd "github.com/nickabs/signalsd/app"
 	"github.com/nickabs/signalsd/app/internal/apperrors"
-	"github.com/nickabs/signalsd/app/internal/response"
+	"github.com/nickabs/signalsd/app/internal/utils"
 	"github.com/rs/zerolog"
 )
 
 // checks that access tokens are valid (signed, correctly set of claims, not expired)
 //
-// Adds userAccountID and claims to context.
-func (a AuthService) Authenticate(next http.Handler) http.Handler {
+// Adds accountID and claims to context.
+func (a AuthService) RequireValidAccessToken(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		reqLogger := zerolog.Ctx(r.Context())
+		logger := zerolog.Ctx(r.Context())
 
 		accessToken, err := a.GetAccessTokenFromHeader(r.Header)
 		if err != nil {
-			response.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthorizationFailure, fmt.Sprintf("unauthorized: %v", err))
+			utils.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthorizationFailure, fmt.Sprintf("unauthorized: %v", err))
 			return
 		}
 
@@ -35,28 +36,85 @@ func (a AuthService) Authenticate(next http.Handler) http.Handler {
 		})
 		if err != nil {
 			if errors.Is(err, jwt.ErrTokenExpired) {
-				response.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAccessTokenExpired, "access token expired, please use the refresh api to renew it")
+				utils.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAccessTokenExpired, "access token expired, please use the refresh api to renew it")
 				return
 			}
-			response.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthorizationFailure, fmt.Sprintf("unauthorized: %v", err))
+			utils.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthorizationFailure, fmt.Sprintf("unauthorized: %v", err))
 			return
 		}
 
-		userAccountIDString := claims.Subject
-		userAccountID, err := uuid.Parse(userAccountIDString)
+		accountIDString := claims.Subject
+		accountID, err := uuid.Parse(accountIDString)
 		if err != nil {
-			response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenError, fmt.Sprintf("signed jwt received without a valid userAccountID in sub: %v", err))
+			utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenError, fmt.Sprintf("signed jwt received without a valid accountID in sub: %v", err))
 			return
 		}
 
-		reqLogger.Info().Msgf("user %v access_token sucessfully authenticated", userAccountID)
+		logger.Info().Msgf("user %v access_token sucessfully authenticated", accountID)
 
 		// add user and claims to context
-		ctx := ContextWithUserAccountID(r.Context(), userAccountID)
+		ctx := ContextWithAccountID(r.Context(), accountID)
 		ctx = ContextWithAccessTokenClaims(ctx, claims)
 
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// check the claimed role matches the allowedRoles
+// should only be used after RequireValidAccessToken middlware, which supplies the claims
+func (a AuthService) RequireRole(allowedRoles ...string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			logger := zerolog.Ctx(r.Context())
+			claims, ok := ContextAccessTokenClaims(r.Context())
+			if !ok {
+				utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
+				return
+			}
+
+			for _, role := range allowedRoles {
+				if claims.Role == role {
+					logger.Info().Msg("Role confirmed")
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+			utils.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you do not have permission to use this feature")
+		})
+	}
+}
+
+// check the access_token claims to ensure they can write to this isn
+// should only be used after RequireValidAccessToken middlware, which supplies the claims
+func (a AuthService) RequireIsnWritePermission() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+			logger := zerolog.Ctx(r.Context())
+
+			claims := &AccessTokenClaims{}
+
+			claims, ok := ContextAccessTokenClaims(r.Context())
+			if !ok {
+				utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "check isn write permission: could not get claims from context")
+				return
+			}
+
+			isnSlug := chi.URLParam(r, "isn_slug")
+			if isnSlug == "" {
+				utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInvalidRequest, "check isn write permission: no isn_slug parameter ")
+				return
+			}
+
+			if claims.IsnPerms[isnSlug] == "write" {
+				logger.Debug().Msgf("claim user %v claim isn %v claim perm has write permission", claims.Subject, isnSlug)
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			utils.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you do not have permission to write to this isn")
+		})
+	}
 }
 
 // check that the refresh token is not expired or revoked
@@ -65,12 +123,12 @@ func (a AuthService) Authenticate(next http.Handler) http.Handler {
 func (a AuthService) RequireValidRefreshToken(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		reqLogger := zerolog.Ctx(r.Context())
+		logger := zerolog.Ctx(r.Context())
 
 		// get access token
 		accessToken, err := a.GetAccessTokenFromHeader(r.Header)
 		if err != nil {
-			response.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthorizationFailure, fmt.Sprintf("unauthorized: %v", err))
+			utils.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthorizationFailure, fmt.Sprintf("unauthorized: %v", err))
 			return
 		}
 
@@ -86,13 +144,13 @@ func (a AuthService) RequireValidRefreshToken(next http.Handler) http.Handler {
 			return []byte(a.secretKey), nil
 		})
 		if err != nil && !errors.Is(err, jwt.ErrTokenExpired) {
-			response.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthorizationFailure, fmt.Sprintf("unauthorized: %v", err))
+			utils.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthorizationFailure, fmt.Sprintf("unauthorized: %v", err))
 			return
 		}
 
 		userAccountID, err := uuid.Parse(claims.Subject)
 		if err != nil {
-			response.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthorizationFailure, fmt.Sprintf("could not get user from claims: %v", err))
+			utils.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthorizationFailure, fmt.Sprintf("could not get user from claims: %v", err))
 			return
 		}
 
@@ -100,10 +158,10 @@ func (a AuthService) RequireValidRefreshToken(next http.Handler) http.Handler {
 		returnedRefreshTokenRow, err := a.queries.GetValidRefreshTokenByUserAccountId(r.Context(), userAccountID)
 		if err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
-				response.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeRefreshTokenInvalid, "unauthorised: session expired, please log in again")
+				utils.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeRefreshTokenInvalid, "unauthorised: session expired, please log in again")
 				return
 			}
-			response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+			utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 			return
 		}
 
@@ -111,24 +169,24 @@ func (a AuthService) RequireValidRefreshToken(next http.Handler) http.Handler {
 		cookie, err := r.Cookie(signalsd.RefreshTokenCookieName)
 		if err != nil {
 			if err == http.ErrNoCookie {
-				response.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeRefreshTokenInvalid, "unauthorised: refresh_token cookie not found")
+				utils.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeRefreshTokenInvalid, "unauthorised: refresh_token cookie not found")
 				return
 			}
-			response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("could not read cookie: %v", err))
+			utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("could not read cookie: %v", err))
 			return
 		}
 
 		// authenticate the request
 		ok := a.CheckTokenHash(returnedRefreshTokenRow.HashedToken, cookie.Value)
 		if !ok {
-			response.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeRefreshTokenInvalid, "unauthorised: invalid token, please log in again")
+			utils.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeRefreshTokenInvalid, "unauthorised: invalid token, please log in again")
 			return
 		}
 
-		reqLogger.Info().Msgf("user %v refresh_token validated", userAccountID)
+		logger.Info().Msgf("user %v refresh_token validated", userAccountID)
 
 		// userAccountID and hashedRefreshToken are needed by the token handler
-		ctx := ContextWithUserAccountID(r.Context(), userAccountID)
+		ctx := ContextWithAccountID(r.Context(), userAccountID)
 		ctx = ContextWithHashedRefreshToken(ctx, returnedRefreshTokenRow.HashedToken)
 
 		next.ServeHTTP(w, r.WithContext(ctx))
@@ -138,33 +196,13 @@ func (a AuthService) RequireValidRefreshToken(next http.Handler) http.Handler {
 func (a AuthService) RequireDevEnv(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		reqLogger := zerolog.Ctx(r.Context())
+		logger := zerolog.Ctx(r.Context())
 
 		if a.environment != "dev" {
-			response.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "this api can only be used in the dev environment")
+			utils.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "this api can only be used in the dev environment")
 			return
 		}
-		reqLogger.Info().Msg("Dev environment confirmed")
+		logger.Info().Msg("Dev environment confirmed")
 		next.ServeHTTP(w, r)
 	})
-}
-func (a AuthService) RequireRole(allowedRoles ...string) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			claims, ok := ContextAccessTokenClaims(r.Context())
-			if !ok {
-				response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
-				return
-			}
-
-			for _, role := range allowedRoles {
-				if claims.Role == role {
-					next.ServeHTTP(w, r)
-					return
-				}
-			}
-
-			response.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you do not have permission to use this feature")
-		})
-	}
 }

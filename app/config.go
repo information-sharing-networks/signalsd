@@ -17,7 +17,7 @@ config sets up shared variables for the service:
 */
 
 // service configuration
-type ServiceConfig struct {
+type ServerConfig struct {
 	Environment string
 	Host        string
 	Port        int
@@ -79,7 +79,7 @@ var ValidRoles = map[string]bool{ // users.user_role
 }
 
 // InitConfig loads environment variables and returns a ServiceConfig struct
-func InitConfig(logger zerolog.Logger) *ServiceConfig {
+func InitConfig(logger *zerolog.Logger) *ServerConfig {
 	const (
 		defaultHost        = "127.0.0.1"
 		defaultPort        = 8080
@@ -148,7 +148,7 @@ func InitConfig(logger zerolog.Logger) *ServiceConfig {
 		logger.Fatal().Msg("SIGNALS_SECRET_KEY environment variable is not set")
 	}
 
-	return &ServiceConfig{
+	return &ServerConfig{
 		Environment: environment,
 		Host:        host,
 		Port:        port,

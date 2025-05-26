@@ -25,7 +25,7 @@ CREATE TABLE accounts (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
     account_type TEXT NOT NULL,
     CONSTRAINT account_type_check
-    CHECK (account_type IN ('service_account','user'))
+    CHECK (account_type IN ('service_identity','user'))
 );
 
 ALTER TABLE users
