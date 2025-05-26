@@ -7,6 +7,8 @@ package database
 
 import (
 	"context"
+
+	"github.com/google/uuid"
 )
 
 const createServiceIdentityAccount = `-- name: CreateServiceIdentityAccount :one
@@ -42,5 +44,31 @@ func (q *Queries) CreateUserAccount(ctx context.Context) (Account, error) {
 		&i.UpdatedAt,
 		&i.AccountType,
 	)
+	return i, err
+}
+
+const getAccountByID = `-- name: GetAccountByID :one
+SELECT 
+    a.id ,
+    a.account_type, 
+    COALESCE(u.user_role, 'member') AS account_role
+FROM 
+    accounts a
+LEFT OUTER JOIN users u
+ON a.id = u.account_id
+WHERE a.id = $1
+`
+
+type GetAccountByIDRow struct {
+	ID          uuid.UUID `json:"id"`
+	AccountType string    `json:"account_type"`
+	AccountRole string    `json:"account_role"`
+}
+
+// service_identities can't be owners or admins and are therefore always treated as members.
+func (q *Queries) GetAccountByID(ctx context.Context, id uuid.UUID) (GetAccountByIDRow, error) {
+	row := q.db.QueryRowContext(ctx, getAccountByID, id)
+	var i GetAccountByIDRow
+	err := row.Scan(&i.ID, &i.AccountType, &i.AccountRole)
 	return i, err
 }

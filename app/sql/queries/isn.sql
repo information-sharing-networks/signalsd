@@ -46,6 +46,23 @@ WHERE sd.id = $1;
 SELECT i.* 
 FROM isn i;
 
+-- name: GetIsnsWithIsnReceiver :many
+SELECT
+    i.id,
+    i.user_account_id,
+    i.slug,
+    i.is_in_use,
+    i.visibility,
+    i.storage_type,
+    i.storage_connection_url,
+    ir.max_daily_validation_failures,
+    ir.max_payload_kilobytes,
+    ir.payload_validation,
+    ir.default_rate_limit,
+    COALESCE(ir.receiver_status, 'offline') AS receiver_status
+FROM isn i
+LEFT OUTER JOIN isn_receivers ir
+ON i.id = ir.isn_id;
 
 -- name: GetForDisplayIsnBySlug :one
 SELECT 

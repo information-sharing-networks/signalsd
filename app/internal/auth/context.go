@@ -12,17 +12,17 @@ type contextKey struct {
 }
 
 var (
-	userAccountIDKey      = contextKey{"user-id"}
+	accountIDKey          = contextKey{"user-id"}
 	accessTokenClaimsKey  = contextKey{"access-token-claims"}
 	hashedRefreshTokenKey = contextKey{"hashed_refersh_token"}
 )
 
-func ContextWithUserAccountID(ctx context.Context, id uuid.UUID) context.Context {
-	return context.WithValue(ctx, userAccountIDKey, id)
+func ContextWithAccountID(ctx context.Context, id uuid.UUID) context.Context {
+	return context.WithValue(ctx, accountIDKey, id)
 }
 
-func ContextUserAccountID(ctx context.Context) (uuid.UUID, bool) {
-	id, ok := ctx.Value(userAccountIDKey).(uuid.UUID)
+func ContextAccountID(ctx context.Context) (uuid.UUID, bool) {
+	id, ok := ctx.Value(accountIDKey).(uuid.UUID)
 	return id, ok
 }
 

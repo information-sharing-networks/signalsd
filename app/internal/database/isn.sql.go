@@ -7,6 +7,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
@@ -226,6 +227,76 @@ func (q *Queries) GetIsns(ctx context.Context) ([]Isn, error) {
 			&i.Visibility,
 			&i.StorageType,
 			&i.StorageConnectionURL,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getIsnsWithIsnReceiver = `-- name: GetIsnsWithIsnReceiver :many
+SELECT
+    i.id,
+    i.user_account_id,
+    i.slug,
+    i.is_in_use,
+    i.visibility,
+    i.storage_type,
+    i.storage_connection_url,
+    ir.max_daily_validation_failures,
+    ir.max_payload_kilobytes,
+    ir.payload_validation,
+    ir.default_rate_limit,
+    COALESCE(ir.receiver_status, 'offline') AS receiver_status
+FROM isn i
+LEFT OUTER JOIN isn_receivers ir
+ON i.id = ir.isn_id
+`
+
+type GetIsnsWithIsnReceiverRow struct {
+	ID                         uuid.UUID      `json:"id"`
+	UserAccountID              uuid.UUID      `json:"user_account_id"`
+	Slug                       string         `json:"slug"`
+	IsInUse                    bool           `json:"is_in_use"`
+	Visibility                 string         `json:"visibility"`
+	StorageType                string         `json:"storage_type"`
+	StorageConnectionURL       string         `json:"storage_connection_url"`
+	MaxDailyValidationFailures sql.NullInt32  `json:"max_daily_validation_failures"`
+	MaxPayloadKilobytes        sql.NullInt32  `json:"max_payload_kilobytes"`
+	PayloadValidation          sql.NullString `json:"payload_validation"`
+	DefaultRateLimit           sql.NullInt32  `json:"default_rate_limit"`
+	ReceiverStatus             string         `json:"receiver_status"`
+}
+
+func (q *Queries) GetIsnsWithIsnReceiver(ctx context.Context) ([]GetIsnsWithIsnReceiverRow, error) {
+	rows, err := q.db.QueryContext(ctx, getIsnsWithIsnReceiver)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetIsnsWithIsnReceiverRow
+	for rows.Next() {
+		var i GetIsnsWithIsnReceiverRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserAccountID,
+			&i.Slug,
+			&i.IsInUse,
+			&i.Visibility,
+			&i.StorageType,
+			&i.StorageConnectionURL,
+			&i.MaxDailyValidationFailures,
+			&i.MaxPayloadKilobytes,
+			&i.PayloadValidation,
+			&i.DefaultRateLimit,
+			&i.ReceiverStatus,
 		); err != nil {
 			return nil, err
 		}
