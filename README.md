@@ -187,7 +187,10 @@ run `sqlc generate` from the root of the project to regenerate the type safe go 
 
 
 
-## database overview
-### ISN set-up
+## architecture overview
+### ISN config
+![ISN config](https://github.com/user-attachments/assets/cc0aa836-b52f-4c4b-88ff-0370dc97ea8d)
 
-![signalsd_isn](https://github.com/user-attachments/assets/484dc2e1-7c79-4948-9bbb-3bbe0c5a8f81)
+## Auth
+![auth](https://github.com/user-attachments/assets/cf0b1b89-fc18-42da-b8e4-f7191c664b24)
+
