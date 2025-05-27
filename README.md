@@ -189,8 +189,9 @@ run `sqlc generate` from the root of the project to regenerate the type safe go 
 
 ## architecture overview
 ### ISN config
-![ISN config](https://github.com/user-attachments/assets/cc0aa836-b52f-4c4b-88ff-0370dc97ea8d)
+![ISN config](https://github.com/user-attachments/assets/a91e20c6-65bc-4af1-a6a3-5077084f9f7c)
 
 ## Auth
-![auth](https://github.com/user-attachments/assets/cf0b1b89-fc18-42da-b8e4-f7191c664b24)
+![Auth](https://github.com/user-attachments/assets/c9e1c600-04ed-462e-a3a6-17734f291cbf)
+
 
