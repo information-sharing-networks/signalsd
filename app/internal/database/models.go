@@ -6,6 +6,7 @@ package database
 
 import (
 	"database/sql"
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,6 +31,12 @@ type Isn struct {
 	Visibility           string    `json:"visibility"`
 	StorageType          string    `json:"storage_type"`
 	StorageConnectionURL string    `json:"storage_connection_url"`
+}
+
+type IsnAccount struct {
+	IsnID      uuid.UUID `json:"isn_id"`
+	AccountID  uuid.UUID `json:"account_id"`
+	Permission string    `json:"permission"`
 }
 
 type IsnReceiver struct {
@@ -69,6 +76,32 @@ type ServiceIdentity struct {
 	ClientID           string    `json:"client_id"`
 	ClientSecret       string    `json:"client_secret"`
 	ClientContactEmail string    `json:"client_contact_email"`
+}
+
+type Signal struct {
+	ID                 uuid.UUID       `json:"id"`
+	CreatedAt          sql.NullTime    `json:"created_at"`
+	AccountID          uuid.UUID       `json:"account_id"`
+	SignalBatchID      uuid.UUID       `json:"signal_batch_id"`
+	CorrelationID      uuid.UUID       `json:"correlation_id"`
+	SignalTypeID       uuid.UUID       `json:"signal_type_id"`
+	LocalRef           string          `json:"local_ref"`
+	VersionNumber      int32           `json:"version_number"`
+	IsLatest           bool            `json:"is_latest"`
+	IsWithdrawn        bool            `json:"is_withdrawn"`
+	IsArchived         bool            `json:"is_archived"`
+	JsonValidityStatus string          `json:"json_validity_status"`
+	JsonPayload        json.RawMessage `json:"json_payload"`
+}
+
+type SignalBatch struct {
+	ID          uuid.UUID    `json:"id"`
+	CreatedAt   sql.NullTime `json:"created_at"`
+	UpdatedAt   sql.NullTime `json:"updated_at"`
+	IsnID       uuid.UUID    `json:"isn_id"`
+	AccountID   uuid.UUID    `json:"account_id"`
+	IsLatest    bool         `json:"is_latest"`
+	AccountType string       `json:"account_type"`
 }
 
 type SignalType struct {

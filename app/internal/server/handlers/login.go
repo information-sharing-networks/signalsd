@@ -8,8 +8,8 @@ import (
 	"github.com/nickabs/signalsd/app/internal/apperrors"
 	"github.com/nickabs/signalsd/app/internal/auth"
 	"github.com/nickabs/signalsd/app/internal/database"
-	"github.com/nickabs/signalsd/app/internal/response"
-	"github.com/rs/zerolog/log"
+	"github.com/nickabs/signalsd/app/internal/utils"
+	"github.com/rs/zerolog"
 )
 
 type LoginHandler struct {
@@ -47,56 +47,57 @@ type LoginRequest struct {
 //	@Example value { "access_token": "abc...", "token_type": "Bearer", "expires_in": 1800, "role": "member", "isn_perms": { "isn-slug-1": "write", "isn-slug-2": "read" } }
 //
 //	@Success		200		{object}	auth.AccessTokenResponse
-//	@Failure		400		{object}	response.ErrorResponse
-//	@Failure		401		{object}	response.ErrorResponse
-//	@Failure		500		{object}	response.ErrorResponse
+//	@Failure		400		{object}	utils.ErrorResponse
+//	@Failure		401		{object}	utils.ErrorResponse
+//	@Failure		500		{object}	utils.ErrorResponse
 //
 //	@Router			/auth/login [post]
 func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
+	logger := zerolog.Ctx(r.Context())
 
 	defer r.Body.Close()
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
+		utils.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
 		return
 	}
 
 	exists, err := l.queries.ExistsUserWithEmail(r.Context(), req.Email)
 	if err != nil {
-		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
 	}
 	if !exists {
-		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeUserNotFound, "no user found with this email address")
+		utils.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeUserNotFound, "no user found with this email address")
 		return
 	}
 
 	user, err := l.queries.GetUserByEmail(r.Context(), req.Email)
 	if err != nil {
-		response.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		utils.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
 	}
 
 	err = l.authService.CheckPasswordHash(user.HashedPassword, req.Password)
 	if err != nil {
-		response.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "Incorrect email or password")
+		utils.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "Incorrect email or password")
 		return
 	}
 
 	// new access token
-	ctx := auth.ContextWithUserAccountID(r.Context(), user.AccountID)
+	ctx := auth.ContextWithAccountID(r.Context(), user.AccountID)
 
 	accessTokenResponse, err := l.authService.BuildAccessTokenResponse(ctx)
 	if err != nil {
-		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenError, fmt.Sprintf("error creating access token: %v", err))
+		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenError, fmt.Sprintf("error creating access token: %v", err))
 		return
 	}
 
 	// new refresh token
 	refreshToken, err := l.authService.RotateRefreshToken(ctx)
 	if err != nil {
-		response.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenError, fmt.Sprintf("error creating refresh token: %v", err))
+		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenError, fmt.Sprintf("error creating refresh token: %v", err))
 		return
 	}
 
@@ -105,6 +106,6 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	http.SetCookie(w, newCookie)
 
-	log.Info().Msgf("user %s logged in", user.AccountID)
-	response.RespondWithJSON(w, http.StatusOK, accessTokenResponse)
+	logger.Info().Msgf("user %s logged in", user.AccountID)
+	utils.RespondWithJSON(w, http.StatusOK, accessTokenResponse)
 }

@@ -6,17 +6,17 @@ import (
 	"github.com/rs/zerolog"
 )
 
-func InitServerLogger() zerolog.Logger {
+func InitServerLogger() *zerolog.Logger {
 	logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr}).
 		Level(zerolog.DebugLevel).
 		With().
 		Timestamp().
 		Logger()
 
-	return logger
+	return &logger
 }
 
-func InitHttpLogger(logLevel zerolog.Level) zerolog.Logger {
+func InitHttpLogger(logLevel zerolog.Level) *zerolog.Logger {
 	var logger zerolog.Logger
 
 	if logLevel == zerolog.DebugLevel {
@@ -33,5 +33,5 @@ func InitHttpLogger(logLevel zerolog.Level) zerolog.Logger {
 			Logger()
 	}
 
-	return logger
+	return &logger
 }
