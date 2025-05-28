@@ -15,6 +15,15 @@ type WebhookHandler struct {
 func NewWebhookHandler(queries *database.Queries) *WebhookHandler {
 	return &WebhookHandler{queries: queries}
 }
-func (wh *WebhookHandler) HandlerWebhook(w http.ResponseWriter, r *http.Request) {
+
+// HandlerWebhooks godocs
+//
+//	@Summary		Register webhook
+//	@Tags			Signals Management
+//
+//	@Description	TODO - register a webhook to recieve signals batch status updates
+//
+//	@Router			/webhooks [post]
+func (wh *WebhookHandler) HandlerWebhooks(w http.ResponseWriter, r *http.Request) {
 	utils.RespondWithError(w, r, http.StatusNoContent, apperrors.ErrCodeNotImplemented, "todo - webhooks not yet implemented")
 }

@@ -54,10 +54,13 @@ ON signals (account_id, signal_type_id, local_ref, version_number) WHERE is_late
 
 
 CREATE TABLE isn_accounts (
+    id UUID PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE,
+    updated_at TIMESTAMP WITH TIME ZONE,
     isn_id UUID NOT NULL,
     account_id UUID NOT NULL,
     permission TEXT NOT NULL,
-CONSTRAINT isn_accounts_pk PRIMARY KEY (isn_id, account_id, permission),
+CONSTRAINT isn_accounts_unique UNIQUE (isn_id, account_id ),
 CONSTRAINT isn_accounts_permission_check
     CHECK (permission IN ('read','write')),
 CONSTRAINT fk_isn_accounts_accounts FOREIGN KEY (account_id)

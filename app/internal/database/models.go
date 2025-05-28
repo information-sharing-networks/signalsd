@@ -34,9 +34,12 @@ type Isn struct {
 }
 
 type IsnAccount struct {
-	IsnID      uuid.UUID `json:"isn_id"`
-	AccountID  uuid.UUID `json:"account_id"`
-	Permission string    `json:"permission"`
+	ID         uuid.UUID    `json:"id"`
+	CreatedAt  sql.NullTime `json:"created_at"`
+	UpdatedAt  sql.NullTime `json:"updated_at"`
+	IsnID      uuid.UUID    `json:"isn_id"`
+	AccountID  uuid.UUID    `json:"account_id"`
+	Permission string       `json:"permission"`
 }
 
 type IsnReceiver struct {

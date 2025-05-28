@@ -56,15 +56,18 @@ type UpdateIsnReceiverRequest struct {
 //	@Description	the isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services
 //	@Description
 //	@Description	note receivers are always created in 'offline' mode.
+//	@Description
+//	@Description	This endpoint can only be used by the site owner or the ISN admin
 //
 //	@Tags			ISN config
 //
-//	@Param			request	body		handlers.CreateIsnReceiverRequest	true	"ISN receiver details"
+//	@Param			isn_slug	path		string								true	"isn slug"	example(sample-isn--example-org)
+//	@Param			request		body		handlers.CreateIsnReceiverRequest	true	"ISN receiver details"
 //
-//	@Success		201		{object}	handlers.CreateIsnReceiverResponse
-//	@Failure		400		{object}	utils.ErrorResponse
-//	@Failure		409		{object}	utils.ErrorResponse
-//	@Failure		500		{object}	utils.ErrorResponse
+//	@Success		201			{object}	handlers.CreateIsnReceiverResponse
+//	@Failure		400			{object}	utils.ErrorResponse
+//	@Failure		409			{object}	utils.ErrorResponse
+//	@Failure		500			{object}	utils.ErrorResponse
 //
 //	@Security		BearerAccessToken
 //
@@ -158,6 +161,9 @@ func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *
 //	@Summary	Update an ISN Receiver
 //
 //	@Tags		ISN config
+//
+//	@Description
+//	@Description	This endpoint can only be used by the site owner or the ISN admin
 //
 //	@Param		isn_slug	path	string								true	"isn slug"	example(sample-isn--example-org)
 //	@Param		request		body	handlers.UpdateIsnReceiverRequest	true	"ISN receiver details"

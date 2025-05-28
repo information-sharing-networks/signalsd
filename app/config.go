@@ -78,6 +78,11 @@ var ValidRoles = map[string]bool{ // users.user_role
 	"member": true,
 }
 
+var ValidISNPermissions = map[string]bool{ // isn_accounts.permission
+	"read":  true,
+	"write": true,
+}
+
 // InitConfig loads environment variables and returns a ServiceConfig struct
 func InitConfig(logger *zerolog.Logger) *ServerConfig {
 	const (
