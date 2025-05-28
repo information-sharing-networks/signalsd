@@ -21,79 +21,11 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/admin/accounts/{account_id}": {
-            "put": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "this endpoint can only be used by the site owner account",
-                "tags": [
-                    "admin"
-                ],
-                "summary": "Grant account admin role",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
-                        "description": "account id",
-                        "name": "account_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "this endpoint can only be used by the site owner account",
-                "tags": [
-                    "admin"
-                ],
-                "summary": "Revoke account admin role",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
-                        "description": "account id",
-                        "name": "account_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/admin/live": {
             "get": {
                 "description": "check if the signalsd service is up",
                 "tags": [
-                    "admin"
+                    "Site admin"
                 ],
                 "summary": "Liveness check",
                 "responses": {
@@ -110,7 +42,7 @@ const docTemplate = `{
             "post": {
                 "description": "Delete all registered users and associated data.\nThis endpoint only works on environments configured as 'dev'",
                 "tags": [
-                    "admin"
+                    "Site admin"
                 ],
                 "summary": "reset",
                 "responses": {
@@ -953,6 +885,88 @@ const docTemplate = `{
                 }
             }
         },
+        "/auth/admins/account/{account_id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "This endpoint grants the admin role to a site member\n\nAn admin can:\n- Create an ISN\n- Define the signal_types used in the ISN\n- read/write to their own ISNs\n- Grant other accounts read or write access to their ISNs\n- Create service identities ('service accounts')\n\nthis endpoint can only be used by the site owner account",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Grant admin role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
+                        "description": "account id",
+                        "name": "account_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/admins/{account_id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "this endpoint can only be used by the site owner account",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Revoke account admin role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
+                        "description": "account id",
+                        "name": "account_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/login": {
             "post": {
                 "description": "The response body includes an access token. A refresh token is included in a http-only cookie named refresh_token\nThe access_token is valid for 30 mins.\n\nUse the refresh_token with the /auth/refresh endpoint to renew the access_token.\n\nThe refresh_token lasts 30 days unless it is revoked earlier.\nTo renew the refresh_token, log in again.",
@@ -1177,7 +1191,7 @@ const docTemplate = `{
             "get": {
                 "description": "check if the signalsd service is ready",
                 "tags": [
-                    "admin"
+                    "Site admin"
                 ],
                 "summary": "Readiness",
                 "responses": {
@@ -2113,6 +2127,10 @@ const docTemplate = `{
         {
             "description": "View information about the configured ISNs",
             "name": "ISN view"
+        },
+        {
+            "description": "Site adminstration tools",
+            "name": "Site admin"
         }
     ]
 }`

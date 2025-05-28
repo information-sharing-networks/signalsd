@@ -75,8 +75,6 @@ func (s *Server) registerRoutes() {
 
 	// auth
 	s.router.Route("/auth", func(r chi.Router) {
-		r.Post("/register", users.RegisterUserHandler)
-		r.Post("/login", login.LoginHandler)
 
 		r.Group(func(r chi.Router) {
 			r.Use(s.authService.RequireValidAccessToken)
@@ -91,6 +89,15 @@ func (s *Server) registerRoutes() {
 			r.Post("/revoke", tokens.RevokeRefreshTokenHandler)
 		})
 
+		r.Group(func(r chi.Router) {
+			r.Use(s.authService.RequireValidAccessToken)
+			r.Use(s.authService.RequireRole("owner"))
+			r.Put("/admins/account/{account_id}", users.GrantUserAdminRoleHandler)
+			r.Delete("/admins/account/{account_id}", users.RevokeUserAdminRoleHandler)
+		})
+
+		r.Post("/register", users.RegisterUserHandler)
+		r.Post("/login", login.LoginHandler)
 		r.Get("/users", users.GetUsersHandler)
 	})
 
@@ -142,7 +149,7 @@ func (s *Server) registerRoutes() {
 		r.Get("/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}", signalTypes.GetSignalTypeHandler)
 	})
 
-	// Admin
+	// Site Admin
 	s.router.Route("/admin", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
 			r.Use(s.authService.RequireDevEnv)

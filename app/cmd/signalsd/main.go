@@ -38,6 +38,9 @@ import (
 //	@tag.name			ISN view
 //	@tag.description	View information about the configured ISNs
 
+//	@tag.name			Site admin
+//	@tag.description	Site adminstration tools
+
 func main() {
 
 	serverLogger := logger.InitServerLogger()
