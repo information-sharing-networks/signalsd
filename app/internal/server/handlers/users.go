@@ -12,6 +12,7 @@ import (
 	"github.com/nickabs/signalsd/app/internal/auth"
 	"github.com/nickabs/signalsd/app/internal/database"
 	"github.com/nickabs/signalsd/app/internal/utils"
+	"github.com/rs/zerolog"
 
 	signalsd "github.com/nickabs/signalsd/app"
 )
@@ -226,6 +227,150 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 
 	utils.RespondWithJSON(w, http.StatusNoContent, "")
 
+}
+
+// GrantUserAdminRoleHandler godocs
+//
+//	@Summary		Grant admin role
+//	@Tags			auth
+//
+//	@Description	This endpoint grants the admin role to a site member
+//	@Description
+//	@Description	An admin can:
+//	@Description	- Create an ISN
+//	@Description	- Define the signal_types used in the ISN
+//	@Description	- read/write to their own ISNs
+//	@Description	- Grant other accounts read or write access to their ISNs
+//	@Description	- Create service identities ('service accounts')
+//	@Description
+//	@Description	this endpoint can only be used by the site owner account
+//
+//	@Param			account_id	path		string	true	"account id"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
+//
+//	@Success		204
+//	@Failure		400			{object}	utils.ErrorResponse
+//	@Failure		403			{object}	utils.ErrorResponse
+//	@Failure		500			{object}	utils.ErrorResponse
+//
+//	@Security		BearerAccessToken
+//
+//	@Router			/auth/admins/account/{account_id} [put]
+//
+//	this handler must use the RequireRole (owner) middlewear
+func (u *UserHandler) GrantUserAdminRoleHandler(w http.ResponseWriter, r *http.Request) {
+
+	logger := zerolog.Ctx(r.Context())
+
+	// get user account id for user making request
+	userAccountID, ok := auth.ContextAccountID(r.Context())
+	if !ok {
+		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
+		return
+	}
+
+	// get target account
+	targetAccountIDString := r.PathValue("account_id")
+	targetAccountID, err := uuid.Parse(targetAccountIDString)
+	if err != nil {
+		utils.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, fmt.Sprintf("Invalid account ID: %v", err))
+		return
+	}
+	targetAccount, err := u.queries.GetAccountByID(r.Context(), targetAccountID)
+	if err != nil {
+		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not get account %v from database: %v", targetAccountID, err))
+		return
+	}
+
+	// prevent owners trying to make themselves admin
+	if userAccountID == targetAccountID {
+		utils.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "the owner account is not permitted to change its own role to admin")
+		return
+	}
+
+	if targetAccount.AccountType != "user" {
+		utils.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "this end point should not be used for service identities")
+		return
+	}
+
+	if targetAccount.AccountRole == "admin" {
+		utils.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, fmt.Sprintf("%v is already an admin", targetAccountID))
+		return
+	}
+
+	//update user role
+	rowsUpdated, err := u.queries.UpdateUserAccountToAdmin(r.Context(), targetAccountID)
+	if err != nil || rowsUpdated == 0 {
+		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not get account %v from database: %v", targetAccountID, err))
+		return
+	}
+	logger.Info().Msgf("%v updated to be an admin", targetAccountID)
+	utils.RespondWithJSON(w, http.StatusNoContent, "")
+}
+
+// RevokeAccountAdmin godocs
+//
+//	@Summary		Revoke account admin role
+//	@Tags			auth
+//
+//	@Description	this endpoint can only be used by the site owner account
+//
+//	@Param			account_id	path		string	true	"account id"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
+//
+//	@Success		204
+//	@Failure		500			{object}	utils.ErrorResponse
+//
+//	@Security		BearerAccessToken
+//
+//	@Router			/auth/admins/{account_id} [delete]
+//
+//	this handler must use the RequireRole (owner) middlewar
+func (u *UserHandler) RevokeUserAdminRoleHandler(w http.ResponseWriter, r *http.Request) {
+	logger := zerolog.Ctx(r.Context())
+
+	// get user account id for user making request
+	userAccountID, ok := auth.ContextAccountID(r.Context())
+	if !ok {
+		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
+		return
+	}
+
+	// get target account
+	targetAccountIDString := r.PathValue("account_id")
+	targetAccountID, err := uuid.Parse(targetAccountIDString)
+	if err != nil {
+		utils.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, fmt.Sprintf("Invalid account ID: %v", err))
+		return
+	}
+	targetAccount, err := u.queries.GetAccountByID(r.Context(), targetAccountID)
+	if err != nil {
+		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not get account %v from database: %v", targetAccountID, err))
+		return
+	}
+
+	// prevent owners trying to make themselves admin
+	if userAccountID == targetAccountID {
+		utils.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "the owner account is not permitted to change its own role")
+		return
+	}
+
+	if targetAccount.AccountType != "user" {
+		utils.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "this end point should not be used for service identities")
+		return
+	}
+
+	if targetAccount.AccountRole != "admin" {
+		utils.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, fmt.Sprintf("%v is not an admin", targetAccountID))
+		return
+	}
+
+	//update user role
+	rowsUpdated, err := u.queries.UpdateUserAccountToMember(r.Context(), targetAccountID)
+	if err != nil || rowsUpdated == 0 {
+		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not get account %v from database: %v", targetAccountID, err))
+		return
+	}
+	logger.Info().Msgf("%v: admin role revoked", targetAccountID)
+	utils.RespondWithJSON(w, http.StatusNoContent, "")
 }
 
 // GetUserbyIDHandler godoc

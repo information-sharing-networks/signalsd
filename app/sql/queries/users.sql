@@ -35,6 +35,21 @@ FROM users u
 JOIN isn i ON u.account_id = i.user_account_id 
 WHERE i.id = $1;
 
+-- name: UpdateUserAccountToAdmin :execrows 
+UPDATE users 
+SET 
+    user_role = 'admin'
+WHERE 
+    account_id = $1;
+
+
+-- name: UpdateUserAccountToMember :execrows 
+UPDATE users 
+SET 
+    user_role = 'member'
+WHERE 
+    account_id = $1;
+
 -- name: ExistsUserWithEmail :one 
 SELECT EXISTS (
     SELECT 1 FROM users WHERE email = $1
