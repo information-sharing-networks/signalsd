@@ -28,15 +28,15 @@ CREATE TABLE signals (
     signal_batch_id UUID NOT NULL,
     correlation_id UUID NOT NULL,
     signal_type_id UUID NOT NULL,
-    local_ref TEXT NOT NULL,
+    local_ref TEXT NOT NULL DEFAULT 'pending',
     version_number INT NOT NULL,
     is_latest BOOL NOT NULL DEFAULT true,
     is_withdrawn BOOL NOT NULL DEFAULT false,
     is_archived BOOL NOT NULL DEFAULT false,
-    json_validity_status TEXT NOT NULL,
+    validation_status TEXT NOT NULL,
     json_payload JSONB NOT NULL, 
 CONSTRAINT unique_local_ref_version UNIQUE (account_id, signal_type_id, local_ref, version_number),
-CONSTRAINT json_validity_status_check CHECK (json_validity_status IN ('valid', 'invalid', 'n/a')),
+CONSTRAINT validation_status_check CHECK (validation_status IN ('valid', 'invalid', 'n/a')),
 CONSTRAINT fk_signal_signal_batch FOREIGN KEY (signal_batch_id)
     REFERENCES signal_batches(id)
     ON DELETE CASCADE,

@@ -52,13 +52,13 @@ const docTemplate = `{
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -94,7 +94,7 @@ const docTemplate = `{
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -120,7 +120,7 @@ const docTemplate = `{
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -164,19 +164,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -216,19 +216,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -253,7 +253,7 @@ const docTemplate = `{
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -264,11 +264,11 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "A signal definition describes a data set that is sharable over an ISN.  Setup the ISN before defining any signal defs.\n\nA URL-friendly slug is created based on the title supplied when you load the first version of a definition.\nThe title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.\n\nSlugs are vesioned automatically with semvers: when there is a change to the schema describing the data, the user should create a new definition and specify the bump type (major/minor/patch) to increment the semver\n\nSignal definitions are referred to with a url like this http://{hostname}/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}\n",
+                "description": "A signal type describes a data set that is sharable over an ISN.  Setup the ISN before defining any signal defs.\nSignal types specify a record that can be shared over the ISN\n- Each type has a unique title\n- A URL-friendly slug is created based on the title supplied when you load the first version of a definition.\n- The title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.\n- The field definition is held as an external json schema file\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different json schemas.\n- use this endpoint to create the first version - the bump_type (major/minor/patch) determines the inital semver(1.0.0, 0.1.0 or 0.0.1)\n- subsequent POSTs to this endpoint that reference a previously sumbitted title/slug but point to a different schema will increment the version\n\nSignal type definitions are referred to with a url like this http://{hostname}/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}\n",
                 "tags": [
                     "signal config"
                 ],
-                "summary": "Create signal definition",
+                "summary": "Create signal type definition",
                 "parameters": [
                     {
                         "description": "signal definition details",
@@ -290,19 +290,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -342,19 +342,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -365,7 +365,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "users can update the detailed description, the stage or the link to the readme md\n\nIt is not allowed to update the schema url - instead users should create a new declaration with the same title and bump the version",
+                "description": "users can mark the signal type as *in use/not in use* and update the description or link to the readme file\n\nIt is not allowed to update the schema url - instead users should create a new declaration with the same title and bump the version",
                 "tags": [
                     "signal config"
                 ],
@@ -382,13 +382,13 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "example": "0.0.1",
-                        "description": "version to be recieved",
+                        "description": "Sem ver",
                         "name": "sem_ver",
                         "in": "path",
                         "required": true
                     },
                     {
-                        "description": "signal definition details to be updated",
+                        "description": "signal type details to be updated",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -404,71 +404,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "tags": [
-                    "signal config"
-                ],
-                "summary": "Delete signal definition",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "sample-signal--example-org",
-                        "description": "signal definiton slug",
-                        "name": "slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "example": "0.0.1",
-                        "description": "version to be recieved",
-                        "name": "sem_ver",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -516,7 +464,7 @@ const docTemplate = `{
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -551,7 +499,7 @@ const docTemplate = `{
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -593,19 +541,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -650,19 +598,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -697,7 +645,7 @@ const docTemplate = `{
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -739,19 +687,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -796,19 +744,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "409": {
                         "description": "Conflict",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -841,19 +789,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -879,7 +827,7 @@ const docTemplate = `{
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -914,19 +862,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -961,7 +909,7 @@ const docTemplate = `{
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -995,19 +943,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -1041,27 +989,21 @@ const docTemplate = `{
                         "description": "No Content"
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Bad request with possible error codes: malformed_body, password_too_short",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Unauthorized with possible error code: authentication_error",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Internal server error with possible error codes: database_error, internal_error",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -1069,11 +1011,11 @@ const docTemplate = `{
         },
         "/auth/register": {
             "post": {
-                "description": "The first user to be created for this service will be created with an admin role.\nSubsequent accounts default to standard user roles.",
+                "description": "The first user to be created for this service will be created with an admin role.\nSubsequent accounts default to standard member roles.\nNew members can't access any information beyond the public data on the site until an admin grants them access to an ISN.",
                 "tags": [
                     "auth"
                 ],
-                "summary": "Create user",
+                "summary": "Register user",
                 "parameters": [
                     {
                         "description": "user details",
@@ -1090,21 +1032,21 @@ const docTemplate = `{
                         "description": "Created"
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Bad request with possible error codes: malformed_body, password_too_short",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "409": {
-                        "description": "Conflict",
+                        "description": "Conflict with possible error code:resource_already_exists",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "Internal server error with possible error codes: database_error, internal_error",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -1129,19 +1071,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Not Found",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -1169,19 +1111,19 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -1241,13 +1183,13 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -1288,16 +1230,26 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/utils.ErrorResponse"
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
+            }
+        },
+        "/isn/{isn_slug}/signal_types/{signal_type_slug}/signals": {
+            "post": {
+                "description": "- the client can submit arrays of signals for a single type in a single req (subject to the size\nlimits defined on the signal type definition)\n- The client-supplied local_ref must uniquely identify each signal of the\nspecified signal type that will be supplied by the account.\n- If a local reference is received more than once from an account for a\nspecified signal_type it will be stored with a incremented version number\nand the previous version will be marked as latest=false (it does not matter\nif the previous signal was received in a different batch, but the signal must\nbe owned by the same account).\n- If a deletion request is received, all version of the signal will be marked\nas 'withdrawn'.\n- Correlation_ids are auto generated on the server unless supplied by the client, in which case they are used to identify another signal that this signal is related to. The correlated signal does not need to be owned by the same account.",
+                "tags": [
+                    "Signals Management"
+                ],
+                "summary": "send one or more signals",
+                "responses": {}
             }
         },
         "/webhooks": {
@@ -1328,10 +1280,7 @@ const docTemplate = `{
                 "refresh_token_invalid",
                 "resource_already_exists",
                 "resource_not_found",
-                "signal_type_closed",
-                "token_error",
-                "user_alread_exists",
-                "user_not_found"
+                "token_invalid"
             ],
             "x-enum-varnames": [
                 "ErrCodeAccessTokenExpired",
@@ -1347,10 +1296,7 @@ const docTemplate = `{
                 "ErrCodeRefreshTokenInvalid",
                 "ErrCodeResourceAlreadyExists",
                 "ErrCodeResourceNotFound",
-                "ErrCodeSignalTypeClosed",
-                "ErrCodeTokenError",
-                "ErrCodeUserAlreadyExists",
-                "ErrCodeUserNotFound"
+                "ErrCodeTokenInvalid"
             ]
         },
         "auth.AccessTokenResponse": {
@@ -1377,9 +1323,10 @@ const docTemplate = `{
                     "example": 1800
                 },
                 "isn_perms": {
+                    "description": "todo - perms",
                     "type": "object",
                     "additionalProperties": {
-                        "type": "string"
+                        "$ref": "#/definitions/auth.IsnPerms"
                     }
                 },
                 "role": {
@@ -1394,6 +1341,26 @@ const docTemplate = `{
                 "token_type": {
                     "type": "string",
                     "example": "Bearer"
+                }
+            }
+        },
+        "auth.IsnPerms": {
+            "type": "object",
+            "properties": {
+                "permission": {
+                    "type": "string",
+                    "enum": [
+                        "read",
+                        "write"
+                    ],
+                    "example": "read"
+                },
+                "signal_types": {
+                    "description": "list of available signal types for the isn",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 }
             }
         },
@@ -1608,6 +1575,9 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
+                "is_in_use": {
+                    "type": "boolean"
+                },
                 "isn_id": {
                     "type": "string"
                 },
@@ -1621,9 +1591,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "slug": {
-                    "type": "string"
-                },
-                "stage": {
                     "type": "string"
                 },
                 "title": {
@@ -1788,18 +1755,6 @@ const docTemplate = `{
                     "type": "string",
                     "example": "https://github.com/user/project/v0.0.1/locales/filename.json"
                 },
-                "stage": {
-                    "description": "updated stage",
-                    "type": "string",
-                    "enum": [
-                        "dev",
-                        "test",
-                        "live",
-                        "deprecated",
-                        "closed",
-                        "shuttered"
-                    ]
-                },
                 "title": {
                     "description": "unique title",
                     "type": "string",
@@ -1925,6 +1880,9 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
+                "is_in_use": {
+                    "type": "boolean"
+                },
                 "isn": {
                     "$ref": "#/definitions/database.Isn"
                 },
@@ -1938,9 +1896,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "slug": {
-                    "type": "string"
-                },
-                "stage": {
                     "type": "string"
                 },
                 "title": {
@@ -2067,26 +2022,18 @@ const docTemplate = `{
                     "type": "string",
                     "example": "description"
                 },
+                "is_in_use": {
+                    "type": "boolean",
+                    "example": false
+                },
                 "readme_url": {
                     "description": "Updated readme file. Note file must be on a public github repo",
                     "type": "string",
                     "example": "https://github.com/user/project/v0.0.1/locales/filename.md"
-                },
-                "stage": {
-                    "description": "updated stage",
-                    "type": "string",
-                    "enum": [
-                        "dev",
-                        "test",
-                        "live",
-                        "deprecated",
-                        "closed",
-                        "shuttered"
-                    ]
                 }
             }
         },
-        "utils.ErrorResponse": {
+        "responses.ErrorResponse": {
             "type": "object",
             "properties": {
                 "error_code": {
@@ -2098,7 +2045,8 @@ const docTemplate = `{
                     "example": "example_error_code"
                 },
                 "message": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "message describing the error"
                 }
             }
         }

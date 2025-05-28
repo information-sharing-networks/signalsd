@@ -7,8 +7,8 @@ import (
 	"github.com/nickabs/signalsd/app/internal/apperrors"
 	"github.com/nickabs/signalsd/app/internal/auth"
 	"github.com/nickabs/signalsd/app/internal/database"
+	"github.com/nickabs/signalsd/app/internal/server/responses"
 
-	"github.com/nickabs/signalsd/app/internal/utils"
 	"github.com/rs/zerolog/log"
 )
 
@@ -49,9 +49,9 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, e
 //	@Tags		auth
 //
 //	@Success	200	{object}	auth.AccessTokenResponse
-//	@Failure	400	{object}	utils.ErrorResponse
-//	@Failure	401	{object}	utils.ErrorResponse
-//	@Failure	500	{object}	utils.ErrorResponse
+//	@Failure	400	{object}	responses.ErrorResponse
+//	@Failure	401	{object}	responses.ErrorResponse
+//	@Failure	500	{object}	responses.ErrorResponse
 //
 //	@Security	BearerRefreshToken
 //
@@ -61,19 +61,19 @@ func (a *TokenHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.
 	// the RequireValidRefreshToken middleware adds the userAccountId
 	userAccountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
-		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
 		return
 	}
 
 	accessTokenResponse, err := a.authService.BuildAccessTokenResponse(r.Context())
 	if err != nil {
-		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenError, fmt.Sprintf("error creating access token: %v", err))
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenInvalid, fmt.Sprintf("error creating access token: %v", err))
 		return
 	}
 
 	newRefreshToken, err := a.authService.RotateRefreshToken(r.Context())
 	if err != nil {
-		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenError, fmt.Sprintf("error creating refresh token: %v", err))
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenInvalid, fmt.Sprintf("error creating refresh token: %v", err))
 		return
 	}
 
@@ -83,7 +83,7 @@ func (a *TokenHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.
 
 	log.Info().Msgf("user %v refreshed an access token", userAccountID)
 
-	utils.RespondWithJSON(w, http.StatusOK, accessTokenResponse)
+	responses.RespondWithJSON(w, http.StatusOK, accessTokenResponse)
 }
 
 // RevokeRefreshTokenHandler godoc
@@ -104,9 +104,9 @@ func (a *TokenHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.
 //	@Tags		auth
 //
 //	@Success	204
-//	@Failure	400	{object}	utils.ErrorResponse
-//	@Failure	404	{object}	utils.ErrorResponse
-//	@Failure	500	{object}	utils.ErrorResponse
+//	@Failure	400	{object}	responses.ErrorResponse
+//	@Failure	404	{object}	responses.ErrorResponse
+//	@Failure	500	{object}	responses.ErrorResponse
 //
 //	@Security	BearerRefreshToken
 //
@@ -119,30 +119,30 @@ func (a *TokenHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.
 
 	userAccountId, ok := auth.ContextAccountID(r.Context())
 	if !ok {
-		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "middleware did not supply a userAccountID")
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "middleware did not supply a userAccountID")
 		return
 	}
 	hashedRefreshToken, ok := auth.ContextHashedRefreshToken(r.Context())
 	if !ok {
-		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "middleware did not supply a refresh token")
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "middleware did not supply a refresh token")
 		return
 	}
 
 	rowsAffected, err := a.queries.RevokeRefreshToken(r.Context(), hashedRefreshToken)
 	if err != nil {
-		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenError, fmt.Sprintf("error getting token from database: %v", err))
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("error getting token from database: %v", err))
 		return
 	}
 	if rowsAffected == 0 {
-		utils.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeTokenError, "refresh token not found")
+		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeTokenInvalid, "refresh token not found")
 		return
 	}
 	if rowsAffected != 1 {
-		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
 	}
 
 	log.Info().Msgf("refresh token revoked by userAccountID %v", userAccountId)
-	utils.RespondWithJSON(w, http.StatusNoContent, "")
+	responses.RespondWithJSON(w, http.StatusNoContent, "")
 
 }

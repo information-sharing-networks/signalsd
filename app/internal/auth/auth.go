@@ -26,30 +26,35 @@ type AuthService struct {
 	queries     *database.Queries
 }
 
-type AccessTokenResponse struct {
-	AccessToken string            `json:"access_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxTZXJ2ZXIiLCJzdWIiOiI2OGZiNWY1Yi1lM2Y1LTRhOTYtOGQzNS1jZDIyMDNhMDZmNzMiLCJleHAiOjE3NDY3NzA2MzQsImlhdCI6MTc0Njc2NzAzNH0.3OdnUNgrvt1Zxs9AlLeaC9DVT6Xwc6uGvFQHb6nDfZs"`
-	TokenType   string            `json:"token_type" example:"Bearer"`
-	ExpiresIn   int               `json:"expires_in" example:"1800"` //seconds
-	AccountID   uuid.UUID         `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
-	AccountType string            `json:"account_type" enums:"user,service_identity"`
-	Role        string            `json:"role" enums:"owner,admin,member" example:"admin"`
-	IsnPerms    map[string]string `json:"isn_perms,omitempty"`
-}
-
-type AccessTokenClaims struct {
-	jwt.RegisteredClaims
-	AccountID   uuid.UUID         `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
-	AccountType string            `json:"account_type" enums:"user,service_identity"`
-	Role        string            `json:"role" enums:"owner,admin,member" example:"admin"`
-	IsnPerms    map[string]string `json:"isn_perms,omitempty"`
-}
-
 func NewAuthService(secretKey string, environment string, queries *database.Queries) *AuthService {
 	return &AuthService{
 		secretKey:   secretKey,
 		environment: environment,
 		queries:     queries,
 	}
+}
+
+type AccessTokenResponse struct {
+	AccessToken string              `json:"access_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxTZXJ2ZXIiLCJzdWIiOiI2OGZiNWY1Yi1lM2Y1LTRhOTYtOGQzNS1jZDIyMDNhMDZmNzMiLCJleHAiOjE3NDY3NzA2MzQsImlhdCI6MTc0Njc2NzAzNH0.3OdnUNgrvt1Zxs9AlLeaC9DVT6Xwc6uGvFQHb6nDfZs"`
+	TokenType   string              `json:"token_type" example:"Bearer"`
+	ExpiresIn   int                 `json:"expires_in" example:"1800"` //seconds
+	AccountID   uuid.UUID           `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
+	AccountType string              `json:"account_type" enums:"user,service_identity"`
+	Role        string              `json:"role" enums:"owner,admin,member" example:"admin"`
+	Perms       map[string]IsnPerms `json:"isn_perms,omitempty"` // todo - perms
+}
+
+type IsnPerms struct {
+	Permission      string   `json:"permission" enums:"read,write" example:"read"`
+	SignalTypePaths []string `json:"signal_types,omitempty"` // list of available signal types for the isn
+}
+
+type AccessTokenClaims struct {
+	jwt.RegisteredClaims
+	AccountID   uuid.UUID           `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
+	AccountType string              `json:"account_type" enums:"user,service_identity"`
+	Role        string              `json:"role" enums:"owner,admin,member" example:"admin"`
+	IsnPerms    map[string]IsnPerms `json:"isn_perms,omitempty"` // todo - perms
 }
 
 func (a AuthService) HashPassword(password string) (string, error) {
@@ -78,6 +83,14 @@ func (a AuthService) CheckTokenHash(hash string, token string) bool {
 
 // create a JWT signed with HS256 using the app's secret key.
 //
+// the access token claims are updated to contain:
+// - account id
+// - A list of all the isns the account has access to
+// - The permission granted (read or write)
+// - the list of available signal_types in the isn
+//
+// # For convenience the claims data is also included in the body of the response
+//
 // Roles and ISN read/write permissions are retreived from the database and included in the token claims.
 //
 // The function returns the token inside a AccessTokenResponse that can be returned to the client.
@@ -90,7 +103,7 @@ func (a AuthService) BuildAccessTokenResponse(ctx context.Context) (AccessTokenR
 
 	issuedAt := time.Now()
 	expiresAt := issuedAt.Add(signalsd.AccessTokenExpiry)
-	isnPerms := make(map[string]string)
+	isnPerms := make(map[string]IsnPerms)
 
 	accountID, ok := ContextAccountID(ctx)
 	if !ok {
@@ -114,7 +127,25 @@ func (a AuthService) BuildAccessTokenResponse(ctx context.Context) (AccessTokenR
 	isns, err := a.queries.GetIsnsWithIsnReceiver(ctx)
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		return AccessTokenResponse{}, fmt.Errorf("database error getting ISNs: %w", err)
+	}
 
+	// create a map of isns with their available signal_type paths (sample-signal--example-org/0.0.1 etc)
+	// this list is included in the claims assuming the user has permission for the isn
+	IsnSignalTypePaths := make(map[string][]string)
+	for _, isn := range isns {
+
+		signalTypeRows, err := a.queries.GetInUseSignalTypesByIsnID(ctx, isn.ID)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return AccessTokenResponse{}, fmt.Errorf("database error getting signal_types: %w", err)
+		}
+
+		signalTypePaths := make([]string, 0)
+		for _, signalType := range signalTypeRows {
+			ver := fmt.Sprintf("%s/%s", signalType.Slug, signalType.SemVer)
+			signalTypePaths = append(signalTypePaths, ver)
+		}
+
+		IsnSignalTypePaths[isn.Slug] = signalTypePaths
 	}
 
 	// get the isns this account has access to.
@@ -128,22 +159,35 @@ func (a AuthService) BuildAccessTokenResponse(ctx context.Context) (AccessTokenR
 	case "owner":
 		// owner can write to all ISNs
 		for _, isn := range isns {
-			isnPerms[isn.Slug] = "write"
+			isnPerms[isn.Slug] = IsnPerms{
+				Permission:      "write",
+				SignalTypePaths: IsnSignalTypePaths[isn.Slug],
+			}
 		}
+
 	case "admin":
 		// Admin can write to owned ISNs + ISNs they have been granted permissions to.
 		for _, isn := range isns {
 			if account.ID == isn.UserAccountID {
-				isnPerms[isn.Slug] = "write"
+				isnPerms[isn.Slug] = IsnPerms{
+					Permission:      "write",
+					SignalTypePaths: IsnSignalTypePaths[isn.Slug],
+				}
 			}
 		}
 		for _, isnAccount := range isnAccounts {
-			isnPerms[isnAccount.IsnSlug] = isnAccount.Permission
+			isnPerms[isnAccount.IsnSlug] = IsnPerms{
+				Permission:      isnAccount.Permission,
+				SignalTypePaths: IsnSignalTypePaths[isnAccount.IsnSlug],
+			}
 		}
 	case "member":
 		// Member only has granted permissions (not service identites are always treated as members)
 		for _, isnAccount := range isnAccounts {
-			isnPerms[isnAccount.IsnSlug] = isnAccount.Permission
+			isnPerms[isnAccount.IsnSlug] = IsnPerms{
+				Permission:      isnAccount.Permission,
+				SignalTypePaths: IsnSignalTypePaths[isnAccount.IsnSlug],
+			}
 		}
 	default:
 		return AccessTokenResponse{}, fmt.Errorf("unexpected role : %v", account.AccountRole)
@@ -163,7 +207,6 @@ func (a AuthService) BuildAccessTokenResponse(ctx context.Context) (AccessTokenR
 		IsnPerms:    isnPerms,
 	}
 
-	// todo add all signals to context
 	// create a new signed token
 	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
@@ -178,7 +221,7 @@ func (a AuthService) BuildAccessTokenResponse(ctx context.Context) (AccessTokenR
 		AccountID:   account.ID,
 		AccountType: account.AccountType,
 		Role:        account.AccountRole,
-		IsnPerms:    isnPerms,
+		Perms:       isnPerms,
 	}, nil
 }
 
