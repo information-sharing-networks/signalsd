@@ -567,49 +567,6 @@ info:
   contact: {}
   description: Signals ISN service API
 paths:
-  /admin/accounts/{account_id}:
-    delete:
-      description: this endpoint can only be used by the site owner account
-      parameters:
-      - description: account id
-        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
-        in: path
-        name: account_id
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/utils.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Revoke account admin role
-      tags:
-      - admin
-    put:
-      description: this endpoint can only be used by the site owner account
-      parameters:
-      - description: account id
-        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
-        in: path
-        name: account_id
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/utils.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Grant account admin role
-      tags:
-      - admin
   /admin/live:
     get:
       description: check if the signalsd service is up
@@ -620,7 +577,7 @@ paths:
           description: Not Found
       summary: Liveness check
       tags:
-      - admin
+      - Site admin
   /admin/reset:
     post:
       description: |-
@@ -639,7 +596,7 @@ paths:
             $ref: '#/definitions/utils.ErrorResponse'
       summary: reset
       tags:
-      - admin
+      - Site admin
   /admin/users/{id}:
     get:
       description: This API is protected (includes email addresses in the response)
@@ -1234,6 +1191,68 @@ paths:
       summary: Get the registered users
       tags:
       - auth
+  /auth/admins/{account_id}:
+    delete:
+      description: this endpoint can only be used by the site owner account
+      parameters:
+      - description: account id
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+        in: path
+        name: account_id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Revoke account admin role
+      tags:
+      - auth
+  /auth/admins/account/{account_id}:
+    put:
+      description: |-
+        This endpoint grants the admin role to a site member
+
+        An admin can:
+        - Create an ISN
+        - Define the signal_types used in the ISN
+        - read/write to their own ISNs
+        - Grant other accounts read or write access to their ISNs
+        - Create service identities ('service accounts')
+
+        this endpoint can only be used by the site owner account
+      parameters:
+      - description: account id
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+        in: path
+        name: account_id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Grant admin role
+      tags:
+      - auth
   /auth/login:
     post:
       description: |-
@@ -1422,7 +1441,7 @@ paths:
           description: Not Found
       summary: Readiness
       tags:
-      - admin
+      - Site admin
   /isn/{isn_slug}/accounts/{account_id}:
     delete:
       description: |-
@@ -1517,3 +1536,5 @@ tags:
   name: ISN config
 - description: View information about the configured ISNs
   name: ISN view
+- description: Site adminstration tools
+  name: Site admin

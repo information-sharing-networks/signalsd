@@ -230,3 +230,35 @@ func (q *Queries) UpdatePassword(ctx context.Context, arg UpdatePasswordParams) 
 	}
 	return result.RowsAffected()
 }
+
+const updateUserAccountToAdmin = `-- name: UpdateUserAccountToAdmin :execrows
+UPDATE users 
+SET 
+    user_role = 'admin'
+WHERE 
+    account_id = $1
+`
+
+func (q *Queries) UpdateUserAccountToAdmin(ctx context.Context, accountID uuid.UUID) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateUserAccountToAdmin, accountID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
+const updateUserAccountToMember = `-- name: UpdateUserAccountToMember :execrows
+UPDATE users 
+SET 
+    user_role = 'member'
+WHERE 
+    account_id = $1
+`
+
+func (q *Queries) UpdateUserAccountToMember(ctx context.Context, accountID uuid.UUID) (int64, error) {
+	result, err := q.db.ExecContext(ctx, updateUserAccountToMember, accountID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
