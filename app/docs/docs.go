@@ -21,6 +21,74 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/admin/accounts/{account_id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "this endpoint can only be used by the site owner account",
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Grant account admin role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
+                        "description": "account id",
+                        "name": "account_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "this endpoint can only be used by the site owner account",
+                "tags": [
+                    "admin"
+                ],
+                "summary": "Revoke account admin role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
+                        "description": "account id",
+                        "name": "account_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/live": {
             "get": {
                 "description": "check if the signalsd service is up",
@@ -133,7 +201,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Update the ISN details",
+                "description": "Update the ISN details\nThis endpoint can only be used by the site owner or the ISN admin",
                 "tags": [
                     "ISN config"
                 ],
@@ -190,7 +258,7 @@ const docTemplate = `{
                         "RefreshTokenCookieAuth": []
                     }
                 ],
-                "description": "Create an Information Sharing Network (ISN)\n\nvisibility = \"private\" means that signalsd on the network can only be seen by network participants.\n\nThe only storage_type currently supported is \"admin_db\"\nwhen storage_type = \"admin_db\" the signalsd are stored in the relational database used by the API service to store the admin configuration\nSpecify \"admin_db\" for storage_connection_url in this case (anything else is overriwtten with this value)",
+                "description": "Create an Information Sharing Network (ISN)\n\nvisibility = \"private\" means that signalsd on the network can only be seen by network participants.\n\nThe only storage_type currently supported is \"admin_db\"\nwhen storage_type = \"admin_db\" the signalsd are stored in the relational database used by the API service to store the admin configuration\nSpecify \"admin_db\" for storage_connection_url in this case (anything else is overriwtten with this value)\n\nThis endpoint can only be used by the site owner or an admin",
                 "tags": [
                     "ISN config"
                 ],
@@ -474,18 +542,38 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/isn/{isn_slug}/signals/batch": {
+        "/api/isn/{isn_slug}/signals/accounts/{account_id}/batches": {
+            "get": {
+                "description": "TODO - get latest, previous, by data ranage\nTODO",
+                "tags": [
+                    "Signals Management"
+                ],
+                "summary": "Get details about a set of signal batches",
+                "responses": {}
+            }
+        },
+        "/api/isn/{isn_slug}/signals/accounts/{account_id}/batches/{signals_batch_id}": {
+            "get": {
+                "description": "TODO - get by id. Include status (errs, received, latest localref in batch)",
+                "tags": [
+                    "Signals Management"
+                ],
+                "summary": "Get a signal batch",
+                "responses": {}
+            }
+        },
+        "/api/isn/{isn_slug}/signals/batches": {
             "post": {
                 "security": [
                     {
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "This endpoint is only used by service accounts.\n\nFor user accounts, a batch is automatically created when they are granted write permission to an isn and is never closed)\n\nFor service accounts, the client app can decide how long to keep a batch open\n(a batch status summary is sent to a webhook after the batch closes)\n\nopening a batch closes the previous batch created on the isn for this account.\n\nSignals can only be sent to open batches.\n\nauthentication is based on the supplied access token:\n(the site owner; the isn admin and members with an isn_perm= write can create a batch)\n\nTODO - this end point temporarily open to end users - batch should be auto created by create isn_account",
+                "description": "This endpoint is used by service accounts to create a new batch used to track signals sent to the specified isn\n\nFor user accounts, a batch is automatically created when they are granted write permission to an isn and is only closed if their permission to write to the isn is revoked\n\nFor service accounts, the client app can decide how long to keep a batch open\n(a batch status summary is sent to a webhook after the batch closes)\n\nopening a batch closes the previous batch created on the isn for this account.\n\nSignals can only be sent to open batches.\n\nauthentication is based on the supplied access token:\n(the site owner; the isn admin and members with an isn_perm= write can create a batch)\n",
                 "tags": [
-                    "Signal Exchange"
+                    "Signals Management"
                 ],
-                "summary": "Create a new batch for sending signals to the specified isn",
+                "summary": "Create a new signal batch",
                 "responses": {
                     "201": {
                         "description": "Created",
@@ -542,6 +630,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
+                "description": "This endpoint can only be used by the site owner or the ISN admin",
                 "tags": [
                     "ISN config"
                 ],
@@ -595,12 +684,20 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "An ISN receiver handles the http requests sent by clients that pass Signals to the ISN\n\nYou can specify how many receivers should be started for the ISN and they will listen on an automatically generted port, starting at 8081\n\nThe public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/signals/receiver\nthe isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services\n\nnote receivers are always created in 'offline' mode.",
+                "description": "An ISN receiver handles the http requests sent by clients that pass Signals to the ISN\n\nYou can specify how many receivers should be started for the ISN and they will listen on an automatically generted port, starting at 8081\n\nThe public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/signals/receiver\nthe isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services\n\nnote receivers are always created in 'offline' mode.\n\nThis endpoint can only be used by the site owner or the ISN admin",
                 "tags": [
                     "ISN config"
                 ],
                 "summary": "Create an ISN Receiver definition",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn--example-org",
+                        "description": "isn slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
                     {
                         "description": "ISN receiver details",
                         "name": "request",
@@ -679,6 +776,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
+                "description": "This endpoint can only be used by the site owner or the ISN admin",
                 "tags": [
                     "ISN config"
                 ],
@@ -732,12 +830,20 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "An ISN retriever handles the http requests sent by clients to get Signals from the ISN\n\nYou can specify how many retrievers should be started for the ISN and they will listen on an automatically generted port\n\nThe public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/signals/retriever\nthe isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services\n\nnote retrievers are created in 'offline' mode.",
+                "description": "An ISN retriever handles the http requests sent by clients to get Signals from the ISN\n\nYou can specify how many retrievers should be started for the ISN and they will listen on an automatically generted port\n\nThe public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/signals/retriever\nthe isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services\n\nnote retrievers are created in 'offline' mode.\n\nThis endpoint can only be used by the site owner or the ISN admin",
                 "tags": [
                     "ISN config"
                 ],
                 "summary": "Create an ISN Retriever definition",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn--example-org",
+                        "description": "isn slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
                     {
                         "description": "ISN retriever details",
                         "name": "request",
@@ -1082,6 +1188,112 @@ const docTemplate = `{
                         "description": "Not Found"
                     }
                 }
+            }
+        },
+        "/isn/{isn_slug}/accounts/{account_id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Grant an account read or write access to an isn.\nThis end point can only be used by the site owner or the isn admin account.",
+                "tags": [
+                    "ISN Permissions"
+                ],
+                "summary": "Grant ISN access permission",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn--example-org",
+                        "description": "isn slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
+                        "description": "account id",
+                        "name": "account_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Revoke an account read or write access to an isn.\nThis end point can only be used by the site owner or the isn admin account.",
+                "tags": [
+                    "ISN Permissions"
+                ],
+                "summary": "Revoke ISN access permission",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn--example-org",
+                        "description": "isn slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
+                        "description": "account id",
+                        "name": "account_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/utils.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/webhooks": {
+            "post": {
+                "description": "TODO - register a webhook to recieve signals batch status updates",
+                "tags": [
+                    "Signals Management"
+                ],
+                "summary": "Register webhook",
+                "responses": {}
             }
         }
     },

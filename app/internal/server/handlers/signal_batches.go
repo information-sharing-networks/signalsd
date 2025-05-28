@@ -22,16 +22,6 @@ func NewSignalsBatchHandler(queries *database.Queries) *SignalsBatchHandler {
 	return &SignalsBatchHandler{queries: queries}
 }
 
-/* tdo
-id UUID PRIMARY KEY,
-    created_at TIMESTAMP WITH TIME ZONE,
-    updated_at TIMESTAMP WITH TIME ZONE,
-    isn_id UUID NOT NULL,
-    account_id UUID NOT NULL,
-    is_latest BOOL NOT NULL DEFAULT true,
-    account_type TEXT NOT NULL,
-*/
-
 type CreateSignalsBatchRequest struct {
 	IsnSlug string `json:"isn_slug" example:"sample-isn--example-org"`
 }
@@ -44,36 +34,33 @@ type CreateSignalsBatchResponse struct {
 
 // CreateSignalsBatchHandler godoc
 //
-//	@Summary        Create a new batch for sending signals to the specified isn
-//	@Description    This endpoint is only used by service accounts.
+//	@Summary		Create a new signal batch
+//	@Description	This endpoint is used by service accounts to create a new batch used to track signals sent to the specified isn
 //	@Description
-//	@Description    For user accounts, a batch is automatically created when they are granted write permission to an isn and is never closed)
+//	@Description	For user accounts, a batch is automatically created when they are granted write permission to an isn and is only closed if their permission to write to the isn is revoked
 //	@Description
-//	@Description    For service accounts, the client app can decide how long to keep a batch open
-//	@Description    (a batch status summary is sent to a webhook after the batch closes)
+//	@Description	For service accounts, the client app can decide how long to keep a batch open
+//	@Description	(a batch status summary is sent to a webhook after the batch closes)
 //	@Description
 //	@Description	opening a batch closes the previous batch created on the isn for this account.
 //	@Description
-//	@Description    Signals can only be sent to open batches.
+//	@Description	Signals can only be sent to open batches.
 //	@Description
-//	@Description    authentication is based on the supplied access token:
-//	@Description    (the site owner; the isn admin and members with an isn_perm= write can create a batch)
+//	@Description	authentication is based on the supplied access token:
+//	@Description	(the site owner; the isn admin and members with an isn_perm= write can create a batch)
 //	@Description
-//	@Description	TODO - this end point temporarily open to end users - batch should be auto created by create isn_account
-//	@Tags			Signal Exchange
+//	@Tags			Signals Management
 //
-//	@Success		201		{object} 	CreateSignalsBatchResponse
-//	@Failure		500		{object}	utils.ErrorResponse
+//	@Success		201	{object}	CreateSignalsBatchResponse
+//	@Failure		500	{object}	utils.ErrorResponse
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/api/isn/{isn_slug}/signals/batch [post]
+//	@Router			/api/isn/{isn_slug}/signals/batches [post]
 //
 // CreateSignalsBatchHandler must be used with the RequireValidAccessToken amd RequireIsnWritePermission middleware functions
 func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r *http.Request) {
 	logger := zerolog.Ctx(r.Context())
-
-	//todo handle users returning with the same isn
 
 	// these checks have been done already in the middleware so - if there is an error here - it is a bug.
 	_, ok := auth.ContextAccessTokenClaims(r.Context())
@@ -89,7 +76,12 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 	}
 	account, err := s.queries.GetAccountByID(r.Context(), accountID)
 	if err != nil {
-		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not get ISN from database: %v", err))
+		utils.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, fmt.Sprintf("could not get account %v from datababase: %v ", accountID, err))
+		return
+	}
+
+	if account.AccountType == "user" {
+		utils.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "this endpoint is only for service accounts")
 		return
 	}
 
@@ -97,7 +89,7 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 	isnSlug := r.PathValue("isn_slug")
 	isn, err := s.queries.GetIsnBySlug(r.Context(), isnSlug)
 	if err != nil {
-		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not get ISN from database: %v", err))
+		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not get ISN %v from database: %v", isnSlug, err))
 		return
 	}
 
@@ -106,7 +98,7 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 		AccountID: accountID,
 	})
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not get ISN from database: %v", err))
+		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not close open batch for user %v : %v", accountID, err))
 		return
 	}
 
@@ -136,7 +128,31 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 	})
 }
 
-// GetSignalsBatchHandler godoc todo
+// GetSignalsBatchHandler godocs
+//
+//	@Summary		Get a signal batch
+//	@Tags			Signals Management
+//
+//	@Description	TODO - get by id. Include status (errs, received, latest localref in batch)
+//
+//	@Router			/api/isn/{isn_slug}/signals/accounts/{account_id}/batches/{signals_batch_id} [get]
 func (u *SignalsBatchHandler) GetSignalsBatchHandler(w http.ResponseWriter, r *http.Request) {
 	utils.RespondWithJSON(w, http.StatusOK, "")
+
+	utils.RespondWithError(w, r, http.StatusNoContent, apperrors.ErrCodeNotImplemented, "todo - not yet implemented")
+}
+
+// GetSignalsBatchHandlers godocs
+//
+//	@Summary		Get details about a set of signal batches
+//	@Description	TODO - get latest, previous, by data ranage
+//	@Tags			Signals Management
+//
+//	@Description	TODO
+//
+//	@Router			/api/isn/{isn_slug}/signals/accounts/{account_id}/batches [get]
+func (u *SignalsBatchHandler) GetSignalsBatchesHandler(w http.ResponseWriter, r *http.Request) {
+	utils.RespondWithJSON(w, http.StatusOK, "")
+
+	utils.RespondWithError(w, r, http.StatusNoContent, apperrors.ErrCodeNotImplemented, "todo - not yet implemented")
 }

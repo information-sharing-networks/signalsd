@@ -63,6 +63,9 @@ func (s *Server) registerRoutes() {
 	isnReceivers := handlers.NewIsnReceiverHandler(s.queries)
 	isnRetrievers := handlers.NewIsnRetrieverHandler(s.queries)
 
+	// isn permissions
+	isnAccount := handlers.NewIsnAccountHandler(s.queries)
+
 	// signald runtime handlers
 	webhooks := handlers.NewWebhookHandler(s.queries)
 	signalBatches := handlers.NewSignalsBatchHandler(s.queries)
@@ -115,15 +118,18 @@ func (s *Server) registerRoutes() {
 				r.Put("/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}", signalTypes.UpdateSignalTypeHandler)
 				r.Delete("/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}", signalTypes.DeleteSignalTypeHandler)
 
+				// isn account permissions
+				r.Put("/isn/{isn_slug}/accounts/{account_id}", isnAccount.GrantIsnAccountHandler)
+				r.Delete("/isn/{isn_slug}/accounts/{account_id}", isnAccount.RevokeIsnAccountHandler)
 			})
 			// signals runtime
 			r.Group(func(r chi.Router) {
 
 				// batches
 				r.Use(s.authService.RequireIsnWritePermission())
-				r.Post("/isn/{isn_slug}/signals/batch", signalBatches.CreateSignalsBatchHandler)
+				r.Post("/isn/{isn_slug}/signals/batches", signalBatches.CreateSignalsBatchHandler)
 				// webhooks
-				r.Post("/api/webhooks", webhooks.HandlerWebhook)
+				r.Post("/api/webhooks", webhooks.HandlerWebhooks)
 			})
 		})
 
@@ -138,11 +144,15 @@ func (s *Server) registerRoutes() {
 
 	// Admin
 	s.router.Route("/admin", func(r chi.Router) {
-		r.Use(s.authService.RequireDevEnv)
-		r.Post("/reset", admin.ResetHandler) // delete all users and content  (dev env only)
+		r.Group(func(r chi.Router) {
+			r.Use(s.authService.RequireDevEnv)
+			r.Post("/reset", admin.ResetHandler) // delete all users and content
+		})
 
-		// pending implementation of admin role
-		r.Get("/users/{id}", users.GetUserHandler)
+		r.Group(func(r chi.Router) {
+			r.Use(s.authService.RequireRole("owner"))
+			r.Get("/users/{id}", users.GetUserHandler)
+		})
 	})
 
 	//health

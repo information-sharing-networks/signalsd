@@ -61,6 +61,8 @@ type IsnAndLinkedInfo struct {
 //	@Description	The only storage_type currently supported is "admin_db"
 //	@Description	when storage_type = "admin_db" the signalsd are stored in the relational database used by the API service to store the admin configuration
 //	@Description	Specify "admin_db" for storage_connection_url in this case (anything else is overriwtten with this value)
+//	@Description
+//	@Description	This endpoint can only be used by the site owner or an admin
 //
 //	@Tags			ISN config
 //
@@ -75,6 +77,8 @@ type IsnAndLinkedInfo struct {
 //	@Security		RefreshTokenCookieAuth
 //
 //	@Router			/api/isn/{isn_slug} [post]
+//
+// Use with RequireRole (admin,owner)
 func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 	var req CreateIsnRequest
 
@@ -160,6 +164,7 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 //
 //	@Summary		Update an ISN
 //	@Description	Update the ISN details
+//	@Description	This endpoint can only be used by the site owner or the ISN admin
 //
 //	@Tags			ISN config
 //
@@ -171,11 +176,11 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 //	@Failure		401	{object}	utils.ErrorResponse
 //	@Failure		500	{object}	utils.ErrorResponse
 //
-// //
-//
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/isn/{isn_slug} [put]
+//
+// Use with RequireRole (admin,owner)
 func (i *IsnHandler) UpdateIsnHandler(w http.ResponseWriter, r *http.Request) {
 	var req UpdateIsnRequest
 

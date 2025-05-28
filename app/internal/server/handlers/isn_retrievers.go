@@ -50,15 +50,18 @@ type UpdateIsnRetrieverRequest struct {
 //	@Description	the isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services
 //	@Description
 //	@Description	note retrievers are created in 'offline' mode.
+//	@Description
+//	@Description	This endpoint can only be used by the site owner or the ISN admin
 //
 //	@Tags			ISN config
 //
-//	@Param			request	body		handlers.CreateIsnRetrieverRequest	true	"ISN retriever details"
+//	@Param			isn_slug	path		string								true	"isn slug"	example(sample-isn--example-org)
+//	@Param			request		body		handlers.CreateIsnRetrieverRequest	true	"ISN retriever details"
 //
-//	@Success		201		{object}	handlers.CreateIsnRetrieverResponse
-//	@Failure		400		{object}	utils.ErrorResponse
-//	@Failure		409		{object}	utils.ErrorResponse
-//	@Failure		500		{object}	utils.ErrorResponse
+//	@Success		201			{object}	handlers.CreateIsnRetrieverResponse
+//	@Failure		400			{object}	utils.ErrorResponse
+//	@Failure		409			{object}	utils.ErrorResponse
+//	@Failure		500			{object}	utils.ErrorResponse
 //
 //	@Security		BearerAccessToken
 //
@@ -140,6 +143,8 @@ func (i *IsnRetrieverHandler) CreateIsnRetrieverHandler(w http.ResponseWriter, r
 // UpdateIsnRetrieverHandler godoc
 //
 //	@Summary	Update an ISN Retriever
+//	@Description
+//	@Description	This endpoint can only be used by the site owner or the ISN admin
 //
 //	@Tags		ISN config
 //
