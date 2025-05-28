@@ -46,16 +46,16 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, e
 //	@Description	Access tokens expire after 30 mins and subsequent requests using the token will fail with an error_code of "access_token_expired"
 //	@Description
 //
-//	@Tags			auth
+//	@Tags		auth
 //
-//	@Success		200	{object}	auth.AccessTokenResponse
-//	@Failure		400	{object}	utils.ErrorResponse
-//	@Failure		401	{object}	utils.ErrorResponse
-//	@Failure		500	{object}	utils.ErrorResponse
+//	@Success	200	{object}	auth.AccessTokenResponse
+//	@Failure	400	{object}	utils.ErrorResponse
+//	@Failure	401	{object}	utils.ErrorResponse
+//	@Failure	500	{object}	utils.ErrorResponse
 //
-//	@Security		BearerRefreshToken
+//	@Security	BearerRefreshToken
 //
-//	@Router			/auth/token [post]
+//	@Router		/auth/token [post]
 func (a *TokenHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.Request) {
 
 	// the RequireValidRefreshToken middleware adds the userAccountId
@@ -101,16 +101,16 @@ func (a *TokenHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.
 //	@Description	Note that any unexpired access tokens issued for this user will continue to work until they expire.
 //	@Description	Users must log in again to obtain a new refresh token if the current one has been revoked.
 //	@Description
-//	@Tags			auth
+//	@Tags		auth
 //
-//	@Success		204
-//	@Failure		400	{object}	utils.ErrorResponse
-//	@Failure		404	{object}	utils.ErrorResponse
-//	@Failure		500	{object}	utils.ErrorResponse
+//	@Success	204
+//	@Failure	400	{object}	utils.ErrorResponse
+//	@Failure	404	{object}	utils.ErrorResponse
+//	@Failure	500	{object}	utils.ErrorResponse
 //
-//	@Security		BearerRefreshToken
+//	@Security	BearerRefreshToken
 //
-//	@Router			/auth/revoke [post]
+//	@Router		/auth/revoke [post]
 //
 // RevokeRefreshTokenHandler gets the request from the RequireValidRefreshToken middleware
 // The middleware identifies the user and confirms there is a valid refresh token in the refresh_token cookie

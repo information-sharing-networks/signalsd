@@ -78,3 +78,49 @@ func (a *AdminHandler) LivenessHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Write([]byte(http.StatusText(http.StatusOK)))
 }
+
+// GrantAccountAdminRole godocs
+//
+//	@Summary		Grant account admin role
+//	@Tags			admin
+//
+//	@Description	this endpoint can only be used by the site owner account
+//
+//	@Param			account_id	path		string	true	"account id"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
+//
+//	@Success		204
+//	@Failure		500			{object}	utils.ErrorResponse
+//
+//	@Security		BearerAccessToken
+//
+//	@Router			/admin/accounts/{account_id} [put]
+//
+//	this handler must use the RequireRole (owner) middlewar
+func (wh *IsnAccountHandler) GrantAccountAdminRole(w http.ResponseWriter, r *http.Request) {
+	// check account is not already admin
+	// update role
+	utils.RespondWithError(w, r, http.StatusNoContent, apperrors.ErrCodeNotImplemented, "todo - not yet implemented")
+}
+
+// RevokeAccountAdmin godocs
+//
+//	@Summary		Revoke account admin role
+//	@Tags			admin
+//
+//	@Description	this endpoint can only be used by the site owner account
+//
+//	@Param			account_id	path		string	true	"account id"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
+//
+//	@Success		204
+//	@Failure		500			{object}	utils.ErrorResponse
+//
+//	@Security		BearerAccessToken
+//
+//	@Router			/admin/accounts/{account_id} [delete]
+//
+//	this handler must use the RequireRole (owner) middlewar
+func (wh *IsnAccountHandler) RevokeAccountAdming(w http.ResponseWriter, r *http.Request) {
+	// check account is already admin
+	// update role to member
+	utils.RespondWithError(w, r, http.StatusNoContent, apperrors.ErrCodeNotImplemented, "todo - not yet implemented")
+}

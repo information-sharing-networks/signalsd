@@ -567,6 +567,49 @@ info:
   contact: {}
   description: Signals ISN service API
 paths:
+  /admin/accounts/{account_id}:
+    delete:
+      description: this endpoint can only be used by the site owner account
+      parameters:
+      - description: account id
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+        in: path
+        name: account_id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Revoke account admin role
+      tags:
+      - admin
+    put:
+      description: this endpoint can only be used by the site owner account
+      parameters:
+      - description: account id
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+        in: path
+        name: account_id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Grant account admin role
+      tags:
+      - admin
   /admin/live:
     get:
       description: check if the signalsd service is up
@@ -649,6 +692,8 @@ paths:
         The only storage_type currently supported is "admin_db"
         when storage_type = "admin_db" the signalsd are stored in the relational database used by the API service to store the admin configuration
         Specify "admin_db" for storage_connection_url in this case (anything else is overriwtten with this value)
+
+        This endpoint can only be used by the site owner or an admin
       parameters:
       - description: ISN details
         in: body
@@ -680,7 +725,9 @@ paths:
       tags:
       - ISN config
     put:
-      description: Update the ISN details
+      description: |-
+        Update the ISN details
+        This endpoint can only be used by the site owner or the ISN admin
       parameters:
       - description: isn slug
         example: sample-isn--example-org
@@ -882,12 +929,29 @@ paths:
       summary: Update signal definition
       tags:
       - signal config
-  /api/isn/{isn_slug}/signals/batch:
-    post:
+  /api/isn/{isn_slug}/signals/accounts/{account_id}/batches:
+    get:
       description: |-
-        This endpoint is only used by service accounts.
+        TODO - get latest, previous, by data ranage
+        TODO
+      responses: {}
+      summary: Get details about a set of signal batches
+      tags:
+      - Signals Management
+  /api/isn/{isn_slug}/signals/accounts/{account_id}/batches/{signals_batch_id}:
+    get:
+      description: TODO - get by id. Include status (errs, received, latest localref
+        in batch)
+      responses: {}
+      summary: Get a signal batch
+      tags:
+      - Signals Management
+  /api/isn/{isn_slug}/signals/batches:
+    post:
+      description: |
+        This endpoint is used by service accounts to create a new batch used to track signals sent to the specified isn
 
-        For user accounts, a batch is automatically created when they are granted write permission to an isn and is never closed)
+        For user accounts, a batch is automatically created when they are granted write permission to an isn and is only closed if their permission to write to the isn is revoked
 
         For service accounts, the client app can decide how long to keep a batch open
         (a batch status summary is sent to a webhook after the batch closes)
@@ -898,8 +962,6 @@ paths:
 
         authentication is based on the supplied access token:
         (the site owner; the isn admin and members with an isn_perm= write can create a batch)
-
-        TODO - this end point temporarily open to end users - batch should be auto created by create isn_account
       responses:
         "201":
           description: Created
@@ -911,9 +973,9 @@ paths:
             $ref: '#/definitions/utils.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Create a new batch for sending signals to the specified isn
+      summary: Create a new signal batch
       tags:
-      - Signal Exchange
+      - Signals Management
   /api/isn/{isn_slug}/signals/receiver:
     get:
       parameters:
@@ -947,7 +1009,15 @@ paths:
         the isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services
 
         note receivers are always created in 'offline' mode.
+
+        This endpoint can only be used by the site owner or the ISN admin
       parameters:
+      - description: isn slug
+        example: sample-isn--example-org
+        in: path
+        name: isn_slug
+        required: true
+        type: string
       - description: ISN receiver details
         in: body
         name: request
@@ -977,6 +1047,7 @@ paths:
       tags:
       - ISN config
     put:
+      description: This endpoint can only be used by the site owner or the ISN admin
       parameters:
       - description: isn slug
         example: sample-isn--example-org
@@ -1043,7 +1114,15 @@ paths:
         the isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services
 
         note retrievers are created in 'offline' mode.
+
+        This endpoint can only be used by the site owner or the ISN admin
       parameters:
+      - description: isn slug
+        example: sample-isn--example-org
+        in: path
+        name: isn_slug
+        required: true
+        type: string
       - description: ISN retriever details
         in: body
         name: request
@@ -1073,6 +1152,7 @@ paths:
       tags:
       - ISN config
     put:
+      description: This endpoint can only be used by the site owner or the ISN admin
       parameters:
       - description: isn slug
         example: sample-isn--example-org
@@ -1343,6 +1423,80 @@ paths:
       summary: Readiness
       tags:
       - admin
+  /isn/{isn_slug}/accounts/{account_id}:
+    delete:
+      description: |-
+        Revoke an account read or write access to an isn.
+        This end point can only be used by the site owner or the isn admin account.
+      parameters:
+      - description: isn slug
+        example: sample-isn--example-org
+        in: path
+        name: isn_slug
+        required: true
+        type: string
+      - description: account id
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+        in: path
+        name: account_id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Revoke ISN access permission
+      tags:
+      - ISN Permissions
+    put:
+      description: |-
+        Grant an account read or write access to an isn.
+        This end point can only be used by the site owner or the isn admin account.
+      parameters:
+      - description: isn slug
+        example: sample-isn--example-org
+        in: path
+        name: isn_slug
+        required: true
+        type: string
+      - description: account id
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+        in: path
+        name: account_id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/utils.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Grant ISN access permission
+      tags:
+      - ISN Permissions
+  /webhooks:
+    post:
+      description: TODO - register a webhook to recieve signals batch status updates
+      responses: {}
+      summary: Register webhook
+      tags:
+      - Signals Management
 produces:
 - application/json
 securityDefinitions:
