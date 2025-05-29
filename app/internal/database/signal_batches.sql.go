@@ -7,6 +7,7 @@ package database
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -23,11 +24,53 @@ type CloseISNSignalBatchByAccountIDParams struct {
 }
 
 func (q *Queries) CloseISNSignalBatchByAccountID(ctx context.Context, arg CloseISNSignalBatchByAccountIDParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, closeISNSignalBatchByAccountID, arg.IsnID, arg.AccountID)
+	result, err := q.db.Exec(ctx, closeISNSignalBatchByAccountID, arg.IsnID, arg.AccountID)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
+}
+
+const createOwnerSignalBatch = `-- name: CreateOwnerSignalBatch :one
+INSERT INTO signal_batches (
+    id,
+    created_at,
+    updated_at,
+    isn_id,
+    account_id,
+    is_latest,
+    account_type
+) VALUES (
+    gen_random_uuid(), 
+    now(), 
+    now(), 
+    $1, 
+    (select account_id from users where user_role = 'owner'),
+    TRUE,
+    $2
+)
+RETURNING id, created_at, updated_at, isn_id, account_id, is_latest, account_type
+`
+
+type CreateOwnerSignalBatchParams struct {
+	IsnID       uuid.UUID `json:"isn_id"`
+	AccountType string    `json:"account_type"`
+}
+
+// create a batch for the owner on a new ISN created by an admin
+func (q *Queries) CreateOwnerSignalBatch(ctx context.Context, arg CreateOwnerSignalBatchParams) (SignalBatch, error) {
+	row := q.db.QueryRow(ctx, createOwnerSignalBatch, arg.IsnID, arg.AccountType)
+	var i SignalBatch
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsnID,
+		&i.AccountID,
+		&i.IsLatest,
+		&i.AccountType,
+	)
+	return i, err
 }
 
 const createSignalBatch = `-- name: CreateSignalBatch :one
@@ -58,7 +101,7 @@ type CreateSignalBatchParams struct {
 }
 
 func (q *Queries) CreateSignalBatch(ctx context.Context, arg CreateSignalBatchParams) (SignalBatch, error) {
-	row := q.db.QueryRowContext(ctx, createSignalBatch, arg.IsnID, arg.AccountID, arg.AccountType)
+	row := q.db.QueryRow(ctx, createSignalBatch, arg.IsnID, arg.AccountID, arg.AccountType)
 	var i SignalBatch
 	err := row.Scan(
 		&i.ID,
@@ -72,21 +115,82 @@ func (q *Queries) CreateSignalBatch(ctx context.Context, arg CreateSignalBatchPa
 	return i, err
 }
 
-const getLatestISNSignalBatchByAccountID = `-- name: GetLatestISNSignalBatchByAccountID :one
-SELECT id, created_at, updated_at, isn_id, account_id, is_latest, account_type FROM signal_batches 
-WHERE isn_id = $1 
-AND account_id = $2
+const getLatestIsnSignalBatchesByAccountID = `-- name: GetLatestIsnSignalBatchesByAccountID :many
+SELECT sb.id, sb.created_at, sb.updated_at, sb.isn_id, sb.account_id, sb.is_latest, sb.account_type, i.slug as isn_slug FROM signal_batches sb 
+JOIN isn i
+    ON sb.isn_id = i.id
+WHERE account_id = $1
 AND is_latest = TRUE
 `
 
-type GetLatestISNSignalBatchByAccountIDParams struct {
-	IsnID     uuid.UUID `json:"isn_id"`
-	AccountID uuid.UUID `json:"account_id"`
+type GetLatestIsnSignalBatchesByAccountIDRow struct {
+	ID          uuid.UUID `json:"id"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	IsnID       uuid.UUID `json:"isn_id"`
+	AccountID   uuid.UUID `json:"account_id"`
+	IsLatest    bool      `json:"is_latest"`
+	AccountType string    `json:"account_type"`
+	IsnSlug     string    `json:"isn_slug"`
 }
 
-func (q *Queries) GetLatestISNSignalBatchByAccountID(ctx context.Context, arg GetLatestISNSignalBatchByAccountIDParams) (SignalBatch, error) {
-	row := q.db.QueryRowContext(ctx, getLatestISNSignalBatchByAccountID, arg.IsnID, arg.AccountID)
-	var i SignalBatch
+func (q *Queries) GetLatestIsnSignalBatchesByAccountID(ctx context.Context, accountID uuid.UUID) ([]GetLatestIsnSignalBatchesByAccountIDRow, error) {
+	rows, err := q.db.Query(ctx, getLatestIsnSignalBatchesByAccountID, accountID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetLatestIsnSignalBatchesByAccountIDRow
+	for rows.Next() {
+		var i GetLatestIsnSignalBatchesByAccountIDRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.IsnID,
+			&i.AccountID,
+			&i.IsLatest,
+			&i.AccountType,
+			&i.IsnSlug,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getLatestSignalBatchByIsnSlugAndBatchID = `-- name: GetLatestSignalBatchByIsnSlugAndBatchID :one
+SELECT sb.id, sb.created_at, sb.updated_at, sb.isn_id, sb.account_id, sb.is_latest, sb.account_type, i.slug as isn_slug FROM signal_batches sb
+JOIN isn i 
+ON i.id = sb.isn_id
+WHERE i.slug = $1 
+AND sb.id = $2
+AND sb.is_latest = TRUE
+`
+
+type GetLatestSignalBatchByIsnSlugAndBatchIDParams struct {
+	Slug string    `json:"slug"`
+	ID   uuid.UUID `json:"id"`
+}
+
+type GetLatestSignalBatchByIsnSlugAndBatchIDRow struct {
+	ID          uuid.UUID `json:"id"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	IsnID       uuid.UUID `json:"isn_id"`
+	AccountID   uuid.UUID `json:"account_id"`
+	IsLatest    bool      `json:"is_latest"`
+	AccountType string    `json:"account_type"`
+	IsnSlug     string    `json:"isn_slug"`
+}
+
+func (q *Queries) GetLatestSignalBatchByIsnSlugAndBatchID(ctx context.Context, arg GetLatestSignalBatchByIsnSlugAndBatchIDParams) (GetLatestSignalBatchByIsnSlugAndBatchIDRow, error) {
+	row := q.db.QueryRow(ctx, getLatestSignalBatchByIsnSlugAndBatchID, arg.Slug, arg.ID)
+	var i GetLatestSignalBatchByIsnSlugAndBatchIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.CreatedAt,
@@ -95,6 +199,7 @@ func (q *Queries) GetLatestISNSignalBatchByAccountID(ctx context.Context, arg Ge
 		&i.AccountID,
 		&i.IsLatest,
 		&i.AccountType,
+		&i.IsnSlug,
 	)
 	return i, err
 }

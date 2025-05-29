@@ -1,12 +1,12 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/nickabs/signalsd/app/internal/apperrors"
 	"github.com/nickabs/signalsd/app/internal/auth"
 	"github.com/nickabs/signalsd/app/internal/database"
@@ -54,7 +54,7 @@ type UpdateIsnRetrieverRequest struct {
 //	@Description
 //	@Description	This endpoint can only be used by the site owner or the ISN admin
 //
-//	@Tags			ISN config
+//	@Tags			ISN configuration
 //
 //	@Param			isn_slug	path		string								true	"isn slug"	example(sample-isn--example-org)
 //	@Param			request		body		handlers.CreateIsnRetrieverRequest	true	"ISN retriever details"
@@ -87,7 +87,7 @@ func (i *IsnRetrieverHandler) CreateIsnRetrieverHandler(w http.ResponseWriter, r
 	// check isn exists and is owned by user
 	isn, err := i.queries.GetIsnBySlug(r.Context(), isnSlug)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
 			return
 		}
@@ -147,7 +147,7 @@ func (i *IsnRetrieverHandler) CreateIsnRetrieverHandler(w http.ResponseWriter, r
 //	@Description
 //	@Description	This endpoint can only be used by the site owner or the ISN admin
 //
-//	@Tags			ISN config
+//	@Tags			ISN configuration
 //
 //	@Param			isn_slug	path	string								true	"isn slug"	example(sample-isn--example-org)
 //	@Param			request		body	handlers.UpdateIsnRetrieverRequest	true	"ISN retriever details"
@@ -174,7 +174,7 @@ func (i *IsnRetrieverHandler) UpdateIsnRetrieverHandler(w http.ResponseWriter, r
 	// check isn exists and is owned by user
 	isn, err := i.queries.GetIsnBySlug(r.Context(), isnSlug)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
 			return
 		}
@@ -194,7 +194,7 @@ func (i *IsnRetrieverHandler) UpdateIsnRetrieverHandler(w http.ResponseWriter, r
 	// check retriever exists and is owned by user
 	isnRetriever, err := i.queries.GetIsnRetrieverByIsnSlug(r.Context(), isnSlug)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN retriever not found")
 			return
 		}
@@ -226,7 +226,7 @@ func (i *IsnRetrieverHandler) UpdateIsnRetrieverHandler(w http.ResponseWriter, r
 	if req.ListenerCount != nil {
 		isnRetriever.ListenerCount = *req.ListenerCount
 	}
-	// update isn retriever - todo checks on rows updated
+	// update isn retriever
 	_, err = i.queries.UpdateIsnRetriever(r.Context(), database.UpdateIsnRetrieverParams{
 		IsnID:            isn.ID,
 		DefaultRateLimit: isnRetriever.DefaultRateLimit,
@@ -238,7 +238,7 @@ func (i *IsnRetrieverHandler) UpdateIsnRetrieverHandler(w http.ResponseWriter, r
 		return
 	}
 
-	responses.RespondWithJSON(w, http.StatusNoContent, "")
+	responses.RespondWithStatusCodeOnly(w, http.StatusCreated)
 }
 
 // GetIsnRetrieverHandler godoc
@@ -257,7 +257,7 @@ func (u *IsnRetrieverHandler) GetIsnRetrieverHandler(w http.ResponseWriter, r *h
 
 	res, err := u.queries.GetIsnRetrieverByIsnSlug(r.Context(), isnSlug)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No isn_retriever found for id %v", isnSlug))
 			return
 		}

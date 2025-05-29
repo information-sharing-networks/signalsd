@@ -36,7 +36,7 @@ type CreateIsnReceiverParams struct {
 }
 
 func (q *Queries) CreateIsnReceiver(ctx context.Context, arg CreateIsnReceiverParams) (IsnReceiver, error) {
-	row := q.db.QueryRowContext(ctx, createIsnReceiver,
+	row := q.db.QueryRow(ctx, createIsnReceiver,
 		arg.IsnID,
 		arg.MaxDailyValidationFailures,
 		arg.MaxPayloadKilobytes,
@@ -68,7 +68,7 @@ SELECT EXISTS
 `
 
 func (q *Queries) ExistsIsnReceiver(ctx context.Context, isnID uuid.UUID) (bool, error) {
-	row := q.db.QueryRowContext(ctx, existsIsnReceiver, isnID)
+	row := q.db.QueryRow(ctx, existsIsnReceiver, isnID)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
@@ -100,7 +100,7 @@ type GetForDisplayIsnReceiverByIsnIDRow struct {
 }
 
 func (q *Queries) GetForDisplayIsnReceiverByIsnID(ctx context.Context, isnID uuid.UUID) (GetForDisplayIsnReceiverByIsnIDRow, error) {
-	row := q.db.QueryRowContext(ctx, getForDisplayIsnReceiverByIsnID, isnID)
+	row := q.db.QueryRow(ctx, getForDisplayIsnReceiverByIsnID, isnID)
 	var i GetForDisplayIsnReceiverByIsnIDRow
 	err := row.Scan(
 		&i.CreatedAt,
@@ -138,7 +138,7 @@ type GetIsnReceiverByIsnSlugRow struct {
 }
 
 func (q *Queries) GetIsnReceiverByIsnSlug(ctx context.Context, slug string) (GetIsnReceiverByIsnSlugRow, error) {
-	row := q.db.QueryRowContext(ctx, getIsnReceiverByIsnSlug, slug)
+	row := q.db.QueryRow(ctx, getIsnReceiverByIsnSlug, slug)
 	var i GetIsnReceiverByIsnSlugRow
 	err := row.Scan(
 		&i.IsnID,
@@ -179,7 +179,7 @@ type UpdateIsnReceiverParams struct {
 }
 
 func (q *Queries) UpdateIsnReceiver(ctx context.Context, arg UpdateIsnReceiverParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, updateIsnReceiver,
+	result, err := q.db.Exec(ctx, updateIsnReceiver,
 		arg.IsnID,
 		arg.MaxDailyValidationFailures,
 		arg.MaxPayloadKilobytes,
@@ -191,5 +191,5 @@ func (q *Queries) UpdateIsnReceiver(ctx context.Context, arg UpdateIsnReceiverPa
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }

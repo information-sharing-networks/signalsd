@@ -1,12 +1,12 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/nickabs/signalsd/app/internal/apperrors"
 	"github.com/nickabs/signalsd/app/internal/auth"
 	"github.com/nickabs/signalsd/app/internal/database"
@@ -60,7 +60,7 @@ type UpdateIsnReceiverRequest struct {
 //	@Description
 //	@Description	This endpoint can only be used by the site owner or the ISN admin
 //
-//	@Tags			ISN config
+//	@Tags			ISN configuration
 //
 //	@Param			isn_slug	path		string								true	"isn slug"	example(sample-isn--example-org)
 //	@Param			request		body		handlers.CreateIsnReceiverRequest	true	"ISN receiver details"
@@ -93,7 +93,7 @@ func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *
 	// check isn exists and is owned by user
 	isn, err := i.queries.GetIsnBySlug(r.Context(), isnSlug)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
 			return
 		}
@@ -161,7 +161,7 @@ func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *
 //
 //	@Summary	Update an ISN Receiver
 //
-//	@Tags		ISN config
+//	@Tags		ISN configuration
 //
 //	@Description
 //	@Description	This endpoint can only be used by the site owner or the ISN admin
@@ -191,7 +191,7 @@ func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *
 	// check isn exists and is owned by user
 	isn, err := i.queries.GetIsnBySlug(r.Context(), isnSlug)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
 			return
 		}
@@ -211,7 +211,7 @@ func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *
 	// check receiver exists and is owned by user
 	isnReceiver, err := i.queries.GetIsnReceiverByIsnSlug(r.Context(), isnSlug)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN receiver not found")
 			return
 		}
@@ -271,7 +271,7 @@ func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *
 		return
 	}
 
-	responses.RespondWithJSON(w, http.StatusNoContent, "")
+	responses.RespondWithStatusCodeOnly(w, http.StatusCreated)
 }
 
 // GetIsnReceiverHandler godoc
@@ -290,7 +290,7 @@ func (u *IsnReceiverHandler) GetIsnReceiverHandler(w http.ResponseWriter, r *htt
 
 	res, err := u.queries.GetIsnReceiverByIsnSlug(r.Context(), isnSlug)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No isn_receiver found for id %v", isnSlug))
 			return
 		}

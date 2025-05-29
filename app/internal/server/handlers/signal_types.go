@@ -1,12 +1,12 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/nickabs/signalsd/app/internal/apperrors"
 	"github.com/nickabs/signalsd/app/internal/auth"
 	"github.com/nickabs/signalsd/app/internal/database"
@@ -64,10 +64,10 @@ type SignalTypeAndLinkedInfo struct {
 //	@Description	- use this endpoint to create the first version - the bump_type (major/minor/patch) determines the inital semver(1.0.0, 0.1.0 or 0.0.1)
 //	@Description	- subsequent POSTs to this endpoint that reference a previously sumbitted title/slug but point to a different schema will increment the version
 //	@Description
-//	@Description	Signal type definitions are referred to with a url like this http://{hostname}/api/isn/{isn_slug}/signal-types/{slug}/v{sem_ver}
+//	@Description	Signal type definitions are referred to with a url like this http://{hostname}/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}
 //	@Description
 //
-//	@Tags		signal config
+//	@Tags		Signal definitions
 //
 //	@Param		request	body		handlers.CreateSignalTypeRequest	true	"signal definition details"
 //
@@ -78,7 +78,7 @@ type SignalTypeAndLinkedInfo struct {
 //
 //	@Security	BearerAccessToken
 //
-//	@Router		/api/isn/{isn_slug}/signal-types [post]
+//	@Router		/api/isn/{isn_slug}/signal_types [post]
 //
 // Should only be used with RequiresIsnWritePermission middleware
 func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *http.Request) {
@@ -99,7 +99,7 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 	// check isn exists and is owned by user
 	isn, err := s.queries.GetIsnBySlug(r.Context(), isnSlug)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
 			return
 		}
@@ -156,7 +156,7 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 
 	//  if this is the first version then the query below returns currentSignalType.semver == "0.0.0"
 	currentSignalType, err := s.queries.GetSemVerAndSchemaForLatestSlugVersion(r.Context(), slug)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("database error: %v", err))
 		return
 	}
@@ -201,7 +201,7 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 		return
 	}
 
-	resourceURL := fmt.Sprintf("%s://%s/api/isn/%s/signal-types/%s/v%s",
+	resourceURL := fmt.Sprintf("%s://%s/api/isn/%s/signal_types/%s/v%s",
 		utils.GetScheme(r),
 		r.Host,
 		isn.Slug,
@@ -222,11 +222,11 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 //	@Description	users can mark the signal type as *in use/not in use* and update the description or link to the readme file
 //	@Description
 //	@Description	It is not allowed to update the schema url - instead users should create a new declaration with the same title and bump the version
-//	@Param			slug	path	string								true	"signal definiton slug"		example(sample-signal--example-org)
-//	@Param			sem_ver	path	string								true	"Sem ver"	example(0.0.1)
+//	@Param			slug	path	string								true	"signal definiton slug"	example(sample-signal--example-org)
+//	@Param			sem_ver	path	string								true	"Sem ver"				example(0.0.1)
 //	@Param			request	body	handlers.UpdateSignalTypeRequest	true	"signal type details to be updated"
 //
-//	@Tags			signal config
+//	@Tags			Signal definitions
 //
 //	@Success		204
 //	@Failure		400	{object}	responses.ErrorResponse
@@ -235,7 +235,7 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/api/isn/{isn_slug}/signal-types/{slug}/v{sem_ver} [put]
+//	@Router			/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver} [put]
 func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *http.Request) {
 
 	var req = UpdateSignalTypeRequest{}
@@ -254,7 +254,7 @@ func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *ht
 		SemVer: semVer,
 	})
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No signal type found for %s/v%s", slug, semVer))
 			return
 		}
@@ -267,7 +267,7 @@ func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *ht
 	// check isn exists and is owned by user
 	isn, err := s.queries.GetIsnBySlug(r.Context(), isnSlug)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
 			return
 		}
@@ -317,7 +317,7 @@ func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *ht
 		signalType.IsInUse = *req.IsInUse
 	}
 
-	// update signal-types
+	// update signal_types
 	rowsAffected, err := s.queries.UpdateSignalTypeDetails(r.Context(), database.UpdateSignalTypeDetailsParams{
 		ID:        signalType.ID,
 		ReadmeURL: signalType.ReadmeURL,
@@ -332,7 +332,7 @@ func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *ht
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error - more than one signal type deleted")
 		return
 	}
-	responses.RespondWithJSON(w, http.StatusNoContent, "")
+	responses.RespondWithStatusCodeOnly(w, http.StatusCreated)
 }
 
 // GetSignalTypeHandler godoc
@@ -348,7 +348,7 @@ func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *ht
 //	@Failure	404	{object}	responses.ErrorResponse
 //	@Failure	500	{object}	responses.ErrorResponse
 //
-//	@Router		/api/isn/{isn_slug}/signal-types/{slug}/v{sem_ver} [get]
+//	@Router		/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver} [get]
 func (s *SignalTypeHandler) GetSignalTypeHandler(w http.ResponseWriter, r *http.Request) {
 
 	slug := r.PathValue("slug")
@@ -360,7 +360,7 @@ func (s *SignalTypeHandler) GetSignalTypeHandler(w http.ResponseWriter, r *http.
 		SemVer: semVer,
 	})
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No signal definition found for %s/v%s", slug, semVer))
 			return
 		}
@@ -389,7 +389,7 @@ func (s *SignalTypeHandler) GetSignalTypeHandler(w http.ResponseWriter, r *http.
 //	@Success	200	{array}		database.SignalType
 //	@Failure	500	{object}	responses.ErrorResponse
 //
-//	@Router		/api/isn/{isn_slug}/signal-types [get]
+//	@Router		/api/isn/{isn_slug}/signal_types [get]
 func (s *SignalTypeHandler) GetSignalTypesHandler(w http.ResponseWriter, r *http.Request) {
 
 	res, err := s.queries.GetSignalTypes(r.Context())

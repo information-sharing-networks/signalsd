@@ -1,4 +1,3 @@
-
 version: "2"
 sql:
   - engine: "postgresql"
@@ -8,7 +7,40 @@ sql:
       go:
         package: "database"
         out: "internal/database"
+        sql_package: "pgx/v5"
+        overrides:
+          - db_type: "uuid"
+            go_type:
+              import: "github.com/google/uuid"
+              type: "UUID"
+          - db_type: "uuid"
+            go_type:
+              import: "github.com/google/uuid"
+              type: "UUID"
+              pointer: true
+            nullable: true
+          - db_type: "pg_catalog.timestamptz"
+            go_type:
+              import: "time"
+              type: "Time"
+          - db_type: "pg_catalog.timestamptz"
+            go_type:
+              import: "time"
+              type: "Time"
+              pointer: true
+            nullable: true
+          - db_type: "pg_catalog.date"
+            go_type:
+              import: "time"
+              type: "Time"
+          - db_type: "pg_catalog.date"
+            nullable: true
+            go_type:
+              import: "time"
+              type: "Time"
+              pointer: true
         emit_json_tags: true
+        emit_pointers_for_null_types: true 
         rename:
           schema_url: "SchemaURL"
           readme_url: "ReadmeURL"

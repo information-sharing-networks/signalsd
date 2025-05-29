@@ -117,6 +117,60 @@
                 }
             }
         },
+        "/api/isn/": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    },
+                    {
+                        "RefreshTokenCookieAuth": []
+                    }
+                ],
+                "description": "Create an Information Sharing Network (ISN)\n\nvisibility = \"private\" means that signalsd on the network can only be seen by network participants.\n\nThe only storage_type currently supported is \"admin_db\"\nwhen storage_type = \"admin_db\" the signalsd are stored in the relational database used by the API service to store the admin configuration\nSpecify \"admin_db\" for storage_connection_url in this case (anything else is overriwtten with this value)\nISN admins automatically get write permission for their own sites, so this endpoint also starts a signals batch for them\nowners automatically get write permission on all isns, so start a batch for them too\n\nThis endpoint can only be used by the site owner or an admin",
+                "tags": [
+                    "ISN configuration"
+                ],
+                "summary": "Create an ISN",
+                "parameters": [
+                    {
+                        "description": "ISN details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateIsnRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateIsnResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/isn/{isn_slug}": {
             "put": {
                 "security": [
@@ -126,7 +180,7 @@
                 ],
                 "description": "Update the ISN details\nThis endpoint can only be used by the site owner or the ISN admin",
                 "tags": [
-                    "ISN config"
+                    "ISN configuration"
                 ],
                 "summary": "Update an ISN",
                 "parameters": [
@@ -171,61 +225,9 @@
                         }
                     }
                 }
-            },
-            "post": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    },
-                    {
-                        "RefreshTokenCookieAuth": []
-                    }
-                ],
-                "description": "Create an Information Sharing Network (ISN)\n\nvisibility = \"private\" means that signalsd on the network can only be seen by network participants.\n\nThe only storage_type currently supported is \"admin_db\"\nwhen storage_type = \"admin_db\" the signalsd are stored in the relational database used by the API service to store the admin configuration\nSpecify \"admin_db\" for storage_connection_url in this case (anything else is overriwtten with this value)\n\nThis endpoint can only be used by the site owner or an admin",
-                "tags": [
-                    "ISN config"
-                ],
-                "summary": "Create an ISN",
-                "parameters": [
-                    {
-                        "description": "ISN details",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateIsnRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateIsnResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
             }
         },
-        "/api/isn/{isn_slug}/signal-types": {
+        "/api/isn/{isn_slug}/signal_types": {
             "get": {
                 "tags": [
                     "ISN view"
@@ -255,9 +257,9 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "A signal type describes a data set that is sharable over an ISN.  Setup the ISN before defining any signal defs.\nSignal types specify a record that can be shared over the ISN\n- Each type has a unique title\n- A URL-friendly slug is created based on the title supplied when you load the first version of a definition.\n- The title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.\n- The field definition is held as an external json schema file\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different json schemas.\n- use this endpoint to create the first version - the bump_type (major/minor/patch) determines the inital semver(1.0.0, 0.1.0 or 0.0.1)\n- subsequent POSTs to this endpoint that reference a previously sumbitted title/slug but point to a different schema will increment the version\n\nSignal type definitions are referred to with a url like this http://{hostname}/api/isn/{isn_slug}/signal-types/{slug}/v{sem_ver}\n",
+                "description": "A signal type describes a data set that is sharable over an ISN.  Setup the ISN before defining any signal defs.\nSignal types specify a record that can be shared over the ISN\n- Each type has a unique title\n- A URL-friendly slug is created based on the title supplied when you load the first version of a definition.\n- The title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.\n- The field definition is held as an external json schema file\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different json schemas.\n- use this endpoint to create the first version - the bump_type (major/minor/patch) determines the inital semver(1.0.0, 0.1.0 or 0.0.1)\n- subsequent POSTs to this endpoint that reference a previously sumbitted title/slug but point to a different schema will increment the version\n\nSignal type definitions are referred to with a url like this http://{hostname}/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}\n",
                 "tags": [
-                    "signal config"
+                    "Signal definitions"
                 ],
                 "summary": "Create signal type definition",
                 "parameters": [
@@ -299,7 +301,7 @@
                 }
             }
         },
-        "/api/isn/{isn_slug}/signal-types/{slug}/v{sem_ver}": {
+        "/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}": {
             "get": {
                 "tags": [
                     "ISN view"
@@ -358,7 +360,7 @@
                 ],
                 "description": "users can mark the signal type as *in use/not in use* and update the description or link to the readme file\n\nIt is not allowed to update the schema url - instead users should create a new declaration with the same title and bump the version",
                 "tags": [
-                    "signal config"
+                    "Signal definitions"
                 ],
                 "summary": "Update signal definition",
                 "parameters": [
@@ -417,7 +419,7 @@
             "get": {
                 "description": "TODO - get latest, previous, by data ranage\nTODO",
                 "tags": [
-                    "Signals Management"
+                    "Signal sharing"
                 ],
                 "summary": "Get details about a set of signal batches",
                 "responses": {}
@@ -427,7 +429,7 @@
             "get": {
                 "description": "TODO - get by id. Include status (errs, received, latest localref in batch)",
                 "tags": [
-                    "Signals Management"
+                    "Signal sharing"
                 ],
                 "summary": "Get a signal batch",
                 "responses": {}
@@ -442,7 +444,7 @@
                 ],
                 "description": "This endpoint is used by service accounts to create a new batch used to track signals sent to the specified isn\n\nFor user accounts, a batch is automatically created when they are granted write permission to an isn and is only closed if their permission to write to the isn is revoked\n\nFor service accounts, the client app can decide how long to keep a batch open\n(a batch status summary is sent to a webhook after the batch closes)\n\nopening a batch closes the previous batch created on the isn for this account.\n\nSignals can only be sent to open batches.\n\nauthentication is based on the supplied access token:\n(the site owner; the isn admin and members with an isn_perm= write can create a batch)\n",
                 "tags": [
-                    "Signals Management"
+                    "Signal sharing"
                 ],
                 "summary": "Create a new signal batch",
                 "responses": {
@@ -503,7 +505,7 @@
                 ],
                 "description": "This endpoint can only be used by the site owner or the ISN admin",
                 "tags": [
-                    "ISN config"
+                    "ISN configuration"
                 ],
                 "summary": "Update an ISN Receiver",
                 "parameters": [
@@ -557,7 +559,7 @@
                 ],
                 "description": "An ISN receiver handles the http requests sent by clients that pass Signals to the ISN\n\nYou can specify how many receivers should be started for the ISN and they will listen on an automatically generted port, starting at 8081\n\nThe public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/signals/receiver\nthe isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services\n\nnote receivers are always created in 'offline' mode.\n\nThis endpoint can only be used by the site owner or the ISN admin",
                 "tags": [
-                    "ISN config"
+                    "ISN configuration"
                 ],
                 "summary": "Create an ISN Receiver definition",
                 "parameters": [
@@ -649,7 +651,7 @@
                 ],
                 "description": "This endpoint can only be used by the site owner or the ISN admin",
                 "tags": [
-                    "ISN config"
+                    "ISN configuration"
                 ],
                 "summary": "Update an ISN Retriever",
                 "parameters": [
@@ -703,7 +705,7 @@
                 ],
                 "description": "An ISN retriever handles the http requests sent by clients to get Signals from the ISN\n\nYou can specify how many retrievers should be started for the ISN and they will listen on an automatically generted port\n\nThe public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/signals/retriever\nthe isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services\n\nnote retrievers are created in 'offline' mode.\n\nThis endpoint can only be used by the site owner or the ISN admin",
                 "tags": [
-                    "ISN config"
+                    "ISN configuration"
                 ],
                 "summary": "Create an ISN Retriever definition",
                 "parameters": [
@@ -759,7 +761,7 @@
                 "tags": [
                     "ISN view"
                 ],
-                "summary": "Get an ISN configuration",
+                "summary": "Get an ISN configurationuration",
                 "parameters": [
                     {
                         "type": "string",
@@ -908,7 +910,7 @@
         },
         "/auth/login": {
             "post": {
-                "description": "The response body includes an access token. A refresh token is included in a http-only cookie named refresh_token\nThe access_token is valid for 30 mins.\n\nUse the refresh_token with the /auth/refresh endpoint to renew the access_token.\n\nThe refresh_token lasts 30 days unless it is revoked earlier.\nTo renew the refresh_token, log in again.",
+                "description": "The response body includes an access token which can be used to access the protected enpoints, assuming the account has the appropriate permissions.\nThe access_token is valid for 30 mins.\n\nAs part of the login response, the server sets a http-only cookie on the client that will allow it to use the /auth/refresh endpoint to renew the access_token\nThe refresh_token lasts 30 days unless it is revoked earlier.\n\nThe account's role and permissions are encoded and encloded as part of the jwt access token and also provided in the response body\nTo renew the refresh_token, log in again.",
                 "tags": [
                     "auth"
                 ],
@@ -1087,7 +1089,7 @@
                         "BearerRefreshToken": []
                     }
                 ],
-                "description": "Use this endpoint to get a new access token.\n\nYou need to supply a vaild refresh token to use this API - if the refresh token has expired or been revoked the user must login again to get a new one.\n\nThe refresh token should be supplied in a http-only cookie called refresh_token.\n\nYou must also provide a previously issued bearer access token - it does not matter if it has expired\n(the token is not used to authenticate the request but is needed to establish the ID of the user making the request)\n\nNote this action automatically revokes the current refresh_token and issues a new one.\n\nThe new refresh token is sent in an http-only cookie named refresh_token.\nIn production deployments the secure flag (https only) on the cookie will be set to true\n\nAccess tokens expire after 30 mins and subsequent requests using the token will fail with an error_code of \"access_token_expired\"\n",
+                "description": "Use this endpoint to get a new access token.\n\nA vaild refresh token is needed to use this endpoint - if the refresh token has expired or been revoked the user must login again to get a new one.\nNew refresh tokens are sent as http-only cookies whenever the client uses this endpoint or logs in.\n\nThe browser handles refresh token cookies automatically, but you must provide your current access token in the Authorization header (the token is used only for user identification - expired tokens are accepted).\n\nEach successful refresh operation:\n- Invalidates the current refresh token\n- Issues a new refresh token via secure HTTP-only cookie\n- Returns a new access token in the response body\n\nthe new refresh token cookies is configured with:\n- HttpOnly - Prevents JavaScript access, reducing XSS risk\n- Secure - HTTPS (only in production environments)\n- SameSite=Lax -  preventing the use of cookie in third-party requests except for user-driven interactions.\n\nThe account's role and permissions are encoded and included as part of the jwt access token and also provided in the response body\n\nAccess tokens expire after 30 mins and subsequent requests using the token will fail with HTTP status 401 and an error_code of \"access_token_expired\"",
                 "tags": [
                     "auth"
                 ],
@@ -1233,21 +1235,96 @@
                 }
             }
         },
-        "/isn/{isn_slug}/signal_types/{signal_type_slug}/signals": {
-            "post": {
-                "description": "- the client can submit arrays of signals for a single type in a single req (subject to the size\nlimits defined on the signal type definition)\n- The client-supplied local_ref must uniquely identify each signal of the\nspecified signal type that will be supplied by the account.\n- If a local reference is received more than once from an account for a\nspecified signal_type it will be stored with a incremented version number\nand the previous version will be marked as latest=false (it does not matter\nif the previous signal was received in a different batch, but the signal must\nbe owned by the same account).\n- If a deletion request is received, all version of the signal will be marked\nas 'withdrawn'.\n- Correlation_ids are auto generated on the server unless supplied by the client, in which case they are used to identify another signal that this signal is related to. The correlated signal does not need to be owned by the same account.",
+        "/isn/{isn_slug}/signal_types/{signal_type_slug}/signals/{signal_id}": {
+            "get": {
                 "tags": [
-                    "Signals Management"
+                    "Signal sharing"
                 ],
-                "summary": "send one or more signals",
+                "summary": "get a signal (TODO)",
                 "responses": {}
+            },
+            "delete": {
+                "tags": [
+                    "Signal sharing"
+                ],
+                "summary": "Withdraw a signal (TODO)",
+                "responses": {}
+            }
+        },
+        "/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "- the client can submit an array of signals to this endpoint for storage on the ISN\n- payloads must not mix signals of different types and the payload is subject to the sizen\tlimits defined on the ISN.\n- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.\n- If a local reference is received more than once from an account for a specified signal_type it will be stored with a incremented version number.\n- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account.\n- requests are only accepted for the open signal batch for this account/ISN.\n\n**Authentication**\n\nRequires a valid access token.\nThe claims in the access token list the ISNs and signal_types that the account is permitted to use.\n\n- the RequireIsnWritePermission middleware will consult the claims in the access token to confirm the user is allowed to write to the isn in the URL.\n- This handler also checks that the signal_type/sem_ver in the url is also listed in the claims (this is to catch mistyped urls)\n\n**Validation**\n\nthe content is validated against the json schema asynchronously, however basic checks are done on the incoming data.\nThe following issues create a 400 error and cause the entire payload to be rejected\n- invalid json format\n- missing fields (the array of signals must be in a json object called signals, and content and local_ref must be present for each record).\n- incorrect correlation ids - where supplied, correlation ids must refer to another signal of the same type (error_code is set to \"invalid_correlation_id\" in this case)\n\ninternal errors cause the whole payload to be rejected.",
+                "tags": [
+                    "Signal sharing"
+                ],
+                "summary": "Send signals",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn--example-org",
+                        "description": "isn slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "sample-signal--example-org",
+                        "description": "signal type slug",
+                        "name": "signal_type_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "0.0.1",
+                        "description": "signal type sem_ver number",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "create signals",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateSignalsRequestDoc"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateSignalsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
             }
         },
         "/webhooks": {
             "post": {
                 "description": "TODO - register a webhook to recieve signals batch status updates",
                 "tags": [
-                    "Signals Management"
+                    "Signal sharing"
                 ],
                 "summary": "Register webhook",
                 "responses": {}
@@ -1265,6 +1342,7 @@
                 "forbidden",
                 "internal_error",
                 "invalid_request",
+                "invalid_correlation_id",
                 "malformed_body",
                 "not_implemented",
                 "password_too_short",
@@ -1281,6 +1359,7 @@
                 "ErrCodeForbidden",
                 "ErrCodeInternalError",
                 "ErrCodeInvalidRequest",
+                "ErrCodeInvalidCorrelationID",
                 "ErrCodeMalformedBody",
                 "ErrCodeNotImplemented",
                 "ErrCodePasswordTooShort",
@@ -1295,7 +1374,7 @@
             "properties": {
                 "access_token": {
                     "type": "string",
-                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxTZXJ2ZXIiLCJzdWIiOiI2OGZiNWY1Yi1lM2Y1LTRhOTYtOGQzNS1jZDIyMDNhMDZmNzMiLCJleHAiOjE3NDY3NzA2MzQsImlhdCI6MTc0Njc2NzAzNH0.3OdnUNgrvt1Zxs9AlLeaC9DVT6Xwc6uGvFQHb6nDfZs"
+                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxzZCIsInN1YiI6ImMxMjQ1Yjc0LTMyMTQtNDUzOS04YTgyLTY2NDNkMzllNjk5YiIsImV4cCI6MTc0ODU4ODE2MiwiaWF0IjoxNzQ4NTg2MzYyLCJhY2NvdW50X2lkIjoiYzEyNDViNzQtMzIxNC00NTM5LThhODItNjY0M2QzOWU2OTliIiwiYWNjb3VudF90eXBlIjoidXNlciIsInJvbGUiOiJvd25lciIsImlzbl9wZXJtcyI6eyJzYW1wbGUtaXNuLS1leGFtcGxlLW9yZyI6eyJwZXJtaXNzaW9uIjoid3JpdGUiLCJzaWduYWxfdHlwZXMiOlsic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4xIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4yIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4zIiwic2FtcGxlLXNpZ25hbG5ldy0tZXhhbXBsZS1vcmcvdjAuMC4xIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC40Il19LCJzYW1wbGUtaXNuLS1zYXVsLW9yZyI6eyJwZXJtaXNzaW9uIjoid3JpdGUiLCJzaWduYWxfdHlwZXMiOlsic2FtcGxlLXNpZ25hbC0tc2F1bC1vcmcvdjAuMC4xIl19fX0.33ANor7XHWkB87npB4RWsJUjBnJHdYZce-lT8w_IN_s"
                 },
                 "account_id": {
                     "type": "string",
@@ -1314,7 +1393,6 @@
                     "example": 1800
                 },
                 "isn_perms": {
-                    "description": "todo - perms",
                     "type": "object",
                     "additionalProperties": {
                         "$ref": "#/definitions/auth.IsnPerms"
@@ -1346,12 +1424,20 @@
                     ],
                     "example": "read"
                 },
+                "signal_batch_id": {
+                    "type": "string",
+                    "example": "967affe9-5628-4fdd-921f-020051344a12"
+                },
                 "signal_types": {
                     "description": "list of available signal types for the isn",
                     "type": "array",
                     "items": {
                         "type": "string"
-                    }
+                    },
+                    "example": [
+                        "signal-type-1/v0.0.1",
+                        "signal-type-2/v1.0.0"
+                    ]
                 }
             }
         },
@@ -1681,6 +1767,10 @@
                     "type": "string",
                     "example": "http://localhost:8080/api/isn/sample-isn--example-org"
                 },
+                "signals_batch_id": {
+                    "type": "string",
+                    "example": "b51faf05-aaed-4250-b334-2258ccdf1ff2"
+                },
                 "slug": {
                     "type": "string",
                     "example": "sample-isn--example-org"
@@ -1780,6 +1870,54 @@
                 "signals_batch_id": {
                     "type": "string",
                     "example": "b51faf05-aaed-4250-b334-2258ccdf1ff2"
+                }
+            }
+        },
+        "handlers.CreateSignalsRequestDoc": {
+            "type": "object",
+            "properties": {
+                "signals": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "content": {
+                                "type": "object",
+                                "additionalProperties": {}
+                            },
+                            "correlation_id": {
+                                "type": "string",
+                                "example": "75b45fe1-ecc2-4629-946b-fd9058c3b2ca"
+                            },
+                            "local_ref": {
+                                "type": "string",
+                                "example": "item_id_#1"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "handlers.CreateSignalsResponse": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string",
+                    "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3"
+                },
+                "isn_slug": {
+                    "type": "string",
+                    "example": "sample-isn--example-org"
+                },
+                "signal_type_path": {
+                    "type": "string",
+                    "example": "signal-type-1/v0.0.1"
+                },
+                "stored_signals": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.StoredSignal"
+                    }
                 }
             }
         },
@@ -1890,6 +2028,23 @@
                 },
                 "updated_at": {
                     "type": "string"
+                }
+            }
+        },
+        "handlers.StoredSignal": {
+            "type": "object",
+            "properties": {
+                "local_ref": {
+                    "type": "string",
+                    "example": "item_id_#1"
+                },
+                "signal_version_id": {
+                    "type": "string",
+                    "example": "835788bd-789d-4091-96e3-db0f51ccbabc"
+                },
+                "version_number": {
+                    "type": "integer",
+                    "example": 1
                 }
             }
         },
@@ -2052,20 +2207,28 @@
             "name": "auth"
         },
         {
-            "description": "signal definitions describe the format of the data being shared in an ISN",
-            "name": "signal config"
+            "description": "Site adminstration tools",
+            "name": "Site admin"
         },
         {
             "description": "Information sharing networks are used to exchange signalsd between participating users.",
-            "name": "ISN config"
+            "name": "ISN configuration"
+        },
+        {
+            "description": "Grant accounts read or write access to an ISN",
+            "name": "ISN Permissions"
         },
         {
             "description": "View information about the configured ISNs",
             "name": "ISN view"
         },
         {
-            "description": "Site adminstration tools",
-            "name": "Site admin"
+            "description": "Signal definitions describe the format of the data being shared in an ISN",
+            "name": "Signal definitions"
+        },
+        {
+            "description": "Send and recieve signals over the ISN",
+            "name": "Signal sharing"
         }
     ]
 }

@@ -111,7 +111,7 @@ CREATE TABLE isn_retrievers (
     slug TEXT NOT NULL,
     retriever_origin TEXT NOT NULL,
     retriever_status TEXT NOT NULL,
-    default_rate_limit INT NOT NULL, -- todo
+    default_rate_limit INT NOT NULL,
     CONSTRAINT fk_isn_retrievers_isn
         FOREIGN KEY (isn_id)
         REFERENCES isn(id)

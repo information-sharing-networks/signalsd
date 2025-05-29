@@ -1,12 +1,12 @@
 package handlers
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/nickabs/signalsd/app/internal/apperrors"
 	"github.com/nickabs/signalsd/app/internal/auth"
 	"github.com/nickabs/signalsd/app/internal/database"
@@ -50,7 +50,7 @@ type CreateSignalsBatchResponse struct {
 //	@Description	authentication is based on the supplied access token:
 //	@Description	(the site owner; the isn admin and members with an isn_perm= write can create a batch)
 //	@Description
-//	@Tags		Signals Management
+//	@Tags		Signal sharing
 //
 //	@Success	201	{object}	CreateSignalsBatchResponse
 //	@Failure	500	{object}	responses.ErrorResponse
@@ -98,7 +98,7 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 		IsnID:     isn.ID,
 		AccountID: accountID,
 	})
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not close open batch for user %v : %v", accountID, err))
 		return
 	}
@@ -132,7 +132,7 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 // GetSignalsBatchHandler godocs
 //
 //	@Summary		Get a signal batch
-//	@Tags			Signals Management
+//	@Tags			Signal sharing
 //
 //	@Description	TODO - get by id. Include status (errs, received, latest localref in batch)
 //
@@ -147,7 +147,7 @@ func (u *SignalsBatchHandler) GetSignalsBatchHandler(w http.ResponseWriter, r *h
 //
 //	@Summary		Get details about a set of signal batches
 //	@Description	TODO - get latest, previous, by data ranage
-//	@Tags			Signals Management
+//	@Tags			Signal sharing
 //
 //	@Description	TODO
 //

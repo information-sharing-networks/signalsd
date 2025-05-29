@@ -10,6 +10,7 @@ definitions:
     - forbidden
     - internal_error
     - invalid_request
+    - invalid_correlation_id
     - malformed_body
     - not_implemented
     - password_too_short
@@ -26,6 +27,7 @@ definitions:
     - ErrCodeForbidden
     - ErrCodeInternalError
     - ErrCodeInvalidRequest
+    - ErrCodeInvalidCorrelationID
     - ErrCodeMalformedBody
     - ErrCodeNotImplemented
     - ErrCodePasswordTooShort
@@ -36,7 +38,7 @@ definitions:
   auth.AccessTokenResponse:
     properties:
       access_token:
-        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxTZXJ2ZXIiLCJzdWIiOiI2OGZiNWY1Yi1lM2Y1LTRhOTYtOGQzNS1jZDIyMDNhMDZmNzMiLCJleHAiOjE3NDY3NzA2MzQsImlhdCI6MTc0Njc2NzAzNH0.3OdnUNgrvt1Zxs9AlLeaC9DVT6Xwc6uGvFQHb6nDfZs
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxzZCIsInN1YiI6ImMxMjQ1Yjc0LTMyMTQtNDUzOS04YTgyLTY2NDNkMzllNjk5YiIsImV4cCI6MTc0ODU4ODE2MiwiaWF0IjoxNzQ4NTg2MzYyLCJhY2NvdW50X2lkIjoiYzEyNDViNzQtMzIxNC00NTM5LThhODItNjY0M2QzOWU2OTliIiwiYWNjb3VudF90eXBlIjoidXNlciIsInJvbGUiOiJvd25lciIsImlzbl9wZXJtcyI6eyJzYW1wbGUtaXNuLS1leGFtcGxlLW9yZyI6eyJwZXJtaXNzaW9uIjoid3JpdGUiLCJzaWduYWxfdHlwZXMiOlsic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4xIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4yIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4zIiwic2FtcGxlLXNpZ25hbG5ldy0tZXhhbXBsZS1vcmcvdjAuMC4xIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC40Il19LCJzYW1wbGUtaXNuLS1zYXVsLW9yZyI6eyJwZXJtaXNzaW9uIjoid3JpdGUiLCJzaWduYWxfdHlwZXMiOlsic2FtcGxlLXNpZ25hbC0tc2F1bC1vcmcvdjAuMC4xIl19fX0.33ANor7XHWkB87npB4RWsJUjBnJHdYZce-lT8w_IN_s
         type: string
       account_id:
         example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
@@ -53,7 +55,6 @@ definitions:
       isn_perms:
         additionalProperties:
           $ref: '#/definitions/auth.IsnPerms'
-        description: todo - perms
         type: object
       role:
         enum:
@@ -74,8 +75,14 @@ definitions:
         - write
         example: read
         type: string
+      signal_batch_id:
+        example: 967affe9-5628-4fdd-921f-020051344a12
+        type: string
       signal_types:
         description: list of available signal types for the isn
+        example:
+        - signal-type-1/v0.0.1
+        - signal-type-2/v1.0.0
         items:
           type: string
         type: array
@@ -300,6 +307,9 @@ definitions:
       resource_url:
         example: http://localhost:8080/api/isn/sample-isn--example-org
         type: string
+      signals_batch_id:
+        example: b51faf05-aaed-4250-b334-2258ccdf1ff2
+        type: string
       slug:
         example: sample-isn--example-org
         type: string
@@ -374,6 +384,39 @@ definitions:
         example: b51faf05-aaed-4250-b334-2258ccdf1ff2
         type: string
     type: object
+  handlers.CreateSignalsRequestDoc:
+    properties:
+      signals:
+        items:
+          properties:
+            content:
+              additionalProperties: {}
+              type: object
+            correlation_id:
+              example: 75b45fe1-ecc2-4629-946b-fd9058c3b2ca
+              type: string
+            local_ref:
+              example: item_id_#1
+              type: string
+          type: object
+        type: array
+    type: object
+  handlers.CreateSignalsResponse:
+    properties:
+      account_id:
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+        type: string
+      isn_slug:
+        example: sample-isn--example-org
+        type: string
+      signal_type_path:
+        example: signal-type-1/v0.0.1
+        type: string
+      stored_signals:
+        items:
+          $ref: '#/definitions/handlers.StoredSignal'
+        type: array
+    type: object
   handlers.CreateUserRequest:
     properties:
       email:
@@ -447,6 +490,18 @@ definitions:
         type: string
       updated_at:
         type: string
+    type: object
+  handlers.StoredSignal:
+    properties:
+      local_ref:
+        example: item_id_#1
+        type: string
+      signal_version_id:
+        example: 835788bd-789d-4091-96e3-db0f51ccbabc
+        type: string
+      version_number:
+        example: 1
+        type: integer
     type: object
   handlers.UpdateIsnReceiverRequest:
     properties:
@@ -629,7 +684,7 @@ paths:
       summary: Get the ISNs
       tags:
       - ISN view
-  /api/isn/{isn_slug}:
+  /api/isn/:
     post:
       description: |-
         Create an Information Sharing Network (ISN)
@@ -639,6 +694,8 @@ paths:
         The only storage_type currently supported is "admin_db"
         when storage_type = "admin_db" the signalsd are stored in the relational database used by the API service to store the admin configuration
         Specify "admin_db" for storage_connection_url in this case (anything else is overriwtten with this value)
+        ISN admins automatically get write permission for their own sites, so this endpoint also starts a signals batch for them
+        owners automatically get write permission on all isns, so start a batch for them too
 
         This endpoint can only be used by the site owner or an admin
       parameters:
@@ -670,7 +727,8 @@ paths:
       - RefreshTokenCookieAuth: []
       summary: Create an ISN
       tags:
-      - ISN config
+      - ISN configuration
+  /api/isn/{isn_slug}:
     put:
       description: |-
         Update the ISN details
@@ -707,8 +765,8 @@ paths:
       - BearerAccessToken: []
       summary: Update an ISN
       tags:
-      - ISN config
-  /api/isn/{isn_slug}/signal-types:
+      - ISN configuration
+  /api/isn/{isn_slug}/signal_types:
     get:
       responses:
         "200":
@@ -738,7 +796,7 @@ paths:
         - use this endpoint to create the first version - the bump_type (major/minor/patch) determines the inital semver(1.0.0, 0.1.0 or 0.0.1)
         - subsequent POSTs to this endpoint that reference a previously sumbitted title/slug but point to a different schema will increment the version
 
-        Signal type definitions are referred to with a url like this http://{hostname}/api/isn/{isn_slug}/signal-types/{slug}/v{sem_ver}
+        Signal type definitions are referred to with a url like this http://{hostname}/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}
       parameters:
       - description: signal definition details
         in: body
@@ -767,8 +825,8 @@ paths:
       - BearerAccessToken: []
       summary: Create signal type definition
       tags:
-      - signal config
-  /api/isn/{isn_slug}/signal-types/{slug}/v{sem_ver}:
+      - Signal definitions
+  /api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}:
     get:
       parameters:
       - description: signal definiton slug
@@ -846,7 +904,7 @@ paths:
       - BearerAccessToken: []
       summary: Update signal definition
       tags:
-      - signal config
+      - Signal definitions
   /api/isn/{isn_slug}/signals/accounts/{account_id}/batches:
     get:
       description: |-
@@ -855,7 +913,7 @@ paths:
       responses: {}
       summary: Get details about a set of signal batches
       tags:
-      - Signals Management
+      - Signal sharing
   /api/isn/{isn_slug}/signals/accounts/{account_id}/batches/{signals_batch_id}:
     get:
       description: TODO - get by id. Include status (errs, received, latest localref
@@ -863,7 +921,7 @@ paths:
       responses: {}
       summary: Get a signal batch
       tags:
-      - Signals Management
+      - Signal sharing
   /api/isn/{isn_slug}/signals/batches:
     post:
       description: |
@@ -893,7 +951,7 @@ paths:
       - BearerAccessToken: []
       summary: Create a new signal batch
       tags:
-      - Signals Management
+      - Signal sharing
   /api/isn/{isn_slug}/signals/receiver:
     get:
       parameters:
@@ -963,7 +1021,7 @@ paths:
       - BearerAccessToken: []
       summary: Create an ISN Receiver definition
       tags:
-      - ISN config
+      - ISN configuration
     put:
       description: This endpoint can only be used by the site owner or the ISN admin
       parameters:
@@ -998,7 +1056,7 @@ paths:
       - BearerAccessToken: []
       summary: Update an ISN Receiver
       tags:
-      - ISN config
+      - ISN configuration
   /api/isn/{isn_slug}/signals/retriever:
     get:
       parameters:
@@ -1068,7 +1126,7 @@ paths:
       - BearerAccessToken: []
       summary: Create an ISN Retriever definition
       tags:
-      - ISN config
+      - ISN configuration
     put:
       description: This endpoint can only be used by the site owner or the ISN admin
       parameters:
@@ -1103,7 +1161,7 @@ paths:
       - BearerAccessToken: []
       summary: Update an ISN Retriever
       tags:
-      - ISN config
+      - ISN configuration
   /api/isn/{slug}:
     get:
       description: Returns details about the ISN plus details of any configured receivers/retrievers
@@ -1131,7 +1189,7 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-      summary: Get an ISN configuration
+      summary: Get an ISN configurationuration
       tags:
       - ISN view
   /api/users:
@@ -1217,12 +1275,13 @@ paths:
   /auth/login:
     post:
       description: |-
-        The response body includes an access token. A refresh token is included in a http-only cookie named refresh_token
+        The response body includes an access token which can be used to access the protected enpoints, assuming the account has the appropriate permissions.
         The access_token is valid for 30 mins.
 
-        Use the refresh_token with the /auth/refresh endpoint to renew the access_token.
-
+        As part of the login response, the server sets a http-only cookie on the client that will allow it to use the /auth/refresh endpoint to renew the access_token
         The refresh_token lasts 30 days unless it is revoked earlier.
+
+        The account's role and permissions are encoded and encloded as part of the jwt access token and also provided in the response body
         To renew the refresh_token, log in again.
       parameters:
       - description: email and password
@@ -1353,22 +1412,27 @@ paths:
       - auth
   /auth/token:
     post:
-      description: |
+      description: |-
         Use this endpoint to get a new access token.
 
-        You need to supply a vaild refresh token to use this API - if the refresh token has expired or been revoked the user must login again to get a new one.
+        A vaild refresh token is needed to use this endpoint - if the refresh token has expired or been revoked the user must login again to get a new one.
+        New refresh tokens are sent as http-only cookies whenever the client uses this endpoint or logs in.
 
-        The refresh token should be supplied in a http-only cookie called refresh_token.
+        The browser handles refresh token cookies automatically, but you must provide your current access token in the Authorization header (the token is used only for user identification - expired tokens are accepted).
 
-        You must also provide a previously issued bearer access token - it does not matter if it has expired
-        (the token is not used to authenticate the request but is needed to establish the ID of the user making the request)
+        Each successful refresh operation:
+        - Invalidates the current refresh token
+        - Issues a new refresh token via secure HTTP-only cookie
+        - Returns a new access token in the response body
 
-        Note this action automatically revokes the current refresh_token and issues a new one.
+        the new refresh token cookies is configured with:
+        - HttpOnly - Prevents JavaScript access, reducing XSS risk
+        - Secure - HTTPS (only in production environments)
+        - SameSite=Lax -  preventing the use of cookie in third-party requests except for user-driven interactions.
 
-        The new refresh token is sent in an http-only cookie named refresh_token.
-        In production deployments the secure flag (https only) on the cookie will be set to true
+        The account's role and permissions are encoded and included as part of the jwt access token and also provided in the response body
 
-        Access tokens expire after 30 mins and subsequent requests using the token will fail with an error_code of "access_token_expired"
+        Access tokens expire after 30 mins and subsequent requests using the token will fail with HTTP status 401 and an error_code of "access_token_expired"
       responses:
         "200":
           description: OK
@@ -1469,32 +1533,92 @@ paths:
       summary: Grant ISN access permission
       tags:
       - ISN Permissions
-  /isn/{isn_slug}/signal_types/{signal_type_slug}/signals:
-    post:
-      description: |-
-        - the client can submit arrays of signals for a single type in a single req (subject to the size
-        limits defined on the signal type definition)
-        - The client-supplied local_ref must uniquely identify each signal of the
-        specified signal type that will be supplied by the account.
-        - If a local reference is received more than once from an account for a
-        specified signal_type it will be stored with a incremented version number
-        and the previous version will be marked as latest=false (it does not matter
-        if the previous signal was received in a different batch, but the signal must
-        be owned by the same account).
-        - If a deletion request is received, all version of the signal will be marked
-        as 'withdrawn'.
-        - Correlation_ids are auto generated on the server unless supplied by the client, in which case they are used to identify another signal that this signal is related to. The correlated signal does not need to be owned by the same account.
+  /isn/{isn_slug}/signal_types/{signal_type_slug}/signals/{signal_id}:
+    delete:
       responses: {}
-      summary: send one or more signals
+      summary: Withdraw a signal (TODO)
       tags:
-      - Signals Management
+      - Signal sharing
+    get:
+      responses: {}
+      summary: get a signal (TODO)
+      tags:
+      - Signal sharing
+  /isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals:
+    post:
+      description: "- the client can submit an array of signals to this endpoint for
+        storage on the ISN\n- payloads must not mix signals of different types and
+        the payload is subject to the sizen\tlimits defined on the ISN.\n- The client-supplied
+        local_ref must uniquely identify each signal of the specified signal type
+        that will be supplied by the account.\n- If a local reference is received
+        more than once from an account for a specified signal_type it will be stored
+        with a incremented version number.\n- Optionally a correlation_id can be supplied
+        - this will link the signal to a previously received signal. The correlated
+        signal does not need to be owned by the same account.\n- requests are only
+        accepted for the open signal batch for this account/ISN.\n\n**Authentication**\n\nRequires
+        a valid access token.\nThe claims in the access token list the ISNs and signal_types
+        that the account is permitted to use.\n\n- the RequireIsnWritePermission middleware
+        will consult the claims in the access token to confirm the user is allowed
+        to write to the isn in the URL.\n- This handler also checks that the signal_type/sem_ver
+        in the url is also listed in the claims (this is to catch mistyped urls)\n\n**Validation**\n\nthe
+        content is validated against the json schema asynchronously, however basic
+        checks are done on the incoming data.\nThe following issues create a 400 error
+        and cause the entire payload to be rejected\n- invalid json format\n- missing
+        fields (the array of signals must be in a json object called signals, and
+        content and local_ref must be present for each record).\n- incorrect correlation
+        ids - where supplied, correlation ids must refer to another signal of the
+        same type (error_code is set to \"invalid_correlation_id\" in this case)\n\ninternal
+        errors cause the whole payload to be rejected."
+      parameters:
+      - description: isn slug
+        example: sample-isn--example-org
+        in: path
+        name: isn_slug
+        required: true
+        type: string
+      - description: signal type slug
+        example: sample-signal--example-org
+        in: path
+        name: signal_type_slug
+        required: true
+        type: string
+      - description: signal type sem_ver number
+        example: 0.0.1
+        in: path
+        name: sem_ver
+        required: true
+        type: string
+      - description: create signals
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateSignalsRequestDoc'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.CreateSignalsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Send signals
+      tags:
+      - Signal sharing
   /webhooks:
     post:
       description: TODO - register a webhook to recieve signals batch status updates
       responses: {}
       summary: Register webhook
       tags:
-      - Signals Management
+      - Signal sharing
 produces:
 - application/json
 securityDefinitions:
@@ -1507,13 +1631,17 @@ swagger: "2.0"
 tags:
 - description: User and token management endpoints
   name: auth
-- description: signal definitions describe the format of the data being shared in
-    an ISN
-  name: signal config
-- description: Information sharing networks are used to exchange signalsd between
-    participating users.
-  name: ISN config
-- description: View information about the configured ISNs
-  name: ISN view
 - description: Site adminstration tools
   name: Site admin
+- description: Information sharing networks are used to exchange signalsd between
+    participating users.
+  name: ISN configuration
+- description: Grant accounts read or write access to an ISN
+  name: ISN Permissions
+- description: View information about the configured ISNs
+  name: ISN view
+- description: Signal definitions describe the format of the data being shared in
+    an ISN
+  name: Signal definitions
+- description: Send and recieve signals over the ISN
+  name: Signal sharing

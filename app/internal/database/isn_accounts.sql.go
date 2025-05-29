@@ -7,7 +7,7 @@ package database
 
 import (
 	"context"
-	"database/sql"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -31,7 +31,7 @@ type CreateIsnAccountParams struct {
 }
 
 func (q *Queries) CreateIsnAccount(ctx context.Context, arg CreateIsnAccountParams) (IsnAccount, error) {
-	row := q.db.QueryRowContext(ctx, createIsnAccount, arg.IsnID, arg.AccountID, arg.Permission)
+	row := q.db.QueryRow(ctx, createIsnAccount, arg.IsnID, arg.AccountID, arg.Permission)
 	var i IsnAccount
 	err := row.Scan(
 		&i.ID,
@@ -56,11 +56,11 @@ type DeleteIsnAccountParams struct {
 }
 
 func (q *Queries) DeleteIsnAccount(ctx context.Context, arg DeleteIsnAccountParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, deleteIsnAccount, arg.IsnID, arg.AccountID)
+	result, err := q.db.Exec(ctx, deleteIsnAccount, arg.IsnID, arg.AccountID)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const getIsnAccountByIsnAndAccountID = `-- name: GetIsnAccountByIsnAndAccountID :one
@@ -77,17 +77,17 @@ type GetIsnAccountByIsnAndAccountIDParams struct {
 }
 
 type GetIsnAccountByIsnAndAccountIDRow struct {
-	ID         uuid.UUID    `json:"id"`
-	CreatedAt  sql.NullTime `json:"created_at"`
-	UpdatedAt  sql.NullTime `json:"updated_at"`
-	IsnID      uuid.UUID    `json:"isn_id"`
-	AccountID  uuid.UUID    `json:"account_id"`
-	Permission string       `json:"permission"`
-	IsnSlug    string       `json:"isn_slug"`
+	ID         uuid.UUID `json:"id"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+	IsnID      uuid.UUID `json:"isn_id"`
+	AccountID  uuid.UUID `json:"account_id"`
+	Permission string    `json:"permission"`
+	IsnSlug    string    `json:"isn_slug"`
 }
 
 func (q *Queries) GetIsnAccountByIsnAndAccountID(ctx context.Context, arg GetIsnAccountByIsnAndAccountIDParams) (GetIsnAccountByIsnAndAccountIDRow, error) {
-	row := q.db.QueryRowContext(ctx, getIsnAccountByIsnAndAccountID, arg.IsnID, arg.AccountID)
+	row := q.db.QueryRow(ctx, getIsnAccountByIsnAndAccountID, arg.IsnID, arg.AccountID)
 	var i GetIsnAccountByIsnAndAccountIDRow
 	err := row.Scan(
 		&i.ID,
@@ -109,18 +109,18 @@ WHERE ia.account_id = $1
 `
 
 type GetIsnAccountsByAccountIDRow struct {
-	ID         uuid.UUID    `json:"id"`
-	CreatedAt  sql.NullTime `json:"created_at"`
-	UpdatedAt  sql.NullTime `json:"updated_at"`
-	IsnID      uuid.UUID    `json:"isn_id"`
-	AccountID  uuid.UUID    `json:"account_id"`
-	Permission string       `json:"permission"`
-	IsnSlug    string       `json:"isn_slug"`
+	ID         uuid.UUID `json:"id"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+	IsnID      uuid.UUID `json:"isn_id"`
+	AccountID  uuid.UUID `json:"account_id"`
+	Permission string    `json:"permission"`
+	IsnSlug    string    `json:"isn_slug"`
 }
 
 // get all the isns an account has access to.
 func (q *Queries) GetIsnAccountsByAccountID(ctx context.Context, accountID uuid.UUID) ([]GetIsnAccountsByAccountIDRow, error) {
-	rows, err := q.db.QueryContext(ctx, getIsnAccountsByAccountID, accountID)
+	rows, err := q.db.Query(ctx, getIsnAccountsByAccountID, accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -140,9 +140,6 @@ func (q *Queries) GetIsnAccountsByAccountID(ctx context.Context, accountID uuid.
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -166,7 +163,7 @@ type UpdateIsnAccountParams struct {
 }
 
 func (q *Queries) UpdateIsnAccount(ctx context.Context, arg UpdateIsnAccountParams) (IsnAccount, error) {
-	row := q.db.QueryRowContext(ctx, updateIsnAccount, arg.IsnID, arg.AccountID, arg.Permission)
+	row := q.db.QueryRow(ctx, updateIsnAccount, arg.IsnID, arg.AccountID, arg.Permission)
 	var i IsnAccount
 	err := row.Scan(
 		&i.ID,

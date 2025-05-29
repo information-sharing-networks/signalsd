@@ -1,13 +1,14 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nickabs/signalsd/app/internal/apperrors"
 	"github.com/nickabs/signalsd/app/internal/auth"
 	"github.com/nickabs/signalsd/app/internal/database"
@@ -19,10 +20,14 @@ import (
 
 type IsnHandler struct {
 	queries *database.Queries
+	pool    *pgxpool.Pool
 }
 
-func NewIsnHandler(queries *database.Queries) *IsnHandler {
-	return &IsnHandler{queries: queries}
+func NewIsnHandler(queries *database.Queries, pool *pgxpool.Pool) *IsnHandler {
+	return &IsnHandler{
+		queries: queries,
+		pool:    pool,
+	}
 }
 
 type CreateIsnRequest struct {
@@ -39,9 +44,10 @@ type UpdateIsnRequest struct {
 }
 
 type CreateIsnResponse struct {
-	ID          uuid.UUID `json:"id" example:"67890684-3b14-42cf-b785-df28ce570400"`
-	Slug        string    `json:"slug" example:"sample-isn--example-org"`
-	ResourceURL string    `json:"resource_url" example:"http://localhost:8080/api/isn/sample-isn--example-org"`
+	ID             uuid.UUID `json:"id" example:"67890684-3b14-42cf-b785-df28ce570400"`
+	Slug           string    `json:"slug" example:"sample-isn--example-org"`
+	SignalsBatchID uuid.UUID `json:"signals_batch_id" example:"b51faf05-aaed-4250-b334-2258ccdf1ff2"`
+	ResourceURL    string    `json:"resource_url" example:"http://localhost:8080/api/isn/sample-isn--example-org"`
 }
 
 // used in GET handler
@@ -62,10 +68,12 @@ type IsnAndLinkedInfo struct {
 //	@Description	The only storage_type currently supported is "admin_db"
 //	@Description	when storage_type = "admin_db" the signalsd are stored in the relational database used by the API service to store the admin configuration
 //	@Description	Specify "admin_db" for storage_connection_url in this case (anything else is overriwtten with this value)
+//	@Description	ISN admins automatically get write permission for their own sites, so this endpoint also starts a signals batch for them
+//	@Description	owners automatically get write permission on all isns, so start a batch for them too
 //	@Description
 //	@Description	This endpoint can only be used by the site owner or an admin
 //
-//	@Tags			ISN config
+//	@Tags			ISN configuration
 //
 //	@Param			request	body		handlers.CreateIsnRequest	true	"ISN details"
 //
@@ -77,7 +85,7 @@ type IsnAndLinkedInfo struct {
 //	@Security		BearerAccessToken
 //	@Security		RefreshTokenCookieAuth
 //
-//	@Router			/api/isn/{isn_slug} [post]
+//	@Router			/api/isn/ [post]
 //
 // Use with RequireRole (admin,owner)
 func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
@@ -90,6 +98,13 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
 		return
 	}
+
+	claims, ok := auth.ContextAccessTokenClaims(r.Context())
+	if !ok {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive claims from middleware")
+		return
+	}
+
 	defer r.Body.Close()
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -114,7 +129,23 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not create slug from title")
 		return
 	}
-	exists, err := i.queries.ExistsIsnWithSlug(r.Context(), slug)
+
+	tx, err := i.pool.BeginTx(r.Context(), pgx.TxOptions{})
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to being transaction: %v", err))
+		return
+	}
+
+	defer func() {
+		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to rollback transaction: %v", err))
+			return
+		}
+	}()
+
+	txQueries := i.queries.WithTx(tx)
+
+	exists, err := txQueries.ExistsIsnWithSlug(r.Context(), slug)
 	if err != nil {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "database error")
 		return
@@ -132,8 +163,9 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 	if *req.StorageType == "admin_db" {
 		*req.StorageConnectionURL = "admin_db"
 	}
+
 	// create isn
-	returnedIsn, err := i.queries.CreateIsn(r.Context(), database.CreateIsnParams{
+	returnedIsn, err := txQueries.CreateIsn(r.Context(), database.CreateIsnParams{
 		UserAccountID:        userAccountID,
 		Title:                req.Title,
 		Slug:                 slug,
@@ -147,6 +179,33 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not create ISN: %v", err))
 		return
 	}
+	// crete a signals batch for the user creating the admin
+	returnedSignalBatch, err := txQueries.CreateSignalBatch(r.Context(), database.CreateSignalBatchParams{
+		IsnID:       returnedIsn.ID,
+		AccountID:   userAccountID,
+		AccountType: "user", // only users can use the ISN configuration endpoints
+	})
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not insert signal_batch: %v", err))
+		return
+	}
+
+	// if the isn was created by someone other than owner then create a batch for the owner so they can post to the ISN (owners have unlimited access)
+	if claims.Role != "owner" {
+		_, err = txQueries.CreateOwnerSignalBatch(r.Context(), database.CreateOwnerSignalBatchParams{
+			IsnID:       returnedIsn.ID,
+			AccountType: "user", // only users can use the ISN configuration endpoints
+		})
+		if err != nil {
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not insert signal_batch: %v", err))
+			return
+		}
+	}
+
+	if err := tx.Commit(r.Context()); err != nil {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to commit transaction: %v", err))
+		return
+	}
 
 	resourceURL := fmt.Sprintf("%s://%s/api/isn/%s",
 		utils.GetScheme(r),
@@ -155,9 +214,10 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 	)
 
 	responses.RespondWithJSON(w, http.StatusCreated, CreateIsnResponse{
-		ID:          returnedIsn.ID,
-		Slug:        returnedIsn.Slug,
-		ResourceURL: resourceURL,
+		ID:             returnedIsn.ID,
+		Slug:           returnedIsn.Slug,
+		SignalsBatchID: returnedSignalBatch.ID,
+		ResourceURL:    resourceURL,
 	})
 }
 
@@ -167,7 +227,7 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 //	@Description	Update the ISN details
 //	@Description	This endpoint can only be used by the site owner or the ISN admin
 //
-//	@Tags			ISN config
+//	@Tags			ISN configuration
 //
 //	@Param			isn_slug	path	string						true	"isn slug"	example(sample-isn--example-org)
 //	@Param			request		body	handlers.UpdateIsnRequest	true	"ISN details"
@@ -196,7 +256,7 @@ func (i *IsnHandler) UpdateIsnHandler(w http.ResponseWriter, r *http.Request) {
 	// check ISN exists and is owned by user
 	isn, err := i.queries.GetIsnBySlug(r.Context(), isnSlug)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
 			return
 		}
@@ -253,7 +313,7 @@ func (i *IsnHandler) UpdateIsnHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	responses.RespondWithJSON(w, http.StatusNoContent, "")
+	responses.RespondWithStatusCodeOnly(w, http.StatusCreated)
 }
 
 // GetIsnsHandler godoc
@@ -279,7 +339,7 @@ func (s *IsnHandler) GetIsnsHandler(w http.ResponseWriter, r *http.Request) {
 
 // GetIsnHandler godoc
 //
-//	@Summary		Get an ISN configuration
+//	@Summary		Get an ISN configurationuration
 //	@Description	Returns details about the ISN plus details of any configured receivers/retrievers
 //	@Param			isn_slug	path	string	true	"isn slug"	example(sample-isn--example-org)
 //
@@ -298,7 +358,7 @@ func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 	// check isn exists
 	isn, err := s.queries.GetForDisplayIsnBySlug(r.Context(), slug)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No isn found for %s", slug))
 			return
 		}
@@ -316,7 +376,7 @@ func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 	var isnRetceiverRes *database.GetForDisplayIsnReceiverByIsnIDRow
 	isnReceiver, err := s.queries.GetForDisplayIsnReceiverByIsnID(r.Context(), isn.ID)
 	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
+		if !errors.Is(err, pgx.ErrNoRows) {
 			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the receiver for this isn: %v", err))
 			return
 		}
@@ -327,7 +387,7 @@ func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 	var isnRetrieverRes *database.GetForDisplayIsnRetrieverByIsnIDRow
 	isnRetriever, err := s.queries.GetForDisplayIsnRetrieverByIsnID(r.Context(), isn.ID)
 	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
+		if !errors.Is(err, pgx.ErrNoRows) {
 			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the retriever for this isn: %v", err))
 			return
 		}

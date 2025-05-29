@@ -18,7 +18,7 @@ RETURNING id, created_at, updated_at, account_type
 `
 
 func (q *Queries) CreateServiceIdentityAccount(ctx context.Context) (Account, error) {
-	row := q.db.QueryRowContext(ctx, createServiceIdentityAccount)
+	row := q.db.QueryRow(ctx, createServiceIdentityAccount)
 	var i Account
 	err := row.Scan(
 		&i.ID,
@@ -36,7 +36,7 @@ RETURNING id, created_at, updated_at, account_type
 `
 
 func (q *Queries) CreateUserAccount(ctx context.Context) (Account, error) {
-	row := q.db.QueryRowContext(ctx, createUserAccount)
+	row := q.db.QueryRow(ctx, createUserAccount)
 	var i Account
 	err := row.Scan(
 		&i.ID,
@@ -67,7 +67,7 @@ type GetAccountByIDRow struct {
 
 // service_identities can't be owners or admins and are therefore always treated as members.
 func (q *Queries) GetAccountByID(ctx context.Context, id uuid.UUID) (GetAccountByIDRow, error) {
-	row := q.db.QueryRowContext(ctx, getAccountByID, id)
+	row := q.db.QueryRow(ctx, getAccountByID, id)
 	var i GetAccountByIDRow
 	err := row.Scan(&i.ID, &i.AccountType, &i.AccountRole)
 	return i, err

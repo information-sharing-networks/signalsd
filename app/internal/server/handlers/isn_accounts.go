@@ -1,13 +1,13 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	signalsd "github.com/nickabs/signalsd/app"
 	"github.com/nickabs/signalsd/app/internal/apperrors"
 	"github.com/nickabs/signalsd/app/internal/auth"
@@ -69,7 +69,7 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 
 	isn, err := i.queries.GetIsnBySlug(r.Context(), isnSlug)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
 			return
 		}
@@ -122,7 +122,7 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 		AccountID: targetAccountID,
 		IsnID:     isn.ID,
 	})
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not read isn_accounts for %v: %v", targetAccountID, err))
 		return
 	}
@@ -130,7 +130,7 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 	// determine if we are swithching an existing permission
 	updateExisting := false
 
-	if !errors.Is(err, sql.ErrNoRows) {
+	if !errors.Is(err, pgx.ErrNoRows) {
 		// user has permission on this isn already
 		if req.Permission == isnAccount.Permission {
 			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeResourceAlreadyExists, fmt.Sprintf("%v already has %v permission on isn %v", targetAccountID, req.Permission, isnSlug))
@@ -184,7 +184,7 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 	}
 	logger.Info().Msgf("userAccount %v granted new permission %v to account %v on isn %v", userAccountID, req.Permission, targetAccount.ID, isnSlug)
 
-	responses.RespondWithJSON(w, http.StatusNoContent, "")
+	responses.RespondWithStatusCodeOnly(w, http.StatusCreated)
 }
 
 // RevokeIsnAccountPermission godocs
@@ -223,7 +223,7 @@ func (i *IsnAccountHandler) RevokeIsnAccountHandler(w http.ResponseWriter, r *ht
 
 	isn, err := i.queries.GetIsnBySlug(r.Context(), isnSlug)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
 			return
 		}
@@ -262,7 +262,7 @@ func (i *IsnAccountHandler) RevokeIsnAccountHandler(w http.ResponseWriter, r *ht
 		IsnID:     isn.ID,
 	})
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, fmt.Sprintf("account %v does not have any permission to use ISN %v already - no action needed", userAccountID, isnSlug))
 			return
 		}
@@ -292,5 +292,5 @@ func (i *IsnAccountHandler) RevokeIsnAccountHandler(w http.ResponseWriter, r *ht
 
 	logger.Info().Msgf("userAccount %v revoked permission on %v to account %v", userAccountID, isnSlug, targetAccount.ID)
 
-	responses.RespondWithJSON(w, http.StatusNoContent, "")
+	responses.RespondWithStatusCodeOnly(w, http.StatusCreated)
 }

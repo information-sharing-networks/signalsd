@@ -1,9 +1,11 @@
 package main
 
 import (
-	"database/sql"
+	"context"
+	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nickabs/signalsd/app/internal/auth"
 	"github.com/nickabs/signalsd/app/internal/database"
 	"github.com/nickabs/signalsd/app/internal/logger"
@@ -29,17 +31,23 @@ import (
 //	@tag.name			auth
 //	@tag.description	User and token management endpoints
 
-//	@tag.name			signal config
-//	@tag.description	signal definitions describe the format of the data being shared in an ISN
+//	@tag.name			Site admin
+//	@tag.description	Site adminstration tools
 
-//	@tag.name			ISN config
+//	@tag.name			ISN configuration
 //	@tag.description	Information sharing networks are used to exchange signalsd between participating users.
+
+//	@tag.name			ISN Permissions
+//	@tag.description	Grant accounts read or write access to an ISN
 
 //	@tag.name			ISN view
 //	@tag.description	View information about the configured ISNs
 
-//	@tag.name			Site admin
-//	@tag.description	Site adminstration tools
+//	@tag.name			Signal definitions
+//	@tag.description	Signal definitions describe the format of the data being shared in an ISN
+
+//	@tag.name			Signal sharing
+//	@tag.description	Send and recieve signals over the ISN
 
 func main() {
 
@@ -49,22 +57,38 @@ func main() {
 
 	httpLogger := logger.InitHttpLogger(cfg.LogLevel)
 
-	db, err := sql.Open("postgres", cfg.DatabaseURL)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	poolConfig, err := pgxpool.ParseConfig(cfg.DatabaseURL)
 	if err != nil {
-		serverLogger.Fatal().Err(err).Msg("Error opening database connection")
+		serverLogger.Fatal().Err(err).Msg("Failed to parse database URL")
 	}
 
-	if err = db.Ping(); err != nil {
-		serverLogger.Fatal().Err(err).Msg("Error pinging database")
+	if cfg.Environment == "prod" {
+		poolConfig.MaxConns = 8
+		poolConfig.MinConns = 4
+		poolConfig.MaxConnLifetime = 30 * time.Minute
+		poolConfig.MaxConnIdleTime = 5 * time.Minute
+		poolConfig.ConnConfig.ConnectTimeout = 5 * time.Second
 	}
 
-	queries := database.New(db)
+	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
+	if err != nil {
+		serverLogger.Fatal().Err(err).Msg("Unable to create connection pool")
+	}
+
+	if err = pool.Ping(ctx); err != nil {
+		serverLogger.Fatal().Err(err).Msg("Error pinging database via pool")
+	}
+	serverLogger.Info().Msgf("connected to PostgreSQL at %v", cfg.DatabaseURL)
+
+	queries := database.New(pool)
 
 	authService := auth.NewAuthService(cfg.SecretKey, cfg.Environment, queries)
-
 	router := chi.NewRouter()
 
-	server := server.NewServer(db, queries, authService, cfg, serverLogger, httpLogger, router)
+	server := server.NewServer(pool, queries, authService, cfg, serverLogger, httpLogger, router)
 
 	serverLogger.Info().Msg("Starting server")
 

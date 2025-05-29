@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"net/http"
 	"os"
@@ -12,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/jackc/pgx/v5/pgxpool"
 	signalsd "github.com/nickabs/signalsd/app"
 	"github.com/nickabs/signalsd/app/internal/auth"
 	"github.com/nickabs/signalsd/app/internal/database"
@@ -21,7 +21,7 @@ import (
 )
 
 type Server struct {
-	db           *sql.DB
+	pool         *pgxpool.Pool
 	queries      *database.Queries
 	authService  *auth.AuthService
 	serverConfig *signalsd.ServerConfig
@@ -30,9 +30,9 @@ type Server struct {
 	router       *chi.Mux
 }
 
-func NewServer(db *sql.DB, queries *database.Queries, authService *auth.AuthService, serviceConfig *signalsd.ServerConfig, serverLogger *zerolog.Logger, httpLogger *zerolog.Logger, router *chi.Mux) *Server {
+func NewServer(pool *pgxpool.Pool, queries *database.Queries, authService *auth.AuthService, serviceConfig *signalsd.ServerConfig, serverLogger *zerolog.Logger, httpLogger *zerolog.Logger, router *chi.Mux) *Server {
 	s := &Server{
-		db:           db,
+		pool:         pool,
 		queries:      queries,
 		authService:  authService,
 		serverConfig: serviceConfig,
@@ -44,10 +44,62 @@ func NewServer(db *sql.DB, queries *database.Queries, authService *auth.AuthServ
 	return s
 }
 
+func (s *Server) Run() {
+	serverAddr := fmt.Sprintf("%s:%d", s.serverConfig.Host, s.serverConfig.Port)
+
+	httpServer := &http.Server{
+		Addr:         serverAddr,
+		Handler:      s.router,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
+
+	defer func() {
+		s.serverLogger.Info().Msg("closing database connections")
+		s.pool.Close()
+		s.serverLogger.Info().Msg("database connection closed")
+	}()
+
+	go func() {
+		s.serverLogger.Info().Msgf("%s service listening on %s \n", s.serverConfig.Environment, serverAddr)
+
+		err := httpServer.ListenAndServe()
+		if err != nil && err != http.ErrServerClosed {
+			s.serverLogger.Fatal().Err(err).Msg("Server failed to start")
+		}
+	}()
+
+	idleConnsClosed := make(chan struct{}, 1)
+
+	sigint := make(chan os.Signal, 1)
+
+	signal.Notify(sigint, os.Interrupt, syscall.SIGTERM)
+
+	<-sigint
+
+	s.serverLogger.Info().Msg("service shutting down")
+
+	// force an exit if server does not shutdown within 10 seconds
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+
+	// if the server shutsdown in under 10 seconds, exit immediately
+	defer cancel()
+
+	err := httpServer.Shutdown(ctx)
+	if err != nil {
+		s.serverLogger.Warn().Msgf("shutdown error: %v", err)
+	}
+
+	close(idleConnsClosed)
+
+	<-idleConnsClosed
+}
+
 func (s *Server) registerRoutes() {
 
 	// user registration and authentication handlers
-	users := handlers.NewUserHandler(s.queries, s.authService, s.db)
+	users := handlers.NewUserHandler(s.queries, s.authService, s.pool) // handlers that use database transactions need the DB struct
 	login := handlers.NewLoginHandler(s.queries, s.authService, s.serverConfig.Environment)
 	tokens := handlers.NewTokenHandler(s.queries, s.authService, s.serverConfig.Environment)
 
@@ -57,7 +109,7 @@ func (s *Server) registerRoutes() {
 	// middleware handles auth on the remaing services
 
 	// isn definition handlers
-	isn := handlers.NewIsnHandler(s.queries)
+	isn := handlers.NewIsnHandler(s.queries, s.pool)
 	signalTypes := handlers.NewSignalTypeHandler(s.queries)
 
 	isnReceivers := handlers.NewIsnReceiverHandler(s.queries)
@@ -69,6 +121,7 @@ func (s *Server) registerRoutes() {
 	// signald runtime handlers
 	webhooks := handlers.NewWebhookHandler(s.queries)
 	signalBatches := handlers.NewSignalsBatchHandler(s.queries)
+	signals := handlers.NewSignalsHandler(s.queries, s.pool)
 
 	s.router.Use(middleware.RequestID)
 	s.router.Use(logger.LoggingMiddleware(s.httpLogger))
@@ -109,7 +162,7 @@ func (s *Server) registerRoutes() {
 			// token this middleware adds the access token claims and user in the Context supplied to the handlers)
 			r.Use(s.authService.RequireValidAccessToken)
 
-			// isn config
+			// ISN configuration
 			r.Group(func(r chi.Router) {
 
 				// Accounts must be eiter owner or admin to use these endponts
@@ -145,8 +198,12 @@ func (s *Server) registerRoutes() {
 				// signal batches
 				r.Post("/isn/{isn_slug}/signals/batches", signalBatches.CreateSignalsBatchHandler)
 
+				// signal post
+				//r.Post("/isn/{isn_slug}/signal_types/{signal_type_slug}/signals", signals.CreateSignalsHandler)
+				r.Post("/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals", signals.CreateSignalsHandler)
+
 				// webhooks
-				r.Post("/api/webhooks", webhooks.HandlerWebhooks)
+				r.Post("/webhooks", webhooks.HandlerWebhooks)
 			})
 		})
 
@@ -197,60 +254,4 @@ func (s *Server) registerRoutes() {
 	s.router.Get("/", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./assets/home.html") })
 	s.router.Get("/docs", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./docs/redoc.html") })
 	s.router.Get("/swagger.json", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./docs/swagger.json") })
-}
-
-func (s *Server) Run() {
-	serverAddr := fmt.Sprintf("%s:%d", s.serverConfig.Host, s.serverConfig.Port)
-
-	httpServer := &http.Server{
-		Addr:         serverAddr,
-		Handler:      s.router,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		IdleTimeout:  120 * time.Second,
-	}
-
-	// close the db connections when exiting
-	defer func() {
-		err := s.db.Close()
-		if err != nil {
-			s.serverLogger.Warn().Msgf("error closing database connections: %v", err)
-		} else {
-			s.serverLogger.Info().Msg("database connection closed")
-		}
-	}()
-
-	go func() {
-		s.serverLogger.Info().Msgf("%s service listening on %s \n", s.serverConfig.Environment, serverAddr)
-
-		err := httpServer.ListenAndServe()
-		if err != nil && err != http.ErrServerClosed {
-			s.serverLogger.Fatal().Err(err).Msg("Server failed to start")
-		}
-	}()
-
-	idleConnsClosed := make(chan struct{}, 1)
-
-	sigint := make(chan os.Signal, 1)
-
-	signal.Notify(sigint, os.Interrupt, syscall.SIGTERM)
-
-	<-sigint
-
-	s.serverLogger.Info().Msg("service shutting down")
-
-	// force an exit if server does not shutdown within 10 seconds
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-
-	// if the server shutsdown in under 10 seconds, exit immediately
-	defer cancel()
-
-	err := httpServer.Shutdown(ctx)
-	if err != nil {
-		s.serverLogger.Warn().Msgf("shutdown error: %v", err)
-	}
-
-	close(idleConnsClosed)
-
-	<-idleConnsClosed
 }

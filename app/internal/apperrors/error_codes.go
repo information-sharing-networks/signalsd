@@ -10,6 +10,7 @@ const (
 	ErrCodeForbidden             ErrorCode = "forbidden"
 	ErrCodeInternalError         ErrorCode = "internal_error"
 	ErrCodeInvalidRequest        ErrorCode = "invalid_request"
+	ErrCodeInvalidCorrelationID  ErrorCode = "invalid_correlation_id"
 	ErrCodeMalformedBody         ErrorCode = "malformed_body"
 	ErrCodeNotImplemented        ErrorCode = "not_implemented"
 	ErrCodePasswordTooShort      ErrorCode = "password_too_short"

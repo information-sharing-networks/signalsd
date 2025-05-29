@@ -30,7 +30,7 @@ type CreateIsnRetrieverParams struct {
 }
 
 func (q *Queries) CreateIsnRetriever(ctx context.Context, arg CreateIsnRetrieverParams) (IsnRetriever, error) {
-	row := q.db.QueryRowContext(ctx, createIsnRetriever, arg.IsnID, arg.DefaultRateLimit, arg.ListenerCount)
+	row := q.db.QueryRow(ctx, createIsnRetriever, arg.IsnID, arg.DefaultRateLimit, arg.ListenerCount)
 	var i IsnRetriever
 	err := row.Scan(
 		&i.IsnID,
@@ -52,7 +52,7 @@ SELECT EXISTS
 `
 
 func (q *Queries) ExistsIsnRetriever(ctx context.Context, isnID uuid.UUID) (bool, error) {
-	row := q.db.QueryRowContext(ctx, existsIsnRetriever, isnID)
+	row := q.db.QueryRow(ctx, existsIsnRetriever, isnID)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
@@ -78,7 +78,7 @@ type GetForDisplayIsnRetrieverByIsnIDRow struct {
 }
 
 func (q *Queries) GetForDisplayIsnRetrieverByIsnID(ctx context.Context, isnID uuid.UUID) (GetForDisplayIsnRetrieverByIsnIDRow, error) {
-	row := q.db.QueryRowContext(ctx, getForDisplayIsnRetrieverByIsnID, isnID)
+	row := q.db.QueryRow(ctx, getForDisplayIsnRetrieverByIsnID, isnID)
 	var i GetForDisplayIsnRetrieverByIsnIDRow
 	err := row.Scan(
 		&i.CreatedAt,
@@ -111,7 +111,7 @@ type GetIsnRetrieverByIsnSlugRow struct {
 }
 
 func (q *Queries) GetIsnRetrieverByIsnSlug(ctx context.Context, slug string) (GetIsnRetrieverByIsnSlugRow, error) {
-	row := q.db.QueryRowContext(ctx, getIsnRetrieverByIsnSlug, slug)
+	row := q.db.QueryRow(ctx, getIsnRetrieverByIsnSlug, slug)
 	var i GetIsnRetrieverByIsnSlugRow
 	err := row.Scan(
 		&i.IsnID,
@@ -143,7 +143,7 @@ type UpdateIsnRetrieverParams struct {
 }
 
 func (q *Queries) UpdateIsnRetriever(ctx context.Context, arg UpdateIsnRetrieverParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, updateIsnRetriever,
+	result, err := q.db.Exec(ctx, updateIsnRetriever,
 		arg.IsnID,
 		arg.DefaultRateLimit,
 		arg.RetrieverStatus,
@@ -152,5 +152,5 @@ func (q *Queries) UpdateIsnRetriever(ctx context.Context, arg UpdateIsnRetriever
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
