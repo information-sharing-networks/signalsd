@@ -64,7 +64,7 @@ type SignalTypeAndLinkedInfo struct {
 //	@Description	- use this endpoint to create the first version - the bump_type (major/minor/patch) determines the inital semver(1.0.0, 0.1.0 or 0.0.1)
 //	@Description	- subsequent POSTs to this endpoint that reference a previously sumbitted title/slug but point to a different schema will increment the version
 //	@Description
-//	@Description	Signal type definitions are referred to with a url like this http://{hostname}/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}
+//	@Description	Signal type definitions are referred to with a url like this http://{hostname}/api/isn/{isn_slug}/signal-types/{slug}/v{sem_ver}
 //	@Description
 //
 //	@Tags		signal config
@@ -78,7 +78,7 @@ type SignalTypeAndLinkedInfo struct {
 //
 //	@Security	BearerAccessToken
 //
-//	@Router		/api/isn/{isn_slug}/signal_types [post]
+//	@Router		/api/isn/{isn_slug}/signal-types [post]
 //
 // Should only be used with RequiresIsnWritePermission middleware
 func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *http.Request) {
@@ -201,7 +201,7 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 		return
 	}
 
-	resourceURL := fmt.Sprintf("%s://%s/api/isn/%s/signal_types/%s/v%s",
+	resourceURL := fmt.Sprintf("%s://%s/api/isn/%s/signal-types/%s/v%s",
 		utils.GetScheme(r),
 		r.Host,
 		isn.Slug,
@@ -235,7 +235,7 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver} [put]
+//	@Router			/api/isn/{isn_slug}/signal-types/{slug}/v{sem_ver} [put]
 func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *http.Request) {
 
 	var req = UpdateSignalTypeRequest{}
@@ -317,7 +317,7 @@ func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *ht
 		signalType.IsInUse = *req.IsInUse
 	}
 
-	// update signal_types
+	// update signal-types
 	rowsAffected, err := s.queries.UpdateSignalTypeDetails(r.Context(), database.UpdateSignalTypeDetailsParams{
 		ID:        signalType.ID,
 		ReadmeURL: signalType.ReadmeURL,
@@ -348,7 +348,7 @@ func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *ht
 //	@Failure	404	{object}	responses.ErrorResponse
 //	@Failure	500	{object}	responses.ErrorResponse
 //
-//	@Router		/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver} [get]
+//	@Router		/api/isn/{isn_slug}/signal-types/{slug}/v{sem_ver} [get]
 func (s *SignalTypeHandler) GetSignalTypeHandler(w http.ResponseWriter, r *http.Request) {
 
 	slug := r.PathValue("slug")
@@ -389,7 +389,7 @@ func (s *SignalTypeHandler) GetSignalTypeHandler(w http.ResponseWriter, r *http.
 //	@Success	200	{array}		database.SignalType
 //	@Failure	500	{object}	responses.ErrorResponse
 //
-//	@Router		/api/isn/{isn_slug}/signal_types [get]
+//	@Router		/api/isn/{isn_slug}/signal-types [get]
 func (s *SignalTypeHandler) GetSignalTypesHandler(w http.ResponseWriter, r *http.Request) {
 
 	res, err := s.queries.GetSignalTypes(r.Context())

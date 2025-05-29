@@ -234,7 +234,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/isn/{isn_slug}/signal_types": {
+        "/api/isn/{isn_slug}/signal-types": {
             "get": {
                 "tags": [
                     "ISN view"
@@ -264,7 +264,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "A signal type describes a data set that is sharable over an ISN.  Setup the ISN before defining any signal defs.\nSignal types specify a record that can be shared over the ISN\n- Each type has a unique title\n- A URL-friendly slug is created based on the title supplied when you load the first version of a definition.\n- The title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.\n- The field definition is held as an external json schema file\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different json schemas.\n- use this endpoint to create the first version - the bump_type (major/minor/patch) determines the inital semver(1.0.0, 0.1.0 or 0.0.1)\n- subsequent POSTs to this endpoint that reference a previously sumbitted title/slug but point to a different schema will increment the version\n\nSignal type definitions are referred to with a url like this http://{hostname}/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}\n",
+                "description": "A signal type describes a data set that is sharable over an ISN.  Setup the ISN before defining any signal defs.\nSignal types specify a record that can be shared over the ISN\n- Each type has a unique title\n- A URL-friendly slug is created based on the title supplied when you load the first version of a definition.\n- The title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.\n- The field definition is held as an external json schema file\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different json schemas.\n- use this endpoint to create the first version - the bump_type (major/minor/patch) determines the inital semver(1.0.0, 0.1.0 or 0.0.1)\n- subsequent POSTs to this endpoint that reference a previously sumbitted title/slug but point to a different schema will increment the version\n\nSignal type definitions are referred to with a url like this http://{hostname}/api/isn/{isn_slug}/signal-types/{slug}/v{sem_ver}\n",
                 "tags": [
                     "signal config"
                 ],
@@ -308,7 +308,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}": {
+        "/api/isn/{isn_slug}/signal-types/{slug}/v{sem_ver}": {
             "get": {
                 "tags": [
                     "ISN view"
