@@ -92,3 +92,10 @@ SELECT sd.*
 FROM signal_types sd
 WHERE sd.isn_id = $1
 AND is_in_use = true;
+
+-- name: ExistsSignalTypeWithSlugAndSchema :one
+SELECT EXISTS
+  (SELECT 1
+   FROM signal_types
+   WHERE slug = $1
+   AND schema_url = $2) AS EXISTS;

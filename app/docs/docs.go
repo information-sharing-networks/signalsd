@@ -1741,10 +1741,6 @@ const docTemplate = `{
                     "type": "string",
                     "example": "description"
                 },
-                "isn_slug": {
-                    "type": "string",
-                    "example": "sample-isn--example-org"
-                },
                 "readme_url": {
                     "description": "Updated readme file. Note file must be on a public github repo",
                     "type": "string",

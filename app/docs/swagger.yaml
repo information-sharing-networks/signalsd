@@ -337,9 +337,6 @@ definitions:
         description: updated description
         example: description
         type: string
-      isn_slug:
-        example: sample-isn--example-org
-        type: string
       readme_url:
         description: Updated readme file. Note file must be on a public github repo
         example: https://github.com/user/project/v0.0.1/locales/filename.md

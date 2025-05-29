@@ -67,6 +67,26 @@ func (q *Queries) CreateSignalType(ctx context.Context, arg CreateSignalTypePara
 	return i, err
 }
 
+const existsSignalTypeWithSlugAndSchema = `-- name: ExistsSignalTypeWithSlugAndSchema :one
+SELECT EXISTS
+  (SELECT 1
+   FROM signal_types
+   WHERE slug = $1
+   AND schema_url = $2) AS EXISTS
+`
+
+type ExistsSignalTypeWithSlugAndSchemaParams struct {
+	Slug      string `json:"slug"`
+	SchemaURL string `json:"schema_url"`
+}
+
+func (q *Queries) ExistsSignalTypeWithSlugAndSchema(ctx context.Context, arg ExistsSignalTypeWithSlugAndSchemaParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, existsSignalTypeWithSlugAndSchema, arg.Slug, arg.SchemaURL)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const getForDisplaySignalTypeByID = `-- name: GetForDisplaySignalTypeByID :one
 SELECT 
     sd.id,

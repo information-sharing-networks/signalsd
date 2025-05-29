@@ -26,9 +26,8 @@ type CreateSignalTypeRequest struct {
 	SchemaURL string  `json:"schema_url" example:"https://github.com/user/project/v0.0.1/locales/filename.json"` // Note file must be on a public github repo
 	Title     string  `json:"title" example:"Sample Signal @example.org"`                                        // unique title
 	BumpType  string  `json:"bump_type" example:"patch" enums:"major,minor,patch"`                               // this is used to increment semver for the signal definition
-	IsnSlug   string  `json:"isn_slug" example:"sample-isn--example-org"`
-	ReadmeURL *string `json:"readme_url" example:"https://github.com/user/project/v0.0.1/locales/filename.md"` // Updated readme file. Note file must be on a public github repo
-	Detail    *string `json:"detail" example:"description"`                                                    // updated description
+	ReadmeURL *string `json:"readme_url" example:"https://github.com/user/project/v0.0.1/locales/filename.md"`   // Updated readme file. Note file must be on a public github repo
+	Detail    *string `json:"detail" example:"description"`                                                      // updated description
 }
 
 type CreateSignalTypeResponse struct {
@@ -128,7 +127,6 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 	if req.SchemaURL == "" ||
 		req.Title == "" ||
 		req.BumpType == "" ||
-		req.IsnSlug == "" ||
 		req.ReadmeURL == nil ||
 		req.Detail == nil {
 		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "one or missing field in the body of the requet")
@@ -156,20 +154,31 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 		return
 	}
 
-	//  increment the semver using the supplied bump instruction supplied in the req
 	//  if this is the first version then the query below returns currentSignalType.semver == "0.0.0"
 	currentSignalType, err := s.queries.GetSemVerAndSchemaForLatestSlugVersion(r.Context(), slug)
-	if err != nil {
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("database error: %v", err))
 		return
 	}
 
-	// if there is already a version for this slug, assume the client wants to bump the version and therefore check a new schema was provided
-	if currentSignalType.SemVer != "0.0.0" && currentSignalType.SchemaURL == req.SchemaURL {
-		responses.RespondWithError(w, r, http.StatusConflict, apperrors.ErrCodeResourceAlreadyExists, "you must supply an updated schemaURL if you want to bump the version")
-		return
+	// if there is already a version for this slug, assume the client wants to bump the version and...
+	if currentSignalType.SemVer != "0.0.0" {
+		//... check the signal type was not previously registerd with this schema
+		exists, err := s.queries.ExistsSignalTypeWithSlugAndSchema(r.Context(), database.ExistsSignalTypeWithSlugAndSchemaParams{
+			Slug:      slug,
+			SchemaURL: req.SchemaURL,
+		})
+		if err != nil {
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("database error: %v", err))
+			return
+		}
+		if exists {
+			responses.RespondWithError(w, r, http.StatusConflict, apperrors.ErrCodeResourceAlreadyExists, "you must supply an updated schemaURL if you want to bump the version")
+			return
+		}
 	}
 
+	//  increment the semver using the supplied bump instruction supplied in the req
 	semVer, err = utils.IncrementSemVer(req.BumpType, currentSignalType.SemVer)
 	if err != nil {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("could not bump sem ver : %v", err))
