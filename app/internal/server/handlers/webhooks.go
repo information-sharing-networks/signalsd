@@ -5,7 +5,7 @@ import (
 
 	"github.com/nickabs/signalsd/app/internal/apperrors"
 	"github.com/nickabs/signalsd/app/internal/database"
-	"github.com/nickabs/signalsd/app/internal/utils"
+	"github.com/nickabs/signalsd/app/internal/server/responses"
 )
 
 type WebhookHandler struct {
@@ -25,5 +25,5 @@ func NewWebhookHandler(queries *database.Queries) *WebhookHandler {
 //
 //	@Router			/webhooks [post]
 func (wh *WebhookHandler) HandlerWebhooks(w http.ResponseWriter, r *http.Request) {
-	utils.RespondWithError(w, r, http.StatusNoContent, apperrors.ErrCodeNotImplemented, "todo - webhooks not yet implemented")
+	responses.RespondWithError(w, r, http.StatusNoContent, apperrors.ErrCodeNotImplemented, "todo - webhooks not yet implemented")
 }

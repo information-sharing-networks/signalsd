@@ -101,40 +101,50 @@ func (s *Server) registerRoutes() {
 		r.Get("/users", users.GetUsersHandler)
 	})
 
-	// api
+	// api routes are used to adminster the ISNs and users
 	s.router.Route("/api", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
 
-			// validate access token and put claims and user in context
+			// request using the routes below must have a valid access token
+			// token this middleware adds the access token claims and user in the Context supplied to the handlers)
 			r.Use(s.authService.RequireValidAccessToken)
 
 			// isn config
 			r.Group(func(r chi.Router) {
+
+				// Accounts must be eiter owner or admin to use these endponts
 				r.Use(s.authService.RequireRole("owner", "admin"))
 
 				// ISN management
 				r.Post("/isn", isn.CreateIsnHandler)
 				r.Put("/isn/{isn_slug}", isn.UpdateIsnHandler)
+
+				// ISN receiver management
 				r.Post("/isn/{isn_slug}/signals/receiver", isnReceivers.CreateIsnReceiverHandler)
 				r.Put("/isn/{isn_slug}/signals/receiver", isnReceivers.UpdateIsnReceiverHandler)
+
+				// ISN retriever management
 				r.Post("/isn/{isn_slug}/signals/retriever", isnRetrievers.CreateIsnRetrieverHandler)
 				r.Put("/isn/{isn_slug}/signals/retriever", isnRetrievers.UpdateIsnRetrieverHandler)
 
-				// signal defs
+				// signal types managment
 				r.Post("/isn/{isn_slug}/signal_types", signalTypes.CreateSignalTypeHandler)
 				r.Put("/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}", signalTypes.UpdateSignalTypeHandler)
-				r.Delete("/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}", signalTypes.DeleteSignalTypeHandler)
 
-				// isn account permissions
+				// ISN account permissions
 				r.Put("/isn/{isn_slug}/accounts/{account_id}", isnAccount.GrantIsnAccountHandler)
 				r.Delete("/isn/{isn_slug}/accounts/{account_id}", isnAccount.RevokeIsnAccountHandler)
 			})
+
 			// signals runtime
 			r.Group(func(r chi.Router) {
 
-				// batches
+				// routes below can only be used by accounts with write permissions to the specified ISN
 				r.Use(s.authService.RequireIsnWritePermission())
+
+				// signal batches
 				r.Post("/isn/{isn_slug}/signals/batches", signalBatches.CreateSignalsBatchHandler)
+
 				// webhooks
 				r.Post("/api/webhooks", webhooks.HandlerWebhooks)
 			})
@@ -152,19 +162,29 @@ func (s *Server) registerRoutes() {
 	// Site Admin
 	s.router.Route("/admin", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
+
+			// route below only works in dev
 			r.Use(s.authService.RequireDevEnv)
-			r.Post("/reset", admin.ResetHandler) // delete all users and content
+
+			// delete all users and content
+			r.Post("/reset", admin.ResetHandler)
 		})
 
 		r.Group(func(r chi.Router) {
+
+			// route below can only be used by the owner as it exposes the email addresses of all users on the site
 			r.Use(s.authService.RequireRole("owner"))
+
 			r.Get("/users/{id}", users.GetUserHandler)
 		})
 	})
 
-	//health
 	s.router.Route("/health", func(r chi.Router) {
-		r.Get("/ready", admin.ReadinessHandler) // health check on database
+
+		// check the site is up and the database is accepting requests
+		r.Get("/ready", admin.ReadinessHandler)
+
+		// check the site is up
 		r.Get("/live", admin.LivenessHandler)
 	})
 
@@ -178,9 +198,10 @@ func (s *Server) registerRoutes() {
 	s.router.Get("/docs", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./docs/redoc.html") })
 	s.router.Get("/swagger.json", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./docs/swagger.json") })
 }
-func (s *Server) Run() {
 
+func (s *Server) Run() {
 	serverAddr := fmt.Sprintf("%s:%d", s.serverConfig.Host, s.serverConfig.Port)
+
 	httpServer := &http.Server{
 		Addr:         serverAddr,
 		Handler:      s.router,
@@ -195,7 +216,7 @@ func (s *Server) Run() {
 		if err != nil {
 			s.serverLogger.Warn().Msgf("error closing database connections: %v", err)
 		} else {
-			s.serverLogger.Info().Msg("database connect closed")
+			s.serverLogger.Info().Msg("database connection closed")
 		}
 	}()
 

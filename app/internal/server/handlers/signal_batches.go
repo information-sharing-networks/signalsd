@@ -10,7 +10,8 @@ import (
 	"github.com/nickabs/signalsd/app/internal/apperrors"
 	"github.com/nickabs/signalsd/app/internal/auth"
 	"github.com/nickabs/signalsd/app/internal/database"
-	"github.com/nickabs/signalsd/app/internal/utils"
+	"github.com/nickabs/signalsd/app/internal/server/responses"
+	"github.com/nickabs/signalsd/app/internal/server/utils"
 	"github.com/rs/zerolog"
 )
 
@@ -49,14 +50,14 @@ type CreateSignalsBatchResponse struct {
 //	@Description	authentication is based on the supplied access token:
 //	@Description	(the site owner; the isn admin and members with an isn_perm= write can create a batch)
 //	@Description
-//	@Tags			Signals Management
+//	@Tags		Signals Management
 //
-//	@Success		201	{object}	CreateSignalsBatchResponse
-//	@Failure		500	{object}	utils.ErrorResponse
+//	@Success	201	{object}	CreateSignalsBatchResponse
+//	@Failure	500	{object}	responses.ErrorResponse
 //
-//	@Security		BearerAccessToken
+//	@Security	BearerAccessToken
 //
-//	@Router			/api/isn/{isn_slug}/signals/batches [post]
+//	@Router		/api/isn/{isn_slug}/signals/batches [post]
 //
 // CreateSignalsBatchHandler must be used with the RequireValidAccessToken amd RequireIsnWritePermission middleware functions
 func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r *http.Request) {
@@ -65,23 +66,23 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 	// these checks have been done already in the middleware so - if there is an error here - it is a bug.
 	_, ok := auth.ContextAccessTokenClaims(r.Context())
 	if !ok {
-		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, " could not get claims from context")
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, " could not get claims from context")
 		return
 	}
 
 	accountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
-		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
 		return
 	}
 	account, err := s.queries.GetAccountByID(r.Context(), accountID)
 	if err != nil {
-		utils.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, fmt.Sprintf("could not get account %v from datababase: %v ", accountID, err))
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, fmt.Sprintf("could not get account %v from datababase: %v ", accountID, err))
 		return
 	}
 
 	if account.AccountType == "user" {
-		utils.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "this endpoint is only for service accounts")
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "this endpoint is only for service accounts")
 		return
 	}
 
@@ -89,7 +90,7 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 	isnSlug := r.PathValue("isn_slug")
 	isn, err := s.queries.GetIsnBySlug(r.Context(), isnSlug)
 	if err != nil {
-		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not get ISN %v from database: %v", isnSlug, err))
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not get ISN %v from database: %v", isnSlug, err))
 		return
 	}
 
@@ -98,7 +99,7 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 		AccountID: accountID,
 	})
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not close open batch for user %v : %v", accountID, err))
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not close open batch for user %v : %v", accountID, err))
 		return
 	}
 
@@ -108,7 +109,7 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 		AccountType: account.AccountType,
 	})
 	if err != nil {
-		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not insert signal_batch: %v", err))
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not insert signal_batch: %v", err))
 		return
 	}
 
@@ -121,7 +122,7 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 	)
 
 	logger.Info().Msgf("New signal batch %v created by %v ", account.ID, returnedRow.ID)
-	utils.RespondWithJSON(w, http.StatusOK, CreateSignalsBatchResponse{
+	responses.RespondWithJSON(w, http.StatusOK, CreateSignalsBatchResponse{
 		ResourceURL:    resourceURL,
 		AccountID:      account.ID,
 		SignalsBatchID: returnedRow.ID,
@@ -137,9 +138,9 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 //
 //	@Router			/api/isn/{isn_slug}/signals/accounts/{account_id}/batches/{signals_batch_id} [get]
 func (u *SignalsBatchHandler) GetSignalsBatchHandler(w http.ResponseWriter, r *http.Request) {
-	utils.RespondWithJSON(w, http.StatusOK, "")
+	responses.RespondWithJSON(w, http.StatusOK, "")
 
-	utils.RespondWithError(w, r, http.StatusNoContent, apperrors.ErrCodeNotImplemented, "todo - not yet implemented")
+	responses.RespondWithError(w, r, http.StatusNoContent, apperrors.ErrCodeNotImplemented, "todo - not yet implemented")
 }
 
 // GetSignalsBatchHandlers godocs
@@ -152,7 +153,7 @@ func (u *SignalsBatchHandler) GetSignalsBatchHandler(w http.ResponseWriter, r *h
 //
 //	@Router			/api/isn/{isn_slug}/signals/accounts/{account_id}/batches [get]
 func (u *SignalsBatchHandler) GetSignalsBatchesHandler(w http.ResponseWriter, r *http.Request) {
-	utils.RespondWithJSON(w, http.StatusOK, "")
+	responses.RespondWithJSON(w, http.StatusOK, "")
 
-	utils.RespondWithError(w, r, http.StatusNoContent, apperrors.ErrCodeNotImplemented, "todo - not yet implemented")
+	responses.RespondWithError(w, r, http.StatusNoContent, apperrors.ErrCodeNotImplemented, "todo - not yet implemented")
 }

@@ -1,4 +1,4 @@
-package utils
+package responses
 
 import (
 	"encoding/json"
@@ -12,7 +12,7 @@ import (
 type ErrorResponse struct {
 	StatusCode int                 `json:"-"`
 	ErrorCode  apperrors.ErrorCode `json:"error_code" example:"example_error_code"`
-	Message    string              `json:"message"`
+	Message    string              `json:"message" example:"message describing the error"`
 	ReqID      string              `json:"-"`
 }
 

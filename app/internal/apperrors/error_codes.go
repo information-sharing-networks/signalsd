@@ -16,8 +16,5 @@ const (
 	ErrCodeRefreshTokenInvalid   ErrorCode = "refresh_token_invalid"
 	ErrCodeResourceAlreadyExists ErrorCode = "resource_already_exists"
 	ErrCodeResourceNotFound      ErrorCode = "resource_not_found"
-	ErrCodeSignalTypeClosed      ErrorCode = "signal_type_closed"
-	ErrCodeTokenError            ErrorCode = "token_error"
-	ErrCodeUserAlreadyExists     ErrorCode = "user_alread_exists"
-	ErrCodeUserNotFound          ErrorCode = "user_not_found"
+	ErrCodeTokenInvalid          ErrorCode = "token_invalid"
 )

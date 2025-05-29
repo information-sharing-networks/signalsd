@@ -8,7 +8,7 @@ import (
 	"github.com/nickabs/signalsd/app/internal/apperrors"
 	"github.com/nickabs/signalsd/app/internal/auth"
 	"github.com/nickabs/signalsd/app/internal/database"
-	"github.com/nickabs/signalsd/app/internal/utils"
+	"github.com/nickabs/signalsd/app/internal/server/responses"
 	"github.com/rs/zerolog"
 )
 
@@ -47,9 +47,9 @@ type LoginRequest struct {
 //	@Example		value { "access_token": "abc...", "token_type": "Bearer", "expires_in": 1800, "role": "member", "isn_perms": { "isn-slug-1": "write", "isn-slug-2": "read" } }
 //
 //	@Success		200	{object}	auth.AccessTokenResponse
-//	@Failure		400	{object}	utils.ErrorResponse
-//	@Failure		401	{object}	utils.ErrorResponse
-//	@Failure		500	{object}	utils.ErrorResponse
+//	@Failure		400	{object}	responses.ErrorResponse
+//	@Failure		401	{object}	responses.ErrorResponse
+//	@Failure		500	{object}	responses.ErrorResponse
 //
 //	@Router			/auth/login [post]
 func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
@@ -59,29 +59,29 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		utils.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
 		return
 	}
 
 	exists, err := l.queries.ExistsUserWithEmail(r.Context(), req.Email)
 	if err != nil {
-		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
 	}
 	if !exists {
-		utils.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeUserNotFound, "no user found with this email address")
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeResourceNotFound, "no user found with this email address")
 		return
 	}
 
 	user, err := l.queries.GetUserByEmail(r.Context(), req.Email)
 	if err != nil {
-		utils.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
 	}
 
 	err = l.authService.CheckPasswordHash(user.HashedPassword, req.Password)
 	if err != nil {
-		utils.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "Incorrect email or password")
+		responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "Incorrect email or password")
 		return
 	}
 
@@ -90,14 +90,14 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	accessTokenResponse, err := l.authService.BuildAccessTokenResponse(ctx)
 	if err != nil {
-		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenError, fmt.Sprintf("error creating access token: %v", err))
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenInvalid, fmt.Sprintf("error creating access token: %v", err))
 		return
 	}
 
 	// new refresh token
 	refreshToken, err := l.authService.RotateRefreshToken(ctx)
 	if err != nil {
-		utils.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenError, fmt.Sprintf("error creating refresh token: %v", err))
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenInvalid, fmt.Sprintf("error creating refresh token: %v", err))
 		return
 	}
 
@@ -107,5 +107,5 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, newCookie)
 
 	logger.Info().Msgf("user %s logged in", user.AccountID)
-	utils.RespondWithJSON(w, http.StatusOK, accessTokenResponse)
+	responses.RespondWithJSON(w, http.StatusOK, accessTokenResponse)
 }

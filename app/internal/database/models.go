@@ -82,19 +82,19 @@ type ServiceIdentity struct {
 }
 
 type Signal struct {
-	ID                 uuid.UUID       `json:"id"`
-	CreatedAt          sql.NullTime    `json:"created_at"`
-	AccountID          uuid.UUID       `json:"account_id"`
-	SignalBatchID      uuid.UUID       `json:"signal_batch_id"`
-	CorrelationID      uuid.UUID       `json:"correlation_id"`
-	SignalTypeID       uuid.UUID       `json:"signal_type_id"`
-	LocalRef           string          `json:"local_ref"`
-	VersionNumber      int32           `json:"version_number"`
-	IsLatest           bool            `json:"is_latest"`
-	IsWithdrawn        bool            `json:"is_withdrawn"`
-	IsArchived         bool            `json:"is_archived"`
-	JsonValidityStatus string          `json:"json_validity_status"`
-	JsonPayload        json.RawMessage `json:"json_payload"`
+	ID               uuid.UUID       `json:"id"`
+	CreatedAt        sql.NullTime    `json:"created_at"`
+	AccountID        uuid.UUID       `json:"account_id"`
+	SignalBatchID    uuid.UUID       `json:"signal_batch_id"`
+	CorrelationID    uuid.UUID       `json:"correlation_id"`
+	SignalTypeID     uuid.UUID       `json:"signal_type_id"`
+	LocalRef         string          `json:"local_ref"`
+	VersionNumber    int32           `json:"version_number"`
+	IsLatest         bool            `json:"is_latest"`
+	IsWithdrawn      bool            `json:"is_withdrawn"`
+	IsArchived       bool            `json:"is_archived"`
+	ValidationStatus string          `json:"validation_status"`
+	JsonPayload      json.RawMessage `json:"json_payload"`
 }
 
 type SignalBatch struct {
@@ -118,7 +118,7 @@ type SignalType struct {
 	Title     string    `json:"title"`
 	Detail    string    `json:"detail"`
 	SemVer    string    `json:"sem_ver"`
-	Stage     string    `json:"stage"`
+	IsInUse   bool      `json:"is_in_use"`
 }
 
 type User struct {
