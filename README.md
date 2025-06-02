@@ -4,7 +4,7 @@
 
 
 # Information Sharing Networks
-ISNs are networks that enable interested parties to share information. The information is shared by way of "signals".
+ISNs are networks that enable interested parties to share information. The information is shared in the form of "signals".
 
 ## Signals
 

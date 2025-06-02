@@ -25,7 +25,7 @@ type CreateOwnerUserParams struct {
 }
 
 func (q *Queries) CreateOwnerUser(ctx context.Context, arg CreateOwnerUserParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, createOwnerUser, arg.AccountID, arg.Email, arg.HashedPassword)
+	row := q.db.QueryRow(ctx, createOwnerUser, arg.AccountID, arg.Email, arg.HashedPassword)
 	var i User
 	err := row.Scan(
 		&i.AccountID,
@@ -53,7 +53,7 @@ type CreateUserParams struct {
 
 // note: don't display emails on public apis ("GetForDisplay*").
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, createUser, arg.AccountID, arg.Email, arg.HashedPassword)
+	row := q.db.QueryRow(ctx, createUser, arg.AccountID, arg.Email, arg.HashedPassword)
 	var i User
 	err := row.Scan(
 		&i.AccountID,
@@ -73,7 +73,7 @@ SELECT EXISTS (
 `
 
 func (q *Queries) ExistsUserWithEmail(ctx context.Context, email string) (bool, error) {
-	row := q.db.QueryRowContext(ctx, existsUserWithEmail, email)
+	row := q.db.QueryRow(ctx, existsUserWithEmail, email)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
@@ -93,7 +93,7 @@ type GetForDisplayUserByIsnIDRow struct {
 }
 
 func (q *Queries) GetForDisplayUserByIsnID(ctx context.Context, id uuid.UUID) (GetForDisplayUserByIsnIDRow, error) {
-	row := q.db.QueryRowContext(ctx, getForDisplayUserByIsnID, id)
+	row := q.db.QueryRow(ctx, getForDisplayUserByIsnID, id)
 	var i GetForDisplayUserByIsnIDRow
 	err := row.Scan(&i.AccountID, &i.CreatedAt, &i.UpdatedAt)
 	return i, err
@@ -113,7 +113,7 @@ type GetForDisplayUserBySignalDefIDRow struct {
 }
 
 func (q *Queries) GetForDisplayUserBySignalDefID(ctx context.Context, id uuid.UUID) (GetForDisplayUserBySignalDefIDRow, error) {
-	row := q.db.QueryRowContext(ctx, getForDisplayUserBySignalDefID, id)
+	row := q.db.QueryRow(ctx, getForDisplayUserBySignalDefID, id)
 	var i GetForDisplayUserBySignalDefIDRow
 	err := row.Scan(&i.AccountID, &i.CreatedAt, &i.UpdatedAt)
 	return i, err
@@ -124,7 +124,7 @@ SELECT account_id, created_at, updated_at, email, hashed_password, user_role FRO
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUserByEmail, email)
+	row := q.db.QueryRow(ctx, getUserByEmail, email)
 	var i User
 	err := row.Scan(
 		&i.AccountID,
@@ -149,7 +149,7 @@ type GetUserByIDRow struct {
 }
 
 func (q *Queries) GetUserByID(ctx context.Context, accountID uuid.UUID) (GetUserByIDRow, error) {
-	row := q.db.QueryRowContext(ctx, getUserByID, accountID)
+	row := q.db.QueryRow(ctx, getUserByID, accountID)
 	var i GetUserByIDRow
 	err := row.Scan(
 		&i.AccountID,
@@ -173,7 +173,7 @@ type GetUsersRow struct {
 }
 
 func (q *Queries) GetUsers(ctx context.Context) ([]GetUsersRow, error) {
-	rows, err := q.db.QueryContext(ctx, getUsers)
+	rows, err := q.db.Query(ctx, getUsers)
 	if err != nil {
 		return nil, err
 	}
@@ -192,9 +192,6 @@ func (q *Queries) GetUsers(ctx context.Context) ([]GetUsersRow, error) {
 		}
 		items = append(items, i)
 	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
@@ -207,7 +204,7 @@ FROM users
 `
 
 func (q *Queries) IsFirstUser(ctx context.Context) (bool, error) {
-	row := q.db.QueryRowContext(ctx, isFirstUser)
+	row := q.db.QueryRow(ctx, isFirstUser)
 	var is_empty bool
 	err := row.Scan(&is_empty)
 	return is_empty, err
@@ -224,11 +221,11 @@ type UpdatePasswordParams struct {
 }
 
 func (q *Queries) UpdatePassword(ctx context.Context, arg UpdatePasswordParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, updatePassword, arg.AccountID, arg.HashedPassword)
+	result, err := q.db.Exec(ctx, updatePassword, arg.AccountID, arg.HashedPassword)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const updateUserAccountToAdmin = `-- name: UpdateUserAccountToAdmin :execrows
@@ -240,11 +237,11 @@ WHERE
 `
 
 func (q *Queries) UpdateUserAccountToAdmin(ctx context.Context, accountID uuid.UUID) (int64, error) {
-	result, err := q.db.ExecContext(ctx, updateUserAccountToAdmin, accountID)
+	result, err := q.db.Exec(ctx, updateUserAccountToAdmin, accountID)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const updateUserAccountToMember = `-- name: UpdateUserAccountToMember :execrows
@@ -256,9 +253,9 @@ WHERE
 `
 
 func (q *Queries) UpdateUserAccountToMember(ctx context.Context, accountID uuid.UUID) (int64, error) {
-	result, err := q.db.ExecContext(ctx, updateUserAccountToMember, accountID)
+	result, err := q.db.Exec(ctx, updateUserAccountToMember, accountID)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }

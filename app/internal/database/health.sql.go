@@ -14,7 +14,7 @@ SELECT 1 as healthy
 `
 
 func (q *Queries) IsDatabaseRunning(ctx context.Context) (int32, error) {
-	row := q.db.QueryRowContext(ctx, isDatabaseRunning)
+	row := q.db.QueryRow(ctx, isDatabaseRunning)
 	var healthy int32
 	err := row.Scan(&healthy)
 	return healthy, err

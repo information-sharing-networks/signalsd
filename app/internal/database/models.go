@@ -5,8 +5,6 @@
 package database
 
 import (
-	"database/sql"
-	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -34,12 +32,12 @@ type Isn struct {
 }
 
 type IsnAccount struct {
-	ID         uuid.UUID    `json:"id"`
-	CreatedAt  sql.NullTime `json:"created_at"`
-	UpdatedAt  sql.NullTime `json:"updated_at"`
-	IsnID      uuid.UUID    `json:"isn_id"`
-	AccountID  uuid.UUID    `json:"account_id"`
-	Permission string       `json:"permission"`
+	ID         uuid.UUID `json:"id"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+	IsnID      uuid.UUID `json:"isn_id"`
+	AccountID  uuid.UUID `json:"account_id"`
+	Permission string    `json:"permission"`
 }
 
 type IsnReceiver struct {
@@ -64,12 +62,12 @@ type IsnRetriever struct {
 }
 
 type RefreshToken struct {
-	HashedToken   string       `json:"hashed_token"`
-	UserAccountID uuid.UUID    `json:"user_account_id"`
-	CreatedAt     time.Time    `json:"created_at"`
-	UpdatedAt     time.Time    `json:"updated_at"`
-	ExpiresAt     time.Time    `json:"expires_at"`
-	RevokedAt     sql.NullTime `json:"revoked_at"`
+	HashedToken   string     `json:"hashed_token"`
+	UserAccountID uuid.UUID  `json:"user_account_id"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+	ExpiresAt     time.Time  `json:"expires_at"`
+	RevokedAt     *time.Time `json:"revoked_at"`
 }
 
 type ServiceIdentity struct {
@@ -82,29 +80,25 @@ type ServiceIdentity struct {
 }
 
 type Signal struct {
-	ID               uuid.UUID       `json:"id"`
-	CreatedAt        sql.NullTime    `json:"created_at"`
-	AccountID        uuid.UUID       `json:"account_id"`
-	SignalBatchID    uuid.UUID       `json:"signal_batch_id"`
-	CorrelationID    uuid.UUID       `json:"correlation_id"`
-	SignalTypeID     uuid.UUID       `json:"signal_type_id"`
-	LocalRef         string          `json:"local_ref"`
-	VersionNumber    int32           `json:"version_number"`
-	IsLatest         bool            `json:"is_latest"`
-	IsWithdrawn      bool            `json:"is_withdrawn"`
-	IsArchived       bool            `json:"is_archived"`
-	ValidationStatus string          `json:"validation_status"`
-	JsonPayload      json.RawMessage `json:"json_payload"`
+	ID            uuid.UUID `json:"id"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	AccountID     uuid.UUID `json:"account_id"`
+	SignalTypeID  uuid.UUID `json:"signal_type_id"`
+	LocalRef      string    `json:"local_ref"`
+	CorrelationID uuid.UUID `json:"correlation_id"`
+	IsWithdrawn   bool      `json:"is_withdrawn"`
+	IsArchived    bool      `json:"is_archived"`
 }
 
 type SignalBatch struct {
-	ID          uuid.UUID    `json:"id"`
-	CreatedAt   sql.NullTime `json:"created_at"`
-	UpdatedAt   sql.NullTime `json:"updated_at"`
-	IsnID       uuid.UUID    `json:"isn_id"`
-	AccountID   uuid.UUID    `json:"account_id"`
-	IsLatest    bool         `json:"is_latest"`
-	AccountType string       `json:"account_type"`
+	ID          uuid.UUID `json:"id"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	IsnID       uuid.UUID `json:"isn_id"`
+	AccountID   uuid.UUID `json:"account_id"`
+	IsLatest    bool      `json:"is_latest"`
+	AccountType string    `json:"account_type"`
 }
 
 type SignalType struct {
@@ -119,6 +113,17 @@ type SignalType struct {
 	Detail    string    `json:"detail"`
 	SemVer    string    `json:"sem_ver"`
 	IsInUse   bool      `json:"is_in_use"`
+}
+
+type SignalVersion struct {
+	ID               uuid.UUID `json:"id"`
+	CreatedAt        time.Time `json:"created_at"`
+	AccountID        uuid.UUID `json:"account_id"`
+	SignalBatchID    uuid.UUID `json:"signal_batch_id"`
+	SignalID         uuid.UUID `json:"signal_id"`
+	VersionNumber    int32     `json:"version_number"`
+	ValidationStatus string    `json:"validation_status"`
+	Content          []byte    `json:"content"`
 }
 
 type User struct {

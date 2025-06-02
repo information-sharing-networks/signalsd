@@ -70,3 +70,8 @@ func RespondWithJSON(w http.ResponseWriter, status int, payload any) {
 	w.WriteHeader(status)
 	w.Write(data)
 }
+
+func RespondWithStatusCodeOnly(w http.ResponseWriter, status int) {
+	w.WriteHeader(status)
+	return
+}

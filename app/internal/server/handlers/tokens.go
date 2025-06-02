@@ -31,31 +31,34 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, e
 //	@Summary		Refresh access token
 //	@Description	Use this endpoint to get a new access token.
 //	@Description
-//	@Description	You need to supply a vaild refresh token to use this API - if the refresh token has expired or been revoked the user must login again to get a new one.
+//	@Description	A vaild refresh token is needed to use this endpoint - if the refresh token has expired or been revoked the user must login again to get a new one.
+//	@Description	New refresh tokens are sent as http-only cookies whenever the client uses this endpoint or logs in.
 //	@Description
-//	@Description	The refresh token should be supplied in a http-only cookie called refresh_token.
+//	@Description	The browser handles refresh token cookies automatically, but you must provide your current access token in the Authorization header (the token is used only for user identification - expired tokens are accepted).
 //	@Description
-//	@Description	You must also provide a previously issued bearer access token - it does not matter if it has expired
-//	@Description	(the token is not used to authenticate the request but is needed to establish the ID of the user making the request)
+//	@Description	Each successful refresh operation:
+//	@Description	- Invalidates the current refresh token
+//	@Description	- Issues a new refresh token via secure HTTP-only cookie
+//	@Description	- Returns a new access token in the response body
 //	@Description
-//	@Description	Note this action automatically revokes the current refresh_token and issues a new one.
+//	@Description	the new refresh token cookies is configured with:
+//	@Description	- HttpOnly - Prevents JavaScript access, reducing XSS risk
+//	@Description	- Secure - HTTPS (only in production environments)
+//	@Description	- SameSite=Lax -  preventing the use of cookie in third-party requests except for user-driven interactions.
 //	@Description
-//	@Description	The new refresh token is sent in an http-only cookie named refresh_token.
-//	@Description	In production deployments the secure flag (https only) on the cookie will be set to true
+//	@Description	The account's role and permissions are encoded and included as part of the jwt access token and also provided in the response body
 //	@Description
-//	@Description	Access tokens expire after 30 mins and subsequent requests using the token will fail with an error_code of "access_token_expired"
-//	@Description
+//	@Description	Access tokens expire after 30 mins and subsequent requests using the token will fail with HTTP status 401 and an error_code of "access_token_expired"
+//	@Tags			auth
 //
-//	@Tags		auth
+//	@Success		200	{object}	auth.AccessTokenResponse
+//	@Failure		400	{object}	responses.ErrorResponse
+//	@Failure		401	{object}	responses.ErrorResponse
+//	@Failure		500	{object}	responses.ErrorResponse
 //
-//	@Success	200	{object}	auth.AccessTokenResponse
-//	@Failure	400	{object}	responses.ErrorResponse
-//	@Failure	401	{object}	responses.ErrorResponse
-//	@Failure	500	{object}	responses.ErrorResponse
+//	@Security		BearerRefreshToken
 //
-//	@Security	BearerRefreshToken
-//
-//	@Router		/auth/token [post]
+//	@Router			/auth/token [post]
 func (a *TokenHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.Request) {
 
 	// the RequireValidRefreshToken middleware adds the userAccountId
@@ -143,6 +146,6 @@ func (a *TokenHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.
 	}
 
 	log.Info().Msgf("refresh token revoked by userAccountID %v", userAccountId)
-	responses.RespondWithJSON(w, http.StatusNoContent, "")
+	responses.RespondWithStatusCodeOnly(w, http.StatusCreated)
 
 }

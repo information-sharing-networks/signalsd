@@ -5,7 +5,7 @@ CREATE TABLE isn_retrievers (
     isn_id UUID PRIMARY KEY,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    default_rate_limit INT NOT NULL, -- todo
+    default_rate_limit INT NOT NULL, 
     retriever_status TEXT NOT NULL,
     listener_count INT NOT NULL,
     CONSTRAINT fk_isn_retrievers_isn
@@ -26,7 +26,7 @@ CREATE TABLE isn_retrievers (
     slug TEXT NOT NULL,
     retriever_origin TEXT NOT NULL,
     retriever_status TEXT NOT NULL,
-    default_rate_limit INT NOT NULL, -- todo
+    default_rate_limit INT NOT NULL, 
     CONSTRAINT fk_isn_retrievers_isn
         FOREIGN KEY (isn_id)
         REFERENCES isn(id)

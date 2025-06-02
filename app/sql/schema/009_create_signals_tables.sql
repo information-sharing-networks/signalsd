@@ -2,8 +2,8 @@
 
 CREATE TABLE signal_batches (
     id UUID PRIMARY KEY,
-    created_at TIMESTAMP WITH TIME ZONE,
-    updated_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
     isn_id UUID NOT NULL,
     account_id UUID NOT NULL,
     is_latest BOOL NOT NULL DEFAULT TRUE,
@@ -21,42 +21,55 @@ CREATE UNIQUE INDEX one_latest_signal_batch_per_account_idx
 ON signal_batches (account_id) WHERE is_latest = TRUE;
 
 -- Records table
+-- this table is the master signal record rerpresenting a unique account/signal type/local ref combination
+-- the only updateable field is correlation_id.
 CREATE TABLE signals (
     id UUID PRIMARY KEY,
-    created_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
     account_id UUID NOT NULL,
-    signal_batch_id UUID NOT NULL,
-    correlation_id UUID NOT NULL,
     signal_type_id UUID NOT NULL,
-    local_ref TEXT NOT NULL DEFAULT 'pending',
-    version_number INT NOT NULL,
-    is_latest BOOL NOT NULL DEFAULT true,
+    local_ref TEXT NOT NULL,
+    correlation_id UUID NOT NULL,
     is_withdrawn BOOL NOT NULL DEFAULT false,
     is_archived BOOL NOT NULL DEFAULT false,
-    validation_status TEXT NOT NULL,
-    json_payload JSONB NOT NULL, 
-CONSTRAINT unique_local_ref_version UNIQUE (account_id, signal_type_id, local_ref, version_number),
-CONSTRAINT validation_status_check CHECK (validation_status IN ('valid', 'invalid', 'n/a')),
-CONSTRAINT fk_signal_signal_batch FOREIGN KEY (signal_batch_id)
-    REFERENCES signal_batches(id)
-    ON DELETE CASCADE,
+CONSTRAINT unique_signals_account_id_signal_type_local_ref UNIQUE (account_id, signal_type_id, local_ref),
 CONSTRAINT fk_signal_signal_type FOREIGN KEY (signal_type_id)
     REFERENCES signal_types(id)
     ON DELETE CASCADE,
-CONSTRAINT fk_correlation_id FOREIGN KEY (correlation_id)
-    REFERENCES signals(id),
+-- these constaints prevent users accidentally correlating signals of different types
+CONSTRAINT unique_signals_signal_type_id_correlation_id UNIQUE (signal_type_id, id),
+CONSTRAINT fk_correlation_id FOREIGN KEY (signal_type_id,correlation_id)
+    REFERENCES signals(signal_type_id,id),
 CONSTRAINT fk_signal_accounts FOREIGN KEY (account_id)
     REFERENCES accounts(id)
     ON DELETE CASCADE
 );
-CREATE UNIQUE INDEX one_latest_signal_per_local_ref_idx
-ON signals (account_id, signal_type_id, local_ref, version_number) WHERE is_latest = TRUE;
+
+CREATE TABLE signal_versions (
+    id UUID PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    account_id UUID NOT NULL,
+    signal_batch_id UUID NOT NULL,
+    signal_id UUID NOT NULL,
+    version_number INT NOT NULL,
+    validation_status TEXT NOT NULL DEFAULT 'pending',
+    content JSONB NOT NULL, 
+    CONSTRAINT unique_signal_id_version_number UNIQUE (signal_id, version_number),
+    CONSTRAINT fk_signal_version_signal_id FOREIGN KEY (signal_id)
+        REFERENCES signals(id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_signal_version_signal_batch FOREIGN KEY (signal_batch_id)
+        REFERENCES signal_batches(id)
+        ON DELETE CASCADE,
+    CONSTRAINT validation_status_check CHECK (validation_status IN ('pending','valid', 'invalid', 'n/a'))
+);
 
 
 CREATE TABLE isn_accounts (
     id UUID PRIMARY KEY,
-    created_at TIMESTAMP WITH TIME ZONE,
-    updated_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL ,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
     isn_id UUID NOT NULL,
     account_id UUID NOT NULL,
     permission TEXT NOT NULL,
@@ -73,6 +86,7 @@ CONSTRAINT fk_isn_accounts_isn FOREIGN KEY (isn_id)
 
 -- +goose Down
 
+DROP TABLE IF EXISTS signal_versions CASCADE;
 DROP TABLE IF EXISTS signals CASCADE ;
 DROP TABLE IF EXISTS signal_batches CASCADE;
-DROP TABLE IF EXISTS isn_accounts;
+DROP TABLE IF EXISTS isn_accounts CASCADE;

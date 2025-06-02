@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -9,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	signalsd "github.com/nickabs/signalsd/app"
 	"github.com/nickabs/signalsd/app/internal/apperrors"
 	"github.com/nickabs/signalsd/app/internal/server/responses"
@@ -107,7 +107,7 @@ func (a AuthService) RequireIsnWritePermission() func(http.Handler) http.Handler
 			}
 
 			if claims.IsnPerms[isnSlug].Permission == "write" {
-				logger.Debug().Msgf("user %v write access confirmed for isn %v", claims.Subject, isnSlug)
+				logger.Info().Msgf("user %v write access confirmed for isn %v", claims.Subject, isnSlug)
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -157,7 +157,7 @@ func (a AuthService) RequireValidRefreshToken(next http.Handler) http.Handler {
 		// check the database for an unexpired/unrevoked refresh token for the user and - if there isn't one  - tell the user to login in again
 		returnedRefreshTokenRow, err := a.queries.GetValidRefreshTokenByUserAccountId(r.Context(), userAccountID)
 		if err != nil {
-			if errors.Is(err, sql.ErrNoRows) {
+			if errors.Is(err, pgx.ErrNoRows) {
 				responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeRefreshTokenInvalid, "unauthorised: session expired, please log in again")
 				return
 			}

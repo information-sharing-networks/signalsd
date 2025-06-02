@@ -1,13 +1,14 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/nickabs/signalsd/app/internal/apperrors"
 	"github.com/nickabs/signalsd/app/internal/auth"
 	"github.com/nickabs/signalsd/app/internal/database"
@@ -20,14 +21,14 @@ import (
 type UserHandler struct {
 	queries     *database.Queries
 	authService *auth.AuthService
-	db          *sql.DB
+	pool        *pgxpool.Pool
 }
 
-func NewUserHandler(queries *database.Queries, authService *auth.AuthService, db *sql.DB) *UserHandler {
+func NewUserHandler(queries *database.Queries, authService *auth.AuthService, pool *pgxpool.Pool) *UserHandler {
 	return &UserHandler{
 		queries:     queries,
 		authService: authService,
-		db:          db,
+		pool:        pool,
 	}
 }
 
@@ -95,13 +96,18 @@ func (u *UserHandler) RegisterUserHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	// create the account record followed by the user (note transaction needed to ensure both records are created together)
-	tx, err := u.db.BeginTx(r.Context(), nil)
+	tx, err := u.pool.BeginTx(r.Context(), pgx.TxOptions{})
 	if err != nil {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to being transaction: %v", err))
 		return
 	}
 
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to rollback transaction: %v", err))
+			return
+		}
+	}()
 
 	txQueries := u.queries.WithTx(tx)
 
@@ -112,7 +118,7 @@ func (u *UserHandler) RegisterUserHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	// first user is granted the owner role
-	isFirstUser, err := u.queries.IsFirstUser(r.Context())
+	isFirstUser, err := txQueries.IsFirstUser(r.Context())
 	if err != nil {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
@@ -135,12 +141,12 @@ func (u *UserHandler) RegisterUserHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := tx.Commit(); err != nil {
+	if err := tx.Commit(r.Context()); err != nil {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to commit transaction: %v", err))
 		return
 	}
 
-	responses.RespondWithJSON(w, http.StatusCreated, "")
+	responses.RespondWithStatusCodeOnly(w, http.StatusCreated)
 }
 
 // UpdatePasswordHandler godoc
@@ -225,7 +231,7 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	responses.RespondWithJSON(w, http.StatusNoContent, "")
+	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
 
 }
 
@@ -304,7 +310,7 @@ func (u *UserHandler) GrantUserAdminRoleHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 	logger.Info().Msgf("%v updated to be an admin", targetAccountID)
-	responses.RespondWithJSON(w, http.StatusNoContent, "")
+	responses.RespondWithStatusCodeOnly(w, http.StatusCreated)
 }
 
 // RevokeAccountAdmin godocs
@@ -370,7 +376,7 @@ func (u *UserHandler) RevokeUserAdminRoleHandler(w http.ResponseWriter, r *http.
 		return
 	}
 	logger.Info().Msgf("%v: admin role revoked", targetAccountID)
-	responses.RespondWithJSON(w, http.StatusNoContent, "")
+	responses.RespondWithStatusCodeOnly(w, http.StatusCreated)
 }
 
 // GetUserbyIDHandler godoc
@@ -395,7 +401,7 @@ func (u *UserHandler) GetUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	res, err := u.queries.GetUserByID(r.Context(), userAccountID)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No user found for id %v", userAccountID))
 			return
 		}

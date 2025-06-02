@@ -14,9 +14,9 @@ DELETE FROM Accounts
 `
 
 func (q *Queries) DeleteAccounts(ctx context.Context) (int64, error) {
-	result, err := q.db.ExecContext(ctx, deleteAccounts)
+	result, err := q.db.Exec(ctx, deleteAccounts)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }

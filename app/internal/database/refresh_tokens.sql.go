@@ -7,7 +7,6 @@ package database
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,13 +17,13 @@ SELECT user_account_id, expires_at, revoked_at FROM refresh_tokens where hashed_
 `
 
 type GetRefreshTokenRow struct {
-	UserAccountID uuid.UUID    `json:"user_account_id"`
-	ExpiresAt     time.Time    `json:"expires_at"`
-	RevokedAt     sql.NullTime `json:"revoked_at"`
+	UserAccountID uuid.UUID  `json:"user_account_id"`
+	ExpiresAt     time.Time  `json:"expires_at"`
+	RevokedAt     *time.Time `json:"revoked_at"`
 }
 
 func (q *Queries) GetRefreshToken(ctx context.Context, hashedToken string) (GetRefreshTokenRow, error) {
-	row := q.db.QueryRowContext(ctx, getRefreshToken, hashedToken)
+	row := q.db.QueryRow(ctx, getRefreshToken, hashedToken)
 	var i GetRefreshTokenRow
 	err := row.Scan(&i.UserAccountID, &i.ExpiresAt, &i.RevokedAt)
 	return i, err
@@ -44,7 +43,7 @@ type GetValidRefreshTokenByUserAccountIdRow struct {
 }
 
 func (q *Queries) GetValidRefreshTokenByUserAccountId(ctx context.Context, userAccountID uuid.UUID) (GetValidRefreshTokenByUserAccountIdRow, error) {
-	row := q.db.QueryRowContext(ctx, getValidRefreshTokenByUserAccountId, userAccountID)
+	row := q.db.QueryRow(ctx, getValidRefreshTokenByUserAccountId, userAccountID)
 	var i GetValidRefreshTokenByUserAccountIdRow
 	err := row.Scan(&i.HashedToken, &i.ExpiresAt)
 	return i, err
@@ -68,7 +67,7 @@ type InsertRefreshTokenRow struct {
 }
 
 func (q *Queries) InsertRefreshToken(ctx context.Context, arg InsertRefreshTokenParams) (InsertRefreshTokenRow, error) {
-	row := q.db.QueryRowContext(ctx, insertRefreshToken, arg.HashedToken, arg.UserAccountID, arg.ExpiresAt)
+	row := q.db.QueryRow(ctx, insertRefreshToken, arg.HashedToken, arg.UserAccountID, arg.ExpiresAt)
 	var i InsertRefreshTokenRow
 	err := row.Scan(&i.HashedToken, &i.UserAccountID)
 	return i, err
@@ -81,11 +80,11 @@ AND revoked_at IS NULL
 `
 
 func (q *Queries) RevokeAllRefreshTokensForUser(ctx context.Context, userAccountID uuid.UUID) (int64, error) {
-	result, err := q.db.ExecContext(ctx, revokeAllRefreshTokensForUser, userAccountID)
+	result, err := q.db.Exec(ctx, revokeAllRefreshTokensForUser, userAccountID)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
 
 const revokeRefreshToken = `-- name: RevokeRefreshToken :execrows
@@ -94,9 +93,9 @@ WHERE hashed_token = $1
 `
 
 func (q *Queries) RevokeRefreshToken(ctx context.Context, hashedToken string) (int64, error) {
-	result, err := q.db.ExecContext(ctx, revokeRefreshToken, hashedToken)
+	result, err := q.db.Exec(ctx, revokeRefreshToken, hashedToken)
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }

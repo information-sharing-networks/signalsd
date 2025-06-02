@@ -7,7 +7,6 @@ package database
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
@@ -48,7 +47,7 @@ type CreateIsnRow struct {
 }
 
 func (q *Queries) CreateIsn(ctx context.Context, arg CreateIsnParams) (CreateIsnRow, error) {
-	row := q.db.QueryRowContext(ctx, createIsn,
+	row := q.db.QueryRow(ctx, createIsn,
 		arg.UserAccountID,
 		arg.Title,
 		arg.Slug,
@@ -72,7 +71,7 @@ SELECT EXISTS
 `
 
 func (q *Queries) ExistsIsnWithSlug(ctx context.Context, slug string) (bool, error) {
-	row := q.db.QueryRowContext(ctx, existsIsnWithSlug, slug)
+	row := q.db.QueryRow(ctx, existsIsnWithSlug, slug)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
@@ -108,7 +107,7 @@ type GetForDisplayIsnBySlugRow struct {
 }
 
 func (q *Queries) GetForDisplayIsnBySlug(ctx context.Context, slug string) (GetForDisplayIsnBySlugRow, error) {
-	row := q.db.QueryRowContext(ctx, getForDisplayIsnBySlug, slug)
+	row := q.db.QueryRow(ctx, getForDisplayIsnBySlug, slug)
 	var i GetForDisplayIsnBySlugRow
 	err := row.Scan(
 		&i.ID,
@@ -132,7 +131,7 @@ WHERE i.id = $1
 `
 
 func (q *Queries) GetIsnByID(ctx context.Context, id uuid.UUID) (Isn, error) {
-	row := q.db.QueryRowContext(ctx, getIsnByID, id)
+	row := q.db.QueryRow(ctx, getIsnByID, id)
 	var i Isn
 	err := row.Scan(
 		&i.ID,
@@ -158,7 +157,7 @@ WHERE sd.id = $1
 `
 
 func (q *Queries) GetIsnBySignalTypeID(ctx context.Context, id uuid.UUID) (Isn, error) {
-	row := q.db.QueryRowContext(ctx, getIsnBySignalTypeID, id)
+	row := q.db.QueryRow(ctx, getIsnBySignalTypeID, id)
 	var i Isn
 	err := row.Scan(
 		&i.ID,
@@ -183,7 +182,7 @@ WHERE i.slug = $1
 `
 
 func (q *Queries) GetIsnBySlug(ctx context.Context, slug string) (Isn, error) {
-	row := q.db.QueryRowContext(ctx, getIsnBySlug, slug)
+	row := q.db.QueryRow(ctx, getIsnBySlug, slug)
 	var i Isn
 	err := row.Scan(
 		&i.ID,
@@ -207,7 +206,7 @@ FROM isn i
 `
 
 func (q *Queries) GetIsns(ctx context.Context) ([]Isn, error) {
-	rows, err := q.db.QueryContext(ctx, getIsns)
+	rows, err := q.db.Query(ctx, getIsns)
 	if err != nil {
 		return nil, err
 	}
@@ -231,9 +230,6 @@ func (q *Queries) GetIsns(ctx context.Context) ([]Isn, error) {
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -261,22 +257,22 @@ ON i.id = ir.isn_id
 `
 
 type GetIsnsWithIsnReceiverRow struct {
-	ID                         uuid.UUID      `json:"id"`
-	UserAccountID              uuid.UUID      `json:"user_account_id"`
-	Slug                       string         `json:"slug"`
-	IsInUse                    bool           `json:"is_in_use"`
-	Visibility                 string         `json:"visibility"`
-	StorageType                string         `json:"storage_type"`
-	StorageConnectionURL       string         `json:"storage_connection_url"`
-	MaxDailyValidationFailures sql.NullInt32  `json:"max_daily_validation_failures"`
-	MaxPayloadKilobytes        sql.NullInt32  `json:"max_payload_kilobytes"`
-	PayloadValidation          sql.NullString `json:"payload_validation"`
-	DefaultRateLimit           sql.NullInt32  `json:"default_rate_limit"`
-	ReceiverStatus             string         `json:"receiver_status"`
+	ID                         uuid.UUID `json:"id"`
+	UserAccountID              uuid.UUID `json:"user_account_id"`
+	Slug                       string    `json:"slug"`
+	IsInUse                    bool      `json:"is_in_use"`
+	Visibility                 string    `json:"visibility"`
+	StorageType                string    `json:"storage_type"`
+	StorageConnectionURL       string    `json:"storage_connection_url"`
+	MaxDailyValidationFailures *int32    `json:"max_daily_validation_failures"`
+	MaxPayloadKilobytes        *int32    `json:"max_payload_kilobytes"`
+	PayloadValidation          *string   `json:"payload_validation"`
+	DefaultRateLimit           *int32    `json:"default_rate_limit"`
+	ReceiverStatus             string    `json:"receiver_status"`
 }
 
 func (q *Queries) GetIsnsWithIsnReceiver(ctx context.Context) ([]GetIsnsWithIsnReceiverRow, error) {
-	rows, err := q.db.QueryContext(ctx, getIsnsWithIsnReceiver)
+	rows, err := q.db.Query(ctx, getIsnsWithIsnReceiver)
 	if err != nil {
 		return nil, err
 	}
@@ -301,9 +297,6 @@ func (q *Queries) GetIsnsWithIsnReceiver(ctx context.Context) ([]GetIsnsWithIsnR
 			return nil, err
 		}
 		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -333,7 +326,7 @@ type UpdateIsnParams struct {
 }
 
 func (q *Queries) UpdateIsn(ctx context.Context, arg UpdateIsnParams) (int64, error) {
-	result, err := q.db.ExecContext(ctx, updateIsn,
+	result, err := q.db.Exec(ctx, updateIsn,
 		arg.ID,
 		arg.Detail,
 		arg.IsInUse,
@@ -344,5 +337,5 @@ func (q *Queries) UpdateIsn(ctx context.Context, arg UpdateIsnParams) (int64, er
 	if err != nil {
 		return 0, err
 	}
-	return result.RowsAffected()
+	return result.RowsAffected(), nil
 }
