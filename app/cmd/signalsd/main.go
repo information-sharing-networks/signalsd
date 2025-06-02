@@ -46,9 +46,11 @@ import (
 //	@tag.name			Signal definitions
 //	@tag.description	Signal definitions describe the format of the data being shared in an ISN
 
-//	@tag.name			Signal sharing
+//	@tag.name			Service accounts
 //	@tag.description	Send and recieve signals over the ISN
 
+// @tag.name			Service accounts
+// @tag.description	service account ("service identities") end points
 func main() {
 
 	serverLogger := logger.InitServerLogger()

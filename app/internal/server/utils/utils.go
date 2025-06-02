@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
 	"golang.org/x/text/runes"
@@ -129,4 +130,28 @@ func GetScheme(r *http.Request) string {
 func IsValidOrigin(urlStr string) bool {
 	re := regexp.MustCompile(`^(https?):\/\/([a-zA-Z0-9_\-\.]+)(:\d+)?$`)
 	return re.MatchString(urlStr)
+}
+
+// check that the supplied string conforms to the date formats supported by the API (ISO 8601 or YYYY-MM-DD)
+// Assume YYYY-MM-DD is the start of day in UTC e.g 2006-01-02T00:00:00Z
+func ParseDateTime(dateString string) (time.Time, error) {
+	isoLayouts := []string{
+		time.RFC3339,     // e.g 2006-01-02T15:04:05Z07:00
+		time.RFC3339Nano, // e.g 2006-01-02T15:04:05.999999999Z07:00
+	}
+
+	for _, layout := range isoLayouts {
+		if t, err := time.Parse(layout, dateString); err == nil {
+			return t, nil
+		} else {
+			fmt.Printf("layout :%v dateString: %v error: %v", layout, dateString, err)
+		}
+	}
+
+	//If not an ISO 8601 with timezone, try YYYY.MM.DD
+	if t, err := time.Parse("2006-01-02", dateString); err == nil {
+		return t.UTC(), nil
+	}
+
+	return time.Time{}, fmt.Errorf("unsupported date format: %s. Expected ISO 8601 with timezone (e.g., 2006-01-02T15:04:05Z07:00) or YYYY.MM.DD (e.g., 2006-01-02)", dateString)
 }

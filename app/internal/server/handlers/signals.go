@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"slices"
 
@@ -16,6 +17,7 @@ import (
 	"github.com/nickabs/signalsd/app/internal/auth"
 	"github.com/nickabs/signalsd/app/internal/database"
 	"github.com/nickabs/signalsd/app/internal/server/responses"
+	"github.com/nickabs/signalsd/app/internal/server/utils"
 )
 
 type SignalsHandler struct {
@@ -38,7 +40,7 @@ type CreateSignalsRequest struct {
 	} `json:"signals"`
 }
 
-// workaround because Swaggo can't process json.RawMessage
+// workaround this structure is only needed for Swaggo documentation (swaggo does not understand json.RawMessage type)
 type CreateSignalsRequestDoc struct {
 	Signals []struct {
 		LocalRef      string         `json:"local_ref" example:"item_id_#1"`
@@ -47,11 +49,6 @@ type CreateSignalsRequestDoc struct {
 	} `json:"signals"`
 }
 
-type CreateSignalsResponse2 struct {
-	LocalRef      string     `json:"local_ref" example:"item_id_#1"`
-	SignalId      *uuid.UUID `json:"signal_id" example:"835788bd-789d-4091-96e3-db0f51ccbabc"`
-	VersionNumber int32      `json:"version_number" example:"1"`
-}
 type CreateSignalsResponse struct {
 	IsnSlug        string         `json:"isn_slug" example:"sample-isn--example-org"`
 	SignalTypePath string         `json:"signal_type_path" example:"signal-type-1/v0.0.1"`
@@ -62,6 +59,42 @@ type StoredSignal struct {
 	LocalRef        string    `json:"local_ref" example:"item_id_#1"`
 	SignalVersionID uuid.UUID `json:"signal_version_id" example:"835788bd-789d-4091-96e3-db0f51ccbabc"`
 	VersionNumber   int32     `json:"version_number" example:"1"`
+}
+
+type SearchParams struct {
+	IsnSlug        string     `json:"isn_id"`
+	SignalTypeSlug string     `json:"signal_type_id"`
+	SemVer         string     `json:"sem_ver"`
+	AccountID      *uuid.UUID `json:"account_id,omitempty"`
+	StartDate      *time.Time `json:"start_date,omitempty"`
+	EndDate        *time.Time `json:"end_date,omitempty"`
+}
+
+type SignalVersion struct {
+	AccountID          uuid.UUID       `json:"account_id"`
+	AccountType        string          `json:"account_type"`
+	Email              string          `json:"email,omitempty"`
+	LocalRef           string          `json:"local_ref"`
+	VersionNumber      int32           `json:"version_number"`
+	CreatedAt          time.Time       `json:"created_at"`
+	SignalVersionID    uuid.UUID       `json:"signal_version_id"`
+	SignalID           uuid.UUID       `json:"signal_id"`
+	CorrelatedLocalRef string          `json:"correlated_local_ref"`
+	CorrelatedSignalID uuid.UUID       `json:"correlated_signal_id"`
+	Content            json.RawMessage `json:"content"`
+}
+type SignalVersionDoc struct {
+	AccountID          uuid.UUID      `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
+	AccountType        string         `json:"account_type" example:"user"`
+	Email              string         `json:"email" example:"user@example.com"`
+	LocalRef           string         `json:"local_ref" example:"item_id_#1"`
+	VersionNumber      int32          `json:"version_number" example:"1"`
+	CreatedAt          time.Time      `json:"created_at" example:"2025-06-03T13:47:47.331787+01:00"`
+	SignalVersionID    uuid.UUID      `json:"signal_version_id" example:"835788bd-789d-4091-96e3-db0f51ccbabc"`
+	SignalID           uuid.UUID      `json:"signal_id" example:"4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19"`
+	CorrelatedLocalRef string         `json:"correlated_local_ref" example:"item_id_#2"`
+	CorrelatedSignalID uuid.UUID      `json:"correlated_signal_id" example:"17c50d26-1da6-4ac0-897f-3a2f85f07cd3"`
+	Content            map[string]any `json:"content"`
 }
 
 // SignalsHandler godocs
@@ -81,7 +114,7 @@ type StoredSignal struct {
 //	@Description	Requires a valid access token.
 //	@Description	The claims in the access token list the ISNs and signal_types that the account is permitted to use.
 //	@Description
-//	@Description	- the RequireIsnWritePermission middleware will consult the claims in the access token to confirm the user is allowed to write to the isn in the URL.
+//	@Description	- the RequireIsnPermission middleware will consult the claims in the access token to confirm the user is allowed to write to the isn in the URL.
 //	@Description	- This handler also checks that the signal_type/sem_ver in the url is also listed in the claims (this is to catch mistyped urls)
 //	@Description
 //	@Description	**Validation**
@@ -94,14 +127,14 @@ type StoredSignal struct {
 //	@Description
 //	@Description	internal errors cause the whole payload to be rejected.
 //
-//	@Param			isn_slug			path	string								true	"isn slug"						example(sample-isn--example-org)
-//	@Param			signal_type_slug	path	string								true	"signal type slug"				example(sample-signal--example-org)
-//	@Param			sem_ver				path	string								true	"signal type sem_ver number"	example(0.0.1)
-//	@Param			request				body	handlers.CreateSignalsRequestDoc	true	"create signals"
+//	@Param			isn_slug			path		string								true	"isn slug"						example(sample-isn--example-org)
+//	@Param			signal_type_slug	path		string								true	"signal type slug"				example(sample-signal--example-org)
+//	@Param			sem_ver				path		string								true	"signal type sem_ver number"	example(0.0.1)
+//	@Param			request				body		handlers.CreateSignalsRequestDoc	true	"create signals"
 //
-//	@Success		201 {object} 	handlers.CreateSignalsResponse
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		500	{object}	responses.ErrorResponse
+//	@Success		201					{object}	handlers.CreateSignalsResponse
+//	@Failure		400					{object}	responses.ErrorResponse
+//	@Failure		500					{object}	responses.ErrorResponse
 //
 //	@Security		BearerAccessToken
 //
@@ -122,11 +155,6 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 	accountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get accountID from context")
-		return
-	}
-
-	if claims.AccountID != accountID {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "the accountID and the claims.AccountID from context do not match")
 		return
 	}
 
@@ -174,9 +202,6 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 	txQueries := s.queries.WithTx(tx)
 
 	for _, signal := range createSignalsRequest.Signals {
-		// if the processing fails - because of a bad record, report which one failed and produce an audit
-		// return signal id/signal master id.
-
 		var err error
 
 		// create the signal master record the first time this acccount id/signal type/local_ref is received
@@ -246,17 +271,150 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 //	@Summary	Withdraw a signal (TODO)
 //	@Tags		Signal sharing
 //
-//	@Router		/isn/{isn_slug}/signal_types/{signal_type_slug}/signals/{signal_id} [delete]
+//	@Router		/isn/{isn_slug}/signal_types/{signal_type_slug}/{signal_id} [delete]
 func (s *SignalsHandler) DeleteSignalHandler(w http.ResponseWriter, r *http.Request) {
-	responses.RespondWithError(w, r, http.StatusNoContent, apperrors.ErrCodeNotImplemented, "todo - signals not yet implemented")
+	// mark as withdrawn
+	responses.RespondWithError(w, r, http.StatusNotImplemented, apperrors.ErrCodeNotImplemented, "todo - delete signal not yet implemented")
 }
 
-// GetSignalsHandler godocs
+// GetSignalHandler godocs
 //
 //	@Summary	get a signal (TODO)
 //	@Tags		Signal sharing
 //
-//	@Router		/isn/{isn_slug}/signal_types/{signal_type_slug}/signals/{signal_id} [get]
+//	@Router		/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/{signal_id} [get]
 func (s *SignalsHandler) GetSignalHandler(w http.ResponseWriter, r *http.Request) {
-	responses.RespondWithError(w, r, http.StatusNoContent, apperrors.ErrCodeNotImplemented, "todo - signals not yet implemented")
+	// todo option to
+	// option to search by local ref
+	// reutrn history of versions
+	// return withdrawn
+	responses.RespondWithError(w, r, http.StatusNotImplemented, apperrors.ErrCodeNotImplemented, "todo - iget signal not yet implemented")
+}
+
+// GetSignalHandler godocs
+//
+//	@Summary		Search for signals
+//	@Tags			Signal sharing
+//
+//	@Description	Search for signals by date or account
+//	@Description
+//	@Description	Accepted timestamps formats (ISO 8601):
+//	@Description	- 2006-01-02T15:04:05Z (UTC)
+//	@Description	- 2006-01-02T15:04:05+07:00 (with offset)
+//	@Description	- 2006-01-02T15:04:05.999999999Z (nano precision)
+//	@Description
+//	@Description	Note: If the timestamp contains a timezone offset (as in +07:00), the + must be percent-encoded as %2B in the query strings.
+//	@Description
+//	@Description	Dates (YYYY-MM-DD) can also be used.
+//	@Description	These are treated as the start of day UTC (so 2006-01-02 is treated as 2006-01-02T00:00:00Z)
+//	@Description
+//	@Description	Note the endpoint returns the latest version of each signal and does not include withdrawn or archived signals
+//
+//	@Param			start_date	query		string	false	"Start date for filtering"	example(2006-01-02T15:04:05Z)
+//	@Param			end_date	query		string	false	"End date for filtering"	example(2006-01-02T16:00:00Z
+//	@Param			account_id	query		string	false	"Account ID for filtering"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
+//
+//	@Success		200			{array}		handlers.SignalVersionDoc
+//	@Failure		400			{object}	responses.ErrorResponse
+//	@Failure		500			{object}	responses.ErrorResponse
+//
+//	@Router			/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search [get]
+func (s *SignalsHandler) SearchSignalsHandler(w http.ResponseWriter, r *http.Request) {
+
+	// set up params
+	isnSlug := r.PathValue("isn_slug")
+	signalTypeSlug := r.PathValue("signal_type_slug")
+	semVer := r.PathValue("sem_ver")
+	signalTypePath := fmt.Sprintf("%v/v%v", signalTypeSlug, semVer)
+
+	searchParams := SearchParams{
+		IsnSlug:        isnSlug,
+		SignalTypeSlug: signalTypeSlug,
+		SemVer:         semVer,
+	}
+
+	if accountIDString := r.URL.Query().Get("account_id"); accountIDString != "" {
+		accountID, err := uuid.Parse(accountIDString)
+		if err != nil {
+			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "account_id is not a valid UUID")
+			return
+		}
+		searchParams.AccountID = &accountID
+	}
+
+	if startDateString := r.URL.Query().Get("start_date"); startDateString != "" {
+		startDate, err := utils.ParseDateTime(startDateString)
+		if err != nil {
+			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
+			return
+		}
+		searchParams.StartDate = &startDate
+	}
+
+	if endDateString := r.URL.Query().Get("end_date"); endDateString != "" {
+		endDate, err := utils.ParseDateTime(endDateString)
+		if err != nil {
+			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
+			return
+		}
+		searchParams.EndDate = &endDate
+	}
+
+	// check that this the user is requesting a valid signal type/sem_ver for this isn
+	claims, ok := auth.ContextAccessTokenClaims(r.Context())
+	if !ok {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
+		return
+	}
+
+	found := slices.Contains(claims.IsnPerms[isnSlug].SignalTypePaths, signalTypePath)
+	if !found {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("signal type %v is not available on ISN %v", signalTypePath, isnSlug))
+		return
+	}
+
+	hasPartialDateRange := (searchParams.StartDate != nil) != (searchParams.EndDate != nil)
+	hasDateRange := searchParams.StartDate != nil && searchParams.EndDate != nil
+	hasAccount := searchParams.AccountID != nil
+
+	if hasPartialDateRange {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "you must supply both start_date and end_date search parameters")
+		return
+	}
+	if !hasDateRange && !hasAccount {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "you must supply a search paramenter")
+		return
+	}
+
+	rows, err := s.queries.GetLatestSignalVersionsWithOptionalFilters(r.Context(), database.GetLatestSignalVersionsWithOptionalFiltersParams{
+		IsnSlug:        searchParams.IsnSlug,
+		SignalTypeSlug: searchParams.SignalTypeSlug,
+		SemVer:         searchParams.SemVer,
+		StartDate:      searchParams.StartDate,
+		EndDate:        searchParams.EndDate,
+		AccountID:      searchParams.AccountID,
+	})
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to select signals from database: %v", err))
+		return
+	}
+
+	res := make([]SignalVersion, 0, len(rows))
+	for _, row := range rows {
+		res = append(res, SignalVersion{
+			AccountID:          row.AccountID,
+			AccountType:        row.AccountType,
+			Email:              row.Email,
+			LocalRef:           row.LocalRef,
+			VersionNumber:      row.VersionNumber,
+			CreatedAt:          row.CreatedAt,
+			SignalVersionID:    row.SignalVersionID,
+			SignalID:           row.SignalID,
+			CorrelatedLocalRef: row.CorrelatedLocalRef,
+			CorrelatedSignalID: row.CorrelatedSignalID,
+			Content:            row.Content,
+		})
+	}
+	// check for valid ISO dates
+	responses.RespondWithJSON(w, http.StatusOK, res)
 }

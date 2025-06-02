@@ -55,11 +55,47 @@
                 }
             }
         },
+        "/admin/users": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "This api displays all the site users and their email addreses (can only be used by owner account)",
+                "tags": [
+                    "Site admin"
+                ],
+                "summary": "Get registered users",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/database.GetUsersRow"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/users/{id}": {
             "get": {
-                "description": "This API is protected (includes email addresses in the response) - currently only available on dev envs, pending implementation of admin roles.",
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "This api displays a site user and their email addreses (can only be used by owner account)",
                 "tags": [
-                    "auth"
+                    "Site admin"
                 ],
                 "summary": "Get registered user",
                 "parameters": [
@@ -214,6 +250,346 @@
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/isn/{isn_slug}/accounts/{account_id}/batches": {
+            "get": {
+                "description": "TODO - get latest, previous, by data ranage\nTODO",
+                "tags": [
+                    "Service accounts"
+                ],
+                "summary": "Get details about a set of signal batches",
+                "responses": {}
+            }
+        },
+        "/api/isn/{isn_slug}/accounts/{account_id}/batches/{signals_batch_id}": {
+            "get": {
+                "description": "TODO - get by id. Include status (errs, received, latest localref in batch)",
+                "tags": [
+                    "Service accounts"
+                ],
+                "summary": "Get a signal batch",
+                "responses": {}
+            }
+        },
+        "/api/isn/{isn_slug}/batches": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "This endpoint is used by service accounts to create a new batch used to track signals sent to the specified isn\n\nFor user accounts, a batch is automatically created when they are granted write permission to an isn and is only closed if their permission to write to the isn is revoked\n\nFor service accounts, the client app can decide how long to keep a batch open\n(a batch status summary is sent to a webhook after the batch closes)\n\nopening a batch closes the previous batch created on the isn for this account.\n\nSignals can only be sent to open batches.\n\nauthentication is based on the supplied access token:\n(the site owner; the isn admin and members with an isn_perm= write can create a batch)\n",
+                "tags": [
+                    "Service accounts"
+                ],
+                "summary": "Create a new signal batch",
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateSignalsBatchResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/isn/{isn_slug}/receiver": {
+            "get": {
+                "tags": [
+                    "ISN view"
+                ],
+                "summary": "Get an ISN receiver config",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn--example-org",
+                        "description": "isn slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/database.GetIsnReceiverByIsnSlugRow"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "This endpoint can only be used by the site owner or the ISN admin",
+                "tags": [
+                    "ISN configuration"
+                ],
+                "summary": "Update an ISN Receiver",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn--example-org",
+                        "description": "isn slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "ISN receiver details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdateIsnReceiverRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "An ISN receiver handles the http requests sent by clients that pass Signals to the ISN\n\nYou can specify how many receivers should be started for the ISN and they will listen on an automatically generted port, starting at 8081\n\nThe public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/receiver\nthe isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services\n\nnote receivers are always created in 'offline' mode.\n\nThis endpoint can only be used by the site owner or the ISN admin",
+                "tags": [
+                    "ISN configuration"
+                ],
+                "summary": "Create an ISN Receiver definition",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn--example-org",
+                        "description": "isn slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "ISN receiver details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateIsnReceiverRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateIsnReceiverResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/isn/{isn_slug}/retriever": {
+            "get": {
+                "tags": [
+                    "ISN view"
+                ],
+                "summary": "Get an ISN retriever config",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn--example-org",
+                        "description": "isn slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/database.GetIsnRetrieverByIsnSlugRow"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "This endpoint can only be used by the site owner or the ISN admin",
+                "tags": [
+                    "ISN configuration"
+                ],
+                "summary": "Update an ISN Retriever",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn--example-org",
+                        "description": "isn slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "ISN retriever details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdateIsnRetrieverRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "An ISN retriever handles the http requests sent by clients to get Signals from the ISN\n\nYou can specify how many retrievers should be started for the ISN and they will listen on an automatically generted port\n\nThe public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/retriever\nthe isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services\n\nnote retrievers are created in 'offline' mode.\n\nThis endpoint can only be used by the site owner or the ISN admin",
+                "tags": [
+                    "ISN configuration"
+                ],
+                "summary": "Create an ISN Retriever definition",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn--example-org",
+                        "description": "isn slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "ISN retriever details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateIsnRetrieverRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateIsnRetrieverResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -415,346 +791,6 @@
                 }
             }
         },
-        "/api/isn/{isn_slug}/signals/accounts/{account_id}/batches": {
-            "get": {
-                "description": "TODO - get latest, previous, by data ranage\nTODO",
-                "tags": [
-                    "Signal sharing"
-                ],
-                "summary": "Get details about a set of signal batches",
-                "responses": {}
-            }
-        },
-        "/api/isn/{isn_slug}/signals/accounts/{account_id}/batches/{signals_batch_id}": {
-            "get": {
-                "description": "TODO - get by id. Include status (errs, received, latest localref in batch)",
-                "tags": [
-                    "Signal sharing"
-                ],
-                "summary": "Get a signal batch",
-                "responses": {}
-            }
-        },
-        "/api/isn/{isn_slug}/signals/batches": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "This endpoint is used by service accounts to create a new batch used to track signals sent to the specified isn\n\nFor user accounts, a batch is automatically created when they are granted write permission to an isn and is only closed if their permission to write to the isn is revoked\n\nFor service accounts, the client app can decide how long to keep a batch open\n(a batch status summary is sent to a webhook after the batch closes)\n\nopening a batch closes the previous batch created on the isn for this account.\n\nSignals can only be sent to open batches.\n\nauthentication is based on the supplied access token:\n(the site owner; the isn admin and members with an isn_perm= write can create a batch)\n",
-                "tags": [
-                    "Signal sharing"
-                ],
-                "summary": "Create a new signal batch",
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateSignalsBatchResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/isn/{isn_slug}/signals/receiver": {
-            "get": {
-                "tags": [
-                    "ISN view"
-                ],
-                "summary": "Get an ISN receiver config",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "sample-isn--example-org",
-                        "description": "isn slug",
-                        "name": "slug",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/database.GetIsnReceiverByIsnSlugRow"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "This endpoint can only be used by the site owner or the ISN admin",
-                "tags": [
-                    "ISN configuration"
-                ],
-                "summary": "Update an ISN Receiver",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "sample-isn--example-org",
-                        "description": "isn slug",
-                        "name": "isn_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "ISN receiver details",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.UpdateIsnReceiverRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "An ISN receiver handles the http requests sent by clients that pass Signals to the ISN\n\nYou can specify how many receivers should be started for the ISN and they will listen on an automatically generted port, starting at 8081\n\nThe public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/signals/receiver\nthe isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services\n\nnote receivers are always created in 'offline' mode.\n\nThis endpoint can only be used by the site owner or the ISN admin",
-                "tags": [
-                    "ISN configuration"
-                ],
-                "summary": "Create an ISN Receiver definition",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "sample-isn--example-org",
-                        "description": "isn slug",
-                        "name": "isn_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "ISN receiver details",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateIsnReceiverRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateIsnReceiverResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/isn/{isn_slug}/signals/retriever": {
-            "get": {
-                "tags": [
-                    "ISN view"
-                ],
-                "summary": "Get an ISN retriever config",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "sample-isn--example-org",
-                        "description": "isn slug",
-                        "name": "slug",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/database.GetIsnRetrieverByIsnSlugRow"
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "This endpoint can only be used by the site owner or the ISN admin",
-                "tags": [
-                    "ISN configuration"
-                ],
-                "summary": "Update an ISN Retriever",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "sample-isn--example-org",
-                        "description": "isn slug",
-                        "name": "isn_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "ISN retriever details",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.UpdateIsnRetrieverRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "post": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "An ISN retriever handles the http requests sent by clients to get Signals from the ISN\n\nYou can specify how many retrievers should be started for the ISN and they will listen on an automatically generted port\n\nThe public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/signals/retriever\nthe isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services\n\nnote retrievers are created in 'offline' mode.\n\nThis endpoint can only be used by the site owner or the ISN admin",
-                "tags": [
-                    "ISN configuration"
-                ],
-                "summary": "Create an ISN Retriever definition",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "sample-isn--example-org",
-                        "description": "isn slug",
-                        "name": "isn_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "ISN retriever details",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateIsnRetrieverRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateIsnRetrieverResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/api/isn/{slug}": {
             "get": {
                 "description": "Returns details about the ISN plus details of any configured receivers/retrievers",
@@ -789,32 +825,6 @@
                         "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/users": {
-            "get": {
-                "description": "This api displays email addresses and is currently only available on dev env pending implementation of role based access",
-                "tags": [
-                    "auth"
-                ],
-                "summary": "Get the registered users",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/database.GetUsersRow"
-                            }
                         }
                     },
                     "500": {
@@ -1235,22 +1245,6 @@
                 }
             }
         },
-        "/isn/{isn_slug}/signal_types/{signal_type_slug}/signals/{signal_id}": {
-            "get": {
-                "tags": [
-                    "Signal sharing"
-                ],
-                "summary": "get a signal (TODO)",
-                "responses": {}
-            },
-            "delete": {
-                "tags": [
-                    "Signal sharing"
-                ],
-                "summary": "Withdraw a signal (TODO)",
-                "responses": {}
-            }
-        },
         "/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals": {
             "post": {
                 "security": [
@@ -1258,7 +1252,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "- the client can submit an array of signals to this endpoint for storage on the ISN\n- payloads must not mix signals of different types and the payload is subject to the sizen\tlimits defined on the ISN.\n- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.\n- If a local reference is received more than once from an account for a specified signal_type it will be stored with a incremented version number.\n- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account.\n- requests are only accepted for the open signal batch for this account/ISN.\n\n**Authentication**\n\nRequires a valid access token.\nThe claims in the access token list the ISNs and signal_types that the account is permitted to use.\n\n- the RequireIsnWritePermission middleware will consult the claims in the access token to confirm the user is allowed to write to the isn in the URL.\n- This handler also checks that the signal_type/sem_ver in the url is also listed in the claims (this is to catch mistyped urls)\n\n**Validation**\n\nthe content is validated against the json schema asynchronously, however basic checks are done on the incoming data.\nThe following issues create a 400 error and cause the entire payload to be rejected\n- invalid json format\n- missing fields (the array of signals must be in a json object called signals, and content and local_ref must be present for each record).\n- incorrect correlation ids - where supplied, correlation ids must refer to another signal of the same type (error_code is set to \"invalid_correlation_id\" in this case)\n\ninternal errors cause the whole payload to be rejected.",
+                "description": "- the client can submit an array of signals to this endpoint for storage on the ISN\n- payloads must not mix signals of different types and the payload is subject to the sizen\tlimits defined on the ISN.\n- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.\n- If a local reference is received more than once from an account for a specified signal_type it will be stored with a incremented version number.\n- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account.\n- requests are only accepted for the open signal batch for this account/ISN.\n\n**Authentication**\n\nRequires a valid access token.\nThe claims in the access token list the ISNs and signal_types that the account is permitted to use.\n\n- the RequireIsnPermission middleware will consult the claims in the access token to confirm the user is allowed to write to the isn in the URL.\n- This handler also checks that the signal_type/sem_ver in the url is also listed in the claims (this is to catch mistyped urls)\n\n**Validation**\n\nthe content is validated against the json schema asynchronously, however basic checks are done on the incoming data.\nThe following issues create a 400 error and cause the entire payload to be rejected\n- invalid json format\n- missing fields (the array of signals must be in a json object called signals, and content and local_ref must be present for each record).\n- incorrect correlation ids - where supplied, correlation ids must refer to another signal of the same type (error_code is set to \"invalid_correlation_id\" in this case)\n\ninternal errors cause the whole payload to be rejected.",
                 "tags": [
                     "Signal sharing"
                 ],
@@ -1320,13 +1314,85 @@
                 }
             }
         },
+        "/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search": {
+            "get": {
+                "description": "Search for signals by date or account\n\nAccepted timestamps formats (ISO 8601):\n- 2006-01-02T15:04:05Z (UTC)\n- 2006-01-02T15:04:05+07:00 (with offset)\n- 2006-01-02T15:04:05.999999999Z (nano precision)\n\nNote: If the timestamp contains a timezone offset (as in +07:00), the + must be percent-encoded as %2B in the query strings.\n\nDates (YYYY-MM-DD) can also be used.\nThese are treated as the start of day UTC (so 2006-01-02 is treated as 2006-01-02T00:00:00Z)\n\nNote the endpoint returns the latest version of each signal and does not include withdrawn or archived signals",
+                "tags": [
+                    "Signal sharing"
+                ],
+                "summary": "Search for signals",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "2006-01-02T15:04:05Z",
+                        "description": "Start date for filtering",
+                        "name": "start_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "End date for filtering",
+                        "name": "end_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
+                        "description": "Account ID for filtering",
+                        "name": "account_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handlers.SignalVersionDoc"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}": {
+            "get": {
+                "tags": [
+                    "Signal sharing"
+                ],
+                "summary": "get a signal (TODO)",
+                "responses": {}
+            }
+        },
+        "/isn/{isn_slug}/signal_types/{signal_type_slug}/{signal_id}": {
+            "delete": {
+                "tags": [
+                    "Signal sharing"
+                ],
+                "summary": "Withdraw a signal (TODO)",
+                "responses": {}
+            }
+        },
         "/webhooks": {
             "post": {
                 "description": "TODO - register a webhook to recieve signals batch status updates",
                 "tags": [
                     "Signal sharing"
                 ],
-                "summary": "Register webhook",
+                "summary": "Register webhook (TODO)",
                 "responses": {}
             }
         }
@@ -1340,9 +1406,10 @@
                 "authorization_error",
                 "database_error",
                 "forbidden",
+                "invalid_correlation_id",
                 "internal_error",
                 "invalid_request",
-                "invalid_correlation_id",
+                "invalid_url_param",
                 "malformed_body",
                 "not_implemented",
                 "password_too_short",
@@ -1357,9 +1424,10 @@
                 "ErrCodeAuthorizationFailure",
                 "ErrCodeDatabaseError",
                 "ErrCodeForbidden",
+                "ErrCodeInvalidCorrelationID",
                 "ErrCodeInternalError",
                 "ErrCodeInvalidRequest",
-                "ErrCodeInvalidCorrelationID",
+                "ErrCodeInvalidURLParam",
                 "ErrCodeMalformedBody",
                 "ErrCodeNotImplemented",
                 "ErrCodePasswordTooShort",
@@ -2031,6 +2099,55 @@
                 }
             }
         },
+        "handlers.SignalVersionDoc": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string",
+                    "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3"
+                },
+                "account_type": {
+                    "type": "string",
+                    "example": "user"
+                },
+                "content": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "correlated_local_ref": {
+                    "type": "string",
+                    "example": "item_id_#2"
+                },
+                "correlated_signal_id": {
+                    "type": "string",
+                    "example": "17c50d26-1da6-4ac0-897f-3a2f85f07cd3"
+                },
+                "created_at": {
+                    "type": "string",
+                    "example": "2025-06-03T13:47:47.331787+01:00"
+                },
+                "email": {
+                    "type": "string",
+                    "example": "user@example.com"
+                },
+                "local_ref": {
+                    "type": "string",
+                    "example": "item_id_#1"
+                },
+                "signal_id": {
+                    "type": "string",
+                    "example": "4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19"
+                },
+                "signal_version_id": {
+                    "type": "string",
+                    "example": "835788bd-789d-4091-96e3-db0f51ccbabc"
+                },
+                "version_number": {
+                    "type": "integer",
+                    "example": 1
+                }
+            }
+        },
         "handlers.StoredSignal": {
             "type": "object",
             "properties": {
@@ -2228,7 +2345,11 @@
         },
         {
             "description": "Send and recieve signals over the ISN",
-            "name": "Signal sharing"
+            "name": "Service accounts"
+        },
+        {
+            "description": "service account (\"service identities\") end points",
+            "name": "Service accounts"
         }
     ]
 }

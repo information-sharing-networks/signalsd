@@ -86,7 +86,7 @@ func (a AuthService) RequireRole(allowedRoles ...string) func(http.Handler) http
 
 // check the access_token claims to ensure they can write to this isn
 // should only be used after RequireValidAccessToken middlware, which supplies the claims
-func (a AuthService) RequireIsnWritePermission() func(http.Handler) http.Handler {
+func (a AuthService) RequireIsnPermission(allowedPermissions ...string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -106,13 +106,15 @@ func (a AuthService) RequireIsnWritePermission() func(http.Handler) http.Handler
 				return
 			}
 
-			if claims.IsnPerms[isnSlug].Permission == "write" {
-				logger.Info().Msgf("user %v write access confirmed for isn %v", claims.Subject, isnSlug)
-				next.ServeHTTP(w, r)
-				return
+			for _, permission := range allowedPermissions {
+				if claims.IsnPerms[isnSlug].Permission == permission {
+					logger.Info().Msgf("Permission confirmed: %v", permission)
+					next.ServeHTTP(w, r)
+					return
+				}
 			}
 
-			responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you do not have permission to write to this isn")
+			responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you do not have the necessary access permission for this isn")
 		})
 	}
 }

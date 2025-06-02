@@ -8,9 +8,10 @@ definitions:
     - authorization_error
     - database_error
     - forbidden
+    - invalid_correlation_id
     - internal_error
     - invalid_request
-    - invalid_correlation_id
+    - invalid_url_param
     - malformed_body
     - not_implemented
     - password_too_short
@@ -25,9 +26,10 @@ definitions:
     - ErrCodeAuthorizationFailure
     - ErrCodeDatabaseError
     - ErrCodeForbidden
+    - ErrCodeInvalidCorrelationID
     - ErrCodeInternalError
     - ErrCodeInvalidRequest
-    - ErrCodeInvalidCorrelationID
+    - ErrCodeInvalidURLParam
     - ErrCodeMalformedBody
     - ErrCodeNotImplemented
     - ErrCodePasswordTooShort
@@ -491,6 +493,42 @@ definitions:
       updated_at:
         type: string
     type: object
+  handlers.SignalVersionDoc:
+    properties:
+      account_id:
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+        type: string
+      account_type:
+        example: user
+        type: string
+      content:
+        additionalProperties: {}
+        type: object
+      correlated_local_ref:
+        example: item_id_#2
+        type: string
+      correlated_signal_id:
+        example: 17c50d26-1da6-4ac0-897f-3a2f85f07cd3
+        type: string
+      created_at:
+        example: "2025-06-03T13:47:47.331787+01:00"
+        type: string
+      email:
+        example: user@example.com
+        type: string
+      local_ref:
+        example: item_id_#1
+        type: string
+      signal_id:
+        example: 4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19
+        type: string
+      signal_version_id:
+        example: 835788bd-789d-4091-96e3-db0f51ccbabc
+        type: string
+      version_number:
+        example: 1
+        type: integer
+    type: object
   handlers.StoredSignal:
     properties:
       local_ref:
@@ -642,10 +680,30 @@ paths:
       summary: reset
       tags:
       - Site admin
+  /admin/users:
+    get:
+      description: This api displays all the site users and their email addreses (can
+        only be used by owner account)
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/database.GetUsersRow'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Get registered users
+      tags:
+      - Site admin
   /admin/users/{id}:
     get:
-      description: This API is protected (includes email addresses in the response)
-        - currently only available on dev envs, pending implementation of admin roles.
+      description: This api displays a site user and their email addreses (can only
+        be used by owner account)
       parameters:
       - description: user id
         example: 68fb5f5b-e3f5-4a96-8d35-cd2203a06f73
@@ -664,9 +722,11 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
       summary: Get registered user
       tags:
-      - auth
+      - Site admin
   /api/isn:
     get:
       description: get a list of the configured ISNs
@@ -764,6 +824,263 @@ paths:
       security:
       - BearerAccessToken: []
       summary: Update an ISN
+      tags:
+      - ISN configuration
+  /api/isn/{isn_slug}/accounts/{account_id}/batches:
+    get:
+      description: |-
+        TODO - get latest, previous, by data ranage
+        TODO
+      responses: {}
+      summary: Get details about a set of signal batches
+      tags:
+      - Service accounts
+  /api/isn/{isn_slug}/accounts/{account_id}/batches/{signals_batch_id}:
+    get:
+      description: TODO - get by id. Include status (errs, received, latest localref
+        in batch)
+      responses: {}
+      summary: Get a signal batch
+      tags:
+      - Service accounts
+  /api/isn/{isn_slug}/batches:
+    post:
+      description: |
+        This endpoint is used by service accounts to create a new batch used to track signals sent to the specified isn
+
+        For user accounts, a batch is automatically created when they are granted write permission to an isn and is only closed if their permission to write to the isn is revoked
+
+        For service accounts, the client app can decide how long to keep a batch open
+        (a batch status summary is sent to a webhook after the batch closes)
+
+        opening a batch closes the previous batch created on the isn for this account.
+
+        Signals can only be sent to open batches.
+
+        authentication is based on the supplied access token:
+        (the site owner; the isn admin and members with an isn_perm= write can create a batch)
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.CreateSignalsBatchResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Create a new signal batch
+      tags:
+      - Service accounts
+  /api/isn/{isn_slug}/receiver:
+    get:
+      parameters:
+      - description: isn slug
+        example: sample-isn--example-org
+        in: path
+        name: slug
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/database.GetIsnReceiverByIsnSlugRow'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      summary: Get an ISN receiver config
+      tags:
+      - ISN view
+    post:
+      description: |-
+        An ISN receiver handles the http requests sent by clients that pass Signals to the ISN
+
+        You can specify how many receivers should be started for the ISN and they will listen on an automatically generted port, starting at 8081
+
+        The public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/receiver
+        the isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services
+
+        note receivers are always created in 'offline' mode.
+
+        This endpoint can only be used by the site owner or the ISN admin
+      parameters:
+      - description: isn slug
+        example: sample-isn--example-org
+        in: path
+        name: isn_slug
+        required: true
+        type: string
+      - description: ISN receiver details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateIsnReceiverRequest'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.CreateIsnReceiverResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Create an ISN Receiver definition
+      tags:
+      - ISN configuration
+    put:
+      description: This endpoint can only be used by the site owner or the ISN admin
+      parameters:
+      - description: isn slug
+        example: sample-isn--example-org
+        in: path
+        name: isn_slug
+        required: true
+        type: string
+      - description: ISN receiver details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateIsnReceiverRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Update an ISN Receiver
+      tags:
+      - ISN configuration
+  /api/isn/{isn_slug}/retriever:
+    get:
+      parameters:
+      - description: isn slug
+        example: sample-isn--example-org
+        in: path
+        name: slug
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/database.GetIsnRetrieverByIsnSlugRow'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      summary: Get an ISN retriever config
+      tags:
+      - ISN view
+    post:
+      description: |-
+        An ISN retriever handles the http requests sent by clients to get Signals from the ISN
+
+        You can specify how many retrievers should be started for the ISN and they will listen on an automatically generted port
+
+        The public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/retriever
+        the isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services
+
+        note retrievers are created in 'offline' mode.
+
+        This endpoint can only be used by the site owner or the ISN admin
+      parameters:
+      - description: isn slug
+        example: sample-isn--example-org
+        in: path
+        name: isn_slug
+        required: true
+        type: string
+      - description: ISN retriever details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateIsnRetrieverRequest'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.CreateIsnRetrieverResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Create an ISN Retriever definition
+      tags:
+      - ISN configuration
+    put:
+      description: This endpoint can only be used by the site owner or the ISN admin
+      parameters:
+      - description: isn slug
+        example: sample-isn--example-org
+        in: path
+        name: isn_slug
+        required: true
+        type: string
+      - description: ISN retriever details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateIsnRetrieverRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Update an ISN Retriever
       tags:
       - ISN configuration
   /api/isn/{isn_slug}/signal_types:
@@ -905,263 +1222,6 @@ paths:
       summary: Update signal definition
       tags:
       - Signal definitions
-  /api/isn/{isn_slug}/signals/accounts/{account_id}/batches:
-    get:
-      description: |-
-        TODO - get latest, previous, by data ranage
-        TODO
-      responses: {}
-      summary: Get details about a set of signal batches
-      tags:
-      - Signal sharing
-  /api/isn/{isn_slug}/signals/accounts/{account_id}/batches/{signals_batch_id}:
-    get:
-      description: TODO - get by id. Include status (errs, received, latest localref
-        in batch)
-      responses: {}
-      summary: Get a signal batch
-      tags:
-      - Signal sharing
-  /api/isn/{isn_slug}/signals/batches:
-    post:
-      description: |
-        This endpoint is used by service accounts to create a new batch used to track signals sent to the specified isn
-
-        For user accounts, a batch is automatically created when they are granted write permission to an isn and is only closed if their permission to write to the isn is revoked
-
-        For service accounts, the client app can decide how long to keep a batch open
-        (a batch status summary is sent to a webhook after the batch closes)
-
-        opening a batch closes the previous batch created on the isn for this account.
-
-        Signals can only be sent to open batches.
-
-        authentication is based on the supplied access token:
-        (the site owner; the isn admin and members with an isn_perm= write can create a batch)
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/handlers.CreateSignalsBatchResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Create a new signal batch
-      tags:
-      - Signal sharing
-  /api/isn/{isn_slug}/signals/receiver:
-    get:
-      parameters:
-      - description: isn slug
-        example: sample-isn--example-org
-        in: path
-        name: slug
-        required: true
-        type: string
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/database.GetIsnReceiverByIsnSlugRow'
-            type: array
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      summary: Get an ISN receiver config
-      tags:
-      - ISN view
-    post:
-      description: |-
-        An ISN receiver handles the http requests sent by clients that pass Signals to the ISN
-
-        You can specify how many receivers should be started for the ISN and they will listen on an automatically generted port, starting at 8081
-
-        The public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/signals/receiver
-        the isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services
-
-        note receivers are always created in 'offline' mode.
-
-        This endpoint can only be used by the site owner or the ISN admin
-      parameters:
-      - description: isn slug
-        example: sample-isn--example-org
-        in: path
-        name: isn_slug
-        required: true
-        type: string
-      - description: ISN receiver details
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.CreateIsnReceiverRequest'
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/handlers.CreateIsnReceiverResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Create an ISN Receiver definition
-      tags:
-      - ISN configuration
-    put:
-      description: This endpoint can only be used by the site owner or the ISN admin
-      parameters:
-      - description: isn slug
-        example: sample-isn--example-org
-        in: path
-        name: isn_slug
-        required: true
-        type: string
-      - description: ISN receiver details
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.UpdateIsnReceiverRequest'
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Update an ISN Receiver
-      tags:
-      - ISN configuration
-  /api/isn/{isn_slug}/signals/retriever:
-    get:
-      parameters:
-      - description: isn slug
-        example: sample-isn--example-org
-        in: path
-        name: slug
-        required: true
-        type: string
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/database.GetIsnRetrieverByIsnSlugRow'
-            type: array
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      summary: Get an ISN retriever config
-      tags:
-      - ISN view
-    post:
-      description: |-
-        An ISN retriever handles the http requests sent by clients to get Signals from the ISN
-
-        You can specify how many retrievers should be started for the ISN and they will listen on an automatically generted port
-
-        The public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/signals/retriever
-        the isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services
-
-        note retrievers are created in 'offline' mode.
-
-        This endpoint can only be used by the site owner or the ISN admin
-      parameters:
-      - description: isn slug
-        example: sample-isn--example-org
-        in: path
-        name: isn_slug
-        required: true
-        type: string
-      - description: ISN retriever details
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.CreateIsnRetrieverRequest'
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/handlers.CreateIsnRetrieverResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Create an ISN Retriever definition
-      tags:
-      - ISN configuration
-    put:
-      description: This endpoint can only be used by the site owner or the ISN admin
-      parameters:
-      - description: isn slug
-        example: sample-isn--example-org
-        in: path
-        name: isn_slug
-        required: true
-        type: string
-      - description: ISN retriever details
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.UpdateIsnRetrieverRequest'
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Update an ISN Retriever
-      tags:
-      - ISN configuration
   /api/isn/{slug}:
     get:
       description: Returns details about the ISN plus details of any configured receivers/retrievers
@@ -1192,24 +1252,6 @@ paths:
       summary: Get an ISN configurationuration
       tags:
       - ISN view
-  /api/users:
-    get:
-      description: This api displays email addresses and is currently only available
-        on dev env pending implementation of role based access
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/database.GetUsersRow'
-            type: array
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      summary: Get the registered users
-      tags:
-      - auth
   /auth/admins/{account_id}:
     delete:
       description: this endpoint can only be used by the site owner account
@@ -1533,15 +1575,10 @@ paths:
       summary: Grant ISN access permission
       tags:
       - ISN Permissions
-  /isn/{isn_slug}/signal_types/{signal_type_slug}/signals/{signal_id}:
+  /isn/{isn_slug}/signal_types/{signal_type_slug}/{signal_id}:
     delete:
       responses: {}
       summary: Withdraw a signal (TODO)
-      tags:
-      - Signal sharing
-    get:
-      responses: {}
-      summary: get a signal (TODO)
       tags:
       - Signal sharing
   /isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals:
@@ -1557,7 +1594,7 @@ paths:
         signal does not need to be owned by the same account.\n- requests are only
         accepted for the open signal batch for this account/ISN.\n\n**Authentication**\n\nRequires
         a valid access token.\nThe claims in the access token list the ISNs and signal_types
-        that the account is permitted to use.\n\n- the RequireIsnWritePermission middleware
+        that the account is permitted to use.\n\n- the RequireIsnPermission middleware
         will consult the claims in the access token to confirm the user is allowed
         to write to the isn in the URL.\n- This handler also checks that the signal_type/sem_ver
         in the url is also listed in the claims (this is to catch mistyped urls)\n\n**Validation**\n\nthe
@@ -1612,11 +1649,66 @@ paths:
       summary: Send signals
       tags:
       - Signal sharing
+  /isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}:
+    get:
+      responses: {}
+      summary: get a signal (TODO)
+      tags:
+      - Signal sharing
+  /isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search:
+    get:
+      description: |-
+        Search for signals by date or account
+
+        Accepted timestamps formats (ISO 8601):
+        - 2006-01-02T15:04:05Z (UTC)
+        - 2006-01-02T15:04:05+07:00 (with offset)
+        - 2006-01-02T15:04:05.999999999Z (nano precision)
+
+        Note: If the timestamp contains a timezone offset (as in +07:00), the + must be percent-encoded as %2B in the query strings.
+
+        Dates (YYYY-MM-DD) can also be used.
+        These are treated as the start of day UTC (so 2006-01-02 is treated as 2006-01-02T00:00:00Z)
+
+        Note the endpoint returns the latest version of each signal and does not include withdrawn or archived signals
+      parameters:
+      - description: Start date for filtering
+        example: "2006-01-02T15:04:05Z"
+        in: query
+        name: start_date
+        type: string
+      - description: End date for filtering
+        in: query
+        name: end_date
+        type: string
+      - description: Account ID for filtering
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+        in: query
+        name: account_id
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.SignalVersionDoc'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      summary: Search for signals
+      tags:
+      - Signal sharing
   /webhooks:
     post:
       description: TODO - register a webhook to recieve signals batch status updates
       responses: {}
-      summary: Register webhook
+      summary: Register webhook (TODO)
       tags:
       - Signal sharing
 produces:
@@ -1644,4 +1736,6 @@ tags:
     an ISN
   name: Signal definitions
 - description: Send and recieve signals over the ISN
-  name: Signal sharing
+  name: Service accounts
+- description: service account ("service identities") end points
+  name: Service accounts

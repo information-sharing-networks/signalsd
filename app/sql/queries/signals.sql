@@ -107,3 +107,240 @@ JOIN signals s
     AND s.account_id = sqlc.arg(account_id)
     AND s.local_ref = sqlc.arg(local_ref)
 RETURNING id, version_number;
+
+-- Note the get queries:
+-- do not return withdrawn or archived signals 
+-- do not check validity status
+-- require isn_slug,signal_type_slug & sem_ver params
+
+-- name: GetLatestSignalVersionsByAccountID :many
+WITH LatestSignals AS (
+    SELECT
+        a.id AS account_id,
+        a.account_type,
+        COALESCE(u.email, si.client_contact_email) AS email, -- show either the user or service account email
+        s.local_ref,
+        sv.version_number,
+        sv.created_at,
+        sv.id AS signal_version_id,
+        sv.signal_id,
+        s2.local_ref AS correlated_local_ref,
+        s2.id AS correlated_signal_id,
+        sv.content,
+        ROW_NUMBER() OVER (PARTITION BY sv.signal_id ORDER BY sv.version_number DESC) AS rn
+    FROM
+        signal_versions sv
+    JOIN
+        signals s ON s.id = sv.signal_id
+    JOIN
+        signals s2 ON s2.id = s.correlation_id
+    JOIN 
+        accounts a ON a.id = s.account_id
+    JOIN 
+        signal_types st on st.id = s.signal_type_id
+    JOIN 
+        isn i ON i.id = st.isn_id 
+    LEFT OUTER JOIN 
+        users u ON u.account_id = a.id
+    LEFT OUTER JOIN 
+        service_identities si ON si.account_id = a.id
+    WHERE i.slug = sqlc.arg(isn_slug)
+        AND st.slug = sqlc.arg(signal_type_slug)
+        AND st.sem_ver = sqlc.arg(sem_ver)
+        AND s.account_id = sqlc.arg(account_id)
+)
+SELECT
+    ls.account_id,
+    ls.account_type,
+    ls.email,
+    ls.local_ref,
+    ls.version_number,
+    ls.created_at,
+    ls.signal_version_id,
+    ls.signal_id,
+    ls.correlated_local_ref,
+    ls.correlated_signal_id,
+    ls.content
+FROM
+    LatestSignals ls
+WHERE
+    ls.rn = 1
+ORDER BY
+    ls.local_ref,
+    ls.version_number,
+    ls.signal_version_id;
+
+-- name: GetLatestSignalVersionsByDateRange :many
+WITH LatestSignals AS (
+    SELECT
+        a.id AS account_id,
+        a.account_type,
+        COALESCE(u.email, si.client_contact_email) AS email, -- show either the user or service account email
+        s.local_ref,
+        sv.version_number,
+        sv.created_at,
+        sv.id AS signal_version_id,
+        sv.signal_id,
+        s2.local_ref AS correlated_local_ref,
+        s2.id AS correlated_signal_id,
+        sv.content,
+        ROW_NUMBER() OVER (PARTITION BY sv.signal_id ORDER BY sv.version_number DESC) AS rn
+    FROM
+        signal_versions sv
+    JOIN
+        signals s ON s.id = sv.signal_id
+    JOIN
+        signals s2 ON s2.id = s.correlation_id
+    JOIN 
+        accounts a ON a.id = s.account_id
+    JOIN 
+        signal_types st on st.id = s.signal_type_id
+    JOIN 
+        isn i ON i.id = st.isn_id 
+    LEFT OUTER JOIN 
+        users u ON u.account_id = a.id
+    LEFT OUTER JOIN 
+        service_identities si ON si.account_id = a.id
+    WHERE i.slug = sqlc.arg(isn_slug)
+        AND st.slug = sqlc.arg(signal_type_slug)
+        AND st.sem_ver = sqlc.arg(sem_ver)
+        AND sv.created_at BETWEEN sqlc.arg(start_date) AND sqlc.arg(end_date)
+)
+SELECT
+    ls.account_id,
+    ls.account_type,
+    ls.email,
+    ls.local_ref,
+    ls.version_number,
+    ls.created_at,
+    ls.signal_version_id,
+    ls.signal_id,
+    ls.correlated_local_ref,
+    ls.correlated_signal_id,
+    ls.content
+FROM
+    LatestSignals ls
+WHERE
+    ls.rn = 1
+ORDER BY
+    ls.local_ref,
+    ls.version_number,
+    ls.signal_version_id;
+
+-- name: GetLatestSignalVersionsByDateRangeAndAccountID :many
+WITH LatestSignals AS (
+    SELECT
+        a.id AS account_id,
+        a.account_type,
+        COALESCE(u.email, si.client_contact_email) AS email, -- show either the user or service account email
+        s.local_ref,
+        sv.version_number,
+        sv.created_at,
+        sv.id AS signal_version_id,
+        sv.signal_id,
+        s2.local_ref AS correlated_local_ref,
+        s2.id AS correlated_signal_id,
+        sv.content,
+        ROW_NUMBER() OVER (PARTITION BY sv.signal_id ORDER BY sv.version_number DESC) AS rn
+    FROM
+        signal_versions sv
+    JOIN
+        signals s ON s.id = sv.signal_id
+    JOIN
+        signals s2 ON s2.id = s.correlation_id
+    JOIN 
+        accounts a ON a.id = s.account_id
+    JOIN 
+        signal_types st on st.id = s.signal_type_id
+    JOIN 
+        isn i ON i.id = st.isn_id 
+    LEFT OUTER JOIN 
+        users u ON u.account_id = a.id
+    LEFT OUTER JOIN 
+        service_identities si ON si.account_id = a.id
+    WHERE i.slug = sqlc.arg(isn_slug)
+        AND st.slug = sqlc.arg(signal_type_slug)
+        AND st.sem_ver = sqlc.arg(sem_ver)
+        AND sv.created_at BETWEEN sqlc.arg(start_date) AND sqlc.arg(end_date)
+        AND a.id = sqlc.arg(account_id)
+)
+SELECT
+    ls.account_id,
+    ls.account_type,
+    ls.email,
+    ls.local_ref,
+    ls.version_number,
+    ls.created_at,
+    ls.signal_version_id,
+    ls.signal_id,
+    ls.correlated_local_ref,
+    ls.correlated_signal_id,
+    ls.content
+FROM
+    LatestSignals ls
+WHERE
+    ls.rn = 1
+ORDER BY
+    ls.local_ref,
+    ls.version_number,
+    ls.signal_version_id;
+
+
+-- name: GetLatestSignalVersionsWithOptionalFilters :many
+WITH LatestSignals AS (
+    SELECT
+        a.id AS account_id,
+        a.account_type,
+        COALESCE(u.email, si.client_contact_email) AS email, -- show either the user or service account email
+        s.local_ref,
+        sv.version_number,
+        sv.created_at,
+        sv.id AS signal_version_id,
+        sv.signal_id,
+        s2.local_ref AS correlated_local_ref,
+        s2.id AS correlated_signal_id,
+        sv.content,
+        ROW_NUMBER() OVER (PARTITION BY sv.signal_id ORDER BY sv.version_number DESC) AS rn
+    FROM
+        signal_versions sv
+    JOIN
+        signals s ON s.id = sv.signal_id
+    JOIN
+        signals s2 ON s2.id = s.correlation_id
+    JOIN 
+        accounts a ON a.id = s.account_id
+    JOIN 
+        signal_types st on st.id = s.signal_type_id
+    JOIN 
+        isn i ON i.id = st.isn_id 
+    LEFT OUTER JOIN 
+        users u ON u.account_id = a.id
+    LEFT OUTER JOIN 
+        service_identities si ON si.account_id = a.id
+    WHERE i.slug = sqlc.arg(isn_slug)
+        AND st.slug = sqlc.arg(signal_type_slug)
+        AND st.sem_ver = sqlc.arg(sem_ver)
+        AND (sqlc.narg('account_id')::uuid IS NULL OR a.id = sqlc.narg('account_id')::uuid)
+        AND (sqlc.narg('start_date')::timestamptz IS NULL OR sv.created_at >= sqlc.narg('start_date')::timestamptz)
+        AND (sqlc.narg('end_date')::timestamptz IS NULL OR sv.created_at <= sqlc.narg('end_date')::timestamptz)
+)
+SELECT
+    ls.account_id,
+    ls.account_type,
+    ls.email,
+    ls.local_ref,
+    ls.version_number,
+    ls.created_at,
+    ls.signal_version_id,
+    ls.signal_id,
+    ls.correlated_local_ref,
+    ls.correlated_signal_id,
+    ls.content
+FROM
+    LatestSignals ls
+WHERE
+    ls.rn = 1
+ORDER BY
+    ls.local_ref,
+    ls.version_number,
+    ls.signal_version_id;

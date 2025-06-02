@@ -7,6 +7,8 @@ package database
 
 import (
 	"context"
+	"encoding/json"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -163,12 +165,12 @@ RETURNING id, version_number
 `
 
 type CreateSignalVersionParams struct {
-	AccountID      uuid.UUID `json:"account_id"`
-	SignalBatchID  uuid.UUID `json:"signal_batch_id"`
-	Content        []byte    `json:"content"`
-	LocalRef       string    `json:"local_ref"`
-	SignalTypeSlug string    `json:"signal_type_slug"`
-	SemVer         string    `json:"sem_ver"`
+	AccountID      uuid.UUID       `json:"account_id"`
+	SignalBatchID  uuid.UUID       `json:"signal_batch_id"`
+	Content        json.RawMessage `json:"content"`
+	LocalRef       string          `json:"local_ref"`
+	SignalTypeSlug string          `json:"signal_type_slug"`
+	SemVer         string          `json:"sem_ver"`
 }
 
 type CreateSignalVersionRow struct {
@@ -189,4 +191,486 @@ func (q *Queries) CreateSignalVersion(ctx context.Context, arg CreateSignalVersi
 	var i CreateSignalVersionRow
 	err := row.Scan(&i.ID, &i.VersionNumber)
 	return i, err
+}
+
+const getLatestSignalVersionsByAccountID = `-- name: GetLatestSignalVersionsByAccountID :many
+
+WITH LatestSignals AS (
+    SELECT
+        a.id AS account_id,
+        a.account_type,
+        COALESCE(u.email, si.client_contact_email) AS email, -- show either the user or service account email
+        s.local_ref,
+        sv.version_number,
+        sv.created_at,
+        sv.id AS signal_version_id,
+        sv.signal_id,
+        s2.local_ref AS correlated_local_ref,
+        s2.id AS correlated_signal_id,
+        sv.content,
+        ROW_NUMBER() OVER (PARTITION BY sv.signal_id ORDER BY sv.version_number DESC) AS rn
+    FROM
+        signal_versions sv
+    JOIN
+        signals s ON s.id = sv.signal_id
+    JOIN
+        signals s2 ON s2.id = s.correlation_id
+    JOIN 
+        accounts a ON a.id = s.account_id
+    JOIN 
+        signal_types st on st.id = s.signal_type_id
+    JOIN 
+        isn i ON i.id = st.isn_id 
+    LEFT OUTER JOIN 
+        users u ON u.account_id = a.id
+    LEFT OUTER JOIN 
+        service_identities si ON si.account_id = a.id
+    WHERE i.slug = $1
+        AND st.slug = $2
+        AND st.sem_ver = $3
+        AND s.account_id = $4
+)
+SELECT
+    ls.account_id,
+    ls.account_type,
+    ls.email,
+    ls.local_ref,
+    ls.version_number,
+    ls.created_at,
+    ls.signal_version_id,
+    ls.signal_id,
+    ls.correlated_local_ref,
+    ls.correlated_signal_id,
+    ls.content
+FROM
+    LatestSignals ls
+WHERE
+    ls.rn = 1
+ORDER BY
+    ls.local_ref,
+    ls.version_number,
+    ls.signal_version_id
+`
+
+type GetLatestSignalVersionsByAccountIDParams struct {
+	IsnSlug        string    `json:"isn_slug"`
+	SignalTypeSlug string    `json:"signal_type_slug"`
+	SemVer         string    `json:"sem_ver"`
+	AccountID      uuid.UUID `json:"account_id"`
+}
+
+type GetLatestSignalVersionsByAccountIDRow struct {
+	AccountID          uuid.UUID       `json:"account_id"`
+	AccountType        string          `json:"account_type"`
+	Email              string          `json:"email"`
+	LocalRef           string          `json:"local_ref"`
+	VersionNumber      int32           `json:"version_number"`
+	CreatedAt          time.Time       `json:"created_at"`
+	SignalVersionID    uuid.UUID       `json:"signal_version_id"`
+	SignalID           uuid.UUID       `json:"signal_id"`
+	CorrelatedLocalRef string          `json:"correlated_local_ref"`
+	CorrelatedSignalID uuid.UUID       `json:"correlated_signal_id"`
+	Content            json.RawMessage `json:"content"`
+}
+
+// Note the get queries:
+// do not return withdrawn or archived signals
+// do not check validity status
+// require isn_slug,signal_type_slug & sem_ver params
+func (q *Queries) GetLatestSignalVersionsByAccountID(ctx context.Context, arg GetLatestSignalVersionsByAccountIDParams) ([]GetLatestSignalVersionsByAccountIDRow, error) {
+	rows, err := q.db.Query(ctx, getLatestSignalVersionsByAccountID,
+		arg.IsnSlug,
+		arg.SignalTypeSlug,
+		arg.SemVer,
+		arg.AccountID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetLatestSignalVersionsByAccountIDRow
+	for rows.Next() {
+		var i GetLatestSignalVersionsByAccountIDRow
+		if err := rows.Scan(
+			&i.AccountID,
+			&i.AccountType,
+			&i.Email,
+			&i.LocalRef,
+			&i.VersionNumber,
+			&i.CreatedAt,
+			&i.SignalVersionID,
+			&i.SignalID,
+			&i.CorrelatedLocalRef,
+			&i.CorrelatedSignalID,
+			&i.Content,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getLatestSignalVersionsByDateRange = `-- name: GetLatestSignalVersionsByDateRange :many
+WITH LatestSignals AS (
+    SELECT
+        a.id AS account_id,
+        a.account_type,
+        COALESCE(u.email, si.client_contact_email) AS email, -- show either the user or service account email
+        s.local_ref,
+        sv.version_number,
+        sv.created_at,
+        sv.id AS signal_version_id,
+        sv.signal_id,
+        s2.local_ref AS correlated_local_ref,
+        s2.id AS correlated_signal_id,
+        sv.content,
+        ROW_NUMBER() OVER (PARTITION BY sv.signal_id ORDER BY sv.version_number DESC) AS rn
+    FROM
+        signal_versions sv
+    JOIN
+        signals s ON s.id = sv.signal_id
+    JOIN
+        signals s2 ON s2.id = s.correlation_id
+    JOIN 
+        accounts a ON a.id = s.account_id
+    JOIN 
+        signal_types st on st.id = s.signal_type_id
+    JOIN 
+        isn i ON i.id = st.isn_id 
+    LEFT OUTER JOIN 
+        users u ON u.account_id = a.id
+    LEFT OUTER JOIN 
+        service_identities si ON si.account_id = a.id
+    WHERE i.slug = $1
+        AND st.slug = $2
+        AND st.sem_ver = $3
+        AND sv.created_at BETWEEN $4 AND $5
+)
+SELECT
+    ls.account_id,
+    ls.account_type,
+    ls.email,
+    ls.local_ref,
+    ls.version_number,
+    ls.created_at,
+    ls.signal_version_id,
+    ls.signal_id,
+    ls.correlated_local_ref,
+    ls.correlated_signal_id,
+    ls.content
+FROM
+    LatestSignals ls
+WHERE
+    ls.rn = 1
+ORDER BY
+    ls.local_ref,
+    ls.version_number,
+    ls.signal_version_id
+`
+
+type GetLatestSignalVersionsByDateRangeParams struct {
+	IsnSlug        string    `json:"isn_slug"`
+	SignalTypeSlug string    `json:"signal_type_slug"`
+	SemVer         string    `json:"sem_ver"`
+	StartDate      time.Time `json:"start_date"`
+	EndDate        time.Time `json:"end_date"`
+}
+
+type GetLatestSignalVersionsByDateRangeRow struct {
+	AccountID          uuid.UUID       `json:"account_id"`
+	AccountType        string          `json:"account_type"`
+	Email              string          `json:"email"`
+	LocalRef           string          `json:"local_ref"`
+	VersionNumber      int32           `json:"version_number"`
+	CreatedAt          time.Time       `json:"created_at"`
+	SignalVersionID    uuid.UUID       `json:"signal_version_id"`
+	SignalID           uuid.UUID       `json:"signal_id"`
+	CorrelatedLocalRef string          `json:"correlated_local_ref"`
+	CorrelatedSignalID uuid.UUID       `json:"correlated_signal_id"`
+	Content            json.RawMessage `json:"content"`
+}
+
+func (q *Queries) GetLatestSignalVersionsByDateRange(ctx context.Context, arg GetLatestSignalVersionsByDateRangeParams) ([]GetLatestSignalVersionsByDateRangeRow, error) {
+	rows, err := q.db.Query(ctx, getLatestSignalVersionsByDateRange,
+		arg.IsnSlug,
+		arg.SignalTypeSlug,
+		arg.SemVer,
+		arg.StartDate,
+		arg.EndDate,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetLatestSignalVersionsByDateRangeRow
+	for rows.Next() {
+		var i GetLatestSignalVersionsByDateRangeRow
+		if err := rows.Scan(
+			&i.AccountID,
+			&i.AccountType,
+			&i.Email,
+			&i.LocalRef,
+			&i.VersionNumber,
+			&i.CreatedAt,
+			&i.SignalVersionID,
+			&i.SignalID,
+			&i.CorrelatedLocalRef,
+			&i.CorrelatedSignalID,
+			&i.Content,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getLatestSignalVersionsByDateRangeAndAccountID = `-- name: GetLatestSignalVersionsByDateRangeAndAccountID :many
+WITH LatestSignals AS (
+    SELECT
+        a.id AS account_id,
+        a.account_type,
+        COALESCE(u.email, si.client_contact_email) AS email, -- show either the user or service account email
+        s.local_ref,
+        sv.version_number,
+        sv.created_at,
+        sv.id AS signal_version_id,
+        sv.signal_id,
+        s2.local_ref AS correlated_local_ref,
+        s2.id AS correlated_signal_id,
+        sv.content,
+        ROW_NUMBER() OVER (PARTITION BY sv.signal_id ORDER BY sv.version_number DESC) AS rn
+    FROM
+        signal_versions sv
+    JOIN
+        signals s ON s.id = sv.signal_id
+    JOIN
+        signals s2 ON s2.id = s.correlation_id
+    JOIN 
+        accounts a ON a.id = s.account_id
+    JOIN 
+        signal_types st on st.id = s.signal_type_id
+    JOIN 
+        isn i ON i.id = st.isn_id 
+    LEFT OUTER JOIN 
+        users u ON u.account_id = a.id
+    LEFT OUTER JOIN 
+        service_identities si ON si.account_id = a.id
+    WHERE i.slug = $1
+        AND st.slug = $2
+        AND st.sem_ver = $3
+        AND sv.created_at BETWEEN $4 AND $5
+        AND a.id = $6
+)
+SELECT
+    ls.account_id,
+    ls.account_type,
+    ls.email,
+    ls.local_ref,
+    ls.version_number,
+    ls.created_at,
+    ls.signal_version_id,
+    ls.signal_id,
+    ls.correlated_local_ref,
+    ls.correlated_signal_id,
+    ls.content
+FROM
+    LatestSignals ls
+WHERE
+    ls.rn = 1
+ORDER BY
+    ls.local_ref,
+    ls.version_number,
+    ls.signal_version_id
+`
+
+type GetLatestSignalVersionsByDateRangeAndAccountIDParams struct {
+	IsnSlug        string    `json:"isn_slug"`
+	SignalTypeSlug string    `json:"signal_type_slug"`
+	SemVer         string    `json:"sem_ver"`
+	StartDate      time.Time `json:"start_date"`
+	EndDate        time.Time `json:"end_date"`
+	AccountID      uuid.UUID `json:"account_id"`
+}
+
+type GetLatestSignalVersionsByDateRangeAndAccountIDRow struct {
+	AccountID          uuid.UUID       `json:"account_id"`
+	AccountType        string          `json:"account_type"`
+	Email              string          `json:"email"`
+	LocalRef           string          `json:"local_ref"`
+	VersionNumber      int32           `json:"version_number"`
+	CreatedAt          time.Time       `json:"created_at"`
+	SignalVersionID    uuid.UUID       `json:"signal_version_id"`
+	SignalID           uuid.UUID       `json:"signal_id"`
+	CorrelatedLocalRef string          `json:"correlated_local_ref"`
+	CorrelatedSignalID uuid.UUID       `json:"correlated_signal_id"`
+	Content            json.RawMessage `json:"content"`
+}
+
+func (q *Queries) GetLatestSignalVersionsByDateRangeAndAccountID(ctx context.Context, arg GetLatestSignalVersionsByDateRangeAndAccountIDParams) ([]GetLatestSignalVersionsByDateRangeAndAccountIDRow, error) {
+	rows, err := q.db.Query(ctx, getLatestSignalVersionsByDateRangeAndAccountID,
+		arg.IsnSlug,
+		arg.SignalTypeSlug,
+		arg.SemVer,
+		arg.StartDate,
+		arg.EndDate,
+		arg.AccountID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetLatestSignalVersionsByDateRangeAndAccountIDRow
+	for rows.Next() {
+		var i GetLatestSignalVersionsByDateRangeAndAccountIDRow
+		if err := rows.Scan(
+			&i.AccountID,
+			&i.AccountType,
+			&i.Email,
+			&i.LocalRef,
+			&i.VersionNumber,
+			&i.CreatedAt,
+			&i.SignalVersionID,
+			&i.SignalID,
+			&i.CorrelatedLocalRef,
+			&i.CorrelatedSignalID,
+			&i.Content,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getLatestSignalVersionsWithOptionalFilters = `-- name: GetLatestSignalVersionsWithOptionalFilters :many
+WITH LatestSignals AS (
+    SELECT
+        a.id AS account_id,
+        a.account_type,
+        COALESCE(u.email, si.client_contact_email) AS email, -- show either the user or service account email
+        s.local_ref,
+        sv.version_number,
+        sv.created_at,
+        sv.id AS signal_version_id,
+        sv.signal_id,
+        s2.local_ref AS correlated_local_ref,
+        s2.id AS correlated_signal_id,
+        sv.content,
+        ROW_NUMBER() OVER (PARTITION BY sv.signal_id ORDER BY sv.version_number DESC) AS rn
+    FROM
+        signal_versions sv
+    JOIN
+        signals s ON s.id = sv.signal_id
+    JOIN
+        signals s2 ON s2.id = s.correlation_id
+    JOIN 
+        accounts a ON a.id = s.account_id
+    JOIN 
+        signal_types st on st.id = s.signal_type_id
+    JOIN 
+        isn i ON i.id = st.isn_id 
+    LEFT OUTER JOIN 
+        users u ON u.account_id = a.id
+    LEFT OUTER JOIN 
+        service_identities si ON si.account_id = a.id
+    WHERE i.slug = $1
+        AND st.slug = $2
+        AND st.sem_ver = $3
+        AND ($4::uuid IS NULL OR a.id = $4::uuid)
+        AND ($5::timestamptz IS NULL OR sv.created_at >= $5::timestamptz)
+        AND ($6::timestamptz IS NULL OR sv.created_at <= $6::timestamptz)
+)
+SELECT
+    ls.account_id,
+    ls.account_type,
+    ls.email,
+    ls.local_ref,
+    ls.version_number,
+    ls.created_at,
+    ls.signal_version_id,
+    ls.signal_id,
+    ls.correlated_local_ref,
+    ls.correlated_signal_id,
+    ls.content
+FROM
+    LatestSignals ls
+WHERE
+    ls.rn = 1
+ORDER BY
+    ls.local_ref,
+    ls.version_number,
+    ls.signal_version_id
+`
+
+type GetLatestSignalVersionsWithOptionalFiltersParams struct {
+	IsnSlug        string     `json:"isn_slug"`
+	SignalTypeSlug string     `json:"signal_type_slug"`
+	SemVer         string     `json:"sem_ver"`
+	AccountID      *uuid.UUID `json:"account_id"`
+	StartDate      *time.Time `json:"start_date"`
+	EndDate        *time.Time `json:"end_date"`
+}
+
+type GetLatestSignalVersionsWithOptionalFiltersRow struct {
+	AccountID          uuid.UUID       `json:"account_id"`
+	AccountType        string          `json:"account_type"`
+	Email              string          `json:"email"`
+	LocalRef           string          `json:"local_ref"`
+	VersionNumber      int32           `json:"version_number"`
+	CreatedAt          time.Time       `json:"created_at"`
+	SignalVersionID    uuid.UUID       `json:"signal_version_id"`
+	SignalID           uuid.UUID       `json:"signal_id"`
+	CorrelatedLocalRef string          `json:"correlated_local_ref"`
+	CorrelatedSignalID uuid.UUID       `json:"correlated_signal_id"`
+	Content            json.RawMessage `json:"content"`
+}
+
+func (q *Queries) GetLatestSignalVersionsWithOptionalFilters(ctx context.Context, arg GetLatestSignalVersionsWithOptionalFiltersParams) ([]GetLatestSignalVersionsWithOptionalFiltersRow, error) {
+	rows, err := q.db.Query(ctx, getLatestSignalVersionsWithOptionalFilters,
+		arg.IsnSlug,
+		arg.SignalTypeSlug,
+		arg.SemVer,
+		arg.AccountID,
+		arg.StartDate,
+		arg.EndDate,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetLatestSignalVersionsWithOptionalFiltersRow
+	for rows.Next() {
+		var i GetLatestSignalVersionsWithOptionalFiltersRow
+		if err := rows.Scan(
+			&i.AccountID,
+			&i.AccountType,
+			&i.Email,
+			&i.LocalRef,
+			&i.VersionNumber,
+			&i.CreatedAt,
+			&i.SignalVersionID,
+			&i.SignalID,
+			&i.CorrelatedLocalRef,
+			&i.CorrelatedSignalID,
+			&i.Content,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

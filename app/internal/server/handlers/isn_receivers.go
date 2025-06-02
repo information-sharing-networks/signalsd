@@ -53,7 +53,7 @@ type UpdateIsnReceiverRequest struct {
 //	@Description
 //	@Description	You can specify how many receivers should be started for the ISN and they will listen on an automatically generted port, starting at 8081
 //	@Description
-//	@Description	The public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/signals/receiver
+//	@Description	The public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/receiver
 //	@Description	the isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services
 //	@Description
 //	@Description	note receivers are always created in 'offline' mode.
@@ -72,7 +72,7 @@ type UpdateIsnReceiverRequest struct {
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/api/isn/{isn_slug}/signals/receiver [post]
+//	@Router			/api/isn/{isn_slug}/receiver [post]
 func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *http.Request) {
 	var req CreateIsnReceiverRequest
 
@@ -176,7 +176,7 @@ func (i *IsnReceiverHandler) CreateIsnReceiverHandler(w http.ResponseWriter, r *
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/api/isn/{isn_slug}/signals/receiver [put]
+//	@Router			/api/isn/{isn_slug}/receiver [put]
 func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *http.Request) {
 	var req UpdateIsnReceiverRequest
 
@@ -283,7 +283,7 @@ func (i *IsnReceiverHandler) UpdateIsnReceiverHandler(w http.ResponseWriter, r *
 //	@Success	200		{array}		database.GetIsnReceiverByIsnSlugRow
 //	@Failure	500		{object}	responses.ErrorResponse
 //
-//	@Router		/api/isn/{isn_slug}/signals/receiver [get]
+//	@Router		/api/isn/{isn_slug}/receiver [get]
 func (u *IsnReceiverHandler) GetIsnReceiverHandler(w http.ResponseWriter, r *http.Request) {
 
 	isnSlug := r.PathValue("isn_slug")
