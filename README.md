@@ -1,6 +1,7 @@
-[ISN intro](#information-sharing-networks) |
+[Intro](#information-sharing-networks) |
 [Try it out](#try-it-out) |
 [Developers](#developers) |
+[Technical Overview](#service-overview) 
 
 
 # Information Sharing Networks
@@ -187,11 +188,17 @@ run `sqlc generate` from the root of the project to regenerate the type safe go 
 
 
 
-## architecture overview
-### ISN config
-![ISN config](https://github.com/user-attachments/assets/a91e20c6-65bc-4af1-a6a3-5077084f9f7c)
-
+# Service overview
+technical overview
 ## Auth
-![Auth](https://github.com/user-attachments/assets/c9e1c600-04ed-462e-a3a6-17734f291cbf)
+
+![auth](https://github.com/user-attachments/assets/018cedf6-ba96-41ee-b3da-6d7cca08fb27)
+
+## ISN config
+![ISN Config](https://github.com/user-attachments/assets/b2491f77-f461-405e-8c21-2226695092b9)
+
+## Signals
+![signals](https://github.com/user-attachments/assets/b8d11640-c863-443e-989e-98620ad07c74)
+
 
 
