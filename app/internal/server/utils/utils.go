@@ -143,8 +143,6 @@ func ParseDateTime(dateString string) (time.Time, error) {
 	for _, layout := range isoLayouts {
 		if t, err := time.Parse(layout, dateString); err == nil {
 			return t, nil
-		} else {
-			fmt.Printf("layout :%v dateString: %v error: %v", layout, dateString, err)
 		}
 	}
 
@@ -153,5 +151,5 @@ func ParseDateTime(dateString string) (time.Time, error) {
 		return t.UTC(), nil
 	}
 
-	return time.Time{}, fmt.Errorf("unsupported date format: %s. Expected ISO 8601 with timezone (e.g., 2006-01-02T15:04:05Z07:00) or YYYY.MM.DD (e.g., 2006-01-02)", dateString)
+	return time.Time{}, fmt.Errorf("unsupported date format: %s. Expected ISO 8601 with timezone (e.g., 2006-01-02T15:04:05+07:00) or YYYY-MM-DD (e.g., 2006-01-02)", dateString)
 }
