@@ -1397,9 +1397,9 @@ const docTemplate = `{
         },
         "/webhooks": {
             "post": {
-                "description": "TODO - register a webhook to recieve signals batch status updates",
+                "description": "register a webhook to recieve signals batch status updates",
                 "tags": [
-                    "Signal sharing"
+                    "Service Accounts"
                 ],
                 "summary": "Register webhook (TODO)",
                 "responses": {}

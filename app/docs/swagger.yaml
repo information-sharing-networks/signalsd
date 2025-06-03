@@ -1706,11 +1706,11 @@ paths:
       - Signal sharing
   /webhooks:
     post:
-      description: TODO - register a webhook to recieve signals batch status updates
+      description: register a webhook to recieve signals batch status updates
       responses: {}
       summary: Register webhook (TODO)
       tags:
-      - Signal sharing
+      - Service Accounts
 produces:
 - application/json
 securityDefinitions:

@@ -2,6 +2,7 @@ package logger
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5/middleware"
@@ -12,6 +13,13 @@ import (
 func LoggingMiddleware(logger *zerolog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+			// Skip logging for health requests
+			if strings.HasPrefix(r.URL.Path, "/health/") {
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			start := time.Now()
 			requestID := middleware.GetReqID(r.Context())
 
