@@ -47,7 +47,7 @@ type UpdateIsnRetrieverRequest struct {
 //	@Description
 //	@Description	You can specify how many retrievers should be started for the ISN and they will listen on an automatically generted port
 //	@Description
-//	@Description	The public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/signals/retriever
+//	@Description	The public facing url will be hosted on https://{isn_host}/isn/{isn_slug}/retriever
 //	@Description	the isn_host will typically be a load balancer or API gateway that proxies requests to the internal signald services
 //	@Description
 //	@Description	note retrievers are created in 'offline' mode.
@@ -66,7 +66,7 @@ type UpdateIsnRetrieverRequest struct {
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/api/isn/{isn_slug}/signals/retriever [post]
+//	@Router			/api/isn/{isn_slug}/retriever [post]
 func (i *IsnRetrieverHandler) CreateIsnRetrieverHandler(w http.ResponseWriter, r *http.Request) {
 	var req CreateIsnRetrieverRequest
 
@@ -159,7 +159,7 @@ func (i *IsnRetrieverHandler) CreateIsnRetrieverHandler(w http.ResponseWriter, r
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/api/isn/{isn_slug}/signals/retriever [put]
+//	@Router			/api/isn/{isn_slug}/retriever [put]
 func (i *IsnRetrieverHandler) UpdateIsnRetrieverHandler(w http.ResponseWriter, r *http.Request) {
 	var req UpdateIsnRetrieverRequest
 
@@ -250,7 +250,7 @@ func (i *IsnRetrieverHandler) UpdateIsnRetrieverHandler(w http.ResponseWriter, r
 //	@Success	200		{array}		database.GetIsnRetrieverByIsnSlugRow
 //	@Failure	500		{object}	responses.ErrorResponse
 //
-//	@Router		/api/isn/{isn_slug}/signals/retriever [get]
+//	@Router		/api/isn/{isn_slug}/retriever [get]
 func (u *IsnRetrieverHandler) GetIsnRetrieverHandler(w http.ResponseWriter, r *http.Request) {
 
 	isnSlug := r.PathValue("isn_slug")

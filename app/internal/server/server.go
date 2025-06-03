@@ -145,16 +145,16 @@ func (s *Server) registerRoutes() {
 		r.Group(func(r chi.Router) {
 			r.Use(s.authService.RequireValidAccessToken)
 			r.Use(s.authService.RequireRole("owner"))
+
 			r.Put("/admins/account/{account_id}", users.GrantUserAdminRoleHandler)
 			r.Delete("/admins/account/{account_id}", users.RevokeUserAdminRoleHandler)
 		})
 
 		r.Post("/register", users.RegisterUserHandler)
 		r.Post("/login", login.LoginHandler)
-		r.Get("/users", users.GetUsersHandler)
 	})
 
-	// api routes are used to adminster the ISNs and users
+	// api routes aused to adminster the ISNs
 	s.router.Route("/api", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
 
@@ -173,12 +173,12 @@ func (s *Server) registerRoutes() {
 				r.Put("/isn/{isn_slug}", isn.UpdateIsnHandler)
 
 				// ISN receiver management
-				r.Post("/isn/{isn_slug}/signals/receiver", isnReceivers.CreateIsnReceiverHandler)
-				r.Put("/isn/{isn_slug}/signals/receiver", isnReceivers.UpdateIsnReceiverHandler)
+				r.Post("/isn/{isn_slug}/receiver", isnReceivers.CreateIsnReceiverHandler)
+				r.Put("/isn/{isn_slug}/receiver", isnReceivers.UpdateIsnReceiverHandler)
 
 				// ISN retriever management
-				r.Post("/isn/{isn_slug}/signals/retriever", isnRetrievers.CreateIsnRetrieverHandler)
-				r.Put("/isn/{isn_slug}/signals/retriever", isnRetrievers.UpdateIsnRetrieverHandler)
+				r.Post("/isn/{isn_slug}/retriever", isnRetrievers.CreateIsnRetrieverHandler)
+				r.Put("/isn/{isn_slug}/retriever", isnRetrievers.UpdateIsnRetrieverHandler)
 
 				// signal types managment
 				r.Post("/isn/{isn_slug}/signal_types", signalTypes.CreateSignalTypeHandler)
@@ -189,29 +189,37 @@ func (s *Server) registerRoutes() {
 				r.Delete("/isn/{isn_slug}/accounts/{account_id}", isnAccount.RevokeIsnAccountHandler)
 			})
 
-			// signals runtime
+			// signals exchange
 			r.Group(func(r chi.Router) {
 
 				// routes below can only be used by accounts with write permissions to the specified ISN
-				r.Use(s.authService.RequireIsnWritePermission())
+				r.Use(s.authService.RequireIsnPermission("write"))
 
 				// signal batches
-				r.Post("/isn/{isn_slug}/signals/batches", signalBatches.CreateSignalsBatchHandler)
+				r.Post("/isn/{isn_slug}/batches", signalBatches.CreateSignalsBatchHandler)
 
 				// signal post
-				//r.Post("/isn/{isn_slug}/signal_types/{signal_type_slug}/signals", signals.CreateSignalsHandler)
 				r.Post("/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals", signals.CreateSignalsHandler)
 
 				// webhooks
 				r.Post("/webhooks", webhooks.HandlerWebhooks)
+			})
+
+			// search signals
+			r.Group(func(r chi.Router) {
+
+				// routes below can only be used by accounts with read or write permissions to the specified ISN
+				r.Use(s.authService.RequireIsnPermission("read", "write"))
+
+				r.Get("/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search", signals.SearchSignalsHandler)
 			})
 		})
 
 		// unrestricted
 		r.Get("/isn", isn.GetIsnsHandler)
 		r.Get("/isn/{isn_slug}", isn.GetIsnHandler)
-		r.Get("/isn/{isn_slug}/signals/receiver", isnReceivers.GetIsnReceiverHandler)
-		r.Get("/isn/{isn_slug}/signals/retriever", isnRetrievers.GetIsnRetrieverHandler)
+		r.Get("/isn/{isn_slug}/receiver", isnReceivers.GetIsnReceiverHandler)
+		r.Get("/isn/{isn_slug}/retriever", isnRetrievers.GetIsnRetrieverHandler)
 		r.Get("/isn/{isn_slug}/signal_types", signalTypes.GetSignalTypesHandler)
 		r.Get("/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}", signalTypes.GetSignalTypeHandler)
 	})
@@ -230,9 +238,11 @@ func (s *Server) registerRoutes() {
 		r.Group(func(r chi.Router) {
 
 			// route below can only be used by the owner as it exposes the email addresses of all users on the site
+			r.Use(s.authService.RequireValidAccessToken)
 			r.Use(s.authService.RequireRole("owner"))
 
 			r.Get("/users/{id}", users.GetUserHandler)
+			r.Get("/users", users.GetUsersHandler)
 		})
 	})
 

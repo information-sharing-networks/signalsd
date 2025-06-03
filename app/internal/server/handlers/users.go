@@ -381,13 +381,16 @@ func (u *UserHandler) RevokeUserAdminRoleHandler(w http.ResponseWriter, r *http.
 
 // GetUserbyIDHandler godoc
 //
-//	@Summary		Get registered user
-//	@Description	This API is protected (includes email addresses in the response) - currently only available on dev envs, pending implementation of admin roles.
-//	@Tags			auth
+//	@Summary	Get registered user
+//	@Description
+//	@Description	This api displays a site user and their email addreses (can only be used by owner account)
+//	@Tags			Site admin
 //
 //	@Param			id	path		string	true	"user id"	example(68fb5f5b-e3f5-4a96-8d35-cd2203a06f73)
 //	@Success		200	{array}		database.GetUserByIDRow
 //	@Failure		500	{object}	responses.ErrorResponse
+//
+//	@Security		BearerAccessToken
 //
 //	@Router			/admin/users/{id} [get]
 func (u *UserHandler) GetUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -414,14 +417,16 @@ func (u *UserHandler) GetUserHandler(w http.ResponseWriter, r *http.Request) {
 
 // GetUsersHandler godoc
 //
-//	@Summary		Get the registered users
-//	@Description	This api displays email addresses and is currently only available on dev env pending implementation of role based access
-//	@Tags			auth
+//	@Summary		Get registered users
+//	@Description	This api displays all the site users and their email addreses (can only be used by owner account)
+//	@Tags			Site admin
 //
 //	@Success		200	{array}		database.GetUsersRow
 //	@Failure		500	{object}	responses.ErrorResponse
 //
-//	@Router			/api/users [get]
+//	@Security		BearerAccessToken
+//
+//	@Router			/admin/users [get]
 func (u *UserHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 
 	res, err := u.queries.GetUsers(r.Context())

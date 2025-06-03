@@ -18,7 +18,7 @@ func NewWebhookHandler(queries *database.Queries) *WebhookHandler {
 
 // HandlerWebhooks godocs
 //
-//	@Summary		Register webhook
+//	@Summary		Register webhook (TODO)
 //	@Tags			Signal sharing
 //
 //	@Description	TODO - register a webhook to recieve signals batch status updates

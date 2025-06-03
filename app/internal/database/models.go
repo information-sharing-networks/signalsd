@@ -5,6 +5,7 @@
 package database
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -116,14 +117,14 @@ type SignalType struct {
 }
 
 type SignalVersion struct {
-	ID               uuid.UUID `json:"id"`
-	CreatedAt        time.Time `json:"created_at"`
-	AccountID        uuid.UUID `json:"account_id"`
-	SignalBatchID    uuid.UUID `json:"signal_batch_id"`
-	SignalID         uuid.UUID `json:"signal_id"`
-	VersionNumber    int32     `json:"version_number"`
-	ValidationStatus string    `json:"validation_status"`
-	Content          []byte    `json:"content"`
+	ID               uuid.UUID       `json:"id"`
+	CreatedAt        time.Time       `json:"created_at"`
+	AccountID        uuid.UUID       `json:"account_id"`
+	SignalBatchID    uuid.UUID       `json:"signal_batch_id"`
+	SignalID         uuid.UUID       `json:"signal_id"`
+	VersionNumber    int32           `json:"version_number"`
+	ValidationStatus string          `json:"validation_status"`
+	Content          json.RawMessage `json:"content"`
 }
 
 type User struct {

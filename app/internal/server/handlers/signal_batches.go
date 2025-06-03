@@ -50,16 +50,16 @@ type CreateSignalsBatchResponse struct {
 //	@Description	authentication is based on the supplied access token:
 //	@Description	(the site owner; the isn admin and members with an isn_perm= write can create a batch)
 //	@Description
-//	@Tags		Signal sharing
+//	@Tags		Service accounts
 //
 //	@Success	201	{object}	CreateSignalsBatchResponse
 //	@Failure	500	{object}	responses.ErrorResponse
 //
 //	@Security	BearerAccessToken
 //
-//	@Router		/api/isn/{isn_slug}/signals/batches [post]
+//	@Router		/api/isn/{isn_slug}/batches [post]
 //
-// CreateSignalsBatchHandler must be used with the RequireValidAccessToken amd RequireIsnWritePermission middleware functions
+// CreateSignalsBatchHandler must be used with the RequireValidAccessToken amd RequireIsnPermission middleware functions
 func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r *http.Request) {
 	logger := zerolog.Ctx(r.Context())
 
@@ -132,11 +132,11 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 // GetSignalsBatchHandler godocs
 //
 //	@Summary		Get a signal batch
-//	@Tags			Signal sharing
+//	@Tags			Service accounts
 //
 //	@Description	TODO - get by id. Include status (errs, received, latest localref in batch)
 //
-//	@Router			/api/isn/{isn_slug}/signals/accounts/{account_id}/batches/{signals_batch_id} [get]
+//	@Router			/api/isn/{isn_slug}/accounts/{account_id}/batches/{signals_batch_id} [get]
 func (u *SignalsBatchHandler) GetSignalsBatchHandler(w http.ResponseWriter, r *http.Request) {
 	responses.RespondWithJSON(w, http.StatusOK, "")
 
@@ -147,11 +147,11 @@ func (u *SignalsBatchHandler) GetSignalsBatchHandler(w http.ResponseWriter, r *h
 //
 //	@Summary		Get details about a set of signal batches
 //	@Description	TODO - get latest, previous, by data ranage
-//	@Tags			Signal sharing
+//	@Tags			Service accounts
 //
 //	@Description	TODO
 //
-//	@Router			/api/isn/{isn_slug}/signals/accounts/{account_id}/batches [get]
+//	@Router			/api/isn/{isn_slug}/accounts/{account_id}/batches [get]
 func (u *SignalsBatchHandler) GetSignalsBatchesHandler(w http.ResponseWriter, r *http.Request) {
 	responses.RespondWithJSON(w, http.StatusOK, "")
 

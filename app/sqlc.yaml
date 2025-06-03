@@ -9,6 +9,8 @@ sql:
         out: "internal/database"
         sql_package: "pgx/v5"
         overrides:
+          - db_type: "jsonb"
+            go_type: "encoding/json.RawMessage"
           - db_type: "uuid"
             go_type:
               import: "github.com/google/uuid"
@@ -17,6 +19,16 @@ sql:
             go_type:
               import: "github.com/google/uuid"
               type: "UUID"
+              pointer: true
+            nullable: true
+          - db_type: "timestamptz"
+            go_type:
+              import: "time"
+              type: "Time"
+          - db_type: "timestamptz"
+            go_type:
+              import: "time"
+              type: "Time"
               pointer: true
             nullable: true
           - db_type: "pg_catalog.timestamptz"
