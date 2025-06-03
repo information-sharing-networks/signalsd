@@ -7,12 +7,12 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	signalsd "github.com/information-sharing-networks/signalsd/app"
+	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
+	"github.com/information-sharing-networks/signalsd/app/internal/auth"
+	"github.com/information-sharing-networks/signalsd/app/internal/database"
+	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
 	"github.com/jackc/pgx/v5"
-	signalsd "github.com/nickabs/signalsd/app"
-	"github.com/nickabs/signalsd/app/internal/apperrors"
-	"github.com/nickabs/signalsd/app/internal/auth"
-	"github.com/nickabs/signalsd/app/internal/database"
-	"github.com/nickabs/signalsd/app/internal/server/responses"
 	"github.com/rs/zerolog"
 )
 

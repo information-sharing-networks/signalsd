@@ -1,4 +1,4 @@
-module github.com/nickabs/signalsd/app
+module github.com/information-sharing-networks/signalsd/app
 
 go 1.24.2
 

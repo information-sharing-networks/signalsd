@@ -5,15 +5,15 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/information-sharing-networks/signalsd/app/internal/auth"
+	"github.com/information-sharing-networks/signalsd/app/internal/database"
+	"github.com/information-sharing-networks/signalsd/app/internal/logger"
+	"github.com/information-sharing-networks/signalsd/app/internal/server"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/nickabs/signalsd/app/internal/auth"
-	"github.com/nickabs/signalsd/app/internal/database"
-	"github.com/nickabs/signalsd/app/internal/logger"
-	"github.com/nickabs/signalsd/app/internal/server"
 
-	signalsd "github.com/nickabs/signalsd/app"
+	signalsd "github.com/information-sharing-networks/signalsd/app"
 
-	_ "github.com/nickabs/signalsd/app/docs"
+	_ "github.com/information-sharing-networks/signalsd/app/docs"
 )
 
 //	@description	Signals ISN service API

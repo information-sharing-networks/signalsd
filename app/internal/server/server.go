@@ -11,12 +11,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	signalsd "github.com/information-sharing-networks/signalsd/app"
+	"github.com/information-sharing-networks/signalsd/app/internal/auth"
+	"github.com/information-sharing-networks/signalsd/app/internal/database"
+	"github.com/information-sharing-networks/signalsd/app/internal/logger"
+	"github.com/information-sharing-networks/signalsd/app/internal/server/handlers"
 	"github.com/jackc/pgx/v5/pgxpool"
-	signalsd "github.com/nickabs/signalsd/app"
-	"github.com/nickabs/signalsd/app/internal/auth"
-	"github.com/nickabs/signalsd/app/internal/database"
-	"github.com/nickabs/signalsd/app/internal/logger"
-	"github.com/nickabs/signalsd/app/internal/server/handlers"
 	"github.com/rs/zerolog"
 )
 

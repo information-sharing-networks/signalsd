@@ -14,9 +14,9 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	signalsd "github.com/information-sharing-networks/signalsd/app"
+	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/jackc/pgx/v5"
-	signalsd "github.com/nickabs/signalsd/app"
-	"github.com/nickabs/signalsd/app/internal/database"
 	"golang.org/x/crypto/bcrypt"
 )
 

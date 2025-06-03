@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/nickabs/signalsd/app/internal/apperrors"
+	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	"github.com/rs/zerolog"
 )
 
