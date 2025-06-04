@@ -123,7 +123,7 @@ type SignalVersionDoc struct {
 //	@Description	The following issues create a 400 error and cause the entire payload to be rejected
 //	@Description	- invalid json format
 //	@Description	- missing fields (the array of signals must be in a json object called signals, and content and local_ref must be present for each record).
-//	@Description	- incorrect correlation ids - where supplied, correlation ids must refer to another signal of the same type (error_code is set to "invalid_correlation_id" in this case)
+//	@Description	- incorrect correlation ids - where supplied, correlation ids must refer to another signal ID in the ISN (error_code is set to "invalid_correlation_id" in this is not the case)
 //	@Description
 //	@Description	internal errors cause the whole payload to be rejected.
 //
