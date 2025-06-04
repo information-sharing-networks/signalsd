@@ -318,6 +318,8 @@ func (s *SignalsHandler) GetSignalHandler(w http.ResponseWriter, r *http.Request
 //	@Failure		400			{object}	responses.ErrorResponse
 //	@Failure		500			{object}	responses.ErrorResponse
 //
+//	@Security		BearerAccessToken
+//
 //	@Router			/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search [get]
 func (s *SignalsHandler) SearchSignalsHandler(w http.ResponseWriter, r *http.Request) {
 
