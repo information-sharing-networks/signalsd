@@ -198,7 +198,7 @@ technical overview
 ![ISN Config](https://github.com/user-attachments/assets/b2491f77-f461-405e-8c21-2226695092b9)
 
 ## Signals
-![signals](https://github.com/user-attachments/assets/b8d11640-c863-443e-989e-98620ad07c74)
+![signals](https://github.com/user-attachments/assets/ff387ce1-e023-4c48-9b2b-a59d8625efc4)
 
 
 
