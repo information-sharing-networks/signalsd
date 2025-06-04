@@ -1,16 +1,19 @@
 -- name: CreateSignal :one
 -- this query creates one row in signals for every new combination of account_id, signal_type_id, local_ref
 WITH ids AS (
-    SELECT st.id AS signal_type_id, gen_random_uuid() AS signal_id
+    SELECT st.id AS signal_type_id, 
+        st.isn_id,
+        gen_random_uuid() AS signal_id
     FROM signal_types st 
     WHERE st.slug = sqlc.arg(signal_type_slug)
-    and st.sem_ver = sqlc.arg(sem_ver)
+        AND st.sem_ver = sqlc.arg(sem_ver)
 )
 INSERT INTO signals (
     id,
     created_at,
     updated_at,
     account_id,
+    isn_id,
     signal_type_id,
     local_ref,
     correlation_id,
@@ -21,6 +24,7 @@ SELECT
     now(),
     now(),
     sqlc.arg(account_id),
+    ids.isn_id,
     ids.signal_type_id,
     sqlc.arg(local_ref),
     ids.signal_id,
@@ -34,16 +38,19 @@ RETURNING id;
 -- name: CreateOrUpdateSignalWithCorrelationID :one
 -- note if there is already a master record, then correlation_id is updated with the supplied value
 WITH ids AS (
-    SELECT st.id AS signal_type_id
+    SELECT 
+        st.id AS signal_type_id,
+        st.isn_id
     FROM signal_types st 
     WHERE st.slug = sqlc.arg(signal_type_slug)
-    and st.sem_ver = sqlc.arg(sem_ver)
+        AND st.sem_ver = sqlc.arg(sem_ver)
 )
 INSERT INTO signals (
     id,
     created_at,
     updated_at,
     account_id,
+    isn_id,
     signal_type_id,
     local_ref,
     correlation_id,
@@ -54,6 +61,7 @@ SELECT
     now(),
     now(),
     sqlc.arg(account_id),
+    ids.isn_id,
     ids.signal_type_id,
     sqlc.arg(local_ref),
     sqlc.arg(correlation_id),

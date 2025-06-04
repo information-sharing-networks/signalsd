@@ -15,16 +15,19 @@ import (
 
 const createOrUpdateSignalWithCorrelationID = `-- name: CreateOrUpdateSignalWithCorrelationID :one
 WITH ids AS (
-    SELECT st.id AS signal_type_id
+    SELECT 
+        st.id AS signal_type_id,
+        st.isn_id
     FROM signal_types st 
     WHERE st.slug = $4
-    and st.sem_ver = $5
+        AND st.sem_ver = $5
 )
 INSERT INTO signals (
     id,
     created_at,
     updated_at,
     account_id,
+    isn_id,
     signal_type_id,
     local_ref,
     correlation_id,
@@ -35,6 +38,7 @@ SELECT
     now(),
     now(),
     $1,
+    ids.isn_id,
     ids.signal_type_id,
     $2,
     $3,
@@ -72,16 +76,19 @@ func (q *Queries) CreateOrUpdateSignalWithCorrelationID(ctx context.Context, arg
 
 const createSignal = `-- name: CreateSignal :one
 WITH ids AS (
-    SELECT st.id AS signal_type_id, gen_random_uuid() AS signal_id
+    SELECT st.id AS signal_type_id, 
+        st.isn_id,
+        gen_random_uuid() AS signal_id
     FROM signal_types st 
     WHERE st.slug = $3
-    and st.sem_ver = $4
+        AND st.sem_ver = $4
 )
 INSERT INTO signals (
     id,
     created_at,
     updated_at,
     account_id,
+    isn_id,
     signal_type_id,
     local_ref,
     correlation_id,
@@ -92,6 +99,7 @@ SELECT
     now(),
     now(),
     $1,
+    ids.isn_id,
     ids.signal_type_id,
     $2,
     ids.signal_id,

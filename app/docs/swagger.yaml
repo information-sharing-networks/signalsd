@@ -1493,7 +1493,7 @@ paths:
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
-      - BearerRefreshToken: []
+      - BearerAccessToken: []
       summary: Refresh access token
       tags:
       - auth
@@ -1603,8 +1603,8 @@ paths:
         and cause the entire payload to be rejected\n- invalid json format\n- missing
         fields (the array of signals must be in a json object called signals, and
         content and local_ref must be present for each record).\n- incorrect correlation
-        ids - where supplied, correlation ids must refer to another signal of the
-        same type (error_code is set to \"invalid_correlation_id\" in this case)\n\ninternal
+        ids - where supplied, correlation ids must refer to another signal ID in the
+        ISN (error_code is set to \"invalid_correlation_id\" in this is not the case)\n\ninternal
         errors cause the whole payload to be rejected."
       parameters:
       - description: isn slug
