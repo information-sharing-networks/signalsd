@@ -1325,6 +1325,11 @@ const docTemplate = `{
         },
         "/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search": {
             "get": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
                 "description": "Search for signals by date or account\n\nAccepted timestamps formats (ISO 8601):\n- 2006-01-02T15:04:05Z (UTC)\n- 2006-01-02T15:04:05+07:00 (with offset)\n- 2006-01-02T15:04:05.999999999Z (nano precision)\n\nNote: If the timestamp contains a timezone offset (as in +07:00), the + must be percent-encoded as %2B in the query strings.\n\nDates (YYYY-MM-DD) can also be used.\nThese are treated as the start of day UTC (so 2006-01-02 is treated as 2006-01-02T00:00:00Z)\n\nNote the endpoint returns the latest version of each signal and does not include withdrawn or archived signals",
                 "tags": [
                     "Signal sharing"

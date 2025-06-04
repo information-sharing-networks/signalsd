@@ -4,6 +4,7 @@
 [Technical Overview](#service-overview) 
 
 ![ci](https://github.com/information-sharing-networks/signalsd/actions/workflows/ci.yml/badge.svg)
+![cd](https://github.com/information-sharing-networks/signalsd/actions/workflows/cd.yml/badge.svg)
 
 # Information Sharing Networks
 ISNs are networks that enable interested parties to share information. The information is shared in the form of "signals".
@@ -71,7 +72,7 @@ Instructions on installing the dependencies are below or, if you prefer, you can
 ## Docker local development environment
 First, clone the repo. There is only one required env variable for the docker env:
 ```
-export SIGNALS_SECRET_KEY="" # add a random secret key here (used to sign the JWT tokens used in the service)
+SECRET_KEY="" # add a random secret key here (used to sign the JWT tokens used in the service)
 ```
 
 Follow the instructions below to run the signalsd service.  This service handles 
@@ -108,8 +109,8 @@ psql postgres://signalsd-dev@localhost:15432/signalsd_admin?sslmode=disable
 
 ...or connect with a local postgres client
 ```sh
-export SIGNALS_DB_URL=postgres://signalsd-dev:@localhost:15432/signalsd_admin?sslmode=disable
-psql $SIGNALS_DB_URL
+DATABASE_URL=postgres://signalsd-dev:@localhost:15432/signalsd_admin?sslmode=disable
+psql $DATABASE_URL
 ```
 
 ## Developer local installation
@@ -130,12 +131,12 @@ go install github.com/swaggo/swag/cmd/swag@latest #generates OpenApi specs from 
 set the following env variables
 ``` bash
 # sample Signals service config
-export SIGNALS_DB_URL="postgres://username:@localhost:5432/signalsd_admin?sslmode=disable" # on mac, username is your login username
-export SIGNALS_ENVIRONMENT=dev
-export SIGNALS_SECRET_KEY="" # add your random secret key here
-export SIGNALS_PORT=8080
-export SIGNALS_LOG_LEVEL=debug
-export SIGNALS_HOST=127.0.0.1
+DATABASE_URL="postgres://username:@localhost:5432/signalsd_admin?sslmode=disable" # on mac, username is your login username
+ENVIRONMENT=dev
+SECRET_KEY="" # add your random secret key here
+PORT=8080
+LOG_LEVEL=debug
+HOST=127.0.0.1
 ```
 
 the secret key is used to sign the JWT access tokens used by the service.  You can create a strong key using
@@ -155,17 +156,17 @@ psql postgres
 # 3  and create the service database:  CREATE DATABASE signalsd_admin;
 
 # 4 configure your connection 
-export SIGNALS_DB_URL="postgres://user:@localhost:5432/signalsd_admin?sslmode=disable"
+DATABASE_URL="postgres://user:@localhost:5432/signalsd_admin?sslmode=disable"
 ```
 
 **database migrations**
 the database schema is managed by [goose](https://github.com/pressly/goose)
 ```
 # drop all database objects
-goose -dir app/sql/schema postgres $SIGNALS_DB_URL  down-to 0
+goose -dir app/sql/schema postgres $DATABASE_URL  down-to 0
 
 # update the schema to the current version - run this after pulling code from the github repo
-goose -dir app/sql/schema postgres $SIGNALS_DB_URL  up
+goose -dir app/sql/schema postgres $DATABASE_URL  up
 ```
 
 
