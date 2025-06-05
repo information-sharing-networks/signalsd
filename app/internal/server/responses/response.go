@@ -44,13 +44,13 @@ func RespondWithError(w http.ResponseWriter, r *http.Request, statusCode int, er
 			Str("request_id", requestID).
 			Msg("error marshaling error response")
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(`{"error_code":"internal_error","message":"Internal Server Error"}`))
+		_, _ = w.Write([]byte(`{"error_code":"internal_error","message":"Internal Server Error"}`))
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(statusCode)
-	w.Write(dat)
+	_, _ = w.Write(dat)
 }
 
 func RespondWithJSON(w http.ResponseWriter, status int, payload any) {
@@ -62,16 +62,15 @@ func RespondWithJSON(w http.ResponseWriter, status int, payload any) {
 	data, err := json.Marshal(payload)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(`{"error_code":"marshal_error","message":"Internal Server Error"}`))
+		_, _ = w.Write([]byte(`{"error_code":"marshal_error","message":"Internal Server Error"}`))
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(status)
-	w.Write(data)
+	_, _ = w.Write(data)
 }
 
 func RespondWithStatusCodeOnly(w http.ResponseWriter, status int) {
 	w.WriteHeader(status)
-	return
 }

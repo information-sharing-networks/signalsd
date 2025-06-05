@@ -3,6 +3,7 @@
 [Developers](#developers) |
 [Technical Overview](#service-overview) 
 
+![ci](https://github.com/information-sharing-networks/signalsd/actions/workflows/ci.yml/badge.svg)
 
 # Information Sharing Networks
 ISNs are networks that enable interested parties to share information. The information is shared in the form of "signals".
