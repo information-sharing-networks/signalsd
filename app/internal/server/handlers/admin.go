@@ -39,7 +39,7 @@ func (a *AdminHandler) ResetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(fmt.Sprintf("%d accounts deleted", deletedAccountsCount)))
+	_, _ = w.Write([]byte(fmt.Sprintf("%d accounts deleted", deletedAccountsCount)))
 }
 
 // ReadinessHandler godoc
@@ -59,7 +59,7 @@ func (a *AdminHandler) ReadinessHandler(w http.ResponseWriter, r *http.Request) 
 	if err == nil {
 		w.WriteHeader(http.StatusOK)
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		w.Write([]byte(http.StatusText(http.StatusOK)))
+		_, _ = w.Write([]byte(http.StatusText(http.StatusOK)))
 	}
 }
 
@@ -76,5 +76,5 @@ func (a *AdminHandler) ReadinessHandler(w http.ResponseWriter, r *http.Request) 
 func (a *AdminHandler) LivenessHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Write([]byte(http.StatusText(http.StatusOK)))
+	_, _ = w.Write([]byte(http.StatusText(http.StatusOK)))
 }
