@@ -22,7 +22,7 @@ Examples of data that might be contained in a signal
 - An attestation from an organisation that a signal produced or provided by another organisation is accurate or true
   
 ## Reference Implementations
-The [initial implementation](https://github.com/information-sharing-networks/isn-ref-impl) was a proof of concept and use to test the ideas as part of the UK govs Border Trade Demonstrator initiative (BTDs).  The BTDs established ISNs that were used by several goverment agencies and industry groups to make process improvements at the border by sharing supply chain information. 
+The [initial implementation](https://github.com/information-sharing-networks/isn-ref-impl) was a proof of concept used as part of the UK govs Border Trade Demonstrator (BTD) initiative.  The BTDs established ISNs that were used by several goverment agencies and industry groups to make process improvements at the border by sharing supply chain information. 
 
 This repo contains the second version (work in progress) - it develops the ISN administration facilities and will scale to higher volumes of data.
 
@@ -32,7 +32,7 @@ There are three components
 - a demonstration UI 
 
 ## Credits
-Many thanks to Ross McDonald who came up with the concept and created the initial reference implemenation.
+Many thanks to [Ross McDonald](https://github.com/rossajmcd) who came up with the concept and created the initial reference implemenation.
 
 # Try it out
 You can run the service on your laptop without installing any additional software using Docker.
