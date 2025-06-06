@@ -21,38 +21,39 @@ import (
 )
 
 type Server struct {
-	pool         *pgxpool.Pool
-	queries      *database.Queries
-	authService  *auth.AuthService
-	serverConfig *signalsd.ServerConfig
-	serverLogger *zerolog.Logger
-	httpLogger   *zerolog.Logger
-	router       *chi.Mux
+	pool          *pgxpool.Pool
+	queries       *database.Queries
+	authService   *auth.AuthService
+	serviceConfig *signalsd.ServerConfig
+	serverLogger  *zerolog.Logger
+	httpLogger    *zerolog.Logger
+	router        *chi.Mux
 }
 
 func NewServer(pool *pgxpool.Pool, queries *database.Queries, authService *auth.AuthService, serviceConfig *signalsd.ServerConfig, serverLogger *zerolog.Logger, httpLogger *zerolog.Logger, router *chi.Mux) *Server {
 	s := &Server{
-		pool:         pool,
-		queries:      queries,
-		authService:  authService,
-		serverConfig: serviceConfig,
-		serverLogger: serverLogger,
-		httpLogger:   httpLogger,
-		router:       router,
+		pool:          pool,
+		queries:       queries,
+		authService:   authService,
+		serviceConfig: serviceConfig,
+		serverLogger:  serverLogger,
+		httpLogger:    httpLogger,
+		router:        router,
 	}
+	s.setupMiddleware()
 	s.registerRoutes()
 	return s
 }
 
 func (s *Server) Run() {
-	serverAddr := fmt.Sprintf("%s:%d", s.serverConfig.Host, s.serverConfig.Port)
+	serverAddr := fmt.Sprintf("%s:%d", s.serviceConfig.Host, s.serviceConfig.Port)
 
 	httpServer := &http.Server{
 		Addr:         serverAddr,
 		Handler:      s.router,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		IdleTimeout:  120 * time.Second,
+		ReadTimeout:  s.serviceConfig.ReadTimeout,
+		WriteTimeout: s.serviceConfig.WriteTimeout,
+		IdleTimeout:  s.serviceConfig.WriteTimeout,
 	}
 
 	defer func() {
@@ -62,7 +63,7 @@ func (s *Server) Run() {
 	}()
 
 	go func() {
-		s.serverLogger.Info().Msgf("%s service listening on %s \n", s.serverConfig.Environment, serverAddr)
+		s.serverLogger.Info().Msgf("%s service listening on %s \n", s.serviceConfig.Environment, serverAddr)
 
 		err := httpServer.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
@@ -96,12 +97,17 @@ func (s *Server) Run() {
 	<-idleConnsClosed
 }
 
+func (s *Server) setupMiddleware() {
+	s.router.Use(middleware.RequestID)
+	s.router.Use(logger.LoggingMiddleware(s.httpLogger))
+}
+
 func (s *Server) registerRoutes() {
 
 	// user registration and authentication handlers
 	users := handlers.NewUserHandler(s.queries, s.authService, s.pool) // handlers that use database transactions need the DB struct
-	login := handlers.NewLoginHandler(s.queries, s.authService, s.serverConfig.Environment)
-	tokens := handlers.NewTokenHandler(s.queries, s.authService, s.serverConfig.Environment)
+	login := handlers.NewLoginHandler(s.queries, s.authService, s.serviceConfig.Environment)
+	tokens := handlers.NewTokenHandler(s.queries, s.authService, s.serviceConfig.Environment)
 
 	// site admin handlers
 	admin := handlers.NewAdminHandler(s.queries)
@@ -122,9 +128,6 @@ func (s *Server) registerRoutes() {
 	webhooks := handlers.NewWebhookHandler(s.queries)
 	signalBatches := handlers.NewSignalsBatchHandler(s.queries)
 	signals := handlers.NewSignalsHandler(s.queries, s.pool)
-
-	s.router.Use(middleware.RequestID)
-	s.router.Use(logger.LoggingMiddleware(s.httpLogger))
 
 	// auth
 	s.router.Route("/auth", func(r chi.Router) {

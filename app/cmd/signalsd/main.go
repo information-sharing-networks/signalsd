@@ -55,7 +55,7 @@ func main() {
 
 	serverLogger := logger.InitServerLogger()
 
-	cfg := signalsd.InitConfig(serverLogger)
+	cfg := signalsd.NewServerConfig(serverLogger)
 
 	httpLogger := logger.InitHttpLogger(cfg.LogLevel)
 

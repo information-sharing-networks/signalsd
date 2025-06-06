@@ -1701,6 +1701,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
       summary: Search for signals
       tags:
       - Signal sharing
