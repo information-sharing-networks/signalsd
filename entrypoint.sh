@@ -18,19 +18,6 @@ function launchLocal() {
     exec /app/signalsd
 }
 
-function launchProd() {
-
-    echo "generate sqlc files"
-    sqlc generate
-    
-    echo "creating swaggo documenation"
-    swag init -g ./cmd/signalsd/main.go 
-
-    echo "migrating database schema"
-    goose -dir sql/schema postgres $DATABASE_URL up
-
-    exec /app/signalsd 
-}
 
 function launchLocalDev() {
    
@@ -91,8 +78,8 @@ while getopts "e:" arg; do
     fi
 done
 
-if [ "$ENV" != "local-dev" ] && [ "$ENV" != "local" ] && [ "$ENV" != "prod" ]; then
-    echo "usage $0 -e environment (local, local-dev, prod) " >&2
+if [ "$ENV" != "local-dev" ] && [ "$ENV" != "local" ]; then
+    echo "usage $0 -e environment (local, local-dev) " >&2
     exit 1
 fi
 
@@ -108,7 +95,3 @@ if [ "$ENV" = "local-dev" ]; then
 fi
 
 
-if [ "$ENV" = "prod" ]; then
-    cd /app
-    launchProd
-fi

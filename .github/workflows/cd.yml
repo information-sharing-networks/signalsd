@@ -1,17 +1,32 @@
+# build signalsd image, push to gcloud and deploy to gcloud run
 name: CD
 
 on:
   push:
-    branches: [cd]
+    branches: [main]
+
+env:
+  # app
+  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+  SECRET_KEY: ${{ secrets.SECRET_KEY }}
+  ENVIRONMENT: prod
+  LOG_LEVEL: debug
+  # gcloud
+  SERVICE_NAME: signalsd
+  PROJECT_ID: signals-462015
+  REGION: europe-west2
+  REPOSITORY: signalsd
+  IMAGE_NAME: signalsd
+  DEPLOY_REGION: europe-west1
+  RUNTIME_SERVICE_ACCOUNT: cloud-run-runtime@signals-462015.iam.gserviceaccount.com
+  GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+  MAX_INSTANCES: 4
+  CPU: 1
 
 jobs:
   tests:
     name: Deploy
     runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: ./app
 
     steps:
       - name: Check out code
@@ -24,23 +39,49 @@ jobs:
           cache: true                                
           cache-dependency-path: app/go.sum    
 
-      - name: Download Go modules
-        run: go mod download
-
       - name: Build app
-        run: CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build ./cmd/signalsd/
+        run: |
+          cd app
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build ./cmd/signalsd/
 
-      - id: auth
+      - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+          credentials_json: ${{ env.GCP_CREDENTIALS }}
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
 
-      - name: Build and push docker image
+      - name: Configure Docker to use gcloud as credential helper
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      - name: Build and push Docker image
         run: |
-          cd ..
-          gcloud builds  submit  --config=cloudbuild.yaml . --async
+          docker buildx build \
+          --platform linux/amd64 \
+          -f app/Dockerfile \
+          --push \
+          -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+          -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest \
+          .
+      
+      - name: Install goose
+        run: go install github.com/pressly/goose/v3/cmd/goose@latest
 
+      - name: Run migrations
+        run: |
+          cd app
+          goose -dir sql/schema postgres ${{ env.DATABASE_URL }} up
 
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            --region ${{ env.DEPLOY_REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --set-env-vars "DATABASE_URL=${{ env.DATABASE_URL }},SECRET_KEY=${{ env.SECRET_KEY }},ENVIRONMENT=${{ env.ENVIRONMENT }}, LOG_LEVEL=${{ env.LOG_LEVEL }}" \
+            --port 8080 \
+            --memory 512Mi \
+            --cpu ${{ env.CPU }} \
+            --max-instances ${{ env.MAX_INSTANCES }}
