@@ -20,15 +20,11 @@ func RespondWithError(w http.ResponseWriter, r *http.Request, statusCode int, er
 	requestLogger := zerolog.Ctx(r.Context())
 	requestID := middleware.GetReqID(r.Context())
 
-	// Only log real server errors
-	if statusCode >= 500 {
-		requestLogger.Error().
-			Int("status", statusCode).
-			Any("error_code", errorCode).
-			Str("error_message", message).
-			Str("request_id", requestID).
-			Msg("Request failed")
-	}
+	requestLogger.Error().
+		Int("status", statusCode).
+		Any("error_code", errorCode).
+		Str("error_message", message).
+		Msg("Request failed")
 
 	errResponse := ErrorResponse{
 		StatusCode: statusCode,
@@ -41,7 +37,6 @@ func RespondWithError(w http.ResponseWriter, r *http.Request, statusCode int, er
 	if err != nil {
 		requestLogger.Error().
 			Err(err).
-			Str("request_id", requestID).
 			Msg("error marshaling error response")
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte(`{"error_code":"internal_error","message":"Internal Server Error"}`))
