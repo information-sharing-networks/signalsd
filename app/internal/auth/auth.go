@@ -129,8 +129,8 @@ func (a AuthService) BuildAccessTokenResponse(ctx context.Context) (AccessTokenR
 		return AccessTokenResponse{}, fmt.Errorf("invalid user role %v for user %v", account.AccountRole, accountID)
 	}
 
-	// get all the siteIsns on this site
-	siteIsns, err := a.queries.GetIsnsWithIsnReceiver(ctx)
+	// get all the Isns on this site
+	siteIsns, err := a.queries.GetIsns(ctx)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return AccessTokenResponse{}, fmt.Errorf("database error getting ISNs: %w", err)
 	}

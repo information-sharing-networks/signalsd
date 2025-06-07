@@ -247,7 +247,7 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 //	@Description	- Define the signal_types used in the ISN
 //	@Description	- read/write to their own ISNs
 //	@Description	- Grant other accounts read or write access to their ISNs
-//	@Description	- Create service identities ('service accounts')
+//	@Description	- Create service accounts
 //	@Description
 //	@Description	this endpoint can only be used by the site owner account
 //
@@ -294,7 +294,7 @@ func (u *UserHandler) GrantUserAdminRoleHandler(w http.ResponseWriter, r *http.R
 	}
 
 	if targetAccount.AccountType != "user" {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "this end point should not be used for service identities")
+		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "this end point should not be used for service accounts")
 		return
 	}
 
@@ -360,7 +360,7 @@ func (u *UserHandler) RevokeUserAdminRoleHandler(w http.ResponseWriter, r *http.
 	}
 
 	if targetAccount.AccountType != "user" {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "this end point should not be used for service identities")
+		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "this end point should not be used for service accounts")
 		return
 	}
 

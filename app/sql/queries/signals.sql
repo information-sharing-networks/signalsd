@@ -151,7 +151,7 @@ WITH LatestSignals AS (
     LEFT OUTER JOIN 
         users u ON u.account_id = a.id
     LEFT OUTER JOIN 
-        service_identities si ON si.account_id = a.id
+        service_accounts si ON si.account_id = a.id
     WHERE i.slug = sqlc.arg(isn_slug)
         AND st.slug = sqlc.arg(signal_type_slug)
         AND st.sem_ver = sqlc.arg(sem_ver)
@@ -208,7 +208,7 @@ WITH LatestSignals AS (
     LEFT OUTER JOIN 
         users u ON u.account_id = a.id
     LEFT OUTER JOIN 
-        service_identities si ON si.account_id = a.id
+        service_accounts si ON si.account_id = a.id
     WHERE i.slug = sqlc.arg(isn_slug)
         AND st.slug = sqlc.arg(signal_type_slug)
         AND st.sem_ver = sqlc.arg(sem_ver)
@@ -265,7 +265,7 @@ WITH LatestSignals AS (
     LEFT OUTER JOIN 
         users u ON u.account_id = a.id
     LEFT OUTER JOIN 
-        service_identities si ON si.account_id = a.id
+        service_accounts si ON si.account_id = a.id
     WHERE i.slug = sqlc.arg(isn_slug)
         AND st.slug = sqlc.arg(signal_type_slug)
         AND st.sem_ver = sqlc.arg(sem_ver)
@@ -324,7 +324,7 @@ WITH LatestSignals AS (
     LEFT OUTER JOIN 
         users u ON u.account_id = a.id
     LEFT OUTER JOIN 
-        service_identities si ON si.account_id = a.id
+        service_accounts si ON si.account_id = a.id
     WHERE i.slug = sqlc.arg(isn_slug)
         AND st.slug = sqlc.arg(signal_type_slug)
         AND st.sem_ver = sqlc.arg(sem_ver)

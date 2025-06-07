@@ -118,9 +118,6 @@ func (s *Server) registerRoutes() {
 	isn := handlers.NewIsnHandler(s.queries, s.pool)
 	signalTypes := handlers.NewSignalTypeHandler(s.queries)
 
-	isnReceivers := handlers.NewIsnReceiverHandler(s.queries)
-	isnRetrievers := handlers.NewIsnRetrieverHandler(s.queries)
-
 	// isn permissions
 	isnAccount := handlers.NewIsnAccountHandler(s.queries)
 
@@ -175,14 +172,6 @@ func (s *Server) registerRoutes() {
 				r.Post("/isn", isn.CreateIsnHandler)
 				r.Put("/isn/{isn_slug}", isn.UpdateIsnHandler)
 
-				// ISN receiver management
-				r.Post("/isn/{isn_slug}/receiver", isnReceivers.CreateIsnReceiverHandler)
-				r.Put("/isn/{isn_slug}/receiver", isnReceivers.UpdateIsnReceiverHandler)
-
-				// ISN retriever management
-				r.Post("/isn/{isn_slug}/retriever", isnRetrievers.CreateIsnRetrieverHandler)
-				r.Put("/isn/{isn_slug}/retriever", isnRetrievers.UpdateIsnRetrieverHandler)
-
 				// signal types managment
 				r.Post("/isn/{isn_slug}/signal_types", signalTypes.CreateSignalTypeHandler)
 				r.Put("/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}", signalTypes.UpdateSignalTypeHandler)
@@ -221,8 +210,6 @@ func (s *Server) registerRoutes() {
 		// unrestricted
 		r.Get("/isn", isn.GetIsnsHandler)
 		r.Get("/isn/{isn_slug}", isn.GetIsnHandler)
-		r.Get("/isn/{isn_slug}/receiver", isnReceivers.GetIsnReceiverHandler)
-		r.Get("/isn/{isn_slug}/retriever", isnRetrievers.GetIsnRetrieverHandler)
 		r.Get("/isn/{isn_slug}/signal_types", signalTypes.GetSignalTypesHandler)
 		r.Get("/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}", signalTypes.GetSignalTypeHandler)
 	})

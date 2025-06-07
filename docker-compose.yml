@@ -1,4 +1,4 @@
-# docker-compose.yml (Local)
+# docker-compose.yml (run the service locally - for non-developers)
 services:
   db:
     image: postgres:17-alpine
@@ -28,7 +28,7 @@ services:
   app:
     build: 
       context: .
-      dockerfile: app/Dockerfile
+      dockerfile: app/Dockerfile.local
     container_name: signalsd-app
     entrypoint: ["/app/entrypoint.sh", "-e", "local"]
     environment:

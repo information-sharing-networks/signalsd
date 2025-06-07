@@ -202,16 +202,25 @@ run `sqlc generate` from the root of the project to regenerate the type safe go 
 
 
 # Service overview
-technical overview
 ## Auth
-
-![auth](https://github.com/user-attachments/assets/018cedf6-ba96-41ee-b3da-6d7cca08fb27)
+![auth.0.2.0](https://github.com/user-attachments/assets/15d194a9-04c6-4b4f-a7ad-c69e5b347e7f)
 
 ## ISN config
-![ISN Config](https://github.com/user-attachments/assets/b2491f77-f461-405e-8c21-2226695092b9)
+![isns.0.2.0](https://github.com/user-attachments/assets/e091a3ae-e9ed-4b44-aa7e-027ddb93e98c)
 
 ## Signals
-![signals](https://github.com/user-attachments/assets/ff387ce1-e023-4c48-9b2b-a59d8625efc4)
+![signal.0.2.0](https://github.com/user-attachments/assets/86a00593-3536-4126-806d-c5b2d55232de)
 
+
+## CI/CD
+see github actions workflows in .github/workflows
+
+![ci_cd.0.2.0](https://github.com/user-attachments/assets/d5399e2f-0d0b-420b-9c17-0fbcea6f520c)
+
+
+## cloud deployment
+The service is deployed using the image created at the last push to the main branch.  It is deployed as a container on Google Cloud Run - google handles https, firewall, loadbalancing and autoscaling. The service will scale to zero when not in use.
+
+![deploy.0.2.0](https://github.com/user-attachments/assets/942384a7-ccd7-4abb-b2a7-a9e293e23a10)
 
 

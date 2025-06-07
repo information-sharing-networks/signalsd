@@ -36,26 +36,21 @@ type CreateIsnRequest struct {
 }
 
 type UpdateIsnRequest struct {
-	Detail               *string `json:"detail" example:"Sample ISN description"`
-	IsInUse              *bool   `json:"is_in_use" example:"true"`
-	Visibility           *string `json:"visibility" example:"private" enums:"public,private"`
-	StorageType          *string `json:"storage_type" example:"mq"`
-	StorageConnectionURL *string `json:"storage_connection_url" example:"postgres:/signalsd:@localhost:5432/signals?sslmode=disable"`
+	Detail     *string `json:"detail" example:"Sample ISN description"`
+	IsInUse    *bool   `json:"is_in_use" example:"true"`
+	Visibility *string `json:"visibility" example:"private" enums:"public,private"`
 }
 
 type CreateIsnResponse struct {
-	ID             uuid.UUID `json:"id" example:"67890684-3b14-42cf-b785-df28ce570400"`
-	Slug           string    `json:"slug" example:"sample-isn--example-org"`
-	SignalsBatchID uuid.UUID `json:"signals_batch_id" example:"b51faf05-aaed-4250-b334-2258ccdf1ff2"`
-	ResourceURL    string    `json:"resource_url" example:"http://localhost:8080/api/isn/sample-isn--example-org"`
+	ID          uuid.UUID `json:"id" example:"67890684-3b14-42cf-b785-df28ce570400"`
+	Slug        string    `json:"slug" example:"sample-isn--example-org"`
+	ResourceURL string    `json:"resource_url" example:"http://localhost:8080/api/isn/sample-isn--example-org"`
 }
 
 // used in GET handler
 type IsnAndLinkedInfo struct {
 	database.GetForDisplayIsnBySlugRow
-	User         database.GetForDisplayUserByIsnIDRow          `json:"user"`
-	IsnReceiver  *database.GetForDisplayIsnReceiverByIsnIDRow  `json:"isn_receiver,omitempty"`
-	IsnRetriever *database.GetForDisplayIsnRetrieverByIsnIDRow `json:"isn_rectriever,omitempty"`
+	User database.GetForDisplayUserByIsnIDRow `json:"user"`
 }
 
 // CreateIsnHandler godoc
@@ -65,11 +60,8 @@ type IsnAndLinkedInfo struct {
 //	@Description
 //	@Description	visibility = "private" means that signalsd on the network can only be seen by network participants.
 //	@Description
-//	@Description	The only storage_type currently supported is "admin_db"
-//	@Description	when storage_type = "admin_db" the signalsd are stored in the relational database used by the API service to store the admin configuration
-//	@Description	Specify "admin_db" for storage_connection_url in this case (anything else is overriwtten with this value)
-//	@Description	ISN admins automatically get write permission for their own sites, so this endpoint also starts a signals batch for them
-//	@Description	owners automatically get write permission on all isns, so start a batch for them too
+//	@Description	ISN admins automatically get write permission for their own sites, so this endpoint also starts a signals batch for them.
+//	@Description	Owners automatically get write permission on all isns, so a batch is started for them also.
 //	@Description
 //	@Description	This endpoint can only be used by the site owner or an admin
 //
@@ -116,9 +108,7 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 	if req.Title == "" ||
 		req.Detail == nil ||
 		req.IsInUse == nil ||
-		req.Visibility == nil ||
-		req.StorageType == nil ||
-		req.StorageConnectionURL == nil {
+		req.Visibility == nil {
 		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you have not supplied all the required fields in the payload")
 		return
 	}
@@ -160,27 +150,21 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if *req.StorageType == "admin_db" {
-		*req.StorageConnectionURL = "admin_db"
-	}
-
 	// create isn
 	returnedIsn, err := txQueries.CreateIsn(r.Context(), database.CreateIsnParams{
-		UserAccountID:        userAccountID,
-		Title:                req.Title,
-		Slug:                 slug,
-		Detail:               *req.Detail,
-		IsInUse:              *req.IsInUse,
-		Visibility:           *req.Visibility,
-		StorageType:          *req.StorageType,
-		StorageConnectionURL: *req.StorageConnectionURL,
+		UserAccountID: userAccountID,
+		Title:         req.Title,
+		Slug:          slug,
+		Detail:        *req.Detail,
+		IsInUse:       *req.IsInUse,
+		Visibility:    *req.Visibility,
 	})
 	if err != nil {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not create ISN: %v", err))
 		return
 	}
 	// crete a signals batch for the user creating the admin
-	returnedSignalBatch, err := txQueries.CreateSignalBatch(r.Context(), database.CreateSignalBatchParams{
+	_, err = txQueries.CreateSignalBatch(r.Context(), database.CreateSignalBatchParams{
 		IsnID:       returnedIsn.ID,
 		AccountID:   userAccountID,
 		AccountType: "user", // only users can use the ISN configuration endpoints
@@ -214,10 +198,9 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 	)
 
 	responses.RespondWithJSON(w, http.StatusCreated, CreateIsnResponse{
-		ID:             returnedIsn.ID,
-		Slug:           returnedIsn.Slug,
-		SignalsBatchID: returnedSignalBatch.ID,
-		ResourceURL:    resourceURL,
+		ID:          returnedIsn.ID,
+		Slug:        returnedIsn.Slug,
+		ResourceURL: resourceURL,
 	})
 }
 
@@ -288,25 +271,12 @@ func (i *IsnHandler) UpdateIsnHandler(w http.ResponseWriter, r *http.Request) {
 	if req.Visibility != nil {
 		isn.Visibility = *req.Visibility
 	}
-	if req.StorageType != nil {
-		isn.StorageType = *req.StorageType
-	}
-	if req.StorageConnectionURL != nil {
-		isn.StorageConnectionURL = *req.StorageConnectionURL
-	}
 
-	if isn.StorageType == "admin_db" {
-		isn.StorageConnectionURL = "admin_db"
-	}
-
-	// update isn_receiver
 	_, err = i.queries.UpdateIsn(r.Context(), database.UpdateIsnParams{
-		ID:                   isn.ID,
-		Detail:               isn.Detail,
-		IsInUse:              isn.IsInUse,
-		Visibility:           isn.Visibility,
-		StorageType:          isn.StorageType,
-		StorageConnectionURL: isn.StorageConnectionURL,
+		ID:         isn.ID,
+		Detail:     isn.Detail,
+		IsInUse:    isn.IsInUse,
+		Visibility: isn.Visibility,
 	})
 	if err != nil {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not create ISN: %v", err))
@@ -340,7 +310,7 @@ func (s *IsnHandler) GetIsnsHandler(w http.ResponseWriter, r *http.Request) {
 // GetIsnHandler godoc
 //
 //	@Summary		Get an ISN configurationuration
-//	@Description	Returns details about the ISN plus details of any configured receivers/retrievers
+//	@Description	Returns details about the ISN
 //	@Param			isn_slug	path	string	true	"isn slug"	example(sample-isn--example-org)
 //
 //	@Tags			ISN view
@@ -370,36 +340,10 @@ func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the user for this isn: %v", err))
 		return
 	}
-
-	// get receiver and retriever if they were defined
-
-	var isnRetceiverRes *database.GetForDisplayIsnReceiverByIsnIDRow
-	isnReceiver, err := s.queries.GetForDisplayIsnReceiverByIsnID(r.Context(), isn.ID)
-	if err != nil {
-		if !errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the receiver for this isn: %v", err))
-			return
-		}
-	} else {
-		isnRetceiverRes = &isnReceiver
-	}
-
-	var isnRetrieverRes *database.GetForDisplayIsnRetrieverByIsnIDRow
-	isnRetriever, err := s.queries.GetForDisplayIsnRetrieverByIsnID(r.Context(), isn.ID)
-	if err != nil {
-		if !errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the retriever for this isn: %v", err))
-			return
-		}
-	} else {
-		isnRetrieverRes = &isnRetriever
-	}
 	//send response
 	res := IsnAndLinkedInfo{
 		GetForDisplayIsnBySlugRow: isn,
 		User:                      user,
-		IsnReceiver:               isnRetceiverRes,
-		IsnRetriever:              isnRetrieverRes,
 	}
 	responses.RespondWithJSON(w, http.StatusOK, res)
 }
