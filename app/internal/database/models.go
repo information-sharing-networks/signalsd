@@ -19,17 +19,15 @@ type Account struct {
 }
 
 type Isn struct {
-	ID                   uuid.UUID `json:"id"`
-	CreatedAt            time.Time `json:"created_at"`
-	UpdatedAt            time.Time `json:"updated_at"`
-	UserAccountID        uuid.UUID `json:"user_account_id"`
-	Title                string    `json:"title"`
-	Slug                 string    `json:"slug"`
-	Detail               string    `json:"detail"`
-	IsInUse              bool      `json:"is_in_use"`
-	Visibility           string    `json:"visibility"`
-	StorageType          string    `json:"storage_type"`
-	StorageConnectionURL string    `json:"storage_connection_url"`
+	ID            uuid.UUID `json:"id"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	UserAccountID uuid.UUID `json:"user_account_id"`
+	Title         string    `json:"title"`
+	Slug          string    `json:"slug"`
+	Detail        string    `json:"detail"`
+	IsInUse       bool      `json:"is_in_use"`
+	Visibility    string    `json:"visibility"`
 }
 
 type IsnAccount struct {
@@ -41,27 +39,6 @@ type IsnAccount struct {
 	Permission string    `json:"permission"`
 }
 
-type IsnReceiver struct {
-	IsnID                      uuid.UUID `json:"isn_id"`
-	CreatedAt                  time.Time `json:"created_at"`
-	UpdatedAt                  time.Time `json:"updated_at"`
-	MaxDailyValidationFailures int32     `json:"max_daily_validation_failures"`
-	MaxPayloadKilobytes        int32     `json:"max_payload_kilobytes"`
-	PayloadValidation          string    `json:"payload_validation"`
-	DefaultRateLimit           int32     `json:"default_rate_limit"`
-	ReceiverStatus             string    `json:"receiver_status"`
-	ListenerCount              int32     `json:"listener_count"`
-}
-
-type IsnRetriever struct {
-	IsnID            uuid.UUID `json:"isn_id"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
-	DefaultRateLimit int32     `json:"default_rate_limit"`
-	RetrieverStatus  string    `json:"retriever_status"`
-	ListenerCount    int32     `json:"listener_count"`
-}
-
 type RefreshToken struct {
 	HashedToken   string     `json:"hashed_token"`
 	UserAccountID uuid.UUID  `json:"user_account_id"`
@@ -71,7 +48,7 @@ type RefreshToken struct {
 	RevokedAt     *time.Time `json:"revoked_at"`
 }
 
-type ServiceIdentity struct {
+type ServiceAccount struct {
 	AccountID          uuid.UUID `json:"account_id"`
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
@@ -85,12 +62,12 @@ type Signal struct {
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
 	AccountID     uuid.UUID `json:"account_id"`
+	IsnID         uuid.UUID `json:"isn_id"`
 	SignalTypeID  uuid.UUID `json:"signal_type_id"`
 	LocalRef      string    `json:"local_ref"`
 	CorrelationID uuid.UUID `json:"correlation_id"`
 	IsWithdrawn   bool      `json:"is_withdrawn"`
 	IsArchived    bool      `json:"is_archived"`
-	IsnID         uuid.UUID `json:"isn_id"`
 }
 
 type SignalBatch struct {

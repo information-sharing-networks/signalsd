@@ -35,7 +35,7 @@ import (
 //	@tag.description	Site adminstration tools
 
 //	@tag.name			ISN configuration
-//	@tag.description	Information sharing networks are used to exchange signalsd between participating users.
+//	@tag.description	Manage the Information Sharing Networks that are used to exchange signals between participating users.
 
 //	@tag.name			ISN Permissions
 //	@tag.description	Grant accounts read or write access to an ISN
@@ -44,13 +44,10 @@ import (
 //	@tag.description	View information about the configured ISNs
 
 //	@tag.name			Signal definitions
-//	@tag.description	Signal definitions describe the format of the data being shared in an ISN
-
-//	@tag.name			Service accounts
-//	@tag.description	Send and recieve signals over the ISN
+//	@tag.description	Define the format of the data being shared in an ISN
 
 // @tag.name			Service accounts
-// @tag.description	service account ("service identities") end points
+// @tag.description		Manage service account end points
 func main() {
 
 	serverLogger := logger.InitServerLogger()

@@ -9,10 +9,8 @@ INSERT INTO isn (
     slug,
     detail,
     is_in_use,
-    visibility,
-    storage_type,
-    storage_connection_url 
-) VALUES (gen_random_uuid(), now(), now(), $1, $2, $3, $4, $5, $6 ,$7, $8) 
+    visibility
+) VALUES (gen_random_uuid(), now(), now(), $1, $2, $3, $4, $5, $6 )
 RETURNING id, slug;
 
 -- name: UpdateIsn :execrows
@@ -20,10 +18,8 @@ UPDATE isn SET (
     updated_at, 
     detail,
     is_in_use,
-    visibility,
-    storage_type,
-    storage_connection_url
-) = (Now(), $2, $3, $4, $5, $6)
+    visibility
+) = (Now(), $2, $3, $4)
 WHERE id = $1;
 
 -- name: GetIsnByID :one
@@ -46,24 +42,6 @@ WHERE sd.id = $1;
 SELECT i.* 
 FROM isn i;
 
--- name: GetIsnsWithIsnReceiver :many
-SELECT
-    i.id,
-    i.user_account_id,
-    i.slug,
-    i.is_in_use,
-    i.visibility,
-    i.storage_type,
-    i.storage_connection_url,
-    ir.max_daily_validation_failures,
-    ir.max_payload_kilobytes,
-    ir.payload_validation,
-    ir.default_rate_limit,
-    COALESCE(ir.receiver_status, 'offline') AS receiver_status
-FROM isn i
-LEFT OUTER JOIN isn_receivers ir
-ON i.id = ir.isn_id;
-
 -- name: GetForDisplayIsnBySlug :one
 SELECT 
     id,
@@ -73,9 +51,7 @@ SELECT
     slug,
     detail,
     is_in_use,
-    visibility,
-    storage_type,
-    storage_connection_url
+    visibility
 FROM isn 
 WHERE slug = $1;
 

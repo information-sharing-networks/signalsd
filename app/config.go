@@ -53,26 +53,9 @@ var ValidSignalTypeStages = map[string]bool{ // stored in the signal_types.stage
 	"closed":     true,
 	"shuttered":  true,
 }
-var ValidPayloadValidations = map[string]bool{ //stored in the isn_receivers.payload_validation column
-	"always":   true,
-	"never":    true,
-	"optional": true,
-}
 var ValidVisibilities = map[string]bool{ //stored in the isn.visibility column
 	"public":  true,
 	"private": true,
-}
-var ValidRetrieverStatus = map[string]bool{ // ins_retriever.retriever_status
-	"offline": true,
-	"online":  true,
-	"error":   true,
-	"closed":  true,
-}
-var ValidReceiverStatus = map[string]bool{ // ins_receiver.receiver_status
-	"offline": true,
-	"online":  true,
-	"error":   true,
-	"closed":  true,
 }
 
 var ValidRoles = map[string]bool{ // users.user_role

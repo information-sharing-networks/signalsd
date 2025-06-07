@@ -11,14 +11,14 @@ import (
 	"github.com/google/uuid"
 )
 
-const createServiceIdentityAccount = `-- name: CreateServiceIdentityAccount :one
+const createUserAccount = `-- name: CreateUserAccount :one
 INSERT INTO accounts (id, created_at, updated_at, account_type)
-VALUES ( gen_random_uuid(), NOW(), NOW(), 'service_identity')
+VALUES ( gen_random_uuid(), NOW(), NOW(), 'user')
 RETURNING id, created_at, updated_at, account_type
 `
 
-func (q *Queries) CreateServiceIdentityAccount(ctx context.Context) (Account, error) {
-	row := q.db.QueryRow(ctx, createServiceIdentityAccount)
+func (q *Queries) CreateUserAccount(ctx context.Context) (Account, error) {
+	row := q.db.QueryRow(ctx, createUserAccount)
 	var i Account
 	err := row.Scan(
 		&i.ID,
@@ -29,14 +29,14 @@ func (q *Queries) CreateServiceIdentityAccount(ctx context.Context) (Account, er
 	return i, err
 }
 
-const createUserAccount = `-- name: CreateUserAccount :one
+const createserviceAccountAccount = `-- name: CreateserviceAccountAccount :one
 INSERT INTO accounts (id, created_at, updated_at, account_type)
-VALUES ( gen_random_uuid(), NOW(), NOW(), 'user')
+VALUES ( gen_random_uuid(), NOW(), NOW(), 'service_identity')
 RETURNING id, created_at, updated_at, account_type
 `
 
-func (q *Queries) CreateUserAccount(ctx context.Context) (Account, error) {
-	row := q.db.QueryRow(ctx, createUserAccount)
+func (q *Queries) CreateserviceAccountAccount(ctx context.Context) (Account, error) {
+	row := q.db.QueryRow(ctx, createserviceAccountAccount)
 	var i Account
 	err := row.Scan(
 		&i.ID,
@@ -65,7 +65,7 @@ type GetAccountByIDRow struct {
 	AccountRole string    `json:"account_role"`
 }
 
-// service_identities can't be owners or admins and are therefore always treated as members.
+// service_accounts can't be owners or admins and are therefore always treated as members.
 func (q *Queries) GetAccountByID(ctx context.Context, id uuid.UUID) (GetAccountByIDRow, error) {
 	row := q.db.QueryRow(ctx, getAccountByID, id)
 	var i GetAccountByIDRow
