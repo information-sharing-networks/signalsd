@@ -16,10 +16,11 @@ func InitServerLogger() *zerolog.Logger {
 	return &logger
 }
 
-func InitHttpLogger(logLevel zerolog.Level) *zerolog.Logger {
+// use console writer when in dev enviroment
+func InitHttpLogger(logLevel zerolog.Level, environment string) *zerolog.Logger {
 	var logger zerolog.Logger
 
-	if logLevel == zerolog.DebugLevel {
+	if environment == "dev" {
 		logger = zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr}).
 			Level(logLevel).
 			With().
