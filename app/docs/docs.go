@@ -1231,6 +1231,41 @@ const docTemplate = `{
                 }
             }
         },
+        "database.GetForDisplaySignalTypeByIsnIDRow": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "detail": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_in_use": {
+                    "type": "boolean"
+                },
+                "readme_url": {
+                    "type": "string"
+                },
+                "schema_url": {
+                    "type": "string"
+                },
+                "sem_ver": {
+                    "type": "string"
+                },
+                "slug": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "database.GetForDisplayUserByIsnIDRow": {
             "type": "object",
             "properties": {
@@ -1539,6 +1574,12 @@ const docTemplate = `{
                 },
                 "is_in_use": {
                     "type": "boolean"
+                },
+                "signal_types": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/database.GetForDisplaySignalTypeByIsnIDRow"
+                    }
                 },
                 "slug": {
                     "type": "string"

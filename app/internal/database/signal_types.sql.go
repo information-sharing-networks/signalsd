@@ -89,18 +89,18 @@ func (q *Queries) ExistsSignalTypeWithSlugAndSchema(ctx context.Context, arg Exi
 
 const getForDisplaySignalTypeByID = `-- name: GetForDisplaySignalTypeByID :one
 SELECT 
-    sd.id,
-    sd.created_at,
-    sd.updated_at,
-    sd.slug,
-    sd.schema_url,
-    sd.readme_url,
-    sd.title,
-    sd.detail,
-    sd.sem_ver,
-    sd.is_in_use
-FROM signal_types sd
-WHERE sd.id = $1
+    st.id,
+    st.created_at,
+    st.updated_at,
+    st.slug,
+    st.schema_url,
+    st.readme_url,
+    st.title,
+    st.detail,
+    st.sem_ver,
+    st.is_in_use
+FROM signal_types st
+WHERE st.id = $1
 `
 
 type GetForDisplaySignalTypeByIDRow struct {
@@ -134,21 +134,81 @@ func (q *Queries) GetForDisplaySignalTypeByID(ctx context.Context, id uuid.UUID)
 	return i, err
 }
 
+const getForDisplaySignalTypeByIsnID = `-- name: GetForDisplaySignalTypeByIsnID :many
+SELECT 
+    st.id,
+    st.created_at,
+    st.updated_at,
+    st.slug,
+    st.schema_url,
+    st.readme_url,
+    st.title,
+    st.detail,
+    st.sem_ver,
+    st.is_in_use
+FROM signal_types st
+WHERE st.isn_id = $1
+`
+
+type GetForDisplaySignalTypeByIsnIDRow struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	Slug      string    `json:"slug"`
+	SchemaURL string    `json:"schema_url"`
+	ReadmeURL string    `json:"readme_url"`
+	Title     string    `json:"title"`
+	Detail    string    `json:"detail"`
+	SemVer    string    `json:"sem_ver"`
+	IsInUse   bool      `json:"is_in_use"`
+}
+
+func (q *Queries) GetForDisplaySignalTypeByIsnID(ctx context.Context, isnID uuid.UUID) ([]GetForDisplaySignalTypeByIsnIDRow, error) {
+	rows, err := q.db.Query(ctx, getForDisplaySignalTypeByIsnID, isnID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetForDisplaySignalTypeByIsnIDRow
+	for rows.Next() {
+		var i GetForDisplaySignalTypeByIsnIDRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Slug,
+			&i.SchemaURL,
+			&i.ReadmeURL,
+			&i.Title,
+			&i.Detail,
+			&i.SemVer,
+			&i.IsInUse,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getForDisplaySignalTypeBySlug = `-- name: GetForDisplaySignalTypeBySlug :one
 SELECT 
-    sd.id,
-    sd.created_at,
-    sd.updated_at,
-    sd.slug,
-    sd.schema_url,
-    sd.readme_url,
-    sd.title,
-    sd.detail,
-    sd.sem_ver,
-    sd.is_in_use
-FROM signal_types sd
-WHERE sd.slug = $1
-  AND sd.sem_ver = $2
+    st.id,
+    st.created_at,
+    st.updated_at,
+    st.slug,
+    st.schema_url,
+    st.readme_url,
+    st.title,
+    st.detail,
+    st.sem_ver,
+    st.is_in_use
+FROM signal_types st
+WHERE st.slug = $1
+  AND st.sem_ver = $2
 `
 
 type GetForDisplaySignalTypeBySlugParams struct {
@@ -188,9 +248,9 @@ func (q *Queries) GetForDisplaySignalTypeBySlug(ctx context.Context, arg GetForD
 }
 
 const getInUseSignalTypesByIsnID = `-- name: GetInUseSignalTypesByIsnID :many
-SELECT sd.id, sd.created_at, sd.updated_at, sd.isn_id, sd.slug, sd.schema_url, sd.readme_url, sd.title, sd.detail, sd.sem_ver, sd.is_in_use
-FROM signal_types sd
-WHERE sd.isn_id = $1
+SELECT st.id, st.created_at, st.updated_at, st.isn_id, st.slug, st.schema_url, st.readme_url, st.title, st.detail, st.sem_ver, st.is_in_use
+FROM signal_types st
+WHERE st.isn_id = $1
 AND is_in_use = true
 `
 
@@ -232,17 +292,17 @@ SELECT '0.0.0' AS sem_ver,
        '' AS schema_url
 WHERE NOT EXISTS
     (SELECT 1
-     FROM signal_types sd1
-     WHERE sd1.slug = $1)
+     FROM signal_types st1
+     WHERE st1.slug = $1)
 UNION ALL
-SELECT sd2.sem_ver,
-       sd2.schema_url
-FROM signal_types sd2
-WHERE sd2.slug = $1
-  AND sd2.sem_ver =
-    (SELECT max(sd3.sem_ver)
-     FROM signal_types sd3
-     WHERE sd3.slug = $1)
+SELECT st2.sem_ver,
+       st2.schema_url
+FROM signal_types st2
+WHERE st2.slug = $1
+  AND st2.sem_ver =
+    (SELECT max(st3.sem_ver)
+     FROM signal_types st3
+     WHERE st3.slug = $1)
 `
 
 type GetSemVerAndSchemaForLatestSlugVersionRow struct {
@@ -260,9 +320,9 @@ func (q *Queries) GetSemVerAndSchemaForLatestSlugVersion(ctx context.Context, sl
 
 const getSignalTypeByID = `-- name: GetSignalTypeByID :one
 
-SELECT sd.id, sd.created_at, sd.updated_at, sd.isn_id, sd.slug, sd.schema_url, sd.readme_url, sd.title, sd.detail, sd.sem_ver, sd.is_in_use
-FROM signal_types sd
-WHERE sd.id = $1
+SELECT st.id, st.created_at, st.updated_at, st.isn_id, st.slug, st.schema_url, st.readme_url, st.title, st.detail, st.sem_ver, st.is_in_use
+FROM signal_types st
+WHERE st.id = $1
 `
 
 func (q *Queries) GetSignalTypeByID(ctx context.Context, id uuid.UUID) (SignalType, error) {
@@ -286,10 +346,10 @@ func (q *Queries) GetSignalTypeByID(ctx context.Context, id uuid.UUID) (SignalTy
 
 const getSignalTypeBySlug = `-- name: GetSignalTypeBySlug :one
 
-SELECT sd.id, sd.created_at, sd.updated_at, sd.isn_id, sd.slug, sd.schema_url, sd.readme_url, sd.title, sd.detail, sd.sem_ver, sd.is_in_use
-FROM signal_types sd
-WHERE sd.slug = $1
-AND sd.sem_ver = $2
+SELECT st.id, st.created_at, st.updated_at, st.isn_id, st.slug, st.schema_url, st.readme_url, st.title, st.detail, st.sem_ver, st.is_in_use
+FROM signal_types st
+WHERE st.slug = $1
+AND st.sem_ver = $2
 `
 
 type GetSignalTypeBySlugParams struct {
@@ -318,8 +378,8 @@ func (q *Queries) GetSignalTypeBySlug(ctx context.Context, arg GetSignalTypeBySl
 
 const getSignalTypes = `-- name: GetSignalTypes :many
 
-SELECT sd.id, sd.created_at, sd.updated_at, sd.isn_id, sd.slug, sd.schema_url, sd.readme_url, sd.title, sd.detail, sd.sem_ver, sd.is_in_use
-FROM signal_types sd
+SELECT st.id, st.created_at, st.updated_at, st.isn_id, st.slug, st.schema_url, st.readme_url, st.title, st.detail, st.sem_ver, st.is_in_use
+FROM signal_types st
 `
 
 func (q *Queries) GetSignalTypes(ctx context.Context) ([]SignalType, error) {

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -50,7 +51,8 @@ type CreateIsnResponse struct {
 // used in GET handler
 type IsnAndLinkedInfo struct {
 	database.GetForDisplayIsnBySlugRow
-	User database.GetForDisplayUserByIsnIDRow `json:"user"`
+	User        database.GetForDisplayUserByIsnIDRow          `json:"user"`
+	SignalTypes *[]database.GetForDisplaySignalTypeByIsnIDRow `json:"signal_types,omitempty"`
 }
 
 // CreateIsnHandler godoc
@@ -340,10 +342,23 @@ func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the user for this isn: %v", err))
 		return
 	}
+
+	var signalTypesRes *[]database.GetForDisplaySignalTypeByIsnIDRow
+	signalTypes, err := s.queries.GetForDisplaySignalTypeByIsnID(r.Context(), isn.ID)
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+			return
+		}
+	} else {
+		signalTypesRes = &signalTypes
+	}
+
 	//send response
 	res := IsnAndLinkedInfo{
 		GetForDisplayIsnBySlugRow: isn,
 		User:                      user,
+		SignalTypes:               signalTypesRes,
 	}
 	responses.RespondWithJSON(w, http.StatusOK, res)
 }

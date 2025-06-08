@@ -21,52 +21,68 @@ WHERE id = $1;
 
 -- name: GetSignalTypes :many
 
-SELECT sd.*
-FROM signal_types sd;
+SELECT st.*
+FROM signal_types st;
 
 -- name: GetSignalTypeByID :one
 
-SELECT sd.*
-FROM signal_types sd
-WHERE sd.id = $1;
+SELECT st.*
+FROM signal_types st
+WHERE st.id = $1;
 
 -- name: GetSignalTypeBySlug :one
 
-SELECT sd.*
-FROM signal_types sd
-WHERE sd.slug = $1
-AND sd.sem_ver = $2;
+SELECT st.*
+FROM signal_types st
+WHERE st.slug = $1
+AND st.sem_ver = $2;
 
 -- name: GetForDisplaySignalTypeByID :one
 SELECT 
-    sd.id,
-    sd.created_at,
-    sd.updated_at,
-    sd.slug,
-    sd.schema_url,
-    sd.readme_url,
-    sd.title,
-    sd.detail,
-    sd.sem_ver,
-    sd.is_in_use
-FROM signal_types sd
-WHERE sd.id = $1;
+    st.id,
+    st.created_at,
+    st.updated_at,
+    st.slug,
+    st.schema_url,
+    st.readme_url,
+    st.title,
+    st.detail,
+    st.sem_ver,
+    st.is_in_use
+FROM signal_types st
+WHERE st.id = $1;
 
 -- name: GetForDisplaySignalTypeBySlug :one
 SELECT 
-    sd.id,
-    sd.created_at,
-    sd.updated_at,
-    sd.slug,
-    sd.schema_url,
-    sd.readme_url,
-    sd.title,
-    sd.detail,
-    sd.sem_ver,
-    sd.is_in_use
-FROM signal_types sd
-WHERE sd.slug = $1
-  AND sd.sem_ver = $2;
+    st.id,
+    st.created_at,
+    st.updated_at,
+    st.slug,
+    st.schema_url,
+    st.readme_url,
+    st.title,
+    st.detail,
+    st.sem_ver,
+    st.is_in_use
+FROM signal_types st
+WHERE st.slug = $1
+  AND st.sem_ver = $2;
+
+
+-- name: GetForDisplaySignalTypeByIsnID :many
+SELECT 
+    st.id,
+    st.created_at,
+    st.updated_at,
+    st.slug,
+    st.schema_url,
+    st.readme_url,
+    st.title,
+    st.detail,
+    st.sem_ver,
+    st.is_in_use
+FROM signal_types st
+WHERE st.isn_id = $1;
 
 -- if there are no signals defs for the supplied slug, this query returns an empty string for schema_url and a sem_ver of '0.0.0' 
 -- name: GetSemVerAndSchemaForLatestSlugVersion :one
@@ -74,23 +90,23 @@ SELECT '0.0.0' AS sem_ver,
        '' AS schema_url
 WHERE NOT EXISTS
     (SELECT 1
-     FROM signal_types sd1
-     WHERE sd1.slug = $1)
+     FROM signal_types st1
+     WHERE st1.slug = $1)
 UNION ALL
-SELECT sd2.sem_ver,
-       sd2.schema_url
-FROM signal_types sd2
-WHERE sd2.slug = $1
-  AND sd2.sem_ver =
-    (SELECT max(sd3.sem_ver)
-     FROM signal_types sd3
-     WHERE sd3.slug = $1);
+SELECT st2.sem_ver,
+       st2.schema_url
+FROM signal_types st2
+WHERE st2.slug = $1
+  AND st2.sem_ver =
+    (SELECT max(st3.sem_ver)
+     FROM signal_types st3
+     WHERE st3.slug = $1);
 
 -- only return signal_types for the ISN that are flagged "in use"
 -- name: GetInUseSignalTypesByIsnID :many
-SELECT sd.*
-FROM signal_types sd
-WHERE sd.isn_id = $1
+SELECT st.*
+FROM signal_types st
+WHERE st.isn_id = $1
 AND is_in_use = true;
 
 -- name: ExistsSignalTypeWithSlugAndSchema :one
