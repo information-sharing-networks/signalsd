@@ -19,8 +19,18 @@ type ErrorResponse struct {
 func RespondWithError(w http.ResponseWriter, r *http.Request, statusCode int, errorCode apperrors.ErrorCode, message string) {
 	requestLogger := zerolog.Ctx(r.Context())
 	requestID := middleware.GetReqID(r.Context())
+	var logEvent *zerolog.Event
 
-	requestLogger.Error().
+	switch {
+	case statusCode >= 500:
+		logEvent = requestLogger.Error()
+	case statusCode >= 400:
+		logEvent = requestLogger.Warn()
+	default:
+		logEvent = requestLogger.Info()
+	}
+
+	logEvent.
 		Int("status", statusCode).
 		Any("error_code", errorCode).
 		Str("error_message", message).
