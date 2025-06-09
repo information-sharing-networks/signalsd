@@ -1031,6 +1031,28 @@ paths:
       summary: Register user
       tags:
       - auth
+  /auth/register/service-accounts:
+    post:
+      description: Access tokens expire after 30 mins and subsequent requests using
+        the token will fail with HTTP status 401 and an error_code of "access_token_expired"
+      responses:
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerServiceAccount: []
+      summary: Register a new service account
+      tags:
+      - auth
   /auth/revoke:
     post:
       description: |
@@ -1063,6 +1085,14 @@ paths:
       security:
       - BearerRefreshToken: []
       summary: Revoke refresh token
+      tags:
+      - auth
+  /auth/service-accounts/revoke:
+    post:
+      description: |
+        Revoke a client secret to prevent it being used to create new access ServiceAccounts.
+      responses: {}
+      summary: Revoke client secret
       tags:
       - auth
   /auth/token:

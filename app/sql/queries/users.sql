@@ -1,8 +1,8 @@
 -- note: don't display emails on public apis ("GetForDisplay*").
 
 -- name: CreateUser :one
-INSERT INTO users (account_id, created_at, updated_at, email, hashed_password)
-VALUES ( $1, NOW(), NOW(), $2, $3)
+INSERT INTO users (account_id, created_at, updated_at, email, hashed_password, user_role)
+VALUES ( $1, NOW(), NOW(), $2, $3, 'member')
 RETURNING *;
 
 -- name: CreateOwnerUser :one

@@ -18,7 +18,7 @@ CREATE TABLE users (
     hashed_password TEXT NOT NULL,
     user_role text NOT NULL,
     CONSTRAINT user_role_check
-        CHECK (user_role IN ('owner','admin','user')),
+        CHECK (user_role IN ('owner','admin','member')),
     CONSTRAINT users_email_key UNIQUE (email),
     CONSTRAINT fk_user_account FOREIGN KEY (account_id) 
         REFERENCES accounts(id) 

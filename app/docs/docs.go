@@ -772,6 +772,40 @@ const docTemplate = `{
                 }
             }
         },
+        "/auth/register/service-accounts": {
+            "post": {
+                "security": [
+                    {
+                        "BearerServiceAccount": []
+                    }
+                ],
+                "description": "Access tokens expire after 30 mins and subsequent requests using the token will fail with HTTP status 401 and an error_code of \"access_token_expired\"",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Register a new service account",
+                "responses": {
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/auth/revoke": {
             "post": {
                 "security": [
@@ -807,6 +841,16 @@ const docTemplate = `{
                         }
                     }
                 }
+            }
+        },
+        "/auth/service-accounts/revoke": {
+            "post": {
+                "description": "Revoke a client secret to prevent it being used to create new access ServiceAccounts.\n",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Revoke client secret",
+                "responses": {}
             }
         },
         "/auth/token": {
