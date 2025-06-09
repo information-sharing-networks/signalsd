@@ -20,6 +20,8 @@ RUN addgroup -S signalsd && adduser -S -G signalsd signalsd
 WORKDIR /app
 
 COPY --from=builder --chown=signalsd:signalsd /app/signalsd .
+COPY --from=builder --chown=signalsd:signalsd /app/docs .
+
 
 USER signalsd
 
