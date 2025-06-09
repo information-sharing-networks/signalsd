@@ -15,6 +15,7 @@ RUN mkdir runtime
 RUN CGO_ENABLED=0 GOOS=linux go build -o runtime/signalsd cmd/signalsd/main.go
 
 COPY /app/docs runtime/docs/
+COPY /app/assets runtime/assets/
 
 # --- Create a runtime image ---
 FROM alpine:3.21

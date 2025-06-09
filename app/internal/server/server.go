@@ -245,13 +245,12 @@ func (s *Server) registerRoutes() {
 		r.Get("/live", admin.LivenessHandler)
 	})
 
-	// documentation
 	s.router.Route("/assets", func(r chi.Router) {
-		r.Get("/*", func(w http.ResponseWriter, r *http.Request) {
-			http.StripPrefix("/assets/", http.FileServer(http.Dir("assets"))).ServeHTTP(w, r)
-		})
+		fs := http.FileServer(http.Dir("assets"))
+		r.Get("/*", http.StripPrefix("/assets/", fs).ServeHTTP)
 	})
-	s.router.Get("/", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./assets/home.html") })
+
+	s.router.Get("/", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./assets/index.html") })
 	s.router.Get("/docs", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./docs/redoc.html") })
 	s.router.Get("/swagger.json", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./docs/swagger.json") })
 }
