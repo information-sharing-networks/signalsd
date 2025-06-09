@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"net/url"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -80,7 +81,10 @@ func main() {
 	if err = pool.Ping(ctx); err != nil {
 		serverLogger.Fatal().Err(err).Msg("Error pinging database via pool")
 	}
-	serverLogger.Info().Msgf("connected to PostgreSQL at %v", cfg.DatabaseURL)
+
+	safeURL, _ := removePassword(cfg.DatabaseURL)
+
+	serverLogger.Info().Msgf("connected to PostgreSQL at %v", safeURL)
 
 	queries := database.New(pool)
 
@@ -95,4 +99,14 @@ func main() {
 
 	serverLogger.Info().Msg("server shutdown complete")
 
+}
+
+func removePassword(connStr string) (string, error) {
+	u, _ := url.Parse(connStr)
+	if u.User != nil {
+		username := u.User.Username()
+		u.User = url.User(username)
+	}
+
+	return u.String(), nil
 }
