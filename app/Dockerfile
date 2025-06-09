@@ -10,7 +10,11 @@ RUN go mod download
 
 COPY app .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o signalsd cmd/signalsd/main.go
+RUN mkdir runtime
+
+RUN CGO_ENABLED=0 GOOS=linux go build -o runtime/signalsd cmd/signalsd/main.go
+
+COPY /app/docs runtime/docs/
 
 # --- Create a runtime image ---
 FROM alpine:3.21
@@ -19,9 +23,7 @@ RUN addgroup -S signalsd && adduser -S -G signalsd signalsd
 
 WORKDIR /app
 
-COPY --from=builder --chown=signalsd:signalsd /app/signalsd .
-COPY --from=builder --chown=signalsd:signalsd /app/docs .
-
+COPY --from=builder --chown=signalsd:signalsd /app/runtime .
 
 USER signalsd
 
