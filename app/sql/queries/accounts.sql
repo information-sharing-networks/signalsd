@@ -3,9 +3,9 @@ INSERT INTO accounts (id, created_at, updated_at, account_type)
 VALUES ( gen_random_uuid(), NOW(), NOW(), 'user')
 RETURNING *;
 
--- name: CreateserviceAccountAccount :one
+-- name: CreateServiceAccountAccount :one
 INSERT INTO accounts (id, created_at, updated_at, account_type)
-VALUES ( gen_random_uuid(), NOW(), NOW(), 'service_identity')
+VALUES ( gen_random_uuid(), NOW(), NOW(), 'service_account')
 RETURNING *;
 
 -- service_accounts can't be owners or admins and are therefore always treated as members.

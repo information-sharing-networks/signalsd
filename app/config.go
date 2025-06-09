@@ -28,13 +28,15 @@ type ServerConfig struct {
 	IdleTimeout  time.Duration
 }
 
-// common constants
+// common constants - todo option to define as env vars
 const (
 	AccessTokenExpiry      = 30 * time.Minute
 	RefreshTokenExpiry     = 30 * 24 * time.Hour
 	MinimumPasswordLength  = 11
 	RefreshTokenCookieName = "refresh_token"
 	TokenIssuerName        = "Signalsd"
+	OneTimeSecretExpiry    = 48 * time.Hour
+	ClientSecretExpiry     = 365 * 24 * time.Hour
 )
 
 // common maps - used to validate enum values
@@ -44,14 +46,7 @@ var validEnvs = map[string]bool{
 	"test":    true,
 	"staging": true,
 }
-var ValidSignalTypeStages = map[string]bool{ // stored in the signal_types.stage column
-	"dev":        true,
-	"test":       true,
-	"live":       true,
-	"deprecated": true,
-	"closed":     true,
-	"shuttered":  true,
-}
+
 var ValidVisibilities = map[string]bool{ //stored in the isn.visibility column
 	"public":  true,
 	"private": true,
@@ -61,6 +56,11 @@ var ValidRoles = map[string]bool{ // users.user_role
 	"owner":  true,
 	"admin":  true,
 	"member": true,
+}
+
+var ValidAccountTypes = map[string]bool{ // accounts.account_type
+	"user":            true,
+	"service_account": true,
 }
 
 var ValidISNPermissions = map[string]bool{ // isn_accounts.permission

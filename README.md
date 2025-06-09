@@ -203,7 +203,7 @@ run `sqlc generate` from the root of the project to regenerate the type safe go 
 
 # Technical overview
 ## Auth
-![auth.0.2.0](https://github.com/user-attachments/assets/15d194a9-04c6-4b4f-a7ad-c69e5b347e7f)
+![auth.0.2.0](https://github.com/user-attachments/assets/d5d24660-d5fa-4c1e-8af7-4159245fa1cc)
 
 ## ISN config
 ![isns.0.2.0](https://github.com/user-attachments/assets/e091a3ae-e9ed-4b44-aa7e-027ddb93e98c)

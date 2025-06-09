@@ -9,6 +9,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
@@ -26,40 +27,62 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, e
 	}
 }
 
-// RefreshAccessTokenHandler godoc
+// TokenHandler godoc
 //
-//	@Summary		Refresh access token
-//	@Description	Use this endpoint to get a new access token.
+//	@Summary		Get Access Token
 //	@Description
-//	@Description	A vaild refresh token is needed to use this endpoint - if the refresh token has expired or been revoked the user must login again to get a new one.
-//	@Description	New refresh tokens are sent as http-only cookies whenever the client uses this endpoint or logs in.
+//	@Description	**Client Credentials Grant (Service Accounts):**
 //	@Description
-//	@Description	The browser handles refresh token cookies automatically, but you must provide your current access token in the Authorization header (the token is used only for user identification - expired tokens are accepted).
+//	@Description	Issues new access token (in response body)
 //	@Description
-//	@Description	Each successful refresh operation:
-//	@Description	- Invalidates the current refresh token
-//	@Description	- Issues a new refresh token via secure HTTP-only cookie
-//	@Description	- Returns a new access token in the response body
+//	@Description	- Set `grant_type=client_credentials` as URL parameter
+//	@Description	- Provide `client_id` and `client_secret` in request body
+//	@Description	- Access tokens expire after 30 minutes
+//	@Description	(subsequent requests using the token will fail with HTTP status 401 and an error_code of "access_token_expired")
 //	@Description
-//	@Description	the new refresh token cookies is configured with:
-//	@Description	- HttpOnly - Prevents JavaScript access, reducing XSS risk
-//	@Description	- Secure - HTTPS (only in production environments)
-//	@Description	- SameSite=Lax -  preventing the use of cookie in third-party requests except for user-driven interactions.
+//	@Description	**Refresh Token Grant (Web Users):**
 //	@Description
-//	@Description	The account's role and permissions are encoded and included as part of the jwt access token and also provided in the response body
+//	@Description	Issues new access token (in response body) and rotates refresh token (HTTP-only cookie)
 //	@Description
-//	@Description	Access tokens expire after 30 mins and subsequent requests using the token will fail with HTTP status 401 and an error_code of "access_token_expired"
+//	@Description	- Set `grant_type=refresh_token` as URL parameter
+//	@Description	- Must provide current access token in Authorization header (expired tokens accepted)
+//	@Description	- Must have valid refresh token cookie
+//	@Description	- Access tokens expire after 30 minutes
+//	@Description	(subsequent requests using the token will fail with HTTP status 401 and an error_code of "access_token_expired")
+//	@Description	- Refresh tokens expire after 30 days
+//	@Description	- subsequent requests using the refresh token will fail with HTTP status 401 and an error_code of "refresh_token_expired" and users must login again to get a new one.
+//	@Description
 //	@Tags			auth
+//
+//	@Param			grant_type	query	string	true	"grant type"	Enums(client_credentials, refresh_token)
+//	@Param			request		body	auth.ServiceAccountTokenRequest	false	"Service account credentials (required for client_credentials grant)"
 //
 //	@Success		200	{object}	auth.AccessTokenResponse
 //	@Failure		400	{object}	responses.ErrorResponse
 //	@Failure		401	{object}	responses.ErrorResponse
 //	@Failure		500	{object}	responses.ErrorResponse
 //
-//	@Security		BearerAccessToken
-//
-//	@Router			/auth/token [post]
+//	@Router			/oauth/token [post]
+func (t *TokenHandler) TokenHandler(w http.ResponseWriter, r *http.Request) {
+	grantType := r.URL.Query().Get("grant_type")
+
+	switch grantType {
+	case "client_credentials":
+		t.ClientCredentialsHandler(w, r)
+	case "refresh_token":
+		t.RefreshAccessTokenHandler(w, r)
+	default:
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, fmt.Sprintf("unsupported grant_type: %s", grantType))
+	}
+}
+
+// RefreshAccessTokenHandler godoc
+// for web users
+// A valid refresh token is needed to use this endpoint - if the refresh token has expired or been revoked the user must login again to get a new one.
+// New refresh tokens are sent as http-only cookies whenever the client uses this endpoint or logs in.
 func (a *TokenHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.Request) {
+
+	logger := zerolog.Ctx(r.Context())
 
 	// the RequireValidRefreshToken middleware adds the userAccountId
 	userAccountID, ok := auth.ContextAccountID(r.Context())
@@ -84,9 +107,34 @@ func (a *TokenHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.
 
 	http.SetCookie(w, newCookie)
 
-	log.Info().Msgf("user %v refreshed an access token", userAccountID)
+	logger.Info().Msgf("user %v refreshed an access token", userAccountID)
 
 	responses.RespondWithJSON(w, http.StatusOK, accessTokenResponse)
+}
+
+// ClientCredentialsHandler godoc
+// for service accounts
+// gets request via the RequireValidClientCredentials middleware (this adds the server account account ID to the context)
+func (t *TokenHandler) ClientCredentialsHandler(w http.ResponseWriter, r *http.Request) {
+
+	logger := zerolog.Ctx(r.Context())
+
+	serverAccountAccountID, ok := auth.ContextAccountID(r.Context())
+	if !ok {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "middleware did not supply a Server Account ID")
+		return
+	}
+
+	accessTokenResponse, err := t.authService.BuildAccessTokenResponse(r.Context())
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenInvalid, fmt.Sprintf("error creating access token: %v", err))
+		return
+	}
+
+	logger.Info().Msgf("serviceAccount %v refreshed an access token", serverAccountAccountID)
+
+	responses.RespondWithJSON(w, http.StatusOK, accessTokenResponse)
+
 }
 
 // RevokeRefreshTokenHandler godoc

@@ -10,8 +10,100 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const createClientSecret = `-- name: CreateClientSecret :one
+INSERT INTO client_secrets (hashed_secret, service_account_account_id, created_at, updated_at, expires_at)
+VALUES ( $1,$2, NOW(), NOW(), $3 )
+RETURNING hashed_secret, service_account_account_id
+`
+
+type CreateClientSecretParams struct {
+	HashedSecret            string    `json:"hashed_secret"`
+	ServiceAccountAccountID uuid.UUID `json:"service_account_account_id"`
+	ExpiresAt               time.Time `json:"expires_at"`
+}
+
+type CreateClientSecretRow struct {
+	HashedSecret            string    `json:"hashed_secret"`
+	ServiceAccountAccountID uuid.UUID `json:"service_account_account_id"`
+}
+
+func (q *Queries) CreateClientSecret(ctx context.Context, arg CreateClientSecretParams) (CreateClientSecretRow, error) {
+	row := q.db.QueryRow(ctx, createClientSecret, arg.HashedSecret, arg.ServiceAccountAccountID, arg.ExpiresAt)
+	var i CreateClientSecretRow
+	err := row.Scan(&i.HashedSecret, &i.ServiceAccountAccountID)
+	return i, err
+}
+
+const createOneTimeClientSecret = `-- name: CreateOneTimeClientSecret :one
+INSERT INTO one_time_client_secrets (id, service_account_account_id, plaintext_secret, created_at, expires_at)
+VALUES ( $1, $2, $3, NOW(), $4)
+RETURNING id
+`
+
+type CreateOneTimeClientSecretParams struct {
+	ID                      uuid.UUID `json:"id"`
+	ServiceAccountAccountID uuid.UUID `json:"service_account_account_id"`
+	PlaintextSecret         string    `json:"plaintext_secret"`
+	ExpiresAt               time.Time `json:"expires_at"`
+}
+
+func (q *Queries) CreateOneTimeClientSecret(ctx context.Context, arg CreateOneTimeClientSecretParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, createOneTimeClientSecret,
+		arg.ID,
+		arg.ServiceAccountAccountID,
+		arg.PlaintextSecret,
+		arg.ExpiresAt,
+	)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const createServiceAccount = `-- name: CreateServiceAccount :one
+INSERT INTO service_accounts (
+    account_id,
+    created_at,
+    updated_at,
+    client_id,
+    client_contact_email,
+    client_organization,
+    rate_limit_per_minute,
+    is_active
+) VALUES ( $1, NOW(), NOW(), $2, $3, $4, $5, true)
+RETURNING account_id, created_at, updated_at, client_id, client_contact_email, client_organization, rate_limit_per_minute, is_active
+`
+
+type CreateServiceAccountParams struct {
+	AccountID          uuid.UUID `json:"account_id"`
+	ClientID           string    `json:"client_id"`
+	ClientContactEmail string    `json:"client_contact_email"`
+	ClientOrganization string    `json:"client_organization"`
+	RateLimitPerMinute int32     `json:"rate_limit_per_minute"`
+}
+
+func (q *Queries) CreateServiceAccount(ctx context.Context, arg CreateServiceAccountParams) (ServiceAccount, error) {
+	row := q.db.QueryRow(ctx, createServiceAccount,
+		arg.AccountID,
+		arg.ClientID,
+		arg.ClientContactEmail,
+		arg.ClientOrganization,
+		arg.RateLimitPerMinute,
+	)
+	var i ServiceAccount
+	err := row.Scan(
+		&i.AccountID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ClientID,
+		&i.ClientContactEmail,
+		&i.ClientOrganization,
+		&i.RateLimitPerMinute,
+		&i.IsActive,
+	)
+	return i, err
+}
 
 const deleteOneTimeClientSecret = `-- name: DeleteOneTimeClientSecret :execrows
 DELETE from one_time_client_secrets 
@@ -26,33 +118,111 @@ func (q *Queries) DeleteOneTimeClientSecret(ctx context.Context, id uuid.UUID) (
 	return result.RowsAffected(), nil
 }
 
-const extendClientSecret = `-- name: ExtendClientSecret :execrows
-UPDATE client_secrets SET (updated_at, expires_at) = (NOW(), NOW()) 
+const existsServiceAccountWithEmailAndOrganization = `-- name: ExistsServiceAccountWithEmailAndOrganization :one
+SELECT EXISTS (
+    SELECT 1 FROM service_accounts
+    WHERE client_contact_email = $1
+    AND client_organization = $2
+) AS exists
+`
+
+type ExistsServiceAccountWithEmailAndOrganizationParams struct {
+	ClientContactEmail string `json:"client_contact_email"`
+	ClientOrganization string `json:"client_organization"`
+}
+
+func (q *Queries) ExistsServiceAccountWithEmailAndOrganization(ctx context.Context, arg ExistsServiceAccountWithEmailAndOrganizationParams) (bool, error) {
+	row := q.db.QueryRow(ctx, existsServiceAccountWithEmailAndOrganization, arg.ClientContactEmail, arg.ClientOrganization)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
+const getOneTimeClientSecret = `-- name: GetOneTimeClientSecret :one
+SELECT created_at, service_account_account_id, plaintext_secret, expires_at
+FROM one_time_client_secrets
+WHERE id = $1
+`
+
+type GetOneTimeClientSecretRow struct {
+	CreatedAt               time.Time `json:"created_at"`
+	ServiceAccountAccountID uuid.UUID `json:"service_account_account_id"`
+	PlaintextSecret         string    `json:"plaintext_secret"`
+	ExpiresAt               time.Time `json:"expires_at"`
+}
+
+func (q *Queries) GetOneTimeClientSecret(ctx context.Context, id uuid.UUID) (GetOneTimeClientSecretRow, error) {
+	row := q.db.QueryRow(ctx, getOneTimeClientSecret, id)
+	var i GetOneTimeClientSecretRow
+	err := row.Scan(
+		&i.CreatedAt,
+		&i.ServiceAccountAccountID,
+		&i.PlaintextSecret,
+		&i.ExpiresAt,
+	)
+	return i, err
+}
+
+const getServiceAccountByAccountID = `-- name: GetServiceAccountByAccountID :one
+SELECT sa.account_id, sa.created_at, sa.updated_at, sa.client_id, sa.client_contact_email, sa.client_organization, sa.rate_limit_per_minute, sa.is_active FROM service_accounts sa
+WHERE sa.account_id = $1
+`
+
+func (q *Queries) GetServiceAccountByAccountID(ctx context.Context, accountID uuid.UUID) (ServiceAccount, error) {
+	row := q.db.QueryRow(ctx, getServiceAccountByAccountID, accountID)
+	var i ServiceAccount
+	err := row.Scan(
+		&i.AccountID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ClientID,
+		&i.ClientContactEmail,
+		&i.ClientOrganization,
+		&i.RateLimitPerMinute,
+		&i.IsActive,
+	)
+	return i, err
+}
+
+const getServiceAccountByClientID = `-- name: GetServiceAccountByClientID :one
+SELECT sa.account_id, sa.created_at, sa.updated_at, sa.client_id, sa.client_contact_email, sa.client_organization, sa.rate_limit_per_minute, sa.is_active FROM service_accounts sa
+WHERE sa.client_id = $1
+`
+
+func (q *Queries) GetServiceAccountByClientID(ctx context.Context, clientID string) (ServiceAccount, error) {
+	row := q.db.QueryRow(ctx, getServiceAccountByClientID, clientID)
+	var i ServiceAccount
+	err := row.Scan(
+		&i.AccountID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ClientID,
+		&i.ClientContactEmail,
+		&i.ClientOrganization,
+		&i.RateLimitPerMinute,
+		&i.IsActive,
+	)
+	return i, err
+}
+
+const getValidClientSecretByHashedSecret = `-- name: GetValidClientSecretByHashedSecret :one
+SELECT hashed_secret, created_at, updated_at, service_account_account_id, expires_at, revoked_at FROM client_secrets
 WHERE hashed_secret = $1
+AND revoked_at IS NULL
+AND expires_at > NOW()
 `
 
-func (q *Queries) ExtendClientSecret(ctx context.Context, hashedSecret string) (int64, error) {
-	result, err := q.db.Exec(ctx, extendClientSecret, hashedSecret)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
-const getClientSecret = `-- name: GetClientSecret :one
-SELECT service_account_account_id, expires_at, revoked_at FROM client_secrets where hashed_secret = $1
-`
-
-type GetClientSecretRow struct {
-	ServiceAccountAccountID uuid.UUID  `json:"service_account_account_id"`
-	ExpiresAt               time.Time  `json:"expires_at"`
-	RevokedAt               *time.Time `json:"revoked_at"`
-}
-
-func (q *Queries) GetClientSecret(ctx context.Context, hashedSecret string) (GetClientSecretRow, error) {
-	row := q.db.QueryRow(ctx, getClientSecret, hashedSecret)
-	var i GetClientSecretRow
-	err := row.Scan(&i.ServiceAccountAccountID, &i.ExpiresAt, &i.RevokedAt)
+func (q *Queries) GetValidClientSecretByHashedSecret(ctx context.Context, hashedSecret string) (ClientSecret, error) {
+	row := q.db.QueryRow(ctx, getValidClientSecretByHashedSecret, hashedSecret)
+	var i ClientSecret
+	err := row.Scan(
+		&i.HashedSecret,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ServiceAccountAccountID,
+		&i.ExpiresAt,
+		&i.RevokedAt,
+	)
 	return i, err
 }
 
@@ -74,55 +244,6 @@ func (q *Queries) GetValidClientSecretByServiceAccountAccountId(ctx context.Cont
 	var i GetValidClientSecretByServiceAccountAccountIdRow
 	err := row.Scan(&i.HashedSecret, &i.ExpiresAt)
 	return i, err
-}
-
-const insertClientSecrets = `-- name: InsertClientSecrets :one
-INSERT INTO client_secrets (hashed_secret, service_account_account_id, created_at, updated_at, expires_at)
-VALUES ( $1,$2, NOW(), NOW(), $3)
-RETURNING hashed_secret, service_account_account_id
-`
-
-type InsertClientSecretsParams struct {
-	HashedSecret            string    `json:"hashed_secret"`
-	ServiceAccountAccountID uuid.UUID `json:"service_account_account_id"`
-	ExpiresAt               time.Time `json:"expires_at"`
-}
-
-type InsertClientSecretsRow struct {
-	HashedSecret            string    `json:"hashed_secret"`
-	ServiceAccountAccountID uuid.UUID `json:"service_account_account_id"`
-}
-
-func (q *Queries) InsertClientSecrets(ctx context.Context, arg InsertClientSecretsParams) (InsertClientSecretsRow, error) {
-	row := q.db.QueryRow(ctx, insertClientSecrets, arg.HashedSecret, arg.ServiceAccountAccountID, arg.ExpiresAt)
-	var i InsertClientSecretsRow
-	err := row.Scan(&i.HashedSecret, &i.ServiceAccountAccountID)
-	return i, err
-}
-
-const insertOneTimeClientSecret = `-- name: InsertOneTimeClientSecret :one
-INSERT INTO one_time_client_secrets (id, service_account_account_id, plaintext_secret, created_at, expires_at)
-VALUES ( $1, $2, $3, NOW(), $4)
-RETURNING id
-`
-
-type InsertOneTimeClientSecretParams struct {
-	ID                      uuid.UUID        `json:"id"`
-	ServiceAccountAccountID uuid.UUID        `json:"service_account_account_id"`
-	PlaintextSecret         string           `json:"plaintext_secret"`
-	ExpiresAt               pgtype.Timestamp `json:"expires_at"`
-}
-
-func (q *Queries) InsertOneTimeClientSecret(ctx context.Context, arg InsertOneTimeClientSecretParams) (uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, insertOneTimeClientSecret,
-		arg.ID,
-		arg.ServiceAccountAccountID,
-		arg.PlaintextSecret,
-		arg.ExpiresAt,
-	)
-	var id uuid.UUID
-	err := row.Scan(&id)
-	return id, err
 }
 
 const revokeAllClientSecretsForUser = `-- name: RevokeAllClientSecretsForUser :execrows

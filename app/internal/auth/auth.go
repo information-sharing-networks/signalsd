@@ -39,7 +39,7 @@ type AccessTokenResponse struct {
 	TokenType   string              `json:"token_type" example:"Bearer"`
 	ExpiresIn   int                 `json:"expires_in" example:"1800"` //seconds
 	AccountID   uuid.UUID           `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
-	AccountType string              `json:"account_type" enums:"user,service_identity"`
+	AccountType string              `json:"account_type" enums:"user,service_account"`
 	Role        string              `json:"role" enums:"owner,admin,member" example:"admin"`
 	Perms       map[string]IsnPerms `json:"isn_perms,omitempty"`
 }
@@ -53,7 +53,7 @@ type IsnPerms struct {
 type AccessTokenClaims struct {
 	jwt.RegisteredClaims
 	AccountID   uuid.UUID           `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
-	AccountType string              `json:"account_type" enums:"user,service_identity"`
+	AccountType string              `json:"account_type" enums:"user,service_account"`
 	Role        string              `json:"role" enums:"owner,admin,member" example:"admin"`
 	IsnPerms    map[string]IsnPerms `json:"isn_perms,omitempty" example:"isn1"`
 }
@@ -68,6 +68,18 @@ func (a AuthService) HashPassword(password string) (string, error) {
 
 func (a AuthService) CheckPasswordHash(hash, password string) error {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+}
+
+// GenerateSecureToken
+// Returns the token as a base64-URL-encoded string for safe transmission/storage
+func (a AuthService) GenerateSecureToken(byteLength int) (string, error) {
+	tokenBytes := make([]byte, byteLength)
+	_, err := io.ReadFull(rand.Reader, tokenBytes)
+	if err != nil {
+		return "", fmt.Errorf("error generating secure random bytes: %v", err)
+	}
+
+	return base64.URLEncoding.EncodeToString(tokenBytes), nil
 }
 
 // hash a token using sha512
@@ -279,15 +291,10 @@ func (a AuthService) RotateRefreshToken(ctx context.Context) (string, error) {
 		return "", fmt.Errorf("authservice: could not revoke previous refresh tokens for user %v", userAccountID)
 	}
 
-	// Generate random bytes
-	tokenBytes := make([]byte, 32)
-	_, err = io.ReadFull(rand.Reader, tokenBytes)
+	plainTextToken, err := a.GenerateSecureToken(32)
 	if err != nil {
 		return "", fmt.Errorf("authservice: error creating refresh token: %v", err)
 	}
-
-	// Convert to base64 string for safe transmission/storage
-	plainTextToken := base64.URLEncoding.EncodeToString(tokenBytes)
 
 	// Hash the plain text token
 	hashedToken := a.HashToken(plainTextToken)
