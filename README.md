@@ -223,7 +223,7 @@ The service is deployed using the image created at the last push to the main bra
 
 ![deploy.0.2.0](https://github.com/user-attachments/assets/942384a7-ccd7-4abb-b2a7-a9e293e23a10)
 
-note this is a pre-prod version and should not be used with data that you don't mind being deleted or seen by other people.
+note this is a pre-prod version and should only be used with data that you don't mind being deleted or seen by other people.
 
 the steps to set up this environment in Google Cloud are:
 > create a project called signald 
