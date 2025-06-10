@@ -94,7 +94,7 @@ func NewServiceAccountHandler(queries *database.Queries, authService *auth.AuthS
 type CreateServiceAccountRequest struct {
 	ClientOrganization string `json:"client_organization" example:"example org"`
 	ClientContactEmail string `json:"client_contact_email" example:"example@example.com"`
-	RateLimitPerMinute int    `json:"rate_limit_per_minute" example:"100"`
+	RateLimitPerMinute int32  `json:"rate_limit_per_minute" example:"100"`
 }
 
 type CreateServiceAccountResponse struct {
@@ -191,7 +191,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 		ClientID:           clientID,
 		ClientContactEmail: req.ClientContactEmail,
 		ClientOrganization: req.ClientOrganization,
-		RateLimitPerMinute: int32(req.RateLimitPerMinute),
+		RateLimitPerMinute: req.RateLimitPerMinute,
 	})
 	if err != nil {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not insert service account record: %v", err))
@@ -425,5 +425,5 @@ func (s *ServiceAccountHandler) renderErrorPage(w http.ResponseWriter, title, me
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusBadRequest)
-	w.Write([]byte(errorHTML))
+	_, _ = w.Write([]byte(errorHTML))
 }
