@@ -154,14 +154,14 @@ func (t *TokenHandler) ClientCredentialsHandler(w http.ResponseWriter, r *http.R
 //	@Description
 //	@Tags		auth
 //
-//	@Success	204
+//	@Success	200
 //	@Failure	400	{object}	responses.ErrorResponse
 //	@Failure	404	{object}	responses.ErrorResponse
 //	@Failure	500	{object}	responses.ErrorResponse
 //
 //	@Security	BearerRefreshToken
 //
-//	@Router		/auth/revoke [post]
+//	@Router		/oauth/revoke [post]
 //
 // RevokeRefreshTokenHandler gets the request from the RequireValidRefreshToken middleware
 // The middleware identifies the user and confirms there is a valid refresh token in the refresh_token cookie
@@ -194,6 +194,6 @@ func (a *TokenHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.
 	}
 
 	log.Info().Msgf("refresh token revoked by userAccountID %v", userAccountId)
-	responses.RespondWithStatusCodeOnly(w, http.StatusCreated)
+	responses.RespondWithStatusCodeOnly(w, http.StatusOK)
 
 }
