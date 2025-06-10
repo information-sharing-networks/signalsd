@@ -137,12 +137,6 @@ func (s *Server) registerRoutes() {
 		})
 
 		r.Group(func(r chi.Router) {
-			r.Use(s.authService.RequireValidRefreshToken)
-
-			r.Post("/revoke", tokens.RevokeRefreshTokenHandler)
-		})
-
-		r.Group(func(r chi.Router) {
 			r.Use(s.authService.RequireValidAccessToken)
 			r.Use(s.authService.RequireRole("owner"))
 
@@ -162,6 +156,7 @@ func (s *Server) registerRoutes() {
 		r.Get("/service-accounts/setup/{setup_id}", serviceAccounts.SetupServiceAccountHandler)
 	})
 
+	//oauth2.0 token handling
 	s.router.Route("/oauth", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
 			// Apply grant-type-specific validation middleware
@@ -169,6 +164,12 @@ func (s *Server) registerRoutes() {
 
 			// Unified OAuth 2.0 token endpoint
 			r.Post("/token", tokens.TokenHandler)
+		})
+
+		r.Group(func(r chi.Router) {
+			r.Use(s.authService.RequireValidRefreshToken)
+
+			r.Post("/revoke", tokens.RevokeRefreshTokenHandler)
 		})
 	})
 
