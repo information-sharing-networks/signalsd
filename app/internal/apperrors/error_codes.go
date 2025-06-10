@@ -17,6 +17,7 @@ const (
 	ErrCodePasswordTooShort      ErrorCode = "password_too_short"
 	ErrCodeRefreshTokenInvalid   ErrorCode = "refresh_token_invalid"
 	ErrCodeResourceAlreadyExists ErrorCode = "resource_already_exists"
+	ErrCodeResourceExpired       ErrorCode = "resource_expired"
 	ErrCodeResourceNotFound      ErrorCode = "resource_not_found"
 	ErrCodeTokenInvalid          ErrorCode = "token_invalid"
 )

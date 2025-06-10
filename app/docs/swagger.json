@@ -770,12 +770,29 @@
                         "BearerServiceAccount": []
                     }
                 ],
-                "description": "Access tokens expire after 30 mins and subsequent requests using the token will fail with HTTP status 401 and an error_code of \"access_token_expired\"",
+                "description": "Registring a new service account creates a one time link with the client credentials in it - this must be used by the client within 48 hrs.",
                 "tags": [
-                    "auth"
+                    "Service accounts"
                 ],
                 "summary": "Register a new service account",
+                "parameters": [
+                    {
+                        "description": "service account details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateServiceAccountRequest"
+                        }
+                    }
+                ],
                 "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateServiceAccountResponse"
+                        }
+                    },
                     "400": {
                         "description": "Bad Request",
                         "schema": {
@@ -836,32 +853,19 @@
         },
         "/auth/service-accounts/revoke": {
             "post": {
-                "description": "Revoke a client secret to prevent it being used to create new access ServiceAccounts.\n",
-                "tags": [
-                    "auth"
-                ],
-                "summary": "Revoke client secret",
-                "responses": {}
-            }
-        },
-        "/auth/token": {
-            "post": {
                 "security": [
                     {
-                        "BearerAccessToken": []
+                        "BearerServiceAccount": []
                     }
                 ],
-                "description": "Use this endpoint to get a new access token.\n\nA vaild refresh token is needed to use this endpoint - if the refresh token has expired or been revoked the user must login again to get a new one.\nNew refresh tokens are sent as http-only cookies whenever the client uses this endpoint or logs in.\n\nThe browser handles refresh token cookies automatically, but you must provide your current access token in the Authorization header (the token is used only for user identification - expired tokens are accepted).\n\nEach successful refresh operation:\n- Invalidates the current refresh token\n- Issues a new refresh token via secure HTTP-only cookie\n- Returns a new access token in the response body\n\nthe new refresh token cookies is configured with:\n- HttpOnly - Prevents JavaScript access, reducing XSS risk\n- Secure - HTTPS (only in production environments)\n- SameSite=Lax -  preventing the use of cookie in third-party requests except for user-driven interactions.\n\nThe account's role and permissions are encoded and included as part of the jwt access token and also provided in the response body\n\nAccess tokens expire after 30 mins and subsequent requests using the token will fail with HTTP status 401 and an error_code of \"access_token_expired\"",
+                "description": "TODO Revoke a client secret to prevent it being used to create new access ServiceAccounts.\n",
                 "tags": [
-                    "auth"
+                    "Service accounts"
                 ],
-                "summary": "Refresh access token",
+                "summary": "Revoke client secret",
                 "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/auth.AccessTokenResponse"
-                        }
+                    "204": {
+                        "description": "No Content"
                     },
                     "400": {
                         "description": "Bad Request",
@@ -869,8 +873,55 @@
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
-                    "401": {
-                        "description": "Unauthorized",
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/service-accounts/setup/{setup_id}": {
+            "get": {
+                "description": "Exchange one-time setup token for permanent client credentials\nThis endpoint can only be used once and must be called within 48 hours\n\ntheend point renders a html page that the user can copy the client credentials from",
+                "tags": [
+                    "Service accounts"
+                ],
+                "summary": "Complete service account setup",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "One-time setup token",
+                        "name": "token",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "410": {
+                        "description": "Gone",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1143,11 +1194,67 @@
                 "responses": {}
             }
         },
+        "/oauth/token": {
+            "post": {
+                "description": "**Client Credentials Grant (Service Accounts):**\n\nIssues new access token (in response body)\n\n- Set `grant_type=client_credentials` as URL parameter\n- Provide `client_id` and `client_secret` in request body\n- Access tokens expire after 30 minutes\n(subsequent requests using the token will fail with HTTP status 401 and an error_code of \"access_token_expired\")\n\n**Refresh Token Grant (Web Users):**\n\nIssues new access token (in response body) and rotates refresh token (HTTP-only cookie)\n\n- Set `grant_type=refresh_token` as URL parameter\n- Must provide current access token in Authorization header (expired tokens accepted)\n- Must have valid refresh token cookie\n- Access tokens expire after 30 minutes\n(subsequent requests using the token will fail with HTTP status 401 and an error_code of \"access_token_expired\")\n- Refresh tokens expire after 30 days\n- subsequent requests using the refresh token will fail with HTTP status 401 and an error_code of \"refresh_token_expired\" and users must login again to get a new one.\n",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Get Access Token",
+                "parameters": [
+                    {
+                        "enum": [
+                            "client_credentials",
+                            "refresh_token"
+                        ],
+                        "type": "string",
+                        "description": "grant type",
+                        "name": "grant_type",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "description": "Service account credentials (required for client_credentials grant)",
+                        "name": "request",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/auth.ServiceAccountTokenRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/auth.AccessTokenResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/webhooks": {
             "post": {
                 "description": "register a webhook to recieve signals batch status updates",
                 "tags": [
-                    "Service Accounts"
+                    "Service accounts"
                 ],
                 "summary": "Register webhook (TODO)",
                 "responses": {}
@@ -1172,6 +1279,7 @@
                 "password_too_short",
                 "refresh_token_invalid",
                 "resource_already_exists",
+                "resource_expired",
                 "resource_not_found",
                 "token_invalid"
             ],
@@ -1190,6 +1298,7 @@
                 "ErrCodePasswordTooShort",
                 "ErrCodeRefreshTokenInvalid",
                 "ErrCodeResourceAlreadyExists",
+                "ErrCodeResourceExpired",
                 "ErrCodeResourceNotFound",
                 "ErrCodeTokenInvalid"
             ]
@@ -1209,7 +1318,7 @@
                     "type": "string",
                     "enum": [
                         "user",
-                        "service_identity"
+                        "service_account"
                     ]
                 },
                 "expires_in": {
@@ -1263,6 +1372,19 @@
                         "signal-type-1/v0.0.1",
                         "signal-type-2/v1.0.0"
                     ]
+                }
+            }
+        },
+        "auth.ServiceAccountTokenRequest": {
+            "type": "object",
+            "properties": {
+                "client_id": {
+                    "type": "string",
+                    "example": "sa_example-org_k7j2m9x1"
+                },
+                "client_secret": {
+                    "type": "string",
+                    "example": "dGhpcyBpcyBhIHNlY3JldA"
                 }
             }
         },
@@ -1461,6 +1583,44 @@
                 "slug": {
                     "type": "string",
                     "example": "sample-isn--example-org"
+                }
+            }
+        },
+        "handlers.CreateServiceAccountRequest": {
+            "type": "object",
+            "properties": {
+                "client_contact_email": {
+                    "type": "string",
+                    "example": "example@example.com"
+                },
+                "client_organization": {
+                    "type": "string",
+                    "example": "example org"
+                },
+                "rate_limit_per_minute": {
+                    "type": "integer",
+                    "example": 100
+                }
+            }
+        },
+        "handlers.CreateServiceAccountResponse": {
+            "type": "object",
+            "properties": {
+                "client_id": {
+                    "type": "string",
+                    "example": "sa_example-org_k7j2m9x1"
+                },
+                "expires_at": {
+                    "type": "string",
+                    "example": "2024-12-25T10:30:00Z"
+                },
+                "expires_in": {
+                    "type": "integer",
+                    "example": 172800
+                },
+                "setup_url": {
+                    "type": "string",
+                    "example": "https://api.example.com/auth/service-accounts/setup/550e8400-e29b-41d4-a716-446655440000"
                 }
             }
         },

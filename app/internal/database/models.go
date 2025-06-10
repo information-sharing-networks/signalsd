@@ -18,6 +18,15 @@ type Account struct {
 	AccountType string    `json:"account_type"`
 }
 
+type ClientSecret struct {
+	HashedSecret            string     `json:"hashed_secret"`
+	CreatedAt               time.Time  `json:"created_at"`
+	UpdatedAt               time.Time  `json:"updated_at"`
+	ServiceAccountAccountID uuid.UUID  `json:"service_account_account_id"`
+	ExpiresAt               time.Time  `json:"expires_at"`
+	RevokedAt               *time.Time `json:"revoked_at"`
+}
+
 type Isn struct {
 	ID            uuid.UUID `json:"id"`
 	CreatedAt     time.Time `json:"created_at"`
@@ -39,6 +48,14 @@ type IsnAccount struct {
 	Permission string    `json:"permission"`
 }
 
+type OneTimeClientSecret struct {
+	ID                      uuid.UUID `json:"id"`
+	CreatedAt               time.Time `json:"created_at"`
+	ServiceAccountAccountID uuid.UUID `json:"service_account_account_id"`
+	PlaintextSecret         string    `json:"plaintext_secret"`
+	ExpiresAt               time.Time `json:"expires_at"`
+}
+
 type RefreshToken struct {
 	HashedToken   string     `json:"hashed_token"`
 	UserAccountID uuid.UUID  `json:"user_account_id"`
@@ -53,8 +70,10 @@ type ServiceAccount struct {
 	CreatedAt          time.Time `json:"created_at"`
 	UpdatedAt          time.Time `json:"updated_at"`
 	ClientID           string    `json:"client_id"`
-	ClientSecret       string    `json:"client_secret"`
 	ClientContactEmail string    `json:"client_contact_email"`
+	ClientOrganization string    `json:"client_organization"`
+	RateLimitPerMinute int32     `json:"rate_limit_per_minute"`
+	IsActive           bool      `json:"is_active"`
 }
 
 type Signal struct {

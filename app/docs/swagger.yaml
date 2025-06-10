@@ -17,6 +17,7 @@ definitions:
     - password_too_short
     - refresh_token_invalid
     - resource_already_exists
+    - resource_expired
     - resource_not_found
     - token_invalid
     type: string
@@ -35,6 +36,7 @@ definitions:
     - ErrCodePasswordTooShort
     - ErrCodeRefreshTokenInvalid
     - ErrCodeResourceAlreadyExists
+    - ErrCodeResourceExpired
     - ErrCodeResourceNotFound
     - ErrCodeTokenInvalid
   auth.AccessTokenResponse:
@@ -48,7 +50,7 @@ definitions:
       account_type:
         enum:
         - user
-        - service_identity
+        - service_account
         type: string
       expires_in:
         description: seconds
@@ -88,6 +90,15 @@ definitions:
         items:
           type: string
         type: array
+    type: object
+  auth.ServiceAccountTokenRequest:
+    properties:
+      client_id:
+        example: sa_example-org_k7j2m9x1
+        type: string
+      client_secret:
+        example: dGhpcyBpcyBhIHNlY3JldA
+        type: string
     type: object
   database.GetForDisplaySignalTypeByIsnIDRow:
     properties:
@@ -219,6 +230,33 @@ definitions:
         type: string
       slug:
         example: sample-isn--example-org
+        type: string
+    type: object
+  handlers.CreateServiceAccountRequest:
+    properties:
+      client_contact_email:
+        example: example@example.com
+        type: string
+      client_organization:
+        example: example org
+        type: string
+      rate_limit_per_minute:
+        example: 100
+        type: integer
+    type: object
+  handlers.CreateServiceAccountResponse:
+    properties:
+      client_id:
+        example: sa_example-org_k7j2m9x1
+        type: string
+      expires_at:
+        example: "2024-12-25T10:30:00Z"
+        type: string
+      expires_in:
+        example: 172800
+        type: integer
+      setup_url:
+        example: https://api.example.com/auth/service-accounts/setup/550e8400-e29b-41d4-a716-446655440000
         type: string
     type: object
   handlers.CreateSignalTypeRequest:
@@ -1033,9 +1071,20 @@ paths:
       - auth
   /auth/register/service-accounts:
     post:
-      description: Access tokens expire after 30 mins and subsequent requests using
-        the token will fail with HTTP status 401 and an error_code of "access_token_expired"
+      description: Registring a new service account creates a one time link with the
+        client credentials in it - this must be used by the client within 48 hrs.
+      parameters:
+      - description: service account details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateServiceAccountRequest'
       responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.CreateServiceAccountResponse'
         "400":
           description: Bad Request
           schema:
@@ -1052,7 +1101,7 @@ paths:
       - BearerServiceAccount: []
       summary: Register a new service account
       tags:
-      - auth
+      - Service accounts
   /auth/revoke:
     post:
       description: |
@@ -1090,45 +1139,16 @@ paths:
   /auth/service-accounts/revoke:
     post:
       description: |
-        Revoke a client secret to prevent it being used to create new access ServiceAccounts.
-      responses: {}
-      summary: Revoke client secret
-      tags:
-      - auth
-  /auth/token:
-    post:
-      description: |-
-        Use this endpoint to get a new access token.
-
-        A vaild refresh token is needed to use this endpoint - if the refresh token has expired or been revoked the user must login again to get a new one.
-        New refresh tokens are sent as http-only cookies whenever the client uses this endpoint or logs in.
-
-        The browser handles refresh token cookies automatically, but you must provide your current access token in the Authorization header (the token is used only for user identification - expired tokens are accepted).
-
-        Each successful refresh operation:
-        - Invalidates the current refresh token
-        - Issues a new refresh token via secure HTTP-only cookie
-        - Returns a new access token in the response body
-
-        the new refresh token cookies is configured with:
-        - HttpOnly - Prevents JavaScript access, reducing XSS risk
-        - Secure - HTTPS (only in production environments)
-        - SameSite=Lax -  preventing the use of cookie in third-party requests except for user-driven interactions.
-
-        The account's role and permissions are encoded and included as part of the jwt access token and also provided in the response body
-
-        Access tokens expire after 30 mins and subsequent requests using the token will fail with HTTP status 401 and an error_code of "access_token_expired"
+        TODO Revoke a client secret to prevent it being used to create new access ServiceAccounts.
       responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/auth.AccessTokenResponse'
+        "204":
+          description: No Content
         "400":
           description: Bad Request
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-        "401":
-          description: Unauthorized
+        "404":
+          description: Not Found
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "500":
@@ -1136,10 +1156,45 @@ paths:
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
-      - BearerAccessToken: []
-      summary: Refresh access token
+      - BearerServiceAccount: []
+      summary: Revoke client secret
       tags:
-      - auth
+      - Service accounts
+  /auth/service-accounts/setup/{setup_id}:
+    get:
+      description: |-
+        Exchange one-time setup token for permanent client credentials
+        This endpoint can only be used once and must be called within 48 hours
+
+        theend point renders a html page that the user can copy the client credentials from
+      parameters:
+      - description: One-time setup token
+        in: path
+        name: token
+        required: true
+        type: string
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "410":
+          description: Gone
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      summary: Complete service account setup
+      tags:
+      - Service accounts
   /health/ready:
     get:
       description: check if the signalsd service is ready
@@ -1349,13 +1404,71 @@ paths:
       summary: Search for signals
       tags:
       - Signal sharing
+  /oauth/token:
+    post:
+      description: |
+        **Client Credentials Grant (Service Accounts):**
+
+        Issues new access token (in response body)
+
+        - Set `grant_type=client_credentials` as URL parameter
+        - Provide `client_id` and `client_secret` in request body
+        - Access tokens expire after 30 minutes
+        (subsequent requests using the token will fail with HTTP status 401 and an error_code of "access_token_expired")
+
+        **Refresh Token Grant (Web Users):**
+
+        Issues new access token (in response body) and rotates refresh token (HTTP-only cookie)
+
+        - Set `grant_type=refresh_token` as URL parameter
+        - Must provide current access token in Authorization header (expired tokens accepted)
+        - Must have valid refresh token cookie
+        - Access tokens expire after 30 minutes
+        (subsequent requests using the token will fail with HTTP status 401 and an error_code of "access_token_expired")
+        - Refresh tokens expire after 30 days
+        - subsequent requests using the refresh token will fail with HTTP status 401 and an error_code of "refresh_token_expired" and users must login again to get a new one.
+      parameters:
+      - description: grant type
+        enum:
+        - client_credentials
+        - refresh_token
+        in: query
+        name: grant_type
+        required: true
+        type: string
+      - description: Service account credentials (required for client_credentials
+          grant)
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/auth.ServiceAccountTokenRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.AccessTokenResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      summary: Get Access Token
+      tags:
+      - auth
   /webhooks:
     post:
       description: register a webhook to recieve signals batch status updates
       responses: {}
       summary: Register webhook (TODO)
       tags:
-      - Service Accounts
+      - Service accounts
 produces:
 - application/json
 securityDefinitions:

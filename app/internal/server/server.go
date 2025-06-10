@@ -105,7 +105,8 @@ func (s *Server) setupMiddleware() {
 func (s *Server) registerRoutes() {
 
 	// user registration and authentication handlers
-	users := handlers.NewUserHandler(s.queries, s.authService, s.pool) // handlers that use database transactions need the DB struct
+	users := handlers.NewUserHandler(s.queries, s.authService, s.pool) // handlers that use database transactions need the DB pool struct
+	serviceAccounts := handlers.NewServiceAccountHandler(s.queries, s.authService, s.pool)
 	login := handlers.NewLoginHandler(s.queries, s.authService, s.serviceConfig.Environment)
 	tokens := handlers.NewTokenHandler(s.queries, s.authService, s.serviceConfig.Environment)
 
@@ -138,7 +139,6 @@ func (s *Server) registerRoutes() {
 		r.Group(func(r chi.Router) {
 			r.Use(s.authService.RequireValidRefreshToken)
 
-			r.Post("/token", tokens.RefreshAccessTokenHandler)
 			r.Post("/revoke", tokens.RevokeRefreshTokenHandler)
 		})
 
@@ -150,8 +150,26 @@ func (s *Server) registerRoutes() {
 			r.Delete("/admins/account/{account_id}", users.RevokeUserAdminRoleHandler)
 		})
 
+		r.Group(func(r chi.Router) {
+			r.Use(s.authService.RequireValidAccessToken)
+			r.Use(s.authService.RequireRole("owner", "admin"))
+
+			r.Post("/register/service-accounts", serviceAccounts.RegisterServiceAccountHandler)
+		})
+
 		r.Post("/register", users.RegisterUserHandler)
 		r.Post("/login", login.LoginHandler)
+		r.Get("/service-accounts/setup/{setup_id}", serviceAccounts.SetupServiceAccountHandler)
+	})
+
+	s.router.Route("/oauth", func(r chi.Router) {
+		r.Group(func(r chi.Router) {
+			// Apply grant-type-specific validation middleware
+			r.Use(s.authService.RequireOAuthGrantType)
+
+			// Unified OAuth 2.0 token endpoint
+			r.Post("/token", tokens.TokenHandler)
+		})
 	})
 
 	// api routes aused to adminster the ISNs

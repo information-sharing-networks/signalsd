@@ -1,13 +1,81 @@
 package handlers
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"html/template"
 	"net/http"
+	"time"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
+	signalsd "github.com/information-sharing-networks/signalsd/app"
+	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
+	"github.com/information-sharing-networks/signalsd/app/internal/server/utils"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rs/zerolog"
 )
+
+// template for service account setup confirmation
+const setupPageTemplate = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Service Account Setup</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+        .container { background: #f8f9fa; border-radius: 8px; padding: 30px; }
+        .success { color: #28a745; font-size: 24px; margin-bottom: 20px; }
+        .credential { background: white; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; margin: 15px 0; }
+        .label { font-weight: bold; color: #495057; margin-bottom: 5px; }
+        .value { font-family: monospace; background: #f8f9fa; padding: 8px; border-radius: 3px; word-break: break-all; }
+        .warning { background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; padding: 15px; margin: 20px 0; }
+        .warning-title { font-weight: bold; color: #856404; }
+        .expiry { text-align: center; margin: 20px 0; padding: 15px; background: #d1ecf1; border-radius: 4px; }
+        .copy-btn { background: #007bff; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; margin-left: 10px; }
+        .copy-btn:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="success">✓ Signalds Service Account Setup Complete</div>
+
+        <div class="credential">
+            <div class="label">Client ID</div>
+            <div class="value">{{.ClientID}} <button class="copy-btn" onclick="copy('{{.ClientID}}')">Copy</button></div>
+        </div>
+
+        <div class="credential">
+            <div class="label">Client Secret</div>
+            <div class="value">{{.ClientSecret}} <button class="copy-btn" onclick="copy('{{.ClientSecret}}')">Copy</button></div>
+        </div>
+
+        <div class="warning">
+            <div class="warning-title">⚠️ Important</div>
+            This is the only time you'll see the client secret. Store it securely.
+            These credentials expire on {{.ExpiresAt.Format "January 2, 2006"}}.
+        </div>
+
+        <h3>Next Steps:</h3>
+        <p>when using the API include client secret as: <code>Authorization: Bearer &lt;token&gt;</code></li>
+    </div>
+
+    <script>
+        function copy(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                event.target.textContent = 'Copied!';
+                setTimeout(() => event.target.textContent = 'Copy', 2000);
+            });
+        }
+    </script>
+</body>
+</html>`
 
 type ServiceAccountHandler struct {
 	queries     *database.Queries
@@ -23,12 +91,34 @@ func NewServiceAccountHandler(queries *database.Queries, authService *auth.AuthS
 	}
 }
 
+type CreateServiceAccountRequest struct {
+	ClientOrganization string `json:"client_organization" example:"example org"`
+	ClientContactEmail string `json:"client_contact_email" example:"example@example.com"`
+	RateLimitPerMinute int32  `json:"rate_limit_per_minute" example:"100"`
+}
+
+type CreateServiceAccountResponse struct {
+	ClientID  string    `json:"client_id" example:"sa_example-org_k7j2m9x1"`
+	SetupURL  string    `json:"setup_url" example:"https://api.example.com/auth/service-accounts/setup/550e8400-e29b-41d4-a716-446655440000"`
+	ExpiresAt time.Time `json:"expires_at" example:"2024-12-25T10:30:00Z"`
+	ExpiresIn int       `json:"expires_in" example:"172800"`
+}
+
+type SetupPageData struct {
+	ClientID     string
+	ClientSecret string
+	ExpiresAt    time.Time
+}
+
 // RegisterServiceAccountHandler godocs
 //
 //	@Summary		Register a new service account
-//	@Description	Access tokens expire after 30 mins and subsequent requests using the token will fail with HTTP status 401 and an error_code of "access_token_expired"
-//	@Tags			auth
+//	@Description	Registring a new service account creates a one time link with the client credentials in it - this must be used by the client within 48 hrs.
+//	@Tags			Service accounts
 //
+//	@Param			request	body	handlers.CreateServiceAccountRequest	true	"service account details"
+//
+//	@Success		200	{object}	handlers.CreateServiceAccountResponse
 //	@Failure		400	{object}	responses.ErrorResponse
 //	@Failure		401	{object}	responses.ErrorResponse
 //	@Failure		500	{object}	responses.ErrorResponse
@@ -36,22 +126,127 @@ func NewServiceAccountHandler(queries *database.Queries, authService *auth.AuthS
 //	@Security		BearerServiceAccount
 //
 //	@Router			/auth/register/service-accounts [post]
-func (a *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWriter, r *http.Request) {
+func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWriter, r *http.Request) {
+	var req CreateServiceAccountRequest
+
+	defer r.Body.Close()
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
+		return
+	}
+
+	if req.ClientContactEmail == "" || req.ClientOrganization == "" {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "client_organization, client_contact_email are required")
+		return
+	}
+
+	exists, err := s.queries.ExistsServiceAccountWithEmailAndOrganization(r.Context(), database.ExistsServiceAccountWithEmailAndOrganizationParams{
+		ClientContactEmail: req.ClientContactEmail,
+		ClientOrganization: req.ClientOrganization,
+	})
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		return
+	}
+	if exists {
+		responses.RespondWithError(w, r, http.StatusConflict, apperrors.ErrCodeResourceAlreadyExists, "a service account already exists for this client organization and contact email")
+		return
+	}
+
+	// create client_id
+
+	clientID, err := utils.GenerateClientID(req.ClientOrganization)
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("could not generate client id: %v", err))
+		return
+	}
 
 	// transaction
-	// create account
-	// create service account
-	// create one time secret + retrieval url
+	tx, err := s.pool.BeginTx(r.Context(), pgx.TxOptions{})
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to being transaction: %v", err))
+		return
+	}
 
-	responses.RespondWithStatusCodeOnly(w, http.StatusNotImplemented)
+	defer func() {
+		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to rollback transaction: %v", err))
+			return
+		}
+	}()
+
+	txQueries := s.queries.WithTx(tx)
+
+	// create account
+	account, err := txQueries.CreateServiceAccountAccount(r.Context())
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not insert account record: %v", err))
+		return
+	}
+
+	// create service account
+	serviceAccount, err := txQueries.CreateServiceAccount(r.Context(), database.CreateServiceAccountParams{
+		AccountID:          account.ID,
+		ClientID:           clientID,
+		ClientContactEmail: req.ClientContactEmail,
+		ClientOrganization: req.ClientOrganization,
+		RateLimitPerMinute: req.RateLimitPerMinute,
+	})
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not insert service account record: %v", err))
+		return
+	}
+
+	// Generate the actual client secret (this gets stored temporarily)
+	clientSecret, err := s.authService.GenerateSecureToken(32)
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("could not generate client secret: %v", err))
+		return
+	}
+
+	// Create one-time secret record
+	expiresAt := time.Now().Add(signalsd.OneTimeSecretExpiry)
+	oneTimeSecretID, err := txQueries.CreateOneTimeClientSecret(r.Context(), database.CreateOneTimeClientSecretParams{
+		ID:                      uuid.New(),
+		ServiceAccountAccountID: serviceAccount.AccountID,
+		PlaintextSecret:         clientSecret,
+		ExpiresAt:               expiresAt,
+	})
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not insert one time client secret record: %v", err))
+		return
+	}
+
+	if err := tx.Commit(r.Context()); err != nil {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to commit transaction: %v", err))
+		return
+	}
+
+	// Generate the one-time setup URL
+	setupURL := fmt.Sprintf("%s://%s/auth/service-accounts/setup/%s",
+		utils.GetScheme(r),
+		r.Host,
+		oneTimeSecretID.String(),
+	)
+
+	// Return the setup information
+	response := CreateServiceAccountResponse{
+		ClientID:  serviceAccount.ClientID,
+		SetupURL:  setupURL,
+		ExpiresAt: expiresAt,
+		ExpiresIn: int(signalsd.OneTimeSecretExpiry.Seconds()),
+	}
+
+	responses.RespondWithJSON(w, http.StatusCreated, response)
 }
 
 // RevokeServiceAccountHandler godoc
 //
 //	@Summary		Revoke client secret
-//	@Description	Revoke a client secret to prevent it being used to create new access ServiceAccounts.
+//	@Description	TODO Revoke a client secret to prevent it being used to create new access ServiceAccounts.
 //	@Description
-//	@Tags		auth
+//	@Tags		Service accounts
 //
 //	@Success	204
 //	@Failure	400	{object}	responses.ErrorResponse
@@ -65,21 +260,170 @@ func (a *ServiceAccountHandler) RevokeServiceAccountHandler(w http.ResponseWrite
 	responses.RespondWithStatusCodeOnly(w, http.StatusNotImplemented)
 }
 
-// RetrieveOneTimeClientSecret godoc
+// SetupServiceAccountHandler godoc
 //
-//	@Summary		Revoke client secret
-//	@Description	Revoke a client secret to prevent it being used to create new access ServiceAccounts.
+//	@Summary		Complete service account setup
+//	@Description	Exchange one-time setup token for permanent client credentials
+//	@Description	This endpoint can only be used once and must be called within 48 hours
 //	@Description
-//	@Tags		auth
+//	@Description	theend point renders a html page that the user can copy the client credentials from
+//	@Tags			Service accounts
 //
-//	@Router		/auth/service-accounts/revoke [post]
-func (a *ServiceAccountHandler) RetrieveOneTimeClientSecret(w http.ResponseWriter, r *http.Request) {
+//	@Param			token	path	string	true	"One-time setup token"
+//
+//	@Success		201
+//	@Failure		400	{object}	responses.ErrorResponse
+//	@Failure		404	{object}	responses.ErrorResponse
+//	@Failure		410	{object}	responses.ErrorResponse
+//	@Failure		500	{object}	responses.ErrorResponse
+//
+//	@Router			/auth/service-accounts/setup/{setup_id} [get]
+func (s *ServiceAccountHandler) SetupServiceAccountHandler(w http.ResponseWriter, r *http.Request) {
+	// Extract token from URL path
+	oneTimeSecretIDString := chi.URLParam(r, "setup_id")
 
-	// retieve by id / account id
-	// check not expired
-	// delete entry from one time table
-	// revoke any previously issued credentials for the service account
-	// record hashed client secret secret the expiry time on token for 1 year.
+	logger := zerolog.Ctx(r.Context())
 
-	responses.RespondWithStatusCodeOnly(w, http.StatusNotImplemented)
+	// Parse token as UUID
+	oneTimeSecretID, err := uuid.Parse(oneTimeSecretIDString)
+	if err != nil {
+		logger.Warn().Msg("invalid setup ID format")
+		s.renderErrorPage(w, "Invalid Setup ID", "The setup ID you provided is not valid. Please check the URL and try again.")
+		return
+	}
+
+	// Start transaction
+	tx, err := s.pool.BeginTx(r.Context(), pgx.TxOptions{})
+	if err != nil {
+		logger.Error().Err(err).Msg("failed to begin transaction")
+		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
+		return
+	}
+
+	defer func() {
+		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
+			logger.Error().Err(err).Msg("failed to rollback transaction")
+			s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
+			return
+		}
+	}()
+
+	txQueries := s.queries.WithTx(tx)
+
+	// Retrieve and validate one-time secret
+	oneTimeSecret, err := txQueries.GetOneTimeClientSecret(r.Context(), oneTimeSecretID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			logger.Warn().Msgf("setup ID %v not found or already used", oneTimeSecretID)
+			s.renderErrorPage(w, "set up ID not found ", "The setup ID you provided has already been used or is no longer valid")
+			return
+		}
+		logger.Error().Err(err).Msg("database error")
+		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
+		return
+	}
+
+	// Check if token has expired
+	if time.Now().After(oneTimeSecret.ExpiresAt) {
+		logger.Warn().Msgf("setup ID %v has expired", oneTimeSecretID)
+		s.renderErrorPage(w, "set up ID not found or already used", "The setup ID you provided has already been used or is no longer valid")
+		return
+	}
+
+	serviceAccount, err := txQueries.GetServiceAccountByAccountID(r.Context(), oneTimeSecret.ServiceAccountAccountID)
+	if err != nil {
+		logger.Error().Err(err).Msg("database error - could not retrieve service account")
+		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
+		return
+	}
+
+	// Revoke any existing client secrets for this service account
+	_, err = txQueries.RevokeAllClientSecretsForUser(r.Context(), oneTimeSecret.ServiceAccountAccountID)
+	if err != nil {
+		logger.Error().Err(err).Msg("database error - could not revoke existing secrets")
+		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
+		return
+	}
+
+	// Create long-term client secret
+	hashedSecret := s.authService.HashToken(oneTimeSecret.PlaintextSecret)
+	expiresAt := time.Now().Add(signalsd.ClientSecretExpiry)
+
+	_, err = txQueries.CreateClientSecret(r.Context(), database.CreateClientSecretParams{
+		HashedSecret:            hashedSecret,
+		ServiceAccountAccountID: oneTimeSecret.ServiceAccountAccountID,
+		ExpiresAt:               expiresAt,
+	})
+	if err != nil {
+		logger.Error().Err(err).Msg("database error - could not create client secret")
+		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
+		return
+	}
+
+	// Delete the one-time secret
+	_, err = txQueries.DeleteOneTimeClientSecret(r.Context(), oneTimeSecretID)
+	if err != nil {
+		logger.Error().Err(err).Msg("database error - could not delete one-time client secret")
+		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
+		return
+	}
+
+	if err := tx.Commit(r.Context()); err != nil {
+		logger.Error().Err(err).Msg("database error - failed to commit transaction")
+		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
+		return
+	}
+
+	template, err := template.New("setup").Parse(setupPageTemplate)
+	if err != nil {
+		logger.Error().Err(err).Msg("template parsing error")
+		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
+		return
+	}
+
+	// Prepare html response
+	data := SetupPageData{
+		ClientID:     serviceAccount.ClientID,
+		ClientSecret: oneTimeSecret.PlaintextSecret,
+		ExpiresAt:    expiresAt,
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusCreated)
+
+	if err := template.Execute(w, data); err != nil {
+		logger.Error().Err(err).Msg("template execution error")
+		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
+		return
+	}
+}
+
+func (s *ServiceAccountHandler) renderErrorPage(w http.ResponseWriter, title, message string) {
+	errorHTML := `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>` + title + `</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+        .container { background: #f8f9fa; border-radius: 8px; padding: 30px; text-align: center; }
+        .error { color: #dc3545; font-size: 24px; margin-bottom: 20px; }
+        .message { color: #495057; margin-bottom: 30px; line-height: 1.5; }
+        .back-link { color: #007bff; text-decoration: none; }
+        .back-link:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="error">⚠️ ` + title + `</div>
+        <div class="message">` + message + `</div>
+        <a href="javascript:history.back()" class="back-link">← Go Back</a>
+    </div>
+</body>
+</html>`
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusBadRequest)
+	_, _ = w.Write([]byte(errorHTML))
 }
