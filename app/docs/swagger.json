@@ -770,7 +770,7 @@
                         "BearerServiceAccount": []
                     }
                 ],
-                "description": "Registring a new service account creates a one time link with the client credentials in it - this must be used by the client within 48 hrs.",
+                "description": "Registring a new service account creates a one time link with the client credentials in it - this must be used by the client within 48 hrs.\n\nYou have to be an admin or the site owner to use this endpoint",
                 "tags": [
                     "Service accounts"
                 ],
@@ -801,43 +801,6 @@
                     },
                     "401": {
                         "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/auth/revoke": {
-            "post": {
-                "security": [
-                    {
-                        "BearerRefreshToken": []
-                    }
-                ],
-                "description": "Revoke a refresh token to prevent it being used to create new access tokens.\n\nYou need to supply a vaild refresh token to use this API - if the refresh token has expired or been revoked the user must login again to get a new one.\n\nThe refresh token should be supplied in a http-only cookie called refresh_token.\n\nYou must also provide a previously issued bearer access token - it does not matter if it has expired\n(the token is not used to authenticate the request but is needed to establish the ID of the user making the request)\n\nNote that any unexpired access tokens issued for this user will continue to work until they expire.\nUsers must log in again to obtain a new refresh token if the current one has been revoked.\n",
-                "tags": [
-                    "auth"
-                ],
-                "summary": "Revoke refresh token",
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -890,7 +853,7 @@
         },
         "/auth/service-accounts/setup/{setup_id}": {
             "get": {
-                "description": "Exchange one-time setup token for permanent client credentials\nThis endpoint can only be used once and must be called within 48 hours\n\ntheend point renders a html page that the user can copy the client credentials from",
+                "description": "Exchange one-time setup token for permanent client credentials (the one-time request is when a new service account is registered).\nthe endpoint renders a html page that the user can use to copy their client credentials\n\nThis endpoint can only be used once and must be called within 48 hours.\n",
                 "tags": [
                     "Service accounts"
                 ],
@@ -898,8 +861,8 @@
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "One-time setup token",
-                        "name": "token",
+                        "description": "One-time setup ID",
+                        "name": "setoup_id",
                         "in": "path",
                         "required": true
                     }
@@ -1194,13 +1157,55 @@
                 "responses": {}
             }
         },
-        "/oauth/token": {
+        "/oauth/revoke": {
             "post": {
-                "description": "**Client Credentials Grant (Service Accounts):**\n\nIssues new access token (in response body)\n\n- Set `grant_type=client_credentials` as URL parameter\n- Provide `client_id` and `client_secret` in request body\n- Access tokens expire after 30 minutes\n(subsequent requests using the token will fail with HTTP status 401 and an error_code of \"access_token_expired\")\n\n**Refresh Token Grant (Web Users):**\n\nIssues new access token (in response body) and rotates refresh token (HTTP-only cookie)\n\n- Set `grant_type=refresh_token` as URL parameter\n- Must provide current access token in Authorization header (expired tokens accepted)\n- Must have valid refresh token cookie\n- Access tokens expire after 30 minutes\n(subsequent requests using the token will fail with HTTP status 401 and an error_code of \"access_token_expired\")\n- Refresh tokens expire after 30 days\n- subsequent requests using the refresh token will fail with HTTP status 401 and an error_code of \"refresh_token_expired\" and users must login again to get a new one.\n",
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Revoke a refersh token or client secret to prevent it being used to create new access tokens.\n\n**Service Accounts:**\nYou must supply your `client ID` and `client secret` in the request body.\n\n**Web Users:**\nThis end point expects a refresh token in a `http-only cookie` and a valid access token in the Authorization header.\n\nif the refresh token has expired or been revoked the user must login again to get a new one.\n\nYou must also provide a previously issued `bearer access token` in the Authorization header - it does not matter if it has expired\n(the token is not used to authenticate the request but is needed to establish the ID of the user making the request)\n\nNote that any unexpired access tokens issued for this user will continue to work until they expire.\nUsers must log in again to obtain a new refresh token if the current one has been revoked.\n",
                 "tags": [
                     "auth"
                 ],
-                "summary": "Get Access Token",
+                "summary": "Revoke a token",
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/oauth/token": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "**Client Credentials Grant (Service Accounts):**\n\nIssues new access token (in response body)\n\n- Set `grant_type=client_credentials` as URL parameter\n- Provide `client_id` and `client_secret` in request body\n- Must provide current access token in Authorization header (expired tokens accepted)\n- Access tokens expire after 30 minutes\n(subsequent requests using the token will fail with HTTP status 401 and an error_code of \"access_token_expired\")\n\n**Refresh Token Grant (Web Users):**\n\nIssues new access token (in response body) and rotates refresh token (HTTP-only cookie)\n\n- Set `grant_type=refresh_token` as URL parameter\n- Must provide current access token in Authorization header (expired tokens accepted)\n- Must have valid refresh token cookie\n- Access tokens expire after 30 minutes\n(subsequent requests using the token will fail with HTTP status 401 and an error_code of \"access_token_expired\")\n- Refresh tokens expire after 30 days\n- subsequent requests using the refresh token will fail with HTTP status 401 and an error_code of \"refresh_token_expired\" and users must login again to get a new one.\n",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "New Access Token",
                 "parameters": [
                     {
                         "enum": [

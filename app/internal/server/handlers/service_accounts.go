@@ -341,7 +341,7 @@ func (s *ServiceAccountHandler) SetupServiceAccountHandler(w http.ResponseWriter
 	}
 
 	// Revoke any existing client secrets for this service account
-	_, err = txQueries.RevokeAllClientSecretsForUser(r.Context(), oneTimeSecret.ServiceAccountAccountID)
+	_, err = txQueries.RevokeAllClientSecretsForAccount(r.Context(), oneTimeSecret.ServiceAccountAccountID)
 	if err != nil {
 		logger.Error().Err(err).Msg("database error - could not revoke existing secrets")
 		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")

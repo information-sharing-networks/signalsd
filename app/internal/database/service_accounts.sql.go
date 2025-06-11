@@ -246,14 +246,14 @@ func (q *Queries) GetValidClientSecretByServiceAccountAccountId(ctx context.Cont
 	return i, err
 }
 
-const revokeAllClientSecretsForUser = `-- name: RevokeAllClientSecretsForUser :execrows
+const revokeAllClientSecretsForAccount = `-- name: RevokeAllClientSecretsForAccount :execrows
 UPDATE client_secrets SET (updated_at, revoked_at) = (NOW(), NOW()) 
 WHERE service_account_account_id = $1
 AND revoked_at IS NULL
 `
 
-func (q *Queries) RevokeAllClientSecretsForUser(ctx context.Context, serviceAccountAccountID uuid.UUID) (int64, error) {
-	result, err := q.db.Exec(ctx, revokeAllClientSecretsForUser, serviceAccountAccountID)
+func (q *Queries) RevokeAllClientSecretsForAccount(ctx context.Context, serviceAccountAccountID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeAllClientSecretsForAccount, serviceAccountAccountID)
 	if err != nil {
 		return 0, err
 	}

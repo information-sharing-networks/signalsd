@@ -12,7 +12,8 @@ type contextKey struct {
 }
 
 var (
-	accountIDKey          = contextKey{"user-id"}
+	accountIDKey          = contextKey{"account-id"}
+	accountTypeKey        = contextKey{"account-type"}
 	accessTokenClaimsKey  = contextKey{"access-token-claims"}
 	hashedRefreshTokenKey = contextKey{"hashed_refersh_token"}
 )
@@ -24,6 +25,15 @@ func ContextWithAccountID(ctx context.Context, id uuid.UUID) context.Context {
 func ContextAccountID(ctx context.Context) (uuid.UUID, bool) {
 	id, ok := ctx.Value(accountIDKey).(uuid.UUID)
 	return id, ok
+}
+
+func ContextWithAccountType(ctx context.Context, accountType string) context.Context {
+	return context.WithValue(ctx, accountTypeKey, accountType)
+}
+
+func ContextAccountType(ctx context.Context) (string, bool) {
+	accountType, ok := ctx.Value(accountTypeKey).(string)
+	return accountType, ok
 }
 
 func ContextWithHashedRefreshToken(ctx context.Context, token string) context.Context {
