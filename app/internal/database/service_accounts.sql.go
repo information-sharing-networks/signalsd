@@ -118,6 +118,28 @@ func (q *Queries) DeleteOneTimeClientSecret(ctx context.Context, id uuid.UUID) (
 	return result.RowsAffected(), nil
 }
 
+const deleteOneTimeClientSecretsByOrgAndEmail = `-- name: DeleteOneTimeClientSecretsByOrgAndEmail :execrows
+DELETE from one_time_client_secrets 
+WHERE service_account_account_id = (SELECT account_id 
+                                    FROM service_accounts 
+                                    WHERE client_organization = $1 
+                                    AND client_contact_email = $2)
+AND expires_at > NOW()
+`
+
+type DeleteOneTimeClientSecretsByOrgAndEmailParams struct {
+	ClientOrganization string `json:"client_organization"`
+	ClientContactEmail string `json:"client_contact_email"`
+}
+
+func (q *Queries) DeleteOneTimeClientSecretsByOrgAndEmail(ctx context.Context, arg DeleteOneTimeClientSecretsByOrgAndEmailParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteOneTimeClientSecretsByOrgAndEmail, arg.ClientOrganization, arg.ClientContactEmail)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const existsServiceAccountWithEmailAndOrganization = `-- name: ExistsServiceAccountWithEmailAndOrganization :one
 SELECT EXISTS (
     SELECT 1 FROM service_accounts
@@ -191,6 +213,33 @@ WHERE sa.client_id = $1
 
 func (q *Queries) GetServiceAccountByClientID(ctx context.Context, clientID string) (ServiceAccount, error) {
 	row := q.db.QueryRow(ctx, getServiceAccountByClientID, clientID)
+	var i ServiceAccount
+	err := row.Scan(
+		&i.AccountID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ClientID,
+		&i.ClientContactEmail,
+		&i.ClientOrganization,
+		&i.RateLimitPerMinute,
+		&i.IsActive,
+	)
+	return i, err
+}
+
+const getServiceAccountWithOrganizationAndEmail = `-- name: GetServiceAccountWithOrganizationAndEmail :one
+SELECT account_id, created_at, updated_at, client_id, client_contact_email, client_organization, rate_limit_per_minute, is_active FROM service_accounts
+    WHERE client_organization = $1
+    AND client_contact_email = $2
+`
+
+type GetServiceAccountWithOrganizationAndEmailParams struct {
+	ClientOrganization string `json:"client_organization"`
+	ClientContactEmail string `json:"client_contact_email"`
+}
+
+func (q *Queries) GetServiceAccountWithOrganizationAndEmail(ctx context.Context, arg GetServiceAccountWithOrganizationAndEmailParams) (ServiceAccount, error) {
+	row := q.db.QueryRow(ctx, getServiceAccountWithOrganizationAndEmail, arg.ClientOrganization, arg.ClientContactEmail)
 	var i ServiceAccount
 	err := row.Scan(
 		&i.AccountID,

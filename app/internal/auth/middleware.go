@@ -125,7 +125,6 @@ func (a AuthService) RequireValidRefreshToken(next http.Handler) http.Handler {
 		// check the database for an unexpired/unrevoked refresh token for the user and - if there isn't one  - tell the user to login in again
 		returnedRefreshTokenRow, err := a.queries.GetValidRefreshTokenByUserAccountId(r.Context(), userAccountID)
 		if err != nil {
-			logger.Debug().Msgf("error getting refresh token for user %v: %v", userAccountID, err)
 			if errors.Is(err, pgx.ErrNoRows) {
 				responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeRefreshTokenInvalid, "unauthorised: session expired, please log in again")
 				return

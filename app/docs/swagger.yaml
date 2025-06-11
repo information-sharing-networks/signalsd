@@ -1071,8 +1071,10 @@ paths:
       - auth
   /auth/register/service-accounts:
     post:
-      description: |-
+      description: |
         Registring a new service account creates a one time link with the client credentials in it - this must be used by the client within 48 hrs.
+
+        If you want to reissue the client credentials call this endpoint again with the same client organization and contact email.
 
         You have to be an admin or the site owner to use this endpoint
       parameters:
@@ -1102,30 +1104,6 @@ paths:
       security:
       - BearerServiceAccount: []
       summary: Register a new service account
-      tags:
-      - Service accounts
-  /auth/service-accounts/revoke:
-    post:
-      description: |
-        TODO Revoke a client secret to prevent it being used to create new access ServiceAccounts.
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerServiceAccount: []
-      summary: Revoke client secret
       tags:
       - Service accounts
   /auth/service-accounts/setup/{setup_id}:

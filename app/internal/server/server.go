@@ -168,6 +168,7 @@ func (s *Server) registerRoutes() {
 		})
 
 		r.Group(func(r chi.Router) {
+
 			// the RequireValidAccountTypeCredentials middleware calls the appropriate authentication middleware for the user account type (user or service_account)
 			r.Use(s.authService.RequireValidAccountTypeCredentials)
 

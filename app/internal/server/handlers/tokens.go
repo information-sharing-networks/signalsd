@@ -76,8 +76,6 @@ func (a *TokenHandler) NewAccessTokenHandler(w http.ResponseWriter, r *http.Requ
 
 	logger := zerolog.Ctx(r.Context())
 
-	logger.Debug().Msg("NewAccessTokenHandler called")
-
 	// RequireValidRefreshToken / RequireClientCredentials middleware adds the userAccountId or serverAccountAccountID to the context
 	accountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
