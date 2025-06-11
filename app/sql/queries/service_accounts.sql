@@ -37,7 +37,7 @@ WHERE service_account_account_id = $1
 UPDATE client_secrets SET (updated_at, revoked_at) = (NOW(), NOW()) 
 WHERE hashed_secret = $1;
 
--- name: RevokeAllClientSecretsForUser :execrows
+-- name: RevokeAllClientSecretsForAccount :execrows
 UPDATE client_secrets SET (updated_at, revoked_at) = (NOW(), NOW()) 
 WHERE service_account_account_id = $1
 AND revoked_at IS NULL;

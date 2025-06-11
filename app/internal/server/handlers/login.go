@@ -89,7 +89,7 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	// new access token
 	ctx := auth.ContextWithAccountID(r.Context(), user.AccountID)
 
-	accessTokenResponse, err := l.authService.BuildAccessTokenResponse(ctx)
+	accessTokenResponse, err := l.authService.CreateAccessToken(ctx)
 	if err != nil {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenInvalid, fmt.Sprintf("error creating access token: %v", err))
 		return

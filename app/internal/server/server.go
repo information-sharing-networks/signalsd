@@ -131,13 +131,13 @@ func (s *Server) registerRoutes() {
 	s.router.Route("/auth", func(r chi.Router) {
 
 		r.Group(func(r chi.Router) {
-			r.Use(s.authService.RequireValidAccessToken)
+			r.Use(s.authService.RequireValidAccessToken(false))
 
 			r.Put("/password/reset", users.UpdatePasswordHandler)
 		})
 
 		r.Group(func(r chi.Router) {
-			r.Use(s.authService.RequireValidAccessToken)
+			r.Use(s.authService.RequireValidAccessToken(false))
 			r.Use(s.authService.RequireRole("owner"))
 
 			r.Put("/admins/account/{account_id}", users.GrantUserAdminRoleHandler)
@@ -145,7 +145,7 @@ func (s *Server) registerRoutes() {
 		})
 
 		r.Group(func(r chi.Router) {
-			r.Use(s.authService.RequireValidAccessToken)
+			r.Use(s.authService.RequireValidAccessToken(false))
 			r.Use(s.authService.RequireRole("owner", "admin"))
 
 			r.Post("/register/service-accounts", serviceAccounts.RegisterServiceAccountHandler)
@@ -158,18 +158,21 @@ func (s *Server) registerRoutes() {
 
 	//oauth2.0 token handling
 	s.router.Route("/oauth", func(r chi.Router) {
+
 		r.Group(func(r chi.Router) {
-			// Apply grant-type-specific validation middleware
+			// the RequireOAuthGrantType middleware calls the appropriate authentication middleware for the grant_type (client_credentials or refresh_token)
 			r.Use(s.authService.RequireOAuthGrantType)
 
-			// Unified OAuth 2.0 token endpoint
-			r.Post("/token", tokens.TokenHandler)
+			// get new access tokens
+			r.Post("/token", tokens.NewAccessTokenHandler)
 		})
 
 		r.Group(func(r chi.Router) {
-			r.Use(s.authService.RequireValidRefreshToken)
+			// the RequireValidAccountTypeCredentials middleware calls the appropriate authentication middleware for the user account type (user or service_account)
+			r.Use(s.authService.RequireValidAccountTypeCredentials)
 
-			r.Post("/revoke", tokens.RevokeRefreshTokenHandler)
+			// revoke a client secret (service accounts) or refresh token (web users)
+			r.Post("/revoke", tokens.RevokeTokenHandler)
 		})
 	})
 
@@ -177,9 +180,9 @@ func (s *Server) registerRoutes() {
 	s.router.Route("/api", func(r chi.Router) {
 		r.Group(func(r chi.Router) {
 
-			// request using the routes below must have a valid access token
-			// token this middleware adds the access token claims and user in the Context supplied to the handlers)
-			r.Use(s.authService.RequireValidAccessToken)
+			// request using the routes below must have a valid access token.
+			// this middleware adds the access token claims and user in the Context supplied to the handlers)
+			r.Use(s.authService.RequireValidAccessToken(false))
 
 			// ISN configuration
 			r.Group(func(r chi.Router) {
@@ -206,10 +209,10 @@ func (s *Server) registerRoutes() {
 				// routes below can only be used by accounts with write permissions to the specified ISN
 				r.Use(s.authService.RequireIsnPermission("write"))
 
-				// signal batches
+				// signals batches
 				r.Post("/isn/{isn_slug}/batches", signalBatches.CreateSignalsBatchHandler)
 
-				// signal post
+				// signals post
 				r.Post("/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals", signals.CreateSignalsHandler)
 
 				// webhooks
@@ -247,7 +250,7 @@ func (s *Server) registerRoutes() {
 		r.Group(func(r chi.Router) {
 
 			// route below can only be used by the owner as it exposes the email addresses of all users on the site
-			r.Use(s.authService.RequireValidAccessToken)
+			r.Use(s.authService.RequireValidAccessToken(false))
 			r.Use(s.authService.RequireRole("owner"))
 
 			r.Get("/users/{id}", users.GetUserHandler)
