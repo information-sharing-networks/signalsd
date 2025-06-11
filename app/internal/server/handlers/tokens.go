@@ -27,9 +27,9 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, e
 	}
 }
 
-// TokenHandler godoc
+// NewAccessTokenHandler godoc
 //
-//	@Summary		Get Access Token
+//	@Summary		New Access Token
 //	@Description
 //	@Description	**Client Credentials Grant (Service Accounts):**
 //	@Description
@@ -37,6 +37,7 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, e
 //	@Description
 //	@Description	- Set `grant_type=client_credentials` as URL parameter
 //	@Description	- Provide `client_id` and `client_secret` in request body
+//	@Description	- Must provide current access token in Authorization header (expired tokens accepted)
 //	@Description	- Access tokens expire after 30 minutes
 //	@Description	(subsequent requests using the token will fail with HTTP status 401 and an error_code of "access_token_expired")
 //	@Description
@@ -62,91 +63,74 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, e
 //	@Failure		401	{object}	responses.ErrorResponse
 //	@Failure		500	{object}	responses.ErrorResponse
 //
+//	@Security		BearerAccessToken
+//
 //	@Router			/oauth/token [post]
-func (t *TokenHandler) TokenHandler(w http.ResponseWriter, r *http.Request) {
-	grantType := r.URL.Query().Get("grant_type")
-
-	switch grantType {
-	case "client_credentials":
-		t.ClientCredentialsHandler(w, r)
-	case "refresh_token":
-		t.RefreshAccessTokenHandler(w, r)
-	default:
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, fmt.Sprintf("unsupported grant_type: %s", grantType))
-	}
-}
-
-// RefreshAccessTokenHandler godoc
-// for web users
-// A valid refresh token is needed to use this endpoint - if the refresh token has expired or been revoked the user must login again to get a new one.
-// New refresh tokens are sent as http-only cookies whenever the client uses this endpoint or logs in.
-func (a *TokenHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.Request) {
+//
+// NewAccessTokenHandler handles requests for both service accounts and web users.
+// For web users, a new refresh tokens is sent as http-only cookies whenever the client uses this endpoint.
+//
+// Use with the RequireOAuthGrantType middleware
+// this calls the appropriate authentication middleware for the grant_type (client_credentials or refresh_token)) and adds the authenticated accountID to the context
+func (a *TokenHandler) NewAccessTokenHandler(w http.ResponseWriter, r *http.Request) {
 
 	logger := zerolog.Ctx(r.Context())
 
-	// the RequireValidRefreshToken middleware adds the userAccountId
-	userAccountID, ok := auth.ContextAccountID(r.Context())
+	logger.Debug().Msg("NewAccessTokenHandler called")
+
+	// RequireValidRefreshToken / RequireClientCredentials middleware adds the userAccountId or serverAccountAccountID to the context
+	accountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
 		return
 	}
 
-	accessTokenResponse, err := a.authService.BuildAccessTokenResponse(r.Context())
-	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenInvalid, fmt.Sprintf("error creating access token: %v", err))
-		return
-	}
-
-	newRefreshToken, err := a.authService.RotateRefreshToken(r.Context())
-	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenInvalid, fmt.Sprintf("error creating refresh token: %v", err))
-		return
-	}
-
-	newCookie := a.authService.NewRefreshTokenCookie(a.environment, newRefreshToken)
-
-	http.SetCookie(w, newCookie)
-
-	logger.Info().Msgf("user %v refreshed an access token", userAccountID)
-
-	responses.RespondWithJSON(w, http.StatusOK, accessTokenResponse)
-}
-
-// ClientCredentialsHandler godoc
-// for service accounts
-// gets request via the RequireValidClientCredentials middleware (this adds the server account account ID to the context)
-func (t *TokenHandler) ClientCredentialsHandler(w http.ResponseWriter, r *http.Request) {
-
-	logger := zerolog.Ctx(r.Context())
-
-	serverAccountAccountID, ok := auth.ContextAccountID(r.Context())
+	accountType, ok := auth.ContextAccountType(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "middleware did not supply a Server Account ID")
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive accountType from middleware")
 		return
 	}
 
-	accessTokenResponse, err := t.authService.BuildAccessTokenResponse(r.Context())
+	// todo account is active?
+
+	// create new access token refresh
+	accessTokenResponse, err := a.authService.CreateAccessToken(r.Context())
 	if err != nil {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenInvalid, fmt.Sprintf("error creating access token: %v", err))
 		return
 	}
 
-	logger.Info().Msgf("serviceAccount %v refreshed an access token", serverAccountAccountID)
+	// rotate the refresh token (web users only)
+	if accountType == "user" {
+		newRefreshToken, err := a.authService.RotateRefreshToken(r.Context())
+		if err != nil {
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenInvalid, fmt.Sprintf("error creating refresh token: %v", err))
+			return
+		}
+
+		newCookie := a.authService.NewRefreshTokenCookie(a.environment, newRefreshToken)
+
+		http.SetCookie(w, newCookie)
+	}
+	logger.Info().Msgf("account %v refreshed an access token", accountID)
 
 	responses.RespondWithJSON(w, http.StatusOK, accessTokenResponse)
-
 }
 
-// RevokeRefreshTokenHandler godoc
+// RevokeTokenHandler godoc
 //
-//	@Summary		Revoke refresh token
-//	@Description	Revoke a refresh token to prevent it being used to create new access tokens.
+//	@Summary		Revoke a token
+//	@Description	Revoke a refersh token or client secret to prevent it being used to create new access tokens.
 //	@Description
-//	@Description	You need to supply a vaild refresh token to use this API - if the refresh token has expired or been revoked the user must login again to get a new one.
+//	@Description	**Service Accounts:**
+//	@Description 	You must supply your `client ID` and `client secret` in the request body.
 //	@Description
-//	@Description	The refresh token should be supplied in a http-only cookie called refresh_token.
+//	@Description	**Web Users:**
+//	@Description	This end point expects a refresh token in a `http-only cookie` and a valid access token in the Authorization header.
 //	@Description
-//	@Description	You must also provide a previously issued bearer access token - it does not matter if it has expired
+//	@Description	if the refresh token has expired or been revoked the user must login again to get a new one.
+//	@Description
+//	@Description	You must also provide a previously issued `bearer access token` in the Authorization header - it does not matter if it has expired
 //	@Description	(the token is not used to authenticate the request but is needed to establish the ID of the user making the request)
 //	@Description
 //	@Description	Note that any unexpired access tokens issued for this user will continue to work until they expire.
@@ -154,18 +138,55 @@ func (t *TokenHandler) ClientCredentialsHandler(w http.ResponseWriter, r *http.R
 //	@Description
 //	@Tags		auth
 //
-//	@Success	204
+//	@Success	200
 //	@Failure	400	{object}	responses.ErrorResponse
 //	@Failure	404	{object}	responses.ErrorResponse
 //	@Failure	500	{object}	responses.ErrorResponse
 //
-//	@Security	BearerRefreshToken
+//	@Security	BearerAccessToken
 //
-//	@Router		/auth/revoke [post]
+//	@Router		/oauth/revoke [post]
 //
-// RevokeRefreshTokenHandler gets the request from the RequireValidRefreshToken middleware
-// The middleware identifies the user and confirms there is a valid refresh token in the refresh_token cookie
-// and - if there is - adds the hashed token to the auth.AuthContext This function marks the token as revoked on the database.
+// Use with RequireValidAccountTypeCredentials middleware which will ensure the requestor is authenticated and add the accountID and accountType to the context
+func (a *TokenHandler) RevokeTokenHandler(w http.ResponseWriter, r *http.Request) {
+	accountType, ok := auth.ContextAccountType(r.Context())
+	if !ok {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get account type from context")
+		return
+	}
+
+	if accountType == "user" {
+		a.RevokeRefreshTokenHandler(w, r)
+		return
+	}
+	// service accounts
+	a.RevokeClientSecretHandler(w, r)
+}
+
+// Use revoke a client secret (service accounts) - called by the wrapper handler for /oauth/revoke (RevokeTokenHandler)
+func (a *TokenHandler) RevokeClientSecretHandler(w http.ResponseWriter, r *http.Request) {
+	serverAccountID, ok := auth.ContextAccountID(r.Context())
+	if !ok {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "middleware did not supply a serverAccountID")
+		return
+	}
+
+	// cancle all client secrets for this account
+	rowsUpdated, err := a.queries.RevokeAllClientSecretsForAccount(r.Context(), serverAccountID)
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("error revoking client secrets: %v", err))
+		return
+	}
+
+	if rowsUpdated == 0 {
+		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeTokenInvalid, "no client secrets found to revoke")
+		return
+	}
+
+	responses.RespondWithStatusCodeOnly(w, http.StatusOK)
+}
+
+// Use revoke a refresh token (web users) - called by the wrapper handler for /oauth/revoke (RevokeTokenHandler)
 func (a *TokenHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 
 	userAccountId, ok := auth.ContextAccountID(r.Context())
@@ -194,6 +215,6 @@ func (a *TokenHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.
 	}
 
 	log.Info().Msgf("refresh token revoked by userAccountID %v", userAccountId)
-	responses.RespondWithStatusCodeOnly(w, http.StatusCreated)
+	responses.RespondWithStatusCodeOnly(w, http.StatusOK)
 
 }

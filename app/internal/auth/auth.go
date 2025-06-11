@@ -17,6 +17,7 @@ import (
 	signalsd "github.com/information-sharing-networks/signalsd/app"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/jackc/pgx/v5"
+	"github.com/rs/zerolog"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -98,12 +99,12 @@ func (a AuthService) CheckTokenHash(hash string, token string) bool {
 //
 // Roles and ISN read/write permissions are retreived from the database and included in the token claims and the response body.
 //
-// the access token contains to contain:
+// the access token contains:
 //   - standard jwt registerd claims(sub, exp, iat)
-//   - account id
+//   - account ID
+//   - account type (user or service_account)
 //   - account role (owner, admin, member)
-//   - A list of all the isns the account has access to
-//   - The permission granted (read or write)
+//   - A list of all the isns the account has access to and the permission granted (read or write)
 //   - the list of available signal_types in the isn
 //
 // The function returns the token inside a AccessTokenResponse that can be returned to the client.
@@ -117,7 +118,7 @@ func (a AuthService) CheckTokenHash(hash string, token string) bool {
 //
 //	Note that since the tokens last 30 mins, there is the potential for the permissions to become stale.
 //	if there are particular requests that *must* have the latest permissions the handler should check the db rather than using the claims info.
-func (a AuthService) BuildAccessTokenResponse(ctx context.Context) (AccessTokenResponse, error) {
+func (a AuthService) CreateAccessToken(ctx context.Context) (AccessTokenResponse, error) {
 
 	issuedAt := time.Now()
 	expiresAt := issuedAt.Add(signalsd.AccessTokenExpiry)
@@ -273,6 +274,8 @@ func (a AuthService) GetAccessTokenFromHeader(headers http.Header) (string, erro
 	if accessToken == authorizationHeaderValue {
 		return "", fmt.Errorf(`authorization header format must be Bearer {token}`)
 	}
+	logger := zerolog.Ctx(context.Background())
+	logger.Debug().Msgf("authorization header value: %v", accessToken)
 
 	return accessToken, nil
 }

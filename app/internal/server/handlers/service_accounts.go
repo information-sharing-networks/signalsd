@@ -114,6 +114,8 @@ type SetupPageData struct {
 //
 //	@Summary		Register a new service account
 //	@Description	Registring a new service account creates a one time link with the client credentials in it - this must be used by the client within 48 hrs.
+//	@Description
+//	@Description	You have to be an admin or the site owner to use this endpoint
 //	@Tags			Service accounts
 //
 //	@Param			request	body	handlers.CreateServiceAccountRequest	true	"service account details"
@@ -263,13 +265,14 @@ func (a *ServiceAccountHandler) RevokeServiceAccountHandler(w http.ResponseWrite
 // SetupServiceAccountHandler godoc
 //
 //	@Summary		Complete service account setup
-//	@Description	Exchange one-time setup token for permanent client credentials
-//	@Description	This endpoint can only be used once and must be called within 48 hours
+//	@Description	Exchange one-time setup token for permanent client credentials (the one-time request is when a new service account is registered).
+//	@Description	the endpoint renders a html page that the user can use to copy their client credentials
 //	@Description
-//	@Description	theend point renders a html page that the user can copy the client credentials from
+//	@Description	This endpoint can only be used once and must be called within 48 hours.
+//	@Description
 //	@Tags			Service accounts
 //
-//	@Param			token	path	string	true	"One-time setup token"
+//	@Param			setoup_id	path	string	true	"One-time setup ID"
 //
 //	@Success		201
 //	@Failure		400	{object}	responses.ErrorResponse
@@ -338,7 +341,7 @@ func (s *ServiceAccountHandler) SetupServiceAccountHandler(w http.ResponseWriter
 	}
 
 	// Revoke any existing client secrets for this service account
-	_, err = txQueries.RevokeAllClientSecretsForUser(r.Context(), oneTimeSecret.ServiceAccountAccountID)
+	_, err = txQueries.RevokeAllClientSecretsForAccount(r.Context(), oneTimeSecret.ServiceAccountAccountID)
 	if err != nil {
 		logger.Error().Err(err).Msg("database error - could not revoke existing secrets")
 		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
