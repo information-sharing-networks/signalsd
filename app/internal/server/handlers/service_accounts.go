@@ -48,32 +48,40 @@ const setupPageTemplate = `<!DOCTYPE html>
 
         <div class="credential">
             <div class="label">Client ID</div>
-            <div class="value">{{.ClientID}} <button class="copy-btn" onclick="copy('{{.ClientID}}')">Copy</button></div>
+            <div class="value">{{.ClientID}} <button class="copy-btn" onclick="copy('{{.ClientID}}', this)">Copy</button></div>
         </div>
 
         <div class="credential">
             <div class="label">Client Secret</div>
-            <div class="value">{{.ClientSecret}} <button class="copy-btn" onclick="copy('{{.ClientSecret}}')">Copy</button></div>
+            <div class="value">{{.ClientSecret}} <button class="copy-btn" onclick="copy('{{.ClientSecret}}', this)">Copy</button></div>
         </div>
 
         <div class="warning">
             <div class="warning-title">⚠️ Important</div>
-            This is the only time you'll see the client secret. Store it securely.
+            This is the only time you'll see the client secret.
             These credentials expire on {{.ExpiresAt.Format "January 2, 2006"}}.
         </div>
 
         <h3>Next Steps:</h3>
-        <p>when using the API include client secret as: <code>Authorization: Bearer &lt;token&gt;</code></li>
+		<p>Store the client ID and secret securely. You will need them to authenticate with the API.</p>
+        <p>access tokens are issued by calling the /oauth/token endpoint with your client_id and client_secret in the request body</p>
+        <p>When using the API include the access token as: <code>Authorization: Bearer &lt;token&gt;</code></li>
     </div>
 
-    <script>
-        function copy(text) {
-            navigator.clipboard.writeText(text).then(() => {
-                event.target.textContent = 'Copied!';
-                setTimeout(() => event.target.textContent = 'Copy', 2000);
-            });
-        }
-    </script>
+	<script>
+		function copy(text, btn) {
+			navigator.clipboard.writeText(text).then(() => {
+				btn.textContent = '✓ Copied!';
+				btn.style.background = '#28a745';
+				btn.disabled = true;
+				setTimeout(() => {
+					btn.textContent = 'Copy';
+					btn.style.background = '#007bff';
+					btn.disabled = false;
+				}, 1500);
+			});
+		}
+	</script>
 </body>
 </html>`
 
@@ -115,7 +123,10 @@ type SetupPageData struct {
 //	@Summary		Register a new service account
 //	@Description	Registring a new service account creates a one time link with the client credentials in it - this must be used by the client within 48 hrs.
 //	@Description
+//	@Description	If you want to reissue the client credentials call this endpoint again with the same client organization and contact email.
+//	@Description
 //	@Description	You have to be an admin or the site owner to use this endpoint
+//	@Description
 //	@Tags			Service accounts
 //
 //	@Param			request	body	handlers.CreateServiceAccountRequest	true	"service account details"
@@ -130,6 +141,7 @@ type SetupPageData struct {
 //	@Router			/auth/register/service-accounts [post]
 func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWriter, r *http.Request) {
 	var req CreateServiceAccountRequest
+	logger := zerolog.Ctx(r.Context())
 
 	defer r.Body.Close()
 
@@ -143,25 +155,45 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 		return
 	}
 
-	exists, err := s.queries.ExistsServiceAccountWithEmailAndOrganization(r.Context(), database.ExistsServiceAccountWithEmailAndOrganizationParams{
-		ClientContactEmail: req.ClientContactEmail,
+	clientAlreadyExists := false
+	clientID := ""
+
+	serviceAccount, err := s.queries.GetServiceAccountWithOrganizationAndEmail(r.Context(), database.GetServiceAccountWithOrganizationAndEmailParams{
 		ClientOrganization: req.ClientOrganization,
+		ClientContactEmail: req.ClientContactEmail,
 	})
-	if err != nil {
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
 	}
-	if exists {
-		responses.RespondWithError(w, r, http.StatusConflict, apperrors.ErrCodeResourceAlreadyExists, "a service account already exists for this client organization and contact email")
-		return
-	}
+	if errors.Is(err, pgx.ErrNoRows) {
+		// new service account - create client_id
+		clientID, err = utils.GenerateClientID(req.ClientOrganization)
+		if err != nil {
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("could not generate client id: %v", err))
+			return
+		}
+	} else {
+		// service account exists: reset the one time password, revoke any client secrets and reissue a one time url
+		clientAlreadyExists = true
+		clientID = serviceAccount.ClientID
 
-	// create client_id
+		logger.Info().Msgf("service account %v already exists - revoking exitng client secrets", clientID)
 
-	clientID, err := utils.GenerateClientID(req.ClientOrganization)
-	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("could not generate client id: %v", err))
-		return
+		_, err := s.queries.RevokeAllClientSecretsForAccount(r.Context(), serviceAccount.AccountID)
+		if err != nil {
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("error revoking client secrets: %v", err))
+			return
+		}
+
+		_, err = s.queries.DeleteOneTimeClientSecretsByOrgAndEmail(r.Context(), database.DeleteOneTimeClientSecretsByOrgAndEmailParams{
+			ClientContactEmail: req.ClientContactEmail,
+			ClientOrganization: req.ClientOrganization,
+		})
+		if err != nil {
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("error deleting one time client secrets: %v", err))
+			return
+		}
 	}
 
 	// transaction
@@ -180,24 +212,26 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 
 	txQueries := s.queries.WithTx(tx)
 
-	// create account
-	account, err := txQueries.CreateServiceAccountAccount(r.Context())
-	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not insert account record: %v", err))
-		return
-	}
+	if !clientAlreadyExists {
+		// create account
+		account, err := txQueries.CreateServiceAccountAccount(r.Context())
+		if err != nil {
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not insert account record: %v", err))
+			return
+		}
 
-	// create service account
-	serviceAccount, err := txQueries.CreateServiceAccount(r.Context(), database.CreateServiceAccountParams{
-		AccountID:          account.ID,
-		ClientID:           clientID,
-		ClientContactEmail: req.ClientContactEmail,
-		ClientOrganization: req.ClientOrganization,
-		RateLimitPerMinute: req.RateLimitPerMinute,
-	})
-	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not insert service account record: %v", err))
-		return
+		// create service account
+		_, err = txQueries.CreateServiceAccount(r.Context(), database.CreateServiceAccountParams{
+			AccountID:          account.ID,
+			ClientID:           clientID,
+			ClientContactEmail: req.ClientContactEmail,
+			ClientOrganization: req.ClientOrganization,
+			RateLimitPerMinute: req.RateLimitPerMinute,
+		})
+		if err != nil {
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not insert service account record: %v", err))
+			return
+		}
 	}
 
 	// Generate the actual client secret (this gets stored temporarily)
@@ -232,6 +266,8 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 		oneTimeSecretID.String(),
 	)
 
+	logger.Info().Msgf("service account %v created - setup url: %v", clientID, setupURL)
+
 	// Return the setup information
 	response := CreateServiceAccountResponse{
 		ClientID:  serviceAccount.ClientID,
@@ -241,25 +277,6 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 	}
 
 	responses.RespondWithJSON(w, http.StatusCreated, response)
-}
-
-// RevokeServiceAccountHandler godoc
-//
-//	@Summary		Revoke client secret
-//	@Description	TODO Revoke a client secret to prevent it being used to create new access ServiceAccounts.
-//	@Description
-//	@Tags		Service accounts
-//
-//	@Success	204
-//	@Failure	400	{object}	responses.ErrorResponse
-//	@Failure	404	{object}	responses.ErrorResponse
-//	@Failure	500	{object}	responses.ErrorResponse
-//
-//	@Security	BearerServiceAccount
-//
-//	@Router		/auth/service-accounts/revoke [post]
-func (a *ServiceAccountHandler) RevokeServiceAccountHandler(w http.ResponseWriter, r *http.Request) {
-	responses.RespondWithStatusCodeOnly(w, http.StatusNotImplemented)
 }
 
 // SetupServiceAccountHandler godoc

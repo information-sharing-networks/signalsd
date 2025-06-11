@@ -21,9 +21,18 @@ INSERT INTO one_time_client_secrets (id, service_account_account_id, plaintext_s
 VALUES ( $1, $2, $3, NOW(), $4)
 RETURNING id;
 
+
 -- name: DeleteOneTimeClientSecret :execrows
 DELETE from one_time_client_secrets 
 WHERE id = $1;
+
+-- name: DeleteOneTimeClientSecretsByOrgAndEmail :execrows
+DELETE from one_time_client_secrets 
+WHERE service_account_account_id = (SELECT account_id 
+                                    FROM service_accounts 
+                                    WHERE client_organization = $1 
+                                    AND client_contact_email = $2)
+AND expires_at > NOW();
 
 -- name: GetValidClientSecretByServiceAccountAccountId :one
 SELECT hashed_secret, expires_at
@@ -31,7 +40,6 @@ FROM client_secrets
 WHERE service_account_account_id = $1
   AND revoked_at IS NULL
   AND expires_at > NOW();
-
 
 -- name: RevokeClientSecret :execrows
 UPDATE client_secrets SET (updated_at, revoked_at) = (NOW(), NOW()) 
@@ -48,6 +56,11 @@ SELECT EXISTS (
     WHERE client_contact_email = $1
     AND client_organization = $2
 ) AS exists;
+
+-- name: GetServiceAccountWithOrganizationAndEmail :one
+SELECT * FROM service_accounts
+    WHERE client_organization = $1
+    AND client_contact_email = $2;
 
 -- name: GetOneTimeClientSecret :one
 SELECT created_at, service_account_account_id, plaintext_secret, expires_at

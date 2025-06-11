@@ -17,7 +17,6 @@ import (
 	signalsd "github.com/information-sharing-networks/signalsd/app"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/jackc/pgx/v5"
-	"github.com/rs/zerolog"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -274,8 +273,6 @@ func (a AuthService) GetAccessTokenFromHeader(headers http.Header) (string, erro
 	if accessToken == authorizationHeaderValue {
 		return "", fmt.Errorf(`authorization header format must be Bearer {token}`)
 	}
-	logger := zerolog.Ctx(context.Background())
-	logger.Debug().Msgf("authorization header value: %v", accessToken)
 
 	return accessToken, nil
 }

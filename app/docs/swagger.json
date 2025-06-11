@@ -770,7 +770,7 @@
                         "BearerServiceAccount": []
                     }
                 ],
-                "description": "Registring a new service account creates a one time link with the client credentials in it - this must be used by the client within 48 hrs.\n\nYou have to be an admin or the site owner to use this endpoint",
+                "description": "Registring a new service account creates a one time link with the client credentials in it - this must be used by the client within 48 hrs.\n\nIf you want to reissue the client credentials call this endpoint again with the same client organization and contact email.\n\nYou have to be an admin or the site owner to use this endpoint\n",
                 "tags": [
                     "Service accounts"
                 ],
@@ -801,43 +801,6 @@
                     },
                     "401": {
                         "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/auth/service-accounts/revoke": {
-            "post": {
-                "security": [
-                    {
-                        "BearerServiceAccount": []
-                    }
-                ],
-                "description": "TODO Revoke a client secret to prevent it being used to create new access ServiceAccounts.\n",
-                "tags": [
-                    "Service accounts"
-                ],
-                "summary": "Revoke client secret",
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
