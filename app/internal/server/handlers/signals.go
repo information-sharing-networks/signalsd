@@ -158,6 +158,11 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// check the account has an open batch for this isn
+	if claims.IsnPerms[isnSlug].SignalBatchID == nil {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, fmt.Sprintf("you must open a batch for ISN %v before sending signals", isnSlug))
+		return
+	}
 	// check that this the user is requesting a valid signal type/sem_ver for this isn
 	found := slices.Contains(claims.IsnPerms[isnSlug].SignalTypePaths, signalTypePath)
 	if !found {
