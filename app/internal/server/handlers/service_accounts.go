@@ -157,6 +157,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 
 	clientAlreadyExists := false
 	clientID := ""
+	serviceAccountID := uuid.UUID{}
 
 	serviceAccount, err := s.queries.GetServiceAccountWithOrganizationAndEmail(r.Context(), database.GetServiceAccountWithOrganizationAndEmailParams{
 		ClientOrganization: req.ClientOrganization,
@@ -177,6 +178,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 		// service account exists: reset the one time password, revoke any client secrets and reissue a one time url
 		clientAlreadyExists = true
 		clientID = serviceAccount.ClientID
+		serviceAccountID = serviceAccount.AccountID
 
 		logger.Info().Msgf("service account %v already exists - revoking exitng client secrets", clientID)
 
@@ -213,16 +215,20 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 	txQueries := s.queries.WithTx(tx)
 
 	if !clientAlreadyExists {
-		// create account
-		account, err := txQueries.CreateServiceAccountAccount(r.Context())
+		logger.Info().Msgf("creating new service account %v", clientID)
+
+		// create serviceAccount
+		serviceAccount, err := txQueries.CreateServiceAccountAccount(r.Context())
 		if err != nil {
 			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not insert account record: %v", err))
 			return
 		}
 
+		serviceAccountID = serviceAccount.ID
+
 		// create service account
 		_, err = txQueries.CreateServiceAccount(r.Context(), database.CreateServiceAccountParams{
-			AccountID:          account.ID,
+			AccountID:          serviceAccount.ID,
 			ClientID:           clientID,
 			ClientContactEmail: req.ClientContactEmail,
 			ClientOrganization: req.ClientOrganization,
@@ -245,7 +251,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 	expiresAt := time.Now().Add(signalsd.OneTimeSecretExpiry)
 	oneTimeSecretID, err := txQueries.CreateOneTimeClientSecret(r.Context(), database.CreateOneTimeClientSecretParams{
 		ID:                      uuid.New(),
-		ServiceAccountAccountID: serviceAccount.AccountID,
+		ServiceAccountAccountID: serviceAccountID,
 		PlaintextSecret:         clientSecret,
 		ExpiresAt:               expiresAt,
 	})
@@ -270,7 +276,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 
 	// Return the setup information
 	response := CreateServiceAccountResponse{
-		ClientID:  serviceAccount.ClientID,
+		ClientID:  clientID,
 		SetupURL:  setupURL,
 		ExpiresAt: expiresAt,
 		ExpiresIn: int(signalsd.OneTimeSecretExpiry.Seconds()),
