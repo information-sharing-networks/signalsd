@@ -111,7 +111,7 @@ func (s *Server) registerRoutes() {
 	tokens := handlers.NewTokenHandler(s.queries, s.authService, s.serviceConfig.Environment)
 
 	// site admin handlers
-	admin := handlers.NewAdminHandler(s.queries, s.pool)
+	admin := handlers.NewAdminHandler(s.queries, s.pool, s.authService)
 
 	// middleware handles auth on the remaing services
 
@@ -268,6 +268,7 @@ func (s *Server) registerRoutes() {
 			r.Post("/accounts/{account_id}/enable", admin.EnableAccountHandler)
 			r.Get("/service-accounts", admin.GetServiceAccountsHandler)
 			r.Get("/service-accounts/{id}", admin.GetServiceAccountHandler)
+			r.Put("/users/{user_id}/reset-password", admin.ResetUserPasswordHandler)
 		})
 	})
 

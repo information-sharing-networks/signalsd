@@ -405,6 +405,17 @@ definitions:
         example: lkIB53@6O^Y
         type: string
     type: object
+  handlers.ResetUserPasswordRequest:
+    properties:
+      new_password:
+        description: Admin provides the new password
+        type: string
+    type: object
+  handlers.ResetUserPasswordResponse:
+    properties:
+      message:
+        type: string
+    type: object
   handlers.SignalTypeAndLinkedInfo:
     properties:
       created_at:
@@ -559,7 +570,7 @@ paths:
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: Authentication failed (handled by middleware)
+          description: 'Authentication failed '
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
@@ -599,11 +610,11 @@ paths:
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: Authentication failed (handled by middleware)
+          description: 'Authentication failed '
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
-          description: Insufficient permissions (handled by middleware)
+          description: 'Insufficient permissions '
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
@@ -662,11 +673,11 @@ paths:
               $ref: '#/definitions/database.ServiceAccount'
             type: array
         "401":
-          description: Authentication failed (handled by middleware)
+          description: 'Authentication failed '
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
-          description: Insufficient permissions (handled by middleware)
+          description: 'Insufficient permissions '
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "500":
@@ -699,11 +710,11 @@ paths:
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: Authentication failed (handled by middleware)
+          description: 'Authentication failed '
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
-          description: Insufficient permissions (handled by middleware)
+          description: 'Insufficient permissions '
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
@@ -731,11 +742,11 @@ paths:
               $ref: '#/definitions/database.GetUsersRow'
             type: array
         "401":
-          description: Authentication failed (handled by middleware)
+          description: 'Authentication failed '
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
-          description: Insufficient permissions (handled by middleware)
+          description: 'Insufficient permissions '
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "500":
@@ -768,11 +779,11 @@ paths:
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: Authentication failed (handled by middleware)
+          description: 'Authentication failed '
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
-          description: Insufficient permissions (handled by middleware)
+          description: 'Insufficient permissions '
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
@@ -786,6 +797,51 @@ paths:
       security:
       - BearerAccessToken: []
       summary: Get registered user
+      tags:
+      - Site admin
+  /admin/users/{user_id}/reset-password:
+    put:
+      description: Allows admins to reset a user's password
+      parameters:
+      - description: User Account ID
+        in: path
+        name: user_id
+        required: true
+        type: string
+      - description: New password
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.ResetUserPasswordRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.ResetUserPasswordResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Forbidden - admin role required
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Reset user password (Admin only)
       tags:
       - Site admin
   /api/isn:
@@ -1347,7 +1403,7 @@ paths:
           description: OK
         "404":
           description: Not Found
-      summary: Readiness
+      summary: Readiness Check
       tags:
       - Site admin
   /isn/{isn_slug}/accounts/{account_id}:
@@ -1577,11 +1633,11 @@ paths:
         "200":
           description: OK
         "400":
-          description: Invalid request body (handled by middleware)
+          description: 'Invalid request body '
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: Authentication failed (handled by middleware)
+          description: 'Authentication failed '
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
@@ -1642,11 +1698,11 @@ paths:
           schema:
             $ref: '#/definitions/auth.AccessTokenResponse'
         "400":
-          description: Invalid grant_type parameter (handled by middleware)
+          description: 'Invalid grant_type parameter '
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: Authentication failed (handled by middleware)
+          description: 'Authentication failed '
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "500":
