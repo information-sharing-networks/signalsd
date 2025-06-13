@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -9,7 +10,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	signalsd "github.com/information-sharing-networks/signalsd/app"
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
+	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
 	"github.com/jackc/pgx/v5"
@@ -18,14 +21,16 @@ import (
 )
 
 type AdminHandler struct {
-	queries *database.Queries
-	pool    *pgxpool.Pool
+	queries     *database.Queries
+	pool        *pgxpool.Pool
+	authService *auth.AuthService
 }
 
-func NewAdminHandler(queries *database.Queries, pool *pgxpool.Pool) *AdminHandler {
+func NewAdminHandler(queries *database.Queries, pool *pgxpool.Pool, authService *auth.AuthService) *AdminHandler {
 	return &AdminHandler{
-		queries: queries,
-		pool:    pool,
+		queries:     queries,
+		pool:        pool,
+		authService: authService,
 	}
 }
 
@@ -54,7 +59,7 @@ func (a *AdminHandler) ResetHandler(w http.ResponseWriter, r *http.Request) {
 
 // ReadinessHandler godoc
 //
-//	@Summary		Readiness
+//	@Summary		Readiness Check
 //	@Description	check if the signalsd service is ready
 //	@Tags			Site admin
 //
@@ -434,4 +439,116 @@ func (a *AdminHandler) GetServiceAccountsHandler(w http.ResponseWriter, r *http.
 
 	logger.Info().Msgf("retrieved %d service accounts", len(serviceAccounts))
 	responses.RespondWithJSON(w, http.StatusOK, serviceAccounts)
+}
+
+// Simple password reset types
+type ResetUserPasswordRequest struct {
+	NewPassword string `json:"new_password"` // Admin provides the new password
+}
+
+type ResetUserPasswordResponse struct {
+	Message string `json:"message"`
+}
+
+// ResetUserPasswordHandler godoc
+//
+//	@Summary		Reset user password
+//	@Description	Allows admins to reset a user's password
+//	@Tags			Site admin
+//
+//	@Param			user_id	path	string							true	"User Account ID"
+//	@Param			request	body	handlers.ResetUserPasswordRequest	true	"New password"
+//
+//	@Success		200	{object}	handlers.ResetUserPasswordResponse
+//	@Failure		400	{object}	responses.ErrorResponse
+//	@Failure		401	{object}	responses.ErrorResponse	"Unauthorized"
+//	@Failure		403	{object}	responses.ErrorResponse	"Forbidden - admin role required"
+//	@Failure		404	{object}	responses.ErrorResponse	"User not found"
+//	@Failure		500	{object}	responses.ErrorResponse	"Internal server error"
+//
+//	@Security		BearerAccessToken
+//
+//	@Router			/admin/users/{user_id}/reset-password [put]
+func (a *AdminHandler) ResetUserPasswordHandler(w http.ResponseWriter, r *http.Request) {
+	logger := zerolog.Ctx(r.Context())
+
+	// Get admin account ID from context (set by middleware)
+	adminAccountID, ok := auth.ContextAccountID(r.Context())
+	if !ok {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "admin account ID not found in context")
+		return
+	}
+
+	// Get user ID from URL parameter
+	userIDStr := chi.URLParam(r, "user_id")
+	if userIDStr == "" {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "user_id parameter is required")
+		return
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "invalid user_id format")
+		return
+	}
+
+	// Parse request body
+	var req ResetUserPasswordRequest
+	defer r.Body.Close()
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
+		return
+	}
+
+	// Verify user exists
+	user, err := a.queries.GetUserByID(r.Context(), userID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "user not found")
+			return
+		}
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		return
+	}
+
+	// Validate the new password
+	if req.NewPassword == "" {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "new_password is required")
+		return
+	}
+
+	if len(req.NewPassword) < signalsd.MinimumPasswordLength {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodePasswordTooShort, fmt.Sprintf("password must be at least %d characters", signalsd.MinimumPasswordLength))
+		return
+	}
+
+	// Hash the new password
+	hashedPassword, err := a.authService.HashPassword(req.NewPassword)
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("failed to hash password: %v", err))
+		return
+	}
+
+	// Update the password in the database
+	rowsAffected, err := a.queries.UpdatePassword(r.Context(), database.UpdatePasswordParams{
+		AccountID:      userID,
+		HashedPassword: hashedPassword,
+	})
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to update password: %v", err))
+		return
+	}
+
+	if rowsAffected != 1 {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "password update affected unexpected number of rows")
+		return
+	}
+
+	logger.Info().Msgf("Admin %v reset user password for user %v", adminAccountID, userID)
+	response := ResetUserPasswordResponse{
+		Message: fmt.Sprintf("Password successfully reset for user %s", user.Email),
+	}
+
+	responses.RespondWithJSON(w, http.StatusOK, response)
 }
