@@ -17,9 +17,15 @@ import (
 	_ "github.com/information-sharing-networks/signalsd/app/docs"
 )
 
+//	@title			Signals ISN API
+//	@version		1.0
 //	@description	Signals ISN service API
-//	@license		MIT
-//	@host			localhost:8080
+//	@license.name	MIT
+
+//	@servers.url		https://api.example.com
+//	@servers.description	Production server
+//	@servers.url		http://localhost:8080
+//	@servers.description	Development server
 
 //	@accept		json
 //	@produce	json

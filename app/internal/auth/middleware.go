@@ -188,8 +188,16 @@ func (a AuthService) RequireValidClientCredentials(next http.Handler) http.Handl
 			return
 		}
 
-		if !serviceAccount.IsActive {
-			responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "service account is not active")
+		// check if the service account is active
+		account, err := a.queries.GetAccountByID(r.Context(), serviceAccount.AccountID)
+		if err != nil {
+			responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "account not found")
+			return
+		}
+
+		if !account.IsActive {
+			logger.Warn().Msgf("attempt to authenticate with disabled service account: %v", serviceAccount.AccountID)
+			responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "account is disabled")
 			return
 		}
 
