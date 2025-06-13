@@ -56,7 +56,7 @@ const docTemplate = `{
                         }
                     },
                     "401": {
-                        "description": "Authentication failed (handled by middleware)",
+                        "description": "Authentication failed ",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -114,13 +114,13 @@ const docTemplate = `{
                         }
                     },
                     "401": {
-                        "description": "Authentication failed (handled by middleware)",
+                        "description": "Authentication failed ",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "Insufficient permissions (handled by middleware)",
+                        "description": "Insufficient permissions ",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -206,13 +206,13 @@ const docTemplate = `{
                         }
                     },
                     "401": {
-                        "description": "Authentication failed (handled by middleware)",
+                        "description": "Authentication failed ",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "Insufficient permissions (handled by middleware)",
+                        "description": "Insufficient permissions ",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -261,13 +261,13 @@ const docTemplate = `{
                         }
                     },
                     "401": {
-                        "description": "Authentication failed (handled by middleware)",
+                        "description": "Authentication failed ",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "Insufficient permissions (handled by middleware)",
+                        "description": "Insufficient permissions ",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -310,13 +310,13 @@ const docTemplate = `{
                         }
                     },
                     "401": {
-                        "description": "Authentication failed (handled by middleware)",
+                        "description": "Authentication failed ",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "Insufficient permissions (handled by middleware)",
+                        "description": "Insufficient permissions ",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -366,13 +366,13 @@ const docTemplate = `{
                         }
                     },
                     "401": {
-                        "description": "Authentication failed (handled by middleware)",
+                        "description": "Authentication failed ",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "Insufficient permissions (handled by middleware)",
+                        "description": "Insufficient permissions ",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -385,6 +385,76 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/users/{user_id}/reset-password": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Allows admins to reset a user's password",
+                "tags": [
+                    "Site admin"
+                ],
+                "summary": "Reset user password (Admin only)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User Account ID",
+                        "name": "user_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "New password",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ResetUserPasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ResetUserPasswordResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - admin role required",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1132,7 +1202,7 @@ const docTemplate = `{
                 "tags": [
                     "Site admin"
                 ],
-                "summary": "Readiness",
+                "summary": "Readiness Check",
                 "responses": {
                     "200": {
                         "description": "OK"
@@ -1402,13 +1472,13 @@ const docTemplate = `{
                         "description": "OK"
                     },
                     "400": {
-                        "description": "Invalid request body (handled by middleware)",
+                        "description": "Invalid request body ",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Authentication failed (handled by middleware)",
+                        "description": "Authentication failed ",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1469,13 +1539,13 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Invalid grant_type parameter (handled by middleware)",
+                        "description": "Invalid grant_type parameter ",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Authentication failed (handled by middleware)",
+                        "description": "Authentication failed ",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -2069,6 +2139,23 @@ const docTemplate = `{
                     "description": "passwords must be at least 11 characters long",
                     "type": "string",
                     "example": "lkIB53@6O^Y"
+                }
+            }
+        },
+        "handlers.ResetUserPasswordRequest": {
+            "type": "object",
+            "properties": {
+                "new_password": {
+                    "description": "Admin provides the new password",
+                    "type": "string"
+                }
+            }
+        },
+        "handlers.ResetUserPasswordResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
                 }
             }
         },
