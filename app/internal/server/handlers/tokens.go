@@ -59,8 +59,8 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, e
 //	@Param			request		body	auth.ServiceAccountTokenRequest	false	"Service account credentials (required for client_credentials grant)"
 //
 //	@Success		200	{object}	auth.AccessTokenResponse
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		401	{object}	responses.ErrorResponse
+//	@Failure		400	{object}	responses.ErrorResponse	"Invalid grant_type parameter "
+//	@Failure		401	{object}	responses.ErrorResponse	"Authentication failed "
 //	@Failure		500	{object}	responses.ErrorResponse
 //
 //	@Security		BearerAccessToken
@@ -117,28 +117,36 @@ func (a *TokenHandler) NewAccessTokenHandler(w http.ResponseWriter, r *http.Requ
 
 // RevokeTokenHandler godoc
 //
-//	@Summary		Revoke a token
-//	@Description	Revoke a refersh token or client secret to prevent it being used to create new access tokens.
+//	@Summary		Revoke a token (logout for web users)
+//	@Description	Revoke a refresh token or client secret to prevent it being used to create new access tokens.
+//	@Description	**This endpoint serves as the logout function for web users.**
 //	@Description
 //	@Description	**Service Accounts:**
 //	@Description 	You must supply your `client ID` and `client secret` in the request body.
+//	@Description	This revokes all client secrets for the service account.
 //	@Description
-//	@Description	**Web Users:**
-//	@Description	This end point expects a refresh token in a `http-only cookie` and a valid access token in the Authorization header.
+//	@Description	**Web Users (Logout):**
+//	@Description	This endpoint expects a refresh token in an `http-only cookie` and a valid access token in the Authorization header.
+//	@Description	This revokes the user's refresh token, effectively logging them out.
 //	@Description
-//	@Description	if the refresh token has expired or been revoked the user must login again to get a new one.
+//	@Description	If the refresh token has expired or been revoked, the user must login again to get a new one.
 //	@Description
 //	@Description	You must also provide a previously issued `bearer access token` in the Authorization header - it does not matter if it has expired
-//	@Description	(the token is not used to authenticate the request but is needed to establish the ID of the user making the request)
+//	@Description	(the token is not used to authenticate the request but is needed to establish the ID of the user making the request).
 //	@Description
-//	@Description	Note that any unexpired access tokens issued for this user will continue to work until they expire.
-//	@Description	Users must log in again to obtain a new refresh token if the current one has been revoked.
+//	@Description	**Note:** Any unexpired access tokens issued for this user will continue to work until they expire.
+//	@Description	Users must log in again to obtain a new refresh token after logout/revocation.
+//	@Description
+//	@Description	**Client Examples:**
+//	@Description	- **Web User Logout:** `POST /oauth/revoke` with refresh token cookie + Authorization header
+//	@Description	- **Service Account:** `POST /oauth/revoke` with client_id and client_secret in request body
 //	@Description
 //	@Tags		auth
 //
 //	@Success	200
-//	@Failure	400	{object}	responses.ErrorResponse
-//	@Failure	404	{object}	responses.ErrorResponse
+//	@Failure	400	{object}	responses.ErrorResponse	"Invalid request body "
+//	@Failure	401	{object}	responses.ErrorResponse	"Authentication failed "
+//	@Failure	404	{object}	responses.ErrorResponse	"Token not found or already revoked"
 //	@Failure	500	{object}	responses.ErrorResponse
 //
 //	@Security	BearerAccessToken
