@@ -16,6 +16,7 @@ type Account struct {
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 	AccountType string    `json:"account_type"`
+	IsActive    bool      `json:"is_active"`
 }
 
 type ClientSecret struct {
@@ -73,7 +74,6 @@ type ServiceAccount struct {
 	ClientContactEmail string    `json:"client_contact_email"`
 	ClientOrganization string    `json:"client_organization"`
 	RateLimitPerMinute int32     `json:"rate_limit_per_minute"`
-	IsActive           bool      `json:"is_active"`
 }
 
 type Signal struct {

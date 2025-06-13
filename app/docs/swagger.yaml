@@ -177,6 +177,23 @@ definitions:
       visibility:
         type: string
     type: object
+  database.ServiceAccount:
+    properties:
+      account_id:
+        type: string
+      client_contact_email:
+        type: string
+      client_id:
+        type: string
+      client_organization:
+        type: string
+      created_at:
+        type: string
+      rate_limit_per_minute:
+        type: integer
+      updated_at:
+        type: string
+    type: object
   database.SignalType:
     properties:
       created_at:
@@ -509,11 +526,99 @@ definitions:
         example: message describing the error
         type: string
     type: object
-host: localhost:8080
 info:
   contact: {}
   description: Signals ISN service API
+  license:
+    name: MIT
+  title: Signals ISN API
+  version: "1.0"
 paths:
+  /admin/accounts/{account_id}/disable:
+    post:
+      description: |-
+        Disabling an account prevents it from being used to create new access tokens.
+
+        The handler will also revoke:
+        - client secrets/one-time secrets (service accounts)
+        - refresh tokens (web users).
+
+        Note: The site owner account cannot be disabled to prevent system lockout.
+        Only owners and admins can disable accounts.
+      parameters:
+      - description: Account ID to disable
+        in: path
+        name: account_id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid account ID format
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: Authentication failed (handled by middleware)
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Cannot disable site owner account
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Account not found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Disable an account
+      tags:
+      - Site admin
+  /admin/accounts/{account_id}/enable:
+    post:
+      description: "For service accounts, you will need to register them again using
+        /auth/register/service-accounts\nThe client ID will remain the same but they
+        must go through\tthe setup process again.\n\nFor user accounts, they can immediately
+        log in again.\n\nOnly owners and admins can enable accounts."
+      parameters:
+      - description: Account ID to enable
+        in: path
+        name: account_id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Invalid account ID format
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: Authentication failed (handled by middleware)
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Insufficient permissions (handled by middleware)
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Account not found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Enable an account
+      tags:
+      - Site admin
   /admin/live:
     get:
       description: check if the signalsd service is up
@@ -544,6 +649,76 @@ paths:
       summary: reset
       tags:
       - Site admin
+  /admin/service-accounts:
+    get:
+      description: |-
+        Get a list of all service accounts in the system.
+        Only owners and admins can view service account lists.
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/database.ServiceAccount'
+            type: array
+        "401":
+          description: Authentication failed (handled by middleware)
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Insufficient permissions (handled by middleware)
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Get all service accounts
+      tags:
+      - Site admin
+  /admin/service-accounts/{id}:
+    get:
+      description: |-
+        Get a specific service account by account ID.
+        Only owners and admins can view service account details.
+      parameters:
+      - description: Service Account ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/database.ServiceAccount'
+        "400":
+          description: Invalid service account ID format
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: Authentication failed (handled by middleware)
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Insufficient permissions (handled by middleware)
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Service account not found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Get service account
+      tags:
+      - Site admin
   /admin/users:
     get:
       description: This api displays all the site users and their email addreses (can
@@ -555,6 +730,14 @@ paths:
             items:
               $ref: '#/definitions/database.GetUsersRow'
             type: array
+        "401":
+          description: Authentication failed (handled by middleware)
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Insufficient permissions (handled by middleware)
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -579,9 +762,23 @@ paths:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/database.GetUserByIDRow'
-            type: array
+            $ref: '#/definitions/database.GetUserByIDRow'
+        "400":
+          description: Invalid user ID format
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: Authentication failed (handled by middleware)
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Insufficient permissions (handled by middleware)
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
@@ -1074,7 +1271,9 @@ paths:
       description: |
         Registring a new service account creates a one time link with the client credentials in it - this must be used by the client within 48 hrs.
 
-        If you want to reissue the client credentials call this endpoint again with the same client organization and contact email.
+        If you want to reissue a client's credentials call this endpoint again with the same client organization and contact email.
+        A new one time setup url will be generated and the old one will be revoked.
+        Note the client_id will remain the same and any existing client secrets will be revoked.
 
         You have to be an admin or the site owner to use this endpoint
       parameters:
@@ -1109,14 +1308,13 @@ paths:
   /auth/service-accounts/setup/{setup_id}:
     get:
       description: |
-        Exchange one-time setup token for permanent client credentials (the one-time request is when a new service account is registered).
-        the endpoint renders a html page that the user can use to copy their client credentials
-
-        This endpoint can only be used once and must be called within 48 hours.
+        Exchange one-time setup token for permanent client credentials (the one-time request url is created when a new service account is registered).
+        the endpoint renders a html page that the user can use to copy their client credentials.
+        The setup url is only valid for 48 hours.
       parameters:
       - description: One-time setup ID
         in: path
-        name: setoup_id
+        name: setup_id
         required: true
         type: string
       responses:
@@ -1353,30 +1551,41 @@ paths:
   /oauth/revoke:
     post:
       description: |
-        Revoke a refersh token or client secret to prevent it being used to create new access tokens.
+        Revoke a refresh token or client secret to prevent it being used to create new access tokens.
+        **This endpoint serves as the logout function for web users.**
 
         **Service Accounts:**
         You must supply your `client ID` and `client secret` in the request body.
+        This revokes all client secrets for the service account.
 
-        **Web Users:**
-        This end point expects a refresh token in a `http-only cookie` and a valid access token in the Authorization header.
+        **Web Users (Logout):**
+        This endpoint expects a refresh token in an `http-only cookie` and a valid access token in the Authorization header.
+        This revokes the user's refresh token, effectively logging them out.
 
-        if the refresh token has expired or been revoked the user must login again to get a new one.
+        If the refresh token has expired or been revoked, the user must login again to get a new one.
 
         You must also provide a previously issued `bearer access token` in the Authorization header - it does not matter if it has expired
-        (the token is not used to authenticate the request but is needed to establish the ID of the user making the request)
+        (the token is not used to authenticate the request but is needed to establish the ID of the user making the request).
 
-        Note that any unexpired access tokens issued for this user will continue to work until they expire.
-        Users must log in again to obtain a new refresh token if the current one has been revoked.
+        **Note:** Any unexpired access tokens issued for this user will continue to work until they expire.
+        Users must log in again to obtain a new refresh token after logout/revocation.
+
+        **Client Examples:**
+        - **Web User Logout:** `POST /oauth/revoke` with refresh token cookie + Authorization header
+        - **Service Account:** `POST /oauth/revoke` with client_id and client_secret in request body
       responses:
         "200":
           description: OK
         "400":
-          description: Bad Request
+          description: Invalid request body (handled by middleware)
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: Authentication failed (handled by middleware)
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
-          description: Not Found
+          description: Token not found or already revoked
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "500":
@@ -1385,7 +1594,7 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Revoke a token
+      summary: Revoke a token (logout for web users)
       tags:
       - auth
   /oauth/token:
@@ -1433,11 +1642,11 @@ paths:
           schema:
             $ref: '#/definitions/auth.AccessTokenResponse'
         "400":
-          description: Bad Request
+          description: Invalid grant_type parameter (handled by middleware)
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: Unauthorized
+          description: Authentication failed (handled by middleware)
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "500":

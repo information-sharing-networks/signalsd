@@ -69,10 +69,9 @@ INSERT INTO service_accounts (
     client_id,
     client_contact_email,
     client_organization,
-    rate_limit_per_minute,
-    is_active
-) VALUES ( $1, NOW(), NOW(), $2, $3, $4, $5, true)
-RETURNING account_id, created_at, updated_at, client_id, client_contact_email, client_organization, rate_limit_per_minute, is_active
+    rate_limit_per_minute
+) VALUES ( $1, NOW(), NOW(), $2, $3, $4, $5)
+RETURNING account_id, created_at, updated_at, client_id, client_contact_email, client_organization, rate_limit_per_minute
 `
 
 type CreateServiceAccountParams struct {
@@ -100,7 +99,6 @@ func (q *Queries) CreateServiceAccount(ctx context.Context, arg CreateServiceAcc
 		&i.ClientContactEmail,
 		&i.ClientOrganization,
 		&i.RateLimitPerMinute,
-		&i.IsActive,
 	)
 	return i, err
 }
@@ -186,7 +184,7 @@ func (q *Queries) GetOneTimeClientSecret(ctx context.Context, id uuid.UUID) (Get
 }
 
 const getServiceAccountByAccountID = `-- name: GetServiceAccountByAccountID :one
-SELECT sa.account_id, sa.created_at, sa.updated_at, sa.client_id, sa.client_contact_email, sa.client_organization, sa.rate_limit_per_minute, sa.is_active FROM service_accounts sa
+SELECT sa.account_id, sa.created_at, sa.updated_at, sa.client_id, sa.client_contact_email, sa.client_organization, sa.rate_limit_per_minute FROM service_accounts sa
 WHERE sa.account_id = $1
 `
 
@@ -201,13 +199,12 @@ func (q *Queries) GetServiceAccountByAccountID(ctx context.Context, accountID uu
 		&i.ClientContactEmail,
 		&i.ClientOrganization,
 		&i.RateLimitPerMinute,
-		&i.IsActive,
 	)
 	return i, err
 }
 
 const getServiceAccountByClientID = `-- name: GetServiceAccountByClientID :one
-SELECT sa.account_id, sa.created_at, sa.updated_at, sa.client_id, sa.client_contact_email, sa.client_organization, sa.rate_limit_per_minute, sa.is_active FROM service_accounts sa
+SELECT sa.account_id, sa.created_at, sa.updated_at, sa.client_id, sa.client_contact_email, sa.client_organization, sa.rate_limit_per_minute FROM service_accounts sa
 WHERE sa.client_id = $1
 `
 
@@ -222,13 +219,12 @@ func (q *Queries) GetServiceAccountByClientID(ctx context.Context, clientID stri
 		&i.ClientContactEmail,
 		&i.ClientOrganization,
 		&i.RateLimitPerMinute,
-		&i.IsActive,
 	)
 	return i, err
 }
 
 const getServiceAccountWithOrganizationAndEmail = `-- name: GetServiceAccountWithOrganizationAndEmail :one
-SELECT account_id, created_at, updated_at, client_id, client_contact_email, client_organization, rate_limit_per_minute, is_active FROM service_accounts
+SELECT account_id, created_at, updated_at, client_id, client_contact_email, client_organization, rate_limit_per_minute FROM service_accounts
     WHERE client_organization = $1
     AND client_contact_email = $2
 `
@@ -249,9 +245,40 @@ func (q *Queries) GetServiceAccountWithOrganizationAndEmail(ctx context.Context,
 		&i.ClientContactEmail,
 		&i.ClientOrganization,
 		&i.RateLimitPerMinute,
-		&i.IsActive,
 	)
 	return i, err
+}
+
+const getServiceAccounts = `-- name: GetServiceAccounts :many
+SELECT sa.account_id, sa.created_at, sa.updated_at, sa.client_id, sa.client_contact_email, sa.client_organization, sa.rate_limit_per_minute FROM service_accounts sa
+`
+
+func (q *Queries) GetServiceAccounts(ctx context.Context) ([]ServiceAccount, error) {
+	rows, err := q.db.Query(ctx, getServiceAccounts)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ServiceAccount
+	for rows.Next() {
+		var i ServiceAccount
+		if err := rows.Scan(
+			&i.AccountID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.ClientID,
+			&i.ClientContactEmail,
+			&i.ClientOrganization,
+			&i.RateLimitPerMinute,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getValidClientSecretByHashedSecret = `-- name: GetValidClientSecretByHashedSecret :one

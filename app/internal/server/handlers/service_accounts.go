@@ -123,7 +123,9 @@ type SetupPageData struct {
 //	@Summary		Register a new service account
 //	@Description	Registring a new service account creates a one time link with the client credentials in it - this must be used by the client within 48 hrs.
 //	@Description
-//	@Description	If you want to reissue the client credentials call this endpoint again with the same client organization and contact email.
+//	@Description	If you want to reissue a client's credentials call this endpoint again with the same client organization and contact email.
+//	@Description	A new one time setup url will be generated and the old one will be revoked.
+//	@Description	Note the client_id will remain the same and any existing client secrets will be revoked.
 //	@Description
 //	@Description	You have to be an admin or the site owner to use this endpoint
 //	@Description
@@ -288,16 +290,16 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 // SetupServiceAccountHandler godoc
 //
 //	@Summary		Complete service account setup
-//	@Description	Exchange one-time setup token for permanent client credentials (the one-time request is when a new service account is registered).
-//	@Description	the endpoint renders a html page that the user can use to copy their client credentials
-//	@Description
-//	@Description	This endpoint can only be used once and must be called within 48 hours.
+//	@Description	Exchange one-time setup token for permanent client credentials (the one-time request url is created when a new service account is registered).
+//	@Description	the endpoint renders a html page that the user can use to copy their client credentials.
+//	@Description	The setup url is only valid for 48 hours.
 //	@Description
 //	@Tags			Service accounts
 //
-//	@Param			setoup_id	path	string	true	"One-time setup ID"
+//	@Param			setup_id	path	string	true	"One-time setup ID"
 //
 //	@Success		201
+//
 //	@Failure		400	{object}	responses.ErrorResponse
 //	@Failure		404	{object}	responses.ErrorResponse
 //	@Failure		410	{object}	responses.ErrorResponse

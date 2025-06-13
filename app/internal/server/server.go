@@ -111,7 +111,7 @@ func (s *Server) registerRoutes() {
 	tokens := handlers.NewTokenHandler(s.queries, s.authService, s.serviceConfig.Environment)
 
 	// site admin handlers
-	admin := handlers.NewAdminHandler(s.queries)
+	admin := handlers.NewAdminHandler(s.queries, s.pool)
 
 	// middleware handles auth on the remaing services
 
@@ -254,8 +254,20 @@ func (s *Server) registerRoutes() {
 			r.Use(s.authService.RequireValidAccessToken(false))
 			r.Use(s.authService.RequireRole("owner"))
 
-			r.Get("/users/{id}", users.GetUserHandler)
-			r.Get("/users", users.GetUsersHandler)
+			r.Get("/users/{id}", admin.GetUserHandler)
+			r.Get("/users", admin.GetUsersHandler)
+		})
+
+		r.Group(func(r chi.Router) {
+
+			// routes below can only be used by owners and admins
+			r.Use(s.authService.RequireValidAccessToken(false))
+			r.Use(s.authService.RequireRole("owner", "admin"))
+
+			r.Post("/accounts/{account_id}/disable", admin.DisableAccountHandler)
+			r.Post("/accounts/{account_id}/enable", admin.EnableAccountHandler)
+			r.Get("/service-accounts", admin.GetServiceAccountsHandler)
+			r.Get("/service-accounts/{id}", admin.GetServiceAccountHandler)
 		})
 	})
 

@@ -86,6 +86,19 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// check if the user account is active
+	account, err := l.queries.GetAccountByID(r.Context(), user.AccountID)
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		return
+	}
+
+	if !account.IsActive {
+		logger.Warn().Msgf("attempt to login with disabled user account: %v", user.AccountID)
+		responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "account is disabled")
+		return
+	}
+
 	// new access token
 	ctx := auth.ContextWithAccountID(r.Context(), user.AccountID)
 

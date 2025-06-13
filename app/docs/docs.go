@@ -16,11 +16,130 @@ const docTemplate = `{
         "description": "{{escape .Description}}",
         "title": "{{.Title}}",
         "contact": {},
+        "license": {
+            "name": "MIT"
+        },
         "version": "{{.Version}}"
     },
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/admin/accounts/{account_id}/disable": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Disabling an account prevents it from being used to create new access tokens.\n\nThe handler will also revoke:\n- client secrets/one-time secrets (service accounts)\n- refresh tokens (web users).\n\nNote: The site owner account cannot be disabled to prevent system lockout.\nOnly owners and admins can disable accounts.",
+                "tags": [
+                    "Site admin"
+                ],
+                "summary": "Disable an account",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Account ID to disable",
+                        "name": "account_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "description": "Invalid account ID format",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication failed (handled by middleware)",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Cannot disable site owner account",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/accounts/{account_id}/enable": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "For service accounts, you will need to register them again using /auth/register/service-accounts\nThe client ID will remain the same but they must go through\tthe setup process again.\n\nFor user accounts, they can immediately log in again.\n\nOnly owners and admins can enable accounts.",
+                "tags": [
+                    "Site admin"
+                ],
+                "summary": "Enable an account",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Account ID to enable",
+                        "name": "account_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "description": "Invalid account ID format",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication failed (handled by middleware)",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions (handled by middleware)",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Account not found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/live": {
             "get": {
                 "description": "check if the signalsd service is up",
@@ -64,6 +183,110 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/service-accounts": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Get a list of all service accounts in the system.\nOnly owners and admins can view service account lists.",
+                "tags": [
+                    "Site admin"
+                ],
+                "summary": "Get all service accounts",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/database.ServiceAccount"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication failed (handled by middleware)",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions (handled by middleware)",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/service-accounts/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Get a specific service account by account ID.\nOnly owners and admins can view service account details.",
+                "tags": [
+                    "Site admin"
+                ],
+                "summary": "Get service account",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Service Account ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/database.ServiceAccount"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid service account ID format",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication failed (handled by middleware)",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions (handled by middleware)",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Service account not found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/users": {
             "get": {
                 "security": [
@@ -84,6 +307,18 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/database.GetUsersRow"
                             }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication failed (handled by middleware)",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions (handled by middleware)",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "500": {
@@ -121,10 +356,31 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/database.GetUserByIDRow"
-                            }
+                            "$ref": "#/definitions/database.GetUserByIDRow"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid user ID format",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication failed (handled by middleware)",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions (handled by middleware)",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "500": {
@@ -779,7 +1035,7 @@ const docTemplate = `{
                         "BearerServiceAccount": []
                     }
                 ],
-                "description": "Registring a new service account creates a one time link with the client credentials in it - this must be used by the client within 48 hrs.\n\nIf you want to reissue the client credentials call this endpoint again with the same client organization and contact email.\n\nYou have to be an admin or the site owner to use this endpoint\n",
+                "description": "Registring a new service account creates a one time link with the client credentials in it - this must be used by the client within 48 hrs.\n\nIf you want to reissue a client's credentials call this endpoint again with the same client organization and contact email.\nA new one time setup url will be generated and the old one will be revoked.\nNote the client_id will remain the same and any existing client secrets will be revoked.\n\nYou have to be an admin or the site owner to use this endpoint\n",
                 "tags": [
                     "Service accounts"
                 ],
@@ -825,7 +1081,7 @@ const docTemplate = `{
         },
         "/auth/service-accounts/setup/{setup_id}": {
             "get": {
-                "description": "Exchange one-time setup token for permanent client credentials (the one-time request is when a new service account is registered).\nthe endpoint renders a html page that the user can use to copy their client credentials\n\nThis endpoint can only be used once and must be called within 48 hours.\n",
+                "description": "Exchange one-time setup token for permanent client credentials (the one-time request url is created when a new service account is registered).\nthe endpoint renders a html page that the user can use to copy their client credentials.\nThe setup url is only valid for 48 hours.\n",
                 "tags": [
                     "Service accounts"
                 ],
@@ -834,7 +1090,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "description": "One-time setup ID",
-                        "name": "setoup_id",
+                        "name": "setup_id",
                         "in": "path",
                         "required": true
                     }
@@ -1136,23 +1392,29 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Revoke a refersh token or client secret to prevent it being used to create new access tokens.\n\n**Service Accounts:**\nYou must supply your ` + "`" + `client ID` + "`" + ` and ` + "`" + `client secret` + "`" + ` in the request body.\n\n**Web Users:**\nThis end point expects a refresh token in a ` + "`" + `http-only cookie` + "`" + ` and a valid access token in the Authorization header.\n\nif the refresh token has expired or been revoked the user must login again to get a new one.\n\nYou must also provide a previously issued ` + "`" + `bearer access token` + "`" + ` in the Authorization header - it does not matter if it has expired\n(the token is not used to authenticate the request but is needed to establish the ID of the user making the request)\n\nNote that any unexpired access tokens issued for this user will continue to work until they expire.\nUsers must log in again to obtain a new refresh token if the current one has been revoked.\n",
+                "description": "Revoke a refresh token or client secret to prevent it being used to create new access tokens.\n**This endpoint serves as the logout function for web users.**\n\n**Service Accounts:**\nYou must supply your ` + "`" + `client ID` + "`" + ` and ` + "`" + `client secret` + "`" + ` in the request body.\nThis revokes all client secrets for the service account.\n\n**Web Users (Logout):**\nThis endpoint expects a refresh token in an ` + "`" + `http-only cookie` + "`" + ` and a valid access token in the Authorization header.\nThis revokes the user's refresh token, effectively logging them out.\n\nIf the refresh token has expired or been revoked, the user must login again to get a new one.\n\nYou must also provide a previously issued ` + "`" + `bearer access token` + "`" + ` in the Authorization header - it does not matter if it has expired\n(the token is not used to authenticate the request but is needed to establish the ID of the user making the request).\n\n**Note:** Any unexpired access tokens issued for this user will continue to work until they expire.\nUsers must log in again to obtain a new refresh token after logout/revocation.\n\n**Client Examples:**\n- **Web User Logout:** ` + "`" + `POST /oauth/revoke` + "`" + ` with refresh token cookie + Authorization header\n- **Service Account:** ` + "`" + `POST /oauth/revoke` + "`" + ` with client_id and client_secret in request body\n",
                 "tags": [
                     "auth"
                 ],
-                "summary": "Revoke a token",
+                "summary": "Revoke a token (logout for web users)",
                 "responses": {
                     "200": {
                         "description": "OK"
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid request body (handled by middleware)",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication failed (handled by middleware)",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "Token not found or already revoked",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1207,13 +1469,13 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid grant_type parameter (handled by middleware)",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "Authentication failed (handled by middleware)",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1479,6 +1741,32 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "visibility": {
+                    "type": "string"
+                }
+            }
+        },
+        "database.ServiceAccount": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                },
+                "client_contact_email": {
+                    "type": "string"
+                },
+                "client_id": {
+                    "type": "string"
+                },
+                "client_organization": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "rate_limit_per_minute": {
+                    "type": "integer"
+                },
+                "updated_at": {
                     "type": "string"
                 }
             }
@@ -2001,11 +2289,11 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "",
-	Host:             "localhost:8080",
+	Version:          "1.0",
+	Host:             "",
 	BasePath:         "",
 	Schemes:          []string{},
-	Title:            "",
+	Title:            "Signals ISN API",
 	Description:      "Signals ISN service API",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,

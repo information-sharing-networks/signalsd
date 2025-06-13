@@ -6,9 +6,8 @@ INSERT INTO service_accounts (
     client_id,
     client_contact_email,
     client_organization,
-    rate_limit_per_minute,
-    is_active
-) VALUES ( $1, NOW(), NOW(), $2, $3, $4, $5, true)
+    rate_limit_per_minute
+) VALUES ( $1, NOW(), NOW(), $2, $3, $4, $5)
 RETURNING *;
 
 -- name: CreateClientSecret :one
@@ -80,3 +79,6 @@ WHERE sa.client_id = $1;
 -- name: GetServiceAccountByAccountID :one
 SELECT sa.* FROM service_accounts sa
 WHERE sa.account_id = $1;
+
+-- name: GetServiceAccounts :many
+SELECT sa.account_id, sa.created_at, sa.updated_at, sa.client_id, sa.client_contact_email, sa.client_organization, sa.rate_limit_per_minute FROM service_accounts sa;
