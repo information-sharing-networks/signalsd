@@ -395,7 +395,7 @@
                 "tags": [
                     "Site admin"
                 ],
-                "summary": "Reset user password (Admin only)",
+                "summary": "Reset user password",
                 "parameters": [
                     {
                         "type": "string",
@@ -1497,7 +1497,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "**Client Credentials Grant (Service Accounts):**\n\nIssues new access token (in response body)\n\n- Set `grant_type=client_credentials` as URL parameter\n- Provide `client_id` and `client_secret` in request body\n- Must provide current access token in Authorization header (expired tokens accepted)\n- Access tokens expire after 30 minutes\n(subsequent requests using the token will fail with HTTP status 401 and an error_code of \"access_token_expired\")\n\n**Refresh Token Grant (Web Users):**\n\nIssues new access token (in response body) and rotates refresh token (HTTP-only cookie)\n\n- Set `grant_type=refresh_token` as URL parameter\n- Must provide current access token in Authorization header (expired tokens accepted)\n- Must have valid refresh token cookie\n- Access tokens expire after 30 minutes\n(subsequent requests using the token will fail with HTTP status 401 and an error_code of \"access_token_expired\")\n- Refresh tokens expire after 30 days\n- subsequent requests using the refresh token will fail with HTTP status 401 and an error_code of \"refresh_token_expired\" and users must login again to get a new one.\n",
+                "description": "**Client Credentials Grant (Service Accounts):**\n\nIssues new access token (in response body)\n\n- Set `grant_type=client_credentials` as URL parameter\n- Provide `client_id` and `client_secret` in request body\n- Access tokens expire after 30 minutes\n(subsequent requests using the token will fail with HTTP status 401 and an error_code of \"access_token_expired\")\n\n**Refresh Token Grant (Web Users):**\n\nIssues new access token (in response body) and rotates refresh token (HTTP-only cookie)\n\n- Set `grant_type=refresh_token` as URL parameter\n- Must provide current access token in Authorization header (expired tokens accepted)\n- Must have valid refresh token cookie\n- Access tokens expire after 30 minutes\n(subsequent requests using the token will fail with HTTP status 401 and an error_code of \"access_token_expired\")\n- Refresh tokens expire after 30 days\n- subsequent requests using the refresh token will fail with HTTP status 401 and an error_code of \"refresh_token_expired\" and users must login again to get a new one.\n",
                 "tags": [
                     "auth"
                 ],

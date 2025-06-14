@@ -99,6 +99,7 @@ func main() {
 
 	server := server.NewServer(pool, queries, authService, cfg, serverLogger, httpLogger, router)
 
+	serverLogger.Info().Msgf("CORS allowed origins: %v", cfg.AllowedOrigins)
 	serverLogger.Info().Msg("Starting server")
 
 	server.Run()

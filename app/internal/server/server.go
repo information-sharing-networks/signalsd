@@ -10,11 +10,12 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	signalsd "github.com/information-sharing-networks/signalsd/app"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
+
 	"github.com/information-sharing-networks/signalsd/app/internal/server/handlers"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog"
@@ -98,8 +99,10 @@ func (s *Server) Run() {
 }
 
 func (s *Server) setupMiddleware() {
-	s.router.Use(middleware.RequestID)
-	s.router.Use(logger.LoggingMiddleware(s.httpLogger))
+	s.router.Use(chimiddleware.RequestID)
+	s.router.Use(logger.RequestLogging(s.httpLogger))
+	s.router.Use(CORS(s.serviceConfig.AllowedOrigins))
+	s.router.Use(SecurityHeaders(s.serviceConfig.Environment))
 }
 
 func (s *Server) registerRoutes() {
