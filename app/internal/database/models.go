@@ -100,17 +100,18 @@ type SignalBatch struct {
 }
 
 type SignalType struct {
-	ID        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	IsnID     uuid.UUID `json:"isn_id"`
-	Slug      string    `json:"slug"`
-	SchemaURL string    `json:"schema_url"`
-	ReadmeURL string    `json:"readme_url"`
-	Title     string    `json:"title"`
-	Detail    string    `json:"detail"`
-	SemVer    string    `json:"sem_ver"`
-	IsInUse   bool      `json:"is_in_use"`
+	ID            uuid.UUID `json:"id"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	IsnID         uuid.UUID `json:"isn_id"`
+	Slug          string    `json:"slug"`
+	SchemaURL     string    `json:"schema_url"`
+	ReadmeURL     string    `json:"readme_url"`
+	Title         string    `json:"title"`
+	Detail        string    `json:"detail"`
+	SemVer        string    `json:"sem_ver"`
+	IsInUse       bool      `json:"is_in_use"`
+	SchemaContent string    `json:"schema_content"`
 }
 
 type SignalVersion struct {

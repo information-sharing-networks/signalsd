@@ -11,8 +11,9 @@ INSERT INTO signal_types (
     title,
     detail,
     sem_ver,
-    is_in_use
-    ) VALUES (gen_random_uuid(), now(), now(), $1, $2, $3, $4, $5, $6, $7, true)
+    is_in_use,
+    schema_content
+    ) VALUES (gen_random_uuid(), now(), now(), $1, $2, $3, $4, $5, $6, $7, true, $8)
 RETURNING *;
 
 -- name: UpdateSignalTypeDetails :execrows
@@ -115,3 +116,6 @@ SELECT EXISTS
    FROM signal_types
    WHERE slug = $1
    AND schema_url = $2) AS EXISTS;
+
+-- name: GetSchemaURLs :many
+SELECT DISTINCT schema_url FROM signal_types;

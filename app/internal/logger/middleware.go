@@ -51,7 +51,7 @@ func RequestLogging(logger *zerolog.Logger) func(http.Handler) http.Handler {
 
 			logEvent.
 				Int("status", ww.Status()).
-				Dur("duration", duration).
+				Str("duration", duration.String()).
 				Int("bytes", ww.BytesWritten()).
 				Msg("Request completed")
 		})

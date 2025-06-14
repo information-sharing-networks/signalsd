@@ -13,6 +13,7 @@ require (
 	github.com/go-chi/chi/v5 v5.2.1
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/rs/zerolog v1.34.0
+	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/swaggo/swag v1.16.4
 )
 
