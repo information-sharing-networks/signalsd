@@ -668,7 +668,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "A signal type describes a data set that is sharable over an ISN.  Setup the ISN before defining any signal defs.\nSignal types specify a record that can be shared over the ISN\n- Each type has a unique title\n- A URL-friendly slug is created based on the title supplied when you load the first version of a definition.\n- The title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.\n- The field definition is held as an external json schema file\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different json schemas.\n- use this endpoint to create the first version - the bump_type (major/minor/patch) determines the inital semver(1.0.0, 0.1.0 or 0.0.1)\n- subsequent POSTs to this endpoint that reference a previously sumbitted title/slug but point to a different schema will increment the version\n\nSignal type definitions are referred to with a url like this http://{hostname}/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}\n",
+                "description": "A signal type describes a data set that is sharable over an ISN.  Setup the ISN before defining any signal defs.\nSignal types specify a record that can be shared over the ISN\n- Each type has a unique title\n- A URL-friendly slug is created based on the title supplied when you load the first version of a definition.\n- The title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.\n- The field definition is held as an external JSON schema file\n\nSchema URL Requirements\n- Must be a valid JSON schema on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)\n- To disable schema validation, use: https://github.com/skip/validation/main/schema.json\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas\n- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)\n- Subsequent POSTs to this endpoint that reference a previously submitted title/slug but point to a different schema will increment the version\n\nSignal type definitions are referred to with a URL like this: http://{hostname}/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}\n",
                 "tags": [
                     "Signal definitions"
                 ],
@@ -813,6 +813,65 @@
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Only signal types that have never been referenced by signals can be deleted",
+                "tags": [
+                    "Signal definitions"
+                ],
+                "summary": "Delete a signal definition",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-signal--example-org",
+                        "description": "signal type slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "0.0.1",
+                        "description": "version to be deleted",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1581,6 +1640,7 @@
                 "refresh_token_invalid",
                 "resource_already_exists",
                 "resource_expired",
+                "resource_in_use",
                 "resource_not_found",
                 "token_invalid"
             ],
@@ -1600,6 +1660,7 @@
                 "ErrCodeRefreshTokenInvalid",
                 "ErrCodeResourceAlreadyExists",
                 "ErrCodeResourceExpired",
+                "ErrCodeResourceInUse",
                 "ErrCodeResourceNotFound",
                 "ErrCodeTokenInvalid"
             ]
@@ -1854,6 +1915,9 @@
                 "readme_url": {
                     "type": "string"
                 },
+                "schema_content": {
+                    "type": "string"
+                },
                 "schema_url": {
                     "type": "string"
                 },
@@ -1965,19 +2029,19 @@
                     "example": "patch"
                 },
                 "detail": {
-                    "description": "updated description",
+                    "description": "description",
                     "type": "string",
                     "example": "description"
                 },
                 "readme_url": {
-                    "description": "Updated readme file. Note file must be on a public github repo",
+                    "description": "README file URL: must be a GitHub URL ending in .md",
                     "type": "string",
-                    "example": "https://github.com/user/project/v0.0.1/locales/filename.md"
+                    "example": "https://github.com/user/project/blob/2025.01.01/readme.md"
                 },
                 "schema_url": {
-                    "description": "Note file must be on a public github repo",
+                    "description": "JSON schema URL: must be a GitHub URL ending in .json, OR use https://github.com/skip/validation/main/schema.json to disable validation",
                     "type": "string",
-                    "example": "https://github.com/user/project/v0.0.1/locales/filename.json"
+                    "example": "https://github.com/user/project/blob/2025.01.01/schema.json"
                 },
                 "title": {
                     "description": "unique title",
@@ -2298,13 +2362,14 @@
                     "example": "description"
                 },
                 "is_in_use": {
+                    "description": "whether this signal type version is actively used",
                     "type": "boolean",
                     "example": false
                 },
                 "readme_url": {
-                    "description": "Updated readme file. Note file must be on a public github repo",
+                    "description": "README file URL: must be a GitHub URL ending in .md",
                     "type": "string",
-                    "example": "https://github.com/user/project/v0.0.1/locales/filename.md"
+                    "example": "https://github.com/user/project/blob/2025.01.01/readme.md"
                 }
             }
         },

@@ -10,6 +10,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/server"
+	"github.com/information-sharing-networks/signalsd/app/internal/server/schemas"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	signalsd "github.com/information-sharing-networks/signalsd/app"
@@ -93,6 +94,11 @@ func main() {
 	serverLogger.Info().Msgf("connected to PostgreSQL at %v", safeURL)
 
 	queries := database.New(pool)
+
+	if err := schemas.LoadSchemaCache(ctx, queries); err != nil {
+		serverLogger.Fatal().Err(err).Msg("Failed to load schema cache")
+	}
+	serverLogger.Info().Msg("Schema cache loaded")
 
 	authService := auth.NewAuthService(cfg.SecretKey, cfg.Environment, queries)
 	router := chi.NewRouter()

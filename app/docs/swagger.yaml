@@ -18,6 +18,7 @@ definitions:
     - refresh_token_invalid
     - resource_already_exists
     - resource_expired
+    - resource_in_use
     - resource_not_found
     - token_invalid
     type: string
@@ -37,6 +38,7 @@ definitions:
     - ErrCodeRefreshTokenInvalid
     - ErrCodeResourceAlreadyExists
     - ErrCodeResourceExpired
+    - ErrCodeResourceInUse
     - ErrCodeResourceNotFound
     - ErrCodeTokenInvalid
   auth.AccessTokenResponse:
@@ -208,6 +210,8 @@ definitions:
         type: string
       readme_url:
         type: string
+      schema_content:
+        type: string
       schema_url:
         type: string
       sem_ver:
@@ -287,16 +291,17 @@ definitions:
         example: patch
         type: string
       detail:
-        description: updated description
+        description: description
         example: description
         type: string
       readme_url:
-        description: Updated readme file. Note file must be on a public github repo
-        example: https://github.com/user/project/v0.0.1/locales/filename.md
+        description: 'README file URL: must be a GitHub URL ending in .md'
+        example: https://github.com/user/project/blob/2025.01.01/readme.md
         type: string
       schema_url:
-        description: Note file must be on a public github repo
-        example: https://github.com/user/project/v0.0.1/locales/filename.json
+        description: 'JSON schema URL: must be a GitHub URL ending in .json, OR use
+          https://github.com/skip/validation/main/schema.json to disable validation'
+        example: https://github.com/user/project/blob/2025.01.01/schema.json
         type: string
       title:
         description: unique title
@@ -520,11 +525,12 @@ definitions:
         example: description
         type: string
       is_in_use:
+        description: whether this signal type version is actively used
         example: false
         type: boolean
       readme_url:
-        description: Updated readme file. Note file must be on a public github repo
-        example: https://github.com/user/project/v0.0.1/locales/filename.md
+        description: 'README file URL: must be a GitHub URL ending in .md'
+        example: https://github.com/user/project/blob/2025.01.01/readme.md
         type: string
     type: object
   responses.ErrorResponse:
@@ -1010,14 +1016,18 @@ paths:
         - Each type has a unique title
         - A URL-friendly slug is created based on the title supplied when you load the first version of a definition.
         - The title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.
-        - The field definition is held as an external json schema file
+        - The field definition is held as an external JSON schema file
+
+        Schema URL Requirements
+        - Must be a valid JSON schema on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)
+        - To disable schema validation, use: https://github.com/skip/validation/main/schema.json
 
         Versions
-        - A signal type can have multiple versions - these share the same title/slug but have different json schemas.
-        - use this endpoint to create the first version - the bump_type (major/minor/patch) determines the inital semver(1.0.0, 0.1.0 or 0.0.1)
-        - subsequent POSTs to this endpoint that reference a previously sumbitted title/slug but point to a different schema will increment the version
+        - A signal type can have multiple versions - these share the same title/slug but have different JSON schemas
+        - Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)
+        - Subsequent POSTs to this endpoint that reference a previously submitted title/slug but point to a different schema will increment the version
 
-        Signal type definitions are referred to with a url like this http://{hostname}/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}
+        Signal type definitions are referred to with a URL like this: http://{hostname}/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}
       parameters:
       - description: signal definition details
         in: body
@@ -1048,6 +1058,46 @@ paths:
       tags:
       - Signal definitions
   /api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}:
+    delete:
+      description: Only signal types that have never been referenced by signals can
+        be deleted
+      parameters:
+      - description: signal type slug
+        example: sample-signal--example-org
+        in: path
+        name: slug
+        required: true
+        type: string
+      - description: version to be deleted
+        example: 0.0.1
+        in: path
+        name: sem_ver
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Delete a signal definition
+      tags:
+      - Signal definitions
     get:
       parameters:
       - description: signal definiton slug

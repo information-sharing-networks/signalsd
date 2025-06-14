@@ -231,10 +231,10 @@ run `sqlc generate` from the root of the project to regenerate the type safe go 
 ![auth.0.4.0](https://github.com/user-attachments/assets/643ec71a-f037-4a7e-9497-6023d9100e69)
 
 ## ISN config
-![isns.0.2.0](https://github.com/user-attachments/assets/e091a3ae-e9ed-4b44-aa7e-027ddb93e98c)
+![ISN config v0 5 0](https://github.com/user-attachments/assets/2be326f2-f4d0-485e-aeed-28076383cd8e)
 
 ## Signals
-![signal.0.2.0](https://github.com/user-attachments/assets/86a00593-3536-4126-806d-c5b2d55232de)
+![Signals v0 5 0](https://github.com/user-attachments/assets/ffe9ad66-3026-40ad-94b7-83e7f5d7b4b8)
 
 
 ## CI/CD

@@ -97,7 +97,6 @@ INSERT INTO signal_versions (
     signal_batch_id,
     signal_id,
     version_number,
-    validation_status,
     content
 )
 SELECT
@@ -107,7 +106,6 @@ SELECT
     sqlc.arg(signal_batch_id),
     s.id,
     ver.version_number,
-    'pending',
     sqlc.arg(content)
 FROM ver 
 JOIN signals s 

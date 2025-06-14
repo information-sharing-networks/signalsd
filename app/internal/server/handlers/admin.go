@@ -207,7 +207,6 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 			return
 		}
 
-		logger.Debug().Msgf("disabled service account and revoked client secrets: %v", accountID)
 	} else if account.AccountType == "user" {
 		// Revoke all refresh tokens for user accounts
 		_, err = txQueries.RevokeAllRefreshTokensForUser(r.Context(), accountID)
@@ -217,7 +216,6 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 			return
 		}
 
-		logger.Debug().Msgf("disabled user account and revoked refresh tokens: %v", accountID)
 	}
 
 	// Commit transaction

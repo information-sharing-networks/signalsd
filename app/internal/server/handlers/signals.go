@@ -14,6 +14,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
+	"github.com/information-sharing-networks/signalsd/app/internal/server/schemas"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/utils"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -163,6 +164,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, fmt.Sprintf("you must open a batch for ISN %v before sending signals", isnSlug))
 		return
 	}
+
 	// check that this the user is requesting a valid signal type/sem_ver for this isn
 	found := slices.Contains(claims.IsnPerms[isnSlug].SignalTypePaths, signalTypePath)
 	if !found {
@@ -170,17 +172,37 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// TODO - temp table > upsert for larger payloads)
-
 	createSignalsRequest := CreateSignalsRequest{}
 
 	defer r.Body.Close()
 	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
 	err := decoder.Decode(&createSignalsRequest)
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("invalid JSON format: %v", err))
 		return
+	}
+
+	// Validate basic structure
+	if createSignalsRequest.Signals == nil {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "request must contain a 'signals' array")
+		return
+	}
+
+	if len(createSignalsRequest.Signals) == 0 {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "request must contain at least one signal in the 'signals' array")
+		return
+	}
+
+	// Validate each signal has required fields
+	for i, signal := range createSignalsRequest.Signals {
+		if signal.LocalRef == "" {
+			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("signal at index %d is missing required field 'local_ref'", i))
+			return
+		}
+		if len(signal.Content) == 0 {
+			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("signal at index %d is missing required field 'content'", i))
+			return
+		}
 	}
 
 	createSignalsResponse := CreateSignalsResponse{
@@ -206,8 +228,23 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 
 	txQueries := s.queries.WithTx(tx)
 
-	for _, signal := range createSignalsRequest.Signals {
+	for i, signal := range createSignalsRequest.Signals {
 		var err error
+
+		// Unmarshal and validate signal content against schema
+		var signalData any
+		if err := json.Unmarshal(signal.Content, &signalData); err != nil {
+			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody,
+				fmt.Sprintf("signal %d (local_ref: %s) contains invalid JSON in content field: %v", i+1, signal.LocalRef, err))
+			return
+		}
+
+		err = schemas.ValidateJSON(signalTypePath, signalData)
+		if err != nil {
+			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody,
+				fmt.Sprintf("signal %d (local_ref: %s) failed schema validation: %v", i+1, signal.LocalRef, err))
+			return
+		}
 
 		// create the signal master record the first time this acccount id/signal type/local_ref is received
 		if signal.CorrelationId == nil {
@@ -232,11 +269,11 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) {
 				if pgErr.Code == "23503" && pgErr.ConstraintName == "fk_correlation_id" {
-					responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidCorrelationID, fmt.Sprintf("error processing local ref %s - invalid correlation id %v", signal.LocalRef, signal.CorrelationId))
+					responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidCorrelationID, fmt.Sprintf("signal %d (local_ref: %s) has invalid correlation_id %v", i+1, signal.LocalRef, signal.CorrelationId))
 					return
 				}
 			}
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: local ref %s - could not insert signals: %v", signal.LocalRef, err))
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error processing signal %d (local_ref: %s): %v", i+1, signal.LocalRef, err))
 			return
 		}
 
@@ -250,7 +287,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 			Content:        signal.Content,
 		})
 		if err != nil {
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: local ref %s - could not insert signal_versions: %v", signal.LocalRef, err))
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error creating version for signal %d (local_ref: %s): %v", i+1, signal.LocalRef, err))
 			return
 		}
 
