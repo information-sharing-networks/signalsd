@@ -58,6 +58,31 @@ docker compose down --rmi local -v
 ```
 
 # Developers
+
+## Environment
+The service uses the following environment variables
+```bash
+# Database connection
+DATABASE_URL=postgres://user:password@host:port/database?sslmode=disable
+
+# JWT signing key (generate a secure random string)
+SECRET_KEY=your-64-character-secret-key-here
+
+# Server configuration
+HOST=0.0.0.0                    # Default: 0.0.0.0
+PORT=8080                       # Default: 8080
+ENVIRONMENT=prod                # Default: dev (options: dev, prod, test, staging)
+LOG_LEVEL=info                  # Default: debug (options: debug, info, warn, error)
+
+# database timeouts (optional)
+READ_TIMEOUT=15s                # Default: 15s
+WRITE_TIMEOUT=15s               # Default: 15s  
+IDLE_TIMEOUT=60s                # Default: 60s
+
+# CORS allowed origins (optional) - defaults to allow all origins (*)
+ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
+```
+
 ## Depenencies
 The http service is written in Go and has the following development dependencies 
 - [goose](https://github.com/pressly/goose) **database migrations**

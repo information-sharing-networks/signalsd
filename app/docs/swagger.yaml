@@ -841,7 +841,7 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Reset user password (Admin only)
+      summary: Reset user password
       tags:
       - Site admin
   /api/isn:
@@ -1662,7 +1662,6 @@ paths:
 
         - Set `grant_type=client_credentials` as URL parameter
         - Provide `client_id` and `client_secret` in request body
-        - Must provide current access token in Authorization header (expired tokens accepted)
         - Access tokens expire after 30 minutes
         (subsequent requests using the token will fail with HTTP status 401 and an error_code of "access_token_expired")
 
