@@ -9,11 +9,10 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// standard logger for all http requests
-func LoggingMiddleware(logger *zerolog.Logger) func(http.Handler) http.Handler {
+// RequestLogging returns a middleware that logs HTTP requests
+func RequestLogging(logger *zerolog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
 			// Skip logging for health requests
 			if strings.HasPrefix(r.URL.Path, "/health/") {
 				next.ServeHTTP(w, r)

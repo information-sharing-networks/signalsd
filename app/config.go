@@ -3,6 +3,7 @@ package signalsd
 import (
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -17,15 +18,16 @@ config sets up shared variables for the service:
 
 // service configuration
 type ServerConfig struct {
-	Environment  string
-	Host         string
-	Port         int
-	SecretKey    string
-	LogLevel     zerolog.Level
-	DatabaseURL  string
-	ReadTimeout  time.Duration
-	WriteTimeout time.Duration
-	IdleTimeout  time.Duration
+	Environment    string
+	Host           string
+	Port           int
+	SecretKey      string
+	LogLevel       zerolog.Level
+	DatabaseURL    string
+	ReadTimeout    time.Duration
+	WriteTimeout   time.Duration
+	IdleTimeout    time.Duration
+	AllowedOrigins []string
 }
 
 // common constants - todo option to define as env vars
@@ -146,16 +148,20 @@ func NewServerConfig(logger *zerolog.Logger) *ServerConfig {
 	readTimeout := getEnvDuration("READ_TIMEOUT", defaultReadTimeout)
 	idleTimeout := getEnvDuration("IDLE_TIMEOUT", defaultIdleTimeout)
 
+	// CORS allowed origins
+	allowedOrigins := getOrigins("ALLOWED_ORIGINS")
+
 	return &ServerConfig{
-		Environment:  environment,
-		Host:         host,
-		Port:         port,
-		SecretKey:    secretKey,
-		LogLevel:     logLevel,
-		DatabaseURL:  databaseURL,
-		ReadTimeout:  readTimeout,
-		WriteTimeout: writeTimeout,
-		IdleTimeout:  idleTimeout,
+		Environment:    environment,
+		Host:           host,
+		Port:           port,
+		SecretKey:      secretKey,
+		LogLevel:       logLevel,
+		DatabaseURL:    databaseURL,
+		ReadTimeout:    readTimeout,
+		WriteTimeout:   writeTimeout,
+		IdleTimeout:    idleTimeout,
+		AllowedOrigins: allowedOrigins,
 	}
 }
 
@@ -166,4 +172,18 @@ func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
 		}
 	}
 	return defaultValue
+}
+
+// return origins from ALLOWED_ORIGINS (default to *)
+func getOrigins(key string) []string {
+	val := os.Getenv(key)
+	if val == "" {
+		return []string{"*"}
+	}
+	origins := strings.Split(val, ",")
+	for i, origin := range origins {
+		origins[i] = strings.TrimSpace(origin)
+	}
+
+	return origins
 }

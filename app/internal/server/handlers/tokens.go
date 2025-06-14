@@ -37,7 +37,6 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, e
 //	@Description
 //	@Description	- Set `grant_type=client_credentials` as URL parameter
 //	@Description	- Provide `client_id` and `client_secret` in request body
-//	@Description	- Must provide current access token in Authorization header (expired tokens accepted)
 //	@Description	- Access tokens expire after 30 minutes
 //	@Description	(subsequent requests using the token will fail with HTTP status 401 and an error_code of "access_token_expired")
 //	@Description
