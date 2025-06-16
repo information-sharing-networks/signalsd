@@ -40,6 +40,7 @@ func FetchSchema(url string) (string, error) {
 		url = strings.Replace(url, "/blob/", "/", 1)
 	}
 
+	// #nosec G107 -- URL is validated to be GitHub-only before this function is called
 	res, err := http.Get(url)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch schema from %s: %w", originalURL, err)
