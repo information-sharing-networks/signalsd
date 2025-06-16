@@ -41,7 +41,6 @@ func FetchSchema(url string) (string, error) {
 	}
 
 	// #nosec G107 -- URL is validated to be GitHub-only before this function is called
-	// codeql[go/ssrf] -- URL is validated to be GitHub-only before this function is called
 	res, err := http.Get(url)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch schema from %s: %w", originalURL, err)
