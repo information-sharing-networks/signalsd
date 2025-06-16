@@ -462,6 +462,7 @@ type ResetUserPasswordResponse struct {
 //	@Failure		401	{object}	responses.ErrorResponse	"Unauthorized"
 //	@Failure		403	{object}	responses.ErrorResponse	"Forbidden - admin role required"
 //	@Failure		404	{object}	responses.ErrorResponse	"User not found"
+//	@Failure		413	{object}	responses.ErrorResponse	"Request body too large (max 64KB)"
 //	@Failure		500	{object}	responses.ErrorResponse	"Internal server error"
 //
 //	@Security		BearerAccessToken

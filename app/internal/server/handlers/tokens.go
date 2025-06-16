@@ -60,6 +60,7 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, e
 //	@Success		200	{object}	auth.AccessTokenResponse
 //	@Failure		400	{object}	responses.ErrorResponse	"Invalid grant_type parameter "
 //	@Failure		401	{object}	responses.ErrorResponse	"Authentication failed "
+//	@Failure		413	{object}	responses.ErrorResponse	"Request body too large (max 64KB)"
 //	@Failure		500	{object}	responses.ErrorResponse
 //
 //	@Security		BearerAccessToken
@@ -146,6 +147,7 @@ func (a *TokenHandler) NewAccessTokenHandler(w http.ResponseWriter, r *http.Requ
 //	@Failure	400	{object}	responses.ErrorResponse	"Invalid request body "
 //	@Failure	401	{object}	responses.ErrorResponse	"Authentication failed "
 //	@Failure	404	{object}	responses.ErrorResponse	"Token not found or already revoked"
+//	@Failure	413	{object}	responses.ErrorResponse	"Request body too large (max 64KB)"
 //	@Failure	500	{object}	responses.ErrorResponse
 //
 //	@Security	BearerAccessToken

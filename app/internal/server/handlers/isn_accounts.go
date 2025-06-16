@@ -41,6 +41,7 @@ type GrantIsnAccountPermissionRequest struct {
 //
 //	@Success		204
 //	@Failure		400	{object}	responses.ErrorResponse
+//	@Failure		413	{object}	responses.ErrorResponse	"Request body too large (max 64KB)"
 //	@Failure		500	{object}	responses.ErrorResponse
 //
 //	@Security		BearerAccessToken

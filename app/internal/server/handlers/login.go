@@ -50,6 +50,7 @@ type LoginRequest struct {
 //	@Example		value { "access_token": "abc...", "token_type": "Bearer", "expires_in": 1800, "role": "member", "isn_perms": { "isn-slug-1": "write", "isn-slug-2": "read" } }
 //	@Failure		400	{object}	responses.ErrorResponse
 //	@Failure		401	{object}	responses.ErrorResponse
+//	@Failure		413	{object}	responses.ErrorResponse	"Request body too large (max 64KB)"
 //	@Failure		500	{object}	responses.ErrorResponse
 //
 //	@Router			/auth/login [post]

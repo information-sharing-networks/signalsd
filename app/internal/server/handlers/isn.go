@@ -74,6 +74,7 @@ type IsnAndLinkedInfo struct {
 //	@Success		201		{object}	handlers.CreateIsnResponse
 //	@Failure		400		{object}	responses.ErrorResponse
 //	@Failure		409		{object}	responses.ErrorResponse
+//	@Failure		413		{object}	responses.ErrorResponse	"Request body too large (max 64KB)"
 //	@Failure		500		{object}	responses.ErrorResponse
 //
 //	@Security		BearerAccessToken
@@ -220,6 +221,7 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 //	@Success		204
 //	@Failure		400	{object}	responses.ErrorResponse
 //	@Failure		401	{object}	responses.ErrorResponse
+//	@Failure		413	{object}	responses.ErrorResponse	"Request body too large (max 64KB)"
 //	@Failure		500	{object}	responses.ErrorResponse
 //
 //	@Security		BearerAccessToken

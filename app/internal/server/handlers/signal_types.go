@@ -78,6 +78,7 @@ type SignalTypeAndLinkedInfo struct {
 //	@Success	201		{object}	handlers.CreateSignalTypeResponse
 //	@Failure	400		{object}	responses.ErrorResponse
 //	@Failure	409		{object}	responses.ErrorResponse
+//	@Failure	413		{object}	responses.ErrorResponse	"Request body too large (max 64KB)"
 //	@Failure	500		{object}	responses.ErrorResponse
 //
 //	@Security	BearerAccessToken
@@ -264,6 +265,7 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 //	@Success		204
 //	@Failure		400	{object}	responses.ErrorResponse
 //	@Failure		401	{object}	responses.ErrorResponse
+//	@Failure		413	{object}	responses.ErrorResponse	"Request body too large (max 64KB)"
 //	@Failure		500	{object}	responses.ErrorResponse
 //
 //	@Security		BearerAccessToken

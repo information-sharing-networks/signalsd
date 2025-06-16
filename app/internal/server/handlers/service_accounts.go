@@ -136,6 +136,7 @@ type SetupPageData struct {
 //	@Success		200	{object}	handlers.CreateServiceAccountResponse
 //	@Failure		400	{object}	responses.ErrorResponse
 //	@Failure		401	{object}	responses.ErrorResponse
+//	@Failure		413	{object}	responses.ErrorResponse	"Request body too large (max 64KB)"
 //	@Failure		500	{object}	responses.ErrorResponse
 //
 //	@Security		BearerServiceAccount

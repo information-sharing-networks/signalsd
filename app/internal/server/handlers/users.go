@@ -56,6 +56,7 @@ type UpdatePasswordRequest struct {
 //	@Success		201
 //	@Failure		400	{object}	responses.ErrorResponse	"Bad request with possible error codes: malformed_body, password_too_short"
 //	@Failure		409	{object}	responses.ErrorResponse	"Conflict with possible error code:resource_already_exists"
+//	@Failure		413	{object}	responses.ErrorResponse	"Request body too large (max 64KB)"
 //	@Failure		500	{object}	responses.ErrorResponse	"Internal server error with possible error codes: database_error, internal_error"
 //
 //	@Router			/auth/register [post]
@@ -161,6 +162,7 @@ func (u *UserHandler) RegisterUserHandler(w http.ResponseWriter, r *http.Request
 //	@Success		204
 //	@Failure		400	{object}	responses.ErrorResponse	"Bad request with possible error codes: malformed_body, password_too_short"
 //	@Failure		401	{object}	responses.ErrorResponse	"Unauthorized with possible error code: authentication_error"
+//	@Failure		413	{object}	responses.ErrorResponse	"Request body too large (max 64KB)"
 //	@Failure		500	{object}	responses.ErrorResponse	"Internal server error with possible error codes: database_error, internal_error"
 //
 //	@Security		BearerAccessToken

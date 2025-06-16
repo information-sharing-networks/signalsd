@@ -53,6 +53,7 @@ type CreateSignalsBatchResponse struct {
 //	@Tags		Service accounts
 //
 //	@Success	201	{object}	CreateSignalsBatchResponse
+//	@Failure	413	{object}	responses.ErrorResponse	"Request body too large (configurable limit, default 50MB)"
 //	@Failure	500	{object}	responses.ErrorResponse
 //
 //	@Security	BearerAccessToken

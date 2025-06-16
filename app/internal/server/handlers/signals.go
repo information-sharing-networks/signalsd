@@ -135,6 +135,7 @@ type SignalVersionDoc struct {
 //
 //	@Success		201					{object}	handlers.CreateSignalsResponse
 //	@Failure		400					{object}	responses.ErrorResponse
+//	@Failure		413					{object}	responses.ErrorResponse	"Request body too large (configurable limit, default 50MB)"
 //	@Failure		500					{object}	responses.ErrorResponse
 //
 //	@Security		BearerAccessToken
