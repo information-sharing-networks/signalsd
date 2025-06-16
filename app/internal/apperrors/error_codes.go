@@ -18,6 +18,7 @@ const (
 	ErrCodeRefreshTokenInvalid   ErrorCode = "refresh_token_invalid"
 	ErrCodeResourceAlreadyExists ErrorCode = "resource_already_exists"
 	ErrCodeResourceExpired       ErrorCode = "resource_expired"
+	ErrCodeResourceInUse         ErrorCode = "resource_in_use"
 	ErrCodeResourceNotFound      ErrorCode = "resource_not_found"
 	ErrCodeTokenInvalid          ErrorCode = "token_invalid"
 )

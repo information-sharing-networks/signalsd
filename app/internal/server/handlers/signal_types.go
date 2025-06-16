@@ -10,6 +10,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
+	"github.com/information-sharing-networks/signalsd/app/internal/server/schemas"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/utils"
 	"github.com/jackc/pgx/v5"
 )
@@ -23,11 +24,11 @@ func NewSignalTypeHandler(queries *database.Queries) *SignalTypeHandler {
 }
 
 type CreateSignalTypeRequest struct {
-	SchemaURL string  `json:"schema_url" example:"https://github.com/user/project/v0.0.1/locales/filename.json"` // Note file must be on a public github repo
-	Title     string  `json:"title" example:"Sample Signal @example.org"`                                        // unique title
-	BumpType  string  `json:"bump_type" example:"patch" enums:"major,minor,patch"`                               // this is used to increment semver for the signal definition
-	ReadmeURL *string `json:"readme_url" example:"https://github.com/user/project/v0.0.1/locales/filename.md"`   // Updated readme file. Note file must be on a public github repo
-	Detail    *string `json:"detail" example:"description"`                                                      // updated description
+	SchemaURL string  `json:"schema_url" example:"https://github.com/user/project/blob/2025.01.01/schema.json"` // JSON schema URL: must be a GitHub URL ending in .json, OR use https://github.com/skip/validation/main/schema.json to disable validation
+	Title     string  `json:"title" example:"Sample Signal @example.org"`                                       // unique title
+	BumpType  string  `json:"bump_type" example:"patch" enums:"major,minor,patch"`                              // this is used to increment semver for the signal definition
+	ReadmeURL *string `json:"readme_url" example:"https://github.com/user/project/blob/2025.01.01/readme.md"`   // README file URL: must be a GitHub URL ending in .md
+	Detail    *string `json:"detail" example:"description"`                                                     // description
 }
 
 type CreateSignalTypeResponse struct {
@@ -36,11 +37,10 @@ type CreateSignalTypeResponse struct {
 	ResourceURL string `json:"resource_url" example:"http://localhost:8080/api/isn/sample-isn--example-org/signals_types/sample-signal--example-org/v0.0.1"`
 }
 
-// these are the only fields that can be updated after a signal type is defined
 type UpdateSignalTypeRequest struct {
-	ReadmeURL *string `json:"readme_url" example:"https://github.com/user/project/v0.0.1/locales/filename.md"` // Updated readme file. Note file must be on a public github repo
-	Detail    *string `json:"detail" example:"description"`                                                    // updated description
-	IsInUse   *bool   `json:"is_in_use" example:"false"`
+	ReadmeURL *string `json:"readme_url" example:"https://github.com/user/project/blob/2025.01.01/readme.md"` // README file URL: must be a GitHub URL ending in .md
+	Detail    *string `json:"detail" example:"description"`                                                   // updated description
+	IsInUse   *bool   `json:"is_in_use" example:"false"`                                                      // whether this signal type version is actively used
 }
 
 // used in GET handler
@@ -57,14 +57,18 @@ type SignalTypeAndLinkedInfo struct {
 //	@Description	- Each type has a unique title
 //	@Description	- A URL-friendly slug is created based on the title supplied when you load the first version of a definition.
 //	@Description	- The title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.
-//	@Description	- The field definition is held as an external json schema file
+//	@Description	- The field definition is held as an external JSON schema file
+//	@Description
+//	@Description	Schema URL Requirements
+//	@Description	- Must be a valid JSON schema on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)
+//	@Description	- To disable schema validation, use: https://github.com/skip/validation/main/schema.json
 //	@Description
 //	@Description	Versions
-//	@Description	- A signal type can have multiple versions - these share the same title/slug but have different json schemas.
-//	@Description	- use this endpoint to create the first version - the bump_type (major/minor/patch) determines the inital semver(1.0.0, 0.1.0 or 0.0.1)
-//	@Description	- subsequent POSTs to this endpoint that reference a previously sumbitted title/slug but point to a different schema will increment the version
+//	@Description	- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas
+//	@Description	- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)
+//	@Description	- Subsequent POSTs to this endpoint that reference a previously submitted title/slug but point to a different schema will increment the version
 //	@Description
-//	@Description	Signal type definitions are referred to with a url like this http://{hostname}/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}
+//	@Description	Signal type definitions are referred to with a URL like this: http://{hostname}/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}
 //	@Description
 //
 //	@Tags		Signal definitions
@@ -185,21 +189,50 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 		return
 	}
 
-	// create signal def
+	if err := schemas.ValidateSchemaURL(req.SchemaURL); err != nil {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("schema URL validation failed: %v", err))
+		return
+	}
+
+	// Fetch and validate the schema
+	var schemaContent string
+	if schemas.SkipValidation(req.SchemaURL) {
+		// for consistency store the permissive schema in the db
+		schemaContent = "{}"
+	} else {
+		schemaContent, err = schemas.FetchSchema(req.SchemaURL)
+		if err != nil {
+			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("could not fetch schema from github: %v", err))
+			return
+		}
+	}
+
+	compiledSchema, err := schemas.ValidateAndCompileSchema(req.SchemaURL, schemaContent)
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("invalid JSON schema: %v", err))
+		return
+	}
+
+	// create signal type
 	var returnedSignalType database.SignalType
 	returnedSignalType, err = s.queries.CreateSignalType(r.Context(), database.CreateSignalTypeParams{
-		IsnID:     isn.ID,
-		Slug:      slug,
-		SemVer:    semVer,
-		SchemaURL: req.SchemaURL,
-		Title:     req.Title,
-		Detail:    *req.Detail,
-		ReadmeURL: *req.ReadmeURL,
+		IsnID:         isn.ID,
+		Slug:          slug,
+		SemVer:        semVer,
+		SchemaURL:     req.SchemaURL,
+		Title:         req.Title,
+		Detail:        *req.Detail,
+		ReadmeURL:     *req.ReadmeURL,
+		SchemaContent: schemaContent,
 	})
 	if err != nil {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not create signal definition: %v", err))
 		return
 	}
+
+	// Add the pre-compiled schema to cache
+	signalTypePath := fmt.Sprintf("%s/v%s", slug, semVer)
+	schemas.AddToCache(signalTypePath, compiledSchema, req.SchemaURL)
 
 	resourceURL := fmt.Sprintf("%s://%s/api/isn/%s/signal_types/%s/v%s",
 		utils.GetScheme(r),
@@ -399,4 +432,68 @@ func (s *SignalTypeHandler) GetSignalTypesHandler(w http.ResponseWriter, r *http
 	}
 	responses.RespondWithJSON(w, http.StatusOK, res)
 
+}
+
+// DeleteSignalTypeHandler godoc
+//
+//	@Summary		Delete a signal definition
+//	@Description	Only signal types that have never been referenced by signals can be deleted
+//	@Param			slug	path	string	true	"signal type slug"	example(sample-signal--example-org)
+//	@Param			sem_ver	path	string	true	"version to be deleted"		example(0.0.1)
+//
+//	@Tags			Signal definitions
+//
+//	@Success		204
+//	@Failure		400	{object}	responses.ErrorResponse
+//	@Failure		404	{object}	responses.ErrorResponse
+//	@Failure		409	{object}	responses.ErrorResponse
+//	@Failure		500	{object}	responses.ErrorResponse
+//
+//	@Security		BearerAccessToken
+//
+//	@Router			/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver} [delete]
+func (s *SignalTypeHandler) DeleteSignalTypeHandler(w http.ResponseWriter, r *http.Request) {
+
+	slug := r.PathValue("slug")
+	semVer := r.PathValue("sem_ver")
+
+	// check signal type exists
+	signalType, err := s.queries.GetSignalTypeBySlug(r.Context(), database.GetSignalTypeBySlugParams{
+		Slug:   slug,
+		SemVer: semVer,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No signal type found for %s/v%s", slug, semVer))
+			return
+		}
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error %v", err))
+		return
+	}
+
+	// check if signal type is being used by any signals
+	inUse, err := s.queries.CheckSignalTypeInUse(r.Context(), signalType.ID)
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("error checking signal type usage: %v", err))
+		return
+	}
+
+	if inUse {
+		responses.RespondWithError(w, r, http.StatusConflict, apperrors.ErrCodeResourceInUse, fmt.Sprintf("Cannot delete signal type %s/v%s: it is being used by existing signals", slug, semVer))
+		return
+	}
+
+	// delete the signal type
+	rowsAffected, err := s.queries.DeleteSignalType(r.Context(), signalType.ID)
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("error deleting signal type: %v", err))
+		return
+	}
+
+	if rowsAffected == 0 {
+		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("Signal type %s/v%s not found", slug, semVer))
+		return
+	}
+
+	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
 }

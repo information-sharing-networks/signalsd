@@ -201,6 +201,7 @@ func (s *Server) registerRoutes() {
 				// signal types managment
 				r.Post("/isn/{isn_slug}/signal_types", signalTypes.CreateSignalTypeHandler)
 				r.Put("/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}", signalTypes.UpdateSignalTypeHandler)
+				r.Delete("/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}", signalTypes.DeleteSignalTypeHandler)
 
 				// ISN account permissions
 				r.Put("/isn/{isn_slug}/accounts/{account_id}", isnAccount.GrantIsnAccountHandler)

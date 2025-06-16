@@ -152,7 +152,6 @@ INSERT INTO signal_versions (
     signal_batch_id,
     signal_id,
     version_number,
-    validation_status,
     content
 )
 SELECT
@@ -162,7 +161,6 @@ SELECT
     $2,
     s.id,
     ver.version_number,
-    'pending',
     $3
 FROM ver 
 JOIN signals s 
