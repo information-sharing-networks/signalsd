@@ -73,8 +73,9 @@ HOST=0.0.0.0                    # Default: 0.0.0.0
 PORT=8080                       # Default: 8080
 ENVIRONMENT=prod                # Default: dev (options: dev, prod, test, staging)
 LOG_LEVEL=info                  # Default: debug (options: debug, info, warn, error)
+MAX_SIGNAL_PAYLOAD_SIZE=52428800 # Default: 50MB (52428800 bytes) - max size of a signal payload 
 
-# database timeouts (optional)
+# database timeouts 
 READ_TIMEOUT=15s                # Default: 15s
 WRITE_TIMEOUT=15s               # Default: 15s  
 IDLE_TIMEOUT=60s                # Default: 60s
@@ -251,7 +252,7 @@ The service is deployed using the image created at the last push to the main bra
 note this is a pre-prod version and should only be used with data that you don't mind being deleted or seen by other people.
 
 the steps to set up this environment in Google Cloud are:
-> create a project called signald 
+> create a project called signalsd 
 
 > create an artifact registry called signalsd
 
@@ -279,6 +280,6 @@ the steps to set up this environment in Google Cloud are:
   - DATABASE_URL (url of your postgres service - we are using Neon.tech, but you can use any provider you choose)
   - SECRET_KEY (random secret key for your app - used by the signalsd server to sign JWT tokens)
 
-> Note that at the time of writing this service operatates within the generous free-tiers offerred by google and Neon.Tech, but you should check the current rules to be sure.
+> Note that at the time of writing this service operatates within the free-tiers offerred by google and Neon.Tech, but you should check the current rules to be sure.
 
 that's it!

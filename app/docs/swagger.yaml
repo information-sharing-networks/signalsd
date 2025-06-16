@@ -16,6 +16,7 @@ definitions:
     - not_implemented
     - password_too_short
     - refresh_token_invalid
+    - request_too_large
     - resource_already_exists
     - resource_expired
     - resource_in_use
@@ -36,6 +37,7 @@ definitions:
     - ErrCodeNotImplemented
     - ErrCodePasswordTooShort
     - ErrCodeRefreshTokenInvalid
+    - ErrCodeRequestTooLarge
     - ErrCodeResourceAlreadyExists
     - ErrCodeResourceExpired
     - ErrCodeResourceInUse
