@@ -29,7 +29,7 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, e
 
 // NewAccessTokenHandler godoc
 //
-//	@Summary		New Access Token
+//	@Summary	New Access Token
 //	@Description
 //	@Description	**Client Credentials Grant (Service Accounts):**
 //	@Description
@@ -52,19 +52,18 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, e
 //	@Description	- Refresh tokens expire after 30 days
 //	@Description	- subsequent requests using the refresh token will fail with HTTP status 401 and an error_code of "refresh_token_expired" and users must login again to get a new one.
 //	@Description
-//	@Tags			auth
+//	@Tags		auth
 //
-//	@Param			grant_type	query	string	true	"grant type"	Enums(client_credentials, refresh_token)
-//	@Param			request		body	auth.ServiceAccountTokenRequest	false	"Service account credentials (required for client_credentials grant)"
+//	@Param		grant_type	query		string							true	"grant type"	Enums(client_credentials, refresh_token)
+//	@Param		request		body		auth.ServiceAccountTokenRequest	false	"Service account credentials (required for client_credentials grant)"
 //
-//	@Success		200	{object}	auth.AccessTokenResponse
-//	@Failure		400	{object}	responses.ErrorResponse	"Invalid grant_type parameter "
-//	@Failure		401	{object}	responses.ErrorResponse	"Authentication failed "
-//	@Failure		500	{object}	responses.ErrorResponse
+//	@Success	200			{object}	auth.AccessTokenResponse
+//	@Failure	400			{object}	responses.ErrorResponse	"Invalid grant_type parameter "
+//	@Failure	401			{object}	responses.ErrorResponse	"Authentication failed "
 //
-//	@Security		BearerAccessToken
+//	@Security	BearerAccessToken
 //
-//	@Router			/oauth/token [post]
+//	@Router		/oauth/token [post]
 //
 // NewAccessTokenHandler handles requests for both service accounts and web users.
 // For web users, a new refresh tokens is sent as http-only cookies whenever the client uses this endpoint.
@@ -121,7 +120,7 @@ func (a *TokenHandler) NewAccessTokenHandler(w http.ResponseWriter, r *http.Requ
 //	@Description	**This endpoint serves as the logout function for web users.**
 //	@Description
 //	@Description	**Service Accounts:**
-//	@Description 	You must supply your `client ID` and `client secret` in the request body.
+//	@Description	You must supply your `client ID` and `client secret` in the request body.
 //	@Description	This revokes all client secrets for the service account.
 //	@Description
 //	@Description	**Web Users (Logout):**
@@ -146,7 +145,6 @@ func (a *TokenHandler) NewAccessTokenHandler(w http.ResponseWriter, r *http.Requ
 //	@Failure	400	{object}	responses.ErrorResponse	"Invalid request body "
 //	@Failure	401	{object}	responses.ErrorResponse	"Authentication failed "
 //	@Failure	404	{object}	responses.ErrorResponse	"Token not found or already revoked"
-//	@Failure	500	{object}	responses.ErrorResponse
 //
 //	@Security	BearerAccessToken
 //

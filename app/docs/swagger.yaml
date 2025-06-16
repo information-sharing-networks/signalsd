@@ -16,6 +16,8 @@ definitions:
     - not_implemented
     - password_too_short
     - refresh_token_invalid
+    - request_too_large
+    - rate_limit_exceeded
     - resource_already_exists
     - resource_expired
     - resource_in_use
@@ -36,6 +38,8 @@ definitions:
     - ErrCodeNotImplemented
     - ErrCodePasswordTooShort
     - ErrCodeRefreshTokenInvalid
+    - ErrCodeRequestTooLarge
+    - ErrCodeRateLimitExceeded
     - ErrCodeResourceAlreadyExists
     - ErrCodeResourceExpired
     - ErrCodeResourceInUse
@@ -191,8 +195,6 @@ definitions:
         type: string
       created_at:
         type: string
-      rate_limit_per_minute:
-        type: integer
       updated_at:
         type: string
     type: object
@@ -261,9 +263,6 @@ definitions:
       client_organization:
         example: example org
         type: string
-      rate_limit_per_minute:
-        example: 100
-        type: integer
     type: object
   handlers.CreateServiceAccountResponse:
     properties:
@@ -545,7 +544,46 @@ definitions:
     type: object
 info:
   contact: {}
-  description: Signals ISN service API
+  description: |
+    Signals ISN service API for managing Information Sharing Networks
+
+    ## Common Error Responses
+    All endpoints may return:
+    - `413` Request body exceeds size limit
+    - `429` Rate limit exceeded
+    - `500` Internal server error
+
+    Individual endpoints document their specific business logic errors.
+
+    ## Request Limits
+    All endpoints are protected by:
+    - **Rate limiting**: Configurable requests per second (default: 100 RPS, 20 burst)
+    - **Request size limits**: 64KB for admin/auth endpoints, 50MB for signal ingestion
+
+    Check the X-Max-Request-Body response header for the configured limit on signals payload.
+
+    The rate limit is set globaly and prevents abuse of the service.
+    In production there will be additional protections in place such as per-IP rate limiting provided by the load balancer/reverse proxy.
+
+    ## Authentication & Authorization
+
+    ### Authentication Flow
+    - **Web users**: Login → get JWT + refresh cookie → use JWT for API calls
+    - **Service accounts**: Authenticate with Client credentials → get JWT → use JWT for API calls → re-authenticate when expired
+
+    ### Authorization
+    All protected API endpoints expect valid JWT access tokens containing user identity and permissions.
+
+    tokens should be supplied using:
+    **Authorization header**: `Bearer <token>`
+
+    **Token refresh:**
+    - **Web users**: Refresh tokens (HTTP-only cookies) automatically renew access tokens
+    - **Service accounts**: Must re-authenticate with client credentials when tokens expire
+
+    Access tokens expire in 30 minutes
+
+    Refresh tokens expire in 30 days (web users only)
   license:
     name: MIT
   title: Signals ISN API
@@ -587,10 +625,6 @@ paths:
           description: Account not found
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
       summary: Disable an account
@@ -627,10 +661,6 @@ paths:
           description: Account not found
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
       summary: Enable an account
@@ -659,10 +689,6 @@ paths:
           description: Forbidden
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
       summary: reset
       tags:
       - Site admin
@@ -684,10 +710,6 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
           description: 'Insufficient permissions '
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -727,10 +749,6 @@ paths:
           description: Service account not found
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
       summary: Get service account
@@ -753,10 +771,6 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
           description: 'Insufficient permissions '
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -796,10 +810,6 @@ paths:
           description: User not found
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
       summary: Get registered user
@@ -807,7 +817,8 @@ paths:
       - Site admin
   /admin/users/{user_id}/reset-password:
     put:
-      description: Allows admins to reset a user's password
+      description: Allows admins to reset a user's password (use this endpoint if
+        the user has forgotten their password)
       parameters:
       - description: User Account ID
         in: path
@@ -841,10 +852,6 @@ paths:
           description: User not found
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
       summary: Reset user password
@@ -860,10 +867,6 @@ paths:
             items:
               $ref: '#/definitions/database.Isn'
             type: array
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
       summary: Get the ISNs
       tags:
       - ISN view
@@ -896,10 +899,6 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
         "409":
           description: Conflict
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -937,8 +936,12 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -984,10 +987,6 @@ paths:
           description: Created
           schema:
             $ref: '#/definitions/handlers.CreateSignalsBatchResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
       summary: Create a new signal batch
@@ -1002,10 +1001,6 @@ paths:
             items:
               $ref: '#/definitions/database.SignalType'
             type: array
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
       summary: Get the signal definitions
       tags:
       - ISN view
@@ -1044,12 +1039,12 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-        "409":
-          description: Conflict
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
+        "409":
+          description: Conflict
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -1167,8 +1162,12 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -1199,10 +1198,6 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
       summary: Get an ISN configurationuration
       tags:
       - ISN view
@@ -1219,8 +1214,12 @@ paths:
       responses:
         "204":
           description: No Content
-        "500":
-          description: Internal Server Error
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -1257,10 +1256,6 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
           description: Forbidden
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -1308,10 +1303,8 @@ paths:
       - auth
   /auth/password/reset:
     put:
-      description: |-
-        Use this api to reset the user's password.  Requires a valid access token and the current password
-
-        TODO - forgotten password facility
+      description: |
+        Use this api when a user wants to reset their password.  Requires a valid access token and the current password
       parameters:
       - description: user details
         in: body
@@ -1330,14 +1323,9 @@ paths:
           description: 'Unauthorized with possible error code: authentication_error'
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: 'Internal server error with possible error codes: database_error,
-            internal_error'
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Reset password
+      summary: Password reset
       tags:
       - auth
   /auth/register:
@@ -1361,12 +1349,7 @@ paths:
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "409":
-          description: Conflict with possible error code:resource_already_exists
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: 'Internal server error with possible error codes: database_error,
-            internal_error'
+          description: 'Conflict with possible error code: resource_already_exists'
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       summary: Register user
@@ -1402,10 +1385,6 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerServiceAccount: []
       summary: Register a new service account
@@ -1436,10 +1415,6 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
         "410":
           description: Gone
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       summary: Complete service account setup
@@ -1481,8 +1456,12 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -1514,8 +1493,12 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -1525,7 +1508,11 @@ paths:
       - ISN Permissions
   /isn/{isn_slug}/signal_types/{signal_type_slug}/{signal_id}:
     delete:
-      responses: {}
+      responses:
+        "501":
+          description: Not implemented
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
       summary: Withdraw a signal (TODO)
       tags:
       - Signal sharing
@@ -1588,10 +1575,6 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
       summary: Send signals
@@ -1599,7 +1582,11 @@ paths:
       - Signal sharing
   /isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}:
     get:
-      responses: {}
+      responses:
+        "501":
+          description: Not implemented
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
       summary: get a signal (TODO)
       tags:
       - Signal sharing
@@ -1645,10 +1632,6 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
       summary: Search for signals
@@ -1692,10 +1675,6 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
           description: Token not found or already revoked
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -1754,10 +1733,6 @@ paths:
           description: 'Authentication failed '
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
       summary: New Access Token
@@ -1766,7 +1741,11 @@ paths:
   /webhooks:
     post:
       description: register a webhook to recieve signals batch status updates
-      responses: {}
+      responses:
+        "204":
+          description: Not implemented
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
       summary: Register webhook (TODO)
       tags:
       - Service accounts
@@ -1780,7 +1759,8 @@ securityDefinitions:
     type: apiKey
 swagger: "2.0"
 tags:
-- description: User and token management endpoints
+- description: Authentication and authorization endpoints. Web users get JWT + refresh
+    tokens, service accounts use client credentials to get JWT access tokens.
   name: auth
 - description: Site adminstration tools
   name: Site admin

@@ -16,6 +16,8 @@ const (
 	ErrCodeNotImplemented        ErrorCode = "not_implemented"
 	ErrCodePasswordTooShort      ErrorCode = "password_too_short"
 	ErrCodeRefreshTokenInvalid   ErrorCode = "refresh_token_invalid"
+	ErrCodeRequestTooLarge       ErrorCode = "request_too_large"
+	ErrCodeRateLimitExceeded     ErrorCode = "rate_limit_exceeded"
 	ErrCodeResourceAlreadyExists ErrorCode = "resource_already_exists"
 	ErrCodeResourceExpired       ErrorCode = "resource_expired"
 	ErrCodeResourceInUse         ErrorCode = "resource_in_use"

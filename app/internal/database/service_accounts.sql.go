@@ -68,10 +68,9 @@ INSERT INTO service_accounts (
     updated_at,
     client_id,
     client_contact_email,
-    client_organization,
-    rate_limit_per_minute
-) VALUES ( $1, NOW(), NOW(), $2, $3, $4, $5)
-RETURNING account_id, created_at, updated_at, client_id, client_contact_email, client_organization, rate_limit_per_minute
+    client_organization
+) VALUES ( $1, NOW(), NOW(), $2, $3, $4)
+RETURNING account_id, created_at, updated_at, client_id, client_contact_email, client_organization
 `
 
 type CreateServiceAccountParams struct {
@@ -79,7 +78,6 @@ type CreateServiceAccountParams struct {
 	ClientID           string    `json:"client_id"`
 	ClientContactEmail string    `json:"client_contact_email"`
 	ClientOrganization string    `json:"client_organization"`
-	RateLimitPerMinute int32     `json:"rate_limit_per_minute"`
 }
 
 func (q *Queries) CreateServiceAccount(ctx context.Context, arg CreateServiceAccountParams) (ServiceAccount, error) {
@@ -88,7 +86,6 @@ func (q *Queries) CreateServiceAccount(ctx context.Context, arg CreateServiceAcc
 		arg.ClientID,
 		arg.ClientContactEmail,
 		arg.ClientOrganization,
-		arg.RateLimitPerMinute,
 	)
 	var i ServiceAccount
 	err := row.Scan(
@@ -98,7 +95,6 @@ func (q *Queries) CreateServiceAccount(ctx context.Context, arg CreateServiceAcc
 		&i.ClientID,
 		&i.ClientContactEmail,
 		&i.ClientOrganization,
-		&i.RateLimitPerMinute,
 	)
 	return i, err
 }
@@ -184,7 +180,7 @@ func (q *Queries) GetOneTimeClientSecret(ctx context.Context, id uuid.UUID) (Get
 }
 
 const getServiceAccountByAccountID = `-- name: GetServiceAccountByAccountID :one
-SELECT sa.account_id, sa.created_at, sa.updated_at, sa.client_id, sa.client_contact_email, sa.client_organization, sa.rate_limit_per_minute FROM service_accounts sa
+SELECT sa.account_id, sa.created_at, sa.updated_at, sa.client_id, sa.client_contact_email, sa.client_organization FROM service_accounts sa
 WHERE sa.account_id = $1
 `
 
@@ -198,13 +194,12 @@ func (q *Queries) GetServiceAccountByAccountID(ctx context.Context, accountID uu
 		&i.ClientID,
 		&i.ClientContactEmail,
 		&i.ClientOrganization,
-		&i.RateLimitPerMinute,
 	)
 	return i, err
 }
 
 const getServiceAccountByClientID = `-- name: GetServiceAccountByClientID :one
-SELECT sa.account_id, sa.created_at, sa.updated_at, sa.client_id, sa.client_contact_email, sa.client_organization, sa.rate_limit_per_minute FROM service_accounts sa
+SELECT sa.account_id, sa.created_at, sa.updated_at, sa.client_id, sa.client_contact_email, sa.client_organization FROM service_accounts sa
 WHERE sa.client_id = $1
 `
 
@@ -218,13 +213,12 @@ func (q *Queries) GetServiceAccountByClientID(ctx context.Context, clientID stri
 		&i.ClientID,
 		&i.ClientContactEmail,
 		&i.ClientOrganization,
-		&i.RateLimitPerMinute,
 	)
 	return i, err
 }
 
 const getServiceAccountWithOrganizationAndEmail = `-- name: GetServiceAccountWithOrganizationAndEmail :one
-SELECT account_id, created_at, updated_at, client_id, client_contact_email, client_organization, rate_limit_per_minute FROM service_accounts
+SELECT account_id, created_at, updated_at, client_id, client_contact_email, client_organization FROM service_accounts
     WHERE client_organization = $1
     AND client_contact_email = $2
 `
@@ -244,13 +238,12 @@ func (q *Queries) GetServiceAccountWithOrganizationAndEmail(ctx context.Context,
 		&i.ClientID,
 		&i.ClientContactEmail,
 		&i.ClientOrganization,
-		&i.RateLimitPerMinute,
 	)
 	return i, err
 }
 
 const getServiceAccounts = `-- name: GetServiceAccounts :many
-SELECT sa.account_id, sa.created_at, sa.updated_at, sa.client_id, sa.client_contact_email, sa.client_organization, sa.rate_limit_per_minute FROM service_accounts sa
+SELECT sa.account_id, sa.created_at, sa.updated_at, sa.client_id, sa.client_contact_email, sa.client_organization FROM service_accounts sa
 `
 
 func (q *Queries) GetServiceAccounts(ctx context.Context) ([]ServiceAccount, error) {
@@ -269,7 +262,6 @@ func (q *Queries) GetServiceAccounts(ctx context.Context) ([]ServiceAccount, err
 			&i.ClientID,
 			&i.ClientContactEmail,
 			&i.ClientOrganization,
-			&i.RateLimitPerMinute,
 		); err != nil {
 			return nil, err
 		}

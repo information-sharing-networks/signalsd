@@ -20,7 +20,46 @@ import (
 
 //	@title			Signals ISN API
 //	@version		1.0
-//	@description	Signals ISN service API
+//	@description	Signals ISN service API for managing Information Sharing Networks
+//	@description
+//	@description	## Common Error Responses
+//	@description	All endpoints may return:
+//	@description	- `413` Request body exceeds size limit
+//	@description	- `429` Rate limit exceeded
+//	@description	- `500` Internal server error
+//	@description
+//	@description	Individual endpoints document their specific business logic errors.
+//	@description
+//	@description	## Request Limits
+//	@description	All endpoints are protected by:
+//	@description	- **Rate limiting**: Configurable requests per second (default: 100 RPS, 20 burst)
+//	@description	- **Request size limits**: 64KB for admin/auth endpoints, 50MB for signal ingestion
+//	@description
+//	@description	Check the X-Max-Request-Body response header for the configured limit on signals payload.
+//	@description
+//	@description	The rate limit is set globaly and prevents abuse of the service.
+//	@description	In production there will be additional protections in place such as per-IP rate limiting provided by the load balancer/reverse proxy.
+//	@description
+//	@description	## Authentication & Authorization
+//	@description
+//	@description	### Authentication Flow
+//	@description	- **Web users**: Login → get JWT + refresh cookie → use JWT for API calls
+//	@description	- **Service accounts**: Authenticate with Client credentials → get JWT → use JWT for API calls → re-authenticate when expired
+//	@description
+//	@description	### Authorization
+//	@description	All protected API endpoints expect valid JWT access tokens containing user identity and permissions.
+//	@description
+//	@description	tokens should be supplied using:
+//	@description	**Authorization header**: `Bearer <token>`
+//	@description
+//	@description	**Token refresh:**
+//	@description	- **Web users**: Refresh tokens (HTTP-only cookies) automatically renew access tokens
+//	@description	- **Service accounts**: Must re-authenticate with client credentials when tokens expire
+//	@description
+//	@description	Access tokens expire in 30 minutes
+//	@description
+//	@description	Refresh tokens expire in 30 days (web users only)
+//  @description
 //	@license.name	MIT
 
 //	@servers.url		https://api.example.com
@@ -37,7 +76,7 @@ import (
 //	@description				Bearer {JWT access token}
 
 //	@tag.name			auth
-//	@tag.description	User and token management endpoints
+//	@tag.description	Authentication and authorization endpoints. Web users get JWT + refresh tokens, service accounts use client credentials to get JWT access tokens.
 
 //	@tag.name			Site admin
 //	@tag.description	Site adminstration tools

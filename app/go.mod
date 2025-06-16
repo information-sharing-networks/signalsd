@@ -15,6 +15,7 @@ require (
 	github.com/rs/zerolog v1.34.0
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/swaggo/swag v1.16.4
+	golang.org/x/time v0.12.0
 )
 
 require (

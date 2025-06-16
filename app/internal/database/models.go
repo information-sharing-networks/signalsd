@@ -73,7 +73,6 @@ type ServiceAccount struct {
 	ClientID           string    `json:"client_id"`
 	ClientContactEmail string    `json:"client_contact_email"`
 	ClientOrganization string    `json:"client_organization"`
-	RateLimitPerMinute int32     `json:"rate_limit_per_minute"`
 }
 
 type Signal struct {

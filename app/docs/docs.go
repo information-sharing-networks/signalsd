@@ -72,12 +72,6 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
                     }
                 }
             }
@@ -130,12 +124,6 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
                     }
                 }
             }
@@ -173,12 +161,6 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
                     }
                 }
             }
@@ -213,12 +195,6 @@ const docTemplate = `{
                     },
                     "403": {
                         "description": "Insufficient permissions ",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -277,12 +253,6 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
                     }
                 }
             }
@@ -317,12 +287,6 @@ const docTemplate = `{
                     },
                     "403": {
                         "description": "Insufficient permissions ",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -382,12 +346,6 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
                     }
                 }
             }
@@ -399,7 +357,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Allows admins to reset a user's password",
+                "description": "Allows admins to reset a user's password (use this endpoint if the user has forgotten their password)",
                 "tags": [
                     "Site admin"
                 ],
@@ -452,12 +410,6 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
                     }
                 }
             }
@@ -477,12 +429,6 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/database.Isn"
                             }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -529,12 +475,6 @@ const docTemplate = `{
                     },
                     "409": {
                         "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -589,8 +529,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
-                    "500": {
-                        "description": "Internal Server Error",
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -636,12 +582,6 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/handlers.CreateSignalsBatchResponse"
                         }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
                     }
                 }
             }
@@ -660,12 +600,6 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/database.SignalType"
                             }
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -705,14 +639,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
-                    "409": {
-                        "description": "Conflict",
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
-                    "500": {
-                        "description": "Internal Server Error",
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -825,8 +759,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
-                    "500": {
-                        "description": "Internal Server Error",
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -928,12 +868,6 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
                     }
                 }
             }
@@ -975,12 +909,6 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
                     }
                 }
             }
@@ -1011,8 +939,14 @@ const docTemplate = `{
                     "204": {
                         "description": "No Content"
                     },
-                    "500": {
-                        "description": "Internal Server Error",
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1073,11 +1007,11 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Use this api to reset the user's password.  Requires a valid access token and the current password\n\nTODO - forgotten password facility",
+                "description": "Use this api when a user wants to reset their password.  Requires a valid access token and the current password\n",
                 "tags": [
                     "auth"
                 ],
-                "summary": "Reset password",
+                "summary": "Password reset",
                 "parameters": [
                     {
                         "description": "user details",
@@ -1101,12 +1035,6 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized with possible error code: authentication_error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error with possible error codes: database_error, internal_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1143,13 +1071,7 @@ const docTemplate = `{
                         }
                     },
                     "409": {
-                        "description": "Conflict with possible error code:resource_already_exists",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error with possible error codes: database_error, internal_error",
+                        "description": "Conflict with possible error code: resource_already_exists",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1198,12 +1120,6 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
                     }
                 }
             }
@@ -1242,12 +1158,6 @@ const docTemplate = `{
                     },
                     "410": {
                         "description": "Gone",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1312,8 +1222,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
-                    "500": {
-                        "description": "Internal Server Error",
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1359,8 +1275,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
-                    "500": {
-                        "description": "Internal Server Error",
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1427,12 +1349,6 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
                     }
                 }
             }
@@ -1486,12 +1402,6 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
                     }
                 }
             }
@@ -1502,7 +1412,14 @@ const docTemplate = `{
                     "Signal sharing"
                 ],
                 "summary": "get a signal (TODO)",
-                "responses": {}
+                "responses": {
+                    "501": {
+                        "description": "Not implemented",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
             }
         },
         "/isn/{isn_slug}/signal_types/{signal_type_slug}/{signal_id}": {
@@ -1511,7 +1428,14 @@ const docTemplate = `{
                     "Signal sharing"
                 ],
                 "summary": "Withdraw a signal (TODO)",
-                "responses": {}
+                "responses": {
+                    "501": {
+                        "description": "Not implemented",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
             }
         },
         "/oauth/revoke": {
@@ -1544,12 +1468,6 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Token not found or already revoked",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1608,12 +1526,6 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
                     }
                 }
             }
@@ -1625,7 +1537,14 @@ const docTemplate = `{
                     "Service accounts"
                 ],
                 "summary": "Register webhook (TODO)",
-                "responses": {}
+                "responses": {
+                    "204": {
+                        "description": "Not implemented",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
             }
         }
     },
@@ -1646,6 +1565,8 @@ const docTemplate = `{
                 "not_implemented",
                 "password_too_short",
                 "refresh_token_invalid",
+                "request_too_large",
+                "rate_limit_exceeded",
                 "resource_already_exists",
                 "resource_expired",
                 "resource_in_use",
@@ -1666,6 +1587,8 @@ const docTemplate = `{
                 "ErrCodeNotImplemented",
                 "ErrCodePasswordTooShort",
                 "ErrCodeRefreshTokenInvalid",
+                "ErrCodeRequestTooLarge",
+                "ErrCodeRateLimitExceeded",
                 "ErrCodeResourceAlreadyExists",
                 "ErrCodeResourceExpired",
                 "ErrCodeResourceInUse",
@@ -1894,9 +1817,6 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
-                "rate_limit_per_minute": {
-                    "type": "integer"
-                },
                 "updated_at": {
                     "type": "string"
                 }
@@ -1995,10 +1915,6 @@ const docTemplate = `{
                 "client_organization": {
                     "type": "string",
                     "example": "example org"
-                },
-                "rate_limit_per_minute": {
-                    "type": "integer",
-                    "example": 100
                 }
             }
         },
@@ -2409,7 +2325,7 @@ const docTemplate = `{
     },
     "tags": [
         {
-            "description": "User and token management endpoints",
+            "description": "Authentication and authorization endpoints. Web users get JWT + refresh tokens, service accounts use client credentials to get JWT access tokens.",
             "name": "auth"
         },
         {
@@ -2446,7 +2362,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "",
 	Schemes:          []string{},
 	Title:            "Signals ISN API",
-	Description:      "Signals ISN service API",
+	Description:      "Signals ISN service API for managing Information Sharing Networks\n\n## Common Error Responses\nAll endpoints may return:\n- `413` Request body exceeds size limit\n- `429` Rate limit exceeded\n- `500` Internal server error\n\nIndividual endpoints document their specific business logic errors.\n\n## Request Limits\nAll endpoints are protected by:\n- **Rate limiting**: Configurable requests per second (default: 100 RPS, 20 burst)\n- **Request size limits**: 64KB for admin/auth endpoints, 50MB for signal ingestion\n\nCheck the X-Max-Request-Body response header for the configured limit on signals payload.\n\nThe rate limit is set globaly and prevents abuse of the service.\nIn production there will be additional protections in place such as per-IP rate limiting provided by the load balancer/reverse proxy.\n\n## Authentication & Authorization\n\n### Authentication Flow\n- **Web users**: Login → get JWT + refresh cookie → use JWT for API calls\n- **Service accounts**: Authenticate with Client credentials → get JWT → use JWT for API calls → re-authenticate when expired\n\n### Authorization\nAll protected API endpoints expect valid JWT access tokens containing user identity and permissions.\n\ntokens should be supplied using:\n**Authorization header**: `Bearer <token>`\n\n**Token refresh:**\n- **Web users**: Refresh tokens (HTTP-only cookies) automatically renew access tokens\n- **Service accounts**: Must re-authenticate with client credentials when tokens expire\n\nAccess tokens expire in 30 minutes\n\nRefresh tokens expire in 30 days (web users only)\n",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

@@ -102,7 +102,6 @@ func NewServiceAccountHandler(queries *database.Queries, authService *auth.AuthS
 type CreateServiceAccountRequest struct {
 	ClientOrganization string `json:"client_organization" example:"example org"`
 	ClientContactEmail string `json:"client_contact_email" example:"example@example.com"`
-	RateLimitPerMinute int32  `json:"rate_limit_per_minute" example:"100"`
 }
 
 type CreateServiceAccountResponse struct {
@@ -129,18 +128,17 @@ type SetupPageData struct {
 //	@Description
 //	@Description	You have to be an admin or the site owner to use this endpoint
 //	@Description
-//	@Tags			Service accounts
+//	@Tags		Service accounts
 //
-//	@Param			request	body	handlers.CreateServiceAccountRequest	true	"service account details"
+//	@Param		request	body		handlers.CreateServiceAccountRequest	true	"service account details"
 //
-//	@Success		200	{object}	handlers.CreateServiceAccountResponse
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		401	{object}	responses.ErrorResponse
-//	@Failure		500	{object}	responses.ErrorResponse
+//	@Success	200		{object}	handlers.CreateServiceAccountResponse
+//	@Failure	400		{object}	responses.ErrorResponse
+//	@Failure	401		{object}	responses.ErrorResponse
 //
-//	@Security		BearerServiceAccount
+//	@Security	BearerServiceAccount
 //
-//	@Router			/auth/register/service-accounts [post]
+//	@Router		/auth/register/service-accounts [post]
 func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWriter, r *http.Request) {
 	var req CreateServiceAccountRequest
 	logger := zerolog.Ctx(r.Context())
@@ -234,7 +232,6 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 			ClientID:           clientID,
 			ClientContactEmail: req.ClientContactEmail,
 			ClientOrganization: req.ClientOrganization,
-			RateLimitPerMinute: req.RateLimitPerMinute,
 		})
 		if err != nil {
 			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not insert service account record: %v", err))
@@ -294,18 +291,17 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 //	@Description	the endpoint renders a html page that the user can use to copy their client credentials.
 //	@Description	The setup url is only valid for 48 hours.
 //	@Description
-//	@Tags			Service accounts
+//	@Tags		Service accounts
 //
-//	@Param			setup_id	path	string	true	"One-time setup ID"
+//	@Param		setup_id	path	string	true	"One-time setup ID"
 //
-//	@Success		201
+//	@Success	201
 //
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		404	{object}	responses.ErrorResponse
-//	@Failure		410	{object}	responses.ErrorResponse
-//	@Failure		500	{object}	responses.ErrorResponse
+//	@Failure	400	{object}	responses.ErrorResponse
+//	@Failure	404	{object}	responses.ErrorResponse
+//	@Failure	410	{object}	responses.ErrorResponse
 //
-//	@Router			/auth/service-accounts/setup/{setup_id} [get]
+//	@Router		/auth/service-accounts/setup/{setup_id} [get]
 func (s *ServiceAccountHandler) SetupServiceAccountHandler(w http.ResponseWriter, r *http.Request) {
 	// Extract token from URL path
 	oneTimeSecretIDString := chi.URLParam(r, "setup_id")

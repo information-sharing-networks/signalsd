@@ -43,7 +43,6 @@ func NewAdminHandler(queries *database.Queries, pool *pgxpool.Pool, authService 
 //
 //	@Success		200
 //	@Failure		403	{object}	responses.ErrorResponse
-//	@Failure		500	{object}	responses.ErrorResponse
 //
 //	@Router			/admin/reset [post]
 func (a *AdminHandler) ResetHandler(w http.ResponseWriter, r *http.Request) {
@@ -100,8 +99,8 @@ func (a *AdminHandler) LivenessHandler(w http.ResponseWriter, r *http.Request) {
 //	@Description	Disabling an account prevents it from being used to create new access tokens.
 //	@Description
 //	@Description	The handler will also revoke:
-//	@Description		- client secrets/one-time secrets (service accounts)
-//	@Description		- refresh tokens (web users).
+//	@Description	- client secrets/one-time secrets (service accounts)
+//	@Description	- refresh tokens (web users).
 //	@Description
 //	@Description	Note: The site owner account cannot be disabled to prevent system lockout.
 //	@Description	Only owners and admins can disable accounts.
@@ -114,7 +113,6 @@ func (a *AdminHandler) LivenessHandler(w http.ResponseWriter, r *http.Request) {
 //	@Failure		401	{object}	responses.ErrorResponse	"Authentication failed "
 //	@Failure		403	{object}	responses.ErrorResponse	"Cannot disable site owner account"
 //	@Failure		404	{object}	responses.ErrorResponse	"Account not found"
-//	@Failure		500	{object}	responses.ErrorResponse
 //
 //	@Security		BearerAccessToken
 //
@@ -232,7 +230,7 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 
 // EnableAccountHandler godoc
 //
-//	@Summary		Enable an account
+//	@Summary	Enable an account
 //	@Description
 //	@Description	For service accounts, you will need to register them again using /auth/register/service-accounts
 //	@Description	The client ID will remain the same but they must go through	the setup process again.
@@ -249,7 +247,6 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 //	@Failure		401	{object}	responses.ErrorResponse	"Authentication failed "
 //	@Failure		403	{object}	responses.ErrorResponse	"Insufficient permissions "
 //	@Failure		404	{object}	responses.ErrorResponse	"Account not found"
-//	@Failure		500	{object}	responses.ErrorResponse
 //
 //	@Security		BearerAccessToken
 //
@@ -311,7 +308,6 @@ func (a *AdminHandler) EnableAccountHandler(w http.ResponseWriter, r *http.Reque
 //	@Failure		401	{object}	responses.ErrorResponse	"Authentication failed "
 //	@Failure		403	{object}	responses.ErrorResponse	"Insufficient permissions "
 //	@Failure		404	{object}	responses.ErrorResponse	"User not found"
-//	@Failure		500	{object}	responses.ErrorResponse
 //
 //	@Security		BearerAccessToken
 //
@@ -347,7 +343,6 @@ func (a *AdminHandler) GetUserHandler(w http.ResponseWriter, r *http.Request) {
 //	@Success		200	{array}		database.GetUsersRow
 //	@Failure		401	{object}	responses.ErrorResponse	"Authentication failed "
 //	@Failure		403	{object}	responses.ErrorResponse	"Insufficient permissions "
-//	@Failure		500	{object}	responses.ErrorResponse
 //
 //	@Security		BearerAccessToken
 //
@@ -369,14 +364,13 @@ func (a *AdminHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 //	@Description	Only owners and admins can view service account details.
 //	@Tags			Site admin
 //
-//	@Param			id	path	string	true	"Service Account ID"
+//	@Param			id	path		string	true	"Service Account ID"
 //
 //	@Success		200	{object}	database.ServiceAccount
 //	@Failure		400	{object}	responses.ErrorResponse	"Invalid service account ID format"
 //	@Failure		401	{object}	responses.ErrorResponse	"Authentication failed "
 //	@Failure		403	{object}	responses.ErrorResponse	"Insufficient permissions "
 //	@Failure		404	{object}	responses.ErrorResponse	"Service account not found"
-//	@Failure		500	{object}	responses.ErrorResponse
 //
 //	@Security		BearerAccessToken
 //
@@ -419,7 +413,6 @@ func (a *AdminHandler) GetServiceAccountHandler(w http.ResponseWriter, r *http.R
 //	@Success		200	{array}		database.ServiceAccount
 //	@Failure		401	{object}	responses.ErrorResponse	"Authentication failed "
 //	@Failure		403	{object}	responses.ErrorResponse	"Insufficient permissions "
-//	@Failure		500	{object}	responses.ErrorResponse
 //
 //	@Security		BearerAccessToken
 //
@@ -451,18 +444,17 @@ type ResetUserPasswordResponse struct {
 // ResetUserPasswordHandler godoc
 //
 //	@Summary		Reset user password
-//	@Description	Allows admins to reset a user's password
+//	@Description	Allows admins to reset a user's password (use this endpoint if the user has forgotten their password)
 //	@Tags			Site admin
 //
-//	@Param			user_id	path	string							true	"User Account ID"
-//	@Param			request	body	handlers.ResetUserPasswordRequest	true	"New password"
+//	@Param			user_id	path		string								true	"User Account ID"
+//	@Param			request	body		handlers.ResetUserPasswordRequest	true	"New password"
 //
-//	@Success		200	{object}	handlers.ResetUserPasswordResponse
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		401	{object}	responses.ErrorResponse	"Unauthorized"
-//	@Failure		403	{object}	responses.ErrorResponse	"Forbidden - admin role required"
-//	@Failure		404	{object}	responses.ErrorResponse	"User not found"
-//	@Failure		500	{object}	responses.ErrorResponse	"Internal server error"
+//	@Success		200		{object}	handlers.ResetUserPasswordResponse
+//	@Failure		400		{object}	responses.ErrorResponse
+//	@Failure		401		{object}	responses.ErrorResponse	"Unauthorized"
+//	@Failure		403		{object}	responses.ErrorResponse	"Forbidden - admin role required"
+//	@Failure		404		{object}	responses.ErrorResponse	"User not found"
 //
 //	@Security		BearerAccessToken
 //

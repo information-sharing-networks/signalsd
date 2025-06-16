@@ -41,7 +41,8 @@ type GrantIsnAccountPermissionRequest struct {
 //
 //	@Success		204
 //	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		500	{object}	responses.ErrorResponse
+//	@Failure		403	{object}	responses.ErrorResponse
+//	@Failure		404	{object}	responses.ErrorResponse
 //
 //	@Security		BearerAccessToken
 //
@@ -200,7 +201,8 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 //
 //	@Success		204
 //	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		500	{object}	responses.ErrorResponse
+//	@Failure		403	{object}	responses.ErrorResponse
+//	@Failure		404	{object}	responses.ErrorResponse
 //
 //	@Security		BearerAccessToken
 //

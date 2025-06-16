@@ -18,16 +18,19 @@ config sets up shared variables for the service:
 
 // service configuration
 type ServerConfig struct {
-	Environment    string
-	Host           string
-	Port           int
-	SecretKey      string
-	LogLevel       zerolog.Level
-	DatabaseURL    string
-	ReadTimeout    time.Duration
-	WriteTimeout   time.Duration
-	IdleTimeout    time.Duration
-	AllowedOrigins []string
+	Environment          string
+	Host                 string
+	Port                 int
+	SecretKey            string
+	LogLevel             zerolog.Level
+	DatabaseURL          string
+	ReadTimeout          time.Duration
+	WriteTimeout         time.Duration
+	IdleTimeout          time.Duration
+	AllowedOrigins       []string
+	MaxSignalPayloadSize int64
+	RateLimitRPS         int
+	RateLimitBurst       int
 }
 
 // common constants - todo option to define as env vars
@@ -39,6 +42,9 @@ const (
 	TokenIssuerName        = "Signalsd"
 	OneTimeSecretExpiry    = 48 * time.Hour
 	ClientSecretExpiry     = 365 * 24 * time.Hour
+
+	// Request size limits
+	DefaultAPIRequestSize = 64 * 1024 // 64KB for admin/auth/management API
 )
 
 // common maps - used to validate enum values
@@ -73,13 +79,16 @@ var ValidISNPermissions = map[string]bool{ // isn_accounts.permission
 // NewServerConfig loads environment variables and returns a ServiceConfig struct
 func NewServerConfig(logger *zerolog.Logger) *ServerConfig {
 	const (
-		defaultHost         = "0.0.0.0"
-		defaultPort         = 8080
-		defaultEnviromnent  = "dev"
-		defaultLogLevelStr  = "debug"
-		defaultReadTimeout  = 15 * time.Second
-		defaultWriteTimeout = 15 * time.Second
-		defaultIdleTimeout  = 60 * time.Second
+		defaultHost           = "0.0.0.0"
+		defaultPort           = 8080
+		defaultEnviromnent    = "dev"
+		defaultLogLevelStr    = "debug"
+		defaultReadTimeout    = 15 * time.Second
+		defaultWriteTimeout   = 15 * time.Second
+		defaultIdleTimeout    = 60 * time.Second
+		defaultMaxSignalSize  = 50 * 1024 * 1024 // 50MB default
+		defaultRateLimitRPS   = 100
+		defaultRateLimitBurst = 20 // burst of 20 requests
 	)
 
 	// log level
@@ -151,17 +160,27 @@ func NewServerConfig(logger *zerolog.Logger) *ServerConfig {
 	// CORS allowed origins
 	allowedOrigins := getOrigins("ALLOWED_ORIGINS")
 
+	// Signal payload size
+	maxSignalPayloadSize := getEnvInt64("MAX_SIGNAL_PAYLOAD_SIZE", defaultMaxSignalSize)
+
+	// Rate limiting
+	rateLimitRPS := getEnvInt("RATE_LIMIT_RPS", defaultRateLimitRPS)
+	rateLimitBurst := getEnvInt("RATE_LIMIT_BURST", defaultRateLimitBurst)
+
 	return &ServerConfig{
-		Environment:    environment,
-		Host:           host,
-		Port:           port,
-		SecretKey:      secretKey,
-		LogLevel:       logLevel,
-		DatabaseURL:    databaseURL,
-		ReadTimeout:    readTimeout,
-		WriteTimeout:   writeTimeout,
-		IdleTimeout:    idleTimeout,
-		AllowedOrigins: allowedOrigins,
+		Environment:          environment,
+		Host:                 host,
+		Port:                 port,
+		SecretKey:            secretKey,
+		LogLevel:             logLevel,
+		DatabaseURL:          databaseURL,
+		ReadTimeout:          readTimeout,
+		WriteTimeout:         writeTimeout,
+		IdleTimeout:          idleTimeout,
+		AllowedOrigins:       allowedOrigins,
+		MaxSignalPayloadSize: maxSignalPayloadSize,
+		RateLimitRPS:         rateLimitRPS,
+		RateLimitBurst:       rateLimitBurst,
 	}
 }
 
@@ -169,6 +188,24 @@ func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
 	if val := os.Getenv(key); val != "" {
 		if d, err := time.ParseDuration(val); err == nil {
 			return d
+		}
+	}
+	return defaultValue
+}
+
+func getEnvInt64(key string, defaultValue int64) int64 {
+	if val := os.Getenv(key); val != "" {
+		if parsed, err := strconv.ParseInt(val, 10, 64); err == nil {
+			return parsed
+		}
+	}
+	return defaultValue
+}
+
+func getEnvInt(key string, defaultValue int) int {
+	if val := os.Getenv(key); val != "" {
+		if parsed, err := strconv.Atoi(val); err == nil {
+			return parsed
 		}
 	}
 	return defaultValue
