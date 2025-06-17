@@ -103,7 +103,9 @@ The service uses a Postgresql@17 database.
 Instructions on installing the dependencies are below or, if you prefer, you can use the docker local dev environment which has all the dependencies pre-installed (see the next section).
 
 ## Docker local development environment
-First, clone the repo. There is only one required env variable for the docker env:
+First, clone the repo. 
+
+There is only one required env variable for the docker env:
 ```
 SECRET_KEY="" # add a random secret key here (used to sign the JWT tokens used in the service)
 ```
@@ -111,7 +113,7 @@ SECRET_KEY="" # add a random secret key here (used to sign the JWT tokens used i
 Follow the instructions below to run the signalsd service.  This service handles 
 - user registration
 - ISN configuration
-- running the receivers and retrievers that marshal the exchange of signal over the ISN
+- signals exchange
 
 The API documentation is hosted as part of the service (alternatively you can see the documenation [here](https://information-sharing-networks.github.io/signalsd/app/docs/index.html))
 
@@ -136,14 +138,14 @@ the service starts on [http://localhost:8080](http://localhost:8080)
 
 To query the database, either connect to the docker app container and run the preinstalled psql client
 ```sh
-docker exec -it -u signalsd signalsd-app-dev bash
-psql postgres://signalsd-dev@localhost:15432/signalsd_admin?sslmode=disable
+docker exec -it signalsd-db-dev psql -U signalsd-dev -d signalsd_admin
 ```
 
+
 ...or connect with a local postgres client
+
 ```sh
-DATABASE_URL=postgres://signalsd-dev:@localhost:15432/signalsd_admin?sslmode=disable
-psql $DATABASE_URL
+psql postgres://signalsd-dev:@localhost:15432/signalsd_admin
 ```
 
 ## Developer local installation
