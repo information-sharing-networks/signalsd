@@ -138,7 +138,7 @@ type SetupPageData struct {
 //
 //	@Security	BearerServiceAccount
 //
-//	@Router		/auth/register/service-accounts [post]
+//	@Router		/api/auth/register/service-accounts [post]
 func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWriter, r *http.Request) {
 	var req CreateServiceAccountRequest
 	logger := zerolog.Ctx(r.Context())
@@ -301,7 +301,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 //	@Failure	404	{object}	responses.ErrorResponse
 //	@Failure	410	{object}	responses.ErrorResponse
 //
-//	@Router		/auth/service-accounts/setup/{setup_id} [get]
+//	@Router		/api/auth/service-accounts/setup/{setup_id} [get]
 func (s *ServiceAccountHandler) SetupServiceAccountHandler(w http.ResponseWriter, r *http.Request) {
 	// Extract token from URL path
 	oneTimeSecretIDString := chi.URLParam(r, "setup_id")

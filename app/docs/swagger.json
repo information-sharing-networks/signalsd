@@ -406,6 +406,297 @@
                 }
             }
         },
+        "/api/auth/admins/account/{account_id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "This endpoint grants the admin role to a site member\n\nAn admin can:\n- Create an ISN\n- Define the signal_types used in the ISN\n- read/write to their own ISNs\n- Grant other accounts read or write access to their ISNs\n- Create service accounts\n\nthis endpoint can only be used by the site owner account",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Grant admin role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
+                        "description": "account id",
+                        "name": "account_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "this endpoint can only be used by the site owner account",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Revoke account admin role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
+                        "description": "account id",
+                        "name": "account_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/login": {
+            "post": {
+                "description": "The response body includes an access token which can be used to access the protected enpoints, assuming the account has the appropriate permissions.\nThe access_token is valid for 30 mins.\n\nAs part of the login response, the server sets a http-only cookie on the client that will allow it to use the /auth/refresh endpoint to renew the access_token\nThe refresh_token lasts 30 days unless it is revoked earlier.\n\nThe account's role and permissions are encoded and encloded as part of the jwt access token and also provided in the response body\nTo renew the refresh_token, log in again.",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Login",
+                "parameters": [
+                    {
+                        "description": "email and password",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.LoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/auth.AccessTokenResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/password/reset": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Use this api when a user wants to reset their password.  Requires a valid access token and the current password\n",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Password reset",
+                "parameters": [
+                    {
+                        "description": "user details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdatePasswordRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad request with possible error codes: malformed_body, password_too_short",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized with possible error code: authentication_error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/register": {
+            "post": {
+                "description": "The first user to be created for this service will be created with an admin role.\nSubsequent accounts default to standard member roles.\nNew members can't access any information beyond the public data on the site until an admin grants them access to an ISN.",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Register user",
+                "parameters": [
+                    {
+                        "description": "user details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created"
+                    },
+                    "400": {
+                        "description": "Bad request with possible error codes: malformed_body, password_too_short",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict with possible error code: resource_already_exists",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/register/service-accounts": {
+            "post": {
+                "security": [
+                    {
+                        "BearerServiceAccount": []
+                    }
+                ],
+                "description": "Registring a new service account creates a one time link with the client credentials in it - this must be used by the client within 48 hrs.\n\nIf you want to reissue a client's credentials call this endpoint again with the same client organization and contact email.\nA new one time setup url will be generated and the old one will be revoked.\nNote the client_id will remain the same and any existing client secrets will be revoked.\n\nYou have to be an admin or the site owner to use this endpoint\n",
+                "tags": [
+                    "Service accounts"
+                ],
+                "summary": "Register a new service account",
+                "parameters": [
+                    {
+                        "description": "service account details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateServiceAccountRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateServiceAccountResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/service-accounts/setup/{setup_id}": {
+            "get": {
+                "description": "Exchange one-time setup token for permanent client credentials (the one-time request url is created when a new service account is registered).\nthe endpoint renders a html page that the user can use to copy their client credentials.\nThe setup url is only valid for 48 hours.\n",
+                "tags": [
+                    "Service accounts"
+                ],
+                "summary": "Complete service account setup",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "One-time setup ID",
+                        "name": "setup_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "410": {
+                        "description": "Gone",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/isn": {
             "get": {
                 "description": "get a list of the configured ISNs",
@@ -857,299 +1148,6 @@
                     },
                     "404": {
                         "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/auth/admins/account/{account_id}": {
-            "put": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "This endpoint grants the admin role to a site member\n\nAn admin can:\n- Create an ISN\n- Define the signal_types used in the ISN\n- read/write to their own ISNs\n- Grant other accounts read or write access to their ISNs\n- Create service accounts\n\nthis endpoint can only be used by the site owner account",
-                "tags": [
-                    "auth"
-                ],
-                "summary": "Grant admin role",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
-                        "description": "account id",
-                        "name": "account_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/auth/admins/{account_id}": {
-            "delete": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "this endpoint can only be used by the site owner account",
-                "tags": [
-                    "auth"
-                ],
-                "summary": "Revoke account admin role",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
-                        "description": "account id",
-                        "name": "account_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/auth/login": {
-            "post": {
-                "description": "The response body includes an access token which can be used to access the protected enpoints, assuming the account has the appropriate permissions.\nThe access_token is valid for 30 mins.\n\nAs part of the login response, the server sets a http-only cookie on the client that will allow it to use the /auth/refresh endpoint to renew the access_token\nThe refresh_token lasts 30 days unless it is revoked earlier.\n\nThe account's role and permissions are encoded and encloded as part of the jwt access token and also provided in the response body\nTo renew the refresh_token, log in again.",
-                "tags": [
-                    "auth"
-                ],
-                "summary": "Login",
-                "parameters": [
-                    {
-                        "description": "email and password",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.LoginRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/auth.AccessTokenResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/auth/password/reset": {
-            "put": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "Use this api when a user wants to reset their password.  Requires a valid access token and the current password\n",
-                "tags": [
-                    "auth"
-                ],
-                "summary": "Password reset",
-                "parameters": [
-                    {
-                        "description": "user details",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.UpdatePasswordRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad request with possible error codes: malformed_body, password_too_short",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized with possible error code: authentication_error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/auth/register": {
-            "post": {
-                "description": "The first user to be created for this service will be created with an admin role.\nSubsequent accounts default to standard member roles.\nNew members can't access any information beyond the public data on the site until an admin grants them access to an ISN.",
-                "tags": [
-                    "auth"
-                ],
-                "summary": "Register user",
-                "parameters": [
-                    {
-                        "description": "user details",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateUserRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created"
-                    },
-                    "400": {
-                        "description": "Bad request with possible error codes: malformed_body, password_too_short",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict with possible error code: resource_already_exists",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/auth/register/service-accounts": {
-            "post": {
-                "security": [
-                    {
-                        "BearerServiceAccount": []
-                    }
-                ],
-                "description": "Registring a new service account creates a one time link with the client credentials in it - this must be used by the client within 48 hrs.\n\nIf you want to reissue a client's credentials call this endpoint again with the same client organization and contact email.\nA new one time setup url will be generated and the old one will be revoked.\nNote the client_id will remain the same and any existing client secrets will be revoked.\n\nYou have to be an admin or the site owner to use this endpoint\n",
-                "tags": [
-                    "Service accounts"
-                ],
-                "summary": "Register a new service account",
-                "parameters": [
-                    {
-                        "description": "service account details",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateServiceAccountRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateServiceAccountResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/auth/service-accounts/setup/{setup_id}": {
-            "get": {
-                "description": "Exchange one-time setup token for permanent client credentials (the one-time request url is created when a new service account is registered).\nthe endpoint renders a html page that the user can use to copy their client credentials.\nThe setup url is only valid for 48 hours.\n",
-                "tags": [
-                    "Service accounts"
-                ],
-                "summary": "Complete service account setup",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "One-time setup ID",
-                        "name": "setup_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "410": {
-                        "description": "Gone",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }

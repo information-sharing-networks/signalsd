@@ -56,7 +56,7 @@ type UpdatePasswordRequest struct {
 //	@Failure		400	{object}	responses.ErrorResponse	"Bad request with possible error codes: malformed_body, password_too_short"
 //	@Failure		409	{object}	responses.ErrorResponse	"Conflict with possible error code: resource_already_exists"
 //
-//	@Router			/auth/register [post]
+//	@Router			/api/auth/register [post]
 func (u *UserHandler) RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
 	var req CreateUserRequest
 
@@ -161,7 +161,7 @@ func (u *UserHandler) RegisterUserHandler(w http.ResponseWriter, r *http.Request
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/auth/password/reset [put]
+//	@Router			/api/auth/password/reset [put]
 func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Request) {
 	req := UpdatePasswordRequest{}
 
@@ -255,7 +255,7 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/auth/admins/account/{account_id} [put]
+//	@Router			/api/auth/admins/account/{account_id} [put]
 //
 //	this handler must use the RequireRole (owner) middlewear
 func (u *UserHandler) GrantUserAdminRoleHandler(w http.ResponseWriter, r *http.Request) {
@@ -323,7 +323,7 @@ func (u *UserHandler) GrantUserAdminRoleHandler(w http.ResponseWriter, r *http.R
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/auth/admins/{account_id} [delete]
+//	@Router			/api/auth/admins/account/{account_id} [delete]
 //
 //	this handler must use the RequireRole (owner) middlewar
 func (u *UserHandler) RevokeUserAdminRoleHandler(w http.ResponseWriter, r *http.Request) {

@@ -136,58 +136,59 @@ func (s *Server) registerRoutes() {
 	s.router.Group(func(r chi.Router) {
 		r.Use(RequestSizeLimit(signalsd.DefaultAPIRequestSize))
 
-		// auth
-		r.Route("/auth", func(r chi.Router) {
-
-			r.Group(func(r chi.Router) {
-				r.Use(s.authService.RequireValidAccessToken(false))
-
-				r.Put("/password/reset", users.UpdatePasswordHandler)
-			})
-
-			r.Group(func(r chi.Router) {
-				r.Use(s.authService.RequireValidAccessToken(false))
-				r.Use(s.authService.RequireRole("owner"))
-
-				r.Put("/admins/account/{account_id}", users.GrantUserAdminRoleHandler)
-				r.Delete("/admins/account/{account_id}", users.RevokeUserAdminRoleHandler)
-			})
-
-			r.Group(func(r chi.Router) {
-				r.Use(s.authService.RequireValidAccessToken(false))
-				r.Use(s.authService.RequireRole("owner", "admin"))
-
-				r.Post("/register/service-accounts", serviceAccounts.RegisterServiceAccountHandler)
-			})
-
-			r.Post("/register", users.RegisterUserHandler)
-			r.Post("/login", login.LoginHandler)
-			r.Get("/service-accounts/setup/{setup_id}", serviceAccounts.SetupServiceAccountHandler)
-		})
-
-		//oauth2.0 token handling
-		r.Route("/oauth", func(r chi.Router) {
-
-			r.Group(func(r chi.Router) {
-				// the RequireOAuthGrantType middleware calls the appropriate authentication middleware for the grant_type (client_credentials or refresh_token)
-				r.Use(s.authService.RequireOAuthGrantType)
-
-				// get new access tokens
-				r.Post("/token", tokens.NewAccessTokenHandler)
-			})
-
-			r.Group(func(r chi.Router) {
-
-				// the RequireValidAccountTypeCredentials middleware calls the appropriate authentication middleware for the user account type (user or service_account)
-				r.Use(s.authService.RequireValidAccountTypeCredentials)
-
-				// revoke a client secret (service accounts) or refresh token (web users)
-				r.Post("/revoke", tokens.RevokeTokenHandler)
-			})
-		})
-
 		// api routes used to administer the ISNs (excluding signal ingestion)
 		r.Route("/api", func(r chi.Router) {
+
+			// auth endpoints
+			r.Route("/auth", func(r chi.Router) {
+
+				r.Group(func(r chi.Router) {
+					r.Use(s.authService.RequireValidAccessToken(false))
+
+					r.Put("/password/reset", users.UpdatePasswordHandler)
+				})
+
+				r.Group(func(r chi.Router) {
+					r.Use(s.authService.RequireValidAccessToken(false))
+					r.Use(s.authService.RequireRole("owner"))
+
+					r.Put("/admins/account/{account_id}", users.GrantUserAdminRoleHandler)
+					r.Delete("/admins/account/{account_id}", users.RevokeUserAdminRoleHandler)
+				})
+
+				r.Group(func(r chi.Router) {
+					r.Use(s.authService.RequireValidAccessToken(false))
+					r.Use(s.authService.RequireRole("owner", "admin"))
+
+					r.Post("/register/service-accounts", serviceAccounts.RegisterServiceAccountHandler)
+				})
+
+				r.Post("/register", users.RegisterUserHandler)
+				r.Post("/login", login.LoginHandler)
+				r.Get("/service-accounts/setup/{setup_id}", serviceAccounts.SetupServiceAccountHandler)
+			})
+
+			//oauth2.0 token handling
+			r.Route("/oauth", func(r chi.Router) {
+
+				r.Group(func(r chi.Router) {
+					// the RequireOAuthGrantType middleware calls the appropriate authentication middleware for the grant_type (client_credentials or refresh_token)
+					r.Use(s.authService.RequireOAuthGrantType)
+
+					// get new access tokens
+					r.Post("/token", tokens.NewAccessTokenHandler)
+				})
+
+				r.Group(func(r chi.Router) {
+
+					// the RequireValidAccountTypeCredentials middleware calls the appropriate authentication middleware for the user account type (user or service_account)
+					r.Use(s.authService.RequireValidAccountTypeCredentials)
+
+					// revoke a client secret (service accounts) or refresh token (web users)
+					r.Post("/revoke", tokens.RevokeTokenHandler)
+				})
+			})
+
 			r.Group(func(r chi.Router) {
 
 				// request using the routes below must have a valid access token.

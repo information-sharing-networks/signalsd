@@ -857,6 +857,224 @@ paths:
       summary: Reset user password
       tags:
       - Site admin
+  /api/auth/admins/account/{account_id}:
+    delete:
+      description: this endpoint can only be used by the site owner account
+      parameters:
+      - description: account id
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+        in: path
+        name: account_id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Revoke account admin role
+      tags:
+      - auth
+    put:
+      description: |-
+        This endpoint grants the admin role to a site member
+
+        An admin can:
+        - Create an ISN
+        - Define the signal_types used in the ISN
+        - read/write to their own ISNs
+        - Grant other accounts read or write access to their ISNs
+        - Create service accounts
+
+        this endpoint can only be used by the site owner account
+      parameters:
+      - description: account id
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+        in: path
+        name: account_id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Grant admin role
+      tags:
+      - auth
+  /api/auth/login:
+    post:
+      description: |-
+        The response body includes an access token which can be used to access the protected enpoints, assuming the account has the appropriate permissions.
+        The access_token is valid for 30 mins.
+
+        As part of the login response, the server sets a http-only cookie on the client that will allow it to use the /auth/refresh endpoint to renew the access_token
+        The refresh_token lasts 30 days unless it is revoked earlier.
+
+        The account's role and permissions are encoded and encloded as part of the jwt access token and also provided in the response body
+        To renew the refresh_token, log in again.
+      parameters:
+      - description: email and password
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.LoginRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/auth.AccessTokenResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      summary: Login
+      tags:
+      - auth
+  /api/auth/password/reset:
+    put:
+      description: |
+        Use this api when a user wants to reset their password.  Requires a valid access token and the current password
+      parameters:
+      - description: user details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdatePasswordRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: 'Bad request with possible error codes: malformed_body, password_too_short'
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: 'Unauthorized with possible error code: authentication_error'
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Password reset
+      tags:
+      - auth
+  /api/auth/register:
+    post:
+      description: |-
+        The first user to be created for this service will be created with an admin role.
+        Subsequent accounts default to standard member roles.
+        New members can't access any information beyond the public data on the site until an admin grants them access to an ISN.
+      parameters:
+      - description: user details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateUserRequest'
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: 'Bad request with possible error codes: malformed_body, password_too_short'
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "409":
+          description: 'Conflict with possible error code: resource_already_exists'
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      summary: Register user
+      tags:
+      - auth
+  /api/auth/register/service-accounts:
+    post:
+      description: |
+        Registring a new service account creates a one time link with the client credentials in it - this must be used by the client within 48 hrs.
+
+        If you want to reissue a client's credentials call this endpoint again with the same client organization and contact email.
+        A new one time setup url will be generated and the old one will be revoked.
+        Note the client_id will remain the same and any existing client secrets will be revoked.
+
+        You have to be an admin or the site owner to use this endpoint
+      parameters:
+      - description: service account details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateServiceAccountRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.CreateServiceAccountResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerServiceAccount: []
+      summary: Register a new service account
+      tags:
+      - Service accounts
+  /api/auth/service-accounts/setup/{setup_id}:
+    get:
+      description: |
+        Exchange one-time setup token for permanent client credentials (the one-time request url is created when a new service account is registered).
+        the endpoint renders a html page that the user can use to copy their client credentials.
+        The setup url is only valid for 48 hours.
+      parameters:
+      - description: One-time setup ID
+        in: path
+        name: setup_id
+        required: true
+        type: string
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "410":
+          description: Gone
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      summary: Complete service account setup
+      tags:
+      - Service accounts
   /api/isn:
     get:
       description: get a list of the configured ISNs
@@ -1201,225 +1419,6 @@ paths:
       summary: Get an ISN configurationuration
       tags:
       - ISN view
-  /auth/admins/{account_id}:
-    delete:
-      description: this endpoint can only be used by the site owner account
-      parameters:
-      - description: account id
-        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
-        in: path
-        name: account_id
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Revoke account admin role
-      tags:
-      - auth
-  /auth/admins/account/{account_id}:
-    put:
-      description: |-
-        This endpoint grants the admin role to a site member
-
-        An admin can:
-        - Create an ISN
-        - Define the signal_types used in the ISN
-        - read/write to their own ISNs
-        - Grant other accounts read or write access to their ISNs
-        - Create service accounts
-
-        this endpoint can only be used by the site owner account
-      parameters:
-      - description: account id
-        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
-        in: path
-        name: account_id
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Grant admin role
-      tags:
-      - auth
-  /auth/login:
-    post:
-      description: |-
-        The response body includes an access token which can be used to access the protected enpoints, assuming the account has the appropriate permissions.
-        The access_token is valid for 30 mins.
-
-        As part of the login response, the server sets a http-only cookie on the client that will allow it to use the /auth/refresh endpoint to renew the access_token
-        The refresh_token lasts 30 days unless it is revoked earlier.
-
-        The account's role and permissions are encoded and encloded as part of the jwt access token and also provided in the response body
-        To renew the refresh_token, log in again.
-      parameters:
-      - description: email and password
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.LoginRequest'
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/auth.AccessTokenResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      summary: Login
-      tags:
-      - auth
-  /auth/password/reset:
-    put:
-      description: |
-        Use this api when a user wants to reset their password.  Requires a valid access token and the current password
-      parameters:
-      - description: user details
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.UpdatePasswordRequest'
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: 'Bad request with possible error codes: malformed_body, password_too_short'
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "401":
-          description: 'Unauthorized with possible error code: authentication_error'
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Password reset
-      tags:
-      - auth
-  /auth/register:
-    post:
-      description: |-
-        The first user to be created for this service will be created with an admin role.
-        Subsequent accounts default to standard member roles.
-        New members can't access any information beyond the public data on the site until an admin grants them access to an ISN.
-      parameters:
-      - description: user details
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.CreateUserRequest'
-      responses:
-        "201":
-          description: Created
-        "400":
-          description: 'Bad request with possible error codes: malformed_body, password_too_short'
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "409":
-          description: 'Conflict with possible error code: resource_already_exists'
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      summary: Register user
-      tags:
-      - auth
-  /auth/register/service-accounts:
-    post:
-      description: |
-        Registring a new service account creates a one time link with the client credentials in it - this must be used by the client within 48 hrs.
-
-        If you want to reissue a client's credentials call this endpoint again with the same client organization and contact email.
-        A new one time setup url will be generated and the old one will be revoked.
-        Note the client_id will remain the same and any existing client secrets will be revoked.
-
-        You have to be an admin or the site owner to use this endpoint
-      parameters:
-      - description: service account details
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.CreateServiceAccountRequest'
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.CreateServiceAccountResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerServiceAccount: []
-      summary: Register a new service account
-      tags:
-      - Service accounts
-  /auth/service-accounts/setup/{setup_id}:
-    get:
-      description: |
-        Exchange one-time setup token for permanent client credentials (the one-time request url is created when a new service account is registered).
-        the endpoint renders a html page that the user can use to copy their client credentials.
-        The setup url is only valid for 48 hours.
-      parameters:
-      - description: One-time setup ID
-        in: path
-        name: setup_id
-        required: true
-        type: string
-      responses:
-        "201":
-          description: Created
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "410":
-          description: Gone
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      summary: Complete service account setup
-      tags:
-      - Service accounts
   /health/ready:
     get:
       description: check if the signalsd service is ready

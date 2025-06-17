@@ -52,7 +52,7 @@ type LoginRequest struct {
 //	@Failure		401	{object}	responses.ErrorResponse
 //	@Failure		500	{object}	responses.ErrorResponse
 //
-//	@Router			/auth/login [post]
+//	@Router			/api/auth/login [post]
 func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
 	logger := zerolog.Ctx(r.Context())
