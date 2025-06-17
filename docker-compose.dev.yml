@@ -38,8 +38,6 @@ services:
     working_dir: /signalsd
     ports:
       - "8080:8080"
-    env_file:
-      - ./app/.env
     depends_on:
       db:
         condition: service_healthy
