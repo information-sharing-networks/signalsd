@@ -98,11 +98,14 @@ func (s *Server) Run() {
 	<-idleConnsClosed
 }
 
+// setupMiddleware sets up the middleware that applies to all server requests
+// note that the payload size limit is set on a per-route basis (see registerRoutes)
 func (s *Server) setupMiddleware() {
 	s.router.Use(chimiddleware.RequestID)
 	s.router.Use(logger.RequestLogging(s.httpLogger))
 	s.router.Use(CORS(s.serviceConfig.AllowedOrigins))
 	s.router.Use(SecurityHeaders(s.serviceConfig.Environment))
+	s.router.Use(RateLimit(s.serviceConfig.RateLimitRPS, s.serviceConfig.RateLimitBurst))
 }
 
 func (s *Server) registerRoutes() {
@@ -130,149 +133,159 @@ func (s *Server) registerRoutes() {
 	signalBatches := handlers.NewSignalsBatchHandler(s.queries)
 	signals := handlers.NewSignalsHandler(s.queries, s.pool)
 
-	// auth
-	s.router.Route("/auth", func(r chi.Router) {
+	s.router.Group(func(r chi.Router) {
+		r.Use(RequestSizeLimit(signalsd.DefaultAPIRequestSize))
 
-		r.Group(func(r chi.Router) {
-			r.Use(s.authService.RequireValidAccessToken(false))
+		// auth
+		r.Route("/auth", func(r chi.Router) {
 
-			r.Put("/password/reset", users.UpdatePasswordHandler)
-		})
-
-		r.Group(func(r chi.Router) {
-			r.Use(s.authService.RequireValidAccessToken(false))
-			r.Use(s.authService.RequireRole("owner"))
-
-			r.Put("/admins/account/{account_id}", users.GrantUserAdminRoleHandler)
-			r.Delete("/admins/account/{account_id}", users.RevokeUserAdminRoleHandler)
-		})
-
-		r.Group(func(r chi.Router) {
-			r.Use(s.authService.RequireValidAccessToken(false))
-			r.Use(s.authService.RequireRole("owner", "admin"))
-
-			r.Post("/register/service-accounts", serviceAccounts.RegisterServiceAccountHandler)
-		})
-
-		r.Post("/register", users.RegisterUserHandler)
-		r.Post("/login", login.LoginHandler)
-		r.Get("/service-accounts/setup/{setup_id}", serviceAccounts.SetupServiceAccountHandler)
-	})
-
-	//oauth2.0 token handling
-	s.router.Route("/oauth", func(r chi.Router) {
-
-		r.Group(func(r chi.Router) {
-			// the RequireOAuthGrantType middleware calls the appropriate authentication middleware for the grant_type (client_credentials or refresh_token)
-			r.Use(s.authService.RequireOAuthGrantType)
-
-			// get new access tokens
-			r.Post("/token", tokens.NewAccessTokenHandler)
-		})
-
-		r.Group(func(r chi.Router) {
-
-			// the RequireValidAccountTypeCredentials middleware calls the appropriate authentication middleware for the user account type (user or service_account)
-			r.Use(s.authService.RequireValidAccountTypeCredentials)
-
-			// revoke a client secret (service accounts) or refresh token (web users)
-			r.Post("/revoke", tokens.RevokeTokenHandler)
-		})
-	})
-
-	// api routes aused to adminster the ISNs
-	s.router.Route("/api", func(r chi.Router) {
-		r.Group(func(r chi.Router) {
-
-			// request using the routes below must have a valid access token.
-			// this middleware adds the access token claims and user in the Context supplied to the handlers)
-			r.Use(s.authService.RequireValidAccessToken(false))
-
-			// ISN configuration
 			r.Group(func(r chi.Router) {
+				r.Use(s.authService.RequireValidAccessToken(false))
 
-				// Accounts must be eiter owner or admin to use these endponts
+				r.Put("/password/reset", users.UpdatePasswordHandler)
+			})
+
+			r.Group(func(r chi.Router) {
+				r.Use(s.authService.RequireValidAccessToken(false))
+				r.Use(s.authService.RequireRole("owner"))
+
+				r.Put("/admins/account/{account_id}", users.GrantUserAdminRoleHandler)
+				r.Delete("/admins/account/{account_id}", users.RevokeUserAdminRoleHandler)
+			})
+
+			r.Group(func(r chi.Router) {
+				r.Use(s.authService.RequireValidAccessToken(false))
 				r.Use(s.authService.RequireRole("owner", "admin"))
 
-				// ISN management
-				r.Post("/isn", isn.CreateIsnHandler)
-				r.Put("/isn/{isn_slug}", isn.UpdateIsnHandler)
-
-				// signal types managment
-				r.Post("/isn/{isn_slug}/signal_types", signalTypes.CreateSignalTypeHandler)
-				r.Put("/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}", signalTypes.UpdateSignalTypeHandler)
-				r.Delete("/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}", signalTypes.DeleteSignalTypeHandler)
-
-				// ISN account permissions
-				r.Put("/isn/{isn_slug}/accounts/{account_id}", isnAccount.GrantIsnAccountHandler)
-				r.Delete("/isn/{isn_slug}/accounts/{account_id}", isnAccount.RevokeIsnAccountHandler)
+				r.Post("/register/service-accounts", serviceAccounts.RegisterServiceAccountHandler)
 			})
 
-			// signals exchange
+			r.Post("/register", users.RegisterUserHandler)
+			r.Post("/login", login.LoginHandler)
+			r.Get("/service-accounts/setup/{setup_id}", serviceAccounts.SetupServiceAccountHandler)
+		})
+
+		//oauth2.0 token handling
+		r.Route("/oauth", func(r chi.Router) {
+
 			r.Group(func(r chi.Router) {
+				// the RequireOAuthGrantType middleware calls the appropriate authentication middleware for the grant_type (client_credentials or refresh_token)
+				r.Use(s.authService.RequireOAuthGrantType)
 
-				// routes below can only be used by accounts with write permissions to the specified ISN
-				r.Use(s.authService.RequireIsnPermission("write"))
-
-				// signals batches
-				r.Post("/isn/{isn_slug}/batches", signalBatches.CreateSignalsBatchHandler)
-
-				// signals post
-				r.Post("/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals", signals.CreateSignalsHandler)
-
-				// webhooks
-				r.Post("/webhooks", webhooks.HandlerWebhooks)
+				// get new access tokens
+				r.Post("/token", tokens.NewAccessTokenHandler)
 			})
 
-			// search signals
 			r.Group(func(r chi.Router) {
 
-				// routes below can only be used by accounts with read or write permissions to the specified ISN
-				r.Use(s.authService.RequireIsnPermission("read", "write"))
+				// the RequireValidAccountTypeCredentials middleware calls the appropriate authentication middleware for the user account type (user or service_account)
+				r.Use(s.authService.RequireValidAccountTypeCredentials)
 
-				r.Get("/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search", signals.SearchSignalsHandler)
+				// revoke a client secret (service accounts) or refresh token (web users)
+				r.Post("/revoke", tokens.RevokeTokenHandler)
 			})
 		})
 
-		// unrestricted
-		r.Get("/isn", isn.GetIsnsHandler)
-		r.Get("/isn/{isn_slug}", isn.GetIsnHandler)
-		r.Get("/isn/{isn_slug}/signal_types", signalTypes.GetSignalTypesHandler)
-		r.Get("/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}", signalTypes.GetSignalTypeHandler)
+		// api routes used to administer the ISNs (excluding signal ingestion)
+		r.Route("/api", func(r chi.Router) {
+			r.Group(func(r chi.Router) {
+
+				// request using the routes below must have a valid access token.
+				// this middleware adds the access token claims and user in the Context supplied to the handlers)
+				r.Use(s.authService.RequireValidAccessToken(false))
+
+				// ISN configuration
+				r.Group(func(r chi.Router) {
+
+					// Accounts must be eiter owner or admin to use these endponts
+					r.Use(s.authService.RequireRole("owner", "admin"))
+
+					// ISN management
+					r.Post("/isn", isn.CreateIsnHandler)
+					r.Put("/isn/{isn_slug}", isn.UpdateIsnHandler)
+
+					// signal types managment
+					r.Post("/isn/{isn_slug}/signal_types", signalTypes.CreateSignalTypeHandler)
+					r.Put("/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}", signalTypes.UpdateSignalTypeHandler)
+					r.Delete("/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}", signalTypes.DeleteSignalTypeHandler)
+
+					// ISN account permissions
+					r.Put("/isn/{isn_slug}/accounts/{account_id}", isnAccount.GrantIsnAccountHandler)
+					r.Delete("/isn/{isn_slug}/accounts/{account_id}", isnAccount.RevokeIsnAccountHandler)
+				})
+
+				// search signals (small payloads)
+				r.Group(func(r chi.Router) {
+
+					// routes below can only be used by accounts with read or write permissions to the specified ISN
+					r.Use(s.authService.RequireIsnPermission("read", "write"))
+
+					r.Get("/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search", signals.SearchSignalsHandler)
+				})
+			})
+
+			// unrestricted
+			r.Get("/isn", isn.GetIsnsHandler)
+			r.Get("/isn/{isn_slug}", isn.GetIsnHandler)
+			r.Get("/isn/{isn_slug}/signal_types", signalTypes.GetSignalTypesHandler)
+			r.Get("/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}", signalTypes.GetSignalTypeHandler)
+		})
+
+		// Site Admin
+		r.Route("/admin", func(r chi.Router) {
+			r.Group(func(r chi.Router) {
+
+				// route below only works in dev
+				r.Use(s.authService.RequireDevEnv)
+
+				// delete all users and content
+				r.Post("/reset", admin.ResetHandler)
+			})
+
+			r.Group(func(r chi.Router) {
+
+				// route below can only be used by the owner as it exposes the email addresses of all users on the site
+				r.Use(s.authService.RequireValidAccessToken(false))
+				r.Use(s.authService.RequireRole("owner"))
+
+				r.Get("/users/{id}", admin.GetUserHandler)
+				r.Get("/users", admin.GetUsersHandler)
+			})
+
+			r.Group(func(r chi.Router) {
+
+				// routes below can only be used by owners and admins
+				r.Use(s.authService.RequireValidAccessToken(false))
+				r.Use(s.authService.RequireRole("owner", "admin"))
+
+				r.Post("/accounts/{account_id}/disable", admin.DisableAccountHandler)
+				r.Post("/accounts/{account_id}/enable", admin.EnableAccountHandler)
+				r.Get("/service-accounts", admin.GetServiceAccountsHandler)
+				r.Get("/service-accounts/{id}", admin.GetServiceAccountHandler)
+				r.Put("/users/{user_id}/reset-password", admin.ResetUserPasswordHandler)
+			})
+		})
 	})
 
-	// Site Admin
-	s.router.Route("/admin", func(r chi.Router) {
+	// Signal ingestion routes
+	s.router.Group(func(r chi.Router) {
+		r.Use(RequestSizeLimit(s.serviceConfig.MaxSignalPayloadSize))
+		r.Use(s.authService.RequireValidAccessToken(false))
+
+		// signals exchange
 		r.Group(func(r chi.Router) {
 
-			// route below only works in dev
-			r.Use(s.authService.RequireDevEnv)
+			// routes below can only be used by accounts with write permissions to the specified ISN
+			r.Use(s.authService.RequireIsnPermission("write"))
 
-			// delete all users and content
-			r.Post("/reset", admin.ResetHandler)
-		})
+			// signals batches
+			r.Post("/api/isn/{isn_slug}/batches", signalBatches.CreateSignalsBatchHandler)
 
-		r.Group(func(r chi.Router) {
+			// signals post
+			r.Post("/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals", signals.CreateSignalsHandler)
 
-			// route below can only be used by the owner as it exposes the email addresses of all users on the site
-			r.Use(s.authService.RequireValidAccessToken(false))
-			r.Use(s.authService.RequireRole("owner"))
-
-			r.Get("/users/{id}", admin.GetUserHandler)
-			r.Get("/users", admin.GetUsersHandler)
-		})
-
-		r.Group(func(r chi.Router) {
-
-			// routes below can only be used by owners and admins
-			r.Use(s.authService.RequireValidAccessToken(false))
-			r.Use(s.authService.RequireRole("owner", "admin"))
-
-			r.Post("/accounts/{account_id}/disable", admin.DisableAccountHandler)
-			r.Post("/accounts/{account_id}/enable", admin.EnableAccountHandler)
-			r.Get("/service-accounts", admin.GetServiceAccountsHandler)
-			r.Get("/service-accounts/{id}", admin.GetServiceAccountHandler)
-			r.Put("/users/{user_id}/reset-password", admin.ResetUserPasswordHandler)
+			// webhooks
+			r.Post("/api/webhooks", webhooks.HandlerWebhooks)
 		})
 	})
 

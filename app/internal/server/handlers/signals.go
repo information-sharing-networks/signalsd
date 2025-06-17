@@ -135,7 +135,6 @@ type SignalVersionDoc struct {
 //
 //	@Success		201					{object}	handlers.CreateSignalsResponse
 //	@Failure		400					{object}	responses.ErrorResponse
-//	@Failure		500					{object}	responses.ErrorResponse
 //
 //	@Security		BearerAccessToken
 //
@@ -313,6 +312,8 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 //	@Summary	Withdraw a signal (TODO)
 //	@Tags		Signal sharing
 //
+//	@Failure	501	{object}	responses.ErrorResponse	"Not implemented"
+//
 //	@Router		/isn/{isn_slug}/signal_types/{signal_type_slug}/{signal_id} [delete]
 func (s *SignalsHandler) DeleteSignalHandler(w http.ResponseWriter, r *http.Request) {
 	// mark as withdrawn
@@ -323,6 +324,8 @@ func (s *SignalsHandler) DeleteSignalHandler(w http.ResponseWriter, r *http.Requ
 //
 //	@Summary	get a signal (TODO)
 //	@Tags		Signal sharing
+//
+//	@Failure	501	{object}	responses.ErrorResponse	"Not implemented"
 //
 //	@Router		/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/{signal_id} [get]
 func (s *SignalsHandler) GetSignalHandler(w http.ResponseWriter, r *http.Request) {
@@ -358,7 +361,6 @@ func (s *SignalsHandler) GetSignalHandler(w http.ResponseWriter, r *http.Request
 //
 //	@Success		200			{array}		handlers.SignalVersionDoc
 //	@Failure		400			{object}	responses.ErrorResponse
-//	@Failure		500			{object}	responses.ErrorResponse
 //
 //	@Security		BearerAccessToken
 //

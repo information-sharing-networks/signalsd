@@ -23,6 +23,8 @@ func NewWebhookHandler(queries *database.Queries) *WebhookHandler {
 //
 //	@Description	register a webhook to recieve signals batch status updates
 //
+//	@Failure		204	{object}	responses.ErrorResponse	"Not implemented"
+//
 //	@Router			/webhooks [post]
 func (wh *WebhookHandler) HandlerWebhooks(w http.ResponseWriter, r *http.Request) {
 	responses.RespondWithError(w, r, http.StatusNoContent, apperrors.ErrCodeNotImplemented, "todo - webhooks not yet implemented")

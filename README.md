@@ -29,9 +29,9 @@ The [initial implementation](https://github.com/information-sharing-networks/isn
 This repo contains the second version (work in progress) - it develops the ISN administration facilities and will scale to higher volumes of data.
 
 There are three components
-- an [API](https://information-sharing-networks.github.io/signalsd/app/docs/index.html) used to configure ISNs, register participants and deploy the data sharing infrastructure 
+- an [API](https://information-sharing-networks.github.io/signalsd/app/docs/index.html) used to configure ISNs, register participants and deploy the data sharing infrastructure
 - an associated [framework agreement](https://github.com/information-sharing-networks/Framework) that establishes the responsibilities of the participants in an ISN
-- a demonstration UI 
+- a demonstration UI
 
 ## Credits
 Many thanks to [Ross McDonald](https://github.com/rossajmcd) who came up with the concept and created the initial reference implemenation.
@@ -74,13 +74,21 @@ PORT=8080                       # Default: 8080
 ENVIRONMENT=prod                # Default: dev (options: dev, prod, test, staging)
 LOG_LEVEL=info                  # Default: debug (options: debug, info, warn, error)
 
-# database timeouts (optional)
+# database timeouts 
 READ_TIMEOUT=15s                # Default: 15s
 WRITE_TIMEOUT=15s               # Default: 15s  
 IDLE_TIMEOUT=60s                # Default: 60s
 
-# CORS allowed origins (optional) - defaults to allow all origins (*)
+# adds CORS headers to control which sites are allowed to use the service.  Defaults to allow all origins (*)
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
+
+# rate limits
+RATE_LIMIT_RPS=100              # Default: 100 requests per second
+RATE_LIMIT_BURST=20             # Default: 20 request burst allowance
+
+# payload size limits
+# the signal payload size is configurable (all the other API endpoints have a 64KB limit)
+MAX_SIGNAL_PAYLOAD_SIZE=52428800 # Default: 50MB (52428800 bytes) - 
 ```
 
 ## Depenencies
@@ -243,6 +251,11 @@ see github actions workflows in .github/workflows
 ![ci_cd.0.2.0](https://github.com/user-attachments/assets/d5399e2f-0d0b-420b-9c17-0fbcea6f520c)
 
 
+## rate limits 
+The service includes a shared rate limiter for all traffic regardless of source IP or user identity and protects all endpoints including auth, API, and admin routes. 
+
+This just provides basic protection against abuse - in a production environment you should configure your CDN/load balancer/reverse proxy with per-IP rate limiting.
+
 ## cloud deployment
 The service is deployed using the image created at the last push to the main branch.  It is deployed as a container on Google Cloud Run. Google handles https, firewall, loadbalancing and autoscaling. The service will scale to zero when not in use.
 
@@ -251,7 +264,7 @@ The service is deployed using the image created at the last push to the main bra
 note this is a pre-prod version and should only be used with data that you don't mind being deleted or seen by other people.
 
 the steps to set up this environment in Google Cloud are:
-> create a project called signald 
+> create a project called signalsd 
 
 > create an artifact registry called signalsd
 
@@ -279,6 +292,6 @@ the steps to set up this environment in Google Cloud are:
   - DATABASE_URL (url of your postgres service - we are using Neon.tech, but you can use any provider you choose)
   - SECRET_KEY (random secret key for your app - used by the signalsd server to sign JWT tokens)
 
-> Note that at the time of writing this service operatates within the generous free-tiers offerred by google and Neon.Tech, but you should check the current rules to be sure.
+> Note that at the time of writing this service operatates within the free-tiers offerred by google and Neon.Tech, but you should check the current rules to be sure.
 
 that's it!

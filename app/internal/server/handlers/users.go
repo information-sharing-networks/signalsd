@@ -37,7 +37,6 @@ type CreateUserRequest struct {
 	Email    string `json:"email" example:"example@example.com"`
 }
 
-// todo forgotten password
 type UpdatePasswordRequest struct {
 	CurrentPassword string `json:"current_password" example:"lkIB53@6O^Y"`
 	NewPassword     string `json:"new_password" example:"ue6U>&X3j570"`
@@ -55,8 +54,7 @@ type UpdatePasswordRequest struct {
 //
 //	@Success		201
 //	@Failure		400	{object}	responses.ErrorResponse	"Bad request with possible error codes: malformed_body, password_too_short"
-//	@Failure		409	{object}	responses.ErrorResponse	"Conflict with possible error code:resource_already_exists"
-//	@Failure		500	{object}	responses.ErrorResponse	"Internal server error with possible error codes: database_error, internal_error"
+//	@Failure		409	{object}	responses.ErrorResponse	"Conflict with possible error code: resource_already_exists"
 //
 //	@Router			/auth/register [post]
 func (u *UserHandler) RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
@@ -151,17 +149,15 @@ func (u *UserHandler) RegisterUserHandler(w http.ResponseWriter, r *http.Request
 
 // UpdatePasswordHandler godoc
 //
-//	@Summary		Reset password
-//	@Description	Use this api to reset the user's password.  Requires a valid access token and the current password
+//	@Summary		Password reset
+//	@Description	Use this api when a user wants to reset their password.  Requires a valid access token and the current password
 //	@Description
-//	@Description	TODO - forgotten password facility
 //	@Tags			auth
 //
 //	@Param			request	body	handlers.UpdatePasswordRequest	true	"user details"
 //	@Success		204
 //	@Failure		400	{object}	responses.ErrorResponse	"Bad request with possible error codes: malformed_body, password_too_short"
 //	@Failure		401	{object}	responses.ErrorResponse	"Unauthorized with possible error code: authentication_error"
-//	@Failure		500	{object}	responses.ErrorResponse	"Internal server error with possible error codes: database_error, internal_error"
 //
 //	@Security		BearerAccessToken
 //
@@ -256,7 +252,6 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 //	@Success		204
 //	@Failure		400	{object}	responses.ErrorResponse
 //	@Failure		403	{object}	responses.ErrorResponse
-//	@Failure		500	{object}	responses.ErrorResponse
 //
 //	@Security		BearerAccessToken
 //
@@ -323,7 +318,8 @@ func (u *UserHandler) GrantUserAdminRoleHandler(w http.ResponseWriter, r *http.R
 //	@Param			account_id	path	string	true	"account id"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
 //	@Success		204
-//	@Failure		500	{object}	responses.ErrorResponse
+//	@Failure		400	{object}	responses.ErrorResponse
+//	@Failure		403	{object}	responses.ErrorResponse
 //
 //	@Security		BearerAccessToken
 //

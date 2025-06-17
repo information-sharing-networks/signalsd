@@ -74,7 +74,6 @@ type IsnAndLinkedInfo struct {
 //	@Success		201		{object}	handlers.CreateIsnResponse
 //	@Failure		400		{object}	responses.ErrorResponse
 //	@Failure		409		{object}	responses.ErrorResponse
-//	@Failure		500		{object}	responses.ErrorResponse
 //
 //	@Security		BearerAccessToken
 //	@Security		RefreshTokenCookieAuth
@@ -220,7 +219,8 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 //	@Success		204
 //	@Failure		400	{object}	responses.ErrorResponse
 //	@Failure		401	{object}	responses.ErrorResponse
-//	@Failure		500	{object}	responses.ErrorResponse
+//	@Failure		403	{object}	responses.ErrorResponse
+//	@Failure		404	{object}	responses.ErrorResponse
 //
 //	@Security		BearerAccessToken
 //
@@ -295,7 +295,6 @@ func (i *IsnHandler) UpdateIsnHandler(w http.ResponseWriter, r *http.Request) {
 //	@Tags			ISN view
 //
 //	@Success		200	{array}		database.Isn
-//	@Failure		500	{object}	responses.ErrorResponse
 //
 //	@Router			/api/isn [get]
 func (s *IsnHandler) GetIsnsHandler(w http.ResponseWriter, r *http.Request) {
@@ -320,7 +319,6 @@ func (s *IsnHandler) GetIsnsHandler(w http.ResponseWriter, r *http.Request) {
 //	@Success		200	{object}	handlers.IsnAndLinkedInfo
 //	@Failure		400	{object}	responses.ErrorResponse
 //	@Failure		404	{object}	responses.ErrorResponse
-//	@Failure		500	{object}	responses.ErrorResponse
 //
 //	@Router			/api/isn/{slug} [get]
 func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
