@@ -80,7 +80,7 @@ func RequestSizeLimit(maxBytes int64) func(http.Handler) http.Handler {
 			// Check Content-Length header first (if present)
 			if r.ContentLength > maxBytes {
 				errorMsg := fmt.Sprintf("Request body exceeds maximum size of %d bytes", maxBytes)
-				responses.RespondWithError(w, r, http.StatusRequestEntityTooLarge,
+				responses.RespondWithError(w, r, 413, // Request Entity Too Large
 					apperrors.ErrCodeRequestTooLarge, errorMsg)
 				return
 			}

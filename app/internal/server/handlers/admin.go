@@ -178,7 +178,8 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Revoke tokens based on account type
-	if account.AccountType == "service_account" {
+	switch account.AccountType {
+	case "service_account":
 		// Revoke all client secrets for service accounts
 		_, err = txQueries.RevokeAllClientSecretsForAccount(r.Context(), accountID)
 		if err != nil {
@@ -205,7 +206,7 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 			return
 		}
 
-	} else if account.AccountType == "user" {
+	case "user":
 		// Revoke all refresh tokens for user accounts
 		_, err = txQueries.RevokeAllRefreshTokensForUser(r.Context(), accountID)
 		if err != nil {
