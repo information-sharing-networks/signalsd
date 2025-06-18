@@ -207,7 +207,7 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 		}
 	}
 
-	compiledSchema, err := schemas.ValidateAndCompileSchema(req.SchemaURL, schemaContent)
+	_, err = schemas.ValidateAndCompileSchema(req.SchemaURL, schemaContent)
 	if err != nil {
 		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("invalid JSON schema: %v", err))
 		return
@@ -229,10 +229,6 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not create signal definition: %v", err))
 		return
 	}
-
-	// Add the pre-compiled schema to cache
-	signalTypePath := fmt.Sprintf("%s/v%s", slug, semVer)
-	schemas.AddToCache(signalTypePath, compiledSchema, req.SchemaURL)
 
 	resourceURL := fmt.Sprintf("%s://%s/api/isn/%s/signal_types/%s/v%s",
 		utils.GetScheme(r),

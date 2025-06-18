@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -214,14 +215,14 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 
 	tx, err := s.pool.BeginTx(r.Context(), pgx.TxOptions{})
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to being transaction: %v", err))
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to begin transaction: %v", err))
 		return
 	}
 
 	defer func() {
 		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to rollback transaction: %v", err))
-			return
+			// Log the error but don't try to respond since the request may have already timed out
+			fmt.Printf("failed to rollback transaction: %v\n", err)
 		}
 	}()
 
@@ -230,18 +231,12 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 	for i, signal := range createSignalsRequest.Signals {
 		var err error
 
-		// Unmarshal and validate signal content against schema
-		var signalData any
-		if err := json.Unmarshal(signal.Content, &signalData); err != nil {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody,
-				fmt.Sprintf("signal %d (local_ref: %s) contains invalid JSON in content field: %v", i+1, signal.LocalRef, err))
-			return
-		}
-
-		err = schemas.ValidateJSON(signalTypePath, signalData)
+		// Validate signal content against schema (includes JSON syntax validation)
+		// This will automatically refresh cache if schema is not found
+		err = schemas.ValidateSignal(r.Context(), s.queries, signalTypePath, signal.Content)
 		if err != nil {
 			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody,
-				fmt.Sprintf("signal %d (local_ref: %s) failed schema validation: %v", i+1, signal.LocalRef, err))
+				fmt.Sprintf("signal %d (local_ref: %s) failed validation: %v", i+1, signal.LocalRef, err))
 			return
 		}
 
@@ -299,7 +294,11 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 
 	createSignalsResponse.StoredSignals = storedSignals
 
-	if err = tx.Commit(r.Context()); err != nil {
+	// Use a separate context for commit to avoid issues if request context is canceled
+	commitCtx, commitCancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer commitCancel()
+
+	if err = tx.Commit(commitCtx); err != nil {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to commit transaction: %v", err))
 		return
 	}

@@ -12,6 +12,7 @@ services:
       POSTGRES_HOST_AUTH_METHOD: trust
       POSTGRES_USER: signalsd-dev
       POSTGRES_DB: signalsd_admin
+    # Using default PostgreSQL configuration - no custom command overrides
     healthcheck:
       test: ["CMD-SHELL", "psql -U signalsd-dev -d signalsd_admin -c 'select 1;'"]
       interval: 5s
@@ -23,7 +24,7 @@ services:
       resources:
         limits:
           cpus: '2'
-          memory: 4096M
+          memory: 2048M
 
   app:
     build:

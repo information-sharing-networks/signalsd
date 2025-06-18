@@ -9,14 +9,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-/*
-config sets up shared variables for the service:
-- ServiceConfig: main calls initConfig() and gets a pointer to the newly initialized config struct - the config is then passed to all handlers as a parameter.
-- common constants - e.g token expiry times
-- common maps - used to list valid values for certain fields e.g signalTypes.Stage
-*/
-
-// service configuration
+// service configuration - these can be set as environment variables (sensible defaults are used where possible)
 type ServerConfig struct {
 	Environment          string
 	Host                 string
@@ -31,27 +24,29 @@ type ServerConfig struct {
 	MaxSignalPayloadSize int64
 	RateLimitRPS         int
 	RateLimitBurst       int
+	ServiceMode          string
 }
 
-// common constants - todo option to define as env vars
+// common constants
 const (
-	AccessTokenExpiry      = 30 * time.Minute
-	RefreshTokenExpiry     = 30 * 24 * time.Hour
-	MinimumPasswordLength  = 11
-	RefreshTokenCookieName = "refresh_token"
-	TokenIssuerName        = "Signalsd"
-	OneTimeSecretExpiry    = 48 * time.Hour
-	ClientSecretExpiry     = 365 * 24 * time.Hour
+	AccessTokenExpiry        = 30 * time.Minute
+	RefreshTokenExpiry       = 30 * 24 * time.Hour
+	MinimumPasswordLength    = 11
+	RefreshTokenCookieName   = "refresh_token"
+	TokenIssuerName          = "Signalsd"
+	OneTimeSecretExpiry      = 48 * time.Hour
+	ClientSecretExpiry       = 365 * 24 * time.Hour
+	DefaultMaxAPIRequestSize = 64 * 1024 // 64KB for admin/auth/management API
 
-	// Request size limits
-	DefaultAPIRequestSize = 64 * 1024 // 64KB for admin/auth/management API
 )
 
 // common maps - used to validate enum values
+
 var validEnvs = map[string]bool{
 	"dev":     true,
-	"prod":    true,
 	"test":    true,
+	"perf":    true,
+	"prod":    true,
 	"staging": true,
 }
 
@@ -76,19 +71,27 @@ var ValidISNPermissions = map[string]bool{ // isn_accounts.permission
 	"write": true,
 }
 
-// NewServerConfig loads environment variables and returns a ServiceConfig struct
+var ValidServiceModes = map[string]bool{ // service modes for CLI
+	"all":           true,
+	"admin":         true,
+	"signals":       true, // both read and write (backward compatibility)
+	"signals-read":  true, // read-only signal operations
+	"signals-write": true, // write-only signal operations
+}
+
+// NewServerConfig loads environment variables and returns a ServerConfig struct
 func NewServerConfig(logger *zerolog.Logger) *ServerConfig {
 	const (
-		defaultHost           = "0.0.0.0"
-		defaultPort           = 8080
-		defaultEnviromnent    = "dev"
-		defaultLogLevelStr    = "debug"
-		defaultReadTimeout    = 15 * time.Second
-		defaultWriteTimeout   = 15 * time.Second
-		defaultIdleTimeout    = 60 * time.Second
-		defaultMaxSignalSize  = 50 * 1024 * 1024 // 50MB default
-		defaultRateLimitRPS   = 100
-		defaultRateLimitBurst = 20 // burst of 20 requests
+		defaultHost                 = "0.0.0.0"
+		defaultPort                 = 8080
+		defaultEnviromnent          = "dev"
+		defaultLogLevelStr          = "debug"
+		defaultReadTimeout          = 15 * time.Second
+		defaultWriteTimeout         = 15 * time.Second
+		defaultIdleTimeout          = 60 * time.Second
+		defaultMaxSignalPayloadSize = 5 * 1024 * 1024 // 5MB default
+		defaultRateLimitRPS         = 100
+		defaultRateLimitBurst       = 20 // burst of 20 requests
 	)
 
 	// log level
@@ -161,7 +164,7 @@ func NewServerConfig(logger *zerolog.Logger) *ServerConfig {
 	allowedOrigins := getOrigins("ALLOWED_ORIGINS")
 
 	// Signal payload size
-	maxSignalPayloadSize := getEnvInt64("MAX_SIGNAL_PAYLOAD_SIZE", defaultMaxSignalSize)
+	maxSignalPayloadSize := getEnvInt64("MAX_SIGNAL_PAYLOAD_SIZE", defaultMaxSignalPayloadSize)
 
 	// Rate limiting
 	rateLimitRPS := getEnvInt("RATE_LIMIT_RPS", defaultRateLimitRPS)
@@ -181,6 +184,7 @@ func NewServerConfig(logger *zerolog.Logger) *ServerConfig {
 		MaxSignalPayloadSize: maxSignalPayloadSize,
 		RateLimitRPS:         rateLimitRPS,
 		RateLimitBurst:       rateLimitBurst,
+		ServiceMode:          "", // Will be set by CLI flag
 	}
 }
 

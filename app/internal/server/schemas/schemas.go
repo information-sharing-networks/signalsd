@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/santhosh-tekuri/jsonschema/v5"
@@ -26,7 +27,13 @@ type schemaCache struct {
 	schemaURLs map[string]string // tracks schema URLs for each signal type path
 }
 
-var cache *schemaCache
+// signal types can be added while the signals handler is running, so...
+// the validateSignal function will refresh the cache when encountering an uncached Signal Type.
+// the schemaMutex protects the cache from concurrent access when multiple http go routines are validating signals
+var (
+	cache      *schemaCache
+	cacheMutex sync.RWMutex
+)
 
 // FetchSchema gets a JSON schema from a URL
 // if the supplied url is a 'blob' url (i.e. the url rendered by github web interface) it will be converted to a raw url so the actual json content is fetched
@@ -98,40 +105,82 @@ func ValidateAndCompileSchema(schemaURL, content string) (*jsonschema.Schema, er
 	return schema, nil
 }
 
-// ValidateJSON validates unmarshaled data against a cached schema using signal type path
-func ValidateJSON(signalTypePath string, data any) error {
-	if cache == nil {
-		return fmt.Errorf("schema cache not initialized")
-	}
-
-	// Check if this signal type skips validation
-	schemaURL, exists := cache.schemaURLs[signalTypePath]
-	if !exists {
-		return fmt.Errorf("schema URL not found in cache for signal type: %s", signalTypePath)
-	}
-
-	if SkipValidation(schemaURL) {
-		return nil
-	}
-
-	schema, exists := cache.schemas[signalTypePath]
-	if !exists {
-		return fmt.Errorf("schema not found in cache for signal type: %s", signalTypePath)
-	}
-
-	if err := schema.Validate(data); err != nil {
-		return fmt.Errorf("schema validation failed: %w", err)
-	}
-
-	return nil
-}
-
 // LoadSchemaCache loads schemas from database and compiles them into memory cache
 func LoadSchemaCache(ctx context.Context, queries *database.Queries) error {
-	// Initialize the cache
-	cache = &schemaCache{
-		schemas:    make(map[string]*jsonschema.Schema),
-		schemaURLs: make(map[string]string),
+	cacheMutex.Lock()
+	defer cacheMutex.Unlock()
+
+	return refreshCache(ctx, queries)
+}
+
+// ValidateSignal validates signal JSON content against its schema
+// Automatically refreshes schema cache if the signal type is not found
+func ValidateSignal(ctx context.Context, queries *database.Queries, signalTypePath string, rawJSON json.RawMessage) error {
+	// Try cache first
+	cacheMutex.RLock()
+	if cache != nil {
+		if schemaURL, exists := cache.schemaURLs[signalTypePath]; exists {
+			if SkipValidation(schemaURL) {
+				cacheMutex.RUnlock()
+				return nil
+			}
+			if schema, exists := cache.schemas[signalTypePath]; exists {
+				cacheMutex.RUnlock()
+				// Validate with cached schema
+				var data any
+				if err := json.Unmarshal(rawJSON, &data); err != nil {
+					return fmt.Errorf("invalid JSON format: %v", err)
+				}
+				if err := schema.Validate(data); err != nil {
+					return fmt.Errorf("schema validation failed: %w", err)
+				}
+				return nil // valid json confirmed
+			}
+		}
+	}
+	cacheMutex.RUnlock()
+
+	// Schema not in cache, refresh cache
+	cacheMutex.Lock()
+	defer cacheMutex.Unlock()
+
+	// Refresh entire cache from database
+	if err := refreshCache(ctx, queries); err != nil {
+		return fmt.Errorf("failed to refresh schema cache: %w", err)
+	}
+
+	// Try validation with refreshed cache
+	if cache != nil {
+		if schemaURL, exists := cache.schemaURLs[signalTypePath]; exists {
+			if SkipValidation(schemaURL) {
+				return nil
+			}
+			if schema, exists := cache.schemas[signalTypePath]; exists {
+				// Validate with refreshed schema
+				var data any
+				if err := json.Unmarshal(rawJSON, &data); err != nil {
+					return fmt.Errorf("invalid JSON format: %v", err)
+				}
+				if err := schema.Validate(data); err != nil {
+					return fmt.Errorf("schema validation failed: %w", err)
+				}
+				return nil
+			}
+		}
+	}
+
+	// Schema still not found after refresh
+	return fmt.Errorf("signal type not found: %s", signalTypePath)
+}
+
+// refreshCache refreshes the cache from database (caller must hold write lock)
+func refreshCache(ctx context.Context, queries *database.Queries) error {
+	// Initialize the cache if needed
+	if cache == nil {
+		cache = &schemaCache{
+			schemas:    make(map[string]*jsonschema.Schema),
+			schemaURLs: make(map[string]string),
+		}
 	}
 
 	signalTypes, err := queries.GetSignalTypes(ctx)
@@ -139,15 +188,15 @@ func LoadSchemaCache(ctx context.Context, queries *database.Queries) error {
 		return fmt.Errorf("failed to get signal types from database: %w", err)
 	}
 
+	// Clear existing cache and rebuild
+	cache.schemas = make(map[string]*jsonschema.Schema)
+	cache.schemaURLs = make(map[string]string)
+
 	var loadErrors []string
 
 	for _, signalType := range signalTypes {
 		// Create signal type path as cache key
 		signalTypePath := fmt.Sprintf("%s/v%s", signalType.Slug, signalType.SemVer)
-
-		if _, exists := cache.schemas[signalTypePath]; exists {
-			continue
-		}
 
 		// Store the schema URL for this signal type path
 		cache.schemaURLs[signalTypePath] = signalType.SchemaURL
@@ -166,19 +215,4 @@ func LoadSchemaCache(ctx context.Context, queries *database.Queries) error {
 	}
 
 	return nil
-}
-
-// AddToCache adds a compiled schema to the cache - this is used to dynamically add schemas to the cache when a new signal type is created
-func AddToCache(signalTypePath string, schema *jsonschema.Schema, schemaURL string) {
-	if cache == nil {
-		// Initialize cache if this is the first signal type being added
-		cache = &schemaCache{
-			schemas:    make(map[string]*jsonschema.Schema),
-			schemaURLs: make(map[string]string),
-		}
-	}
-
-	// Store the schema URL for this signal type path
-	cache.schemaURLs[signalTypePath] = schemaURL
-	cache.schemas[signalTypePath] = schema
 }

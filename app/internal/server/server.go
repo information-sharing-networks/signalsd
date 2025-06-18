@@ -22,39 +22,53 @@ import (
 )
 
 type Server struct {
-	pool          *pgxpool.Pool
-	queries       *database.Queries
-	authService   *auth.AuthService
-	serviceConfig *signalsd.ServerConfig
-	serverLogger  *zerolog.Logger
-	httpLogger    *zerolog.Logger
-	router        *chi.Mux
+	pool         *pgxpool.Pool
+	queries      *database.Queries
+	authService  *auth.AuthService
+	serverConfig *signalsd.ServerConfig
+	serverLogger *zerolog.Logger
+	httpLogger   *zerolog.Logger
+	router       *chi.Mux
 }
 
-func NewServer(pool *pgxpool.Pool, queries *database.Queries, authService *auth.AuthService, serviceConfig *signalsd.ServerConfig, serverLogger *zerolog.Logger, httpLogger *zerolog.Logger, router *chi.Mux) *Server {
+func NewServer(pool *pgxpool.Pool, queries *database.Queries, authService *auth.AuthService, serverConfig *signalsd.ServerConfig, serverLogger *zerolog.Logger, httpLogger *zerolog.Logger, router *chi.Mux) *Server {
 	s := &Server{
-		pool:          pool,
-		queries:       queries,
-		authService:   authService,
-		serviceConfig: serviceConfig,
-		serverLogger:  serverLogger,
-		httpLogger:    httpLogger,
-		router:        router,
+		pool:         pool,
+		queries:      queries,
+		authService:  authService,
+		serverConfig: serverConfig,
+		serverLogger: serverLogger,
+		httpLogger:   httpLogger,
+		router:       router,
 	}
+
 	s.setupMiddleware()
-	s.registerRoutes()
+
+	s.registerCommonRoutes()
+
+	switch s.serverConfig.ServiceMode {
+	case "all":
+		s.registerAdminRoutes()
+		s.registerSignalRoutes(s.serverConfig.ServiceMode)
+		s.registerStaticAssetRoutes()
+	case "admin":
+		s.registerAdminRoutes()
+		s.registerStaticAssetRoutes()
+	case "signals", "signals-read", "signals-write":
+		s.registerSignalRoutes(s.serverConfig.ServiceMode)
+	}
 	return s
 }
 
 func (s *Server) Run() {
-	serverAddr := fmt.Sprintf("%s:%d", s.serviceConfig.Host, s.serviceConfig.Port)
+	serverAddr := fmt.Sprintf("%s:%d", s.serverConfig.Host, s.serverConfig.Port)
 
 	httpServer := &http.Server{
 		Addr:         serverAddr,
 		Handler:      s.router,
-		ReadTimeout:  s.serviceConfig.ReadTimeout,
-		WriteTimeout: s.serviceConfig.WriteTimeout,
-		IdleTimeout:  s.serviceConfig.WriteTimeout,
+		ReadTimeout:  s.serverConfig.ReadTimeout,
+		WriteTimeout: s.serverConfig.WriteTimeout,
+		IdleTimeout:  s.serverConfig.WriteTimeout,
 	}
 
 	defer func() {
@@ -64,7 +78,7 @@ func (s *Server) Run() {
 	}()
 
 	go func() {
-		s.serverLogger.Info().Msgf("%s service listening on %s \n", s.serviceConfig.Environment, serverAddr)
+		s.serverLogger.Info().Msgf("%s service listening on %s \n", s.serverConfig.Environment, serverAddr)
 
 		err := httpServer.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
@@ -103,23 +117,20 @@ func (s *Server) Run() {
 func (s *Server) setupMiddleware() {
 	s.router.Use(chimiddleware.RequestID)
 	s.router.Use(logger.RequestLogging(s.httpLogger))
-	s.router.Use(CORS(s.serviceConfig.AllowedOrigins))
-	s.router.Use(SecurityHeaders(s.serviceConfig.Environment))
-	s.router.Use(RateLimit(s.serviceConfig.RateLimitRPS, s.serviceConfig.RateLimitBurst))
+	s.router.Use(CORS(s.serverConfig.AllowedOrigins))
+	s.router.Use(SecurityHeaders(s.serverConfig.Environment))
+	s.router.Use(RateLimit(s.serverConfig.RateLimitRPS, s.serverConfig.RateLimitBurst))
 }
 
-func (s *Server) registerRoutes() {
-
+func (s *Server) registerAdminRoutes() {
 	// user registration and authentication handlers
-	users := handlers.NewUserHandler(s.queries, s.authService, s.pool) // handlers that use database transactions need the DB pool struct
+	users := handlers.NewUserHandler(s.queries, s.authService, s.pool)
 	serviceAccounts := handlers.NewServiceAccountHandler(s.queries, s.authService, s.pool)
-	login := handlers.NewLoginHandler(s.queries, s.authService, s.serviceConfig.Environment)
-	tokens := handlers.NewTokenHandler(s.queries, s.authService, s.serviceConfig.Environment)
+	login := handlers.NewLoginHandler(s.queries, s.authService, s.serverConfig.Environment)
+	tokens := handlers.NewTokenHandler(s.queries, s.authService, s.serverConfig.Environment)
 
 	// site admin handlers
 	admin := handlers.NewAdminHandler(s.queries, s.pool, s.authService)
-
-	// middleware handles auth on the remaing services
 
 	// isn definition handlers
 	isn := handlers.NewIsnHandler(s.queries, s.pool)
@@ -128,13 +139,11 @@ func (s *Server) registerRoutes() {
 	// isn permissions
 	isnAccount := handlers.NewIsnAccountHandler(s.queries)
 
-	// signald runtime handlers
-	webhooks := handlers.NewWebhookHandler(s.queries)
+	// signal batches
 	signalBatches := handlers.NewSignalsBatchHandler(s.queries)
-	signals := handlers.NewSignalsHandler(s.queries, s.pool)
 
 	s.router.Group(func(r chi.Router) {
-		r.Use(RequestSizeLimit(signalsd.DefaultAPIRequestSize))
+		r.Use(RequestSizeLimit(signalsd.DefaultMaxAPIRequestSize))
 
 		// api routes used to administer the ISNs (excluding signal ingestion)
 		r.Route("/api", func(r chi.Router) {
@@ -189,6 +198,13 @@ func (s *Server) registerRoutes() {
 				})
 			})
 
+			// signals batches
+			r.Group(func(r chi.Router) {
+				r.Use(s.authService.RequireValidAccessToken(false))
+				r.Use(s.authService.RequireIsnPermission("write"))
+				r.Post("/api/isn/{isn_slug}/batches", signalBatches.CreateSignalsBatchHandler)
+			})
+
 			r.Group(func(r chi.Router) {
 
 				// request using the routes below must have a valid access token.
@@ -215,14 +231,6 @@ func (s *Server) registerRoutes() {
 					r.Delete("/isn/{isn_slug}/accounts/{account_id}", isnAccount.RevokeIsnAccountHandler)
 				})
 
-				// search signals (small payloads)
-				r.Group(func(r chi.Router) {
-
-					// routes below can only be used by accounts with read or write permissions to the specified ISN
-					r.Use(s.authService.RequireIsnPermission("read", "write"))
-
-					r.Get("/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search", signals.SearchSignalsHandler)
-				})
 			})
 
 			// unrestricted
@@ -267,31 +275,55 @@ func (s *Server) registerRoutes() {
 			})
 		})
 	})
+}
 
-	// Signal ingestion routes
-	s.router.Group(func(r chi.Router) {
-		r.Use(RequestSizeLimit(s.serviceConfig.MaxSignalPayloadSize))
-		r.Use(s.authService.RequireValidAccessToken(false))
+// registerSignalRoutes registers signal routes based on service mode
+func (s *Server) registerSignalRoutes(serviceMode string) {
+	// Initialize handlers once
+	webhooks := handlers.NewWebhookHandler(s.queries)
+	signals := handlers.NewSignalsHandler(s.queries, s.pool)
 
-		// signals exchange
-		r.Group(func(r chi.Router) {
+	// Register write routes
+	switch serviceMode {
+	case "all", "signals", "signals-write":
+		s.router.Group(func(r chi.Router) {
+			r.Use(RequestSizeLimit(s.serverConfig.MaxSignalPayloadSize))
+			r.Use(s.authService.RequireValidAccessToken(false))
 
-			// routes below can only be used by accounts with write permissions to the specified ISN
-			r.Use(s.authService.RequireIsnPermission("write"))
+			r.Group(func(r chi.Router) {
 
-			// signals batches
-			r.Post("/api/isn/{isn_slug}/batches", signalBatches.CreateSignalsBatchHandler)
+				// routes below can only be used by accounts with write permissions to the specified ISN
+				r.Use(s.authService.RequireIsnPermission("write"))
 
-			// signals post
-			r.Post("/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals", signals.CreateSignalsHandler)
+				// signals post
+				r.Post("/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals", signals.CreateSignalsHandler)
 
-			// webhooks
-			r.Post("/api/webhooks", webhooks.HandlerWebhooks)
+				// webhooks - todo
+				r.Post("/api/webhooks", webhooks.HandlerWebhooks)
+			})
 		})
-	})
+	}
+
+	// Register read routes
+	switch serviceMode {
+	case "all", "signals", "signals-read":
+		s.router.Group(func(r chi.Router) {
+
+			r.Use(s.authService.RequireValidAccessToken(false))
+
+			// signals can only be read by accounts with read or write permissions to the specified ISN
+			r.Use(s.authService.RequireIsnPermission("read", "write"))
+
+			r.Get("/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search", signals.SearchSignalsHandler)
+		})
+	}
+}
+
+// registerCommonRoutes registers routes that are always available (e.g health checks)
+func (s *Server) registerCommonRoutes() {
+	admin := handlers.NewAdminHandler(s.queries, s.pool, s.authService)
 
 	s.router.Route("/health", func(r chi.Router) {
-
 		// check the site is up and the database is accepting requests
 		r.Get("/ready", admin.ReadinessHandler)
 
@@ -299,6 +331,11 @@ func (s *Server) registerRoutes() {
 		r.Get("/live", admin.LivenessHandler)
 	})
 
+	s.router.Get("/version", admin.VersionHandler)
+}
+
+// registerStaticAssetRoutes static assets e.g documentation for the API
+func (s *Server) registerStaticAssetRoutes() {
 	s.router.Route("/assets", func(r chi.Router) {
 		fs := http.FileServer(http.Dir("assets"))
 		r.Get("/*", http.StripPrefix("/assets/", fs).ServeHTTP)

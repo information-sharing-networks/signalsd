@@ -542,6 +542,18 @@ definitions:
         example: message describing the error
         type: string
     type: object
+  version.Info:
+    properties:
+      build_date:
+        example: "2025-01-01T12:00:00Z"
+        type: string
+      git_commit:
+        example: abc123
+        type: string
+      version:
+        example: v1.0.0
+        type: string
+    type: object
 info:
   contact: {}
   description: |
@@ -558,7 +570,7 @@ info:
     ## Request Limits
     All endpoints are protected by:
     - **Rate limiting**: Configurable requests per second (default: 100 RPS, 20 burst)
-    - **Request size limits**: 64KB for admin/auth endpoints, 50MB for signal ingestion
+    - **Request size limits**: 64KB for admin/auth endpoints, 5MB for signal ingestion
 
     Check the X-Max-Request-Body response header for the configured limit on signals payload.
 
@@ -664,17 +676,6 @@ paths:
       security:
       - BearerAccessToken: []
       summary: Enable an account
-      tags:
-      - Site admin
-  /admin/live:
-    get:
-      description: check if the signalsd service is up
-      responses:
-        "200":
-          description: OK
-        "404":
-          description: Not Found
-      summary: Liveness check
       tags:
       - Site admin
   /admin/reset:
@@ -1419,6 +1420,17 @@ paths:
       summary: Get an ISN configurationuration
       tags:
       - ISN view
+  /health/live:
+    get:
+      description: check if the signalsd service is up
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+      summary: Liveness check
+      tags:
+      - Site admin
   /health/ready:
     get:
       description: check if the signalsd service is ready
@@ -1737,6 +1749,17 @@ paths:
       summary: New Access Token
       tags:
       - auth
+  /version:
+    get:
+      description: Returns the current API version details
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/version.Info'
+      summary: Get API version
+      tags:
+      - Site admin
   /webhooks:
     post:
       description: register a webhook to recieve signals batch status updates

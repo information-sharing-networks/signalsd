@@ -17,13 +17,13 @@ func TestRequestSizeLimits(t *testing.T) {
 
 	// API routes with 64KB limit
 	router.Group(func(r chi.Router) {
-		r.Use(RequestSizeLimit(signalsd.DefaultAPIRequestSize))
+		r.Use(RequestSizeLimit(signalsd.DefaultMaxAPIRequestSize))
 		r.Post("/api/isn", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		})
 	})
 
-	// Signal routes with 50MB limit
+	// Signal routes with 5MB limit
 	router.Group(func(r chi.Router) {
 		r.Use(RequestSizeLimit(50 * 1024 * 1024))
 		r.Post("/api/signals", func(w http.ResponseWriter, r *http.Request) {
@@ -41,7 +41,7 @@ func TestRequestSizeLimits(t *testing.T) {
 		{"API normal request", "/api/isn", 2 * 1024, http.StatusOK},
 		{"API oversized request", "/api/isn", 128 * 1024, 413}, // Request Entity Too Large
 
-		// Signal endpoints (50MB limit)
+		// Signal endpoints (5MB limit)
 		{"Signal normal request", "/api/signals", 1024 * 1024, http.StatusOK},
 		{"Signal large request", "/api/signals", 10 * 1024 * 1024, http.StatusOK},
 	}

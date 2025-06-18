@@ -15,6 +15,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
+	"github.com/information-sharing-networks/signalsd/app/internal/version"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog"
@@ -86,11 +87,25 @@ func (a *AdminHandler) ReadinessHandler(w http.ResponseWriter, r *http.Request) 
 //	@Success		200
 //	@Failure		404
 //
-//	@Router			/admin/live [Get]
+//	@Router			/health/live [Get]
 func (a *AdminHandler) LivenessHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	_, _ = w.Write([]byte(http.StatusText(http.StatusOK)))
+}
+
+// VersionHandler godoc
+//
+//	@Summary		Get API version
+//	@Description	Returns the current API version details
+//	@Tags			Site admin
+//
+//	@Success		200	{object}	version.Info
+//
+//	@Router			/version [get]
+func (a *AdminHandler) VersionHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(version.Get())
 }
 
 // DisableAccountHandler godoc

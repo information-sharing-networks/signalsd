@@ -4,4 +4,5 @@ notes.md
 /.vscode
 .DS_store
 /app/signalsd
+/signalsd
 tmp/
