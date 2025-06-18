@@ -20,18 +20,7 @@ function launchLocal() {
 
 
 function launchLocalDev() {
-   
-    echo "installing go dependencies..." 
 
-    echo gooose
-    go install github.com/pressly/goose/v3/cmd/goose@latest 
-
-    echo sqlc
-    go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest 
-
-    echo swag
-    go install github.com/swaggo/swag/cmd/swag@latest 
-    
     echo creating signalsd user
 
     if ! getent group signalsd > /dev/null; then

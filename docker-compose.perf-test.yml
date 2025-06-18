@@ -1,11 +1,11 @@
-# docker-compose.yml (development env - mounts the local repo directory)
+# docker-compose.yml (perf-test - larger db container)
 services:
   db:
     image: postgres:17-alpine
     restart: unless-stopped
-    container_name: signalsd-db-dev
+    container_name: signalsd-db-perf
     volumes:
-      - db-data-dev:/var/lib/postgresql/data
+      - db-data-perf:/var/lib/postgresql/data
     ports:
       - "15432:5432"
     environment:
@@ -22,8 +22,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
-          memory: 512M
+          cpus: '2'
+          memory: 4096M
 
   app:
     build:
@@ -38,7 +38,7 @@ services:
             echo "Go tools installation complete"
         WORKDIR /signalsd
         CMD ["/bin/bash"]
-    container_name: signalsd-app-dev
+    container_name: signalsd-app-perf
     volumes:
       - ./:/signalsd # project dir
       - go-modules:/go/pkg/mod # persist downloaded modules
@@ -47,7 +47,6 @@ services:
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY environment variable is required}
       DATABASE_URL: postgres://signalsd-dev:@db:5432/signalsd_admin?sslmode=disable
       ENVIRONMENT: dev
-      RATE_LIMIT_RPS: 500
     working_dir: /signalsd
     ports:
       - "8080:8080"
@@ -66,7 +65,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1'
+          cpus: '2'
           memory: 1024M
 
 networks:
@@ -74,5 +73,5 @@ networks:
     driver: bridge
 
 volumes:
-  db-data-dev:
+  db-data-perf:
   go-modules:
