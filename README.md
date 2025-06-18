@@ -83,7 +83,7 @@ IDLE_TIMEOUT=60s                # Default: 60s
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
 
 # rate limits
-RATE_LIMIT_RPS=100              # Default: 100 requests per second
+RATE_LIMIT_RPS=100              # Default: 100 requests per second (set to 0 to disable rate limiting)
 RATE_LIMIT_BURST=20             # Default: 20 request burst allowance
 
 # payload size limits

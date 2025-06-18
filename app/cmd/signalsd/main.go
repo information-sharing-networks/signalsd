@@ -139,7 +139,11 @@ func main() {
 	}
 	serverLogger.Info().Msg("Schema cache loaded")
 
-	serverLogger.Info().Msgf("rate limit %v rps, %v burst", cfg.RateLimitRPS, cfg.RateLimitBurst)
+	if cfg.RateLimitRPS > 0 {
+		serverLogger.Info().Msgf("rate limiting enabled: %v rps, %v burst", cfg.RateLimitRPS, cfg.RateLimitBurst)
+	} else {
+		serverLogger.Warn().Msg("rate limiting disabled")
+	}
 
 	authService := auth.NewAuthService(cfg.SecretKey, cfg.Environment, queries)
 	router := chi.NewRouter()

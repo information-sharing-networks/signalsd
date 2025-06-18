@@ -47,6 +47,7 @@ services:
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY environment variable is required}
       DATABASE_URL: postgres://signalsd-dev:@db:5432/signalsd_admin?sslmode=disable
       ENVIRONMENT: dev
+      RATE_LIMIT_RPS: ${RATE_LIMIT_RPS:?RATE_LIMIT_RPS environment variable is required}
     working_dir: /signalsd
     ports:
       - "8080:8080"
