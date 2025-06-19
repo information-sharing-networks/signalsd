@@ -246,9 +246,8 @@ func sendSignalBatch(baseURL, authToken, isnSlug, signalType, semVer string, sig
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+authToken)
 
-	// Send request with connection reuse
 	client := &http.Client{
-		Timeout: 30 * time.Second,
+		Timeout: 3 * time.Minute,
 		Transport: &http.Transport{
 			MaxIdleConns:        10,
 			MaxIdleConnsPerHost: 10,

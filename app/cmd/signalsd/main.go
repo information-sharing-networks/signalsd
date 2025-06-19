@@ -11,7 +11,6 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/server"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/schemas"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	signalsd "github.com/information-sharing-networks/signalsd/app"
@@ -120,10 +119,6 @@ func main() {
 		poolConfig.MaxConnIdleTime = 15 * time.Minute
 		poolConfig.ConnConfig.ConnectTimeout = 5 * time.Second
 	}
-
-	// Enable prepared statement caching to reduce query planning overhead
-	poolConfig.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeCacheStatement
-
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
 		serverLogger.Fatal().Err(err).Msg("Unable to create connection pool")
