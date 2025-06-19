@@ -5,13 +5,14 @@ services:
     restart: unless-stopped
     container_name: signalsd-db-dev
     volumes:
-      - db-data-dev:/var/lib/postgresql/data
+      - db-data-perf:/var/lib/postgresql/data
     ports:
       - "15432:5432"
     environment:
       POSTGRES_HOST_AUTH_METHOD: trust
       POSTGRES_USER: signalsd-dev
       POSTGRES_DB: signalsd_admin
+
     healthcheck:
       test: ["CMD-SHELL", "psql -U signalsd-dev -d signalsd_admin -c 'select 1;'"]
       interval: 5s
@@ -22,8 +23,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.5'
-          memory: 512M
+          cpus: '2'
+          memory: 4096M
 
   app:
     build:
@@ -75,4 +76,5 @@ networks:
 
 volumes:
   db-data-dev:
+  db-data-perf:
   go-modules:

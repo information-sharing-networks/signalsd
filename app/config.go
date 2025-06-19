@@ -50,8 +50,9 @@ const (
 // common maps - used to validate enum values
 var validEnvs = map[string]bool{
 	"dev":     true,
-	"prod":    true,
 	"test":    true,
+	"perf":    true,
+	"prod":    true,
 	"staging": true,
 }
 

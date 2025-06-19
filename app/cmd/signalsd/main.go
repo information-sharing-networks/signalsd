@@ -11,6 +11,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/server"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/schemas"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	signalsd "github.com/information-sharing-networks/signalsd/app"
@@ -111,13 +112,17 @@ func main() {
 		serverLogger.Fatal().Err(err).Msg("Failed to parse database URL")
 	}
 
-	if cfg.Environment == "prod" {
-		poolConfig.MaxConns = 8
+	// perf testing config
+	if cfg.Environment == "perf" {
+		poolConfig.MaxConns = 12
 		poolConfig.MinConns = 4
 		poolConfig.MaxConnLifetime = 30 * time.Minute
-		poolConfig.MaxConnIdleTime = 5 * time.Minute
+		poolConfig.MaxConnIdleTime = 15 * time.Minute
 		poolConfig.ConnConfig.ConnectTimeout = 5 * time.Second
 	}
+
+	// Enable prepared statement caching to reduce query planning overhead
+	poolConfig.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeCacheStatement
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
