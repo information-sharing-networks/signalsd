@@ -1,7 +1,5 @@
 # Multi-App Load Balancer Performance Testing
 
-This directory contains everything needed to simulate Google Cloud autoscaling by running multiple app instances behind an nginx load balancer.
-
 ## Architecture
 
 ```
@@ -29,39 +27,25 @@ This directory contains everything needed to simulate Google Cloud autoscaling b
                        └──────────────────┘
 ```
 
-## Quick Start
+# DB config
+### perf - default postgres
+```sql
+ALTER SYSTEM SET shared_buffers = '128MB';        
+ALTER SYSTEM SET effective_cache_size = '4GB';       
+ALTER SYSTEM SET work_mem = '4MB';                   
+ALTER SYSTEM SET maintenance_work_mem = '64MB';      
+```
 
-1. **Start the environment:**
-   ```bash
-   cd test/perf
-   ./run-multi-app.sh start
-   ```
-
-2. **Run performance tests:**
-   ```bash
-   ./run-multi-app.sh test
-   ```
-
-3. **Check health:**
-   ```bash
-   ./run-multi-app.sh health
-   ```
-
-4. **Stop the environment:**
-   ```bash
-   ./run-multi-app.sh stop
-   ```
-
-## Files
-
-- `docker-compose.multi-app.yml` - Multi-container setup with load balancer
-- `nginx.conf` - Load balancer configuration
-- `run-multi-app.sh` - Management script for the environment
-- `run_parallel_tests.sh` - Performance testing script (updated to use load balancer)
+### Neon free tier (8GB+ RAM, 2 CPUs)
+```sql
+ALTER SYSTEM SET shared_buffers = '230MB';
+ALTER SYSTEM SET effective_cache_size = '6553MB';
+ALTER SYSTEM SET max_wal_size = '1GB';
+ALTER SYSTEM SET work_mem = '4MB';
+```
 
 ## Available Commands
 
-- `./run-multi-app.sh start` - Start all containers
 - `./run-multi-app.sh stop` - Stop all containers  
 - `./run-multi-app.sh restart` - Restart all containers
 - `./run-multi-app.sh status` - Show container status
@@ -72,14 +56,6 @@ This directory contains everything needed to simulate Google Cloud autoscaling b
 - `./run-multi-app.sh health` - Check service health
 - `./run-multi-app.sh clean` - Clean up everything
 
-## Endpoints
-
-- **Load Balancer:** http://localhost:8081
-- **Individual Apps:**
-  - App 1: http://localhost:8082
-  - App 2: http://localhost:8083  
-  - App 3: http://localhost:8084
-  - App 4: http://localhost:8085
 
 ## Load Balancer Configuration
 
@@ -89,53 +65,16 @@ The nginx load balancer uses:
 - **Connection pooling** for better performance
 - **Request/response logging** for debugging
 
-## Performance Testing
-
-The `run_parallel_tests.sh` script has been configured to:
-- Use the load balancer endpoint by default (port 8081)
-- Run multiple parallel test instances
-- Collect detailed metrics including latency percentiles
-- Show which app instances handled requests
 
 ### Running Tests
 
 ```bash
-# Run with default 3 parallel instances
-./run-multi-app.sh test
 
-# Run with custom number of parallel instances
-./run-multi-app.sh test 5
+# make sure the perf database is running
+cd signalsd
+docker compose -f docker-compose.perf-test.yml up -d db
 
-# Run directly with environment variable
-PARALLEL_INSTANCES=8 ./run-multi-app.sh test
+# batch size = number of signals in each request
+cd test/perf
+BATCH_SIZE=1 NUM_BATCHES=50 ./run-multi-app.sh test 150
 ```
-
-## Monitoring
-
-### Check Load Distribution
-```bash
-# View nginx access logs to see request distribution
-./run-multi-app.sh logs-lb
-```
-
-### Check App Performance
-```bash
-# View individual app logs
-./run-multi-app.sh logs-app
-```
-
-### Health Monitoring
-```bash
-# Check all services
-./run-multi-app.sh health
-
-# Check load balancer status
-curl http://localhost:8081/nginx-status
-```
-
-## Troubleshooting
-
-1. **Services not starting:** Check if ports are available and database is running
-2. **Load balancer not distributing:** Check nginx logs for upstream errors
-3. **Performance issues:** Monitor individual app logs and resource usage
-4. **Database connection issues:** Ensure shared database is running on port 15432

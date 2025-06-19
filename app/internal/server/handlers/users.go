@@ -102,8 +102,8 @@ func (u *UserHandler) RegisterUserHandler(w http.ResponseWriter, r *http.Request
 
 	defer func() {
 		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to rollback transaction: %v", err))
-			return
+			// Log the error but don't try to respond since the request may have already timed out
+			fmt.Printf("failed to rollback transaction: %v\n", err)
 		}
 	}()
 

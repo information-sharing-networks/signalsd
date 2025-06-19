@@ -45,9 +45,13 @@ services:
       DOCKER_ENV: true
       SECRET_KEY: "multi-container-test-secret-key-12345"
       DATABASE_URL: postgres://signalsd-dev:@host.docker.internal:15432/signalsd_admin?sslmode=disable
-      ENVIRONMENT: dev
+      ENVIRONMENT: perf
       RATE_LIMIT_RPS: 0
       APP_INSTANCE: "app1"
+      # Increase timeouts for large batch processing
+      READ_TIMEOUT: "300s"
+      WRITE_TIMEOUT: "300s"
+      IDLE_TIMEOUT: "300s"
     working_dir: /signalsd
     ports:
       - "8082:8080"  # Expose for direct testing
@@ -88,9 +92,13 @@ services:
       DOCKER_ENV: true
       SECRET_KEY: "multi-container-test-secret-key-12345"
       DATABASE_URL: postgres://signalsd-dev:@host.docker.internal:15432/signalsd_admin?sslmode=disable
-      ENVIRONMENT: dev
+      ENVIRONMENT: perf
       RATE_LIMIT_RPS: 0
       APP_INSTANCE: "app2"
+      # Increase timeouts for large batch processing
+      READ_TIMEOUT: "300s"
+      WRITE_TIMEOUT: "300s"
+      IDLE_TIMEOUT: "300s"
     working_dir: /signalsd
     ports:
       - "8083:8080"  # Expose for direct testing

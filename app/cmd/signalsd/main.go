@@ -114,8 +114,8 @@ func main() {
 
 	// perf testing config
 	if cfg.Environment == "perf" {
-		poolConfig.MaxConns = 12
-		poolConfig.MinConns = 4
+		poolConfig.MaxConns = 50
+		poolConfig.MinConns = 10
 		poolConfig.MaxConnLifetime = 30 * time.Minute
 		poolConfig.MaxConnIdleTime = 15 * time.Minute
 		poolConfig.ConnConfig.ConnectTimeout = 5 * time.Second

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -220,8 +221,8 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 
 	defer func() {
 		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to rollback transaction: %v", err))
-			return
+			// Log the error but don't try to respond since the request may have already timed out
+			fmt.Printf("failed to rollback transaction: %v\n", err)
 		}
 	}()
 
@@ -299,7 +300,11 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 
 	createSignalsResponse.StoredSignals = storedSignals
 
-	if err = tx.Commit(r.Context()); err != nil {
+	// Use a separate context for commit to avoid issues if request context is canceled
+	commitCtx, commitCancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer commitCancel()
+
+	if err = tx.Commit(commitCtx); err != nil {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to commit transaction: %v", err))
 		return
 	}

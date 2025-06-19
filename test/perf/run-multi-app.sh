@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # Multi-App Load Balancer Test Environment Manager
-# Simulates GCP autoscaling with nginx load balancer
 
 set -e
 
@@ -25,7 +24,6 @@ show_help() {
     echo "  test      - Run performance test against load balancer"
     echo "  health    - Check health of all services"
     echo "  validate  - Validate nginx configuration"
-    echo "  scale     - Scale app containers (usage: $0 scale 6)"
     echo "  clean     - Stop and remove all containers and volumes"
     echo ""
     echo "Load Balancer URL: $LOAD_BALANCER_URL"
@@ -83,7 +81,7 @@ show_app_logs() {
 
 run_performance_test() {
     echo "🧪 Running performance test against load balancer..."
-    BASE_URL="$LOAD_BALANCER_URL" ./run_parallel_tests.sh "$@"
+    BASE_URL="$LOAD_BALANCER_URL" ./run-parallel-tests.sh "$@"
 }
 
 check_health() {
@@ -112,40 +110,6 @@ check_health() {
     curl -s "$LOAD_BALANCER_URL/nginx-status" || echo "Load balancer status unavailable"
 }
 
-scale_apps() {
-    local target_scale=${1:-4}
-    echo "⚖️  Scaling app containers to $target_scale instances..."
-    
-    # Note: This is a simplified version. For true scaling, you'd need to:
-    # 1. Update the docker-compose.yml dynamically
-    # 2. Update nginx.conf upstream configuration
-    # 3. Reload nginx configuration
-    
-    echo "⚠️  Dynamic scaling not implemented yet."
-    echo "Current setup supports 2 fixed app instances."
-    echo "To change the number of instances, edit $COMPOSE_FILE and nginx.conf"
-}
-
-validate_nginx() {
-    echo "🔍 Validating nginx configuration..."
-
-    # Create a temporary config with localhost IPs for testing
-    temp_config=$(mktemp)
-    sed -e 's/app1:8080/127.0.0.1:8082/g' \
-        -e 's/app2:8080/127.0.0.1:8083/g' \
-        -e 's/app3:8080/127.0.0.1:8084/g' \
-        -e 's/app4:8080/127.0.0.1:8085/g' \
-        nginx.conf > "$temp_config"
-
-    if docker run --rm -v "$temp_config:/etc/nginx/nginx.conf:ro" nginx:alpine nginx -t 2>/dev/null; then
-        echo "✅ Nginx configuration is valid"
-    else
-        echo "❌ Nginx configuration has syntax errors"
-        echo "ℹ️  Note: Host resolution errors are expected when testing outside Docker Compose"
-    fi
-
-    rm -f "$temp_config"
-}
 
 clean_environment() {
     echo "🧹 Cleaning up environment..."
@@ -182,12 +146,6 @@ case "${1:-help}" in
         ;;
     health)
         check_health
-        ;;
-    validate)
-        validate_nginx
-        ;;
-    scale)
-        scale_apps "$2"
         ;;
     clean)
         clean_environment
