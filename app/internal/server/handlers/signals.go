@@ -231,18 +231,11 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 	for i, signal := range createSignalsRequest.Signals {
 		var err error
 
-		// Unmarshal and validate signal content against schema
-		var signalData any
-		if err := json.Unmarshal(signal.Content, &signalData); err != nil {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody,
-				fmt.Sprintf("signal %d (local_ref: %s) contains invalid JSON in content field: %v", i+1, signal.LocalRef, err))
-			return
-		}
-
-		err = schemas.ValidateJSON(signalTypePath, signalData)
+		// Validate signal content against schema (includes JSON syntax validation)
+		err = schemas.ValidateRawJSON(signalTypePath, signal.Content)
 		if err != nil {
 			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody,
-				fmt.Sprintf("signal %d (local_ref: %s) failed schema validation: %v", i+1, signal.LocalRef, err))
+				fmt.Sprintf("signal %d (local_ref: %s) failed validation: %v", i+1, signal.LocalRef, err))
 			return
 		}
 

@@ -12,23 +12,7 @@ services:
       POSTGRES_HOST_AUTH_METHOD: trust
       POSTGRES_USER: signalsd-dev
       POSTGRES_DB: signalsd_admin
-    command: ["postgres", 
-      "-c", "config_file=/etc/postgresql/postgresql.conf",
-      "-c", "max_connections=200",                  # Increase from default 100
-      "-c", "shared_buffers=1GB",                   # Increase for better caching
-      "-c", "work_mem=16MB",                        # Increase for complex operations
-      "-c", "maintenance_work_mem=256MB",           # Better for bulk operations
-      "-c", "effective_io_concurrency=200",         # Optimize for SSD
-      "-c", "max_worker_processes=8",               # Increase worker processes
-      "-c", "max_parallel_workers_per_gather=4",    # Parallel query execution
-      "-c", "max_parallel_workers=8",               # Maximum parallel workers
-      "-c", "max_wal_size=4GB",                     # Reduce checkpoint frequency
-      "-c", "checkpoint_timeout=15min",             # Less frequent checkpoints
-      "-c", "random_page_cost=1.1",                 # Optimize for SSD
-      "-c", "statement_timeout=60000",              # 60-second statement timeout
-      "-c", "idle_in_transaction_session_timeout=60000", # Prevent idle transactions
-      "-c", "log_min_duration_statement=1000"       # Log slow queries
-    ]
+    # Using default PostgreSQL configuration - no custom command overrides
     healthcheck:
       test: ["CMD-SHELL", "psql -U signalsd-dev -d signalsd_admin -c 'select 1;'"]
       interval: 5s

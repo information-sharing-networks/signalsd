@@ -68,7 +68,7 @@ services:
       resources:
         limits:
           cpus: '1'
-          memory: 512M
+          memory: 4094M
 
   # App Container 2
   app2:
@@ -115,7 +115,7 @@ services:
       resources:
         limits:
           cpus: '1'
-          memory: 512M
+          memory: 4094M
 
   # App Container 3 (disabled for 2-app test)
   # app3:
@@ -201,7 +201,7 @@ services:
   #     resources:
   #       limits:
   #         cpus: '1'
-  #         memory: 512M
+  #         memory: 1024M
 
 networks:
   multi-app-network:

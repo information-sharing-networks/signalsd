@@ -126,6 +126,41 @@ func ValidateJSON(signalTypePath string, data any) error {
 	return nil
 }
 
+// ValidateRawJSON validates raw JSON bytes against a cached schema using signal type path
+// This avoids the need to unmarshal JSON twice - once for validation and once for schema checking
+func ValidateRawJSON(signalTypePath string, rawJSON json.RawMessage) error {
+	if cache == nil {
+		return fmt.Errorf("schema cache not initialized")
+	}
+
+	// Check if this signal type skips validation
+	schemaURL, exists := cache.schemaURLs[signalTypePath]
+	if !exists {
+		return fmt.Errorf("schema URL not found in cache for signal type: %s", signalTypePath)
+	}
+
+	if SkipValidation(schemaURL) {
+		return nil
+	}
+
+	schema, exists := cache.schemas[signalTypePath]
+	if !exists {
+		return fmt.Errorf("schema not found in cache for signal type: %s", signalTypePath)
+	}
+
+	// Unmarshal only once for schema validation
+	var data any
+	if err := json.Unmarshal(rawJSON, &data); err != nil {
+		return fmt.Errorf("invalid JSON format: %v", err)
+	}
+
+	if err := schema.Validate(data); err != nil {
+		return fmt.Errorf("schema validation failed: %w", err)
+	}
+
+	return nil
+}
+
 // LoadSchemaCache loads schemas from database and compiles them into memory cache
 func LoadSchemaCache(ctx context.Context, queries *database.Queries) error {
 	// Initialize the cache
