@@ -1,0 +1,94 @@
+# docker-compose.yml (perf-test - larger db container with performance tuning)
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    container_name: signalsd-db-perf
+    volumes:
+      - db-data-perf:/var/lib/postgresql/data
+    ports:
+      - "15432:5432"
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_USER: signalsd-dev
+      POSTGRES_DB: signalsd_admin
+    command: ["postgres", 
+      "-c", "max_connections=200",                  # Increase from default 100
+      "-c", "shared_buffers=1GB",                   # Increase for better caching
+      "-c", "work_mem=16MB",                        # Increase for complex operations
+      "-c", "maintenance_work_mem=256MB",           # Better for bulk operations
+      "-c", "effective_io_concurrency=200",         # Optimize for SSD
+      "-c", "max_worker_processes=8",               # Increase worker processes
+      "-c", "max_parallel_workers_per_gather=4",    # Parallel query execution
+      "-c", "max_parallel_workers=8",               # Maximum parallel workers
+      "-c", "max_wal_size=4GB",                     # Reduce checkpoint frequency
+      "-c", "checkpoint_timeout=15min",             # Less frequent checkpoints
+      "-c", "random_page_cost=1.1",                 # Optimize for SSD
+      "-c", "statement_timeout=60000",              # 60-second statement timeout
+      "-c", "idle_in_transaction_session_timeout=60000", # Prevent idle transactions
+      "-c", "log_min_duration_statement=1000"       # Log slow queries
+    ]
+    healthcheck:
+      test: ["CMD-SHELL", "psql -U signalsd-dev -d signalsd_admin -c 'select 1;'"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8096M
+
+  app:
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM golang:1.24-alpine
+        RUN apk add --no-cache bash postgresql-client curl jq vim git
+        RUN echo "Installing Go tools..." && \
+            go install github.com/pressly/goose/v3/cmd/goose@latest && \
+            go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest && \
+            go install github.com/swaggo/swag/cmd/swag@latest && \
+            echo "Go tools installation complete"
+        WORKDIR /signalsd
+        CMD ["/bin/bash"]
+    container_name: signalsd-app-perf
+    volumes:
+      - ./:/signalsd # project dir
+      - go-modules:/go/pkg/mod # persist downloaded modules
+    environment:
+      DOCKER_ENV: true
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY environment variable is required}
+      DATABASE_URL: postgres://signalsd-dev:@db:5432/signalsd_admin?sslmode=disable
+      ENVIRONMENT: dev
+      RATE_LIMIT_RPS: ${RATE_LIMIT_RPS:?RATE_LIMIT_RPS environment variable is required}
+    working_dir: /signalsd
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command: >
+      sh -c "/signalsd/entrypoint.sh -e local-dev"
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 512M
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  db-data-perf:
+  go-modules:
