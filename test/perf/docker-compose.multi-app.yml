@@ -1,5 +1,4 @@
 # Multi-Container Performance Test Setup
-# Simulates GCP autoscaling with multiple app containers
 # Uses existing shared database at localhost:15432
 
 services:
@@ -15,6 +14,8 @@ services:
     depends_on:
       - app1
       - app2
+      - app3  # disabled until startup issues resolved
+      - app4  # disabled until startup issues resolved
     networks:
       - multi-app-network
     healthcheck:
@@ -52,6 +53,7 @@ services:
       READ_TIMEOUT: "300s"
       WRITE_TIMEOUT: "300s"
       IDLE_TIMEOUT: "300s"
+      MAX_SIGNAL_PAYLOAD_SIZE: ${MAX_SIGNAL_PAYLOAD_SIZE}
     working_dir: /signalsd
     ports:
       - "8082:8080"  # Expose for direct testing
@@ -68,7 +70,7 @@ services:
       resources:
         limits:
           cpus: '1'
-          memory: 4094M
+          memory: 512M
 
   # App Container 2
   app2:
@@ -99,6 +101,7 @@ services:
       READ_TIMEOUT: "300s"
       WRITE_TIMEOUT: "300s"
       IDLE_TIMEOUT: "300s"
+      MAX_SIGNAL_PAYLOAD_SIZE: ${MAX_SIGNAL_PAYLOAD_SIZE}
     working_dir: /signalsd
     ports:
       - "8083:8080"  # Expose for direct testing
@@ -115,94 +118,103 @@ services:
       resources:
         limits:
           cpus: '1'
-          memory: 4094M
+          memory: 512M
 
-  # App Container 3 (disabled for 2-app test)
-  # app3:
-  #   build:
-  #     context: /Users/nick.abson/dev/signals/signalsd
-  #     dockerfile_inline: |
-  #       FROM golang:1.24-alpine
-  #       RUN apk add --no-cache bash postgresql-client curl jq vim git
-  #       RUN echo "Installing Go tools..." && \
-  #           go install github.com/pressly/goose/v3/cmd/goose@latest && \
-  #           go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest && \
-  #           go install github.com/swaggo/swag/cmd/swag@latest && \
-  #           echo "Go tools installation complete"
-  #       WORKDIR /signalsd
-  #       CMD ["/bin/bash"]
-  #   container_name: signalsd-app3-multi
-  #   volumes:
-  #     - /Users/nick.abson/dev/signals/signalsd:/signalsd
-  #     - go-modules-multi:/go/pkg/mod
-  #   environment:
-  #     DOCKER_ENV: true
-  #     SECRET_KEY: "multi-container-test-secret-key-12345"
-  #     DATABASE_URL: postgres://signalsd-dev:@host.docker.internal:15432/signalsd_admin?sslmode=disable
-  #     ENVIRONMENT: dev
-  #     RATE_LIMIT_RPS: 1000
-  #     APP_INSTANCE: "app3"
-  #   working_dir: /signalsd
-  #   ports:
-  #     - "8084:8080"  # Expose for direct testing
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
-  #     interval: 5s
-  #     timeout: 5s
-  #     retries: 5
-  #   command: >
-  #     sh -c "cd /signalsd/app && go run cmd/signalsd/main.go"
-  #   networks:
-  #     - multi-app-network
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         cpus: '1'
-  #         memory: 512M
+  # App Container 3
+  app3:
+    build:
+      context: /Users/nick.abson/dev/signals/signalsd
+      dockerfile_inline: |
+        FROM golang:1.24-alpine
+        RUN apk add --no-cache bash postgresql-client curl jq vim git
+        RUN echo "Installing Go tools..." && \
+            go install github.com/pressly/goose/v3/cmd/goose@latest && \
+            go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest && \
+            go install github.com/swaggo/swag/cmd/swag@latest && \
+            echo "Go tools installation complete"
+        WORKDIR /signalsd
+        CMD ["/bin/bash"]
+    container_name: signalsd-app3-multi
+    volumes:
+      - /Users/nick.abson/dev/signals/signalsd:/signalsd
+      - go-modules-multi:/go/pkg/mod
+    environment:
+      DOCKER_ENV: true
+      SECRET_KEY: "multi-container-test-secret-key-12345"
+      DATABASE_URL: postgres://signalsd-dev:@host.docker.internal:15432/signalsd_admin?sslmode=disable
+      ENVIRONMENT: perf
+      RATE_LIMIT_RPS: 0
+      APP_INSTANCE: "app3"
+      # Increase timeouts for large batch processing
+      READ_TIMEOUT: "300s"
+      WRITE_TIMEOUT: "300s"
+      IDLE_TIMEOUT: "300s"
+      MAX_SIGNAL_PAYLOAD_SIZE: ${MAX_SIGNAL_PAYLOAD_SIZE}
+    working_dir: /signalsd
+    ports:
+      - "8084:8080"  # Expose for direct testing
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command: >
+      sh -c "cd /signalsd/app && go run cmd/signalsd/main.go"
+    networks:
+      - multi-app-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
 
-  # App Container 4 (disabled for 2-app test)
-  # app4:
-  #   build:
-  #     context: /Users/nick.abson/dev/signals/signalsd
-  #     dockerfile_inline: |
-  #       FROM golang:1.24-alpine
-  #       RUN apk add --no-cache bash postgresql-client curl jq vim git
-  #       RUN echo "Installing Go tools..." && \
-  #           go install github.com/pressly/goose/v3/cmd/goose@latest && \
-  #           go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest && \
-  #           go install github.com/swaggo/swag/cmd/swag@latest && \
-  #           echo "Go tools installation complete"
-  #       WORKDIR /signalsd
-  #       CMD ["/bin/bash"]
-  #   container_name: signalsd-app4-multi
-  #   volumes:
-  #     - /Users/nick.abson/dev/signals/signalsd:/signalsd
-  #     - go-modules-multi:/go/pkg/mod
-  #   environment:
-  #     DOCKER_ENV: true
-  #     SECRET_KEY: "multi-container-test-secret-key-12345"
-  #     DATABASE_URL: postgres://signalsd-dev:@host.docker.internal:15432/signalsd_admin?sslmode=disable
-  #     ENVIRONMENT: dev
-  #     RATE_LIMIT_RPS: 1000
-  #     APP_INSTANCE: "app4"
-  #   working_dir: /signalsd
-  #   ports:
-  #     - "8085:8080"  # Expose for direct testing
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
-  #     interval: 5s
-  #     timeout: 5s
-  #     retries: 5
-  #   command: >
-  #     sh -c "cd /signalsd/app && go run cmd/signalsd/main.go"
-  #   networks:
-  #     - multi-app-network
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         cpus: '1'
-  #         memory: 1024M
-
+  # App Container 4
+  app4:
+    build:
+      context: /Users/nick.abson/dev/signals/signalsd
+      dockerfile_inline: |
+        FROM golang:1.24-alpine
+        RUN apk add --no-cache bash postgresql-client curl jq vim git
+        RUN echo "Installing Go tools..." && \
+            go install github.com/pressly/goose/v3/cmd/goose@latest && \
+            go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest && \
+            go install github.com/swaggo/swag/cmd/swag@latest && \
+            echo "Go tools installation complete"
+        WORKDIR /signalsd
+        CMD ["/bin/bash"]
+    container_name: signalsd-app4-multi
+    volumes:
+      - /Users/nick.abson/dev/signals/signalsd:/signalsd
+      - go-modules-multi:/go/pkg/mod
+    environment:
+      DOCKER_ENV: true
+      SECRET_KEY: "multi-container-test-secret-key-12345"
+      DATABASE_URL: postgres://signalsd-dev:@host.docker.internal:15432/signalsd_admin?sslmode=disable
+      ENVIRONMENT: perf
+      RATE_LIMIT_RPS: 0
+      APP_INSTANCE: "app4"
+      # Increase timeouts for large batch processing
+      READ_TIMEOUT: "300s"
+      WRITE_TIMEOUT: "300s"
+      IDLE_TIMEOUT: "300s"
+      MAX_SIGNAL_PAYLOAD_SIZE: ${MAX_SIGNAL_PAYLOAD_SIZE}
+    working_dir: /signalsd
+    ports:
+      - "8085:8080"  # Expose for direct testing
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    command: >
+      sh -c "cd /signalsd/app && go run cmd/signalsd/main.go"
+    networks:
+      - multi-app-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
 networks:
   multi-app-network:
     driver: bridge

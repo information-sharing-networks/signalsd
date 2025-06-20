@@ -87,7 +87,7 @@ func NewServerConfig(logger *zerolog.Logger) *ServerConfig {
 		defaultReadTimeout    = 15 * time.Second
 		defaultWriteTimeout   = 15 * time.Second
 		defaultIdleTimeout    = 60 * time.Second
-		defaultMaxSignalSize  = 50 * 1024 * 1024 // 50MB default
+		defaultMaxSignalSize  = 5 * 1024 * 1024 // 5MB default
 		defaultRateLimitRPS   = 100
 		defaultRateLimitBurst = 20 // burst of 20 requests
 	)
