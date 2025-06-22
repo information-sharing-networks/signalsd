@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/url"
 	"os"
 	"time"
@@ -124,7 +125,9 @@ func main() {
 
 	// Add flags
 	cmd.Flags().StringVarP(&mode, "mode", "m", "", "Service mode (required): all, admin, signals, signals-read, or signals-write")
-	cmd.MarkFlagRequired("mode")
+	if err := cmd.MarkFlagRequired("mode"); err != nil {
+		log.Fatalf("Failed to mark mode flag as required: %v", err)
+	}
 
 	// Version flag is handled automatically by Cobra
 	v := version.Get()

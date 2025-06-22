@@ -104,8 +104,7 @@ func (a *AdminHandler) LivenessHandler(w http.ResponseWriter, r *http.Request) {
 //
 //	@Router			/version [get]
 func (a *AdminHandler) VersionHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(version.Get())
+	responses.RespondWithJSON(w, http.StatusOK, version.Get())
 }
 
 // DisableAccountHandler godoc
