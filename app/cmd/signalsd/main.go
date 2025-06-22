@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"log"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -12,8 +15,10 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/server"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/schemas"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/spf13/cobra"
 
 	signalsd "github.com/information-sharing-networks/signalsd/app"
+	"github.com/information-sharing-networks/signalsd/app/internal/version"
 
 	_ "github.com/information-sharing-networks/signalsd/app/docs"
 )
@@ -33,7 +38,7 @@ import (
 //	@description	## Request Limits
 //	@description	All endpoints are protected by:
 //	@description	- **Rate limiting**: Configurable requests per second (default: 100 RPS, 20 burst)
-//	@description	- **Request size limits**: 64KB for admin/auth endpoints, 50MB for signal ingestion
+//	@description	- **Request size limits**: 64KB for admin/auth endpoints, 5MB for signal ingestion
 //	@description
 //	@description	Check the X-Max-Request-Body response header for the configured limit on signals payload.
 //	@description
@@ -96,10 +101,48 @@ import (
 // @tag.name			Service accounts
 // @tag.description		Manage service account end points
 func main() {
+	var mode string
 
+	cmd := &cobra.Command{
+		Use:   "signalsd",
+		Short: "Signalsd service for ISNs",
+		Long:  `Signalsd provides APIs for operating a Signals Information Sharing Network`,
+		Example: `
+  signalsd --mode all           # Single service with all endpoints
+  signalsd --mode admin         # Admin service only
+  signalsd --mode signals       # Signal exchange service (read + write)
+  signalsd --mode signals-read  # Signal read operations only
+  signalsd --mode signals-write # Signal write operations only`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Validate mode
+			if !signalsd.ValidServiceModes[mode] {
+				return fmt.Errorf("invalid service mode '%s'. Valid modes: all, admin, signals, signals-read, signals-write", mode)
+			}
+
+			return runServer(mode)
+		},
+	}
+
+	// Add flags
+	cmd.Flags().StringVarP(&mode, "mode", "m", "", "Service mode (required): all, admin, signals, signals-read, or signals-write")
+	if err := cmd.MarkFlagRequired("mode"); err != nil {
+		log.Fatalf("Failed to mark mode flag as required: %v", err)
+	}
+
+	// Version flag is handled automatically by Cobra
+	v := version.Get()
+	cmd.Version = fmt.Sprintf("%s (built %s, commit %s)", v.Version, v.BuildDate, v.GitCommit)
+
+	if err := cmd.Execute(); err != nil {
+		os.Exit(1)
+	}
+}
+
+func runServer(mode string) error {
 	serverLogger := logger.InitServerLogger()
 
 	cfg := signalsd.NewServerConfig(serverLogger)
+	cfg.ServiceMode = mode
 
 	httpLogger := logger.InitHttpLogger(cfg.LogLevel, cfg.Environment)
 
@@ -111,14 +154,14 @@ func main() {
 		serverLogger.Fatal().Err(err).Msg("Failed to parse database URL")
 	}
 
-	if cfg.Environment == "prod" {
-		poolConfig.MaxConns = 8
-		poolConfig.MinConns = 4
+	// perf testing config
+	if cfg.Environment == "perf" {
+		poolConfig.MaxConns = 50
+		poolConfig.MinConns = 10
 		poolConfig.MaxConnLifetime = 30 * time.Minute
-		poolConfig.MaxConnIdleTime = 5 * time.Minute
+		poolConfig.MaxConnIdleTime = 15 * time.Minute
 		poolConfig.ConnConfig.ConnectTimeout = 5 * time.Second
 	}
-
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
 		serverLogger.Fatal().Err(err).Msg("Unable to create connection pool")
@@ -128,7 +171,7 @@ func main() {
 		serverLogger.Fatal().Err(err).Msg("Error pinging database via pool")
 	}
 
-	safeURL, _ := removePassword(cfg.DatabaseURL)
+	safeURL, _ := removePasswordFromConnectionString(cfg.DatabaseURL)
 
 	serverLogger.Info().Msgf("connected to PostgreSQL at %v", safeURL)
 
@@ -139,7 +182,9 @@ func main() {
 	}
 	serverLogger.Info().Msg("Schema cache loaded")
 
-	serverLogger.Info().Msgf("rate limit %v rps, %v burst", cfg.RateLimitRPS, cfg.RateLimitBurst)
+	if cfg.RateLimitRPS <= 0 {
+		serverLogger.Warn().Msg("rate limiting disabled")
+	}
 
 	authService := auth.NewAuthService(cfg.SecretKey, cfg.Environment, queries)
 	router := chi.NewRouter()
@@ -147,15 +192,16 @@ func main() {
 	server := server.NewServer(pool, queries, authService, cfg, serverLogger, httpLogger, router)
 
 	serverLogger.Info().Msgf("CORS allowed origins: %v", cfg.AllowedOrigins)
-	serverLogger.Info().Msg("Starting server")
+	serverLogger.Info().Msgf("service mode: %s", cfg.ServiceMode)
+	serverLogger.Info().Msgf("Starting server (version: %s)", version.Get().Version)
 
 	server.Run()
 
 	serverLogger.Info().Msg("server shutdown complete")
-
+	return nil
 }
 
-func removePassword(connStr string) (string, error) {
+func removePasswordFromConnectionString(connStr string) (string, error) {
 	u, _ := url.Parse(connStr)
 	if u.User != nil {
 		username := u.User.Username()

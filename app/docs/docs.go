@@ -128,23 +128,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/live": {
-            "get": {
-                "description": "check if the signalsd service is up",
-                "tags": [
-                    "Site admin"
-                ],
-                "summary": "Liveness check",
-                "responses": {
-                    "200": {
-                        "description": "OK"
-                    },
-                    "404": {
-                        "description": "Not Found"
-                    }
-                }
-            }
-        },
         "/admin/reset": {
             "post": {
                 "description": "Delete all registered users and associated data.\nThis endpoint only works on environments configured as 'dev'",
@@ -1163,6 +1146,23 @@ const docTemplate = `{
                 }
             }
         },
+        "/health/live": {
+            "get": {
+                "description": "check if the signalsd service is up",
+                "tags": [
+                    "Site admin"
+                ],
+                "summary": "Liveness check",
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "404": {
+                        "description": "Not Found"
+                    }
+                }
+            }
+        },
         "/health/ready": {
             "get": {
                 "description": "check if the signalsd service is ready",
@@ -1523,6 +1523,23 @@ const docTemplate = `{
                         "description": "Authentication failed ",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/version": {
+            "get": {
+                "description": "Returns the current API version details",
+                "tags": [
+                    "Site admin"
+                ],
+                "summary": "Get API version",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/version.Info"
                         }
                     }
                 }
@@ -2311,6 +2328,23 @@ const docTemplate = `{
                     "example": "message describing the error"
                 }
             }
+        },
+        "version.Info": {
+            "type": "object",
+            "properties": {
+                "build_date": {
+                    "type": "string",
+                    "example": "2025-01-01T12:00:00Z"
+                },
+                "git_commit": {
+                    "type": "string",
+                    "example": "abc123"
+                },
+                "version": {
+                    "type": "string",
+                    "example": "v1.0.0"
+                }
+            }
         }
     },
     "securityDefinitions": {
@@ -2360,7 +2394,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "",
 	Schemes:          []string{},
 	Title:            "Signals ISN API",
-	Description:      "Signals ISN service API for managing Information Sharing Networks\n\n## Common Error Responses\nAll endpoints may return:\n- `413` Request body exceeds size limit\n- `429` Rate limit exceeded\n- `500` Internal server error\n\nIndividual endpoints document their specific business logic errors.\n\n## Request Limits\nAll endpoints are protected by:\n- **Rate limiting**: Configurable requests per second (default: 100 RPS, 20 burst)\n- **Request size limits**: 64KB for admin/auth endpoints, 50MB for signal ingestion\n\nCheck the X-Max-Request-Body response header for the configured limit on signals payload.\n\nThe rate limit is set globaly and prevents abuse of the service.\nIn production there will be additional protections in place such as per-IP rate limiting provided by the load balancer/reverse proxy.\n\n## Authentication & Authorization\n\n### Authentication Flow\n- **Web users**: Login → get JWT + refresh cookie → use JWT for API calls\n- **Service accounts**: Authenticate with Client credentials → get JWT → use JWT for API calls → re-authenticate when expired\n\n### Authorization\nAll protected API endpoints expect valid JWT access tokens containing user identity and permissions.\n\ntokens should be supplied using:\n**Authorization header**: `Bearer <token>`\n\n**Token refresh:**\n- **Web users**: Refresh tokens (HTTP-only cookies) automatically renew access tokens\n- **Service accounts**: Must re-authenticate with client credentials when tokens expire\n\nAccess tokens expire in 30 minutes\n\nRefresh tokens expire in 30 days (web users only)\n",
+	Description:      "Signals ISN service API for managing Information Sharing Networks\n\n## Common Error Responses\nAll endpoints may return:\n- `413` Request body exceeds size limit\n- `429` Rate limit exceeded\n- `500` Internal server error\n\nIndividual endpoints document their specific business logic errors.\n\n## Request Limits\nAll endpoints are protected by:\n- **Rate limiting**: Configurable requests per second (default: 100 RPS, 20 burst)\n- **Request size limits**: 64KB for admin/auth endpoints, 5MB for signal ingestion\n\nCheck the X-Max-Request-Body response header for the configured limit on signals payload.\n\nThe rate limit is set globaly and prevents abuse of the service.\nIn production there will be additional protections in place such as per-IP rate limiting provided by the load balancer/reverse proxy.\n\n## Authentication & Authorization\n\n### Authentication Flow\n- **Web users**: Login → get JWT + refresh cookie → use JWT for API calls\n- **Service accounts**: Authenticate with Client credentials → get JWT → use JWT for API calls → re-authenticate when expired\n\n### Authorization\nAll protected API endpoints expect valid JWT access tokens containing user identity and permissions.\n\ntokens should be supplied using:\n**Authorization header**: `Bearer <token>`\n\n**Token refresh:**\n- **Web users**: Refresh tokens (HTTP-only cookies) automatically renew access tokens\n- **Service accounts**: Must re-authenticate with client credentials when tokens expire\n\nAccess tokens expire in 30 minutes\n\nRefresh tokens expire in 30 days (web users only)\n",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

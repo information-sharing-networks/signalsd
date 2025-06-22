@@ -114,14 +114,197 @@ type SignalType struct {
 }
 
 type SignalVersion struct {
-	ID               uuid.UUID       `json:"id"`
-	CreatedAt        time.Time       `json:"created_at"`
-	AccountID        uuid.UUID       `json:"account_id"`
-	SignalBatchID    uuid.UUID       `json:"signal_batch_id"`
-	SignalID         uuid.UUID       `json:"signal_id"`
-	VersionNumber    int32           `json:"version_number"`
-	ValidationStatus string          `json:"validation_status"`
-	Content          json.RawMessage `json:"content"`
+	ID            uuid.UUID       `json:"id"`
+	CreatedAt     time.Time       `json:"created_at"`
+	AccountID     uuid.UUID       `json:"account_id"`
+	SignalBatchID uuid.UUID       `json:"signal_batch_id"`
+	SignalID      uuid.UUID       `json:"signal_id"`
+	VersionNumber int32           `json:"version_number"`
+	Content       json.RawMessage `json:"content"`
+}
+
+type SignalVersionsP0 struct {
+	ID            uuid.UUID       `json:"id"`
+	CreatedAt     time.Time       `json:"created_at"`
+	AccountID     uuid.UUID       `json:"account_id"`
+	SignalBatchID uuid.UUID       `json:"signal_batch_id"`
+	SignalID      uuid.UUID       `json:"signal_id"`
+	VersionNumber int32           `json:"version_number"`
+	Content       json.RawMessage `json:"content"`
+}
+
+type SignalVersionsP1 struct {
+	ID            uuid.UUID       `json:"id"`
+	CreatedAt     time.Time       `json:"created_at"`
+	AccountID     uuid.UUID       `json:"account_id"`
+	SignalBatchID uuid.UUID       `json:"signal_batch_id"`
+	SignalID      uuid.UUID       `json:"signal_id"`
+	VersionNumber int32           `json:"version_number"`
+	Content       json.RawMessage `json:"content"`
+}
+
+type SignalVersionsP2 struct {
+	ID            uuid.UUID       `json:"id"`
+	CreatedAt     time.Time       `json:"created_at"`
+	AccountID     uuid.UUID       `json:"account_id"`
+	SignalBatchID uuid.UUID       `json:"signal_batch_id"`
+	SignalID      uuid.UUID       `json:"signal_id"`
+	VersionNumber int32           `json:"version_number"`
+	Content       json.RawMessage `json:"content"`
+}
+
+type SignalVersionsP3 struct {
+	ID            uuid.UUID       `json:"id"`
+	CreatedAt     time.Time       `json:"created_at"`
+	AccountID     uuid.UUID       `json:"account_id"`
+	SignalBatchID uuid.UUID       `json:"signal_batch_id"`
+	SignalID      uuid.UUID       `json:"signal_id"`
+	VersionNumber int32           `json:"version_number"`
+	Content       json.RawMessage `json:"content"`
+}
+
+type SignalVersionsP4 struct {
+	ID            uuid.UUID       `json:"id"`
+	CreatedAt     time.Time       `json:"created_at"`
+	AccountID     uuid.UUID       `json:"account_id"`
+	SignalBatchID uuid.UUID       `json:"signal_batch_id"`
+	SignalID      uuid.UUID       `json:"signal_id"`
+	VersionNumber int32           `json:"version_number"`
+	Content       json.RawMessage `json:"content"`
+}
+
+type SignalVersionsP5 struct {
+	ID            uuid.UUID       `json:"id"`
+	CreatedAt     time.Time       `json:"created_at"`
+	AccountID     uuid.UUID       `json:"account_id"`
+	SignalBatchID uuid.UUID       `json:"signal_batch_id"`
+	SignalID      uuid.UUID       `json:"signal_id"`
+	VersionNumber int32           `json:"version_number"`
+	Content       json.RawMessage `json:"content"`
+}
+
+type SignalVersionsP6 struct {
+	ID            uuid.UUID       `json:"id"`
+	CreatedAt     time.Time       `json:"created_at"`
+	AccountID     uuid.UUID       `json:"account_id"`
+	SignalBatchID uuid.UUID       `json:"signal_batch_id"`
+	SignalID      uuid.UUID       `json:"signal_id"`
+	VersionNumber int32           `json:"version_number"`
+	Content       json.RawMessage `json:"content"`
+}
+
+type SignalVersionsP7 struct {
+	ID            uuid.UUID       `json:"id"`
+	CreatedAt     time.Time       `json:"created_at"`
+	AccountID     uuid.UUID       `json:"account_id"`
+	SignalBatchID uuid.UUID       `json:"signal_batch_id"`
+	SignalID      uuid.UUID       `json:"signal_id"`
+	VersionNumber int32           `json:"version_number"`
+	Content       json.RawMessage `json:"content"`
+}
+
+type SignalsP0 struct {
+	ID            uuid.UUID `json:"id"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	AccountID     uuid.UUID `json:"account_id"`
+	IsnID         uuid.UUID `json:"isn_id"`
+	SignalTypeID  uuid.UUID `json:"signal_type_id"`
+	LocalRef      string    `json:"local_ref"`
+	CorrelationID uuid.UUID `json:"correlation_id"`
+	IsWithdrawn   bool      `json:"is_withdrawn"`
+	IsArchived    bool      `json:"is_archived"`
+}
+
+type SignalsP1 struct {
+	ID            uuid.UUID `json:"id"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	AccountID     uuid.UUID `json:"account_id"`
+	IsnID         uuid.UUID `json:"isn_id"`
+	SignalTypeID  uuid.UUID `json:"signal_type_id"`
+	LocalRef      string    `json:"local_ref"`
+	CorrelationID uuid.UUID `json:"correlation_id"`
+	IsWithdrawn   bool      `json:"is_withdrawn"`
+	IsArchived    bool      `json:"is_archived"`
+}
+
+type SignalsP2 struct {
+	ID            uuid.UUID `json:"id"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	AccountID     uuid.UUID `json:"account_id"`
+	IsnID         uuid.UUID `json:"isn_id"`
+	SignalTypeID  uuid.UUID `json:"signal_type_id"`
+	LocalRef      string    `json:"local_ref"`
+	CorrelationID uuid.UUID `json:"correlation_id"`
+	IsWithdrawn   bool      `json:"is_withdrawn"`
+	IsArchived    bool      `json:"is_archived"`
+}
+
+type SignalsP3 struct {
+	ID            uuid.UUID `json:"id"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	AccountID     uuid.UUID `json:"account_id"`
+	IsnID         uuid.UUID `json:"isn_id"`
+	SignalTypeID  uuid.UUID `json:"signal_type_id"`
+	LocalRef      string    `json:"local_ref"`
+	CorrelationID uuid.UUID `json:"correlation_id"`
+	IsWithdrawn   bool      `json:"is_withdrawn"`
+	IsArchived    bool      `json:"is_archived"`
+}
+
+type SignalsP4 struct {
+	ID            uuid.UUID `json:"id"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	AccountID     uuid.UUID `json:"account_id"`
+	IsnID         uuid.UUID `json:"isn_id"`
+	SignalTypeID  uuid.UUID `json:"signal_type_id"`
+	LocalRef      string    `json:"local_ref"`
+	CorrelationID uuid.UUID `json:"correlation_id"`
+	IsWithdrawn   bool      `json:"is_withdrawn"`
+	IsArchived    bool      `json:"is_archived"`
+}
+
+type SignalsP5 struct {
+	ID            uuid.UUID `json:"id"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	AccountID     uuid.UUID `json:"account_id"`
+	IsnID         uuid.UUID `json:"isn_id"`
+	SignalTypeID  uuid.UUID `json:"signal_type_id"`
+	LocalRef      string    `json:"local_ref"`
+	CorrelationID uuid.UUID `json:"correlation_id"`
+	IsWithdrawn   bool      `json:"is_withdrawn"`
+	IsArchived    bool      `json:"is_archived"`
+}
+
+type SignalsP6 struct {
+	ID            uuid.UUID `json:"id"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	AccountID     uuid.UUID `json:"account_id"`
+	IsnID         uuid.UUID `json:"isn_id"`
+	SignalTypeID  uuid.UUID `json:"signal_type_id"`
+	LocalRef      string    `json:"local_ref"`
+	CorrelationID uuid.UUID `json:"correlation_id"`
+	IsWithdrawn   bool      `json:"is_withdrawn"`
+	IsArchived    bool      `json:"is_archived"`
+}
+
+type SignalsP7 struct {
+	ID            uuid.UUID `json:"id"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	AccountID     uuid.UUID `json:"account_id"`
+	IsnID         uuid.UUID `json:"isn_id"`
+	SignalTypeID  uuid.UUID `json:"signal_type_id"`
+	LocalRef      string    `json:"local_ref"`
+	CorrelationID uuid.UUID `json:"correlation_id"`
+	IsWithdrawn   bool      `json:"is_withdrawn"`
+	IsArchived    bool      `json:"is_archived"`
 }
 
 type User struct {

@@ -93,8 +93,15 @@ func RequestSizeLimit(maxBytes int64) func(http.Handler) http.Handler {
 	}
 }
 
-// RateLimit limits requests per second
+// RateLimit limits requests per second. If requestsPerSecond <= 0, rate limiting is disabled.
 func RateLimit(requestsPerSecond int, burst int) func(http.Handler) http.Handler {
+	// If rate limiting is disabled, return a no-op middleware
+	if requestsPerSecond <= 0 {
+		return func(next http.Handler) http.Handler {
+			return next
+		}
+	}
+
 	limiter := rate.NewLimiter(rate.Limit(requestsPerSecond), burst)
 
 	return func(next http.Handler) http.Handler {

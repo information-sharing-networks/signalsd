@@ -22,7 +22,14 @@ COPY ../entrypoint.sh .
 RUN sqlc generate && \
     swag init -g cmd/signalsd/main.go
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o signalsd cmd/signalsd/main.go
+# Build args for version info
+ARG VERSION=dev
+ARG BUILD_DATE=unknown
+ARG GIT_COMMIT=unknown
+
+RUN CGO_ENABLED=0 GOOS=linux go build \
+    -ldflags "-X main.version=${VERSION} -X main.buildDate=${BUILD_DATE} -X main.gitCommit=${GIT_COMMIT}" \
+    -o signalsd cmd/signalsd/main.go
 
 # final stage
 FROM alpine:3.21

@@ -83,12 +83,13 @@ IDLE_TIMEOUT=60s                # Default: 60s
 ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001
 
 # rate limits
-RATE_LIMIT_RPS=100              # Default: 100 requests per second
+RATE_LIMIT_RPS=100              # Default: 100 requests per second (set to 0 to disable rate limiting)
 RATE_LIMIT_BURST=20             # Default: 20 request burst allowance
 
-# payload size limits
 # the signal payload size is configurable (all the other API endpoints have a 64KB limit)
-MAX_SIGNAL_PAYLOAD_SIZE=52428800 # Default: 50MB (52428800 bytes) - 
+MAX_SIGNAL_PAYLOAD_SIZE=5242880 # Default: 5MB
+
+
 ```
 
 ## Depenencies
@@ -209,10 +210,10 @@ goose -dir app/sql/schema postgres $DATABASE_URL  up
 ``` bash
 cd app
 go build ./cmd/signalsd/
-./signalsd
+./signalsd -mode all
 
 # or
-go run cmd/signalsd/main.go
+go run cmd/signalsd/main.go -mode all
 ```
 
 ## API docs
@@ -248,7 +249,20 @@ run `sqlc generate` from the root of the project to regenerate the type safe go 
 
 
 ## CI/CD
-see github actions workflows in .github/workflows
+
+**Production**: Deploys only when you create a version tag (e.g., `v1.2.3`)
+
+### Creating a Release
+```bash
+# 1. Test and prepare
+git checkout main && git pull origin main
+cd app && go test ./... && cd ..
+
+# 2. Create and push version tag; build locally with version info
+build.sh -b patch|minor|major
+
+```
+See GitHub Actions workflows in `.github/workflows/`
 
 ![ci_cd.0.2.0](https://github.com/user-attachments/assets/d5399e2f-0d0b-420b-9c17-0fbcea6f520c)
 
@@ -264,6 +278,72 @@ The service is deployed using the image created at the last push to the main bra
 ![deploy.0.2.0](https://github.com/user-attachments/assets/942384a7-ccd7-4abb-b2a7-a9e293e23a10)
 
 note this is a pre-prod version and should only be used with data that you don't mind being deleted or seen by other people.
+
+## Service Mode Configuration
+
+You can run multiple instances of the signalsd service, each in a different mode.  This enables you to, for example, run a separate service for admin and signal processing workloads.
+The service mode is specified using the `-mode` command line flag:
+
+- **`all`**: Serves all endpoints - admin, API, and signal exchange
+- **`admin`**: Serves only admin and API endpoints (excludes signal exchange)
+- **`signals`**: Serves signal exchange endpoints (both read and write operations)
+- **`signals-read`**: Serves only signal read operations 
+- **`signals-write`**: Serves only signal write operations
+
+EXAMPLES (local dev)
+```sh
+PORT=8080 go run cmd/signalsd/main.go --mode admin
+PORT=8081 go run cmd/signalsd/main.go --mode signals-read
+PORT=8082 go run cmd/signalsd/main.go --mode signals-write
+```
+
+## Deployment Configurations
+
+### Basic Config (Admin vs Signals)
+This is the configuration used in the github actions CD pipeline that deploys the latest version of the app.
+As a minimum it is a good idea to separate the admin api container from the signals exchange containers: although they still share a common database, it will ensure that admin requests are not blocked when there are a large number of concurrent signal processing requests.
+
+Configure Google Cloud Load Balancer with path-based routing to direct traffic to the signals and admin instances:
+
+```yaml
+- match:
+    path:
+      regex: "^/api/isn/.*/signal_types/.*/signals.*"
+  route:
+    cluster: signalsd-signals
+
+- match:
+    prefix: "/"
+  route:
+    cluster: signalsd-admin
+```
+
+### Advanced Config (Read vs Write Signals)
+ A moere advanced configuration that separates read and write operations.  This would be useful if using a read-only database replica for readers:
+
+```yaml
+# Write operations
+- match:
+    path:
+      regex: "^/api/isn/.*/signal_types/.*/signals$"
+    method: "POST"
+  route:
+    cluster: signalsd-signals-write
+
+# Read operations
+- match:
+    path:
+      regex: "^/isn/.*/signal_types/.*/signals/.*"
+    method: "GET"
+  route:
+    cluster: signalsd-signals-read
+
+# Admin operations
+- match:
+    prefix: "/"
+  route:
+    cluster: signalsd-admin
+```
 
 the steps to set up this environment in Google Cloud are:
 > create a project called signalsd 

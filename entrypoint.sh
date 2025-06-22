@@ -15,7 +15,7 @@ function launchLocal() {
 
     goose -dir sql/schema postgres $DATABASE_URL up
     
-    exec /app/signalsd
+    exec /app/signalsd -mode all
 }
 
 
@@ -52,7 +52,7 @@ function launchLocalDev() {
     echo "migrating database schema"
     goose -dir sql/schema postgres $DATABASE_URL up
 
-    go run cmd/signalsd/main.go 
+    go run cmd/signalsd/main.go  --mode all
 }
 
 ENV=""

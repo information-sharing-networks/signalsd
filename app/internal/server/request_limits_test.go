@@ -17,13 +17,13 @@ func TestRequestSizeLimits(t *testing.T) {
 
 	// API routes with 64KB limit
 	router.Group(func(r chi.Router) {
-		r.Use(RequestSizeLimit(signalsd.DefaultAPIRequestSize))
+		r.Use(RequestSizeLimit(signalsd.DefaultMaxAPIRequestSize))
 		r.Post("/api/isn", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		})
 	})
 
-	// Signal routes with 50MB limit
+	// Signal routes with 5MB limit
 	router.Group(func(r chi.Router) {
 		r.Use(RequestSizeLimit(50 * 1024 * 1024))
 		r.Post("/api/signals", func(w http.ResponseWriter, r *http.Request) {
@@ -41,7 +41,7 @@ func TestRequestSizeLimits(t *testing.T) {
 		{"API normal request", "/api/isn", 2 * 1024, http.StatusOK},
 		{"API oversized request", "/api/isn", 128 * 1024, 413}, // Request Entity Too Large
 
-		// Signal endpoints (50MB limit)
+		// Signal endpoints (5MB limit)
 		{"Signal normal request", "/api/signals", 1024 * 1024, http.StatusOK},
 		{"Signal large request", "/api/signals", 10 * 1024 * 1024, http.StatusOK},
 	}
@@ -93,5 +93,46 @@ func TestRateLimit(t *testing.T) {
 
 	if rr.Code != http.StatusTooManyRequests {
 		t.Errorf("Rate limit request should fail: got status %d, want %d", rr.Code, http.StatusTooManyRequests)
+	}
+}
+
+func TestRateLimitDisabled(t *testing.T) {
+	tests := []struct {
+		name          string
+		rps           int
+		expectLimited bool
+	}{
+		{"Rate limiting enabled", 10, true},
+		{"Rate limiting disabled with 0", 0, false},
+		{"Rate limiting disabled with negative", -1, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := chi.NewRouter()
+			router.Use(RateLimit(tt.rps, 1)) // burst of 1 for easy testing
+			router.Get("/test", func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(http.StatusOK)
+			})
+
+			// Make 2 requests quickly
+			for i := 0; i < 2; i++ {
+				req := httptest.NewRequest("GET", "/test", nil)
+				rr := httptest.NewRecorder()
+				router.ServeHTTP(rr, req)
+
+				if tt.expectLimited && i == 1 {
+					// Second request should be rate limited
+					if rr.Code != http.StatusTooManyRequests {
+						t.Errorf("Expected rate limit on request %d: got status %d, want %d", i+1, rr.Code, http.StatusTooManyRequests)
+					}
+				} else {
+					// Request should succeed
+					if rr.Code != http.StatusOK {
+						t.Errorf("Request %d failed: got status %d, want %d", i+1, rr.Code, http.StatusOK)
+					}
+				}
+			}
+		})
 	}
 }
