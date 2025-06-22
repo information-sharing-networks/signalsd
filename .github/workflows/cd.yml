@@ -35,28 +35,15 @@ jobs:
     steps:
       - name: Check out code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history including tags
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: "1.24.2"
           cache: true                                
-          cache-dependency-path: app/go.sum    
-
-      - name: Build app
-        run: |
-          cd app
-          # Get version info
-          VERSION=$(git describe --tags --always --dirty)
-          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          GIT_COMMIT=$(git rev-parse --short HEAD)
-
-          # Build with version info
-          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
-            -ldflags "-X github.com/information-sharing-networks/signalsd/app/internal/version.version=${VERSION} \
-            -X github.com/information-sharing-networks/signalsd/app/internal/version.buildDate=${BUILD_DATE} \
-            -X github.com/information-sharing-networks/signalsd/app/internal/version.gitCommit=${GIT_COMMIT}" \
-            ./cmd/signalsd/
+          cache-dependency-path: app/go.sum
 
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
@@ -72,7 +59,7 @@ jobs:
       - name: Build and push Docker image
         run: |
           # Get version info for Docker build
-          VERSION=$(git describe --tags --always --dirty)
+          VERSION=$(git describe --tags --abbrev=0 2>/dev/null || git describe --tags --always --dirty)
           BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           GIT_COMMIT=$(git rev-parse --short HEAD)
 
@@ -102,8 +89,9 @@ jobs:
             --region ${{ env.DEPLOY_REGION }} \
             --platform managed \
             --allow-unauthenticated \
-            --set-env-vars "DATABASE_URL=${{ env.DATABASE_URL }},SECRET_KEY=${{ env.SECRET_KEY }},ENVIRONMENT=${{ env.ENVIRONMENT }},LOG_LEVEL=${{ env.LOG_LEVEL }}" \
-            --args="-mode,admin" \
+            --service-account ${{ env.RUNTIME_SERVICE_ACCOUNT }} \
+            --set-env-vars "DATABASE_URL=${{ env.DATABASE_URL }},SECRET_KEY=${{ env.SECRET_KEY }},ENVIRONMENT=${{ env.ENVIRONMENT }}, LOG_LEVEL=${{ env.LOG_LEVEL }}" \
+            --args="--mode,admin" \
             --port 8080 \
             --memory 256Mi \
             --cpu ${{ env.ADMIN_CPU }} \
@@ -117,8 +105,9 @@ jobs:
             --region ${{ env.DEPLOY_REGION }} \
             --platform managed \
             --allow-unauthenticated \
-            --set-env-vars "DATABASE_URL=${{ env.DATABASE_URL }},SECRET_KEY=${{ env.SECRET_KEY }},ENVIRONMENT=${{ env.ENVIRONMENT }},LOG_LEVEL=${{ env.LOG_LEVEL }}" \
-            --args="-mode,signals" \
+            --service-account ${{ env.RUNTIME_SERVICE_ACCOUNT }} \
+            --set-env-vars "DATABASE_URL=${{ env.DATABASE_URL }},SECRET_KEY=${{ env.SECRET_KEY }},ENVIRONMENT=${{ env.ENVIRONMENT }}, LOG_LEVEL=${{ env.LOG_LEVEL }}" \
+            --args="--mode,signals" \
             --port 8080 \
             --memory 512Mi \
             --cpu ${{ env.SIGNALS_CPU }} \
