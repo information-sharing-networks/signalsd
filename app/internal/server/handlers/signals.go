@@ -121,8 +121,9 @@ type SignalVersionDoc struct {
 //	@Description
 //	@Description	**Validation**
 //	@Description
-//	@Description	the content is validated against the json schema asynchronously, however basic checks are done on the incoming data.
-//	@Description	The following issues create a 400 error and cause the entire payload to be rejected
+//	@Description	Signals are validated against the json schema specified for the signal type unless validation is disabled on the type definition. The entire payload is rejected with a 400 error if validation fails.
+//	@Description
+//	@Description	When validation is disabled, basic checks are still done on the incoming data. The following issues create a 400 error and cause the entire payload to be rejected:
 //	@Description	- invalid json format
 //	@Description	- missing fields (the array of signals must be in a json object called signals, and content and local_ref must be present for each record).
 //	@Description	- incorrect correlation ids - where supplied, correlation ids must refer to another signal ID in the ISN (error_code is set to "invalid_correlation_id" in this is not the case)

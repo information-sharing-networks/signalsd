@@ -13,12 +13,12 @@ export SECRET_KEY=perf-test-secret-key
 export RATE_LIMIT_RPS=0
 
 ```
-2. (A) 8GB postgress and single container app
+2. (A) 4cpu x 8GB postgress and single container app
 ```sh
 docker compose -f docker-compose.perf-test.tuned.yml up -d
 ```
 
-2. (B) 2GB postgress and single container app
+2. (B) 2cpu x 2GB postgress and single container app
 ```sh
 docker compose -f docker-compose.perf-test.yml up -d
 ```
