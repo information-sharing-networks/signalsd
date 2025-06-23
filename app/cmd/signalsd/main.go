@@ -24,7 +24,6 @@ import (
 )
 
 //	@title			Signals ISN API
-//	@version		1.0
 //	@description	Signals ISN service API for managing Information Sharing Networks
 //	@description
 //	@description	## Common Error Responses
