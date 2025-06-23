@@ -1,4 +1,6 @@
 # build signalsd image, push to gcloud and deploy to gcloud run
+# this config runs the admin and signals exchange service in two separate containers
+# note that - if using google cloud run - you need to set up the full load balancer to use this config
 name: CD
 
 on:
@@ -13,7 +15,8 @@ env:
   ENVIRONMENT: prod
   LOG_LEVEL: debug
   # gcloud
-  SERVICE_NAME: signalsd
+  ADMIN_SERVICE_NAME: signalsd-admin
+  SIGNALS_SERVICE_NAME: signalsd-signals
   PROJECT_ID: signals-462015
   REGION: europe-west2
   REPOSITORY: signalsd
@@ -21,8 +24,10 @@ env:
   DEPLOY_REGION: europe-west1
   RUNTIME_SERVICE_ACCOUNT: cloud-run-runtime@signals-462015.iam.gserviceaccount.com
   GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
-  MAX_INSTANCES: 4
-  CPU: 1
+  ADMIN_MAX_INSTANCES: 2
+  SIGNALS_MAX_INSTANCES: 4
+  ADMIN_CPU: 0.5
+  SIGNALS_CPU: 1
 
 jobs:
   tests:
@@ -79,18 +84,34 @@ jobs:
           cd app
           goose -dir sql/schema postgres ${{ env.DATABASE_URL }} up
 
-      - name: Deploy to Cloud Run
+      - name: Deploy Admin Service to Cloud Run
         run: |
-          gcloud run deploy ${{ env.SERVICE_NAME }} \
+          gcloud run deploy ${{ env.ADMIN_SERVICE_NAME }} \
             --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
             --region ${{ env.DEPLOY_REGION }} \
             --platform managed \
             --allow-unauthenticated \
             --service-account ${{ env.RUNTIME_SERVICE_ACCOUNT }} \
             --set-env-vars "DATABASE_URL=${{ env.DATABASE_URL }},SECRET_KEY=${{ env.SECRET_KEY }},ENVIRONMENT=${{ env.ENVIRONMENT }}, LOG_LEVEL=${{ env.LOG_LEVEL }}" \
-            --args="--mode,all" \
+            --args="--mode,admin" \
+            --port 8080 \
+            --memory 256Mi \
+            --cpu ${{ env.ADMIN_CPU }} \
+            --min-instances 1 \
+            --max-instances ${{ env.ADMIN_MAX_INSTANCES }}
+
+      - name: Deploy Signals Service to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SIGNALS_SERVICE_NAME }} \
+            --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            --region ${{ env.DEPLOY_REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --service-account ${{ env.RUNTIME_SERVICE_ACCOUNT }} \
+            --set-env-vars "DATABASE_URL=${{ env.DATABASE_URL }},SECRET_KEY=${{ env.SECRET_KEY }},ENVIRONMENT=${{ env.ENVIRONMENT }}, LOG_LEVEL=${{ env.LOG_LEVEL }}" \
+            --args="--mode,signals" \
             --port 8080 \
             --memory 512Mi \
-            --cpu ${{ env.CPU }} \
+            --cpu ${{ env.SIGNALS_CPU }} \
             --min-instances 0 \
-            --max-instances ${{ env.MAX_INSTANCES }}
+            --max-instances ${{ env.SIGNALS_MAX_INSTANCES }}
