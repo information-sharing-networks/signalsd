@@ -9,12 +9,12 @@ import (
 	"context"
 )
 
-const deleteAccounts = `-- name: DeleteAccounts :execrows
+const DeleteAccounts = `-- name: DeleteAccounts :execrows
 DELETE FROM Accounts
 `
 
 func (q *Queries) DeleteAccounts(ctx context.Context) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteAccounts)
+	result, err := q.db.Exec(ctx, DeleteAccounts)
 	if err != nil {
 		return 0, err
 	}

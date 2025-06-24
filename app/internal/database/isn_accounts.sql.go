@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const createIsnAccount = `-- name: CreateIsnAccount :one
+const CreateIsnAccount = `-- name: CreateIsnAccount :one
 INSERT INTO isn_accounts (
     id,
     created_at,
@@ -31,7 +31,7 @@ type CreateIsnAccountParams struct {
 }
 
 func (q *Queries) CreateIsnAccount(ctx context.Context, arg CreateIsnAccountParams) (IsnAccount, error) {
-	row := q.db.QueryRow(ctx, createIsnAccount, arg.IsnID, arg.AccountID, arg.Permission)
+	row := q.db.QueryRow(ctx, CreateIsnAccount, arg.IsnID, arg.AccountID, arg.Permission)
 	var i IsnAccount
 	err := row.Scan(
 		&i.ID,
@@ -44,7 +44,7 @@ func (q *Queries) CreateIsnAccount(ctx context.Context, arg CreateIsnAccountPara
 	return i, err
 }
 
-const deleteIsnAccount = `-- name: DeleteIsnAccount :execrows
+const DeleteIsnAccount = `-- name: DeleteIsnAccount :execrows
 DELETE FROM isn_accounts
 WHERE isn_id =  $1
 AND account_id = $2
@@ -56,14 +56,14 @@ type DeleteIsnAccountParams struct {
 }
 
 func (q *Queries) DeleteIsnAccount(ctx context.Context, arg DeleteIsnAccountParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteIsnAccount, arg.IsnID, arg.AccountID)
+	result, err := q.db.Exec(ctx, DeleteIsnAccount, arg.IsnID, arg.AccountID)
 	if err != nil {
 		return 0, err
 	}
 	return result.RowsAffected(), nil
 }
 
-const getIsnAccountByIsnAndAccountID = `-- name: GetIsnAccountByIsnAndAccountID :one
+const GetIsnAccountByIsnAndAccountID = `-- name: GetIsnAccountByIsnAndAccountID :one
 SELECT ia.id, ia.created_at, ia.updated_at, ia.isn_id, ia.account_id, ia.permission, i.slug as isn_slug FROM isn_accounts ia
 JOIN isn i 
 ON i.id = ia.isn_id
@@ -87,7 +87,7 @@ type GetIsnAccountByIsnAndAccountIDRow struct {
 }
 
 func (q *Queries) GetIsnAccountByIsnAndAccountID(ctx context.Context, arg GetIsnAccountByIsnAndAccountIDParams) (GetIsnAccountByIsnAndAccountIDRow, error) {
-	row := q.db.QueryRow(ctx, getIsnAccountByIsnAndAccountID, arg.IsnID, arg.AccountID)
+	row := q.db.QueryRow(ctx, GetIsnAccountByIsnAndAccountID, arg.IsnID, arg.AccountID)
 	var i GetIsnAccountByIsnAndAccountIDRow
 	err := row.Scan(
 		&i.ID,
@@ -101,7 +101,7 @@ func (q *Queries) GetIsnAccountByIsnAndAccountID(ctx context.Context, arg GetIsn
 	return i, err
 }
 
-const getIsnAccountsByAccountID = `-- name: GetIsnAccountsByAccountID :many
+const GetIsnAccountsByAccountID = `-- name: GetIsnAccountsByAccountID :many
 SELECT ia.id, ia.created_at, ia.updated_at, ia.isn_id, ia.account_id, ia.permission, i.slug as isn_slug FROM isn_accounts ia
 JOIN isn i 
 ON i.id = ia.isn_id
@@ -120,7 +120,7 @@ type GetIsnAccountsByAccountIDRow struct {
 
 // get all the isns an account has access to.
 func (q *Queries) GetIsnAccountsByAccountID(ctx context.Context, accountID uuid.UUID) ([]GetIsnAccountsByAccountIDRow, error) {
-	rows, err := q.db.Query(ctx, getIsnAccountsByAccountID, accountID)
+	rows, err := q.db.Query(ctx, GetIsnAccountsByAccountID, accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -147,7 +147,7 @@ func (q *Queries) GetIsnAccountsByAccountID(ctx context.Context, accountID uuid.
 	return items, nil
 }
 
-const updateIsnAccount = `-- name: UpdateIsnAccount :one
+const UpdateIsnAccount = `-- name: UpdateIsnAccount :one
 UPDATE isn_accounts SET 
     updated_at = now(),
     permission = $3
@@ -163,7 +163,7 @@ type UpdateIsnAccountParams struct {
 }
 
 func (q *Queries) UpdateIsnAccount(ctx context.Context, arg UpdateIsnAccountParams) (IsnAccount, error) {
-	row := q.db.QueryRow(ctx, updateIsnAccount, arg.IsnID, arg.AccountID, arg.Permission)
+	row := q.db.QueryRow(ctx, UpdateIsnAccount, arg.IsnID, arg.AccountID, arg.Permission)
 	var i IsnAccount
 	err := row.Scan(
 		&i.ID,

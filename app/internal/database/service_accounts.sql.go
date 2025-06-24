@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const createClientSecret = `-- name: CreateClientSecret :one
+const CreateClientSecret = `-- name: CreateClientSecret :one
 INSERT INTO client_secrets (hashed_secret, service_account_account_id, created_at, updated_at, expires_at)
 VALUES ( $1,$2, NOW(), NOW(), $3 )
 RETURNING hashed_secret, service_account_account_id
@@ -30,13 +30,13 @@ type CreateClientSecretRow struct {
 }
 
 func (q *Queries) CreateClientSecret(ctx context.Context, arg CreateClientSecretParams) (CreateClientSecretRow, error) {
-	row := q.db.QueryRow(ctx, createClientSecret, arg.HashedSecret, arg.ServiceAccountAccountID, arg.ExpiresAt)
+	row := q.db.QueryRow(ctx, CreateClientSecret, arg.HashedSecret, arg.ServiceAccountAccountID, arg.ExpiresAt)
 	var i CreateClientSecretRow
 	err := row.Scan(&i.HashedSecret, &i.ServiceAccountAccountID)
 	return i, err
 }
 
-const createOneTimeClientSecret = `-- name: CreateOneTimeClientSecret :one
+const CreateOneTimeClientSecret = `-- name: CreateOneTimeClientSecret :one
 INSERT INTO one_time_client_secrets (id, service_account_account_id, plaintext_secret, created_at, expires_at)
 VALUES ( $1, $2, $3, NOW(), $4)
 RETURNING id
@@ -50,7 +50,7 @@ type CreateOneTimeClientSecretParams struct {
 }
 
 func (q *Queries) CreateOneTimeClientSecret(ctx context.Context, arg CreateOneTimeClientSecretParams) (uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, createOneTimeClientSecret,
+	row := q.db.QueryRow(ctx, CreateOneTimeClientSecret,
 		arg.ID,
 		arg.ServiceAccountAccountID,
 		arg.PlaintextSecret,
@@ -61,7 +61,7 @@ func (q *Queries) CreateOneTimeClientSecret(ctx context.Context, arg CreateOneTi
 	return id, err
 }
 
-const createServiceAccount = `-- name: CreateServiceAccount :one
+const CreateServiceAccount = `-- name: CreateServiceAccount :one
 INSERT INTO service_accounts (
     account_id,
     created_at,
@@ -81,7 +81,7 @@ type CreateServiceAccountParams struct {
 }
 
 func (q *Queries) CreateServiceAccount(ctx context.Context, arg CreateServiceAccountParams) (ServiceAccount, error) {
-	row := q.db.QueryRow(ctx, createServiceAccount,
+	row := q.db.QueryRow(ctx, CreateServiceAccount,
 		arg.AccountID,
 		arg.ClientID,
 		arg.ClientContactEmail,
@@ -99,20 +99,20 @@ func (q *Queries) CreateServiceAccount(ctx context.Context, arg CreateServiceAcc
 	return i, err
 }
 
-const deleteOneTimeClientSecret = `-- name: DeleteOneTimeClientSecret :execrows
+const DeleteOneTimeClientSecret = `-- name: DeleteOneTimeClientSecret :execrows
 DELETE from one_time_client_secrets 
 WHERE id = $1
 `
 
 func (q *Queries) DeleteOneTimeClientSecret(ctx context.Context, id uuid.UUID) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteOneTimeClientSecret, id)
+	result, err := q.db.Exec(ctx, DeleteOneTimeClientSecret, id)
 	if err != nil {
 		return 0, err
 	}
 	return result.RowsAffected(), nil
 }
 
-const deleteOneTimeClientSecretsByOrgAndEmail = `-- name: DeleteOneTimeClientSecretsByOrgAndEmail :execrows
+const DeleteOneTimeClientSecretsByOrgAndEmail = `-- name: DeleteOneTimeClientSecretsByOrgAndEmail :execrows
 DELETE from one_time_client_secrets 
 WHERE service_account_account_id = (SELECT account_id 
                                     FROM service_accounts 
@@ -127,14 +127,14 @@ type DeleteOneTimeClientSecretsByOrgAndEmailParams struct {
 }
 
 func (q *Queries) DeleteOneTimeClientSecretsByOrgAndEmail(ctx context.Context, arg DeleteOneTimeClientSecretsByOrgAndEmailParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteOneTimeClientSecretsByOrgAndEmail, arg.ClientOrganization, arg.ClientContactEmail)
+	result, err := q.db.Exec(ctx, DeleteOneTimeClientSecretsByOrgAndEmail, arg.ClientOrganization, arg.ClientContactEmail)
 	if err != nil {
 		return 0, err
 	}
 	return result.RowsAffected(), nil
 }
 
-const existsServiceAccountWithEmailAndOrganization = `-- name: ExistsServiceAccountWithEmailAndOrganization :one
+const ExistsServiceAccountWithEmailAndOrganization = `-- name: ExistsServiceAccountWithEmailAndOrganization :one
 SELECT EXISTS (
     SELECT 1 FROM service_accounts
     WHERE client_contact_email = $1
@@ -148,13 +148,13 @@ type ExistsServiceAccountWithEmailAndOrganizationParams struct {
 }
 
 func (q *Queries) ExistsServiceAccountWithEmailAndOrganization(ctx context.Context, arg ExistsServiceAccountWithEmailAndOrganizationParams) (bool, error) {
-	row := q.db.QueryRow(ctx, existsServiceAccountWithEmailAndOrganization, arg.ClientContactEmail, arg.ClientOrganization)
+	row := q.db.QueryRow(ctx, ExistsServiceAccountWithEmailAndOrganization, arg.ClientContactEmail, arg.ClientOrganization)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
 }
 
-const getOneTimeClientSecret = `-- name: GetOneTimeClientSecret :one
+const GetOneTimeClientSecret = `-- name: GetOneTimeClientSecret :one
 SELECT created_at, service_account_account_id, plaintext_secret, expires_at
 FROM one_time_client_secrets
 WHERE id = $1
@@ -168,7 +168,7 @@ type GetOneTimeClientSecretRow struct {
 }
 
 func (q *Queries) GetOneTimeClientSecret(ctx context.Context, id uuid.UUID) (GetOneTimeClientSecretRow, error) {
-	row := q.db.QueryRow(ctx, getOneTimeClientSecret, id)
+	row := q.db.QueryRow(ctx, GetOneTimeClientSecret, id)
 	var i GetOneTimeClientSecretRow
 	err := row.Scan(
 		&i.CreatedAt,
@@ -179,13 +179,13 @@ func (q *Queries) GetOneTimeClientSecret(ctx context.Context, id uuid.UUID) (Get
 	return i, err
 }
 
-const getServiceAccountByAccountID = `-- name: GetServiceAccountByAccountID :one
+const GetServiceAccountByAccountID = `-- name: GetServiceAccountByAccountID :one
 SELECT sa.account_id, sa.created_at, sa.updated_at, sa.client_id, sa.client_contact_email, sa.client_organization FROM service_accounts sa
 WHERE sa.account_id = $1
 `
 
 func (q *Queries) GetServiceAccountByAccountID(ctx context.Context, accountID uuid.UUID) (ServiceAccount, error) {
-	row := q.db.QueryRow(ctx, getServiceAccountByAccountID, accountID)
+	row := q.db.QueryRow(ctx, GetServiceAccountByAccountID, accountID)
 	var i ServiceAccount
 	err := row.Scan(
 		&i.AccountID,
@@ -198,13 +198,13 @@ func (q *Queries) GetServiceAccountByAccountID(ctx context.Context, accountID uu
 	return i, err
 }
 
-const getServiceAccountByClientID = `-- name: GetServiceAccountByClientID :one
+const GetServiceAccountByClientID = `-- name: GetServiceAccountByClientID :one
 SELECT sa.account_id, sa.created_at, sa.updated_at, sa.client_id, sa.client_contact_email, sa.client_organization FROM service_accounts sa
 WHERE sa.client_id = $1
 `
 
 func (q *Queries) GetServiceAccountByClientID(ctx context.Context, clientID string) (ServiceAccount, error) {
-	row := q.db.QueryRow(ctx, getServiceAccountByClientID, clientID)
+	row := q.db.QueryRow(ctx, GetServiceAccountByClientID, clientID)
 	var i ServiceAccount
 	err := row.Scan(
 		&i.AccountID,
@@ -217,7 +217,7 @@ func (q *Queries) GetServiceAccountByClientID(ctx context.Context, clientID stri
 	return i, err
 }
 
-const getServiceAccountWithOrganizationAndEmail = `-- name: GetServiceAccountWithOrganizationAndEmail :one
+const GetServiceAccountWithOrganizationAndEmail = `-- name: GetServiceAccountWithOrganizationAndEmail :one
 SELECT account_id, created_at, updated_at, client_id, client_contact_email, client_organization FROM service_accounts
     WHERE client_organization = $1
     AND client_contact_email = $2
@@ -229,7 +229,7 @@ type GetServiceAccountWithOrganizationAndEmailParams struct {
 }
 
 func (q *Queries) GetServiceAccountWithOrganizationAndEmail(ctx context.Context, arg GetServiceAccountWithOrganizationAndEmailParams) (ServiceAccount, error) {
-	row := q.db.QueryRow(ctx, getServiceAccountWithOrganizationAndEmail, arg.ClientOrganization, arg.ClientContactEmail)
+	row := q.db.QueryRow(ctx, GetServiceAccountWithOrganizationAndEmail, arg.ClientOrganization, arg.ClientContactEmail)
 	var i ServiceAccount
 	err := row.Scan(
 		&i.AccountID,
@@ -242,12 +242,12 @@ func (q *Queries) GetServiceAccountWithOrganizationAndEmail(ctx context.Context,
 	return i, err
 }
 
-const getServiceAccounts = `-- name: GetServiceAccounts :many
+const GetServiceAccounts = `-- name: GetServiceAccounts :many
 SELECT sa.account_id, sa.created_at, sa.updated_at, sa.client_id, sa.client_contact_email, sa.client_organization FROM service_accounts sa
 `
 
 func (q *Queries) GetServiceAccounts(ctx context.Context) ([]ServiceAccount, error) {
-	rows, err := q.db.Query(ctx, getServiceAccounts)
+	rows, err := q.db.Query(ctx, GetServiceAccounts)
 	if err != nil {
 		return nil, err
 	}
@@ -273,7 +273,7 @@ func (q *Queries) GetServiceAccounts(ctx context.Context) ([]ServiceAccount, err
 	return items, nil
 }
 
-const getValidClientSecretByHashedSecret = `-- name: GetValidClientSecretByHashedSecret :one
+const GetValidClientSecretByHashedSecret = `-- name: GetValidClientSecretByHashedSecret :one
 SELECT hashed_secret, created_at, updated_at, service_account_account_id, expires_at, revoked_at FROM client_secrets
 WHERE hashed_secret = $1
 AND revoked_at IS NULL
@@ -281,7 +281,7 @@ AND expires_at > NOW()
 `
 
 func (q *Queries) GetValidClientSecretByHashedSecret(ctx context.Context, hashedSecret string) (ClientSecret, error) {
-	row := q.db.QueryRow(ctx, getValidClientSecretByHashedSecret, hashedSecret)
+	row := q.db.QueryRow(ctx, GetValidClientSecretByHashedSecret, hashedSecret)
 	var i ClientSecret
 	err := row.Scan(
 		&i.HashedSecret,
@@ -294,7 +294,7 @@ func (q *Queries) GetValidClientSecretByHashedSecret(ctx context.Context, hashed
 	return i, err
 }
 
-const getValidClientSecretByServiceAccountAccountId = `-- name: GetValidClientSecretByServiceAccountAccountId :one
+const GetValidClientSecretByServiceAccountAccountId = `-- name: GetValidClientSecretByServiceAccountAccountId :one
 SELECT hashed_secret, expires_at
 FROM client_secrets
 WHERE service_account_account_id = $1
@@ -308,33 +308,33 @@ type GetValidClientSecretByServiceAccountAccountIdRow struct {
 }
 
 func (q *Queries) GetValidClientSecretByServiceAccountAccountId(ctx context.Context, serviceAccountAccountID uuid.UUID) (GetValidClientSecretByServiceAccountAccountIdRow, error) {
-	row := q.db.QueryRow(ctx, getValidClientSecretByServiceAccountAccountId, serviceAccountAccountID)
+	row := q.db.QueryRow(ctx, GetValidClientSecretByServiceAccountAccountId, serviceAccountAccountID)
 	var i GetValidClientSecretByServiceAccountAccountIdRow
 	err := row.Scan(&i.HashedSecret, &i.ExpiresAt)
 	return i, err
 }
 
-const revokeAllClientSecretsForAccount = `-- name: RevokeAllClientSecretsForAccount :execrows
+const RevokeAllClientSecretsForAccount = `-- name: RevokeAllClientSecretsForAccount :execrows
 UPDATE client_secrets SET (updated_at, revoked_at) = (NOW(), NOW()) 
 WHERE service_account_account_id = $1
 AND revoked_at IS NULL
 `
 
 func (q *Queries) RevokeAllClientSecretsForAccount(ctx context.Context, serviceAccountAccountID uuid.UUID) (int64, error) {
-	result, err := q.db.Exec(ctx, revokeAllClientSecretsForAccount, serviceAccountAccountID)
+	result, err := q.db.Exec(ctx, RevokeAllClientSecretsForAccount, serviceAccountAccountID)
 	if err != nil {
 		return 0, err
 	}
 	return result.RowsAffected(), nil
 }
 
-const revokeClientSecret = `-- name: RevokeClientSecret :execrows
+const RevokeClientSecret = `-- name: RevokeClientSecret :execrows
 UPDATE client_secrets SET (updated_at, revoked_at) = (NOW(), NOW()) 
 WHERE hashed_secret = $1
 `
 
 func (q *Queries) RevokeClientSecret(ctx context.Context, hashedSecret string) (int64, error) {
-	result, err := q.db.Exec(ctx, revokeClientSecret, hashedSecret)
+	result, err := q.db.Exec(ctx, RevokeClientSecret, hashedSecret)
 	if err != nil {
 		return 0, err
 	}

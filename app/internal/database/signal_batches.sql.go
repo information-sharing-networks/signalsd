@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const closeISNSignalBatchByAccountID = `-- name: CloseISNSignalBatchByAccountID :execrows
+const CloseISNSignalBatchByAccountID = `-- name: CloseISNSignalBatchByAccountID :execrows
 UPDATE signal_batches 
 SET is_latest = FALSE
 WHERE isn_id = $1 and account_id = $2
@@ -24,14 +24,14 @@ type CloseISNSignalBatchByAccountIDParams struct {
 }
 
 func (q *Queries) CloseISNSignalBatchByAccountID(ctx context.Context, arg CloseISNSignalBatchByAccountIDParams) (int64, error) {
-	result, err := q.db.Exec(ctx, closeISNSignalBatchByAccountID, arg.IsnID, arg.AccountID)
+	result, err := q.db.Exec(ctx, CloseISNSignalBatchByAccountID, arg.IsnID, arg.AccountID)
 	if err != nil {
 		return 0, err
 	}
 	return result.RowsAffected(), nil
 }
 
-const createOwnerSignalBatch = `-- name: CreateOwnerSignalBatch :one
+const CreateOwnerSignalBatch = `-- name: CreateOwnerSignalBatch :one
 INSERT INTO signal_batches (
     id,
     created_at,
@@ -59,7 +59,7 @@ type CreateOwnerSignalBatchParams struct {
 
 // create a batch for the owner on a new ISN created by an admin
 func (q *Queries) CreateOwnerSignalBatch(ctx context.Context, arg CreateOwnerSignalBatchParams) (SignalBatch, error) {
-	row := q.db.QueryRow(ctx, createOwnerSignalBatch, arg.IsnID, arg.AccountType)
+	row := q.db.QueryRow(ctx, CreateOwnerSignalBatch, arg.IsnID, arg.AccountType)
 	var i SignalBatch
 	err := row.Scan(
 		&i.ID,
@@ -73,7 +73,7 @@ func (q *Queries) CreateOwnerSignalBatch(ctx context.Context, arg CreateOwnerSig
 	return i, err
 }
 
-const createSignalBatch = `-- name: CreateSignalBatch :one
+const CreateSignalBatch = `-- name: CreateSignalBatch :one
 INSERT INTO signal_batches (
     id,
     created_at,
@@ -101,7 +101,7 @@ type CreateSignalBatchParams struct {
 }
 
 func (q *Queries) CreateSignalBatch(ctx context.Context, arg CreateSignalBatchParams) (SignalBatch, error) {
-	row := q.db.QueryRow(ctx, createSignalBatch, arg.IsnID, arg.AccountID, arg.AccountType)
+	row := q.db.QueryRow(ctx, CreateSignalBatch, arg.IsnID, arg.AccountID, arg.AccountType)
 	var i SignalBatch
 	err := row.Scan(
 		&i.ID,
@@ -115,7 +115,7 @@ func (q *Queries) CreateSignalBatch(ctx context.Context, arg CreateSignalBatchPa
 	return i, err
 }
 
-const getLatestIsnSignalBatchesByAccountID = `-- name: GetLatestIsnSignalBatchesByAccountID :many
+const GetLatestIsnSignalBatchesByAccountID = `-- name: GetLatestIsnSignalBatchesByAccountID :many
 SELECT sb.id, sb.created_at, sb.updated_at, sb.isn_id, sb.account_id, sb.is_latest, sb.account_type, i.slug as isn_slug FROM signal_batches sb 
 JOIN isn i
     ON sb.isn_id = i.id
@@ -135,7 +135,7 @@ type GetLatestIsnSignalBatchesByAccountIDRow struct {
 }
 
 func (q *Queries) GetLatestIsnSignalBatchesByAccountID(ctx context.Context, accountID uuid.UUID) ([]GetLatestIsnSignalBatchesByAccountIDRow, error) {
-	rows, err := q.db.Query(ctx, getLatestIsnSignalBatchesByAccountID, accountID)
+	rows, err := q.db.Query(ctx, GetLatestIsnSignalBatchesByAccountID, accountID)
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +163,7 @@ func (q *Queries) GetLatestIsnSignalBatchesByAccountID(ctx context.Context, acco
 	return items, nil
 }
 
-const getLatestSignalBatchByIsnSlugAndBatchID = `-- name: GetLatestSignalBatchByIsnSlugAndBatchID :one
+const GetLatestSignalBatchByIsnSlugAndBatchID = `-- name: GetLatestSignalBatchByIsnSlugAndBatchID :one
 SELECT sb.id, sb.created_at, sb.updated_at, sb.isn_id, sb.account_id, sb.is_latest, sb.account_type, i.slug as isn_slug FROM signal_batches sb
 JOIN isn i 
 ON i.id = sb.isn_id
@@ -189,7 +189,7 @@ type GetLatestSignalBatchByIsnSlugAndBatchIDRow struct {
 }
 
 func (q *Queries) GetLatestSignalBatchByIsnSlugAndBatchID(ctx context.Context, arg GetLatestSignalBatchByIsnSlugAndBatchIDParams) (GetLatestSignalBatchByIsnSlugAndBatchIDRow, error) {
-	row := q.db.QueryRow(ctx, getLatestSignalBatchByIsnSlugAndBatchID, arg.Slug, arg.ID)
+	row := q.db.QueryRow(ctx, GetLatestSignalBatchByIsnSlugAndBatchID, arg.Slug, arg.ID)
 	var i GetLatestSignalBatchByIsnSlugAndBatchIDRow
 	err := row.Scan(
 		&i.ID,

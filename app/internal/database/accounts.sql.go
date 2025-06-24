@@ -11,14 +11,14 @@ import (
 	"github.com/google/uuid"
 )
 
-const createServiceAccountAccount = `-- name: CreateServiceAccountAccount :one
+const CreateServiceAccountAccount = `-- name: CreateServiceAccountAccount :one
 INSERT INTO accounts (id, created_at, updated_at, account_type, is_active)
 VALUES ( gen_random_uuid(), NOW(), NOW(), 'service_account', true)
 RETURNING id, created_at, updated_at, account_type, is_active
 `
 
 func (q *Queries) CreateServiceAccountAccount(ctx context.Context) (Account, error) {
-	row := q.db.QueryRow(ctx, createServiceAccountAccount)
+	row := q.db.QueryRow(ctx, CreateServiceAccountAccount)
 	var i Account
 	err := row.Scan(
 		&i.ID,
@@ -30,14 +30,14 @@ func (q *Queries) CreateServiceAccountAccount(ctx context.Context) (Account, err
 	return i, err
 }
 
-const createUserAccount = `-- name: CreateUserAccount :one
+const CreateUserAccount = `-- name: CreateUserAccount :one
 INSERT INTO accounts (id, created_at, updated_at, account_type, is_active)
 VALUES ( gen_random_uuid(), NOW(), NOW(), 'user', true)
 RETURNING id, created_at, updated_at, account_type, is_active
 `
 
 func (q *Queries) CreateUserAccount(ctx context.Context) (Account, error) {
-	row := q.db.QueryRow(ctx, createUserAccount)
+	row := q.db.QueryRow(ctx, CreateUserAccount)
 	var i Account
 	err := row.Scan(
 		&i.ID,
@@ -49,33 +49,33 @@ func (q *Queries) CreateUserAccount(ctx context.Context) (Account, error) {
 	return i, err
 }
 
-const disableAccount = `-- name: DisableAccount :execrows
+const DisableAccount = `-- name: DisableAccount :execrows
 UPDATE accounts SET (updated_at, is_active) = (NOW(), false)
 WHERE id = $1
 `
 
 func (q *Queries) DisableAccount(ctx context.Context, id uuid.UUID) (int64, error) {
-	result, err := q.db.Exec(ctx, disableAccount, id)
+	result, err := q.db.Exec(ctx, DisableAccount, id)
 	if err != nil {
 		return 0, err
 	}
 	return result.RowsAffected(), nil
 }
 
-const enableAccount = `-- name: EnableAccount :execrows
+const EnableAccount = `-- name: EnableAccount :execrows
 UPDATE accounts SET (updated_at, is_active) = (NOW(), true)
 WHERE id = $1
 `
 
 func (q *Queries) EnableAccount(ctx context.Context, id uuid.UUID) (int64, error) {
-	result, err := q.db.Exec(ctx, enableAccount, id)
+	result, err := q.db.Exec(ctx, EnableAccount, id)
 	if err != nil {
 		return 0, err
 	}
 	return result.RowsAffected(), nil
 }
 
-const getAccountByID = `-- name: GetAccountByID :one
+const GetAccountByID = `-- name: GetAccountByID :one
 SELECT
     a.id ,
     a.account_type,
@@ -97,7 +97,7 @@ type GetAccountByIDRow struct {
 
 // return the account and user_role (user_role is not applicable to service_accounts - which are always treated as members - so just return 'member' in these cases)
 func (q *Queries) GetAccountByID(ctx context.Context, id uuid.UUID) (GetAccountByIDRow, error) {
-	row := q.db.QueryRow(ctx, getAccountByID, id)
+	row := q.db.QueryRow(ctx, GetAccountByID, id)
 	var i GetAccountByIDRow
 	err := row.Scan(
 		&i.ID,

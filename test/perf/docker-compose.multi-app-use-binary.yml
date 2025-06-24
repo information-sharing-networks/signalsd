@@ -1,6 +1,10 @@
 # Multi-Container Performance Test Setup
 # Uses existing shared database at localhost:15432
-# complies binary from source
+# uses existing binary from host. This can be used to compare specific version performance:
+# e.g
+# 1. git checkout v0.7.1
+# 2. build.sh -ld (build linux binary from source)
+# 3. cd test/perf && docker compose -f docker-compose.multi.app.yml up 
 
 services:
 
@@ -58,7 +62,7 @@ services:
       timeout: 5s
       retries: 5
     command: >
-      sh -c "cd /signalsd/app && go run cmd/signalsd/main.go -m signals"
+      sh -c "/signalsd/app/signalsd -m signals"
     networks:
       - multi-app-network
     deploy:
@@ -100,7 +104,7 @@ services:
       timeout: 5s
       retries: 5
     command: >
-      sh -c "cd /signalsd/app && go run cmd/signalsd/main.go -m signals"
+      sh -c "/signalsd/app/signalsd -m signals"
     networks:
       - multi-app-network
     deploy:
@@ -142,7 +146,7 @@ services:
       timeout: 5s
       retries: 5
     command: >
-      sh -c "cd /signalsd/app && go run cmd/signalsd/main.go -m signals"
+      sh -c "/signalsd/app/signalsd -m signals"
     networks:
       - multi-app-network
     deploy:
@@ -179,7 +183,7 @@ services:
       timeout: 5s
       retries: 5
     command: >
-      sh -c "cd /signalsd/app && go run cmd/signalsd/main.go -m admin"
+      sh -c "/signalsd/app/signalsd -m admin"
     networks:
       - multi-app-network
     deploy:
