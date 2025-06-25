@@ -1,11 +1,11 @@
 package handlers
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"slices"
@@ -141,6 +141,9 @@ type SignalVersionDoc struct {
 //	@Security		BearerAccessToken
 //
 //	@Router			/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals [post]
+//
+// CreateSignal Handler inserts signals and signal_versions records - signals are the master records containing
+// the local_ref and correlation_id, signal_versions contains the content and links back to the signal.  Multiple versions are created when signals are resupplied, e.g due to corrections being sent.
 func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Request) {
 
 	isnSlug := r.PathValue("isn_slug")
@@ -183,7 +186,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Validate basic structure
+	// check payload structure is valid
 	if createSignalsRequest.Signals == nil {
 		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "request must contain a 'signals' array")
 		return
@@ -194,7 +197,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Validate each signal has required fields
+	// check each signal in the payload has required fields
 	for i, signal := range createSignalsRequest.Signals {
 		if signal.LocalRef == "" {
 			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("signal at index %d is missing required field 'local_ref'", i))
@@ -227,79 +230,117 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 		}
 	}()
 
-	txQueries := s.queries.WithTx(tx)
-
+	// Validate all signals first (before any database operations)
 	for i, signal := range createSignalsRequest.Signals {
-		var err error
-
 		// Validate signal content against schema (includes JSON syntax validation)
-		// This will automatically refresh cache if schema is not found
 		err = schemas.ValidateSignal(r.Context(), s.queries, signalTypePath, signal.Content)
 		if err != nil {
 			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody,
 				fmt.Sprintf("signal %d (local_ref: %s) failed validation: %v", i+1, signal.LocalRef, err))
 			return
 		}
+	}
 
-		// create the signal master record the first time this acccount id/signal type/local_ref is received
+	// sql statements are batched to reduced the number of round trips to the database
+	signalBatch := &pgx.Batch{}
+	versionBatch := &pgx.Batch{}
+
+	// prepare signal creation batch
+	for _, signal := range createSignalsRequest.Signals {
 		if signal.CorrelationId == nil {
-			_, err = txQueries.CreateSignal(r.Context(), database.CreateSignalParams{
-				AccountID:      claims.AccountID,
-				LocalRef:       signal.LocalRef,
-				SignalTypeSlug: signalTypeSlug,
-				SemVer:         semVer,
-			})
+			signalBatch.Queue(database.CreateSignal,
+				claims.AccountID, signal.LocalRef, signalTypeSlug, semVer)
 		} else {
-
-			// if an invalid correlation id is supplied this insert will fail with a fk error (checked for below)
-			_, err = txQueries.CreateOrUpdateSignalWithCorrelationID(r.Context(), database.CreateOrUpdateSignalWithCorrelationIDParams{
-				AccountID:      claims.AccountID,
-				LocalRef:       signal.LocalRef,
-				SignalTypeSlug: signalTypeSlug,
-				CorrelationID:  *signal.CorrelationId,
-				SemVer:         semVer,
-			})
+			signalBatch.Queue(database.CreateOrUpdateSignalWithCorrelationID,
+				claims.AccountID, signal.LocalRef, *signal.CorrelationId, signalTypeSlug, semVer)
 		}
-		if err != nil && !errors.Is(err, pgx.ErrNoRows) { // no rows are created if adding a new version of an existing signal
+	}
+
+	// Execute signal creation batch
+	signalResults := tx.SendBatch(r.Context(), signalBatch)
+
+	// Check signal creation results for errors (ignore ErrNoRows for existing signals)
+	var signalProcessingError error
+	for i, signal := range createSignalsRequest.Signals {
+		var signalID uuid.UUID
+		err := signalResults.QueryRow().Scan(&signalID)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			var pgErr *pgconn.PgError
 			if errors.As(err, &pgErr) {
 				if pgErr.Code == "23503" && pgErr.ConstraintName == "fk_correlation_id" {
-					responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidCorrelationID, fmt.Sprintf("signal %d (local_ref: %s) has invalid correlation_id %v", i+1, signal.LocalRef, signal.CorrelationId))
-					return
+					signalProcessingError = fmt.Errorf("signal %d (local_ref: %s) has invalid correlation_id %v", i+1, signal.LocalRef, signal.CorrelationId)
+					break
 				}
 			}
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error processing signal %d (local_ref: %s): %v", i+1, signal.LocalRef, err))
-			return
+			signalProcessingError = fmt.Errorf("database error processing signal %d (local_ref: %s): %v", i+1, signal.LocalRef, err)
+			break
 		}
+	}
 
-		// record a new version of the signal
-		returnedRow, err := txQueries.CreateSignalVersion(r.Context(), database.CreateSignalVersionParams{
-			AccountID:      claims.AccountID,
-			LocalRef:       signal.LocalRef,
-			SignalTypeSlug: signalTypeSlug,
-			SemVer:         semVer,
-			SignalBatchID:  *claims.IsnPerms[isnSlug].SignalBatchID,
-			Content:        signal.Content,
-		})
+	// Close batch results before checking for errors to prevent "conn busy"
+	closeErr := signalResults.Close()
+	if closeErr != nil {
+		fmt.Printf("Error closing signal batch results: %v\n", closeErr)
+	}
+
+	// Now handle any processing errors
+	if signalProcessingError != nil {
+		if strings.Contains(signalProcessingError.Error(), "invalid correlation_id") {
+			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidCorrelationID, signalProcessingError.Error())
+		} else {
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, signalProcessingError.Error())
+		}
+		return
+	}
+
+	// Prepare version creation batch
+	for _, signal := range createSignalsRequest.Signals {
+		versionBatch.Queue(database.CreateSignalVersion,
+			claims.AccountID,
+			*claims.IsnPerms[isnSlug].SignalBatchID,
+			signal.Content,
+			signal.LocalRef,
+			signalTypeSlug,
+			semVer,
+		)
+	}
+
+	// Execute version creation batch
+	versionResults := tx.SendBatch(r.Context(), versionBatch)
+
+	// Process version creation results
+	var versionProcessingError error
+	for i, signal := range createSignalsRequest.Signals {
+		var versionID uuid.UUID
+		var versionNumber int32
+		err := versionResults.QueryRow().Scan(&versionID, &versionNumber)
 		if err != nil {
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error creating version for signal %d (local_ref: %s): %v", i+1, signal.LocalRef, err))
-			return
+			versionProcessingError = fmt.Errorf("database error creating version for signal %d (local_ref: %s): %v", i+1, signal.LocalRef, err)
+			break
 		}
 
 		storedSignals = append(storedSignals, StoredSignal{
 			LocalRef:        signal.LocalRef,
-			SignalVersionID: returnedRow.ID,
-			VersionNumber:   returnedRow.VersionNumber,
+			SignalVersionID: versionID,
+			VersionNumber:   versionNumber,
 		})
+	}
+
+	// CRITICAL: Close batch results before checking for errors to prevent "conn busy"
+	closeErr = versionResults.Close()
+	if closeErr != nil {
+		fmt.Printf("Error closing version batch results: %v\n", closeErr)
+	}
+
+	// Now handle any processing errors
+	if versionProcessingError != nil {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, versionProcessingError.Error())
+		return
 	}
 
 	createSignalsResponse.StoredSignals = storedSignals
 
-	// Use a separate context for commit to avoid issues if request context is canceled
-	commitCtx, commitCancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer commitCancel()
-
-	if err = tx.Commit(commitCtx); err != nil {
+	if err = tx.Commit(r.Context()); err != nil {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to commit transaction: %v", err))
 		return
 	}

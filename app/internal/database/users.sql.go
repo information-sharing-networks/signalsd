@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const createOwnerUser = `-- name: CreateOwnerUser :one
+const CreateOwnerUser = `-- name: CreateOwnerUser :one
 INSERT INTO users (account_id, created_at, updated_at, email, hashed_password, user_role)
 VALUES ( $1, NOW(), NOW(), $2, $3, 'owner')
 RETURNING account_id, created_at, updated_at, email, hashed_password, user_role
@@ -25,7 +25,7 @@ type CreateOwnerUserParams struct {
 }
 
 func (q *Queries) CreateOwnerUser(ctx context.Context, arg CreateOwnerUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, createOwnerUser, arg.AccountID, arg.Email, arg.HashedPassword)
+	row := q.db.QueryRow(ctx, CreateOwnerUser, arg.AccountID, arg.Email, arg.HashedPassword)
 	var i User
 	err := row.Scan(
 		&i.AccountID,
@@ -38,7 +38,7 @@ func (q *Queries) CreateOwnerUser(ctx context.Context, arg CreateOwnerUserParams
 	return i, err
 }
 
-const createUser = `-- name: CreateUser :one
+const CreateUser = `-- name: CreateUser :one
 
 INSERT INTO users (account_id, created_at, updated_at, email, hashed_password, user_role)
 VALUES ( $1, NOW(), NOW(), $2, $3, 'member')
@@ -53,7 +53,7 @@ type CreateUserParams struct {
 
 // note: don't display emails on public apis ("GetForDisplay*").
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, createUser, arg.AccountID, arg.Email, arg.HashedPassword)
+	row := q.db.QueryRow(ctx, CreateUser, arg.AccountID, arg.Email, arg.HashedPassword)
 	var i User
 	err := row.Scan(
 		&i.AccountID,
@@ -66,20 +66,20 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	return i, err
 }
 
-const existsUserWithEmail = `-- name: ExistsUserWithEmail :one
+const ExistsUserWithEmail = `-- name: ExistsUserWithEmail :one
 SELECT EXISTS (
     SELECT 1 FROM users WHERE email = $1
 ) AS exists
 `
 
 func (q *Queries) ExistsUserWithEmail(ctx context.Context, email string) (bool, error) {
-	row := q.db.QueryRow(ctx, existsUserWithEmail, email)
+	row := q.db.QueryRow(ctx, ExistsUserWithEmail, email)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
 }
 
-const getForDisplayUserByIsnID = `-- name: GetForDisplayUserByIsnID :one
+const GetForDisplayUserByIsnID = `-- name: GetForDisplayUserByIsnID :one
 SELECT u.account_id, u.created_at , u.updated_at 
 FROM users u 
 JOIN isn i ON u.account_id = i.user_account_id 
@@ -93,13 +93,13 @@ type GetForDisplayUserByIsnIDRow struct {
 }
 
 func (q *Queries) GetForDisplayUserByIsnID(ctx context.Context, id uuid.UUID) (GetForDisplayUserByIsnIDRow, error) {
-	row := q.db.QueryRow(ctx, getForDisplayUserByIsnID, id)
+	row := q.db.QueryRow(ctx, GetForDisplayUserByIsnID, id)
 	var i GetForDisplayUserByIsnIDRow
 	err := row.Scan(&i.AccountID, &i.CreatedAt, &i.UpdatedAt)
 	return i, err
 }
 
-const getForDisplayUserBySignalDefID = `-- name: GetForDisplayUserBySignalDefID :one
+const GetForDisplayUserBySignalDefID = `-- name: GetForDisplayUserBySignalDefID :one
 SELECT u.account_id, u.created_at , u.updated_at 
 FROM users u 
 JOIN signal_types sd ON u.account_id = sd.user_account_id 
@@ -113,18 +113,18 @@ type GetForDisplayUserBySignalDefIDRow struct {
 }
 
 func (q *Queries) GetForDisplayUserBySignalDefID(ctx context.Context, id uuid.UUID) (GetForDisplayUserBySignalDefIDRow, error) {
-	row := q.db.QueryRow(ctx, getForDisplayUserBySignalDefID, id)
+	row := q.db.QueryRow(ctx, GetForDisplayUserBySignalDefID, id)
 	var i GetForDisplayUserBySignalDefIDRow
 	err := row.Scan(&i.AccountID, &i.CreatedAt, &i.UpdatedAt)
 	return i, err
 }
 
-const getUserByEmail = `-- name: GetUserByEmail :one
+const GetUserByEmail = `-- name: GetUserByEmail :one
 SELECT account_id, created_at, updated_at, email, hashed_password, user_role FROM users WHERE email = $1
 `
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
-	row := q.db.QueryRow(ctx, getUserByEmail, email)
+	row := q.db.QueryRow(ctx, GetUserByEmail, email)
 	var i User
 	err := row.Scan(
 		&i.AccountID,
@@ -137,7 +137,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 	return i, err
 }
 
-const getUserByID = `-- name: GetUserByID :one
+const GetUserByID = `-- name: GetUserByID :one
 SELECT  u.account_id, u.email, u.user_role, u.created_at  FROM users u WHERE u.account_id = $1
 `
 
@@ -149,7 +149,7 @@ type GetUserByIDRow struct {
 }
 
 func (q *Queries) GetUserByID(ctx context.Context, accountID uuid.UUID) (GetUserByIDRow, error) {
-	row := q.db.QueryRow(ctx, getUserByID, accountID)
+	row := q.db.QueryRow(ctx, GetUserByID, accountID)
 	var i GetUserByIDRow
 	err := row.Scan(
 		&i.AccountID,
@@ -160,7 +160,7 @@ func (q *Queries) GetUserByID(ctx context.Context, accountID uuid.UUID) (GetUser
 	return i, err
 }
 
-const getUsers = `-- name: GetUsers :many
+const GetUsers = `-- name: GetUsers :many
 SELECT u.account_id, u.email, u.user_role, u.created_at , u.updated_at FROM users u
 `
 
@@ -173,7 +173,7 @@ type GetUsersRow struct {
 }
 
 func (q *Queries) GetUsers(ctx context.Context) ([]GetUsersRow, error) {
-	rows, err := q.db.Query(ctx, getUsers)
+	rows, err := q.db.Query(ctx, GetUsers)
 	if err != nil {
 		return nil, err
 	}
@@ -198,19 +198,19 @@ func (q *Queries) GetUsers(ctx context.Context) ([]GetUsersRow, error) {
 	return items, nil
 }
 
-const isFirstUser = `-- name: IsFirstUser :one
+const IsFirstUser = `-- name: IsFirstUser :one
 SELECT COUNT(*) = 0 AS is_empty
 FROM users
 `
 
 func (q *Queries) IsFirstUser(ctx context.Context) (bool, error) {
-	row := q.db.QueryRow(ctx, isFirstUser)
+	row := q.db.QueryRow(ctx, IsFirstUser)
 	var is_empty bool
 	err := row.Scan(&is_empty)
 	return is_empty, err
 }
 
-const updatePassword = `-- name: UpdatePassword :execrows
+const UpdatePassword = `-- name: UpdatePassword :execrows
 UPDATE users SET (updated_at, hashed_password) = (NOW(), $2)
 WHERE account_id = $1
 `
@@ -221,14 +221,14 @@ type UpdatePasswordParams struct {
 }
 
 func (q *Queries) UpdatePassword(ctx context.Context, arg UpdatePasswordParams) (int64, error) {
-	result, err := q.db.Exec(ctx, updatePassword, arg.AccountID, arg.HashedPassword)
+	result, err := q.db.Exec(ctx, UpdatePassword, arg.AccountID, arg.HashedPassword)
 	if err != nil {
 		return 0, err
 	}
 	return result.RowsAffected(), nil
 }
 
-const updateUserAccountToAdmin = `-- name: UpdateUserAccountToAdmin :execrows
+const UpdateUserAccountToAdmin = `-- name: UpdateUserAccountToAdmin :execrows
 UPDATE users 
 SET 
     user_role = 'admin'
@@ -237,14 +237,14 @@ WHERE
 `
 
 func (q *Queries) UpdateUserAccountToAdmin(ctx context.Context, accountID uuid.UUID) (int64, error) {
-	result, err := q.db.Exec(ctx, updateUserAccountToAdmin, accountID)
+	result, err := q.db.Exec(ctx, UpdateUserAccountToAdmin, accountID)
 	if err != nil {
 		return 0, err
 	}
 	return result.RowsAffected(), nil
 }
 
-const updateUserAccountToMember = `-- name: UpdateUserAccountToMember :execrows
+const UpdateUserAccountToMember = `-- name: UpdateUserAccountToMember :execrows
 UPDATE users 
 SET 
     user_role = 'member'
@@ -253,7 +253,7 @@ WHERE
 `
 
 func (q *Queries) UpdateUserAccountToMember(ctx context.Context, accountID uuid.UUID) (int64, error) {
-	result, err := q.db.Exec(ctx, updateUserAccountToMember, accountID)
+	result, err := q.db.Exec(ctx, UpdateUserAccountToMember, accountID)
 	if err != nil {
 		return 0, err
 	}

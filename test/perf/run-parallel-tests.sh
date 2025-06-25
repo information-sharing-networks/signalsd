@@ -212,7 +212,11 @@ echo "Total Signals Processed: $total_signals"
 echo "Total Successful Batches: $total_successful_batches"
 echo "Total Failed Batches: $total_failed_batches"
 echo "Success Rate: $(echo "scale=1; $total_successful_batches * 100 / ($total_successful_batches + $total_failed_batches)" | bc -l)%"
-echo "Combined Throughput: $(echo "scale=2; $total_signals / $total_time" | bc -l) signals/sec"
+if [ "$total_time" -gt 0 ]; then
+    echo "Combined Throughput: $(echo "scale=2; $total_signals / $total_time" | bc -l) signals/sec"
+else
+    echo "Combined Throughput: >$total_signals signals/sec (completed in <1 second)"
+fi
 echo "Min Instance Throughput: $min_signals_per_sec signals/sec"
 echo "Max Instance Throughput: $max_signals_per_sec signals/sec"
 echo "Test Duration: ${total_time} seconds"

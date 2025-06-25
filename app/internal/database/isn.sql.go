@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const createIsn = `-- name: CreateIsn :one
+const CreateIsn = `-- name: CreateIsn :one
 
 INSERT INTO isn (
     id,
@@ -43,7 +43,7 @@ type CreateIsnRow struct {
 }
 
 func (q *Queries) CreateIsn(ctx context.Context, arg CreateIsnParams) (CreateIsnRow, error) {
-	row := q.db.QueryRow(ctx, createIsn,
+	row := q.db.QueryRow(ctx, CreateIsn,
 		arg.UserAccountID,
 		arg.Title,
 		arg.Slug,
@@ -56,7 +56,7 @@ func (q *Queries) CreateIsn(ctx context.Context, arg CreateIsnParams) (CreateIsn
 	return i, err
 }
 
-const existsIsnWithSlug = `-- name: ExistsIsnWithSlug :one
+const ExistsIsnWithSlug = `-- name: ExistsIsnWithSlug :one
 
 SELECT EXISTS
   (SELECT 1
@@ -65,13 +65,13 @@ SELECT EXISTS
 `
 
 func (q *Queries) ExistsIsnWithSlug(ctx context.Context, slug string) (bool, error) {
-	row := q.db.QueryRow(ctx, existsIsnWithSlug, slug)
+	row := q.db.QueryRow(ctx, ExistsIsnWithSlug, slug)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
 }
 
-const getForDisplayIsnBySlug = `-- name: GetForDisplayIsnBySlug :one
+const GetForDisplayIsnBySlug = `-- name: GetForDisplayIsnBySlug :one
 SELECT 
     id,
     created_at,
@@ -97,7 +97,7 @@ type GetForDisplayIsnBySlugRow struct {
 }
 
 func (q *Queries) GetForDisplayIsnBySlug(ctx context.Context, slug string) (GetForDisplayIsnBySlugRow, error) {
-	row := q.db.QueryRow(ctx, getForDisplayIsnBySlug, slug)
+	row := q.db.QueryRow(ctx, GetForDisplayIsnBySlug, slug)
 	var i GetForDisplayIsnBySlugRow
 	err := row.Scan(
 		&i.ID,
@@ -112,14 +112,14 @@ func (q *Queries) GetForDisplayIsnBySlug(ctx context.Context, slug string) (GetF
 	return i, err
 }
 
-const getIsnByID = `-- name: GetIsnByID :one
+const GetIsnByID = `-- name: GetIsnByID :one
 SELECT i.id, i.created_at, i.updated_at, i.user_account_id, i.title, i.slug, i.detail, i.is_in_use, i.visibility 
 FROM isn i
 WHERE i.id = $1
 `
 
 func (q *Queries) GetIsnByID(ctx context.Context, id uuid.UUID) (Isn, error) {
-	row := q.db.QueryRow(ctx, getIsnByID, id)
+	row := q.db.QueryRow(ctx, GetIsnByID, id)
 	var i Isn
 	err := row.Scan(
 		&i.ID,
@@ -135,7 +135,7 @@ func (q *Queries) GetIsnByID(ctx context.Context, id uuid.UUID) (Isn, error) {
 	return i, err
 }
 
-const getIsnBySignalTypeID = `-- name: GetIsnBySignalTypeID :one
+const GetIsnBySignalTypeID = `-- name: GetIsnBySignalTypeID :one
 SELECT i.id, i.created_at, i.updated_at, i.user_account_id, i.title, i.slug, i.detail, i.is_in_use, i.visibility 
 FROM isn i
 JOIN signal_types sd on sd.isn_id = i.id
@@ -143,7 +143,7 @@ WHERE sd.id = $1
 `
 
 func (q *Queries) GetIsnBySignalTypeID(ctx context.Context, id uuid.UUID) (Isn, error) {
-	row := q.db.QueryRow(ctx, getIsnBySignalTypeID, id)
+	row := q.db.QueryRow(ctx, GetIsnBySignalTypeID, id)
 	var i Isn
 	err := row.Scan(
 		&i.ID,
@@ -159,14 +159,14 @@ func (q *Queries) GetIsnBySignalTypeID(ctx context.Context, id uuid.UUID) (Isn, 
 	return i, err
 }
 
-const getIsnBySlug = `-- name: GetIsnBySlug :one
+const GetIsnBySlug = `-- name: GetIsnBySlug :one
 SELECT i.id, i.created_at, i.updated_at, i.user_account_id, i.title, i.slug, i.detail, i.is_in_use, i.visibility 
 FROM isn i
 WHERE i.slug = $1
 `
 
 func (q *Queries) GetIsnBySlug(ctx context.Context, slug string) (Isn, error) {
-	row := q.db.QueryRow(ctx, getIsnBySlug, slug)
+	row := q.db.QueryRow(ctx, GetIsnBySlug, slug)
 	var i Isn
 	err := row.Scan(
 		&i.ID,
@@ -182,13 +182,13 @@ func (q *Queries) GetIsnBySlug(ctx context.Context, slug string) (Isn, error) {
 	return i, err
 }
 
-const getIsns = `-- name: GetIsns :many
+const GetIsns = `-- name: GetIsns :many
 SELECT i.id, i.created_at, i.updated_at, i.user_account_id, i.title, i.slug, i.detail, i.is_in_use, i.visibility 
 FROM isn i
 `
 
 func (q *Queries) GetIsns(ctx context.Context) ([]Isn, error) {
-	rows, err := q.db.Query(ctx, getIsns)
+	rows, err := q.db.Query(ctx, GetIsns)
 	if err != nil {
 		return nil, err
 	}
@@ -217,7 +217,7 @@ func (q *Queries) GetIsns(ctx context.Context) ([]Isn, error) {
 	return items, nil
 }
 
-const updateIsn = `-- name: UpdateIsn :execrows
+const UpdateIsn = `-- name: UpdateIsn :execrows
 UPDATE isn SET (
     updated_at, 
     detail,
@@ -235,7 +235,7 @@ type UpdateIsnParams struct {
 }
 
 func (q *Queries) UpdateIsn(ctx context.Context, arg UpdateIsnParams) (int64, error) {
-	result, err := q.db.Exec(ctx, updateIsn,
+	result, err := q.db.Exec(ctx, UpdateIsn,
 		arg.ID,
 		arg.Detail,
 		arg.IsInUse,

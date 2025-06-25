@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const checkSignalTypeInUse = `-- name: CheckSignalTypeInUse :one
+const CheckSignalTypeInUse = `-- name: CheckSignalTypeInUse :one
 SELECT EXISTS(
     SELECT 1
     FROM signals
@@ -21,13 +21,13 @@ SELECT EXISTS(
 `
 
 func (q *Queries) CheckSignalTypeInUse(ctx context.Context, signalTypeID uuid.UUID) (bool, error) {
-	row := q.db.QueryRow(ctx, checkSignalTypeInUse, signalTypeID)
+	row := q.db.QueryRow(ctx, CheckSignalTypeInUse, signalTypeID)
 	var in_use bool
 	err := row.Scan(&in_use)
 	return in_use, err
 }
 
-const createSignalType = `-- name: CreateSignalType :one
+const CreateSignalType = `-- name: CreateSignalType :one
 
 INSERT INTO signal_types (
     id,
@@ -58,7 +58,7 @@ type CreateSignalTypeParams struct {
 }
 
 func (q *Queries) CreateSignalType(ctx context.Context, arg CreateSignalTypeParams) (SignalType, error) {
-	row := q.db.QueryRow(ctx, createSignalType,
+	row := q.db.QueryRow(ctx, CreateSignalType,
 		arg.IsnID,
 		arg.Slug,
 		arg.SchemaURL,
@@ -86,20 +86,20 @@ func (q *Queries) CreateSignalType(ctx context.Context, arg CreateSignalTypePara
 	return i, err
 }
 
-const deleteSignalType = `-- name: DeleteSignalType :execrows
+const DeleteSignalType = `-- name: DeleteSignalType :execrows
 DELETE FROM signal_types
 WHERE id = $1
 `
 
 func (q *Queries) DeleteSignalType(ctx context.Context, id uuid.UUID) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteSignalType, id)
+	result, err := q.db.Exec(ctx, DeleteSignalType, id)
 	if err != nil {
 		return 0, err
 	}
 	return result.RowsAffected(), nil
 }
 
-const existsSignalTypeWithSlugAndSchema = `-- name: ExistsSignalTypeWithSlugAndSchema :one
+const ExistsSignalTypeWithSlugAndSchema = `-- name: ExistsSignalTypeWithSlugAndSchema :one
 SELECT EXISTS
   (SELECT 1
    FROM signal_types
@@ -113,13 +113,13 @@ type ExistsSignalTypeWithSlugAndSchemaParams struct {
 }
 
 func (q *Queries) ExistsSignalTypeWithSlugAndSchema(ctx context.Context, arg ExistsSignalTypeWithSlugAndSchemaParams) (bool, error) {
-	row := q.db.QueryRow(ctx, existsSignalTypeWithSlugAndSchema, arg.Slug, arg.SchemaURL)
+	row := q.db.QueryRow(ctx, ExistsSignalTypeWithSlugAndSchema, arg.Slug, arg.SchemaURL)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
 }
 
-const getForDisplaySignalTypeByID = `-- name: GetForDisplaySignalTypeByID :one
+const GetForDisplaySignalTypeByID = `-- name: GetForDisplaySignalTypeByID :one
 SELECT 
     st.id,
     st.created_at,
@@ -149,7 +149,7 @@ type GetForDisplaySignalTypeByIDRow struct {
 }
 
 func (q *Queries) GetForDisplaySignalTypeByID(ctx context.Context, id uuid.UUID) (GetForDisplaySignalTypeByIDRow, error) {
-	row := q.db.QueryRow(ctx, getForDisplaySignalTypeByID, id)
+	row := q.db.QueryRow(ctx, GetForDisplaySignalTypeByID, id)
 	var i GetForDisplaySignalTypeByIDRow
 	err := row.Scan(
 		&i.ID,
@@ -166,7 +166,7 @@ func (q *Queries) GetForDisplaySignalTypeByID(ctx context.Context, id uuid.UUID)
 	return i, err
 }
 
-const getForDisplaySignalTypeByIsnID = `-- name: GetForDisplaySignalTypeByIsnID :many
+const GetForDisplaySignalTypeByIsnID = `-- name: GetForDisplaySignalTypeByIsnID :many
 SELECT 
     st.id,
     st.created_at,
@@ -196,7 +196,7 @@ type GetForDisplaySignalTypeByIsnIDRow struct {
 }
 
 func (q *Queries) GetForDisplaySignalTypeByIsnID(ctx context.Context, isnID uuid.UUID) ([]GetForDisplaySignalTypeByIsnIDRow, error) {
-	rows, err := q.db.Query(ctx, getForDisplaySignalTypeByIsnID, isnID)
+	rows, err := q.db.Query(ctx, GetForDisplaySignalTypeByIsnID, isnID)
 	if err != nil {
 		return nil, err
 	}
@@ -226,7 +226,7 @@ func (q *Queries) GetForDisplaySignalTypeByIsnID(ctx context.Context, isnID uuid
 	return items, nil
 }
 
-const getForDisplaySignalTypeBySlug = `-- name: GetForDisplaySignalTypeBySlug :one
+const GetForDisplaySignalTypeBySlug = `-- name: GetForDisplaySignalTypeBySlug :one
 SELECT 
     st.id,
     st.created_at,
@@ -262,7 +262,7 @@ type GetForDisplaySignalTypeBySlugRow struct {
 }
 
 func (q *Queries) GetForDisplaySignalTypeBySlug(ctx context.Context, arg GetForDisplaySignalTypeBySlugParams) (GetForDisplaySignalTypeBySlugRow, error) {
-	row := q.db.QueryRow(ctx, getForDisplaySignalTypeBySlug, arg.Slug, arg.SemVer)
+	row := q.db.QueryRow(ctx, GetForDisplaySignalTypeBySlug, arg.Slug, arg.SemVer)
 	var i GetForDisplaySignalTypeBySlugRow
 	err := row.Scan(
 		&i.ID,
@@ -279,7 +279,7 @@ func (q *Queries) GetForDisplaySignalTypeBySlug(ctx context.Context, arg GetForD
 	return i, err
 }
 
-const getInUseSignalTypesByIsnID = `-- name: GetInUseSignalTypesByIsnID :many
+const GetInUseSignalTypesByIsnID = `-- name: GetInUseSignalTypesByIsnID :many
 SELECT st.id, st.created_at, st.updated_at, st.isn_id, st.slug, st.schema_url, st.readme_url, st.title, st.detail, st.sem_ver, st.is_in_use, st.schema_content
 FROM signal_types st
 WHERE st.isn_id = $1
@@ -288,7 +288,7 @@ AND is_in_use = true
 
 // only return signal_types for the ISN that are flagged "in use"
 func (q *Queries) GetInUseSignalTypesByIsnID(ctx context.Context, isnID uuid.UUID) ([]SignalType, error) {
-	rows, err := q.db.Query(ctx, getInUseSignalTypesByIsnID, isnID)
+	rows, err := q.db.Query(ctx, GetInUseSignalTypesByIsnID, isnID)
 	if err != nil {
 		return nil, err
 	}
@@ -320,12 +320,12 @@ func (q *Queries) GetInUseSignalTypesByIsnID(ctx context.Context, isnID uuid.UUI
 	return items, nil
 }
 
-const getSchemaURLs = `-- name: GetSchemaURLs :many
+const GetSchemaURLs = `-- name: GetSchemaURLs :many
 SELECT DISTINCT schema_url FROM signal_types
 `
 
 func (q *Queries) GetSchemaURLs(ctx context.Context) ([]string, error) {
-	rows, err := q.db.Query(ctx, getSchemaURLs)
+	rows, err := q.db.Query(ctx, GetSchemaURLs)
 	if err != nil {
 		return nil, err
 	}
@@ -344,7 +344,7 @@ func (q *Queries) GetSchemaURLs(ctx context.Context) ([]string, error) {
 	return items, nil
 }
 
-const getSemVerAndSchemaForLatestSlugVersion = `-- name: GetSemVerAndSchemaForLatestSlugVersion :one
+const GetSemVerAndSchemaForLatestSlugVersion = `-- name: GetSemVerAndSchemaForLatestSlugVersion :one
 SELECT '0.0.0' AS sem_ver,
        '' AS schema_url
 WHERE NOT EXISTS
@@ -369,13 +369,13 @@ type GetSemVerAndSchemaForLatestSlugVersionRow struct {
 
 // if there are no signals defs for the supplied slug, this query returns an empty string for schema_url and a sem_ver of '0.0.0'
 func (q *Queries) GetSemVerAndSchemaForLatestSlugVersion(ctx context.Context, slug string) (GetSemVerAndSchemaForLatestSlugVersionRow, error) {
-	row := q.db.QueryRow(ctx, getSemVerAndSchemaForLatestSlugVersion, slug)
+	row := q.db.QueryRow(ctx, GetSemVerAndSchemaForLatestSlugVersion, slug)
 	var i GetSemVerAndSchemaForLatestSlugVersionRow
 	err := row.Scan(&i.SemVer, &i.SchemaURL)
 	return i, err
 }
 
-const getSignalTypeByID = `-- name: GetSignalTypeByID :one
+const GetSignalTypeByID = `-- name: GetSignalTypeByID :one
 
 SELECT st.id, st.created_at, st.updated_at, st.isn_id, st.slug, st.schema_url, st.readme_url, st.title, st.detail, st.sem_ver, st.is_in_use, st.schema_content
 FROM signal_types st
@@ -383,7 +383,7 @@ WHERE st.id = $1
 `
 
 func (q *Queries) GetSignalTypeByID(ctx context.Context, id uuid.UUID) (SignalType, error) {
-	row := q.db.QueryRow(ctx, getSignalTypeByID, id)
+	row := q.db.QueryRow(ctx, GetSignalTypeByID, id)
 	var i SignalType
 	err := row.Scan(
 		&i.ID,
@@ -402,7 +402,7 @@ func (q *Queries) GetSignalTypeByID(ctx context.Context, id uuid.UUID) (SignalTy
 	return i, err
 }
 
-const getSignalTypeBySlug = `-- name: GetSignalTypeBySlug :one
+const GetSignalTypeBySlug = `-- name: GetSignalTypeBySlug :one
 
 SELECT st.id, st.created_at, st.updated_at, st.isn_id, st.slug, st.schema_url, st.readme_url, st.title, st.detail, st.sem_ver, st.is_in_use, st.schema_content
 FROM signal_types st
@@ -416,7 +416,7 @@ type GetSignalTypeBySlugParams struct {
 }
 
 func (q *Queries) GetSignalTypeBySlug(ctx context.Context, arg GetSignalTypeBySlugParams) (SignalType, error) {
-	row := q.db.QueryRow(ctx, getSignalTypeBySlug, arg.Slug, arg.SemVer)
+	row := q.db.QueryRow(ctx, GetSignalTypeBySlug, arg.Slug, arg.SemVer)
 	var i SignalType
 	err := row.Scan(
 		&i.ID,
@@ -435,14 +435,14 @@ func (q *Queries) GetSignalTypeBySlug(ctx context.Context, arg GetSignalTypeBySl
 	return i, err
 }
 
-const getSignalTypes = `-- name: GetSignalTypes :many
+const GetSignalTypes = `-- name: GetSignalTypes :many
 
 SELECT st.id, st.created_at, st.updated_at, st.isn_id, st.slug, st.schema_url, st.readme_url, st.title, st.detail, st.sem_ver, st.is_in_use, st.schema_content
 FROM signal_types st
 `
 
 func (q *Queries) GetSignalTypes(ctx context.Context) ([]SignalType, error) {
-	rows, err := q.db.Query(ctx, getSignalTypes)
+	rows, err := q.db.Query(ctx, GetSignalTypes)
 	if err != nil {
 		return nil, err
 	}
@@ -474,7 +474,7 @@ func (q *Queries) GetSignalTypes(ctx context.Context) ([]SignalType, error) {
 	return items, nil
 }
 
-const updateSignalTypeDetails = `-- name: UpdateSignalTypeDetails :execrows
+const UpdateSignalTypeDetails = `-- name: UpdateSignalTypeDetails :execrows
 UPDATE signal_types SET (updated_at, readme_url, detail, is_in_use) = (NOW(), $2, $3, $4)
 WHERE id = $1
 `
@@ -487,7 +487,7 @@ type UpdateSignalTypeDetailsParams struct {
 }
 
 func (q *Queries) UpdateSignalTypeDetails(ctx context.Context, arg UpdateSignalTypeDetailsParams) (int64, error) {
-	result, err := q.db.Exec(ctx, updateSignalTypeDetails,
+	result, err := q.db.Exec(ctx, UpdateSignalTypeDetails,
 		arg.ID,
 		arg.ReadmeURL,
 		arg.Detail,

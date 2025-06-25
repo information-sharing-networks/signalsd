@@ -8,11 +8,12 @@ set -e
 
 usage() {
     cat << !
-    Usage: $0 [-d] [-b TYPE]
+    Usage: $0 [-bl] [-t TYPE]
 
     Options:
-        -d          dry run (build the application but don't push the tag to github)
-        -b TYPE     Bump version (major|minor|patch)
+        -b          build only (build the application but don't push the tag to github)
+        -l          build binary for linux rather than Mac (GOOS=linux GOARCH=amd64)
+        -t TYPE     tag version bump type (major|minor|patch) - this will push the tag to github
 !
 }
 
@@ -49,34 +50,37 @@ fi
 
 BUMP_TYPE=""
 
-while getopts "hdb:" opt; do
+while getopts "hblt:" opt; do
     case $opt in
         h) usage; exit 0 ;;
-        d) DRY_RUN=true ;;
-        b) BUMP_TYPE=$OPTARG;;
+        b) BUILD_ONLY=true ;;
+        t) BUMP_TYPE=$OPTARG;;
+        l) LINUX=true ;;
         *) usage >&2; exit 1 ;;
     esac
 done
 
-if [ -z "$BUMP_TYPE" ]; then
-    usage
-    exit
+if [ -z "$BUILD_ONLY" ];then
+    if [ -z "$BUMP_TYPE" ]; then
+        usage
+        exit
+    fi
+
+    if [ "$BUMP_TYPE" != "major" ] && [ "$BUMP_TYPE" != "minor" ] && [ "$BUMP_TYPE" != "patch" ]; then
+        echo "Error: Invalid bump type '$BUMP_TYPE'" >&2
+        exit 1
+    fi
+
+    latest_version=$(get_latest_version)
+
+    new_version=$(bump_version "$latest_version" "$BUMP_TYPE")
+
+    new_tag="v$new_version"
 fi
 
-if [ "$BUMP_TYPE" != "major" ] && [ "$BUMP_TYPE" != "minor" ] && [ "$BUMP_TYPE" != "patch" ]; then
-    echo "Error: Invalid bump type '$BUMP_TYPE'" >&2
-    exit 1
-fi
 
-latest_version=$(get_latest_version)
-
-new_version=$(bump_version "$latest_version" "$BUMP_TYPE")
-
-new_tag="v$new_version"
-
-
-if [ ${DRY_RUN} ]; then
-    echo "dry run: skipping push of new tag $new_tag to github"
+if [ ${BUILD_ONLY} ]; then
+    echo "build only: skipping push of new tag to github"
 else
     echo "Creating $BUMP_TYPE release: v$latest_version -> $new_tag"
 
@@ -101,7 +105,14 @@ LDFLAGS="-X github.com/information-sharing-networks/signalsd/app/internal/versio
     -X github.com/information-sharing-networks/signalsd/app/internal/version.gitCommit=$GIT_COMMIT"
 
 cd app
-go build -ldflags "$LDFLAGS" -o signalsd ./cmd/signalsd/
+
+if [ ${LINUX} ]; then
+    echo "Building for linux"
+    GOOS=linux GOARCH=amd64 go build -ldflags "$LDFLAGS" -o signalsd ./cmd/signalsd/
+else
+    echo "Building for darwin"
+    go build -ldflags "$LDFLAGS" -o signalsd ./cmd/signalsd/
+fi
 cd ..
 
-echo "Build complete: signalsd (with docs and assets)"
+echo "Build complete: signalsd"

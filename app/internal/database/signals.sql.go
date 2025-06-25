@@ -13,7 +13,7 @@ import (
 	"github.com/google/uuid"
 )
 
-const createOrUpdateSignalWithCorrelationID = `-- name: CreateOrUpdateSignalWithCorrelationID :one
+const CreateOrUpdateSignalWithCorrelationID = `-- name: CreateOrUpdateSignalWithCorrelationID :one
 WITH ids AS (
     SELECT 
         st.id AS signal_type_id,
@@ -62,7 +62,7 @@ type CreateOrUpdateSignalWithCorrelationIDParams struct {
 
 // note if there is already a master record, then correlation_id is updated with the supplied value
 func (q *Queries) CreateOrUpdateSignalWithCorrelationID(ctx context.Context, arg CreateOrUpdateSignalWithCorrelationIDParams) (uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, createOrUpdateSignalWithCorrelationID,
+	row := q.db.QueryRow(ctx, CreateOrUpdateSignalWithCorrelationID,
 		arg.AccountID,
 		arg.LocalRef,
 		arg.CorrelationID,
@@ -74,7 +74,7 @@ func (q *Queries) CreateOrUpdateSignalWithCorrelationID(ctx context.Context, arg
 	return id, err
 }
 
-const createSignal = `-- name: CreateSignal :one
+const CreateSignal = `-- name: CreateSignal :one
 WITH ids AS (
     SELECT st.id AS signal_type_id, 
         st.isn_id,
@@ -119,7 +119,7 @@ type CreateSignalParams struct {
 
 // this query creates one row in signals for every new combination of account_id, signal_type_id, local_ref
 func (q *Queries) CreateSignal(ctx context.Context, arg CreateSignalParams) (uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, createSignal,
+	row := q.db.QueryRow(ctx, CreateSignal,
 		arg.AccountID,
 		arg.LocalRef,
 		arg.SignalTypeSlug,
@@ -130,7 +130,7 @@ func (q *Queries) CreateSignal(ctx context.Context, arg CreateSignalParams) (uui
 	return id, err
 }
 
-const createSignalVersion = `-- name: CreateSignalVersion :one
+const CreateSignalVersion = `-- name: CreateSignalVersion :one
 WITH ver AS (
     SELECT 
         st.id AS signal_type_id,
@@ -186,7 +186,7 @@ type CreateSignalVersionRow struct {
 
 // if there is already a version of this signal, create a new one with an incremented version_number
 func (q *Queries) CreateSignalVersion(ctx context.Context, arg CreateSignalVersionParams) (CreateSignalVersionRow, error) {
-	row := q.db.QueryRow(ctx, createSignalVersion,
+	row := q.db.QueryRow(ctx, CreateSignalVersion,
 		arg.AccountID,
 		arg.SignalBatchID,
 		arg.Content,
@@ -199,7 +199,7 @@ func (q *Queries) CreateSignalVersion(ctx context.Context, arg CreateSignalVersi
 	return i, err
 }
 
-const getLatestSignalVersionsByAccountID = `-- name: GetLatestSignalVersionsByAccountID :many
+const GetLatestSignalVersionsByAccountID = `-- name: GetLatestSignalVersionsByAccountID :many
 
 WITH LatestSignals AS (
     SELECT
@@ -284,7 +284,7 @@ type GetLatestSignalVersionsByAccountIDRow struct {
 // do not check validity status
 // require isn_slug,signal_type_slug & sem_ver params
 func (q *Queries) GetLatestSignalVersionsByAccountID(ctx context.Context, arg GetLatestSignalVersionsByAccountIDParams) ([]GetLatestSignalVersionsByAccountIDRow, error) {
-	rows, err := q.db.Query(ctx, getLatestSignalVersionsByAccountID,
+	rows, err := q.db.Query(ctx, GetLatestSignalVersionsByAccountID,
 		arg.IsnSlug,
 		arg.SignalTypeSlug,
 		arg.SemVer,
@@ -320,7 +320,7 @@ func (q *Queries) GetLatestSignalVersionsByAccountID(ctx context.Context, arg Ge
 	return items, nil
 }
 
-const getLatestSignalVersionsByDateRange = `-- name: GetLatestSignalVersionsByDateRange :many
+const GetLatestSignalVersionsByDateRange = `-- name: GetLatestSignalVersionsByDateRange :many
 WITH LatestSignals AS (
     SELECT
         a.id AS account_id,
@@ -401,7 +401,7 @@ type GetLatestSignalVersionsByDateRangeRow struct {
 }
 
 func (q *Queries) GetLatestSignalVersionsByDateRange(ctx context.Context, arg GetLatestSignalVersionsByDateRangeParams) ([]GetLatestSignalVersionsByDateRangeRow, error) {
-	rows, err := q.db.Query(ctx, getLatestSignalVersionsByDateRange,
+	rows, err := q.db.Query(ctx, GetLatestSignalVersionsByDateRange,
 		arg.IsnSlug,
 		arg.SignalTypeSlug,
 		arg.SemVer,
@@ -438,7 +438,7 @@ func (q *Queries) GetLatestSignalVersionsByDateRange(ctx context.Context, arg Ge
 	return items, nil
 }
 
-const getLatestSignalVersionsByDateRangeAndAccountID = `-- name: GetLatestSignalVersionsByDateRangeAndAccountID :many
+const GetLatestSignalVersionsByDateRangeAndAccountID = `-- name: GetLatestSignalVersionsByDateRangeAndAccountID :many
 WITH LatestSignals AS (
     SELECT
         a.id AS account_id,
@@ -521,7 +521,7 @@ type GetLatestSignalVersionsByDateRangeAndAccountIDRow struct {
 }
 
 func (q *Queries) GetLatestSignalVersionsByDateRangeAndAccountID(ctx context.Context, arg GetLatestSignalVersionsByDateRangeAndAccountIDParams) ([]GetLatestSignalVersionsByDateRangeAndAccountIDRow, error) {
-	rows, err := q.db.Query(ctx, getLatestSignalVersionsByDateRangeAndAccountID,
+	rows, err := q.db.Query(ctx, GetLatestSignalVersionsByDateRangeAndAccountID,
 		arg.IsnSlug,
 		arg.SignalTypeSlug,
 		arg.SemVer,
@@ -559,7 +559,7 @@ func (q *Queries) GetLatestSignalVersionsByDateRangeAndAccountID(ctx context.Con
 	return items, nil
 }
 
-const getLatestSignalVersionsWithOptionalFilters = `-- name: GetLatestSignalVersionsWithOptionalFilters :many
+const GetLatestSignalVersionsWithOptionalFilters = `-- name: GetLatestSignalVersionsWithOptionalFilters :many
 WITH LatestSignals AS (
     SELECT
         a.id AS account_id,
@@ -643,7 +643,7 @@ type GetLatestSignalVersionsWithOptionalFiltersRow struct {
 }
 
 func (q *Queries) GetLatestSignalVersionsWithOptionalFilters(ctx context.Context, arg GetLatestSignalVersionsWithOptionalFiltersParams) ([]GetLatestSignalVersionsWithOptionalFiltersRow, error) {
-	rows, err := q.db.Query(ctx, getLatestSignalVersionsWithOptionalFilters,
+	rows, err := q.db.Query(ctx, GetLatestSignalVersionsWithOptionalFilters,
 		arg.IsnSlug,
 		arg.SignalTypeSlug,
 		arg.SemVer,

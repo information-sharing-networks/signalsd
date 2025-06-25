@@ -9,12 +9,12 @@ import (
 	"context"
 )
 
-const isDatabaseRunning = `-- name: IsDatabaseRunning :one
+const IsDatabaseRunning = `-- name: IsDatabaseRunning :one
 SELECT 1 as healthy
 `
 
 func (q *Queries) IsDatabaseRunning(ctx context.Context) (int32, error) {
-	row := q.db.QueryRow(ctx, isDatabaseRunning)
+	row := q.db.QueryRow(ctx, IsDatabaseRunning)
 	var healthy int32
 	err := row.Scan(&healthy)
 	return healthy, err
