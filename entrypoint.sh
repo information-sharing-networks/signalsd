@@ -2,20 +2,12 @@
 
 function launchLocal() {
     # entryfile for local dev docker app 
-    ENV_FILE="/app/env/.env"
-    mkdir -p $(dirname $ENV_FILE)
-
-    if [ ! -f $ENV_FILE ]; then
-        echo "export HOST=0.0.0.0" > $ENV_FILE
-        echo "export SECRET_KEY=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 64)" >> $ENV_FILE
-        echo "export DATABASE_URL=postgres://signalsd@db:5432/signalsd_admin?sslmode=disable" >> $ENV_FILE
-    fi
-
-    . $ENV_FILE
-
+    export SECRET_KEY=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 64)
+    export DATABASE_URL=postgres://signalsd@db:5432/signalsd_admin?sslmode=disable 
+    export HOST=0.0.0.0
     goose -dir sql/schema postgres $DATABASE_URL up
     
-    exec /app/signalsd -mode all
+    HOST=$HOST SECRET_KEY=$SECRET_KEY DATABASE_URL=$DATABASE_URL exec /app/signalsd --mode all
 }
 
 
