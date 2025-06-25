@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -68,7 +67,7 @@ func (a *AdminHandler) ResetHandler(w http.ResponseWriter, r *http.Request) {
 //
 //	@Router			/health/ready [Get]
 func (a *AdminHandler) ReadinessHandler(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), signalsd.ReadinessTimeout)
 	defer cancel()
 	_, err := a.queries.IsDatabaseRunning(ctx)
 	if err == nil {

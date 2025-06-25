@@ -15,7 +15,7 @@ export SIGNALS_PORT=${SIGNALS_PORT:-8080}
 export ADMIN_PORT=${ADMIN_PORT:-8080}
 
 
-echo "🔐 Getting fresh authentication token from ${BASE_URL}..."
+echo "🔐 Getting fresh authentication token from ${BASE_URL}:${ADMIN_PORT}..."
 AUTH_TOKEN=$(curl -s -X POST \
     -H "Content-Type: application/json" \
     -d "{\"email\":\"${ACCOUNT}\",\"password\":\"${PASSWORD}\"}" \

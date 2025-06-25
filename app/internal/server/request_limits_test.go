@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	signalsd "github.com/information-sharing-networks/signalsd/app"
 )
 
 func TestRequestSizeLimits(t *testing.T) {
@@ -17,7 +16,7 @@ func TestRequestSizeLimits(t *testing.T) {
 
 	// API routes with 64KB limit
 	router.Group(func(r chi.Router) {
-		r.Use(RequestSizeLimit(signalsd.DefaultMaxAPIRequestSize))
+		r.Use(RequestSizeLimit(65536)) // 64KB
 		r.Post("/api/isn", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		})
@@ -25,7 +24,7 @@ func TestRequestSizeLimits(t *testing.T) {
 
 	// Signal routes with 5MB limit
 	router.Group(func(r chi.Router) {
-		r.Use(RequestSizeLimit(50 * 1024 * 1024))
+		r.Use(RequestSizeLimit(5242880)) // 5MB
 		r.Post("/api/signals", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		})

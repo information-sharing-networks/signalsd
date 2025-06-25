@@ -41,50 +41,6 @@ services:
           cpus: '4'
           memory: 8096M
 
-  app:
-    build:
-      context: .
-      dockerfile_inline: |
-        FROM golang:1.24-alpine
-        RUN apk add --no-cache bash postgresql-client curl jq vim git
-        RUN echo "Installing Go tools..." && \
-            go install github.com/pressly/goose/v3/cmd/goose@latest && \
-            go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest && \
-            go install github.com/swaggo/swag/cmd/swag@latest && \
-            echo "Go tools installation complete"
-        WORKDIR /signalsd
-        CMD ["/bin/bash"]
-    container_name: signalsd-app-perf
-    volumes:
-      - ./:/signalsd # project dir
-      - go-modules:/go/pkg/mod # persist downloaded modules
-    environment:
-      DOCKER_ENV: true
-      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY environment variable is required}
-      DATABASE_URL: postgres://signalsd-dev:@db:5432/signalsd_admin?sslmode=disable
-      ENVIRONMENT: dev
-      RATE_LIMIT_RPS: ${RATE_LIMIT_RPS:?RATE_LIMIT_RPS environment variable is required}
-    working_dir: /signalsd
-    ports:
-      - "8080:8080"
-    depends_on:
-      db:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    command: >
-      sh -c "/signalsd/entrypoint.sh -e local-dev"
-    networks:
-      - app-network
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 512M
-
 networks:
   app-network:
     driver: bridge

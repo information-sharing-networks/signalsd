@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
@@ -96,8 +95,8 @@ func (s *Server) Run() {
 
 	s.serverLogger.Info().Msg("service shutting down")
 
-	// force an exit if server does not shutdown within 10 seconds
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// force an exit if server does not shutdown within configured timeout
+	ctx, cancel := context.WithTimeout(context.Background(), signalsd.ServerShutdownTimeout)
 
 	// if the server shutsdown in under 10 seconds, exit immediately
 	defer cancel()
@@ -143,7 +142,7 @@ func (s *Server) registerAdminRoutes() {
 	signalBatches := handlers.NewSignalsBatchHandler(s.queries)
 
 	s.router.Group(func(r chi.Router) {
-		r.Use(RequestSizeLimit(signalsd.DefaultMaxAPIRequestSize))
+		r.Use(RequestSizeLimit(s.serverConfig.MaxAPIRequestSize))
 
 		// api routes used to administer the ISNs (excluding signal ingestion)
 		r.Route("/api", func(r chi.Router) {

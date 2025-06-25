@@ -1,5 +1,4 @@
 [Intro](#information-sharing-networks) |
-[Try It Out](#try-it-out) |
 [Developer Guide](#developer-guide) |
 [Technical Overview](#technical-overview)
 
@@ -36,117 +35,108 @@ There are three components:
 ## Credits
 Many thanks to [Ross McDonald](https://github.com/rossajmcd) who came up with the concept and created the initial reference implementation.
 
-# Try It Out
-You can run the service locally using Docker (no additional software installation required).
-
-**Prerequisites**: [Docker Desktop](https://docs.docker.com/get-docker) installed on your system.
-
-1. Download the [latest release](https://github.com/information-sharing-networks/signalsd/archive/refs/heads/main.zip)
-2. Extract the archive: `unzip signalsd-main.zip`
-3. Start the service:
-   ```bash
-   cd signalsd-main
-   docker compose up
-   ```
-4. Access the service at [http://localhost:8080](http://localhost:8080)
-
-**To stop and clean up**:
-```bash
-docker compose down --rmi local -v
-```
-
 # Developer Guide
 
 ## Environment Variables
-The service uses the following environment variables:
-```bash
-# Required
-DATABASE_URL=postgres://user:password@host:port/database?sslmode=disable
-SECRET_KEY=your-64-character-secret-key-here  # Generate with: openssl rand -base64 64
+The service has sensible defaults for all configuration values. You only need to set environment variables to override the defaults.
 
-# Server Configuration
+```bash
+# Required (for production environments)
+DATABASE_URL=postgres://user:password@host:port/database?sslmode=disable
+SECRET_KEY=your-random-secret-key-here  # Generate with: openssl rand -base64 64
+
+# Server Configuration (all optional - defaults shown)
 HOST=0.0.0.0                    # Bind address (default: 0.0.0.0)
 PORT=8080                       # Server port (default: 8080)
 ENVIRONMENT=dev                 # Options: dev, prod, test, perf, staging (default: dev)
 LOG_LEVEL=debug                 # Options: debug, info, warn, error (default: debug)
 
-# Performance Tuning
+# Performance Tuning (all optional - defaults shown)
 READ_TIMEOUT=15s                # HTTP read timeout (default: 15s)
 WRITE_TIMEOUT=15s               # HTTP write timeout (default: 15s)
 IDLE_TIMEOUT=60s                # HTTP idle timeout (default: 60s)
 RATE_LIMIT_RPS=100              # Requests per second (default: 100, set to 0 to disable)
 RATE_LIMIT_BURST=20             # Burst allowance (default: 20)
-MAX_SIGNAL_PAYLOAD_SIZE=5242880 # Max payload size (default: 5MB) - Note: all the other API endpoints have a 64KB limit
+MAX_SIGNAL_PAYLOAD_SIZE=5242880 # Max payload size (default: 5MB)
+MAX_API_REQUEST_SIZE=65536      # Max API request size (default: 64KB)
 
-# Security
-ALLOWED_ORIGINS=https://example.com # CORS origins (default: *, comma-separated for multiple)
+# Security (optional - defaults shown)
+ALLOWED_ORIGINS=*               # CORS origins (default: *, comma-separated for multiple)
 ```
 
-## Dependencies
-The HTTP service is written in Go and has the following development dependencies:
-- [goose](https://github.com/pressly/goose) **database migrations**
-- [sqlc](https://github.com/sqlc-dev/sqlc) **type safe code for SQL queries**
-- [swaggo](https://github.com/swaggo/swag) **generates OpenAPI specs from go comments**
-
-The service uses a PostgreSQL@17 database.
-
-Instructions on installing the dependencies are below or, if you prefer, you can use the docker local dev environment which has all the dependencies pre-installed (see the next section).
+**Note**: In Docker development environment, DATABASE_URL and SECRET_KEY are automatically configured with development-appropriate defaults.
 
 ## Quick Start (Docker Development Environment)
-First, clone the repo:
+
+**Prerequisites**: [Docker Desktop](https://docs.docker.com/get-docker) installed on your system.
+
+Clone the repo:
 ```bash
 git clone https://github.com/information-sharing-networks/signalsd.git
 cd signalsd
 ```
 
-The environment is set automatically in the docker container. However, if you want to customise the default values for the environment variables, you can set them before starting the docker environment, e.g
+Using the development environment:
 ```bash
-export SECRET_KEY="$(openssl rand -base64 64)"  # Generate a secure key
+# Start the service
+docker compose up
+
+# Stop the service
+docker compose down
+
+# Restart the app container to compile and run the latest code
+# Note: This will rerun sqlc, swag, goose, etc. but won't pick up new environment variables
+docker compose restart app
+
+# For environment variable changes, use up instead of restart
+# This recreates the container with the new environment variables
+PORT=8081 docker compose up app
+RATE_LIMIT_RPS=0 docker compose up app  # Disable rate limiting
+
+# Rebuild the image when you change:
+# - dockerfile_inline content
+# - go.mod/go.sum (new dependencies)
+# - Go tool versions (goose, sqlc, swag)
+docker compose up --build app
+
+# Important: If you encounter tool version issues (e.g., missing flags in goose),
+# rebuild the image to get the latest tool versions:
+docker compose up --build
+
+# Connect to the app container
+docker exec -it signalsd-app /bin/bash
+
+# Run individual tools inside the container if needed:
+# Generate API docs
+docker compose exec app sh -c "cd /signalsd/app && swag init -g ./cmd/signalsd/main.go"
+
+# Run database migrations
+docker compose exec app bash -c 'cd /signalsd/app && goose -dir sql/schema postgres "$DATABASE_URL" up'
+
+# Generate type-safe SQL code
+docker compose exec app sh -c "cd /signalsd/app && sqlc generate"
+
+# Connect to the postgres database
+docker exec -it signalsd-db psql -U signalsd-dev -d signalsd_admin
+
+# Stop and remove the environment completely
+docker compose down --rmi local -v
 ```
 
-Start the development environment:
-```bash
-docker compose -f docker-compose.dev.yml up -d
-docker compose logs -f
-```
-
-The service handles:
-- User registration
-- ISN configuration
-- Signals exchange
-
-The service starts on [http://localhost:8080](http://localhost:8080)
+The service starts on [http://localhost:8080](http://localhost:8080) by default.
 
 The API documentation is hosted as part of the service (alternatively you can see the documentation [here](https://information-sharing-networks.github.io/signalsd/app/docs/index.html))
 
-### Development Workflow
+## Troubleshooting Docker Development Environment
+
+### Tool Version Issues
+If you encounter errors or missing features in development tools (goose, sqlc, swag), this is likely due to Docker layer caching using older tool versions.
+
+**Solution**: Force rebuild the Docker image to get the latest tool versions:
 ```bash
-# Your local repo directory is mounted inside the container
-# To test your changes, restart the app container:
-docker compose restart app
-
-# This will regenerate the sqlc code, rebuild the swagger API documents
-# and recompile and run the signalsd service based on your latest changes.
-
-# To stop the service and database:
-docker compose -f docker-compose.dev.yml down
-
-# To stop and remove all docker related images and storage:
-docker compose -f docker-compose.dev.yml down --rmi local -v
+docker compose up --build
 ```
 
-### Database Access
-Connect to the database using either method:
-
-**Via Docker container**:
-```bash
-docker exec -it signalsd-db-dev psql -U signalsd-dev -d signalsd_admin
-```
-
-**Via local PostgreSQL client**:
-```bash
-psql postgres://signalsd-dev:@localhost:15432/signalsd_admin
-```
 
 ## Local Development Setup
 ### Prerequisites (macOS)
@@ -208,6 +198,10 @@ go build ./cmd/signalsd/
 
 # Or run directly
 go run cmd/signalsd/main.go -mode all
+
+
+# configure the service environment 
+PORT=8081 go run cmd/signalsd/main.go -mode all
 ```
 
 ## API Documentation
@@ -245,6 +239,7 @@ Run `sqlc generate` from the root of the project to regenerate the type safe Go 
 
 ## ISN config
 ![ISN config v0 5 0](https://github.com/user-attachments/assets/2be326f2-f4d0-485e-aeed-28076383cd8e)
+
 
 ## Signals
 ![Signals v0 5 0](https://github.com/user-attachments/assets/ffe9ad66-3026-40ad-94b7-83e7f5d7b4b8)
