@@ -99,7 +99,7 @@ git clone https://github.com/information-sharing-networks/signalsd.git
 cd signalsd
 ```
 
-Set the required environment variable:
+The environment is set automatically in the docker container. However, if you want to customise the default values for the environment variables, you can set them before starting the docker environment, e.g
 ```bash
 export SECRET_KEY="$(openssl rand -base64 64)"  # Generate a secure key
 ```

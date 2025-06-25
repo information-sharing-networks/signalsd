@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     container_name: signalsd-db-dev
     volumes:
-      - db-data-perf:/var/lib/postgresql/data
+      - db-data-dev:/var/lib/postgresql/data
     ports:
       - "15432:5432"
     environment:
@@ -23,8 +23,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2'
-          memory: 4096M
+          cpus: '1'
+          memory: 2048M
 
   app:
     build:
@@ -45,16 +45,29 @@ services:
       - go-modules:/go/pkg/mod # persist downloaded modules
     environment:
       DOCKER_ENV: true
-      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY environment variable is required}
-      DATABASE_URL: postgres://signalsd-dev:@db:5432/signalsd_admin?sslmode=disable
-      ENVIRONMENT: dev
-      RATE_LIMIT_RPS: 500
+      # Required
+      SECRET_KEY: ${SECRET_KEY:-dev-container-secret-key-12345}
+      DATABASE_URL: ${DATABASE_URL:-postgres://signalsd-dev:@db:5432/signalsd_admin?sslmode=disable}
+
+      # Server Configuration
+      HOST: ${HOST:-0.0.0.0}
+      PORT: ${PORT:-8080}
+      ENVIRONMENT: ${ENVIRONMENT:-dev}
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+
+      # Performance Tuning
+      READ_TIMEOUT: ${READ_TIMEOUT:-15s}
+      WRITE_TIMEOUT: ${WRITE_TIMEOUT:-15s}
+      IDLE_TIMEOUT: ${IDLE_TIMEOUT:-60s}
+      RATE_LIMIT_RPS: ${RATE_LIMIT_RPS:-100}
+      RATE_LIMIT_BURST: ${RATE_LIMIT_BURST:-20}
+      MAX_SIGNAL_PAYLOAD_SIZE: ${MAX_SIGNAL_PAYLOAD_SIZE:-5242880}
+
+      # Security
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
     working_dir: /signalsd
     ports:
-      - "8080:8080"
-    depends_on:
-      db:
-        condition: service_healthy
+      - "8080:8080" 
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
       interval: 5s
@@ -68,7 +81,7 @@ services:
       resources:
         limits:
           cpus: '1'
-          memory: 1024M
+          memory: 512M
 
 networks:
   app-network:
@@ -76,5 +89,4 @@ networks:
 
 volumes:
   db-data-dev:
-  db-data-perf:
   go-modules:

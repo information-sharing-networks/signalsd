@@ -599,7 +599,6 @@ info:
   license:
     name: MIT
   title: Signals ISN API
-  version: "1.0"
 paths:
   /admin/accounts/{account_id}/disable:
     post:
@@ -1543,12 +1542,14 @@ paths:
         that the account is permitted to use.\n\n- the RequireIsnPermission middleware
         will consult the claims in the access token to confirm the user is allowed
         to write to the isn in the URL.\n- This handler also checks that the signal_type/sem_ver
-        in the url is also listed in the claims (this is to catch mistyped urls)\n\n**Validation**\n\nthe
-        content is validated against the json schema asynchronously, however basic
-        checks are done on the incoming data.\nThe following issues create a 400 error
-        and cause the entire payload to be rejected\n- invalid json format\n- missing
-        fields (the array of signals must be in a json object called signals, and
-        content and local_ref must be present for each record).\n- incorrect correlation
+        in the url is also listed in the claims (this is to catch mistyped urls)\n\n**Validation**\n\nSignals
+        are validated against the json schema specified for the signal type unless
+        validation is disabled on the type definition. The entire payload is rejected
+        with a 400 error if validation fails.\n\nWhen validation is disabled, basic
+        checks are still done on the incoming data. The following issues create a
+        400 error and cause the entire payload to be rejected:\n- invalid json format\n-
+        missing fields (the array of signals must be in a json object called signals,
+        and content and local_ref must be present for each record).\n- incorrect correlation
         ids - where supplied, correlation ids must refer to another signal ID in the
         ISN (error_code is set to \"invalid_correlation_id\" in this is not the case)\n\ninternal
         errors cause the whole payload to be rejected."
