@@ -3,7 +3,7 @@
 # uses existing binary from host. This can be used to compare specific version performance:
 # e.g
 # 1. git checkout v0.7.1
-# 2. build.sh -ld (build linux binary from source)
+# 2. build.sh -lb (build linux binary from source)
 # 3. cd test/perf && docker compose -f docker-compose.multi.app.yml up 
 
 services:

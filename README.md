@@ -266,7 +266,7 @@ git checkout main && git pull origin main
 cd app && go test ./... && cd ..
 
 # 2. Create and push version tag; build locally with version info
-build.sh -b patch|minor|major
+build.sh -t patch|minor|major
 
 ```
 See GitHub Actions workflows in `.github/workflows/`

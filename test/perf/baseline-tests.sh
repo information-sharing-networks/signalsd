@@ -6,9 +6,9 @@
 set -e
 
 # Configuration
-BATCH_SIZE=${BATCH_SIZE:-100}
-NUM_BATCHES=${NUM_BATCHES:-3}
-PARALLEL_TESTS=${PARALLEL_TESTS:-50}
+SIGNALS_IN_PAYLOAD=${SIGNALS_IN_PAYLOAD:-10}
+NUM_REQUESTS=${NUM_REQUESTS:-3}
+PARALLEL_CLIENTS=${PARALLEL_CLIENTS:-50}
 ITERATIONS=${ITERATIONS:-5}
 
 # Create results directory
@@ -22,12 +22,13 @@ echo "🔬 BASELINE PERFORMANCE TESTING"
 echo "=================================="
 echo "Configuration:"
 echo "  signalsd Version: $SIGNALSD_VERSION"
-echo "  Concurrent clients: $PARALLEL_TESTS"
-echo "  Payload Size: $BATCH_SIZE signals per request"
-echo "  Number of requests made per client: $NUM_BATCHES"
+echo "  Concurrent clients: $PARALLEL_CLIENTS"
+echo "  Payload Size: $SIGNALS_IN_PAYLOAD signals per request"
+echo "  Number of requests made per client: $NUM_REQUESTS"
 echo "  Test iterations: $ITERATIONS"
-echo "  Total signals per iteration: $((BATCH_SIZE * NUM_BATCHES * PARALLEL_TESTS))"
-
+echo "  Total signals per iteration: $((SIGNALS_IN_PAYLOAD * NUM_REQUESTS * PARALLEL_CLIENTS))"
+echo
+echo "To rerun this test use: SIGNALS_IN_PAYLOAD=$SIGNALS_IN_PAYLOAD NUM_REQUESTS=$NUM_REQUESTS PARALLEL_CLIENTS=$PARALLEL_CLIENTS ITERATIONS=$ITERATIONS ./baseline-tests.sh"
 echo
 echo "see $RESULTS_DIR for outputs"
 echo "=================================="
@@ -50,7 +51,7 @@ for i in $(seq 1 $ITERATIONS); do
     # Run the test and capture output
     OUTPUT_FILE="$RESULTS_DIR/iteration_${i}_summary.log"
     
-    if BATCH_SIZE=$BATCH_SIZE NUM_BATCHES=$NUM_BATCHES LOG_DIR=${RESULTS_DIR}/iteration_${i} ./run-parallel-tests.sh $PARALLEL_TESTS > "$OUTPUT_FILE" 2>&1; then
+    if SIGNALS_IN_PAYLOAD=$SIGNALS_IN_PAYLOAD NUM_REQUESTS=$NUM_REQUESTS LOG_DIR=${RESULTS_DIR}/iteration_${i} ./run-parallel-tests.sh $PARALLEL_CLIENTS > "$OUTPUT_FILE" 2>&1; then
         echo "✅ Iteration $i completed successfully"
         
         # Extract key metrics from the output
@@ -95,11 +96,11 @@ echo "📈 BASELINE RESULTS SUMMARY"
 echo "=========================="
 echo "Configuration:"
 echo "  signalsd Version: $SIGNALSD_VERSION"
-echo "  Concurrent clients: $PARALLEL_TESTS"
-echo "  Payload Size: $BATCH_SIZE signals per request"
-echo "  Number of requests made per client: $NUM_BATCHES"
+echo "  Concurrent clients: $PARALLEL_CLIENTS"
+echo "  Payload Size: $SIGNALS_IN_PAYLOAD signals per request"
+echo "  Number of requests made per client: $NUM_REQUESTS"
 echo "  Test iterations: $ITERATIONS"
-echo "  Total signals per iteration: $((BATCH_SIZE * NUM_BATCHES * PARALLEL_TESTS))"
+echo "  Total signals per iteration: $((SIGNALS_IN_PAYLOAD * NUM_REQUESTS * PARALLEL_CLIENTS))"
 
 # Calculate statistics
 if [ ${#THROUGHPUTS[@]} -gt 0 ]; then
@@ -181,7 +182,7 @@ if [ ${#THROUGHPUTS[@]} -gt 0 ]; then
 else
     echo "❌ No successful test iterations completed"
 fi
-
+}
 
 # Output summary to both terminal and file
 output_summary | tee "$SUMMARY_TEXT_FILE"
