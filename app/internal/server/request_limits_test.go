@@ -42,7 +42,8 @@ func TestRequestSizeLimits(t *testing.T) {
 
 		// Signal endpoints (5MB limit)
 		{"Signal normal request", "/api/signals", 1024 * 1024, http.StatusOK},
-		{"Signal large request", "/api/signals", 10 * 1024 * 1024, http.StatusOK},
+		{"Signal large request", "/api/signals", 4 * 1024 * 1024, http.StatusOK}, // 4MB - within 5MB limit
+		{"Signal oversized request", "/api/signals", 10 * 1024 * 1024, 413},      // 10MB - exceeds 5MB limit
 	}
 
 	for _, tt := range tests {
