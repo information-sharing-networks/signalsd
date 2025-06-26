@@ -67,7 +67,7 @@ func (s *Server) Run() {
 		Handler:      s.router,
 		ReadTimeout:  s.serverConfig.ReadTimeout,
 		WriteTimeout: s.serverConfig.WriteTimeout,
-		IdleTimeout:  s.serverConfig.WriteTimeout,
+		IdleTimeout:  s.serverConfig.IdleTimeout,
 	}
 
 	defer func() {

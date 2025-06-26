@@ -9,16 +9,15 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"time"
 
+	signalsd "github.com/information-sharing-networks/signalsd/app"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/santhosh-tekuri/jsonschema/v5"
 )
 
-// when the client specifies this schema_url it indicates validation should be skipped
-const SkipValidationURL = "https://github.com/skip/validation/main/schema.json"
-
 func SkipValidation(url string) bool {
-	return url == SkipValidationURL
+	return url == signalsd.SkipValidationURL
 }
 
 // stores compiled JSON schemas indexed by signal type path: {signal_type_slug}/v{sem_ver}
@@ -47,8 +46,12 @@ func FetchSchema(url string) (string, error) {
 		url = strings.Replace(url, "/blob/", "/", 1)
 	}
 
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
 	// #nosec G107 -- URL is validated to be GitHub-only before this function is called
-	res, err := http.Get(url)
+	res, err := client.Get(url)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch schema from %s: %w", originalURL, err)
 	}
@@ -83,7 +86,7 @@ func ValidateSchemaURL(url string) error {
 	}
 
 	if !matched {
-		return fmt.Errorf("schema URL must be a GitHub URL ending in .json (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json) or use %s to skip validation", SkipValidationURL)
+		return fmt.Errorf("schema URL must be a GitHub URL ending in .json (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json) or use %s to skip validation", signalsd.SkipValidationURL)
 	}
 
 	return nil
@@ -198,15 +201,14 @@ func refreshCache(ctx context.Context, queries *database.Queries) error {
 		// Create signal type path as cache key
 		signalTypePath := fmt.Sprintf("%s/v%s", signalType.Slug, signalType.SemVer)
 
-		// Store the schema URL for this signal type path
-		cache.schemaURLs[signalTypePath] = signalType.SchemaURL
-
 		// Compile the schema from the stored content
 		schema, err := jsonschema.CompileString(signalType.SchemaURL, signalType.SchemaContent)
 		if err != nil {
 			loadErrors = append(loadErrors, fmt.Sprintf("signal type %s: %v", signalTypePath, err))
 		} else {
 			cache.schemas[signalTypePath] = schema
+			// Store the schema URL for this signal type path
+			cache.schemaURLs[signalTypePath] = signalType.SchemaURL
 		}
 	}
 

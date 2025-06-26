@@ -15,7 +15,7 @@ var (
 	accountIDKey          = contextKey{"account-id"}
 	accountTypeKey        = contextKey{"account-type"}
 	accessTokenClaimsKey  = contextKey{"access-token-claims"}
-	hashedRefreshTokenKey = contextKey{"hashed_refersh_token"}
+	hashedRefreshTokenKey = contextKey{"hashed_refresh_token"}
 )
 
 func ContextWithAccountID(ctx context.Context, id uuid.UUID) context.Context {

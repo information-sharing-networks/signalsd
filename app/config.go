@@ -46,6 +46,9 @@ const (
 	DatabasePingTimeout   = 10 * time.Second
 	ReadinessTimeout      = 2 * time.Second // Health check timeout
 
+	// JSON validation
+	SkipValidationURL = "https://github.com/skip/validation/main/schema.json" // URL used to indicate JSON schema validation should be skipped
+
 	// Database pool constants for performance testing environment
 	PerfMaxConns        = 50
 	PerfMinConns        = 10

@@ -203,7 +203,11 @@ func runServer(mode string) error {
 }
 
 func removePasswordFromConnectionString(connStr string) (string, error) {
-	u, _ := url.Parse(connStr)
+	u, err := url.Parse(connStr)
+	if err != nil {
+		return "invalid-connection-string", nil
+	}
+
 	if u.User != nil {
 		username := u.User.Username()
 		u.User = url.User(username)

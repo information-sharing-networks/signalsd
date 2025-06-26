@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"regexp"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -260,21 +260,19 @@ func (a AuthService) CreateAccessToken(ctx context.Context) (AccessTokenResponse
 	}, nil
 }
 
-// rerturn the string from Authorization Bearer {string} - note the string can be a JWT accsss token or a refresh token
+// rerturn the JWT access token from Authorization header
 func (a AuthService) GetAccessTokenFromHeader(headers http.Header) (string, error) {
 	authorizationHeaderValue := headers.Get("Authorization")
 	if authorizationHeaderValue == "" {
 		return "", fmt.Errorf("authorization header is missing")
 	}
 
-	re := regexp.MustCompile(`^\s*(?i)\bbearer\b\s*([^\s]+)\s*$`)
-	accessToken := re.ReplaceAllString(authorizationHeaderValue, "$1")
-
-	if accessToken == authorizationHeaderValue {
-		return "", fmt.Errorf(`authorization header format must be Bearer {token}`)
+	parts := strings.Fields(authorizationHeaderValue)
+	if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
+		return "", fmt.Errorf("authorization header format must be Bearer {token}")
 	}
 
-	return accessToken, nil
+	return parts[1], nil
 }
 
 // revoke any open refresh tokens for the user contained in the shared context
