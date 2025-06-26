@@ -1,42 +1,49 @@
 1. start with an empty database
 
 ```sh
-cd signalsd
-
 # remove any running signalsd app and singalsd db containers and volumes
 docker compose down --rmi local -v --remove-orphans 
 docker volume rm signalsd_db-data-perf
+```
 
 
 # env setup
 export SECRET_KEY=perf-test-secret-key
 export RATE_LIMIT_RPS=0
 
-```
+
 2. (A) 4cpu x 8GB postgress and single container app
 ```sh
-docker compose -f docker-compose.perf-test.tuned.yml up -d
+docker compose -f docker-compose.perf-test-db.tuned.yml up -d
 ```
 
 2. (B) 2cpu x 2GB postgress and single container app
 ```sh
-docker compose -f docker-compose.perf-test.yml up -d
+docker compose -f docker-compose.perf-test-db.yml up -d
 ```
 
-2. (C) large postgress and 4 app containers behind load balancer
+3. (A) 4 app containers behind load balancer
 ```sh
-docker compose -f docker-compose.perf-test.tuned.yml up db -d
- 
-cd test/perfdocker-compose.muti-app.yml up -
-docker compose -f docker-compose.multi-app.yml up -d
+    # if running for the first time, bring the admin container up first so it runs the db migration
+    docker compose -f docker-compose.perf-test-db.tuned.yml up admin
+    # then bring up the remaining containers
+    docker compose -f docker-compose.perf-test-db.tuned.yml up signal1 signals2 signals3
+
+    # otherwise bring them all up at once
+    docker compose -f docker-compose.multi-app.yml up -d
 ```
 
-3. set up db
+3. (A) 4 app containers behind load balancer - use precompiled binary (to test specific versions)
 ```sh
-bash test/perf/setup.sh
+docker compose -f docker-compose.multi-app-use-bnary.yml up -d
 ```
 
-4. Run tests
+4. set up db
+```sh
+bash setup.sh
+```
+
+5. Run tests
 ```sh
 # accounts send 10 requests eaach
 # request payloads have 5 signals

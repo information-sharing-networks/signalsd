@@ -59,7 +59,7 @@ type AccessTokenClaims struct {
 }
 
 func (a AuthService) HashPassword(password string) (string, error) {
-	dat, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	dat, err := bcrypt.GenerateFromPassword([]byte(password), signalsd.BcryptCost)
 	if err != nil {
 		return "", err
 	}

@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	signalsd "github.com/information-sharing-networks/signalsd/app"
 )
 
 func TestRequestSizeLimits(t *testing.T) {
@@ -17,7 +16,7 @@ func TestRequestSizeLimits(t *testing.T) {
 
 	// API routes with 64KB limit
 	router.Group(func(r chi.Router) {
-		r.Use(RequestSizeLimit(signalsd.DefaultMaxAPIRequestSize))
+		r.Use(RequestSizeLimit(65536)) // 64KB
 		r.Post("/api/isn", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		})
@@ -25,7 +24,7 @@ func TestRequestSizeLimits(t *testing.T) {
 
 	// Signal routes with 5MB limit
 	router.Group(func(r chi.Router) {
-		r.Use(RequestSizeLimit(50 * 1024 * 1024))
+		r.Use(RequestSizeLimit(5242880)) // 5MB
 		r.Post("/api/signals", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		})
@@ -43,7 +42,8 @@ func TestRequestSizeLimits(t *testing.T) {
 
 		// Signal endpoints (5MB limit)
 		{"Signal normal request", "/api/signals", 1024 * 1024, http.StatusOK},
-		{"Signal large request", "/api/signals", 10 * 1024 * 1024, http.StatusOK},
+		{"Signal large request", "/api/signals", 4 * 1024 * 1024, http.StatusOK}, // 4MB - within 5MB limit
+		{"Signal oversized request", "/api/signals", 10 * 1024 * 1024, 413},      // 10MB - exceeds 5MB limit
 	}
 
 	for _, tt := range tests {

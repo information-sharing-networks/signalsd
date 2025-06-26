@@ -1,0 +1,35 @@
+# docker-compose.yml (perf-test - larger db container)
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    container_name: signalsd-db-perf
+    volumes:
+      - db-data-perf:/var/lib/postgresql/data
+    ports:
+      - "15432:5432"
+    environment:
+      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_USER: signalsd-dev
+      POSTGRES_DB: signalsd_admin
+    # Using default PostgreSQL configuration - no custom command overrides
+    healthcheck:
+      test: ["CMD-SHELL", "psql -U signalsd-dev -d signalsd_admin -c 'select 1;'"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2048M
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  db-data-perf:
+  go-modules:

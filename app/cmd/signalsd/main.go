@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/url"
 	"os"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
@@ -140,12 +139,15 @@ func main() {
 func runServer(mode string) error {
 	serverLogger := logger.InitServerLogger()
 
-	cfg := signalsd.NewServerConfig(serverLogger)
+	cfg, err := signalsd.NewServerConfig(serverLogger)
+	if err != nil {
+		serverLogger.Fatal().Err(err).Msg("Failed to load configuration")
+	}
 	cfg.ServiceMode = mode
 
 	httpLogger := logger.InitHttpLogger(cfg.LogLevel, cfg.Environment)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), signalsd.DatabasePingTimeout)
 	defer cancel()
 
 	poolConfig, err := pgxpool.ParseConfig(cfg.DatabaseURL)
@@ -155,11 +157,11 @@ func runServer(mode string) error {
 
 	// perf testing config
 	if cfg.Environment == "perf" {
-		poolConfig.MaxConns = 50
-		poolConfig.MinConns = 10
-		poolConfig.MaxConnLifetime = 30 * time.Minute
-		poolConfig.MaxConnIdleTime = 15 * time.Minute
-		poolConfig.ConnConfig.ConnectTimeout = 5 * time.Second
+		poolConfig.MaxConns = signalsd.PerfMaxConns
+		poolConfig.MinConns = signalsd.PerfMinConns
+		poolConfig.MaxConnLifetime = signalsd.PerfMaxConnLifetime
+		poolConfig.MaxConnIdleTime = signalsd.PerfMaxConnIdleTime
+		poolConfig.ConnConfig.ConnectTimeout = signalsd.PerfConnectTimeout
 	}
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {

@@ -2,50 +2,11 @@
 
 function launchLocal() {
     # entryfile for local dev docker app 
-    export SECRET_KEY=$(head /dev/urandom | tr -dc A-Za-z0-9 | head -c 64)
-    export DATABASE_URL=postgres://signalsd@db:5432/signalsd_admin?sslmode=disable 
-    export HOST=0.0.0.0
     goose -dir sql/schema postgres $DATABASE_URL up
     
-    HOST=$HOST SECRET_KEY=$SECRET_KEY DATABASE_URL=$DATABASE_URL exec /app/signalsd --mode all
+    exec /app/signalsd --mode all
 }
 
-
-function launchLocalDev() {
-
-    echo creating signalsd user
-
-    if ! getent group signalsd > /dev/null; then
-        echo "creating signalsd group"
-        addgroup -S signalsd  # Create a system group without a password
-    fi
-
-    if ! id -u signalsd > /dev/null 2>&1; then
-        echo "creating signalsd user"
-        adduser -S -G signalsd signalsd -h /home/signalsd -s /bin/bash signalsd 
-    fi
-
-    su - signalsd
-
-    # use database in the docker container
-    DATABASE_URL=postgres://signalsd-dev:@db:5432/signalsd_admin?sslmode=disable
-
-    # configure http server inside docker to accept external requests
-    HOST=0.0.0.0
-    
-    echo "export DATABASE_URL=$DATABASE_URL" > /home/signalsd/.bashrc
-
-    echo "generate sqlc files"
-    sqlc generate
-    
-    echo "creating swaggo documenation"
-    swag init -g ./cmd/signalsd/main.go 
-
-    echo "migrating database schema"
-    goose -dir sql/schema postgres $DATABASE_URL up
-
-    go run cmd/signalsd/main.go  --mode all
-}
 
 ENV=""
 

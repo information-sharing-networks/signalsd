@@ -1,43 +1,57 @@
 package signalsd
 
 import (
-	"os"
-	"strconv"
+	"fmt"
 	"strings"
 	"time"
 
+	"github.com/kelseyhightower/envconfig"
 	"github.com/rs/zerolog"
 )
 
-// service configuration - these can be set as environment variables (sensible defaults are used where possible)
+// Environment variables are automatically mapped using envconfig.
 type ServerConfig struct {
-	Environment          string
-	Host                 string
-	Port                 int
-	SecretKey            string
-	LogLevel             zerolog.Level
-	DatabaseURL          string
-	ReadTimeout          time.Duration
-	WriteTimeout         time.Duration
-	IdleTimeout          time.Duration
-	AllowedOrigins       []string
-	MaxSignalPayloadSize int64
-	RateLimitRPS         int
-	RateLimitBurst       int
-	ServiceMode          string
+	Environment          string        `envconfig:"ENVIRONMENT" default:"dev"`
+	Host                 string        `envconfig:"HOST" default:"0.0.0.0"`
+	Port                 int           `envconfig:"PORT" default:"8080"`
+	SecretKey            string        `envconfig:"SECRET_KEY" required:"true"`
+	LogLevel             zerolog.Level `envconfig:"LOG_LEVEL" default:"debug"`
+	DatabaseURL          string        `envconfig:"DATABASE_URL" required:"true"`
+	ReadTimeout          time.Duration `envconfig:"READ_TIMEOUT" default:"15s"`
+	WriteTimeout         time.Duration `envconfig:"WRITE_TIMEOUT" default:"15s"`
+	IdleTimeout          time.Duration `envconfig:"IDLE_TIMEOUT" default:"60s"`
+	AllowedOrigins       []string      `envconfig:"ALLOWED_ORIGINS" default:"*"`
+	MaxSignalPayloadSize int64         `envconfig:"MAX_SIGNAL_PAYLOAD_SIZE" default:"5242880"` // 5MB
+	MaxAPIRequestSize    int64         `envconfig:"MAX_API_REQUEST_SIZE" default:"65536"`      // 64KB
+	RateLimitRPS         int           `envconfig:"RATE_LIMIT_RPS" default:"100"`
+	RateLimitBurst       int           `envconfig:"RATE_LIMIT_BURST" default:"20"`
+	ServiceMode          string        `envconfig:"SERVICE_MODE"` // Set by CLI flag, not env var
 }
 
-// common constants
+// Application constants
 const (
-	AccessTokenExpiry        = 30 * time.Minute
-	RefreshTokenExpiry       = 30 * 24 * time.Hour
-	MinimumPasswordLength    = 11
-	RefreshTokenCookieName   = "refresh_token"
-	TokenIssuerName          = "Signalsd"
-	OneTimeSecretExpiry      = 48 * time.Hour
-	ClientSecretExpiry       = 365 * 24 * time.Hour
-	DefaultMaxAPIRequestSize = 64 * 1024 // 64KB for admin/auth/management API
+	RefreshTokenCookieName = "refresh_token"
+	TokenIssuerName        = "Signalsd"
 
+	// Security & Auth constants
+	BcryptCost            = 12                  // bcrypt.DefaultCost = 10
+	AccessTokenExpiry     = 30 * time.Minute    // JWT access token lifetime
+	RefreshTokenExpiry    = 30 * 24 * time.Hour // Refresh token lifetime (30 days)
+	OneTimeSecretExpiry   = 48 * time.Hour
+	ClientSecretExpiry    = 365 * 24 * time.Hour // Client secret expiration (1 year)
+	MinimumPasswordLength = 11
+
+	// Operational timeouts
+	ServerShutdownTimeout = 10 * time.Second // Server graceful shutdown timeout
+	DatabasePingTimeout   = 10 * time.Second
+	ReadinessTimeout      = 2 * time.Second // Health check timeout
+
+	// Database pool constants for performance testing environment
+	PerfMaxConns        = 50
+	PerfMinConns        = 10
+	PerfMaxConnLifetime = 30 * time.Minute
+	PerfMaxConnIdleTime = 15 * time.Minute
+	PerfConnectTimeout  = 5 * time.Second
 )
 
 // common maps - used to validate enum values
@@ -50,7 +64,7 @@ var validEnvs = map[string]bool{
 	"staging": true,
 }
 
-var ValidVisibilities = map[string]bool{ //stored in the isn.visibility column
+var ValidVisibilities = map[string]bool{ // isn.visibility
 	"public":  true,
 	"private": true,
 }
@@ -74,157 +88,65 @@ var ValidISNPermissions = map[string]bool{ // isn_accounts.permission
 var ValidServiceModes = map[string]bool{ // service modes for CLI
 	"all":           true,
 	"admin":         true,
-	"signals":       true, // both read and write (backward compatibility)
+	"signals":       true, // both read and write
 	"signals-read":  true, // read-only signal operations
 	"signals-write": true, // write-only signal operations
 }
 
-// NewServerConfig loads environment variables and returns a ServerConfig struct
-func NewServerConfig(logger *zerolog.Logger) *ServerConfig {
-	const (
-		defaultHost                 = "0.0.0.0"
-		defaultPort                 = 8080
-		defaultEnviromnent          = "dev"
-		defaultLogLevelStr          = "debug"
-		defaultReadTimeout          = 15 * time.Second
-		defaultWriteTimeout         = 15 * time.Second
-		defaultIdleTimeout          = 60 * time.Second
-		defaultMaxSignalPayloadSize = 5 * 1024 * 1024 // 5MB default
-		defaultRateLimitRPS         = 100
-		defaultRateLimitBurst       = 20 // burst of 20 requests
-	)
+// NewServerConfig loads environment variables using envconfig and returns a ServerConfig struct
+func NewServerConfig(logger *zerolog.Logger) (*ServerConfig, error) {
+	var cfg ServerConfig
 
-	// log level
-	var logLevel zerolog.Level
-
-	logLevelStr := os.Getenv("LOG_LEVEL")
-	if logLevelStr == "" {
-		logger.Warn().Msgf("LOG_LEVEL not set, defaulting to %s", defaultLogLevelStr)
-		logLevelStr = defaultLogLevelStr
-	}
-	logLevel, err := zerolog.ParseLevel(logLevelStr)
-	if err != nil {
-		logLevel = zerolog.DebugLevel
-		logger.Warn().Msg("LOG_LEVEL not valid, defaulting to debug")
+	// load environment variables with defaults
+	if err := envconfig.Process("", &cfg); err != nil {
+		return nil, fmt.Errorf("failed to process environment variables: %w", err)
 	}
 
-	logger.Info().Msgf("log level set to {%v} \n", logLevel)
-	zerolog.SetGlobalLevel(logLevel)
-
-	// environment
-	environment := os.Getenv("ENVIRONMENT")
-	if environment == "" {
-		logger.Warn().Msgf("ENVIRONMENT environment variable is not set, defaulting to '%s'", defaultEnviromnent)
-		environment = defaultEnviromnent
+	if err := validateConfig(&cfg); err != nil {
+		return nil, fmt.Errorf("configuration validation failed: %w", err)
 	}
 
-	_, ok := validEnvs[environment]
-	if !ok {
-		logger.Fatal().Msgf("invalid ENVIRONMENT environment variable (expects %v)", validEnvs)
-	}
+	logger.Info().
+		Str("environment", cfg.Environment).
+		Str("host", cfg.Host).
+		Int("port", cfg.Port).
+		Str("log_level", cfg.LogLevel.String()).
+		Dur("read_timeout", cfg.ReadTimeout).
+		Dur("write_timeout", cfg.WriteTimeout).
+		Dur("idle_timeout", cfg.IdleTimeout).
+		Int64("max_signal_payload_size", cfg.MaxSignalPayloadSize).
+		Int("rate_limit_rps", cfg.RateLimitRPS).
+		Int("rate_limit_burst", cfg.RateLimitBurst).
+		Msg("Configuration loaded")
 
-	// database
-	databaseURL := os.Getenv("DATABASE_URL")
-	if databaseURL == "" {
-		logger.Fatal().Msg("DATABASE_URL environment variable is not set")
-	}
+	return &cfg, nil
+}
 
-	// http
-	host := os.Getenv("HOST")
+// validateConfig checks for required env variables
+func validateConfig(cfg *ServerConfig) error {
+	if cfg.Environment == "prod" {
+		if cfg.DatabaseURL == "" {
+			return fmt.Errorf("DATABASE_URL is required in %s environment", cfg.Environment)
+		}
+		if cfg.SecretKey == "" {
+			return fmt.Errorf("SECRET_KEY is required in %s environment", cfg.Environment)
+		}
 
-	if host == "" {
-		logger.Warn().Msgf("HOST environment variable is not set, defaulting to '%s'", defaultHost)
-		host = defaultHost
-	}
-	portString := os.Getenv("PORT")
-	var port int
-
-	if portString == "" {
-		logger.Warn().Msgf("PORT environment variable is not set, defaulting to '%d'", defaultPort)
-		port = defaultPort
-	} else {
-		port, err = strconv.Atoi(portString)
-		if err != nil {
-			logger.Fatal().Msg("invalid PORT environment variable")
+		// Additional production safety checks
+		if len(cfg.SecretKey) < 32 {
+			return fmt.Errorf("SECRET_KEY must be at least 32 characters in %s environment", cfg.Environment)
+		}
+		if !strings.Contains(cfg.DatabaseURL, "sslmode=require") && !strings.Contains(cfg.DatabaseURL, "sslmode=verify") {
+			return fmt.Errorf("DATABASE_URL must use SSL in %s environment (add sslmode=require)", cfg.Environment)
 		}
 	}
 
-	// secrets
-	secretKey := os.Getenv("SECRET_KEY")
-	if secretKey == "" {
-		logger.Fatal().Msg("SECRET_KEY environment variable is not set")
+	if cfg.Port < 1 || cfg.Port > 65535 {
+		return fmt.Errorf("PORT must be between 1 and 65535")
+	}
+	if !validEnvs[cfg.Environment] {
+		return fmt.Errorf("invalid ENVIRONMENT: %s", cfg.Environment)
 	}
 
-	//db timeouts
-	writeTimeout := getEnvDuration("WRITE_TIMEOUT", defaultWriteTimeout)
-	readTimeout := getEnvDuration("READ_TIMEOUT", defaultReadTimeout)
-	idleTimeout := getEnvDuration("IDLE_TIMEOUT", defaultIdleTimeout)
-
-	// CORS allowed origins
-	allowedOrigins := getOrigins("ALLOWED_ORIGINS")
-
-	// Signal payload size
-	maxSignalPayloadSize := getEnvInt64("MAX_SIGNAL_PAYLOAD_SIZE", defaultMaxSignalPayloadSize)
-
-	// Rate limiting
-	rateLimitRPS := getEnvInt("RATE_LIMIT_RPS", defaultRateLimitRPS)
-	rateLimitBurst := getEnvInt("RATE_LIMIT_BURST", defaultRateLimitBurst)
-
-	return &ServerConfig{
-		Environment:          environment,
-		Host:                 host,
-		Port:                 port,
-		SecretKey:            secretKey,
-		LogLevel:             logLevel,
-		DatabaseURL:          databaseURL,
-		ReadTimeout:          readTimeout,
-		WriteTimeout:         writeTimeout,
-		IdleTimeout:          idleTimeout,
-		AllowedOrigins:       allowedOrigins,
-		MaxSignalPayloadSize: maxSignalPayloadSize,
-		RateLimitRPS:         rateLimitRPS,
-		RateLimitBurst:       rateLimitBurst,
-		ServiceMode:          "", // Will be set by CLI flag
-	}
-}
-
-func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
-	if val := os.Getenv(key); val != "" {
-		if d, err := time.ParseDuration(val); err == nil {
-			return d
-		}
-	}
-	return defaultValue
-}
-
-func getEnvInt64(key string, defaultValue int64) int64 {
-	if val := os.Getenv(key); val != "" {
-		if parsed, err := strconv.ParseInt(val, 10, 64); err == nil {
-			return parsed
-		}
-	}
-	return defaultValue
-}
-
-func getEnvInt(key string, defaultValue int) int {
-	if val := os.Getenv(key); val != "" {
-		if parsed, err := strconv.Atoi(val); err == nil {
-			return parsed
-		}
-	}
-	return defaultValue
-}
-
-// return origins from ALLOWED_ORIGINS (default to *)
-func getOrigins(key string) []string {
-	val := os.Getenv(key)
-	if val == "" {
-		return []string{"*"}
-	}
-	origins := strings.Split(val, ",")
-	for i, origin := range origins {
-		origins[i] = strings.TrimSpace(origin)
-	}
-
-	return origins
+	return nil
 }

@@ -1,19 +1,20 @@
-# docker-compose.yml (run the service locally - for non-developers)
+# docker-compose.yml (development env - mounts the local repo directory)
 services:
   db:
     image: postgres:17-alpine
     restart: unless-stopped
     container_name: signalsd-db
     volumes:
-      - db-data:/var/lib/postgresql/data
+      - db-data-dev:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "15432:5432"
     environment:
       POSTGRES_HOST_AUTH_METHOD: trust
-      POSTGRES_USER: signalsd
+      POSTGRES_USER: signalsd-dev
       POSTGRES_DB: signalsd_admin
+
     healthcheck:
-      test: ["CMD-SHELL", "psql -U signalsd -d signalsd_admin -c 'select 1;'"]
+      test: ["CMD-SHELL", "psql -U signalsd-dev -d signalsd_admin -c 'select 1;'"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -22,40 +23,80 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '0.25'
-          memory: 256M
+          cpus: '1'
+          memory: 2048M
 
   app:
-    build: 
+    build:
       context: .
-      dockerfile: app/Dockerfile.local
+      dockerfile_inline: |
+        FROM golang:1.24-alpine
+        # Install system dependencies in one layer for better caching
+        RUN apk add --no-cache bash postgresql-client curl jq vim git
+        # Install Go tools
+        RUN go install github.com/pressly/goose/v3/cmd/goose@latest && \
+            go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest && \
+            go install github.com/swaggo/swag/cmd/swag@latest
+        # Pre-download common Go modules for faster startup
+        WORKDIR /tmp/app
+        COPY app/go.mod app/go.sum ./
+        RUN go mod download
+        WORKDIR /signalsd
     container_name: signalsd-app
-    entrypoint: ["/app/entrypoint.sh", "-e", "local"]
+    volumes:
+      - ./:/signalsd # project dir
+      - go-modules:/go/pkg/mod # persist downloaded modules
     environment:
-      DOCKER_ENV: true
-      SIGNALS_ENVIRONMENT: dev
+      # Required - container-specific values
+      - DOCKER_ENV=true
+      - SECRET_KEY=${SECRET_KEY:-dev-container-secret-key-12345}
+      - DATABASE_URL=${DATABASE_URL:-postgres://signalsd-dev:@db:5432/signalsd_admin?sslmode=disable}
+
+      # Optional overrides - pass through from shell if set, otherwise app uses defaults
+      - HOST
+      - PORT
+      - ENVIRONMENT
+      - LOG_LEVEL
+      - READ_TIMEOUT
+      - WRITE_TIMEOUT
+      - IDLE_TIMEOUT
+      - RATE_LIMIT_RPS
+      - RATE_LIMIT_BURST
+      - MAX_SIGNAL_PAYLOAD_SIZE
+      - MAX_API_REQUEST_SIZE
+      - ALLOWED_ORIGINS
+    working_dir: /signalsd
     ports:
-      - "8080:8080"
-    depends_on:
-      db:
-        condition: service_healthy
+      - "${PORT:-8080}:${PORT:-8080}"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
       interval: 5s
       timeout: 5s
       retries: 5
+    command: >
+      sh -c "
+        cd /signalsd/app &&
+        echo 'Generating sqlc files...' &&
+        sqlc generate &&
+        echo 'Creating swagger documentation...' &&
+        swag init -g ./cmd/signalsd/main.go &&
+        echo 'Running database migrations...' &&
+        goose -dir sql/schema postgres \"$$DATABASE_URL\" -env=none up &&
+        echo 'Starting signalsd service (live reload on code changes)...' &&
+        go run -mod=readonly cmd/signalsd/main.go --mode all
+      "
     networks:
       - app-network
     deploy:
       resources:
         limits:
-          cpus: '0.25'
-          memory: 256M
-
+          cpus: '1'
+          memory: 512M
 
 networks:
   app-network:
     driver: bridge
 
 volumes:
-  db-data:
+  db-data-dev:
+  go-modules:

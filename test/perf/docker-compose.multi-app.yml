@@ -39,16 +39,24 @@ services:
       - ../..:/signalsd
       - go-modules-multi:/go/pkg/mod
     environment:
-      DOCKER_ENV: true
-      SECRET_KEY: "multi-container-test-secret-key-12345"
-      DATABASE_URL: postgres://signalsd-dev:@host.docker.internal:15432/signalsd_admin?sslmode=disable
-      ENVIRONMENT: perf
-      RATE_LIMIT_RPS: 0
-      APP_INSTANCE: "signals1"
-      READ_TIMEOUT: "300s"
-      WRITE_TIMEOUT: "300s"
-      IDLE_TIMEOUT: "300s"
-      MAX_SIGNAL_PAYLOAD_SIZE: ${MAX_SIGNAL_PAYLOAD_SIZE}
+      - HOST
+      - PORT
+      - ENVIRONMENT=perf
+      - LOG_LEVEL
+      - READ_TIMEOUT
+      - WRITE_TIMEOUT
+      - IDLE_TIMEOUT
+      - RATE_LIMIT_BURST
+      - MAX_SIGNAL_PAYLOAD_SIZE
+      - MAX_API_REQUEST_SIZE
+      - ALLOWED_ORIGINS
+      - SECRET_KEY=${SECRET_KEY:-multi-container-test-secret-key-12345}
+      - DATABASE_URL=${DATABASE_URL:-postgres://signalsd-dev:@host.docker.internal:15432/signalsd_admin?sslmode=disable}
+      - RATE_LIMIT_RPS=0
+      - APP_INSTANCE=signals1
+      - READ_TIMEOUT=300s
+      - WRITE_TIMEOUT=300s
+      - IDLE_TIMEOUT=300s
     working_dir: /signalsd
     ports:
       - "8082:8080"  # Expose for direct testing
@@ -80,17 +88,24 @@ services:
       - ../..:/signalsd
       - go-modules-multi:/go/pkg/mod
     environment:
-      DOCKER_ENV: true
-      SECRET_KEY: "multi-container-test-secret-key-12345"
-      DATABASE_URL: postgres://signalsd-dev:@host.docker.internal:15432/signalsd_admin?sslmode=disable
-      ENVIRONMENT: perf
-      RATE_LIMIT_RPS: 0
-      APP_INSTANCE: "signals2"
-      # Increase timeouts for large batch processing
-      READ_TIMEOUT: "300s"
-      WRITE_TIMEOUT: "300s"
-      IDLE_TIMEOUT: "300s"
-      MAX_SIGNAL_PAYLOAD_SIZE: ${MAX_SIGNAL_PAYLOAD_SIZE}
+      - HOST
+      - PORT
+      - ENVIRONMENT=perf
+      - LOG_LEVEL
+      - READ_TIMEOUT
+      - WRITE_TIMEOUT
+      - IDLE_TIMEOUT
+      - RATE_LIMIT_BURST
+      - MAX_SIGNAL_PAYLOAD_SIZE
+      - MAX_API_REQUEST_SIZE
+      - ALLOWED_ORIGINS
+      - SECRET_KEY=${SECRET_KEY:-multi-container-test-secret-key-12345}
+      - DATABASE_URL=${DATABASE_URL:-postgres://signalsd-dev:@host.docker.internal:15432/signalsd_admin?sslmode=disable}
+      - RATE_LIMIT_RPS=0
+      - APP_INSTANCE=signals2
+      - READ_TIMEOUT=300s
+      - WRITE_TIMEOUT=300s
+      - IDLE_TIMEOUT=300s
     working_dir: /signalsd
     ports:
       - "8083:8080"  # Expose for direct testing
@@ -122,17 +137,24 @@ services:
       - ../..:/signalsd
       - go-modules-multi:/go/pkg/mod
     environment:
-      DOCKER_ENV: true
-      SECRET_KEY: "multi-container-test-secret-key-12345"
-      DATABASE_URL: postgres://signalsd-dev:@host.docker.internal:15432/signalsd_admin?sslmode=disable
-      ENVIRONMENT: perf
-      RATE_LIMIT_RPS: 0
-      APP_INSTANCE: "signals3"
-      # Increase timeouts for large batch processing
-      READ_TIMEOUT: "300s"
-      WRITE_TIMEOUT: "300s"
-      IDLE_TIMEOUT: "300s"
-      MAX_SIGNAL_PAYLOAD_SIZE: ${MAX_SIGNAL_PAYLOAD_SIZE}
+      - HOST
+      - PORT
+      - ENVIRONMENT=perf
+      - LOG_LEVEL
+      - READ_TIMEOUT
+      - WRITE_TIMEOUT
+      - IDLE_TIMEOUT
+      - RATE_LIMIT_BURST
+      - MAX_SIGNAL_PAYLOAD_SIZE
+      - MAX_API_REQUEST_SIZE
+      - ALLOWED_ORIGINS
+      - SECRET_KEY=${SECRET_KEY:-multi-container-test-secret-key-12345}
+      - DATABASE_URL=${DATABASE_URL:-postgres://signalsd-dev:@host.docker.internal:15432/signalsd_admin?sslmode=disable}
+      - RATE_LIMIT_RPS=0
+      - APP_INSTANCE=signals3
+      - READ_TIMEOUT=300s
+      - WRITE_TIMEOUT=300s
+      - IDLE_TIMEOUT=300s
     working_dir: /signalsd
     ports:
       - "8084:8080"  # Expose for direct testing
@@ -157,19 +179,40 @@ services:
       context: ../..
       dockerfile_inline: |
         FROM golang:1.24-alpine
+        # Install system dependencies in one layer for better caching
+        RUN apk add --no-cache bash postgresql-client curl jq vim git
+        # Install Go tools
+        RUN go install github.com/pressly/goose/v3/cmd/goose@latest && \
+            go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest && \
+            go install github.com/swaggo/swag/cmd/swag@latest
+        # Pre-download common Go modules for faster startup
+        WORKDIR /tmp/app
+        COPY app/go.mod app/go.sum ./
+        RUN go mod download
         WORKDIR /signalsd
-        CMD ["/bin/bash"]
     container_name: signalsd-admin-multi
     volumes:
       - ../..:/signalsd
       - go-modules-multi:/go/pkg/mod
     environment:
-      DOCKER_ENV: true
-      SECRET_KEY: "multi-container-test-secret-key-12345"
-      DATABASE_URL: postgres://signalsd-dev:@host.docker.internal:15432/signalsd_admin?sslmode=disable
-      ENVIRONMENT: perf
-      RATE_LIMIT_RPS: 0
-      APP_INSTANCE: "admin"
+      - HOST
+      - PORT
+      - ENVIRONMENT=perf
+      - LOG_LEVEL
+      - READ_TIMEOUT
+      - WRITE_TIMEOUT
+      - IDLE_TIMEOUT
+      - RATE_LIMIT_BURST
+      - MAX_SIGNAL_PAYLOAD_SIZE
+      - MAX_API_REQUEST_SIZE
+      - ALLOWED_ORIGINS
+      - SECRET_KEY=${SECRET_KEY:-multi-container-test-secret-key-12345}
+      - DATABASE_URL=${DATABASE_URL:-postgres://signalsd-dev:@host.docker.internal:15432/signalsd_admin?sslmode=disable}
+      - RATE_LIMIT_RPS=0
+      - APP_INSTANCE=admin
+      - READ_TIMEOUT=300s
+      - WRITE_TIMEOUT=300s
+      - IDLE_TIMEOUT=300s
     working_dir: /signalsd
     ports:
       - "8085:8080"  # Expose for direct testing
@@ -179,7 +222,17 @@ services:
       timeout: 5s
       retries: 5
     command: >
-      sh -c "cd /signalsd/app && go run cmd/signalsd/main.go -m admin"
+      sh -c "
+        cd /signalsd/app &&
+        echo 'Generating sqlc files...' &&
+        sqlc generate &&
+        echo 'Creating swagger documentation...' &&
+        swag init -g ./cmd/signalsd/main.go &&
+        echo 'Running database migrations...' &&
+        goose -dir sql/schema postgres \"$$DATABASE_URL\" -env=none up &&
+        echo 'Starting signalsd service (live reload on code changes)...' &&
+        go run -mod=readonly cmd/signalsd/main.go --mode admin
+      "
     networks:
       - multi-app-network
     deploy:
