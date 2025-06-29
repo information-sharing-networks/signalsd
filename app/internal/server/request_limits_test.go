@@ -99,7 +99,7 @@ func TestRateLimit(t *testing.T) {
 func TestRateLimitDisabled(t *testing.T) {
 	tests := []struct {
 		name          string
-		rps           int
+		rps           int32
 		expectLimited bool
 	}{
 		{"Rate limiting enabled", 10, true},
