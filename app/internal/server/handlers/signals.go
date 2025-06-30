@@ -326,7 +326,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 		})
 	}
 
-	// CRITICAL: Close batch results before checking for errors to prevent "conn busy"
+	// Close batch results before checking for errors to prevent "conn busy"
 	closeErr = versionResults.Close()
 	if closeErr != nil {
 		fmt.Printf("Error closing version batch results: %v\n", closeErr)
@@ -502,6 +502,5 @@ func (s *SignalsHandler) SearchSignalsHandler(w http.ResponseWriter, r *http.Req
 			Content:            row.Content,
 		})
 	}
-	// check for valid ISO dates
 	responses.RespondWithJSON(w, http.StatusOK, res)
 }

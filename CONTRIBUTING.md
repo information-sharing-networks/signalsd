@@ -2,7 +2,7 @@
 
 ## Approach
 
-   This project values code that is easy to understand, even if it means some repetition, and avoids abstractions that don't solve current problems.
+This project values code that is easy to understand, even if it means some repetition, and avoids abstractions that don't solve current problems.
 
 ## Before You Start
 
@@ -43,10 +43,9 @@ Performance tests are in `test/perf/` - see the [performance testing guide](test
 
 1. **Keep changes focused** - one logical change per PR
 2. **Write clear commit messages** - explain what and why, not how
-3. **Include tests** for new functionality
-4. **Update documentation** if you change APIs or behavior
-5. **keep code lear and readable** so it is easy for other developers to understand
-6. **Follow existing patterns** so the change is consistent with the codebase
+3. **Update documentation** if you change APIs or behavior
+4. **Keep code clear and readable** so it is easy for other developers to understand
+5. **Follow existing patterns** so the change is consistent with the codebase
 
 ### PR Checklist
 
@@ -73,7 +72,6 @@ Performance tests are in `test/perf/` - see the [performance testing guide](test
 - Check the [API documentation](https://information-sharing-networks.github.io/signalsd/app/docs/index.html)
 - Review existing code for patterns
 - Open an issue for questions or discussion
-- Look at recent PRs for examples
 
 ## Release Process
 

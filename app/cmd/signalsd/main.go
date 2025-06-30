@@ -155,14 +155,12 @@ func runServer(mode string) error {
 		serverLogger.Fatal().Err(err).Msg("Failed to parse database URL")
 	}
 
-	// perf testing config
-	if cfg.Environment == "perf" {
-		poolConfig.MaxConns = signalsd.PerfMaxConns
-		poolConfig.MinConns = signalsd.PerfMinConns
-		poolConfig.MaxConnLifetime = signalsd.PerfMaxConnLifetime
-		poolConfig.MaxConnIdleTime = signalsd.PerfMaxConnIdleTime
-		poolConfig.ConnConfig.ConnectTimeout = signalsd.PerfConnectTimeout
-	}
+	poolConfig.MaxConns = cfg.DBMaxConnections
+	poolConfig.MinConns = cfg.DBMinConnections
+	poolConfig.MaxConnLifetime = cfg.DBMaxConnLifetime
+	poolConfig.MaxConnIdleTime = cfg.DBMaxConnIdleTime
+	poolConfig.ConnConfig.ConnectTimeout = cfg.DBConnectTimeout
+
 	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
 	if err != nil {
 		serverLogger.Fatal().Err(err).Msg("Unable to create connection pool")

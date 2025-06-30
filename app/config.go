@@ -23,12 +23,16 @@ type ServerConfig struct {
 	AllowedOrigins       []string      `envconfig:"ALLOWED_ORIGINS" default:"*"`
 	MaxSignalPayloadSize int64         `envconfig:"MAX_SIGNAL_PAYLOAD_SIZE" default:"5242880"` // 5MB
 	MaxAPIRequestSize    int64         `envconfig:"MAX_API_REQUEST_SIZE" default:"65536"`      // 64KB
-	RateLimitRPS         int           `envconfig:"RATE_LIMIT_RPS" default:"100"`
-	RateLimitBurst       int           `envconfig:"RATE_LIMIT_BURST" default:"20"`
-	ServiceMode          string        `envconfig:"SERVICE_MODE"` // Set by CLI flag, not env var
+	RateLimitRPS         int32         `envconfig:"RATE_LIMIT_RPS" default:"100"`
+	RateLimitBurst       int32         `envconfig:"RATE_LIMIT_BURST" default:"20"`
+	ServiceMode          string        `envconfig:"SERVICE_MODE"`                   // Set by CLI flag, not env var
+	DBMaxConnections     int32         `envconfig:"DB_MAX_CONNECTIONS" default:"4"` // pgx pool defaults
+	DBMinConnections     int32         `envconfig:"DB_MIN_CONNECTIONS" default:"0"`
+	DBMaxConnLifetime    time.Duration `envconfig:"DB_MAX_CONN_LIFETIME" default:"60m"`
+	DBMaxConnIdleTime    time.Duration `envconfig:"DB_MAX_CONN_IDLE_TIME" default:"30m"`
+	DBConnectTimeout     time.Duration `envconfig:"DB_CONNECT_TIMEOUT" default:"5s"`
 }
 
-// Application constants
 const (
 	RefreshTokenCookieName = "refresh_token"
 	TokenIssuerName        = "Signalsd"
@@ -48,13 +52,6 @@ const (
 
 	// JSON validation
 	SkipValidationURL = "https://github.com/skip/validation/main/schema.json" // URL used to indicate JSON schema validation should be skipped
-
-	// Database pool constants for performance testing environment
-	PerfMaxConns        = 50
-	PerfMinConns        = 10
-	PerfMaxConnLifetime = 30 * time.Minute
-	PerfMaxConnIdleTime = 15 * time.Minute
-	PerfConnectTimeout  = 5 * time.Second
 )
 
 // common maps - used to validate enum values
@@ -110,16 +107,21 @@ func NewServerConfig(logger *zerolog.Logger) (*ServerConfig, error) {
 	}
 
 	logger.Info().
-		Str("environment", cfg.Environment).
-		Str("host", cfg.Host).
-		Int("port", cfg.Port).
-		Str("log_level", cfg.LogLevel.String()).
-		Dur("read_timeout", cfg.ReadTimeout).
-		Dur("write_timeout", cfg.WriteTimeout).
-		Dur("idle_timeout", cfg.IdleTimeout).
-		Int64("max_signal_payload_size", cfg.MaxSignalPayloadSize).
-		Int("rate_limit_rps", cfg.RateLimitRPS).
-		Int("rate_limit_burst", cfg.RateLimitBurst).
+		Str("ENVIRONMENT", cfg.Environment).
+		Str("HOST", cfg.Host).
+		Int("PORT", cfg.Port).
+		Str("LOG_LEVEL", cfg.LogLevel.String()).
+		Str("READ_TIMEOUT", cfg.ReadTimeout.String()).
+		Str("WRITE_TIMEOUT", cfg.WriteTimeout.String()).
+		Str("IDLE_TIMEOUT", cfg.IdleTimeout.String()).
+		Int64("MAX_SIGNAL_PAYLOAD_SIZE", cfg.MaxSignalPayloadSize).
+		Int32("RATE_LIMIT_RPS", cfg.RateLimitRPS).
+		Int32("RATE_LIMIT_BURST", cfg.RateLimitBurst).
+		Int32("DB_MAX_CONNECTIONS", cfg.DBMaxConnections).
+		Int32("DB_MIN_CONNECTIONS", cfg.DBMinConnections).
+		Str("DB_MAX_CONN_LIFETIME", cfg.DBMaxConnLifetime.String()).
+		Str("DB_MAX_CONN_IDLE_TIME", cfg.DBMaxConnIdleTime.String()).
+		Str("DB_CONNECT_TIMEOUT", cfg.DBConnectTimeout.String()).
 		Msg("Configuration loaded")
 
 	return &cfg, nil
@@ -149,6 +151,17 @@ func validateConfig(cfg *ServerConfig) error {
 	}
 	if !validEnvs[cfg.Environment] {
 		return fmt.Errorf("invalid ENVIRONMENT: %s", cfg.Environment)
+	}
+
+	// Validate database pool configuration
+	if cfg.DBMaxConnections < 1 {
+		return fmt.Errorf("DB_MAX_CONNECTIONS must be at least 1")
+	}
+	if cfg.DBMinConnections < 0 {
+		return fmt.Errorf("DB_MIN_CONNECTIONS must be 0 or greater")
+	}
+	if cfg.DBMinConnections > cfg.DBMaxConnections {
+		return fmt.Errorf("DB_MIN_CONNECTIONS (%d) cannot be greater than DB_MAX_CONNECTIONS (%d)", cfg.DBMinConnections, cfg.DBMaxConnections)
 	}
 
 	return nil

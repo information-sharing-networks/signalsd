@@ -61,9 +61,46 @@ MAX_API_REQUEST_SIZE=65536      # Max API request size (default: 64KB)
 
 # Security - list sites that are allowed to use the service
 ALLOWED_ORIGINS=*               # CORS origins (default: *, comma-separated for multiple)
+
+# Database Connection Pool (the default used are the same as those used by pgx )
+DB_MAX_CONNECTIONS=4
+DB_MIN_CONNECTIONS=0
+DB_MAX_CONN_LIFETIME=60m
+DB_MAX_CONN_IDLE_TIME=30m
+DB_CONNECT_TIMEOUT=5s
 ```
 
 **Note**: In the Docker development environment, DATABASE_URL and SECRET_KEY are automatically configured with development-appropriate defaults.
+
+## Environment-Specific Configuration Examples
+
+### Performance Testing Configuration
+For load testing and performance evaluation:
+```bash
+# Performance testing environment
+ENVIRONMENT=perf
+DB_MAX_CONNECTIONS=50
+DB_MIN_CONNECTIONS=5
+DB_MAX_CONN_LIFETIME=30m
+DB_MAX_CONN_IDLE_TIME=15m
+RATE_LIMIT_RPS=0                # Disable rate limiting for testing
+MAX_SIGNAL_PAYLOAD_SIZE=10485760 # 10MB for larger test payloads
+
+go run cmd/signalsd/main.go --mode all
+```
+
+### Production Configuration
+These are the settings used for the Neon.tech production deployment:
+```bash
+DB_MAX_CONNECTIONS=25           
+DB_MIN_CONNECTIONS=0            # Allow scaling to zero (Cloud Run)
+DB_MAX_CONN_LIFETIME=120m  
+DB_MAX_CONN_IDLE_TIME=20m
+DB_CONNECT_TIMEOUT=10s
+
+go run cmd/signalsd/main.go --mode all
+```
+
 
 ## Quick Start (Docker Development Environment)
 
@@ -91,6 +128,12 @@ docker compose restart app
 # This recreates the container with the new environment variables
 PORT=8081 docker compose up app
 RATE_LIMIT_RPS=0 docker compose up app  # Disable rate limiting
+
+# Performance testing configuration
+ENVIRONMENT=perf DB_MAX_CONNECTIONS=50 DB_MIN_CONNECTIONS=5 RATE_LIMIT_RPS=0 docker compose up app
+
+# Production-like configuration
+ENVIRONMENT=prod DB_MAX_CONNECTIONS=25 DB_CONNECT_TIMEOUT=10s RATE_LIMIT_RPS=200 docker compose up app
 
 # Rebuild the image when you change:
 # - dockerfile_inline content
@@ -147,6 +190,12 @@ go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest       # type safe code for S
 go install github.com/swaggo/swag/cmd/swag@latest         # generates OpenAPI specs from go comments
 ```
 
+### Quality Assurance Tools
+```bash
+go install honnef.co/go/tools/cmd/staticcheck@latest  # static analysis
+go install github.com/securecode/gosec/v2/cmd/gosec@latest  # security analysis
+```
+
 ### Environment Variables
 ```bash
 # local dev service config
@@ -173,7 +222,7 @@ CREATE DATABASE signalsd_admin;
 export DATABASE_URL="postgres://$(whoami):@localhost:5432/signalsd_admin?sslmode=disable"
 ```
 
-### Database Management
+## Database Management
 database schema migration is managed by [goose](https://github.com/pressly/goose):
 
 Schema changes are made by adding files to `app/sql/schema`:
@@ -201,8 +250,14 @@ go build ./cmd/signalsd/
 go run cmd/signalsd/main.go -mode all
 
 
-# configure the service environment 
+# Configure the service environment
 PORT=8081 go run cmd/signalsd/main.go -mode all
+
+# Performance testing with custom database pool settings
+ENVIRONMENT=perf DB_MAX_CONNECTIONS=50 DB_MIN_CONNECTIONS=5 RATE_LIMIT_RPS=0 go run cmd/signalsd/main.go -mode all
+
+# Production-like settings
+ENVIRONMENT=prod DB_MAX_CONNECTIONS=25 DB_CONNECT_TIMEOUT=10s go run cmd/signalsd/main.go -mode all
 ```
 
 ## API Documentation
@@ -213,13 +268,13 @@ swag init -g cmd/signalsd/main.go
 The docs are hosted as part of the signalsd service: [API docs](http://localhost:8080/docs)
 
 
-### SQL Queries
+## SQL Queries
 SQL queries are kept in `app/sql/queries`.
 
 Run `sqlc generate` from the root of the project to regenerate the type safe Go code after adding or altering any queries.
 
 
-### Getting Help
+## Getting Help
 - Check the [API documentation](https://information-sharing-networks.github.io/signalsd/app/docs/index.html)
 - Review logs: `docker compose logs -f`
 - Open an [issue](https://github.com/information-sharing-networks/signalsd/issues) on GitHub
@@ -370,14 +425,43 @@ The `cloud-run-deploy` account will:
 Download a JSON key for the cloud-run-deploy account:
 **IAM > service accounts > cloud-run-deploy account > keys > add key > Create New**
 
-### 6. Configure GitHub Secrets
-Set up GitHub secrets in your fork of the repo:
-**repo > settings > secrets and variables > actions > new repository secret**
+### 6. Configure GitHub Secrets and Variables
+The deployment workflow (`.github/workflows/cd.yml`) has been configured to use GitHub variables for non-sensitive configuration and GitHub secrets for sensitive configuration.
 
-You will need three:
+
+#### Required GitHub Secrets
+Set up GitHub secrets in your fork of the repo:
+**repo > settings > secrets and variables > actions > secrets tab > new repository secret**
+
+You will need three secrets:
 - `GCP_CREDENTIALS` (upload the contents of the JSON key downloaded earlier)
 - `DATABASE_URL` (URL of your postgres service - we are using Neon.tech, but you can use any provider you choose)
 - `SECRET_KEY` (random secret key for your app - used by the signalsd server to sign JWT tokens)
+
+#### Optional GitHub Variables 
+For production tuning, you can set GitHub variables:
+**repo > settings > secrets and variables > actions > variables tab > new repository variable**
+
+if you don't set these variables, app defautls are used.
+
+Recommended production variables:
+```
+# Database Pool Configuration
+DB_MAX_CONNECTIONS=25
+DB_MIN_CONNECTIONS=0
+DB_MAX_CONN_LIFETIME=120m
+DB_MAX_CONN_IDLE_TIME=20m
+DB_CONNECT_TIMEOUT=10s
+
+# Performance Configuration
+RATE_LIMIT_RPS=200
+RATE_LIMIT_BURST=50
+
+# Server Configuration
+READ_TIMEOUT=30s
+WRITE_TIMEOUT=30s
+IDLE_TIMEOUT=120s
+```
 
 ### 7. Cost Considerations
 Note that at the time of writing this service operates within the free-tiers offered by Google and Neon.Tech, but you should check the current rules to be sure.
