@@ -33,6 +33,28 @@ AND ia.account_id = $2;
 -- get all the isns an account has access to.
 -- name: GetIsnAccountsByAccountID :many
 SELECT ia.*, i.slug as isn_slug FROM isn_accounts ia
-JOIN isn i 
+JOIN isn i
 ON i.id = ia.isn_id
 WHERE ia.account_id = $1;
+
+-- get all accounts that have access to a specific ISN
+-- name: GetAccountsByIsnID :many
+SELECT
+    ia.id,
+    ia.created_at,
+    ia.updated_at,
+    ia.isn_id,
+    ia.account_id,
+    ia.permission,
+    a.account_type,
+    a.is_active,
+    COALESCE(u.email, sa.client_contact_email) AS email,
+    COALESCE(u.user_role, 'member') AS account_role,
+    sa.client_id,
+    sa.client_organization
+FROM isn_accounts ia
+JOIN accounts a ON a.id = ia.account_id
+LEFT OUTER JOIN users u ON u.account_id = ia.account_id
+LEFT OUTER JOIN service_accounts sa ON sa.account_id = ia.account_id
+WHERE ia.isn_id = $1
+ORDER BY a.account_type, COALESCE(u.email, sa.client_contact_email);

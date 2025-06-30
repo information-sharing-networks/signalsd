@@ -292,9 +292,9 @@ func (i *IsnHandler) UpdateIsnHandler(w http.ResponseWriter, r *http.Request) {
 //
 //	@Summary		Get the ISNs
 //	@Description	get a list of the configured ISNs
-//	@Tags			ISN view
+//	@Tags			ISN details
 //
-//	@Success		200	{array}		database.Isn
+//	@Success		200	{array}	database.Isn
 //
 //	@Router			/api/isn [get]
 func (s *IsnHandler) GetIsnsHandler(w http.ResponseWriter, r *http.Request) {
@@ -314,7 +314,7 @@ func (s *IsnHandler) GetIsnsHandler(w http.ResponseWriter, r *http.Request) {
 //	@Description	Returns details about the ISN
 //	@Param			isn_slug	path	string	true	"isn slug"	example(sample-isn--example-org)
 //
-//	@Tags			ISN view
+//	@Tags			ISN details
 //
 //	@Success		200	{object}	handlers.IsnAndLinkedInfo
 //	@Failure		400	{object}	responses.ErrorResponse

@@ -371,7 +371,7 @@ func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *ht
 //	@Param		slug	path	string	true	"signal definiton slug"		example(sample-signal--example-org)
 //	@Param		sem_ver	path	string	true	"version to be recieved"	example(0.0.1)
 //
-//	@Tags		ISN view
+//	@Tags		ISN details
 //
 //	@Success	200	{object}	handlers.SignalTypeAndLinkedInfo
 //	@Failure	400	{object}	responses.ErrorResponse
@@ -414,9 +414,9 @@ func (s *SignalTypeHandler) GetSignalTypeHandler(w http.ResponseWriter, r *http.
 // GetSignalTypesHandler godoc
 //
 //	@Summary	Get the signal definitions
-//	@Tags		ISN view
+//	@Tags		ISN details
 //
-//	@Success	200	{array}		database.SignalType
+//	@Success	200	{array}	database.SignalType
 //
 //	@Router		/api/isn/{isn_slug}/signal_types [get]
 func (s *SignalTypeHandler) GetSignalTypesHandler(w http.ResponseWriter, r *http.Request) {
@@ -434,8 +434,8 @@ func (s *SignalTypeHandler) GetSignalTypesHandler(w http.ResponseWriter, r *http
 //
 //	@Summary		Delete a signal definition
 //	@Description	Only signal types that have never been referenced by signals can be deleted
-//	@Param			slug	path	string	true	"signal type slug"	example(sample-signal--example-org)
-//	@Param			sem_ver	path	string	true	"version to be deleted"		example(0.0.1)
+//	@Param			slug	path	string	true	"signal type slug"		example(sample-signal--example-org)
+//	@Param			sem_ver	path	string	true	"version to be deleted"	example(0.0.1)
 //
 //	@Tags			Signal definitions
 //

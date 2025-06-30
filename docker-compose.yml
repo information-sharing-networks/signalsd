@@ -82,7 +82,7 @@ services:
         swag init -g ./cmd/signalsd/main.go &&
         echo 'Running database migrations...' &&
         goose -dir sql/schema postgres \"$$DATABASE_URL\" -env=none up &&
-        echo 'Starting signalsd service (live reload on code changes)...' &&
+        echo 'Starting signalsd service...' &&
         go run -mod=readonly cmd/signalsd/main.go --mode all
       "
     networks:

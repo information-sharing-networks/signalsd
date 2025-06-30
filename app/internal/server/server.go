@@ -144,6 +144,27 @@ func (s *Server) registerAdminRoutes() {
 	s.router.Group(func(r chi.Router) {
 		r.Use(RequestSizeLimit(s.serverConfig.MaxAPIRequestSize))
 
+		//oauth2.0 token handling
+		r.Route("/oauth", func(r chi.Router) {
+
+			r.Group(func(r chi.Router) {
+				// the RequireOAuthGrantType middleware calls the appropriate authentication middleware for the grant_type (client_credentials or refresh_token)
+				r.Use(s.authService.RequireOAuthGrantType)
+
+				// get new access tokens
+				r.Post("/token", tokens.NewAccessTokenHandler)
+			})
+
+			r.Group(func(r chi.Router) {
+
+				// the RequireValidAccountTypeCredentials middleware calls the appropriate authentication middleware for the user account type (user or service_account)
+				r.Use(s.authService.RequireValidAccountTypeCredentials)
+
+				// revoke a client secret (service accounts) or refresh token (web users)
+				r.Post("/revoke", tokens.RevokeTokenHandler)
+			})
+		})
+
 		// api routes used to administer the ISNs (excluding signal ingestion)
 		r.Route("/api", func(r chi.Router) {
 
@@ -158,14 +179,6 @@ func (s *Server) registerAdminRoutes() {
 
 				r.Group(func(r chi.Router) {
 					r.Use(s.authService.RequireValidAccessToken(false))
-					r.Use(s.authService.RequireRole("owner"))
-
-					r.Put("/admins/account/{account_id}", users.GrantUserAdminRoleHandler)
-					r.Delete("/admins/account/{account_id}", users.RevokeUserAdminRoleHandler)
-				})
-
-				r.Group(func(r chi.Router) {
-					r.Use(s.authService.RequireValidAccessToken(false))
 					r.Use(s.authService.RequireRole("owner", "admin"))
 
 					r.Post("/register/service-accounts", serviceAccounts.RegisterServiceAccountHandler)
@@ -176,67 +189,56 @@ func (s *Server) registerAdminRoutes() {
 				r.Get("/service-accounts/setup/{setup_id}", serviceAccounts.SetupServiceAccountHandler)
 			})
 
-			//oauth2.0 token handling
-			r.Route("/oauth", func(r chi.Router) {
-
-				r.Group(func(r chi.Router) {
-					// the RequireOAuthGrantType middleware calls the appropriate authentication middleware for the grant_type (client_credentials or refresh_token)
-					r.Use(s.authService.RequireOAuthGrantType)
-
-					// get new access tokens
-					r.Post("/token", tokens.NewAccessTokenHandler)
-				})
+			// isn admin endpoints
+			r.Route("/isn", func(r chi.Router) {
 
 				r.Group(func(r chi.Router) {
 
-					// the RequireValidAccountTypeCredentials middleware calls the appropriate authentication middleware for the user account type (user or service_account)
-					r.Use(s.authService.RequireValidAccountTypeCredentials)
+					// request using the routes below must have a valid access token.
+					// this middleware adds the access token claims and user in the Context supplied to the handlers)
+					r.Use(s.authService.RequireValidAccessToken(false))
 
-					// revoke a client secret (service accounts) or refresh token (web users)
-					r.Post("/revoke", tokens.RevokeTokenHandler)
+					// ISN configuration
+					r.Group(func(r chi.Router) {
+
+						// Accounts must be eiter owner or admin to use these endponts
+						r.Use(s.authService.RequireRole("owner", "admin"))
+
+						// ISN management
+						r.Post("/", isn.CreateIsnHandler)
+						r.Put("/i/{isn_slug}", isn.UpdateIsnHandler)
+
+						// signal types managment
+						r.Post("/{isn_slug}/signal_types", signalTypes.CreateSignalTypeHandler)
+						r.Put("/{isn_slug}/signal_types/{slug}/v{sem_ver}", signalTypes.UpdateSignalTypeHandler)
+						r.Delete("/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}", signalTypes.DeleteSignalTypeHandler)
+
+						// ISN account permissions
+						r.Put("/{isn_slug}/accounts/{account_id}", isnAccount.GrantIsnAccountHandler)
+						r.Delete("/{isn_slug}/accounts/{account_id}", isnAccount.RevokeIsnAccountHandler)
+						r.Get("/{isn_slug}/accounts", isnAccount.GetIsnAccountsHandler)
+
+					})
+
+					// create new signal batches
+					r.Group(func(r chi.Router) {
+						// accounts must have write permission to the isn to create or read batches
+						r.Use(s.authService.RequireValidAccessToken(false))
+						r.Use(s.authService.RequireIsnPermission("write"))
+
+						r.Post("/{isn_slug}/batches", signalBatches.CreateSignalsBatchHandler)
+						r.Get("/{isn_slug}/batches/{batch_id}/status", signalBatches.GetSignalBatchStatusHandler)
+						r.Get("/{isn_slug}/batches/search", signalBatches.SearchBatchesHandler)
+					})
+
+					// unrestricted
+					r.Get("/", isn.GetIsnsHandler)
+					r.Get("/{isn_slug}", isn.GetIsnHandler)
+					r.Get("/{isn_slug}/signal_types", signalTypes.GetSignalTypesHandler)
+					r.Get("/{isn_slug}/signal_types/{slug}/v{sem_ver}", signalTypes.GetSignalTypeHandler)
 				})
-			})
-
-			// signals batches
-			r.Group(func(r chi.Router) {
-				r.Use(s.authService.RequireValidAccessToken(false))
-				r.Use(s.authService.RequireIsnPermission("write"))
-				r.Post("/api/isn/{isn_slug}/batches", signalBatches.CreateSignalsBatchHandler)
-			})
-
-			r.Group(func(r chi.Router) {
-
-				// request using the routes below must have a valid access token.
-				// this middleware adds the access token claims and user in the Context supplied to the handlers)
-				r.Use(s.authService.RequireValidAccessToken(false))
-
-				// ISN configuration
-				r.Group(func(r chi.Router) {
-
-					// Accounts must be eiter owner or admin to use these endponts
-					r.Use(s.authService.RequireRole("owner", "admin"))
-
-					// ISN management
-					r.Post("/isn", isn.CreateIsnHandler)
-					r.Put("/isn/{isn_slug}", isn.UpdateIsnHandler)
-
-					// signal types managment
-					r.Post("/isn/{isn_slug}/signal_types", signalTypes.CreateSignalTypeHandler)
-					r.Put("/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}", signalTypes.UpdateSignalTypeHandler)
-					r.Delete("/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}", signalTypes.DeleteSignalTypeHandler)
-
-					// ISN account permissions
-					r.Put("/isn/{isn_slug}/accounts/{account_id}", isnAccount.GrantIsnAccountHandler)
-					r.Delete("/isn/{isn_slug}/accounts/{account_id}", isnAccount.RevokeIsnAccountHandler)
-				})
 
 			})
-
-			// unrestricted
-			r.Get("/isn", isn.GetIsnsHandler)
-			r.Get("/isn/{isn_slug}", isn.GetIsnHandler)
-			r.Get("/isn/{isn_slug}/signal_types", signalTypes.GetSignalTypesHandler)
-			r.Get("/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}", signalTypes.GetSignalTypeHandler)
 		})
 
 		// Site Admin
@@ -258,6 +260,10 @@ func (s *Server) registerAdminRoutes() {
 
 				r.Get("/users/{id}", admin.GetUserHandler)
 				r.Get("/users", admin.GetUsersHandler)
+
+				// Admin role management
+				r.Put("/accounts/{account_id}/admin-role", users.GrantUserAdminRoleHandler)
+				r.Delete("/accounts/{account_id}/admin-role", users.RevokeUserAdminRoleHandler)
 			})
 
 			r.Group(func(r chi.Router) {
@@ -283,8 +289,7 @@ func (s *Server) registerSignalRoutes(serviceMode string) {
 	signals := handlers.NewSignalsHandler(s.queries, s.pool)
 
 	// Register write routes
-	switch serviceMode {
-	case "all", "signals", "signals-write":
+	if serviceMode == "all" || serviceMode == "signals" || serviceMode == "signals-write" {
 		s.router.Group(func(r chi.Router) {
 			r.Use(RequestSizeLimit(s.serverConfig.MaxSignalPayloadSize))
 			r.Use(s.authService.RequireValidAccessToken(false))
@@ -304,8 +309,7 @@ func (s *Server) registerSignalRoutes(serviceMode string) {
 	}
 
 	// Register read routes
-	switch serviceMode {
-	case "all", "signals", "signals-read":
+	if serviceMode == "all" || serviceMode == "signals" || serviceMode == "signals-read" {
 		s.router.Group(func(r chi.Router) {
 
 			r.Use(s.authService.RequireValidAccessToken(false))
