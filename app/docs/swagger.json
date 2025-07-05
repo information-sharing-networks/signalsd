@@ -15,6 +15,86 @@
         }
     },
     "paths": {
+        "/admin/accounts/{account_id}/admin-role": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "This endpoint grants the admin role to a site member\n\nAn admin can:\n- Create an ISN\n- Define the signal_types used in the ISN\n- read/write to their own ISNs\n- Grant other accounts read or write access to their ISNs\n- Create service accounts\n\nthis endpoint can only be used by the site owner account",
+                "tags": [
+                    "Site admin"
+                ],
+                "summary": "Grant admin role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
+                        "description": "account id",
+                        "name": "account_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "this endpoint can only be used by the site owner account",
+                "tags": [
+                    "Site admin"
+                ],
+                "summary": "Revoke admin role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
+                        "description": "account id",
+                        "name": "account_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/accounts/{account_id}/disable": {
             "post": {
                 "security": [
@@ -22,7 +102,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Disabling an account prevents it from being used to create new access tokens.\n\nThe handler will also revoke:\n- client secrets/one-time secrets (service accounts)\n- refresh tokens (web users).\n\nNote: The site owner account cannot be disabled to prevent system lockout.\nOnly owners and admins can disable accounts.",
+                "description": "**Use Cases:**\n- **Security Incident**: Compromised account needs immediate lockout\n- **Policy Violation**: Account violated terms and needs suspension\n- **Employee Departure**: Remove access for departed staff\n\n**Actions Performed:**\n- Sets `is_active = false` (account becomes unusable)\n- Revokes all client secrets/one-time secrets (service accounts)\n- Revokes all refresh tokens (web users)\n\n**Recovery:** Account must be re-enabled by admin via `/admin/accounts/{id}/enable`\nService accounts also need re-registration via `/api/auth/register/service-accounts`\n\n**Note:** The site owner account cannot be disabled to prevent system lockout.\nOnly owners and admins can disable accounts.",
                 "tags": [
                     "Site admin"
                 ],
@@ -74,7 +154,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "For service accounts, you will need to register them again using /auth/register/service-accounts\nThe client ID will remain the same but they must go through\tthe setup process again.\n\nFor user accounts, they can immediately log in again.\n\nOnly owners and admins can enable accounts.",
+                "description": "**Administrative endpoint to re-enable previously disabled accounts.**\nSets account status to `is_active = true` (does not create new tokens).\n\n**Post-Enable Steps Required:**\n- **Service Accounts**: Must re-register via `/api/auth/register/service-accounts` (same client_id, new credentials)\n- **Web Users**: Can immediately log in again via `/auth/login`\n\nOnly owners and admins can enable accounts.",
                 "tags": [
                     "Site admin"
                 ],
@@ -388,86 +468,6 @@
                 }
             }
         },
-        "/api/auth/admins/account/{account_id}": {
-            "put": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "This endpoint grants the admin role to a site member\n\nAn admin can:\n- Create an ISN\n- Define the signal_types used in the ISN\n- read/write to their own ISNs\n- Grant other accounts read or write access to their ISNs\n- Create service accounts\n\nthis endpoint can only be used by the site owner account",
-                "tags": [
-                    "auth"
-                ],
-                "summary": "Grant admin role",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
-                        "description": "account id",
-                        "name": "account_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "this endpoint can only be used by the site owner account",
-                "tags": [
-                    "auth"
-                ],
-                "summary": "Revoke account admin role",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
-                        "description": "account id",
-                        "name": "account_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/api/auth/login": {
             "post": {
                 "description": "The response body includes an access token which can be used to access the protected enpoints, assuming the account has the appropriate permissions.\nThe access_token is valid for 30 mins.\n\nAs part of the login response, the server sets a http-only cookie on the client that will allow it to use the /auth/refresh endpoint to renew the access_token\nThe refresh_token lasts 30 days unless it is revoked earlier.\n\nThe account's role and permissions are encoded and encloded as part of the jwt access token and also provided in the response body\nTo renew the refresh_token, log in again.",
@@ -683,7 +683,7 @@
             "get": {
                 "description": "get a list of the configured ISNs",
                 "tags": [
-                    "ISN view"
+                    "ISN details"
                 ],
                 "summary": "Get the ISNs",
                 "responses": {
@@ -809,24 +809,111 @@
                 }
             }
         },
-        "/api/isn/{isn_slug}/accounts/{account_id}/batches": {
+        "/api/isn/{isn_slug}/accounts": {
             "get": {
-                "description": "TODO - get latest, previous, by data ranage\nTODO",
-                "tags": [
-                    "Service accounts"
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
                 ],
-                "summary": "Get details about a set of signal batches",
-                "responses": {}
+                "description": "Get a list of all accounts (users and service accounts) that have permissions on the specified ISN.\nOnly ISN owners and site owners can view this information.",
+                "tags": [
+                    "ISN details"
+                ],
+                "summary": "Get all accounts with access to an ISN",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ISN slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/database.GetAccountsByIsnIDRow"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
             }
         },
-        "/api/isn/{isn_slug}/accounts/{account_id}/batches/{signals_batch_id}": {
-            "get": {
-                "description": "TODO - get by id. Include status (errs, received, latest localref in batch)",
-                "tags": [
-                    "Service accounts"
+        "/api/isn/{isn_slug}/accounts/{account_id}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
                 ],
-                "summary": "Get a signal batch",
-                "responses": {}
+                "description": "Grant an account read or write access to an isn.\nThis end point can only be used by the site owner or the isn admin account.",
+                "tags": [
+                    "ISN Permissions"
+                ],
+                "summary": "Grant ISN access permission",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn--example-org",
+                        "description": "isn slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
+                        "description": "account id",
+                        "name": "account_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
             }
         },
         "/api/isn/{isn_slug}/batches": {
@@ -836,9 +923,9 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "This endpoint is used by service accounts to create a new batch used to track signals sent to the specified isn\n\nFor user accounts, a batch is automatically created when they are granted write permission to an isn and is only closed if their permission to write to the isn is revoked\n\nFor service accounts, the client app can decide how long to keep a batch open\n(a batch status summary is sent to a webhook after the batch closes)\n\nopening a batch closes the previous batch created on the isn for this account.\n\nSignals can only be sent to open batches.\n\nauthentication is based on the supplied access token:\n(the site owner; the isn admin and members with an isn_perm= write can create a batch)\n",
+                "description": "This endpoint is used by service accounts to create a new batch. Batches are used to track signals sent by an account to the specified ISN.\n\nOpening a batch closes the previous batch (the client app can decide how long to keep a batch open)\n\nSignals can only be sent to open batches.\n\nAuthentication is based on the supplied access token:\nthe site owner, the isn admin and members with an isn_perm=write can create a batch for the ISN.\n\nNote this endpoint is not needed for web users (a batch is automatically created when they are granted write permission to an isn and is only closed if their permission to write to the ISN is revoked)\n",
                 "tags": [
-                    "Service accounts"
+                    "Signal sharing"
                 ],
                 "summary": "Create a new signal batch",
                 "responses": {
@@ -854,7 +941,7 @@
         "/api/isn/{isn_slug}/signal_types": {
             "get": {
                 "tags": [
-                    "ISN view"
+                    "ISN details"
                 ],
                 "summary": "Get the signal definitions",
                 "responses": {
@@ -922,7 +1009,7 @@
         "/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}": {
             "get": {
                 "tags": [
-                    "ISN view"
+                    "ISN details"
                 ],
                 "summary": "Get a signal definition",
                 "parameters": [
@@ -1102,7 +1189,7 @@
             "get": {
                 "description": "Returns details about the ISN",
                 "tags": [
-                    "ISN view"
+                    "ISN details"
                 ],
                 "summary": "Get an ISN configurationuration",
                 "parameters": [
@@ -1172,59 +1259,6 @@
             }
         },
         "/isn/{isn_slug}/accounts/{account_id}": {
-            "put": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "Grant an account read or write access to an isn.\nThis end point can only be used by the site owner or the isn admin account.",
-                "tags": [
-                    "ISN Permissions"
-                ],
-                "summary": "Grant ISN access permission",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "sample-isn--example-org",
-                        "description": "isn slug",
-                        "name": "isn_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
-                        "description": "account id",
-                        "name": "account_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            },
             "delete": {
                 "security": [
                     {
@@ -1279,6 +1313,132 @@
                 }
             }
         },
+        "/isn/{isn_slug}/batches/search": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Search for batches with optional filtering parameters\n\nThe search endpoint returns the full batch status (including per-signal-type breakdown) for each batch.\n\nWhere a signal has failed to load as part of the batch and not subsequently been loaded, the failure is considered unresolved and listed as a failure in the batch status\n\nMember accounts can only see batches they have created. ISN Admins can see batches for ISNs they administer. The site owner can see all batches.\n\nAt least one search criteria must be provided:\n- latest=true (get the latest batch)\n- previous=true (get the previous batch)\n- created date range (both created_after and created_before)\n- closed date range (both closed_after and closed_before)\n\nAccepted timestamp formats (ISO 8601):\n- 2006-01-02T15:04:05Z (UTC)\n- 2006-01-02T15:04:05+07:00 (with offset)\n- 2006-01-02T15:04:05.999999999Z (nano precision)\n\nNote: If the timestamp contains a timezone offset (as in +07:00), the + must be percent-encoded as %2B in the query strings.\n\nDates (YYYY-MM-DD) can also be used.\nThese are treated as the start of day UTC (so 2006-01-02 is treated as 2006-01-02T00:00:00Z)",
+                "tags": [
+                    "Signal sharing"
+                ],
+                "summary": "Search for batches",
+                "parameters": [
+                    {
+                        "type": "boolean",
+                        "example": true,
+                        "description": "Get the latest batch",
+                        "name": "latest",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "example": true,
+                        "description": "Get the previous batch",
+                        "name": "previous",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "2006-01-02T15:04:05Z",
+                        "description": "Start date for batch creation filtering",
+                        "name": "created_after",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "2006-01-02T16:00:00Z",
+                        "description": "End date for batch creation filtering",
+                        "name": "created_before",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "2006-01-02T15:04:05Z",
+                        "description": "Start date for batch closure filtering",
+                        "name": "closed_after",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "2006-01-02T16:00:00Z",
+                        "description": "End date for batch closure filtering",
+                        "name": "closed_before",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handlers.BatchStatusResponse"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/isn/{isn_slug}/batches/{batch_id}/status": {
+            "get": {
+                "description": "Returns the status of a batch, including the number of signals loaded and the number of failures for each signal type\n\nThe endpoint returns the full batch status (including per-signal-type breakdown) for the batch\n\nWhere a signal has failed to load as part of the batch and not subsequently been loaded, the failure is considered unresolved and listed as a failure in the batch status\n\nOnly admins/owners can use this endpoint (admins can only see status for batches they created)\n\n",
+                "tags": [
+                    "Signal sharing"
+                ],
+                "summary": "Get batch processing status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ISN slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Batch ID",
+                        "name": "batch_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.BatchStatusResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals": {
             "post": {
                 "security": [
@@ -1286,7 +1446,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "- the client can submit an array of signals to this endpoint for storage on the ISN\n- payloads must not mix signals of different types and the payload is subject to the sizen\tlimits defined on the ISN.\n- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.\n- If a local reference is received more than once from an account for a specified signal_type it will be stored with a incremented version number.\n- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account.\n- requests are only accepted for the open signal batch for this account/ISN.\n\n**Authentication**\n\nRequires a valid access token.\nThe claims in the access token list the ISNs and signal_types that the account is permitted to use.\n\n- the RequireIsnPermission middleware will consult the claims in the access token to confirm the user is allowed to write to the isn in the URL.\n- This handler also checks that the signal_type/sem_ver in the url is also listed in the claims (this is to catch mistyped urls)\n\n**Validation**\n\nSignals are validated against the json schema specified for the signal type unless validation is disabled on the type definition. The entire payload is rejected with a 400 error if validation fails.\n\nWhen validation is disabled, basic checks are still done on the incoming data. The following issues create a 400 error and cause the entire payload to be rejected:\n- invalid json format\n- missing fields (the array of signals must be in a json object called signals, and content and local_ref must be present for each record).\n- incorrect correlation ids - where supplied, correlation ids must refer to another signal ID in the ISN (error_code is set to \"invalid_correlation_id\" in this is not the case)\n\ninternal errors cause the whole payload to be rejected.",
+                "description": "Submit an array of signals for storage on the ISN\n- payloads must not mix signals of different types and is subject to the size limits defined on the site.\n- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.\n- If a local reference is received more than once from an account for a specified signal_type it will be stored with a incremented version number.\n- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account.\n- requests are only accepted for the open signal batch for this account/ISN.\n\n**Authentication**\n\nRequires a valid access token.\nThe claims in the access token list the ISNs and signal_types that the account is permitted to use.\n\nThis handler also checks that the signal_type/sem_ver in the url is also listed in the claims (this is to catch mistyped urls)\n\n**Validation and Processing**\n\nSignals are validated against the json schema specified for the signal type unless validation is disabled on the type definition.\nIndividual signal processing failures (validation errors, incorrect correlation ids, database errors) are recorded in the response but do not prevent other signals from being processed.\n\nWhen validation is disabled, basic checks are still done on the incoming data and the following issues create a 400 error and cause the entire payload to be rejected:\n- invalid json format\n- missing fields (the array of signals must be in a json object called signals, and content and local_ref must be present for each record).\n\n\n**Response Status Codes**\n- 200: All signals processed successfully\n- 207: Partial success (some signals succeeded, some failed)\n- 400 / error_code = 'all_signals_failed_processing': All signals failed processing but request format was valid\n- 400 / error_code = 'malformed_body': Invalid request format, authentication, or other request-level errors\n- 400: authentication, or other request-level errors\n- 500: Internal server errors\n\nInternal server errors cause the whole payload to be rejected.",
                 "tags": [
                     "Signal sharing"
                 ],
@@ -1327,14 +1487,26 @@
                     }
                 ],
                 "responses": {
-                    "201": {
-                        "description": "Created",
+                    "200": {
+                        "description": "All signals processed successfully",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateSignalsResponse"
+                        }
+                    },
+                    "207": {
+                        "description": "Partial success - some signals succeeded, some failed",
                         "schema": {
                             "$ref": "#/definitions/handlers.CreateSignalsResponse"
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "Invalid request format or authentication failure",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1349,7 +1521,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Search for signals by date or account\n\nAccepted timestamps formats (ISO 8601):\n- 2006-01-02T15:04:05Z (UTC)\n- 2006-01-02T15:04:05+07:00 (with offset)\n- 2006-01-02T15:04:05.999999999Z (nano precision)\n\nNote: If the timestamp contains a timezone offset (as in +07:00), the + must be percent-encoded as %2B in the query strings.\n\nDates (YYYY-MM-DD) can also be used.\nThese are treated as the start of day UTC (so 2006-01-02 is treated as 2006-01-02T00:00:00Z)\n\nNote the endpoint returns the latest version of each signal and does not include withdrawn or archived signals",
+                "description": "Search for signals by date or account\n\nAccounts need read or write access to the ISN to use this endpoint\n\nAccepted timestamps formats (ISO 8601):\n- 2006-01-02T15:04:05Z (UTC)\n- 2006-01-02T15:04:05+07:00 (with offset)\n- 2006-01-02T15:04:05.999999999Z (nano precision)\n\nNote: If the timestamp contains a timezone offset (as in +07:00), the + must be percent-encoded as %2B in the query strings.\n\nDates (YYYY-MM-DD) can also be used.\nThese are treated as the start of day UTC (so 2006-01-02 is treated as 2006-01-02T00:00:00Z)\n\nNote the endpoint returns the latest version of each signal and does not include withdrawn or archived signals",
                 "tags": [
                     "Signal sharing"
                 ],
@@ -1434,11 +1606,11 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Revoke a refresh token or client secret to prevent it being used to create new access tokens.\n**This endpoint serves as the logout function for web users.**\n\n**Service Accounts:**\nYou must supply your `client ID` and `client secret` in the request body.\nThis revokes all client secrets for the service account.\n\n**Web Users (Logout):**\nThis endpoint expects a refresh token in an `http-only cookie` and a valid access token in the Authorization header.\nThis revokes the user's refresh token, effectively logging them out.\n\nIf the refresh token has expired or been revoked, the user must login again to get a new one.\n\nYou must also provide a previously issued `bearer access token` in the Authorization header - it does not matter if it has expired\n(the token is not used to authenticate the request but is needed to establish the ID of the user making the request).\n\n**Note:** Any unexpired access tokens issued for this user will continue to work until they expire.\nUsers must log in again to obtain a new refresh token after logout/revocation.\n\n**Client Examples:**\n- **Web User Logout:** `POST /oauth/revoke` with refresh token cookie + Authorization header\n- **Service Account:** `POST /oauth/revoke` with client_id and client_secret in request body\n",
+                "description": "Revoke a refresh token or client secret to prevent it being used to create new access tokens (self-service)\n\n**Use Cases:**\n- **Web User Logout**: User wants to log out of their session\n- **Service Account Security**: Account no longer being used/compromised secret\n\n**Service Accounts:**\nYou must supply your `client ID` and `client secret` in the request body.\nThis revokes **ALL** client secrets for the service account, effectively disabling it.\n\n**IMPORTANT - Service Account Reinstatement:**\n- This endpoint does **NOT** permanently disable the service account itself\n- To restore access, an admin must call `POST /api/auth/register/service-accounts` with the same organization and email\n- This will generate a new setup URL and client secret while preserving the same client_id\n- If the account was disabled by an admin, it must first be re-enabled via `POST /admin/accounts/{account_id}/enable`\n\n**Web Users (Logout):**\nThis endpoint expects a refresh token in an `http-only cookie` and a valid access token in the Authorization header.\nThis revokes the user's refresh token, effectively logging them out.\n\nIf the refresh token has expired or been revoked, the user must login again to get a new one.\n\nYou must also provide a previously issued `bearer access token` in the Authorization header - it does not matter if it has expired\n(the token is not used to authenticate the request but is needed to establish the ID of the user making the request).\n\n**Note:** Any unexpired access tokens issued for this user will continue to work until they expire.\nUsers must log in again to obtain a new refresh token after logout/revocation.\n\n**Client Examples:**\n- **Web User Logout:** `POST /oauth/revoke` with refresh token cookie + Authorization header\n- **Service Account:** `POST /oauth/revoke` with client_id and client_secret in request body\n",
                 "tags": [
                     "auth"
                 ],
-                "summary": "Revoke a token (logout for web users)",
+                "summary": "Revoke a token",
                 "responses": {
                     "200": {
                         "description": "OK"
@@ -1559,6 +1731,7 @@
             "type": "string",
             "enum": [
                 "access_token_expired",
+                "all_signals_failed_processing",
                 "authentication_error",
                 "authorization_error",
                 "database_error",
@@ -1581,6 +1754,7 @@
             ],
             "x-enum-varnames": [
                 "ErrCodeAccessTokenExpired",
+                "ErrCodeAllSignalsFailedProcessing",
                 "ErrCodeAuthenticationFailure",
                 "ErrCodeAuthorizationFailure",
                 "ErrCodeDatabaseError",
@@ -1684,6 +1858,47 @@
                 "client_secret": {
                     "type": "string",
                     "example": "dGhpcyBpcyBhIHNlY3JldA"
+                }
+            }
+        },
+        "database.GetAccountsByIsnIDRow": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                },
+                "account_role": {
+                    "type": "string"
+                },
+                "account_type": {
+                    "type": "string"
+                },
+                "client_id": {
+                    "type": "string"
+                },
+                "client_organization": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "isn_id": {
+                    "type": "string"
+                },
+                "permission": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
                 }
             }
         },
@@ -1869,6 +2084,61 @@
                 }
             }
         },
+        "handlers.BatchStatus": {
+            "type": "object",
+            "properties": {
+                "failed_count": {
+                    "type": "integer"
+                },
+                "signal_type_slug": {
+                    "type": "string"
+                },
+                "signal_type_version": {
+                    "type": "string"
+                },
+                "stored_count": {
+                    "type": "integer"
+                },
+                "unresolved_failures": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.FailureRow"
+                    }
+                }
+            }
+        },
+        "handlers.BatchStatusResponse": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                },
+                "batch_id": {
+                    "type": "string"
+                },
+                "batch_status": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.BatchStatus"
+                    }
+                },
+                "closed_at": {
+                    "type": "string"
+                },
+                "contains_failures": {
+                    "type": "boolean"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "is_latest": {
+                    "type": "boolean"
+                },
+                "isn_slug": {
+                    "type": "string"
+                }
+            }
+        },
         "handlers.CreateIsnRequest": {
             "type": "object",
             "properties": {
@@ -1927,6 +2197,10 @@
         "handlers.CreateServiceAccountResponse": {
             "type": "object",
             "properties": {
+                "account_id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
                 "client_id": {
                     "type": "string",
                     "example": "sa_example-org_k7j2m9x1"
@@ -1941,7 +2215,7 @@
                 },
                 "setup_url": {
                     "type": "string",
-                    "example": "https://api.example.com/auth/service-accounts/setup/550e8400-e29b-41d4-a716-446655440000"
+                    "example": "https://api.example.com/api/auth/service-accounts/setup/550e8400-e29b-41d4-a716-446655440000"
                 }
             }
         },
@@ -2050,15 +2324,53 @@
                     "type": "string",
                     "example": "sample-isn--example-org"
                 },
+                "results": {
+                    "$ref": "#/definitions/handlers.CreateSignalsResults"
+                },
                 "signal_type_path": {
                     "type": "string",
                     "example": "signal-type-1/v0.0.1"
+                },
+                "signals_batch_id": {
+                    "type": "string",
+                    "example": "b51faf05-aaed-4250-b334-2258ccdf1ff2"
+                },
+                "summary": {
+                    "$ref": "#/definitions/handlers.CreateSignalsSummary"
+                }
+            }
+        },
+        "handlers.CreateSignalsResults": {
+            "type": "object",
+            "properties": {
+                "failed_signals": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.FailedSignal"
+                    }
                 },
                 "stored_signals": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/handlers.StoredSignal"
                     }
+                }
+            }
+        },
+        "handlers.CreateSignalsSummary": {
+            "type": "object",
+            "properties": {
+                "failed_count": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "stored_count": {
+                    "type": "integer",
+                    "example": 95
+                },
+                "total_submitted": {
+                    "type": "integer",
+                    "example": 100
                 }
             }
         },
@@ -2073,6 +2385,37 @@
                     "description": "passwords must be at least 11 characters long",
                     "type": "string",
                     "example": "lkIB53@6O^Y"
+                }
+            }
+        },
+        "handlers.FailedSignal": {
+            "type": "object",
+            "properties": {
+                "error_code": {
+                    "type": "string",
+                    "example": "validation_error"
+                },
+                "error_message": {
+                    "type": "string",
+                    "example": "field 'name' is required"
+                },
+                "local_ref": {
+                    "type": "string",
+                    "example": "item_id_#2"
+                }
+            }
+        },
+        "handlers.FailureRow": {
+            "type": "object",
+            "properties": {
+                "error_code": {
+                    "type": "string"
+                },
+                "error_message": {
+                    "type": "string"
+                },
+                "local_ref": {
+                    "type": "string"
                 }
             }
         },
@@ -2365,7 +2708,7 @@
         },
         {
             "description": "View information about the configured ISNs",
-            "name": "ISN view"
+            "name": "ISN details"
         },
         {
             "description": "Define the format of the data being shared in an ISN",

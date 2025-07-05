@@ -48,7 +48,7 @@ func (a AuthService) RequireValidAccessToken(allowExpired bool) func(http.Handle
 			if err != nil {
 				if errors.Is(err, jwt.ErrTokenExpired) {
 					if !allowExpired {
-						responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAccessTokenExpired, "access token expired, please use the refresh api to renew it")
+						responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAccessTokenExpired, "access token expired, please use the /oauth/token endpoint to renew it")
 						return
 					}
 				} else {

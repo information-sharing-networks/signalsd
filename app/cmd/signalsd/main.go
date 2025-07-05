@@ -90,7 +90,7 @@ import (
 //	@tag.name			ISN Permissions
 //	@tag.description	Grant accounts read or write access to an ISN
 
-//	@tag.name			ISN view
+//	@tag.name			ISN details
 //	@tag.description	View information about the configured ISNs
 
 //	@tag.name			Signal definitions

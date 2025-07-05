@@ -63,6 +63,77 @@ func (q *Queries) DeleteIsnAccount(ctx context.Context, arg DeleteIsnAccountPara
 	return result.RowsAffected(), nil
 }
 
+const GetAccountsByIsnID = `-- name: GetAccountsByIsnID :many
+SELECT
+    ia.id,
+    ia.created_at,
+    ia.updated_at,
+    ia.isn_id,
+    ia.account_id,
+    ia.permission,
+    a.account_type,
+    a.is_active,
+    COALESCE(u.email, sa.client_contact_email) AS email,
+    COALESCE(u.user_role, 'member') AS account_role,
+    sa.client_id,
+    sa.client_organization
+FROM isn_accounts ia
+JOIN accounts a ON a.id = ia.account_id
+LEFT OUTER JOIN users u ON u.account_id = ia.account_id
+LEFT OUTER JOIN service_accounts sa ON sa.account_id = ia.account_id
+WHERE ia.isn_id = $1
+ORDER BY a.account_type, COALESCE(u.email, sa.client_contact_email)
+`
+
+type GetAccountsByIsnIDRow struct {
+	ID                 uuid.UUID `json:"id"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
+	IsnID              uuid.UUID `json:"isn_id"`
+	AccountID          uuid.UUID `json:"account_id"`
+	Permission         string    `json:"permission"`
+	AccountType        string    `json:"account_type"`
+	IsActive           bool      `json:"is_active"`
+	Email              string    `json:"email"`
+	AccountRole        string    `json:"account_role"`
+	ClientID           *string   `json:"client_id"`
+	ClientOrganization *string   `json:"client_organization"`
+}
+
+// get all accounts that have access to a specific ISN
+func (q *Queries) GetAccountsByIsnID(ctx context.Context, isnID uuid.UUID) ([]GetAccountsByIsnIDRow, error) {
+	rows, err := q.db.Query(ctx, GetAccountsByIsnID, isnID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetAccountsByIsnIDRow
+	for rows.Next() {
+		var i GetAccountsByIsnIDRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.IsnID,
+			&i.AccountID,
+			&i.Permission,
+			&i.AccountType,
+			&i.IsActive,
+			&i.Email,
+			&i.AccountRole,
+			&i.ClientID,
+			&i.ClientOrganization,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const GetIsnAccountByIsnAndAccountID = `-- name: GetIsnAccountByIsnAndAccountID :one
 SELECT ia.id, ia.created_at, ia.updated_at, ia.isn_id, ia.account_id, ia.permission, i.slug as isn_slug FROM isn_accounts ia
 JOIN isn i 
@@ -103,7 +174,7 @@ func (q *Queries) GetIsnAccountByIsnAndAccountID(ctx context.Context, arg GetIsn
 
 const GetIsnAccountsByAccountID = `-- name: GetIsnAccountsByAccountID :many
 SELECT ia.id, ia.created_at, ia.updated_at, ia.isn_id, ia.account_id, ia.permission, i.slug as isn_slug FROM isn_accounts ia
-JOIN isn i 
+JOIN isn i
 ON i.id = ia.isn_id
 WHERE ia.account_id = $1
 `

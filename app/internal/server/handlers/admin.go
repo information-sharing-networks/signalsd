@@ -109,13 +109,21 @@ func (a *AdminHandler) VersionHandler(w http.ResponseWriter, r *http.Request) {
 // DisableAccountHandler godoc
 //
 //	@Summary		Disable an account
-//	@Description	Disabling an account prevents it from being used to create new access tokens.
 //	@Description
-//	@Description	The handler will also revoke:
-//	@Description	- client secrets/one-time secrets (service accounts)
-//	@Description	- refresh tokens (web users).
+//	@Description	**Use Cases:**
+//	@Description	- **Security Incident**: Compromised account needs immediate lockout
+//	@Description	- **Policy Violation**: Account violated terms and needs suspension
+//	@Description	- **Employee Departure**: Remove access for departed staff
 //	@Description
-//	@Description	Note: The site owner account cannot be disabled to prevent system lockout.
+//	@Description	**Actions Performed:**
+//	@Description	- Sets `is_active = false` (account becomes unusable)
+//	@Description	- Revokes all client secrets/one-time secrets (service accounts)
+//	@Description	- Revokes all refresh tokens (web users)
+//	@Description
+//	@Description	**Recovery:** Account must be re-enabled by admin via `/admin/accounts/{id}/enable`
+//	@Description	Service accounts also need re-registration via `/api/auth/register/service-accounts`
+//	@Description
+//	@Description	**Note:** The site owner account cannot be disabled to prevent system lockout.
 //	@Description	Only owners and admins can disable accounts.
 //	@Tags			Site admin
 //
@@ -245,11 +253,12 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 // EnableAccountHandler godoc
 //
 //	@Summary	Enable an account
+//	@Description	**Administrative endpoint to re-enable previously disabled accounts.**
+//	@Description	Sets account status to `is_active = true` (does not create new tokens).
 //	@Description
-//	@Description	For service accounts, you will need to register them again using /auth/register/service-accounts
-//	@Description	The client ID will remain the same but they must go through	the setup process again.
-//	@Description
-//	@Description	For user accounts, they can immediately log in again.
+//	@Description	**Post-Enable Steps Required:**
+//	@Description	- **Service Accounts**: Must re-register via `/api/auth/register/service-accounts` (same client_id, new credentials)
+//	@Description	- **Web Users**: Can immediately log in again via `/auth/login`
 //	@Description
 //	@Description	Only owners and admins can enable accounts.
 //	@Tags			Site admin

@@ -4,6 +4,7 @@ definitions:
   apperrors.ErrorCode:
     enum:
     - access_token_expired
+    - all_signals_failed_processing
     - authentication_error
     - authorization_error
     - database_error
@@ -26,6 +27,7 @@ definitions:
     type: string
     x-enum-varnames:
     - ErrCodeAccessTokenExpired
+    - ErrCodeAllSignalsFailedProcessing
     - ErrCodeAuthenticationFailure
     - ErrCodeAuthorizationFailure
     - ErrCodeDatabaseError
@@ -104,6 +106,33 @@ definitions:
         type: string
       client_secret:
         example: dGhpcyBpcyBhIHNlY3JldA
+        type: string
+    type: object
+  database.GetAccountsByIsnIDRow:
+    properties:
+      account_id:
+        type: string
+      account_role:
+        type: string
+      account_type:
+        type: string
+      client_id:
+        type: string
+      client_organization:
+        type: string
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      isn_id:
+        type: string
+      permission:
+        type: string
+      updated_at:
         type: string
     type: object
   database.GetForDisplaySignalTypeByIsnIDRow:
@@ -225,6 +254,42 @@ definitions:
       updated_at:
         type: string
     type: object
+  handlers.BatchStatus:
+    properties:
+      failed_count:
+        type: integer
+      signal_type_slug:
+        type: string
+      signal_type_version:
+        type: string
+      stored_count:
+        type: integer
+      unresolved_failures:
+        items:
+          $ref: '#/definitions/handlers.FailureRow'
+        type: array
+    type: object
+  handlers.BatchStatusResponse:
+    properties:
+      account_id:
+        type: string
+      batch_id:
+        type: string
+      batch_status:
+        items:
+          $ref: '#/definitions/handlers.BatchStatus'
+        type: array
+      closed_at:
+        type: string
+      contains_failures:
+        type: boolean
+      created_at:
+        type: string
+      is_latest:
+        type: boolean
+      isn_slug:
+        type: string
+    type: object
   handlers.CreateIsnRequest:
     properties:
       detail:
@@ -266,6 +331,9 @@ definitions:
     type: object
   handlers.CreateServiceAccountResponse:
     properties:
+      account_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
       client_id:
         example: sa_example-org_k7j2m9x1
         type: string
@@ -276,7 +344,7 @@ definitions:
         example: 172800
         type: integer
       setup_url:
-        example: https://api.example.com/auth/service-accounts/setup/550e8400-e29b-41d4-a716-446655440000
+        example: https://api.example.com/api/auth/service-accounts/setup/550e8400-e29b-41d4-a716-446655440000
         type: string
     type: object
   handlers.CreateSignalTypeRequest:
@@ -356,13 +424,39 @@ definitions:
       isn_slug:
         example: sample-isn--example-org
         type: string
+      results:
+        $ref: '#/definitions/handlers.CreateSignalsResults'
       signal_type_path:
         example: signal-type-1/v0.0.1
         type: string
+      signals_batch_id:
+        example: b51faf05-aaed-4250-b334-2258ccdf1ff2
+        type: string
+      summary:
+        $ref: '#/definitions/handlers.CreateSignalsSummary'
+    type: object
+  handlers.CreateSignalsResults:
+    properties:
+      failed_signals:
+        items:
+          $ref: '#/definitions/handlers.FailedSignal'
+        type: array
       stored_signals:
         items:
           $ref: '#/definitions/handlers.StoredSignal'
         type: array
+    type: object
+  handlers.CreateSignalsSummary:
+    properties:
+      failed_count:
+        example: 5
+        type: integer
+      stored_count:
+        example: 95
+        type: integer
+      total_submitted:
+        example: 100
+        type: integer
     type: object
   handlers.CreateUserRequest:
     properties:
@@ -372,6 +466,27 @@ definitions:
       password:
         description: passwords must be at least 11 characters long
         example: lkIB53@6O^Y
+        type: string
+    type: object
+  handlers.FailedSignal:
+    properties:
+      error_code:
+        example: validation_error
+        type: string
+      error_message:
+        example: field 'name' is required
+        type: string
+      local_ref:
+        example: item_id_#2
+        type: string
+    type: object
+  handlers.FailureRow:
+    properties:
+      error_code:
+        type: string
+      error_message:
+        type: string
+      local_ref:
         type: string
     type: object
   handlers.IsnAndLinkedInfo:
@@ -600,16 +715,84 @@ info:
     name: MIT
   title: Signals ISN API
 paths:
+  /admin/accounts/{account_id}/admin-role:
+    delete:
+      description: this endpoint can only be used by the site owner account
+      parameters:
+      - description: account id
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+        in: path
+        name: account_id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Revoke admin role
+      tags:
+      - Site admin
+    put:
+      description: |-
+        This endpoint grants the admin role to a site member
+
+        An admin can:
+        - Create an ISN
+        - Define the signal_types used in the ISN
+        - read/write to their own ISNs
+        - Grant other accounts read or write access to their ISNs
+        - Create service accounts
+
+        this endpoint can only be used by the site owner account
+      parameters:
+      - description: account id
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+        in: path
+        name: account_id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Grant admin role
+      tags:
+      - Site admin
   /admin/accounts/{account_id}/disable:
     post:
       description: |-
-        Disabling an account prevents it from being used to create new access tokens.
+        **Use Cases:**
+        - **Security Incident**: Compromised account needs immediate lockout
+        - **Policy Violation**: Account violated terms and needs suspension
+        - **Employee Departure**: Remove access for departed staff
 
-        The handler will also revoke:
-        - client secrets/one-time secrets (service accounts)
-        - refresh tokens (web users).
+        **Actions Performed:**
+        - Sets `is_active = false` (account becomes unusable)
+        - Revokes all client secrets/one-time secrets (service accounts)
+        - Revokes all refresh tokens (web users)
 
-        Note: The site owner account cannot be disabled to prevent system lockout.
+        **Recovery:** Account must be re-enabled by admin via `/admin/accounts/{id}/enable`
+        Service accounts also need re-registration via `/api/auth/register/service-accounts`
+
+        **Note:** The site owner account cannot be disabled to prevent system lockout.
         Only owners and admins can disable accounts.
       parameters:
       - description: Account ID to disable
@@ -643,10 +826,15 @@ paths:
       - Site admin
   /admin/accounts/{account_id}/enable:
     post:
-      description: "For service accounts, you will need to register them again using
-        /auth/register/service-accounts\nThe client ID will remain the same but they
-        must go through\tthe setup process again.\n\nFor user accounts, they can immediately
-        log in again.\n\nOnly owners and admins can enable accounts."
+      description: |-
+        **Administrative endpoint to re-enable previously disabled accounts.**
+        Sets account status to `is_active = true` (does not create new tokens).
+
+        **Post-Enable Steps Required:**
+        - **Service Accounts**: Must re-register via `/api/auth/register/service-accounts` (same client_id, new credentials)
+        - **Web Users**: Can immediately log in again via `/auth/login`
+
+        Only owners and admins can enable accounts.
       parameters:
       - description: Account ID to enable
         in: path
@@ -857,67 +1045,6 @@ paths:
       summary: Reset user password
       tags:
       - Site admin
-  /api/auth/admins/account/{account_id}:
-    delete:
-      description: this endpoint can only be used by the site owner account
-      parameters:
-      - description: account id
-        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
-        in: path
-        name: account_id
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Revoke account admin role
-      tags:
-      - auth
-    put:
-      description: |-
-        This endpoint grants the admin role to a site member
-
-        An admin can:
-        - Create an ISN
-        - Define the signal_types used in the ISN
-        - read/write to their own ISNs
-        - Grant other accounts read or write access to their ISNs
-        - Create service accounts
-
-        this endpoint can only be used by the site owner account
-      parameters:
-      - description: account id
-        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
-        in: path
-        name: account_id
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Grant admin role
-      tags:
-      - auth
   /api/auth/login:
     post:
       description: |-
@@ -1087,7 +1214,7 @@ paths:
             type: array
       summary: Get the ISNs
       tags:
-      - ISN view
+      - ISN details
   /api/isn/:
     post:
       description: |-
@@ -1167,39 +1294,92 @@ paths:
       summary: Update an ISN
       tags:
       - ISN configuration
-  /api/isn/{isn_slug}/accounts/{account_id}/batches:
+  /api/isn/{isn_slug}/accounts:
     get:
       description: |-
-        TODO - get latest, previous, by data ranage
-        TODO
-      responses: {}
-      summary: Get details about a set of signal batches
+        Get a list of all accounts (users and service accounts) that have permissions on the specified ISN.
+        Only ISN owners and site owners can view this information.
+      parameters:
+      - description: ISN slug
+        in: path
+        name: isn_slug
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/database.GetAccountsByIsnIDRow'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Get all accounts with access to an ISN
       tags:
-      - Service accounts
-  /api/isn/{isn_slug}/accounts/{account_id}/batches/{signals_batch_id}:
-    get:
-      description: TODO - get by id. Include status (errs, received, latest localref
-        in batch)
-      responses: {}
-      summary: Get a signal batch
+      - ISN details
+  /api/isn/{isn_slug}/accounts/{account_id}:
+    put:
+      description: |-
+        Grant an account read or write access to an isn.
+        This end point can only be used by the site owner or the isn admin account.
+      parameters:
+      - description: isn slug
+        example: sample-isn--example-org
+        in: path
+        name: isn_slug
+        required: true
+        type: string
+      - description: account id
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+        in: path
+        name: account_id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Grant ISN access permission
       tags:
-      - Service accounts
+      - ISN Permissions
   /api/isn/{isn_slug}/batches:
     post:
       description: |
-        This endpoint is used by service accounts to create a new batch used to track signals sent to the specified isn
+        This endpoint is used by service accounts to create a new batch. Batches are used to track signals sent by an account to the specified ISN.
 
-        For user accounts, a batch is automatically created when they are granted write permission to an isn and is only closed if their permission to write to the isn is revoked
-
-        For service accounts, the client app can decide how long to keep a batch open
-        (a batch status summary is sent to a webhook after the batch closes)
-
-        opening a batch closes the previous batch created on the isn for this account.
+        Opening a batch closes the previous batch (the client app can decide how long to keep a batch open)
 
         Signals can only be sent to open batches.
 
-        authentication is based on the supplied access token:
-        (the site owner; the isn admin and members with an isn_perm= write can create a batch)
+        Authentication is based on the supplied access token:
+        the site owner, the isn admin and members with an isn_perm=write can create a batch for the ISN.
+
+        Note this endpoint is not needed for web users (a batch is automatically created when they are granted write permission to an isn and is only closed if their permission to write to the ISN is revoked)
       responses:
         "201":
           description: Created
@@ -1209,7 +1389,7 @@ paths:
       - BearerAccessToken: []
       summary: Create a new signal batch
       tags:
-      - Service accounts
+      - Signal sharing
   /api/isn/{isn_slug}/signal_types:
     get:
       responses:
@@ -1221,7 +1401,7 @@ paths:
             type: array
       summary: Get the signal definitions
       tags:
-      - ISN view
+      - ISN details
     post:
       description: |
         A signal type describes a data set that is sharable over an ISN.  Setup the ISN before defining any signal defs.
@@ -1344,7 +1524,7 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       summary: Get a signal definition
       tags:
-      - ISN view
+      - ISN details
     put:
       description: |-
         users can mark the signal type as *in use/not in use* and update the description or link to the readme file
@@ -1418,7 +1598,7 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       summary: Get an ISN configurationuration
       tags:
-      - ISN view
+      - ISN details
   /health/live:
     get:
       description: check if the signalsd service is up
@@ -1479,43 +1659,121 @@ paths:
       summary: Revoke ISN access permission
       tags:
       - ISN Permissions
-    put:
-      description: |-
-        Grant an account read or write access to an isn.
-        This end point can only be used by the site owner or the isn admin account.
+  /isn/{isn_slug}/batches/{batch_id}/status:
+    get:
+      description: |+
+        Returns the status of a batch, including the number of signals loaded and the number of failures for each signal type
+
+        The endpoint returns the full batch status (including per-signal-type breakdown) for the batch
+
+        Where a signal has failed to load as part of the batch and not subsequently been loaded, the failure is considered unresolved and listed as a failure in the batch status
+
+        Only admins/owners can use this endpoint (admins can only see status for batches they created)
+
       parameters:
-      - description: isn slug
-        example: sample-isn--example-org
+      - description: ISN slug
         in: path
         name: isn_slug
         required: true
         type: string
-      - description: account id
-        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+      - description: Batch ID
         in: path
-        name: account_id
+        name: batch_id
         required: true
         type: string
       responses:
-        "204":
-          description: No Content
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.BatchStatusResponse'
         "400":
           description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "403":
-          description: Forbidden
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
           description: Not Found
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      summary: Get batch processing status
+      tags:
+      - Signal sharing
+  /isn/{isn_slug}/batches/search:
+    get:
+      description: |-
+        Search for batches with optional filtering parameters
+
+        The search endpoint returns the full batch status (including per-signal-type breakdown) for each batch.
+
+        Where a signal has failed to load as part of the batch and not subsequently been loaded, the failure is considered unresolved and listed as a failure in the batch status
+
+        Member accounts can only see batches they have created. ISN Admins can see batches for ISNs they administer. The site owner can see all batches.
+
+        At least one search criteria must be provided:
+        - latest=true (get the latest batch)
+        - previous=true (get the previous batch)
+        - created date range (both created_after and created_before)
+        - closed date range (both closed_after and closed_before)
+
+        Accepted timestamp formats (ISO 8601):
+        - 2006-01-02T15:04:05Z (UTC)
+        - 2006-01-02T15:04:05+07:00 (with offset)
+        - 2006-01-02T15:04:05.999999999Z (nano precision)
+
+        Note: If the timestamp contains a timezone offset (as in +07:00), the + must be percent-encoded as %2B in the query strings.
+
+        Dates (YYYY-MM-DD) can also be used.
+        These are treated as the start of day UTC (so 2006-01-02 is treated as 2006-01-02T00:00:00Z)
+      parameters:
+      - description: Get the latest batch
+        example: true
+        in: query
+        name: latest
+        type: boolean
+      - description: Get the previous batch
+        example: true
+        in: query
+        name: previous
+        type: boolean
+      - description: Start date for batch creation filtering
+        example: "2006-01-02T15:04:05Z"
+        in: query
+        name: created_after
+        type: string
+      - description: End date for batch creation filtering
+        example: "2006-01-02T16:00:00Z"
+        in: query
+        name: created_before
+        type: string
+      - description: Start date for batch closure filtering
+        example: "2006-01-02T15:04:05Z"
+        in: query
+        name: closed_after
+        type: string
+      - description: End date for batch closure filtering
+        example: "2006-01-02T16:00:00Z"
+        in: query
+        name: closed_before
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.BatchStatusResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Grant ISN access permission
+      summary: Search for batches
       tags:
-      - ISN Permissions
+      - Signal sharing
   /isn/{isn_slug}/signal_types/{signal_type_slug}/{signal_id}:
     delete:
       responses:
@@ -1528,31 +1786,40 @@ paths:
       - Signal sharing
   /isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals:
     post:
-      description: "- the client can submit an array of signals to this endpoint for
-        storage on the ISN\n- payloads must not mix signals of different types and
-        the payload is subject to the sizen\tlimits defined on the ISN.\n- The client-supplied
-        local_ref must uniquely identify each signal of the specified signal type
-        that will be supplied by the account.\n- If a local reference is received
-        more than once from an account for a specified signal_type it will be stored
-        with a incremented version number.\n- Optionally a correlation_id can be supplied
-        - this will link the signal to a previously received signal. The correlated
-        signal does not need to be owned by the same account.\n- requests are only
-        accepted for the open signal batch for this account/ISN.\n\n**Authentication**\n\nRequires
-        a valid access token.\nThe claims in the access token list the ISNs and signal_types
-        that the account is permitted to use.\n\n- the RequireIsnPermission middleware
-        will consult the claims in the access token to confirm the user is allowed
-        to write to the isn in the URL.\n- This handler also checks that the signal_type/sem_ver
-        in the url is also listed in the claims (this is to catch mistyped urls)\n\n**Validation**\n\nSignals
-        are validated against the json schema specified for the signal type unless
-        validation is disabled on the type definition. The entire payload is rejected
-        with a 400 error if validation fails.\n\nWhen validation is disabled, basic
-        checks are still done on the incoming data. The following issues create a
-        400 error and cause the entire payload to be rejected:\n- invalid json format\n-
-        missing fields (the array of signals must be in a json object called signals,
-        and content and local_ref must be present for each record).\n- incorrect correlation
-        ids - where supplied, correlation ids must refer to another signal ID in the
-        ISN (error_code is set to \"invalid_correlation_id\" in this is not the case)\n\ninternal
-        errors cause the whole payload to be rejected."
+      description: |-
+        Submit an array of signals for storage on the ISN
+        - payloads must not mix signals of different types and is subject to the size limits defined on the site.
+        - The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.
+        - If a local reference is received more than once from an account for a specified signal_type it will be stored with a incremented version number.
+        - Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account.
+        - requests are only accepted for the open signal batch for this account/ISN.
+
+        **Authentication**
+
+        Requires a valid access token.
+        The claims in the access token list the ISNs and signal_types that the account is permitted to use.
+
+        This handler also checks that the signal_type/sem_ver in the url is also listed in the claims (this is to catch mistyped urls)
+
+        **Validation and Processing**
+
+        Signals are validated against the json schema specified for the signal type unless validation is disabled on the type definition.
+        Individual signal processing failures (validation errors, incorrect correlation ids, database errors) are recorded in the response but do not prevent other signals from being processed.
+
+        When validation is disabled, basic checks are still done on the incoming data and the following issues create a 400 error and cause the entire payload to be rejected:
+        - invalid json format
+        - missing fields (the array of signals must be in a json object called signals, and content and local_ref must be present for each record).
+
+
+        **Response Status Codes**
+        - 200: All signals processed successfully
+        - 207: Partial success (some signals succeeded, some failed)
+        - 400 / error_code = 'all_signals_failed_processing': All signals failed processing but request format was valid
+        - 400 / error_code = 'malformed_body': Invalid request format, authentication, or other request-level errors
+        - 400: authentication, or other request-level errors
+        - 500: Internal server errors
+
+        Internal server errors cause the whole payload to be rejected.
       parameters:
       - description: isn slug
         example: sample-isn--example-org
@@ -1579,12 +1846,20 @@ paths:
         schema:
           $ref: '#/definitions/handlers.CreateSignalsRequestDoc'
       responses:
-        "201":
-          description: Created
+        "200":
+          description: All signals processed successfully
+          schema:
+            $ref: '#/definitions/handlers.CreateSignalsResponse'
+        "207":
+          description: Partial success - some signals succeeded, some failed
           schema:
             $ref: '#/definitions/handlers.CreateSignalsResponse'
         "400":
-          description: Bad Request
+          description: Invalid request format or authentication failure
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal server error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -1606,6 +1881,8 @@ paths:
     get:
       description: |-
         Search for signals by date or account
+
+        Accounts need read or write access to the ISN to use this endpoint
 
         Accepted timestamps formats (ISO 8601):
         - 2006-01-02T15:04:05Z (UTC)
@@ -1652,12 +1929,21 @@ paths:
   /oauth/revoke:
     post:
       description: |
-        Revoke a refresh token or client secret to prevent it being used to create new access tokens.
-        **This endpoint serves as the logout function for web users.**
+        Revoke a refresh token or client secret to prevent it being used to create new access tokens (self-service)
+
+        **Use Cases:**
+        - **Web User Logout**: User wants to log out of their session
+        - **Service Account Security**: Account no longer being used/compromised secret
 
         **Service Accounts:**
         You must supply your `client ID` and `client secret` in the request body.
-        This revokes all client secrets for the service account.
+        This revokes **ALL** client secrets for the service account, effectively disabling it.
+
+        **IMPORTANT - Service Account Reinstatement:**
+        - This endpoint does **NOT** permanently disable the service account itself
+        - To restore access, an admin must call `POST /api/auth/register/service-accounts` with the same organization and email
+        - This will generate a new setup URL and client secret while preserving the same client_id
+        - If the account was disabled by an admin, it must first be re-enabled via `POST /admin/accounts/{account_id}/enable`
 
         **Web Users (Logout):**
         This endpoint expects a refresh token in an `http-only cookie` and a valid access token in the Authorization header.
@@ -1691,7 +1977,7 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Revoke a token (logout for web users)
+      summary: Revoke a token
       tags:
       - auth
   /oauth/token:
@@ -1793,7 +2079,7 @@ tags:
 - description: Grant accounts read or write access to an ISN
   name: ISN Permissions
 - description: View information about the configured ISNs
-  name: ISN view
+  name: ISN details
 - description: Define the format of the data being shared in an ISN
   name: Signal definitions
 - description: Manage service account end points

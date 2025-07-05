@@ -103,7 +103,8 @@ func (u *UserHandler) RegisterUserHandler(w http.ResponseWriter, r *http.Request
 	defer func() {
 		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 			// Log the error but don't try to respond since the request may have already timed out
-			fmt.Printf("failed to rollback transaction: %v\n", err)
+			logger := zerolog.Ctx(r.Context())
+			logger.Error().Err(err).Msg("failed to rollback transaction")
 		}
 	}()
 
@@ -152,16 +153,16 @@ func (u *UserHandler) RegisterUserHandler(w http.ResponseWriter, r *http.Request
 //	@Summary		Password reset
 //	@Description	Use this api when a user wants to reset their password.  Requires a valid access token and the current password
 //	@Description
-//	@Tags			auth
+//	@Tags		auth
 //
-//	@Param			request	body	handlers.UpdatePasswordRequest	true	"user details"
-//	@Success		204
-//	@Failure		400	{object}	responses.ErrorResponse	"Bad request with possible error codes: malformed_body, password_too_short"
-//	@Failure		401	{object}	responses.ErrorResponse	"Unauthorized with possible error code: authentication_error"
+//	@Param		request	body	handlers.UpdatePasswordRequest	true	"user details"
+//	@Success	204
+//	@Failure	400	{object}	responses.ErrorResponse	"Bad request with possible error codes: malformed_body, password_too_short"
+//	@Failure	401	{object}	responses.ErrorResponse	"Unauthorized with possible error code: authentication_error"
 //
-//	@Security		BearerAccessToken
+//	@Security	BearerAccessToken
 //
-//	@Router			/api/auth/password/reset [put]
+//	@Router		/api/auth/password/reset [put]
 func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Request) {
 	req := UpdatePasswordRequest{}
 
@@ -234,7 +235,7 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 // GrantUserAdminRoleHandler godocs
 //
 //	@Summary		Grant admin role
-//	@Tags			auth
+//	@Tags			Site admin
 //
 //	@Description	This endpoint grants the admin role to a site member
 //	@Description
@@ -255,7 +256,7 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/api/auth/admins/account/{account_id} [put]
+//	@Router			/admin/accounts/{account_id}/admin-role [put]
 //
 //	this handler must use the RequireRole (owner) middlewear
 func (u *UserHandler) GrantUserAdminRoleHandler(w http.ResponseWriter, r *http.Request) {
@@ -310,8 +311,8 @@ func (u *UserHandler) GrantUserAdminRoleHandler(w http.ResponseWriter, r *http.R
 
 // RevokeAccountAdmin godocs
 //
-//	@Summary		Revoke account admin role
-//	@Tags			auth
+//	@Summary		Revoke admin role
+//	@Tags			Site admin
 //
 //	@Description	this endpoint can only be used by the site owner account
 //
@@ -323,7 +324,7 @@ func (u *UserHandler) GrantUserAdminRoleHandler(w http.ResponseWriter, r *http.R
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/api/auth/admins/account/{account_id} [delete]
+//	@Router			/admin/accounts/{account_id}/admin-role [delete]
 //
 //	this handler must use the RequireRole (owner) middlewar
 func (u *UserHandler) RevokeUserAdminRoleHandler(w http.ResponseWriter, r *http.Request) {

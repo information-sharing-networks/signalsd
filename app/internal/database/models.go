@@ -98,6 +98,17 @@ type SignalBatch struct {
 	AccountType string    `json:"account_type"`
 }
 
+type SignalProcessingFailure struct {
+	ID               uuid.UUID `json:"id"`
+	CreatedAt        time.Time `json:"created_at"`
+	SignalBatchID    uuid.UUID `json:"signal_batch_id"`
+	SignalTypeSlug   string    `json:"signal_type_slug"`
+	SignalTypeSemVer string    `json:"signal_type_sem_ver"`
+	LocalRef         string    `json:"local_ref"`
+	ErrorCode        string    `json:"error_code"`
+	ErrorMessage     string    `json:"error_message"`
+}
+
 type SignalType struct {
 	ID            uuid.UUID `json:"id"`
 	CreatedAt     time.Time `json:"created_at"`

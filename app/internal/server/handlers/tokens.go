@@ -115,13 +115,22 @@ func (a *TokenHandler) NewAccessTokenHandler(w http.ResponseWriter, r *http.Requ
 
 // RevokeTokenHandler godoc
 //
-//	@Summary		Revoke a token (logout for web users)
-//	@Description	Revoke a refresh token or client secret to prevent it being used to create new access tokens.
-//	@Description	**This endpoint serves as the logout function for web users.**
+//	@Summary		Revoke a token
+//	@Description	Revoke a refresh token or client secret to prevent it being used to create new access tokens (self-service)
+//	@Description
+//	@Description	**Use Cases:**
+//	@Description	- **Web User Logout**: User wants to log out of their session
+//	@Description	- **Service Account Security**: Account no longer being used/compromised secret
 //	@Description
 //	@Description	**Service Accounts:**
 //	@Description	You must supply your `client ID` and `client secret` in the request body.
-//	@Description	This revokes all client secrets for the service account.
+//	@Description	This revokes **ALL** client secrets for the service account, effectively disabling it.
+//	@Description
+//	@Description	**IMPORTANT - Service Account Reinstatement:**
+//	@Description	- This endpoint does **NOT** permanently disable the service account itself
+//	@Description	- To restore access, an admin must call `POST /api/auth/register/service-accounts` with the same organization and email
+//	@Description	- This will generate a new setup URL and client secret while preserving the same client_id
+//	@Description	- If the account was disabled by an admin, it must first be re-enabled via `POST /admin/accounts/{account_id}/enable`
 //	@Description
 //	@Description	**Web Users (Logout):**
 //	@Description	This endpoint expects a refresh token in an `http-only cookie` and a valid access token in the Authorization header.
@@ -166,7 +175,8 @@ func (a *TokenHandler) RevokeTokenHandler(w http.ResponseWriter, r *http.Request
 	a.RevokeClientSecretHandler(w, r)
 }
 
-// Use revoke a client secret (service accounts) - called by the wrapper handler for /oauth/revoke (RevokeTokenHandler)
+// RevokeClientSecretHandler revokes ALL client secrets for a service account - called by the wrapper handler for /oauth/revoke (RevokeTokenHandler)
+// This effectively disables the service account until an admin re-registers it via POST /api/auth/register/service-accounts
 func (a *TokenHandler) RevokeClientSecretHandler(w http.ResponseWriter, r *http.Request) {
 	serverAccountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
@@ -174,7 +184,7 @@ func (a *TokenHandler) RevokeClientSecretHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// cancle all client secrets for this account
+	// Revoke all client secrets for this account (disables the service account)
 	rowsUpdated, err := a.queries.RevokeAllClientSecretsForAccount(r.Context(), serverAccountID)
 	if err != nil {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("error revoking client secrets: %v", err))
@@ -189,7 +199,8 @@ func (a *TokenHandler) RevokeClientSecretHandler(w http.ResponseWriter, r *http.
 	responses.RespondWithStatusCodeOnly(w, http.StatusOK)
 }
 
-// Use revoke a refresh token (web users) - called by the wrapper handler for /oauth/revoke (RevokeTokenHandler)
+// RevokeRefreshTokenHandler revokes a specific refresh token for web users (logout) - called by the wrapper handler for /oauth/revoke (RevokeTokenHandler)
+// Users can log back in immediately via /auth/login to get a new refresh token
 func (a *TokenHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
 
 	userAccountId, ok := auth.ContextAccountID(r.Context())

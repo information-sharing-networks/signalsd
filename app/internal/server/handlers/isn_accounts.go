@@ -46,7 +46,7 @@ type GrantIsnAccountPermissionRequest struct {
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/isn/{isn_slug}/accounts/{account_id}  [put]
+//	@Router			/api/isn/{isn_slug}/accounts/{account_id}  [put]
 //
 //	this handler will insert isn_accounts.
 //	for target accounts that are account.account_type "user" that are granted 'write' to an isn the handler will also start a signals batch for this isn.
@@ -295,4 +295,71 @@ func (i *IsnAccountHandler) RevokeIsnAccountHandler(w http.ResponseWriter, r *ht
 	logger.Info().Msgf("userAccount %v revoked permission on %v to account %v", userAccountID, isnSlug, targetAccount.ID)
 
 	responses.RespondWithStatusCodeOnly(w, http.StatusCreated)
+}
+
+// GetIsnAccountsHandler godoc
+//
+//	@Summary		Get all accounts with access to an ISN
+//	@Description	Get a list of all accounts (users and service accounts) that have permissions on the specified ISN.
+//	@Description	Only ISN owners and site owners can view this information.
+//	@Tags			ISN details
+//
+//	@Param			isn_slug	path		string	true	"ISN slug"
+//
+//	@Success		200			{array}		database.GetAccountsByIsnIDRow
+//	@Failure		400			{object}	responses.ErrorResponse
+//	@Failure		403			{object}	responses.ErrorResponse
+//	@Failure		404			{object}	responses.ErrorResponse
+//
+//	@Security		BearerAccessToken
+//
+//	@Router			/api/isn/{isn_slug}/accounts [get]
+func (i *IsnAccountHandler) GetIsnAccountsHandler(w http.ResponseWriter, r *http.Request) {
+	logger := zerolog.Ctx(r.Context())
+
+	// get user account id for user making request
+	userAccountID, ok := auth.ContextAccountID(r.Context())
+	if !ok {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
+		return
+	}
+
+	// check isn exists
+	isnSlug := r.PathValue("isn_slug")
+
+	isn, err := i.queries.GetIsnBySlug(r.Context(), isnSlug)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
+			return
+		}
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		return
+	}
+
+	// check if user is either the ISN owner or a site owner
+	claims, ok := auth.ContextAccessTokenClaims(r.Context())
+	if !ok {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
+		return
+	}
+
+	isIsnOwner := isn.UserAccountID == userAccountID
+	isSiteOwner := claims.Role == "owner"
+
+	if !isIsnOwner && !isSiteOwner {
+		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you must be either the ISN owner or a site owner to access this resource")
+		return
+	}
+
+	// Get all accounts with access to this ISN
+	accounts, err := i.queries.GetAccountsByIsnID(r.Context(), isn.ID)
+	if err != nil {
+		logger.Error().Err(err).Msgf("database error retrieving accounts for ISN: %v", isnSlug)
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		return
+	}
+
+	logger.Info().Msgf("retrieved %d accounts for ISN: %v", len(accounts), isnSlug)
+	responses.RespondWithJSON(w, http.StatusOK, accounts)
 }
