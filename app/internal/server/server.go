@@ -126,7 +126,7 @@ func (s *Server) registerAdminRoutes() {
 	users := handlers.NewUserHandler(s.queries, s.authService, s.pool)
 	serviceAccounts := handlers.NewServiceAccountHandler(s.queries, s.authService, s.pool)
 	login := handlers.NewLoginHandler(s.queries, s.authService, s.serverConfig.Environment)
-	tokens := handlers.NewTokenHandler(s.queries, s.authService, s.serverConfig.Environment)
+	tokens := handlers.NewTokenHandler(s.queries, s.authService, s.pool, s.serverConfig.Environment)
 
 	// site admin handlers
 	admin := handlers.NewAdminHandler(s.queries, s.pool, s.authService)
@@ -182,6 +182,12 @@ func (s *Server) registerAdminRoutes() {
 					r.Use(s.authService.RequireRole("owner", "admin"))
 
 					r.Post("/register/service-accounts", serviceAccounts.RegisterServiceAccountHandler)
+				})
+
+				r.Group(func(r chi.Router) {
+					r.Use(s.authService.RequireValidClientCredentials)
+
+					r.Post("/service-accounts/rotate-secret", tokens.RotateServiceAccountSecretHandler)
 				})
 
 				r.Post("/register", users.RegisterUserHandler)

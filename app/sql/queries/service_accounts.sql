@@ -44,7 +44,12 @@ UPDATE client_secrets SET (updated_at, revoked_at) = (NOW(), NOW())
 WHERE hashed_secret = $1;
 
 -- name: RevokeAllClientSecretsForAccount :execrows
-UPDATE client_secrets SET (updated_at, revoked_at) = (NOW(), NOW()) 
+UPDATE client_secrets SET (updated_at, revoked_at) = (NOW(), NOW())
+WHERE service_account_account_id = $1
+AND revoked_at IS NULL;
+
+-- name: ScheduleRevokeAllClientSecretsForAccount :execrows
+UPDATE client_secrets SET (updated_at, revoked_at) = (NOW() + INTERVAL '5 minutes', NOW())
 WHERE service_account_account_id = $1
 AND revoked_at IS NULL;
 
