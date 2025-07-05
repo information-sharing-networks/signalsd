@@ -289,7 +289,7 @@ Run `sqlc generate` from the root of the project to regenerate the type safe Go 
 
 
 ## Signals
-![Signals v0 5 0](https://github.com/user-attachments/assets/ffe9ad66-3026-40ad-94b7-83e7f5d7b4b8)
+![signals](https://github.com/user-attachments/assets/607ad390-660e-4f26-bdfa-096c25821b94)
 
 ## Rate Limits
 The service includes a shared rate limiter for all traffic regardless of source IP or user identity and protects all endpoints including auth, API, and admin routes.

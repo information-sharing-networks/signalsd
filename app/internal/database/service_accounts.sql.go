@@ -315,7 +315,7 @@ func (q *Queries) GetValidClientSecretByServiceAccountAccountId(ctx context.Cont
 }
 
 const RevokeAllClientSecretsForAccount = `-- name: RevokeAllClientSecretsForAccount :execrows
-UPDATE client_secrets SET (updated_at, revoked_at) = (NOW(), NOW()) 
+UPDATE client_secrets SET (updated_at, revoked_at) = (NOW(), NOW())
 WHERE service_account_account_id = $1
 AND revoked_at IS NULL
 `
@@ -335,6 +335,20 @@ WHERE hashed_secret = $1
 
 func (q *Queries) RevokeClientSecret(ctx context.Context, hashedSecret string) (int64, error) {
 	result, err := q.db.Exec(ctx, RevokeClientSecret, hashedSecret)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const ScheduleRevokeAllClientSecretsForAccount = `-- name: ScheduleRevokeAllClientSecretsForAccount :execrows
+UPDATE client_secrets SET (updated_at, revoked_at) = (NOW() + INTERVAL '5 minutes', NOW())
+WHERE service_account_account_id = $1
+AND revoked_at IS NULL
+`
+
+func (q *Queries) ScheduleRevokeAllClientSecretsForAccount(ctx context.Context, serviceAccountAccountID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, ScheduleRevokeAllClientSecretsForAccount, serviceAccountAccountID)
 	if err != nil {
 		return 0, err
 	}

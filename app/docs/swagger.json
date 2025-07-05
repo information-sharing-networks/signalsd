@@ -638,6 +638,50 @@
                 }
             }
         },
+        "/api/auth/service-accounts/rotate-secret": {
+            "post": {
+                "security": [
+                    {
+                        "ClientCredentials": []
+                    }
+                ],
+                "description": "Self-service endpoint for service accounts to rotate their client secret.\nRequires current valid client_id and client_secret for authentication.\nOld secret is immediately revoked, new secret is returned.\n\n**Use Cases:**\n- Regular credential rotation for security\n- Suspected credential compromise\n",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Rotate service account client secret",
+                "parameters": [
+                    {
+                        "description": "Service account credentials (required for client_credentials grant)",
+                        "name": "request",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/auth.ServiceAccountTokenRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ServiceAccountRotateResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication failed",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/auth/service-accounts/setup/{setup_id}": {
             "get": {
                 "description": "Exchange one-time setup token for permanent client credentials (the one-time request url is created when a new service account is registered).\nthe endpoint renders a html page that the user can use to copy their client credentials.\nThe setup url is only valid for 48 hours.\n",
@@ -2485,6 +2529,28 @@
             "properties": {
                 "message": {
                     "type": "string"
+                }
+            }
+        },
+        "handlers.ServiceAccountRotateResponse": {
+            "type": "object",
+            "properties": {
+                "client_id": {
+                    "type": "string",
+                    "example": "sa_exampleorg_k7j2m9x1"
+                },
+                "client_secret": {
+                    "type": "string",
+                    "example": "dGhpcyBpcyBhIHNlY3JldA"
+                },
+                "expires_at": {
+                    "type": "string",
+                    "example": "2025-07-05T10:30:00Z"
+                },
+                "expires_in": {
+                    "description": "seconds (1 year)",
+                    "type": "integer",
+                    "example": 31536000
                 }
             }
         },

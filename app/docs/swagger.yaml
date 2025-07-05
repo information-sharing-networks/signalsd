@@ -535,6 +535,22 @@ definitions:
       message:
         type: string
     type: object
+  handlers.ServiceAccountRotateResponse:
+    properties:
+      client_id:
+        example: sa_exampleorg_k7j2m9x1
+        type: string
+      client_secret:
+        example: dGhpcyBpcyBhIHNlY3JldA
+        type: string
+      expires_at:
+        example: "2025-07-05T10:30:00Z"
+        type: string
+      expires_in:
+        description: seconds (1 year)
+        example: 31536000
+        type: integer
+    type: object
   handlers.SignalTypeAndLinkedInfo:
     properties:
       created_at:
@@ -1172,6 +1188,41 @@ paths:
       summary: Register a new service account
       tags:
       - Service accounts
+  /api/auth/service-accounts/rotate-secret:
+    post:
+      description: |
+        Self-service endpoint for service accounts to rotate their client secret.
+        Requires current valid client_id and client_secret for authentication.
+        Old secret is immediately revoked, new secret is returned.
+
+        **Use Cases:**
+        - Regular credential rotation for security
+        - Suspected credential compromise
+      parameters:
+      - description: Service account credentials (required for client_credentials
+          grant)
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/auth.ServiceAccountTokenRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.ServiceAccountRotateResponse'
+        "401":
+          description: Authentication failed
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - ClientCredentials: []
+      summary: Rotate service account client secret
+      tags:
+      - auth
   /api/auth/service-accounts/setup/{setup_id}:
     get:
       description: |
