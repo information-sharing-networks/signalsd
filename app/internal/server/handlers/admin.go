@@ -252,21 +252,14 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 
 // EnableAccountHandler godoc
 //
-//	@Summary	Enable an account (restore access after disable)
+//	@Summary	Enable an account
 //	@Description	**Administrative endpoint to re-enable previously disabled accounts.**
-//	@Description	Sets account status to `is_active = true` but does NOT create new tokens.
-//	@Description
-//	@Description	**Use Cases:**
-//	@Description	- **Restore Access**: Re-enable accounts after security incident resolved
-//	@Description	- **End Suspension**: Restore access after policy violation addressed
-//	@Description	- **Employee Return**: Restore access for returning staff
-//	@Description	- **Appeal Granted**: Restore access after successful appeal
+//	@Description	Sets account status to `is_active = true` (does not create new tokens).
 //	@Description
 //	@Description	**Post-Enable Steps Required:**
 //	@Description	- **Service Accounts**: Must re-register via `/api/auth/register/service-accounts` (same client_id, new credentials)
 //	@Description	- **Web Users**: Can immediately log in again via `/auth/login`
 //	@Description
-//	@Description	**Note:** This only changes account status - it does not create new authentication credentials.
 //	@Description	Only owners and admins can enable accounts.
 //	@Tags			Site admin
 //

@@ -129,8 +129,8 @@ type SignalVersionDoc struct {
 //	@Summary		Send signals
 //	@Tags			Signal sharing
 //
-//	@Description	- the client can submit an array of signals to this endpoint for storage on the ISN
-//	@Description	- payloads must not mix signals of different types and the payload is subject to the sizelimits defined on the site.
+//	@Description	Submit an array of signals for storage on the ISN
+//	@Description	- payloads must not mix signals of different types and is subject to the size limits defined on the site.
 //	@Description	- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.
 //	@Description	- If a local reference is received more than once from an account for a specified signal_type it will be stored with a incremented version number.
 //	@Description	- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account.
@@ -148,7 +148,7 @@ type SignalVersionDoc struct {
 //	@Description	Signals are validated against the json schema specified for the signal type unless validation is disabled on the type definition.
 //	@Description	Individual signal processing failures (validation errors, incorrect correlation ids, database errors) are recorded in the response but do not prevent other signals from being processed.
 //	@Description
-//	@Description	When validation is disabled, basic checks are still done on the incoming data. The following issues create a 400 error and cause the entire payload to be rejected:
+//	@Description	When validation is disabled, basic checks are still done on the incoming data and the following issues create a 400 error and cause the entire payload to be rejected:
 //	@Description	- invalid json format
 //	@Description	- missing fields (the array of signals must be in a json object called signals, and content and local_ref must be present for each record).
 //	@Description
@@ -156,8 +156,9 @@ type SignalVersionDoc struct {
 //	@Description	**Response Status Codes**
 //	@Description	- 200: All signals processed successfully
 //	@Description	- 207: Partial success (some signals succeeded, some failed)
-//	@Description	- 400: All signals failed processing (but request format was valid)
-//	@Description	- 400: Invalid request format, authentication, or other request-level errors
+//	@Description	- 400 / error_code = 'all_signals_failed_processing': All signals failed processing but request format was valid
+//	@Description	- 400 / error_code = 'malformed_body': Invalid request format, authentication, or other request-level errors
+//	@Description	- 400: authentication, or other request-level errors
 //	@Description	- 500: Internal server errors
 //	@Description
 //	@Description	Internal server errors cause the whole payload to be rejected.
@@ -286,7 +287,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 			// If we can't start a transaction, record as failure and continue
 			createSignalsResponse.Results.FailedSignals = append(createSignalsResponse.Results.FailedSignals, FailedSignal{
 				LocalRef:     signal.LocalRef,
-				ErrorCode:    string(apperrors.ErrCodeDatabaseError),
+				ErrorCode:    string(apperrors.ErrCodeMalformedBody),
 				ErrorMessage: fmt.Sprintf("failed to begin transaction: %v", err),
 			})
 			continue
@@ -324,7 +325,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 			if errors.As(signalErr, &pgErr) && pgErr.Code == "23503" && pgErr.ConstraintName == "fk_correlation_id" {
 				createSignalsResponse.Results.FailedSignals = append(createSignalsResponse.Results.FailedSignals, FailedSignal{
 					LocalRef:     signal.LocalRef,
-					ErrorCode:    string(apperrors.ErrCodeInvalidCorrelationID),
+					ErrorCode:    string(apperrors.ErrCodeMalformedBody),
 					ErrorMessage: fmt.Sprintf("invalid correlation_id %v", signal.CorrelationId),
 				})
 				continue
@@ -333,7 +334,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 			// Handle other database errors
 			createSignalsResponse.Results.FailedSignals = append(createSignalsResponse.Results.FailedSignals, FailedSignal{
 				LocalRef:     signal.LocalRef,
-				ErrorCode:    string(apperrors.ErrCodeDatabaseError),
+				ErrorCode:    string(apperrors.ErrCodeMalformedBody),
 				ErrorMessage: fmt.Sprintf("database error: %v", signalErr),
 			})
 			continue
@@ -406,12 +407,15 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	// Determine appropriate status code based on results
-	var statusCode int
 	if createSignalsResponse.Summary.StoredCount == 0 {
 		// All signals failed
-		statusCode = http.StatusBadRequest
-	} else if createSignalsResponse.Summary.FailedCount > 0 {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeAllSignalsFailedProcessing, "all signals failed processing")
+		return
+	}
+
+	// Determine appropriate status code based on results
+	var statusCode int
+	if createSignalsResponse.Summary.FailedCount > 0 {
 		// Partial success
 		statusCode = http.StatusMultiStatus
 	} else {

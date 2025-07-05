@@ -4,6 +4,7 @@ definitions:
   apperrors.ErrorCode:
     enum:
     - access_token_expired
+    - all_signals_failed_processing
     - authentication_error
     - authorization_error
     - database_error
@@ -26,6 +27,7 @@ definitions:
     type: string
     x-enum-varnames:
     - ErrCodeAccessTokenExpired
+    - ErrCodeAllSignalsFailedProcessing
     - ErrCodeAuthenticationFailure
     - ErrCodeAuthorizationFailure
     - ErrCodeDatabaseError
@@ -777,18 +779,10 @@ paths:
   /admin/accounts/{account_id}/disable:
     post:
       description: |-
-        **Administrative endpoint to permanently disable accounts.**
-        Sets account status to `is_active = false` AND revokes all tokens.
-
         **Use Cases:**
         - **Security Incident**: Compromised account needs immediate lockout
         - **Policy Violation**: Account violated terms and needs suspension
         - **Employee Departure**: Remove access for departed staff
-        - **Compliance**: Regulatory requirement to disable specific accounts
-
-        **vs Self-Service Token Revocation:**
-        - `/oauth/revoke`: Self-service, account stays active, can get new tokens immediately
-        - `/admin/accounts/{id}/disable`: Admin action, account becomes inactive, requires admin to re-enable
 
         **Actions Performed:**
         - Sets `is_active = false` (account becomes unusable)
@@ -827,26 +821,19 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Disable an account (administrative action)
+      summary: Disable an account
       tags:
       - Site admin
   /admin/accounts/{account_id}/enable:
     post:
       description: |-
         **Administrative endpoint to re-enable previously disabled accounts.**
-        Sets account status to `is_active = true` but does NOT create new tokens.
-
-        **Use Cases:**
-        - **Restore Access**: Re-enable accounts after security incident resolved
-        - **End Suspension**: Restore access after policy violation addressed
-        - **Employee Return**: Restore access for returning staff
-        - **Appeal Granted**: Restore access after successful appeal
+        Sets account status to `is_active = true` (does not create new tokens).
 
         **Post-Enable Steps Required:**
         - **Service Accounts**: Must re-register via `/api/auth/register/service-accounts` (same client_id, new credentials)
         - **Web Users**: Can immediately log in again via `/auth/login`
 
-        **Note:** This only changes account status - it does not create new authentication credentials.
         Only owners and admins can enable accounts.
       parameters:
       - description: Account ID to enable
@@ -875,7 +862,7 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Enable an account (restore access after disable)
+      summary: Enable an account
       tags:
       - Site admin
   /admin/reset:
@@ -1800,8 +1787,8 @@ paths:
   /isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals:
     post:
       description: |-
-        - the client can submit an array of signals to this endpoint for storage on the ISN
-        - payloads must not mix signals of different types and the payload is subject to the sizelimits defined on the site.
+        Submit an array of signals for storage on the ISN
+        - payloads must not mix signals of different types and is subject to the size limits defined on the site.
         - The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.
         - If a local reference is received more than once from an account for a specified signal_type it will be stored with a incremented version number.
         - Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account.
@@ -1819,7 +1806,7 @@ paths:
         Signals are validated against the json schema specified for the signal type unless validation is disabled on the type definition.
         Individual signal processing failures (validation errors, incorrect correlation ids, database errors) are recorded in the response but do not prevent other signals from being processed.
 
-        When validation is disabled, basic checks are still done on the incoming data. The following issues create a 400 error and cause the entire payload to be rejected:
+        When validation is disabled, basic checks are still done on the incoming data and the following issues create a 400 error and cause the entire payload to be rejected:
         - invalid json format
         - missing fields (the array of signals must be in a json object called signals, and content and local_ref must be present for each record).
 
@@ -1827,8 +1814,9 @@ paths:
         **Response Status Codes**
         - 200: All signals processed successfully
         - 207: Partial success (some signals succeeded, some failed)
-        - 400: All signals failed processing (but request format was valid)
-        - 400: Invalid request format, authentication, or other request-level errors
+        - 400 / error_code = 'all_signals_failed_processing': All signals failed processing but request format was valid
+        - 400 / error_code = 'malformed_body': Invalid request format, authentication, or other request-level errors
+        - 400: authentication, or other request-level errors
         - 500: Internal server errors
 
         Internal server errors cause the whole payload to be rejected.
@@ -1940,26 +1928,19 @@ paths:
       - Signal sharing
   /oauth/revoke:
     post:
-      description: |-
-        Revoke a refresh token or client secret to prevent it being used to create new access tokens.
-        **This is a self-service endpoint - accounts revoke their own tokens.**
+      description: |
+        Revoke a refresh token or client secret to prevent it being used to create new access tokens (self-service)
 
         **Use Cases:**
         - **Web User Logout**: User wants to log out of their session
-        - **Service Account Security**: Service account wants to invalidate compromised credentials
-        - **Credential Rotation**: Service account wants to force credential refresh
-
-        **vs Admin Disable/Enable:**
-        - `/oauth/revoke`: Self-service, account stays active, can immediately get new tokens
-        - `/admin/accounts/{id}/disable`: Admin action, account becomes inactive, requires admin to re-enable
-        - `/admin/accounts/{id}/enable`: Admin action, reactivates disabled accounts
+        - **Service Account Security**: Account no longer being used/compromised secret
 
         **Service Accounts:**
         You must supply your `client ID` and `client secret` in the request body.
         This revokes **ALL** client secrets for the service account, effectively disabling it.
 
         **IMPORTANT - Service Account Reinstatement:**
-        - This endpoint does **NOT** disable the service account itself (account remains active)
+        - This endpoint does **NOT** permanently disable the service account itself
         - To restore access, an admin must call `POST /api/auth/register/service-accounts` with the same organization and email
         - This will generate a new setup URL and client secret while preserving the same client_id
         - If the account was disabled by an admin, it must first be re-enabled via `POST /admin/accounts/{account_id}/enable`
@@ -1979,20 +1960,6 @@ paths:
         **Client Examples:**
         - **Web User Logout:** `POST /oauth/revoke` with refresh token cookie + Authorization header
         - **Service Account:** `POST /oauth/revoke` with client_id and client_secret in request body
-
-        **Endpoint Comparison:**
-        ```
-        | Endpoint                        | Who Can Use | Account Status | Tokens Revoked | Immediate Recovery |
-        |---------------------------------|-------------|----------------|----------------|--------------------|
-        | /oauth/revoke                   | Self        | Stays Active   | Own tokens     | Yes (get new)      |
-        | /admin/accounts/{id}/disable    | Admin       | Becomes Inactive| All tokens     | No (admin enable)  |
-        | /admin/accounts/{id}/enable     | Admin       | Becomes Active | None created   | Partial (re-auth)  |
-        ```
-
-        **Recovery Procedures:**
-        - **Service Account Recovery:** Admin calls `POST /api/auth/register/service-accounts` with same org/email
-        - **Disabled Account Recovery:** Admin calls `POST /admin/accounts/{account_id}/enable` then re-register service account
-        - **Web User Recovery:** User logs in again via `/auth/login`
       responses:
         "200":
           description: OK
@@ -2010,7 +1977,7 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Revoke a token (self-service logout/credential reset)
+      summary: Revoke a token
       tags:
       - auth
   /oauth/token:
