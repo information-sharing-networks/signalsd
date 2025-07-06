@@ -649,23 +649,18 @@ const docTemplate = `{
         },
         "/api/auth/service-accounts/rotate-secret": {
             "post": {
-                "security": [
-                    {
-                        "ClientCredentials": []
-                    }
-                ],
-                "description": "Self-service endpoint for service accounts to rotate their client secret.\nRequires current valid client_id and client_secret for authentication.\nOld secret is immediately revoked, new secret is returned.\n\n**Use Cases:**\n- Regular credential rotation for security\n- Suspected credential compromise\n",
+                "description": "Self-service endpoint for service accounts to rotate their client secret.\nRequires current valid client_id and client_secret for authentication.\nThe old secret remains valid for 5 minutes to prevent race conditions when multiple instances are involved and to stop clients being locked out where network issues prevent them from receiving the new secret immediately.\n\n**Use Cases:**\n- Regular credential rotation for security compliance\n- Suspected credential compromise requiring immediate rotation\n",
                 "tags": [
                     "auth"
                 ],
                 "summary": "Rotate service account client secret",
                 "parameters": [
                     {
-                        "description": "Service account credentials (required for client_credentials grant)",
+                        "description": "Service account credentials",
                         "name": "request",
                         "in": "body",
                         "schema": {
-                            "$ref": "#/definitions/auth.ServiceAccountTokenRequest"
+                            "$ref": "#/definitions/handlers.ServiceAccountTokenRequest"
                         }
                     }
                 ],
@@ -1059,6 +1054,59 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Search for signals by date or account in private ISNs (authentication required)\n\nNote the endpoint returns the latest version of each signal and does not include withdrawn or archived signals",
+                "tags": [
+                    "Signal sharing"
+                ],
+                "summary": "Search for signals in private ISNs",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "2006-01-02T15:04:05Z",
+                        "description": "Start date for filtering",
+                        "name": "start_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "End date for filtering",
+                        "name": "end_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
+                        "description": "Account ID for filtering",
+                        "name": "account_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handlers.SignalVersionDoc"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}": {
             "get": {
                 "tags": [
@@ -1277,6 +1325,54 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/public/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search": {
+            "get": {
+                "description": "Search for signals by date or account in public ISNs (no authentication required)\n\nNote the endpoint returns the latest version of each signal and does not include withdrawn or archived signals",
+                "tags": [
+                    "Signal sharing"
+                ],
+                "summary": "Search for signals in public ISNs",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "2006-01-02T15:04:05Z",
+                        "description": "Start date for filtering",
+                        "name": "start_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "End date for filtering",
+                        "name": "end_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
+                        "description": "Account ID for filtering",
+                        "name": "account_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handlers.SignalVersionDoc"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/health/live": {
             "get": {
                 "description": "check if the signalsd service is up",
@@ -1373,7 +1469,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Search for batches with optional filtering parameters\n\nThe search endpoint returns the full batch status (including per-signal-type breakdown) for each batch.\n\nWhere a signal has failed to load as part of the batch and not subsequently been loaded, the failure is considered unresolved and listed as a failure in the batch status\n\nMember accounts can only see batches they have created. ISN Admins can see batches for ISNs they administer. The site owner can see all batches.\n\nAt least one search criteria must be provided:\n- latest=true (get the latest batch)\n- previous=true (get the previous batch)\n- created date range (both created_after and created_before)\n- closed date range (both closed_after and closed_before)\n\nAccepted timestamp formats (ISO 8601):\n- 2006-01-02T15:04:05Z (UTC)\n- 2006-01-02T15:04:05+07:00 (with offset)\n- 2006-01-02T15:04:05.999999999Z (nano precision)\n\nNote: If the timestamp contains a timezone offset (as in +07:00), the + must be percent-encoded as %2B in the query strings.\n\nDates (YYYY-MM-DD) can also be used.\nThese are treated as the start of day UTC (so 2006-01-02 is treated as 2006-01-02T00:00:00Z)",
+                "description": "Search for batches with optional filtering parameters\n\nThe search endpoint returns the full batch status (including per-signal-type breakdown) for each batch.\n\nWhere a signal has failed to load as part of the batch and not subsequently been loaded, the failure is considered unresolved and listed as a failure in the batch status\n\nMember accounts can only see batches they have created. ISN Admins can see batches for ISNs they administer. The site owner can see all batches.\n\nAt least one search criteria must be provided:\n- latest=true (get the latest batch)\n- previous=true (get the previous batch)\n- created date range (both created_after and created_before)\n- closed date range (both closed_after and closed_before)\n\nAccepted timestamp formats (ISO 8601):\n- 2006-01-02T15:04:05Z (UTC)\n- 2006-01-02T15:04:05+07:00 (with offset)\n- 2006-01-02T15:04:05.999999999Z (nano precision)\n\nDates (YYYY-MM-DD) can also be used.\nThese are treated as the start of day UTC (so 2006-01-02 is treated as 2006-01-02T00:00:00Z)",
                 "tags": [
                     "Signal sharing"
                 ],
@@ -1567,59 +1663,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "Search for signals by date or account\n\nAccounts need read or write access to the ISN to use this endpoint\n\nAccepted timestamps formats (ISO 8601):\n- 2006-01-02T15:04:05Z (UTC)\n- 2006-01-02T15:04:05+07:00 (with offset)\n- 2006-01-02T15:04:05.999999999Z (nano precision)\n\nNote: If the timestamp contains a timezone offset (as in +07:00), the + must be percent-encoded as %2B in the query strings.\n\nDates (YYYY-MM-DD) can also be used.\nThese are treated as the start of day UTC (so 2006-01-02 is treated as 2006-01-02T00:00:00Z)\n\nNote the endpoint returns the latest version of each signal and does not include withdrawn or archived signals",
-                "tags": [
-                    "Signal sharing"
-                ],
-                "summary": "Search for signals",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "2006-01-02T15:04:05Z",
-                        "description": "Start date for filtering",
-                        "name": "start_date",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "End date for filtering",
-                        "name": "end_date",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
-                        "description": "Account ID for filtering",
-                        "name": "account_id",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/handlers.SignalVersionDoc"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}": {
             "get": {
                 "tags": [
@@ -1718,7 +1761,7 @@ const docTemplate = `{
                         "name": "request",
                         "in": "body",
                         "schema": {
-                            "$ref": "#/definitions/auth.ServiceAccountTokenRequest"
+                            "$ref": "#/definitions/handlers.ServiceAccountTokenRequest"
                         }
                     }
                 ],
@@ -1898,19 +1941,6 @@ const docTemplate = `{
                         "signal-type-1/v0.0.1",
                         "signal-type-2/v1.0.0"
                     ]
-                }
-            }
-        },
-        "auth.ServiceAccountTokenRequest": {
-            "type": "object",
-            "properties": {
-                "client_id": {
-                    "type": "string",
-                    "example": "sa_example-org_k7j2m9x1"
-                },
-                "client_secret": {
-                    "type": "string",
-                    "example": "dGhpcyBpcyBhIHNlY3JldA"
                 }
             }
         },
@@ -2563,6 +2593,19 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.ServiceAccountTokenRequest": {
+            "type": "object",
+            "properties": {
+                "client_id": {
+                    "type": "string",
+                    "example": "sa_exampleorg_k7j2m9x1"
+                },
+                "client_secret": {
+                    "type": "string",
+                    "example": "dGhpcyBpcyBhIHNlY3JldA"
+                }
+            }
+        },
         "handlers.SignalTypeAndLinkedInfo": {
             "type": "object",
             "properties": {
@@ -2803,7 +2846,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "",
 	Schemes:          []string{},
 	Title:            "Signals ISN API",
-	Description:      "Signals ISN service API for managing Information Sharing Networks\n\n## Common Error Responses\nAll endpoints may return:\n- `413` Request body exceeds size limit\n- `429` Rate limit exceeded\n- `500` Internal server error\n\nIndividual endpoints document their specific business logic errors.\n\n## Request Limits\nAll endpoints are protected by:\n- **Rate limiting**: Configurable requests per second (default: 100 RPS, 20 burst)\n- **Request size limits**: 64KB for admin/auth endpoints, 5MB for signal ingestion\n\nCheck the X-Max-Request-Body response header for the configured limit on signals payload.\n\nThe rate limit is set globaly and prevents abuse of the service.\nIn production there will be additional protections in place such as per-IP rate limiting provided by the load balancer/reverse proxy.\n\n## Authentication & Authorization\n\n### Authentication Flow\n- **Web users**: Login → get JWT + refresh cookie → use JWT for API calls\n- **Service accounts**: Authenticate with Client credentials → get JWT → use JWT for API calls → re-authenticate when expired\n\n### Authorization\nAll protected API endpoints expect valid JWT access tokens containing user identity and permissions.\n\ntokens should be supplied using:\n**Authorization header**: `Bearer <token>`\n\n**Token refresh:**\n- **Web users**: Refresh tokens (HTTP-only cookies) automatically renew access tokens\n- **Service accounts**: Must re-authenticate with client credentials when tokens expire\n\nAccess tokens expire in 30 minutes\n\nRefresh tokens expire in 30 days (web users only)\n",
+	Description:      "Signals ISN service API for managing Information Sharing Networks\n\n## Common Error Responses\nAll endpoints may return:\n- `413` Request body exceeds size limit\n- `429` Rate limit exceeded\n- `500` Internal server error\n\nIndividual endpoints document their specific business logic errors.\n\n## Request Limits\nAll endpoints are protected by:\n- **Rate limiting**: Configurable requests per second (default: 100 RPS, 20 burst)\n- **Request size limits**: 64KB for admin/auth endpoints, 5MB for signal ingestion\n\nCheck the X-Max-Request-Body response header for the configured limit on signals payload.\n\nThe rate limit is set globaly and prevents abuse of the service.\nIn production there will be additional protections in place such as per-IP rate limiting provided by the load balancer/reverse proxy.\n\n## Authentication & Authorization\n\n### Authentication Flow\n- **Web users**: Login → get JWT + refresh cookie → use JWT for API calls\n- **Service accounts**: Authenticate with Client credentials → get JWT → use JWT for API calls → re-authenticate when expired\n\n### Authorization\nAll protected API endpoints expect valid JWT access tokens containing user identity and permissions.\n\ntokens should be supplied using:\n**Authorization header**: `Bearer <token>`\n\n**Token refresh:**\n- **Web users**: Refresh tokens (HTTP-only cookies) automatically renew access tokens\n- **Service accounts**: Must re-authenticate with client credentials when tokens expire\n\nAccess tokens expire in 30 minutes\n\nRefresh tokens expire in 30 days (web users only)\n\n## Date/Time Handling:\n\n**URL Parameters**: The following ISO 8601 formats are accepted in URL query parameters:\n- 2006-01-02T15:04:05Z (UTC)\n- 2006-01-02T15:04:05+07:00 (with offset)\n- 2006-01-02T15:04:05.999999999Z (nano precision)\n- 2006-01-02 (date only, treated as start of day UTC: 2006-01-02T00:00:00Z)\n\nNote: If the timestamp contains a timezone offset (as in +07:00), the + must be percent-encoded as %2B in the query.\n\n**Response Bodies**: All date/time fields in JSON responses use RFC3339 format (ISO 8601):\n- Example: \"2025-06-03T13:47:47.331787+01:00\"",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

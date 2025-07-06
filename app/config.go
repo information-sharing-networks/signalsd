@@ -2,9 +2,11 @@ package signalsd
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
+	"github.com/jub0bs/cors"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/rs/zerolog"
 )
@@ -33,6 +35,12 @@ type ServerConfig struct {
 	DBConnectTimeout     time.Duration `envconfig:"DB_CONNECT_TIMEOUT" default:"5s"`
 }
 
+// CORSConfigs holds the CORS middleware instances for different endpoint types
+type CORSConfigs struct {
+	Public    *cors.Middleware
+	Protected *cors.Middleware
+}
+
 const (
 	RefreshTokenCookieName = "refresh_token"
 	TokenIssuerName        = "Signalsd"
@@ -49,6 +57,9 @@ const (
 	ServerShutdownTimeout = 10 * time.Second // Server graceful shutdown timeout
 	DatabasePingTimeout   = 10 * time.Second
 	ReadinessTimeout      = 2 * time.Second // Health check timeout
+
+	// CORS settings
+	CORSMaxAgeInSeconds = 86400 // 24 hours
 
 	// JSON validation
 	SkipValidationURL = "https://github.com/skip/validation/main/schema.json" // URL used to indicate JSON schema validation should be skipped
@@ -93,17 +104,23 @@ var ValidServiceModes = map[string]bool{ // service modes for CLI
 	"signals-write": true, // write-only signal operations
 }
 
-// NewServerConfig loads environment variables using envconfig and returns a ServerConfig struct
-func NewServerConfig(logger *zerolog.Logger) (*ServerConfig, error) {
+// NewServerConfig loads environment variables using envconfig and returns a ServerConfig struct and CORSConfigs
+func NewServerConfig(logger *zerolog.Logger) (*ServerConfig, *CORSConfigs, error) {
 	var cfg ServerConfig
 
 	// load environment variables with defaults
 	if err := envconfig.Process("", &cfg); err != nil {
-		return nil, fmt.Errorf("failed to process environment variables: %w", err)
+		return nil, nil, fmt.Errorf("failed to process environment variables: %w", err)
 	}
 
 	if err := validateConfig(&cfg); err != nil {
-		return nil, fmt.Errorf("configuration validation failed: %w", err)
+		return nil, nil, fmt.Errorf("configuration validation failed: %w", err)
+	}
+
+	// Initialize CORS configurations
+	corsConfigs, err := createCORSConfigs(&cfg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("CORS configuration failed: %w", err)
 	}
 
 	logger.Info().
@@ -124,7 +141,7 @@ func NewServerConfig(logger *zerolog.Logger) (*ServerConfig, error) {
 		Str("DB_CONNECT_TIMEOUT", cfg.DBConnectTimeout.String()).
 		Msg("Configuration loaded")
 
-	return &cfg, nil
+	return &cfg, corsConfigs, nil
 }
 
 // validateConfig checks for required env variables
@@ -165,4 +182,67 @@ func validateConfig(cfg *ServerConfig) error {
 	}
 
 	return nil
+}
+
+// createCORSConfigs creates the CORS configurations based on the server config
+func createCORSConfigs(cfg *ServerConfig) (*CORSConfigs, error) {
+	var origins []string
+	if len(cfg.AllowedOrigins) == 0 || (len(cfg.AllowedOrigins) == 1 && strings.TrimSpace(cfg.AllowedOrigins[0]) == "*") {
+		origins = []string{"*"}
+	} else {
+		// Trim whitespace from all origins
+		origins = make([]string, len(cfg.AllowedOrigins))
+		for i, origin := range cfg.AllowedOrigins {
+			origins[i] = strings.TrimSpace(origin)
+		}
+	}
+
+	publicConfig := cors.Config{
+		Origins: []string{"*"},
+		Methods: []string{
+			http.MethodGet,
+			http.MethodHead,
+			http.MethodOptions,
+		},
+		RequestHeaders: []string{
+			"Accept",
+			"Content-Type",
+			"X-Requested-With",
+		},
+		MaxAgeInSeconds: CORSMaxAgeInSeconds,
+	}
+
+	publicMiddleware, err := cors.NewMiddleware(publicConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create public CORS middleware: %w", err)
+	}
+
+	protectedConfig := cors.Config{
+		Origins: origins,
+		Methods: []string{
+			http.MethodGet,
+			http.MethodPost,
+			http.MethodPut,
+			http.MethodDelete,
+			http.MethodOptions,
+		},
+		RequestHeaders: []string{
+			"Content-Type",
+			"Authorization",
+			"X-Requested-With",
+		},
+		MaxAgeInSeconds: CORSMaxAgeInSeconds,
+	}
+
+	protectedMiddleware, err := cors.NewMiddleware(protectedConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create protected CORS middleware: %w", err)
+	}
+
+	corsConfigs := &CORSConfigs{
+		Public:    publicMiddleware,
+		Protected: protectedMiddleware,
+	}
+
+	return corsConfigs, nil
 }

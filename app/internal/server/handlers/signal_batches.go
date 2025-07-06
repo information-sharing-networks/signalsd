@@ -353,8 +353,6 @@ func (s *SignalsBatchHandler) getBatchStatusDetails(ctx context.Context, batchID
 //	@Description	- 2006-01-02T15:04:05+07:00 (with offset)
 //	@Description	- 2006-01-02T15:04:05.999999999Z (nano precision)
 //	@Description
-//	@Description	Note: If the timestamp contains a timezone offset (as in +07:00), the + must be percent-encoded as %2B in the query strings.
-//	@Description
 //	@Description	Dates (YYYY-MM-DD) can also be used.
 //	@Description	These are treated as the start of day UTC (so 2006-01-02 is treated as 2006-01-02T00:00:00Z)
 //

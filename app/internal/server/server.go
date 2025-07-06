@@ -25,17 +25,19 @@ type Server struct {
 	queries      *database.Queries
 	authService  *auth.AuthService
 	serverConfig *signalsd.ServerConfig
+	corsConfigs  *signalsd.CORSConfigs
 	serverLogger *zerolog.Logger
 	httpLogger   *zerolog.Logger
 	router       *chi.Mux
 }
 
-func NewServer(pool *pgxpool.Pool, queries *database.Queries, authService *auth.AuthService, serverConfig *signalsd.ServerConfig, serverLogger *zerolog.Logger, httpLogger *zerolog.Logger, router *chi.Mux) *Server {
+func NewServer(pool *pgxpool.Pool, queries *database.Queries, authService *auth.AuthService, serverConfig *signalsd.ServerConfig, corsConfigs *signalsd.CORSConfigs, serverLogger *zerolog.Logger, httpLogger *zerolog.Logger, router *chi.Mux) *Server {
 	s := &Server{
 		pool:         pool,
 		queries:      queries,
 		authService:  authService,
 		serverConfig: serverConfig,
+		corsConfigs:  corsConfigs,
 		serverLogger: serverLogger,
 		httpLogger:   httpLogger,
 		router:       router,
@@ -48,13 +50,13 @@ func NewServer(pool *pgxpool.Pool, queries *database.Queries, authService *auth.
 	switch s.serverConfig.ServiceMode {
 	case "all":
 		s.registerAdminRoutes()
-		s.registerSignalRoutes(s.serverConfig.ServiceMode)
+		s.registerSignalRoutes()
 		s.registerStaticAssetRoutes()
 	case "admin":
 		s.registerAdminRoutes()
 		s.registerStaticAssetRoutes()
 	case "signals", "signals-read", "signals-write":
-		s.registerSignalRoutes(s.serverConfig.ServiceMode)
+		s.registerSignalRoutes()
 	}
 	return s
 }
@@ -116,7 +118,6 @@ func (s *Server) Run() {
 func (s *Server) setupMiddleware() {
 	s.router.Use(chimiddleware.RequestID)
 	s.router.Use(logger.RequestLogging(s.httpLogger))
-	s.router.Use(CORS(s.serverConfig.AllowedOrigins))
 	s.router.Use(SecurityHeaders(s.serverConfig.Environment))
 	s.router.Use(RateLimit(s.serverConfig.RateLimitRPS, s.serverConfig.RateLimitBurst))
 }
@@ -142,6 +143,7 @@ func (s *Server) registerAdminRoutes() {
 	signalBatches := handlers.NewSignalsBatchHandler(s.queries)
 
 	s.router.Group(func(r chi.Router) {
+		r.Use(CORS(s.corsConfigs.Protected))
 		r.Use(RequestSizeLimit(s.serverConfig.MaxAPIRequestSize))
 
 		//oauth2.0 token handling
@@ -289,14 +291,15 @@ func (s *Server) registerAdminRoutes() {
 }
 
 // registerSignalRoutes registers signal routes based on service mode
-func (s *Server) registerSignalRoutes(serviceMode string) {
+func (s *Server) registerSignalRoutes() {
 	// Initialize handlers once
 	webhooks := handlers.NewWebhookHandler(s.queries)
 	signals := handlers.NewSignalsHandler(s.queries, s.pool)
 
-	// Register write routes
-	if serviceMode == "all" || serviceMode == "signals" || serviceMode == "signals-write" {
+	// Register write routes - these are always protected endpoints
+	if s.serverConfig.ServiceMode == "all" || s.serverConfig.ServiceMode == "signals" || s.serverConfig.ServiceMode == "signals-write" {
 		s.router.Group(func(r chi.Router) {
+			r.Use(CORS(s.corsConfigs.Protected))
 			r.Use(RequestSizeLimit(s.serverConfig.MaxSignalPayloadSize))
 			r.Use(s.authService.RequireValidAccessToken(false))
 
@@ -314,17 +317,22 @@ func (s *Server) registerSignalRoutes(serviceMode string) {
 		})
 	}
 
-	// Register read routes
-	if serviceMode == "all" || serviceMode == "signals" || serviceMode == "signals-read" {
+	if s.serverConfig.ServiceMode == "all" || s.serverConfig.ServiceMode == "signals" || s.serverConfig.ServiceMode == "signals-read" {
+
+		// Public ISN signal search - no authentication required
 		s.router.Group(func(r chi.Router) {
-
-			r.Use(s.authService.RequireValidAccessToken(false))
-
-			// signals can only be read by accounts with read or write permissions to the specified ISN
-			r.Use(s.authService.RequireIsnPermission("read", "write"))
-
-			r.Get("/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search", signals.SearchSignalsHandler)
+			r.Use(CORS(s.corsConfigs.Public))
+			r.Get("/api/public/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search", signals.SearchPublicSignalsHandler)
 		})
+
+		// Private ISN signal search - authentication required
+		s.router.Group(func(r chi.Router) {
+			r.Use(CORS(s.corsConfigs.Protected))
+			r.Use(s.authService.RequireValidAccessToken(false))
+			r.Use(s.authService.RequireIsnPermission("read", "write"))
+			r.Get("/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search", signals.SearchPrivateSignalsHandler)
+		})
+
 	}
 }
 
@@ -333,6 +341,8 @@ func (s *Server) registerCommonRoutes() {
 	admin := handlers.NewAdminHandler(s.queries, s.pool, s.authService)
 
 	s.router.Route("/health", func(r chi.Router) {
+		r.Use(CORS(s.corsConfigs.Public))
+
 		// check the site is up and the database is accepting requests
 		r.Get("/ready", admin.ReadinessHandler)
 
@@ -340,17 +350,24 @@ func (s *Server) registerCommonRoutes() {
 		r.Get("/live", admin.LivenessHandler)
 	})
 
-	s.router.Get("/version", admin.VersionHandler)
+	s.router.Group(func(r chi.Router) {
+		r.Use(CORS(s.corsConfigs.Public))
+		r.Get("/version", admin.VersionHandler)
+	})
 }
 
 // registerStaticAssetRoutes static assets e.g documentation for the API
 func (s *Server) registerStaticAssetRoutes() {
 	s.router.Route("/assets", func(r chi.Router) {
+		r.Use(CORS(s.corsConfigs.Public))
 		fs := http.FileServer(http.Dir("assets"))
 		r.Get("/*", http.StripPrefix("/assets/", fs).ServeHTTP)
 	})
 
-	s.router.Get("/", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./assets/index.html") })
-	s.router.Get("/docs", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./docs/redoc.html") })
-	s.router.Get("/swagger.json", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./docs/swagger.json") })
+	s.router.Group(func(r chi.Router) {
+		r.Use(CORS(s.corsConfigs.Public))
+		r.Get("/", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./assets/index.html") })
+		r.Get("/docs", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./docs/redoc.html") })
+		r.Get("/swagger.json", func(w http.ResponseWriter, r *http.Request) { http.ServeFile(w, r, "./docs/swagger.json") })
+	})
 }

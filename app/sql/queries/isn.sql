@@ -61,3 +61,17 @@ SELECT EXISTS
   (SELECT 1
    FROM isn
    WHERE slug = $1) AS EXISTS;
+
+-- name: GetPublicIsnSlugs :many
+SELECT slug FROM isn WHERE visibility = 'public' AND is_in_use = true;
+
+-- name: GetPublicIsnSignalTypes :many
+SELECT
+    i.slug as isn_slug,
+    st.slug as signal_type_slug,
+    st.sem_ver
+FROM isn i
+JOIN signal_types st ON st.isn_id = i.id
+WHERE i.visibility = 'public'
+AND i.is_in_use = true
+AND st.is_in_use = true;

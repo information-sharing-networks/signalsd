@@ -6,12 +6,14 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/server"
+	"github.com/information-sharing-networks/signalsd/app/internal/server/isns"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/schemas"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/spf13/cobra"
@@ -63,6 +65,18 @@ import (
 //	@description
 //	@description	Refresh tokens expire in 30 days (web users only)
 //  @description
+//	@description	## Date/Time Handling:
+//	@description
+//	@description	**URL Parameters**: The following ISO 8601 formats are accepted in URL query parameters:
+//	@description	- 2006-01-02T15:04:05Z (UTC)
+//	@description	- 2006-01-02T15:04:05+07:00 (with offset)
+//	@description	- 2006-01-02T15:04:05.999999999Z (nano precision)
+//	@description	- 2006-01-02 (date only, treated as start of day UTC: 2006-01-02T00:00:00Z)
+//	@description
+//	@description	Note: If the timestamp contains a timezone offset (as in +07:00), the + must be percent-encoded as %2B in the query.
+//	@description
+//	@description	**Response Bodies**: All date/time fields in JSON responses use RFC3339 format (ISO 8601):
+//	@description	- Example: "2025-06-03T13:47:47.331787+01:00"
 //	@license.name	MIT
 
 //	@servers.url		https://api.example.com
@@ -139,7 +153,7 @@ func main() {
 func runServer(mode string) error {
 	serverLogger := logger.InitServerLogger()
 
-	cfg, err := signalsd.NewServerConfig(serverLogger)
+	cfg, corsConfigs, err := signalsd.NewServerConfig(serverLogger)
 	if err != nil {
 		serverLogger.Fatal().Err(err).Msg("Failed to load configuration")
 	}
@@ -177,9 +191,17 @@ func runServer(mode string) error {
 	queries := database.New(pool)
 
 	if err := schemas.LoadSchemaCache(ctx, queries); err != nil {
-		serverLogger.Fatal().Err(err).Msg("Failed to load schema cache")
+		serverLogger.Fatal().Msgf("Failed to load schema cache: %v", err)
 	}
 	serverLogger.Info().Msg("Schema cache loaded")
+
+	if err := isns.LoadPublicISNCache(ctx, queries); err != nil {
+		serverLogger.Fatal().Msgf("Failed to load public ISN cache: %v", err)
+	}
+
+	if isns.PublicISNCount() >= 0 {
+		serverLogger.Info().Msg("Public ISN cache loaded")
+	}
 
 	if cfg.RateLimitRPS <= 0 {
 		serverLogger.Warn().Msg("rate limiting disabled")
@@ -188,9 +210,14 @@ func runServer(mode string) error {
 	authService := auth.NewAuthService(cfg.SecretKey, cfg.Environment, queries)
 	router := chi.NewRouter()
 
-	server := server.NewServer(pool, queries, authService, cfg, serverLogger, httpLogger, router)
+	server := server.NewServer(pool, queries, authService, cfg, corsConfigs, serverLogger, httpLogger, router)
 
 	serverLogger.Info().Msgf("CORS allowed origins: %v", cfg.AllowedOrigins)
+
+	if cfg.Environment == "prod" && (len(cfg.AllowedOrigins) == 0 || (len(cfg.AllowedOrigins) == 1 && strings.TrimSpace(cfg.AllowedOrigins[0]) == "*")) {
+		serverLogger.Warn().Msg("production env is configured to allow all origins for CORS. Use the ALLOWED_ORIGINS env variable to restrict access to specific origins")
+	}
+
 	serverLogger.Info().Msgf("service mode: %s", cfg.ServiceMode)
 	serverLogger.Info().Msgf("Starting server (version: %s)", version.Get().Version)
 

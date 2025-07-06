@@ -303,3 +303,30 @@ func (a AuthService) RequireDevEnv(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+// RequireISNAccessPermission skips authentication for public ISNs.
+// For private ISNs, it requires valid access token and read/write isn permission.
+func (a AuthService) RequireISNAccessPermission(isPublicISN func(string) bool) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			logger := zerolog.Ctx(r.Context())
+
+			isnSlug := chi.URLParam(r, "isn_slug")
+			if isnSlug == "" {
+				responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInvalidRequest, "no isn_slug parameter")
+				return
+			}
+
+			if isPublicISN(isnSlug) {
+				logger.Info().Msgf("Public ISN access granted for: %v", isnSlug)
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// For private ISNs, apply standard authentication and permission checks
+			a.RequireValidAccessToken(false)(
+				a.RequireIsnPermission("read", "write")(next),
+			).ServeHTTP(w, r)
+		})
+	}
+}
