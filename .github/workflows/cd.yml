@@ -4,7 +4,8 @@ name: CD
 on:
   push:
     tags:
-      - 'v*'  
+      - 'v*'
+  workflow_dispatch:
 
 env:
   # Secrets
