@@ -100,17 +100,41 @@ jobs:
           ENV_VARS="${ENV_VARS},SECRET_KEY=${{ env.SECRET_KEY }}"
           ENV_VARS="${ENV_VARS},ENVIRONMENT=${{ env.ENVIRONMENT }}"
           ENV_VARS="${ENV_VARS},LOG_LEVEL=${{ env.LOG_LEVEL }}"
-          ENV_VARS="${ENV_VARS},DB_MAX_CONNECTIONS=${{ env.DB_MAX_CONNECTIONS }}"
-          ENV_VARS="${ENV_VARS},DB_MIN_CONNECTIONS=${{ env.DB_MIN_CONNECTIONS }}"
-          ENV_VARS="${ENV_VARS},DB_MAX_CONN_LIFETIME=${{ env.DB_MAX_CONN_LIFETIME }}"
-          ENV_VARS="${ENV_VARS},DB_MAX_CONN_IDLE_TIME=${{ env.DB_MAX_CONN_IDLE_TIME }}"
-          ENV_VARS="${ENV_VARS},DB_CONNECT_TIMEOUT=${{ env.DB_CONNECT_TIMEOUT }}"
-          ENV_VARS="${ENV_VARS},RATE_LIMIT_RPS=${{ env.RATE_LIMIT_RPS }}"
-          ENV_VARS="${ENV_VARS},RATE_LIMIT_BURST=${{ env.RATE_LIMIT_BURST }}"
-          ENV_VARS="${ENV_VARS},MAX_SIGNAL_PAYLOAD_SIZE=${{ env.MAX_SIGNAL_PAYLOAD_SIZE }}"
-          ENV_VARS="${ENV_VARS},READ_TIMEOUT=${{ env.READ_TIMEOUT }}"
-          ENV_VARS="${ENV_VARS},WRITE_TIMEOUT=${{ env.WRITE_TIMEOUT }}"
-          ENV_VARS="${ENV_VARS},IDLE_TIMEOUT=${{ env.IDLE_TIMEOUT }}"
+
+          # Add optional configuration variables only if they are set
+          if [ -n "${{ env.DB_MAX_CONNECTIONS }}" ]; then
+            ENV_VARS="${ENV_VARS},DB_MAX_CONNECTIONS=${{ env.DB_MAX_CONNECTIONS }}"
+          fi
+          if [ -n "${{ env.DB_MIN_CONNECTIONS }}" ]; then
+            ENV_VARS="${ENV_VARS},DB_MIN_CONNECTIONS=${{ env.DB_MIN_CONNECTIONS }}"
+          fi
+          if [ -n "${{ env.DB_MAX_CONN_LIFETIME }}" ]; then
+            ENV_VARS="${ENV_VARS},DB_MAX_CONN_LIFETIME=${{ env.DB_MAX_CONN_LIFETIME }}"
+          fi
+          if [ -n "${{ env.DB_MAX_CONN_IDLE_TIME }}" ]; then
+            ENV_VARS="${ENV_VARS},DB_MAX_CONN_IDLE_TIME=${{ env.DB_MAX_CONN_IDLE_TIME }}"
+          fi
+          if [ -n "${{ env.DB_CONNECT_TIMEOUT }}" ]; then
+            ENV_VARS="${ENV_VARS},DB_CONNECT_TIMEOUT=${{ env.DB_CONNECT_TIMEOUT }}"
+          fi
+          if [ -n "${{ env.RATE_LIMIT_RPS }}" ]; then
+            ENV_VARS="${ENV_VARS},RATE_LIMIT_RPS=${{ env.RATE_LIMIT_RPS }}"
+          fi
+          if [ -n "${{ env.RATE_LIMIT_BURST }}" ]; then
+            ENV_VARS="${ENV_VARS},RATE_LIMIT_BURST=${{ env.RATE_LIMIT_BURST }}"
+          fi
+          if [ -n "${{ env.MAX_SIGNAL_PAYLOAD_SIZE }}" ]; then
+            ENV_VARS="${ENV_VARS},MAX_SIGNAL_PAYLOAD_SIZE=${{ env.MAX_SIGNAL_PAYLOAD_SIZE }}"
+          fi
+          if [ -n "${{ env.READ_TIMEOUT }}" ]; then
+            ENV_VARS="${ENV_VARS},READ_TIMEOUT=${{ env.READ_TIMEOUT }}"
+          fi
+          if [ -n "${{ env.WRITE_TIMEOUT }}" ]; then
+            ENV_VARS="${ENV_VARS},WRITE_TIMEOUT=${{ env.WRITE_TIMEOUT }}"
+          fi
+          if [ -n "${{ env.IDLE_TIMEOUT }}" ]; then
+            ENV_VARS="${ENV_VARS},IDLE_TIMEOUT=${{ env.IDLE_TIMEOUT }}"
+          fi
 
           # Deploy to Cloud Run
           gcloud run deploy ${{ env.SERVICE_NAME }} \
