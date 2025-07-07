@@ -99,15 +99,6 @@ definitions:
           type: string
         type: array
     type: object
-  auth.ServiceAccountTokenRequest:
-    properties:
-      client_id:
-        example: sa_example-org_k7j2m9x1
-        type: string
-      client_secret:
-        example: dGhpcyBpcyBhIHNlY3JldA
-        type: string
-    type: object
   database.GetAccountsByIsnIDRow:
     properties:
       account_id:
@@ -551,6 +542,15 @@ definitions:
         example: 31536000
         type: integer
     type: object
+  handlers.ServiceAccountTokenRequest:
+    properties:
+      client_id:
+        example: sa_exampleorg_k7j2m9x1
+        type: string
+      client_secret:
+        example: dGhpcyBpcyBhIHNlY3JldA
+        type: string
+    type: object
   handlers.SignalTypeAndLinkedInfo:
     properties:
       created_at:
@@ -687,7 +687,7 @@ definitions:
     type: object
 info:
   contact: {}
-  description: |
+  description: |-
     Signals ISN service API for managing Information Sharing Networks
 
     ## Common Error Responses
@@ -727,6 +727,19 @@ info:
     Access tokens expire in 30 minutes
 
     Refresh tokens expire in 30 days (web users only)
+
+    ## Date/Time Handling:
+
+    **URL Parameters**: The following ISO 8601 formats are accepted in URL query parameters:
+    - 2006-01-02T15:04:05Z (UTC)
+    - 2006-01-02T15:04:05+07:00 (with offset)
+    - 2006-01-02T15:04:05.999999999Z (nano precision)
+    - 2006-01-02 (date only, treated as start of day UTC: 2006-01-02T00:00:00Z)
+
+    Note: If the timestamp contains a timezone offset (as in +07:00), the + must be percent-encoded as %2B in the query.
+
+    **Response Bodies**: All date/time fields in JSON responses use RFC3339 format (ISO 8601):
+    - Example: "2025-06-03T13:47:47.331787+01:00"
   license:
     name: MIT
   title: Signals ISN API
@@ -1193,18 +1206,17 @@ paths:
       description: |
         Self-service endpoint for service accounts to rotate their client secret.
         Requires current valid client_id and client_secret for authentication.
-        Old secret is immediately revoked, new secret is returned.
+        The old secret remains valid for 5 minutes to prevent race conditions when multiple instances are involved and to stop clients being locked out where network issues prevent them from receiving the new secret immediately.
 
         **Use Cases:**
-        - Regular credential rotation for security
-        - Suspected credential compromise
+        - Regular credential rotation for security compliance
+        - Suspected credential compromise requiring immediate rotation
       parameters:
-      - description: Service account credentials (required for client_credentials
-          grant)
+      - description: Service account credentials
         in: body
         name: request
         schema:
-          $ref: '#/definitions/auth.ServiceAccountTokenRequest'
+          $ref: '#/definitions/handlers.ServiceAccountTokenRequest'
       responses:
         "200":
           description: OK
@@ -1218,8 +1230,6 @@ paths:
           description: Internal server error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - ClientCredentials: []
       summary: Rotate service account client secret
       tags:
       - auth
@@ -1501,6 +1511,43 @@ paths:
       summary: Create signal type definition
       tags:
       - Signal definitions
+  /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search:
+    get:
+      description: |-
+        Search for signals by date or account in private ISNs (authentication required)
+
+        Note the endpoint returns the latest version of each signal and does not include withdrawn or archived signals
+      parameters:
+      - description: Start date for filtering
+        example: "2006-01-02T15:04:05Z"
+        in: query
+        name: start_date
+        type: string
+      - description: End date for filtering
+        in: query
+        name: end_date
+        type: string
+      - description: Account ID for filtering
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+        in: query
+        name: account_id
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.SignalVersionDoc'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Search for signals in private ISNs
+      tags:
+      - Signal sharing
   /api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}:
     delete:
       description: Only signal types that have never been referenced by signals can
@@ -1650,6 +1697,41 @@ paths:
       summary: Get an ISN configurationuration
       tags:
       - ISN details
+  /api/public/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search:
+    get:
+      description: |-
+        Search for signals by date or account in public ISNs (no authentication required)
+
+        Note the endpoint returns the latest version of each signal and does not include withdrawn or archived signals
+      parameters:
+      - description: Start date for filtering
+        example: "2006-01-02T15:04:05Z"
+        in: query
+        name: start_date
+        type: string
+      - description: End date for filtering
+        in: query
+        name: end_date
+        type: string
+      - description: Account ID for filtering
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+        in: query
+        name: account_id
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.SignalVersionDoc'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      summary: Search for signals in public ISNs
+      tags:
+      - Signal sharing
   /health/live:
     get:
       description: check if the signalsd service is up
@@ -1773,8 +1855,6 @@ paths:
         - 2006-01-02T15:04:05Z (UTC)
         - 2006-01-02T15:04:05+07:00 (with offset)
         - 2006-01-02T15:04:05.999999999Z (nano precision)
-
-        Note: If the timestamp contains a timezone offset (as in +07:00), the + must be percent-encoded as %2B in the query strings.
 
         Dates (YYYY-MM-DD) can also be used.
         These are treated as the start of day UTC (so 2006-01-02 is treated as 2006-01-02T00:00:00Z)
@@ -1928,55 +2008,6 @@ paths:
       summary: get a signal (TODO)
       tags:
       - Signal sharing
-  /isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search:
-    get:
-      description: |-
-        Search for signals by date or account
-
-        Accounts need read or write access to the ISN to use this endpoint
-
-        Accepted timestamps formats (ISO 8601):
-        - 2006-01-02T15:04:05Z (UTC)
-        - 2006-01-02T15:04:05+07:00 (with offset)
-        - 2006-01-02T15:04:05.999999999Z (nano precision)
-
-        Note: If the timestamp contains a timezone offset (as in +07:00), the + must be percent-encoded as %2B in the query strings.
-
-        Dates (YYYY-MM-DD) can also be used.
-        These are treated as the start of day UTC (so 2006-01-02 is treated as 2006-01-02T00:00:00Z)
-
-        Note the endpoint returns the latest version of each signal and does not include withdrawn or archived signals
-      parameters:
-      - description: Start date for filtering
-        example: "2006-01-02T15:04:05Z"
-        in: query
-        name: start_date
-        type: string
-      - description: End date for filtering
-        in: query
-        name: end_date
-        type: string
-      - description: Account ID for filtering
-        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
-        in: query
-        name: account_id
-        type: string
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/handlers.SignalVersionDoc'
-            type: array
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Search for signals
-      tags:
-      - Signal sharing
   /oauth/revoke:
     post:
       description: |
@@ -2068,7 +2099,7 @@ paths:
         in: body
         name: request
         schema:
-          $ref: '#/definitions/auth.ServiceAccountTokenRequest'
+          $ref: '#/definitions/handlers.ServiceAccountTokenRequest'
       responses:
         "200":
           description: OK

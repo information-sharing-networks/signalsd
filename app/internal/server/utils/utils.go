@@ -156,7 +156,6 @@ func ParseDateTime(dateString string) (time.Time, error) {
 	return time.Time{}, fmt.Errorf("unsupported date format: %s. Expected ISO 8601 with timezone (e.g., 2006-01-02T15:04:05+07:00) or YYYY-MM-DD (e.g., 2006-01-02)", dateString)
 }
 
-// Option 1: Prefix + Random (Recommended)
 func GenerateClientID(organization string) (string, error) {
 	organizationSlug, err := GenerateSlug(organization)
 	if err != nil {
@@ -169,5 +168,5 @@ func GenerateClientID(organization string) (string, error) {
 	}
 	randomSuffix := base32.StdEncoding.EncodeToString(randomBytes)[:8]
 
-	return fmt.Sprintf("sa_%s_%s", organizationSlug, strings.ToLower(randomSuffix)), nil
+	return fmt.Sprintf("sa_%s_%s", strings.ToLower(organizationSlug), strings.ToLower(randomSuffix)), nil
 }

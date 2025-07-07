@@ -217,6 +217,68 @@ func (q *Queries) GetIsns(ctx context.Context) ([]Isn, error) {
 	return items, nil
 }
 
+const GetPublicIsnSignalTypes = `-- name: GetPublicIsnSignalTypes :many
+SELECT
+    i.slug as isn_slug,
+    st.slug as signal_type_slug,
+    st.sem_ver
+FROM isn i
+JOIN signal_types st ON st.isn_id = i.id
+WHERE i.visibility = 'public'
+AND i.is_in_use = true
+AND st.is_in_use = true
+`
+
+type GetPublicIsnSignalTypesRow struct {
+	IsnSlug        string `json:"isn_slug"`
+	SignalTypeSlug string `json:"signal_type_slug"`
+	SemVer         string `json:"sem_ver"`
+}
+
+func (q *Queries) GetPublicIsnSignalTypes(ctx context.Context) ([]GetPublicIsnSignalTypesRow, error) {
+	rows, err := q.db.Query(ctx, GetPublicIsnSignalTypes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetPublicIsnSignalTypesRow
+	for rows.Next() {
+		var i GetPublicIsnSignalTypesRow
+		if err := rows.Scan(&i.IsnSlug, &i.SignalTypeSlug, &i.SemVer); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const GetPublicIsnSlugs = `-- name: GetPublicIsnSlugs :many
+SELECT slug FROM isn WHERE visibility = 'public' AND is_in_use = true
+`
+
+func (q *Queries) GetPublicIsnSlugs(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, GetPublicIsnSlugs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var slug string
+		if err := rows.Scan(&slug); err != nil {
+			return nil, err
+		}
+		items = append(items, slug)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const UpdateIsn = `-- name: UpdateIsn :execrows
 UPDATE isn SET (
     updated_at, 

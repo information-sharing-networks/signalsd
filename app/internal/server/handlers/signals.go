@@ -13,6 +13,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
+	"github.com/information-sharing-networks/signalsd/app/internal/server/isns"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/schemas"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/utils"
@@ -455,24 +456,12 @@ func (s *SignalsHandler) GetSignalHandler(w http.ResponseWriter, r *http.Request
 	responses.RespondWithError(w, r, http.StatusNotImplemented, apperrors.ErrCodeNotImplemented, "todo - iget signal not yet implemented")
 }
 
-// SearchSignalsHandler godocs
+// SearchPublicSignalsHandler godocs
 //
-//	@Summary		Search for signals
+//	@Summary		Search for signals in public ISNs
 //	@Tags			Signal sharing
 //
-//	@Description	Search for signals by date or account
-//	@Description
-//	@Description	Accounts need read or write access to the ISN to use this endpoint
-//	@Description
-//	@Description	Accepted timestamps formats (ISO 8601):
-//	@Description	- 2006-01-02T15:04:05Z (UTC)
-//	@Description	- 2006-01-02T15:04:05+07:00 (with offset)
-//	@Description	- 2006-01-02T15:04:05.999999999Z (nano precision)
-//	@Description
-//	@Description	Note: If the timestamp contains a timezone offset (as in +07:00), the + must be percent-encoded as %2B in the query strings.
-//	@Description
-//	@Description	Dates (YYYY-MM-DD) can also be used.
-//	@Description	These are treated as the start of day UTC (so 2006-01-02 is treated as 2006-01-02T00:00:00Z)
+//	@Description	Search for signals by date or account in public ISNs (no authentication required)
 //	@Description
 //	@Description	Note the endpoint returns the latest version of each signal and does not include withdrawn or archived signals
 //
@@ -483,11 +472,8 @@ func (s *SignalsHandler) GetSignalHandler(w http.ResponseWriter, r *http.Request
 //	@Success		200			{array}		handlers.SignalVersionDoc
 //	@Failure		400			{object}	responses.ErrorResponse
 //
-//	@Security		BearerAccessToken
-//
-//	@Router			/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search [get]
-func (s *SignalsHandler) SearchSignalsHandler(w http.ResponseWriter, r *http.Request) {
-
+//	@Router			/api/public/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search [get]
+func (s *SignalsHandler) SearchPublicSignalsHandler(w http.ResponseWriter, r *http.Request) {
 	// set up params
 	isnSlug := r.PathValue("isn_slug")
 	signalTypeSlug := r.PathValue("signal_type_slug")
@@ -527,16 +513,9 @@ func (s *SignalsHandler) SearchSignalsHandler(w http.ResponseWriter, r *http.Req
 		searchParams.EndDate = &endDate
 	}
 
-	// check that this the user is requesting a valid signal type/sem_ver for this isn
-	claims, ok := auth.ContextAccessTokenClaims(r.Context())
-	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
-		return
-	}
-
-	found := slices.Contains(claims.IsnPerms[isnSlug].SignalTypePaths, signalTypePath)
-	if !found {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("signal type %v is not available on ISN %v", signalTypePath, isnSlug))
+	// Validate this is a public ISN
+	if !isns.IsPublicSignalType(isnSlug, signalTypePath) {
+		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("invalid public ISN or signal type %v is not available on this ISN", signalTypePath))
 		return
 	}
 
@@ -568,6 +547,125 @@ func (s *SignalsHandler) SearchSignalsHandler(w http.ResponseWriter, r *http.Req
 
 	res := make([]SignalVersion, 0, len(rows))
 	for _, row := range rows {
+		// Always hide email addresses for public ISN responses for privacy
+		res = append(res, SignalVersion{
+			AccountID:          row.AccountID,
+			AccountType:        row.AccountType,
+			Email:              "", // hidden for public ISNs
+			LocalRef:           row.LocalRef,
+			VersionNumber:      row.VersionNumber,
+			CreatedAt:          row.CreatedAt,
+			SignalVersionID:    row.SignalVersionID,
+			SignalID:           row.SignalID,
+			CorrelatedLocalRef: row.CorrelatedLocalRef,
+			CorrelatedSignalID: row.CorrelatedSignalID,
+			Content:            row.Content,
+		})
+	}
+	responses.RespondWithJSON(w, http.StatusOK, res)
+}
+
+// SearchPrivateSignalsHandler godocs
+//
+//	@Summary		Search for signals in private ISNs
+//	@Tags			Signal sharing
+//
+//	@Description	Search for signals by date or account in private ISNs (authentication required)
+//	@Description
+//	@Description	Note the endpoint returns the latest version of each signal and does not include withdrawn or archived signals
+//
+//	@Param			start_date	query		string	false	"Start date for filtering"	example(2006-01-02T15:04:05Z)
+//	@Param			end_date	query		string	false	"End date for filtering"	example(2006-01-02T16:00:00Z
+//	@Param			account_id	query		string	false	"Account ID for filtering"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
+//
+//	@Success		200			{array}		handlers.SignalVersionDoc
+//	@Failure		400			{object}	responses.ErrorResponse
+//
+//	@Security		BearerAccessToken
+//
+//	@Router			/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search [get]
+func (s *SignalsHandler) SearchPrivateSignalsHandler(w http.ResponseWriter, r *http.Request) {
+	// set up params
+	isnSlug := r.PathValue("isn_slug")
+	signalTypeSlug := r.PathValue("signal_type_slug")
+	semVer := r.PathValue("sem_ver")
+	signalTypePath := fmt.Sprintf("%v/v%v", signalTypeSlug, semVer)
+
+	searchParams := SearchParams{
+		IsnSlug:        isnSlug,
+		SignalTypeSlug: signalTypeSlug,
+		SemVer:         semVer,
+	}
+
+	if accountIDString := r.URL.Query().Get("account_id"); accountIDString != "" {
+		accountID, err := uuid.Parse(accountIDString)
+		if err != nil {
+			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "account_id is not a valid UUID")
+			return
+		}
+		searchParams.AccountID = &accountID
+	}
+
+	if startDateString := r.URL.Query().Get("start_date"); startDateString != "" {
+		startDate, err := utils.ParseDateTime(startDateString)
+		if err != nil {
+			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
+			return
+		}
+		searchParams.StartDate = &startDate
+	}
+
+	if endDateString := r.URL.Query().Get("end_date"); endDateString != "" {
+		endDate, err := utils.ParseDateTime(endDateString)
+		if err != nil {
+			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
+			return
+		}
+		searchParams.EndDate = &endDate
+	}
+
+	// Validate authenticated access to private ISN
+	claims, hasAuth := auth.ContextAccessTokenClaims(r.Context())
+	if !hasAuth {
+		responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "authentication required for private ISN access")
+		return
+	}
+
+	// Check if user has access to this signal type
+	if !slices.Contains(claims.IsnPerms[isnSlug].SignalTypePaths, signalTypePath) {
+		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, fmt.Sprintf("access denied to signal type %v on ISN %v", signalTypePath, isnSlug))
+		return
+	}
+
+	hasPartialDateRange := (searchParams.StartDate != nil) != (searchParams.EndDate != nil)
+	hasDateRange := searchParams.StartDate != nil && searchParams.EndDate != nil
+	hasAccount := searchParams.AccountID != nil
+
+	if hasPartialDateRange {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "you must supply both start_date and end_date search parameters")
+		return
+	}
+	if !hasDateRange && !hasAccount {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "you must supply a search paramenter")
+		return
+	}
+
+	rows, err := s.queries.GetLatestSignalVersionsWithOptionalFilters(r.Context(), database.GetLatestSignalVersionsWithOptionalFiltersParams{
+		IsnSlug:        searchParams.IsnSlug,
+		SignalTypeSlug: searchParams.SignalTypeSlug,
+		SemVer:         searchParams.SemVer,
+		StartDate:      searchParams.StartDate,
+		EndDate:        searchParams.EndDate,
+		AccountID:      searchParams.AccountID,
+	})
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to select signals from database: %v", err))
+		return
+	}
+
+	res := make([]SignalVersion, 0, len(rows))
+	for _, row := range rows {
+		// Include full information including email addresses for authenticated users
 		res = append(res, SignalVersion{
 			AccountID:          row.AccountID,
 			AccountType:        row.AccountType,
