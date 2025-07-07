@@ -142,9 +142,8 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 	}
 
 	returnedRow, err := s.queries.CreateSignalBatch(r.Context(), database.CreateSignalBatchParams{
-		IsnID:       isn.ID,
-		AccountID:   account.ID,
-		AccountType: account.AccountType,
+		IsnID:     isn.ID,
+		AccountID: account.ID,
 	})
 	if err != nil {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not insert signal_batch: %v", err))

@@ -110,8 +110,18 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
 	}
-	if isn.UserAccountID != userAccountID {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you are not the owner of this ISN")
+	// check if user is either the ISN owner or a site owner
+	claims, ok := auth.ContextAccessTokenClaims(r.Context())
+	if !ok {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
+		return
+	}
+
+	isIsnOwner := isn.UserAccountID == userAccountID
+	isSiteOwner := claims.Role == "owner"
+
+	if !isIsnOwner && !isSiteOwner {
+		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you must be either the ISN owner or a site owner to create signal types")
 		return
 	}
 	// check the isn is in use
@@ -304,8 +314,18 @@ func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *ht
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
 	}
-	if isn.UserAccountID != userAccountID {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you are not the owner of this ISN")
+	// check if user is either the ISN owner or a site owner
+	claims, ok := auth.ContextAccessTokenClaims(r.Context())
+	if !ok {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
+		return
+	}
+
+	isIsnOwner := isn.UserAccountID == userAccountID
+	isSiteOwner := claims.Role == "owner"
+
+	if !isIsnOwner && !isSiteOwner {
+		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you must be either the ISN owner or a site owner to update signal types")
 		return
 	}
 	// check the isn is in use
@@ -452,6 +472,39 @@ func (s *SignalTypeHandler) DeleteSignalTypeHandler(w http.ResponseWriter, r *ht
 
 	slug := r.PathValue("slug")
 	semVer := r.PathValue("sem_ver")
+	isnSlug := r.PathValue("isn_slug")
+
+	userAccountID, ok := auth.ContextAccountID(r.Context())
+	if !ok {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
+		return
+	}
+
+	// check ISN exists and verify ownership
+	isn, err := s.queries.GetIsnBySlug(r.Context(), isnSlug)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
+			return
+		}
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		return
+	}
+
+	// check if user is either the ISN owner or a site owner
+	claims, ok := auth.ContextAccessTokenClaims(r.Context())
+	if !ok {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
+		return
+	}
+
+	isIsnOwner := isn.UserAccountID == userAccountID
+	isSiteOwner := claims.Role == "owner"
+
+	if !isIsnOwner && !isSiteOwner {
+		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you must be either the ISN owner or a site owner to delete signal types")
+		return
+	}
 
 	// check signal type exists
 	signalType, err := s.queries.GetSignalTypeBySlug(r.Context(), database.GetSignalTypeBySlugParams{
@@ -464,6 +517,12 @@ func (s *SignalTypeHandler) DeleteSignalTypeHandler(w http.ResponseWriter, r *ht
 			return
 		}
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error %v", err))
+		return
+	}
+
+	// verify signal type belongs to the ISN
+	if signalType.IsnID != isn.ID {
+		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("Signal type %s/v%s not found in ISN %s", slug, semVer, isnSlug))
 		return
 	}
 

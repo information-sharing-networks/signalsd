@@ -624,6 +624,12 @@ definitions:
         example: 1
         type: integer
     type: object
+  handlers.TransferIsnOwnershipRequest:
+    properties:
+      new_owner_account_id:
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+        type: string
+    type: object
   handlers.UpdateIsnRequest:
     properties:
       detail:
@@ -1283,8 +1289,8 @@ paths:
 
         visibility = "private" means that signalsd on the network can only be seen by network participants.
 
-        ISN admins automatically get write permission for their own sites, so this endpoint also starts a signals batch for them.
-        Owners automatically get write permission on all isns, so a batch is started for them also.
+        ISN admins automatically get write permission for their own ISNs.
+        Site owners automatically get write permission on all ISNs.
 
         This endpoint can only be used by the site owner or an admin
       parameters:
@@ -1671,6 +1677,45 @@ paths:
       summary: Update signal definition
       tags:
       - Signal definitions
+  /api/isn/{isn_slug}/transfer-ownership:
+    put:
+      description: |-
+        Transfer ownership of an ISN to another admin account.
+        This can be used when an admin leaves or when reorganizing responsibilities.
+        Only the site owner can transfer ISN ownership.
+      parameters:
+      - description: ISN slug
+        in: path
+        name: isn_slug
+        required: true
+        type: string
+      - description: Transfer details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.TransferIsnOwnershipRequest'
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      - RefreshTokenCookieAuth: []
+      summary: Transfer ISN ownership
+      tags:
+      - ISN configuration
   /api/isn/{slug}:
     get:
       description: Returns details about the ISN

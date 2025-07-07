@@ -748,7 +748,7 @@
                         "RefreshTokenCookieAuth": []
                     }
                 ],
-                "description": "Create an Information Sharing Network (ISN)\n\nvisibility = \"private\" means that signalsd on the network can only be seen by network participants.\n\nISN admins automatically get write permission for their own sites, so this endpoint also starts a signals batch for them.\nOwners automatically get write permission on all isns, so a batch is started for them also.\n\nThis endpoint can only be used by the site owner or an admin",
+                "description": "Create an Information Sharing Network (ISN)\n\nvisibility = \"private\" means that signalsd on the network can only be seen by network participants.\n\nISN admins automatically get write permission for their own ISNs.\nSite owners automatically get write permission on all ISNs.\n\nThis endpoint can only be used by the site owner or an admin",
                 "tags": [
                     "ISN configuration"
                 ],
@@ -1270,6 +1270,64 @@
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/isn/{isn_slug}/transfer-ownership": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    },
+                    {
+                        "RefreshTokenCookieAuth": []
+                    }
+                ],
+                "description": "Transfer ownership of an ISN to another admin account.\nThis can be used when an admin leaves or when reorganizing responsibilities.\nOnly the site owner can transfer ISN ownership.",
+                "tags": [
+                    "ISN configuration"
+                ],
+                "summary": "Transfer ISN ownership",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ISN slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Transfer details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.TransferIsnOwnershipRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -2698,6 +2756,15 @@
                 "version_number": {
                     "type": "integer",
                     "example": 1
+                }
+            }
+        },
+        "handlers.TransferIsnOwnershipRequest": {
+            "type": "object",
+            "properties": {
+                "new_owner_account_id": {
+                    "type": "string",
+                    "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3"
                 }
             }
         },

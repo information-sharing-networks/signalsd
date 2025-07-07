@@ -219,7 +219,7 @@ func (s *Server) registerAdminRoutes() {
 						// signal types managment
 						r.Post("/{isn_slug}/signal_types", signalTypes.CreateSignalTypeHandler)
 						r.Put("/{isn_slug}/signal_types/{slug}/v{sem_ver}", signalTypes.UpdateSignalTypeHandler)
-						r.Delete("/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}", signalTypes.DeleteSignalTypeHandler)
+						r.Delete("/{isn_slug}/signal_types/{slug}/v{sem_ver}", signalTypes.DeleteSignalTypeHandler)
 
 						// ISN account permissions
 						r.Put("/{isn_slug}/accounts/{account_id}", isnAccount.GrantIsnAccountHandler)
@@ -272,6 +272,9 @@ func (s *Server) registerAdminRoutes() {
 				// Admin role management
 				r.Put("/accounts/{account_id}/admin-role", users.GrantUserAdminRoleHandler)
 				r.Delete("/accounts/{account_id}/admin-role", users.RevokeUserAdminRoleHandler)
+
+				// ISN ownership transfer
+				r.Put("/isn/{isn_slug}/transfer-ownership", isn.TransferIsnOwnershipHandler)
 			})
 
 			r.Group(func(r chi.Router) {

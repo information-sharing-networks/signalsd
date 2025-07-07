@@ -15,11 +15,18 @@ RETURNING id, slug;
 
 -- name: UpdateIsn :execrows
 UPDATE isn SET (
-    updated_at, 
+    updated_at,
     detail,
     is_in_use,
     visibility
 ) = (Now(), $2, $3, $4)
+WHERE id = $1;
+
+-- name: UpdateIsnOwner :execrows
+UPDATE isn SET (
+    updated_at,
+    user_account_id
+) = (Now(), $2)
 WHERE id = $1;
 
 -- name: GetIsnByID :one
