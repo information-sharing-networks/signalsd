@@ -35,7 +35,7 @@ const CreateOrGetWebUserSignalBatch = `-- name: CreateOrGetWebUserSignalBatch :o
 WITH isn AS (
     SELECT id
     FROM isn
-    WHERE slug = $1
+    WHERE isn.slug = $1
 ),
 inserted AS (
     INSERT INTO signal_batches (
@@ -45,22 +45,24 @@ inserted AS (
         isn_id,
         account_id,
         is_latest
-    ) VALUES (
+    )
+    SELECT
         gen_random_uuid(),
         now(),
         now(),
         isn.id,
         $2, -- account_id
         TRUE
-    )
+    FROM isn
     ON CONFLICT (account_id, isn_id) WHERE is_latest = TRUE
     DO NOTHING
     RETURNING id
 )
 SELECT id as batch_id FROM inserted
 UNION ALL
-SELECT id as batch_id FROM signal_batches
-WHERE account_id = $2 AND isn_id = isn.id AND is_latest = TRUE
+SELECT sb.id as batch_id FROM signal_batches sb
+JOIN isn ON sb.isn_id = isn.id
+WHERE sb.account_id = $2 AND sb.is_latest = TRUE
   AND NOT EXISTS (SELECT 1 FROM inserted)
 `
 

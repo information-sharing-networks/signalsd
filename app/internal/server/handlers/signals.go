@@ -203,12 +203,6 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// check the account has an open batch for this isn
-	if claims.IsnPerms[isnSlug].SignalBatchID == nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, fmt.Sprintf("you must open a batch for ISN %v before sending signals", isnSlug))
-		return
-	}
-
 	// check that the user is requesting a valid signal type/sem_ver for this isn
 	found := slices.Contains(claims.IsnPerms[isnSlug].SignalTypePaths, signalTypePath)
 	if !found {
@@ -257,14 +251,14 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 	// Consequently, we need continue to check the database for the latest batch while the session is open.
 	// This is not ideal, but the alternative (ensuring user batches are always created in advance) is messy as it involves creating new user batches at multiple points in the code.
 
-	signalBatchID := *claims.IsnPerms[isnSlug].SignalBatchID
+	var signalBatchID uuid.UUID
 
 	if claims.IsnPerms[isnSlug].SignalBatchID == nil {
 		if claims.AccountType == "service_account" {
 			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "Service accounts must create a signal batch for this ISN before posting signals")
 			return
 		} else {
-			// Get existing batch or create new one atomically
+			// create a new batch for the user if this is first time writing to the isn (the query below returns the initial batch ID for all subsequent requests in this session)
 			signalBatchID, err = s.queries.CreateOrGetWebUserSignalBatch(r.Context(), database.CreateOrGetWebUserSignalBatchParams{
 				Slug:      isnSlug,
 				AccountID: accountID,
@@ -274,6 +268,8 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 				return
 			}
 		}
+	} else {
+		signalBatchID = *claims.IsnPerms[isnSlug].SignalBatchID
 	}
 
 	createSignalsResponse := CreateSignalsResponse{
@@ -371,7 +367,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 		// Signal creation succeeded, now try to create the signal_version entry
 		versionResult, versionErr := s.queries.WithTx(tx).CreateSignalVersion(r.Context(), database.CreateSignalVersionParams{
 			AccountID:      claims.AccountID,
-			SignalBatchID:  *claims.IsnPerms[isnSlug].SignalBatchID,
+			SignalBatchID:  signalBatchID,
 			Content:        signal.Content,
 			LocalRef:       signal.LocalRef,
 			SignalTypeSlug: signalTypeSlug,
