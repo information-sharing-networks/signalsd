@@ -234,6 +234,8 @@ WITH LatestSignals AS (
     WHERE i.slug = $1
         AND st.slug = $2
         AND st.sem_ver = $3
+        AND i.is_in_use = true
+        AND st.is_in_use = true
         AND s.account_id = $4
 )
 SELECT
@@ -354,6 +356,8 @@ WITH LatestSignals AS (
     WHERE i.slug = $1
         AND st.slug = $2
         AND st.sem_ver = $3
+        AND i.is_in_use = true
+        AND st.is_in_use = true
         AND sv.created_at BETWEEN $4 AND $5
 )
 SELECT
@@ -472,6 +476,8 @@ WITH LatestSignals AS (
     WHERE i.slug = $1
         AND st.slug = $2
         AND st.sem_ver = $3
+        AND i.is_in_use = true
+        AND st.is_in_use = true
         AND sv.created_at BETWEEN $4 AND $5
         AND a.id = $6
 )
@@ -593,6 +599,8 @@ WITH LatestSignals AS (
     WHERE i.slug = $1
         AND st.slug = $2
         AND st.sem_ver = $3
+        AND i.is_in_use = true
+        AND st.is_in_use = true
         AND ($4::uuid IS NULL OR a.id = $4::uuid)
         AND ($5::timestamptz IS NULL OR sv.created_at >= $5::timestamptz)
         AND ($6::timestamptz IS NULL OR sv.created_at <= $6::timestamptz)

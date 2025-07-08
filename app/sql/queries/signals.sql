@@ -153,6 +153,8 @@ WITH LatestSignals AS (
     WHERE i.slug = sqlc.arg(isn_slug)
         AND st.slug = sqlc.arg(signal_type_slug)
         AND st.sem_ver = sqlc.arg(sem_ver)
+        AND i.is_in_use = true
+        AND st.is_in_use = true
         AND s.account_id = sqlc.arg(account_id)
 )
 SELECT
@@ -210,6 +212,8 @@ WITH LatestSignals AS (
     WHERE i.slug = sqlc.arg(isn_slug)
         AND st.slug = sqlc.arg(signal_type_slug)
         AND st.sem_ver = sqlc.arg(sem_ver)
+        AND i.is_in_use = true
+        AND st.is_in_use = true
         AND sv.created_at BETWEEN sqlc.arg(start_date) AND sqlc.arg(end_date)
 )
 SELECT
@@ -267,6 +271,8 @@ WITH LatestSignals AS (
     WHERE i.slug = sqlc.arg(isn_slug)
         AND st.slug = sqlc.arg(signal_type_slug)
         AND st.sem_ver = sqlc.arg(sem_ver)
+        AND i.is_in_use = true
+        AND st.is_in_use = true
         AND sv.created_at BETWEEN sqlc.arg(start_date) AND sqlc.arg(end_date)
         AND a.id = sqlc.arg(account_id)
 )
@@ -326,6 +332,8 @@ WITH LatestSignals AS (
     WHERE i.slug = sqlc.arg(isn_slug)
         AND st.slug = sqlc.arg(signal_type_slug)
         AND st.sem_ver = sqlc.arg(sem_ver)
+        AND i.is_in_use = true
+        AND st.is_in_use = true
         AND (sqlc.narg('account_id')::uuid IS NULL OR a.id = sqlc.narg('account_id')::uuid)
         AND (sqlc.narg('start_date')::timestamptz IS NULL OR sv.created_at >= sqlc.narg('start_date')::timestamptz)
         AND (sqlc.narg('end_date')::timestamptz IS NULL OR sv.created_at <= sqlc.narg('end_date')::timestamptz)
