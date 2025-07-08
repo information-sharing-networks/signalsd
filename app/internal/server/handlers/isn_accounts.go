@@ -77,8 +77,18 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
 	}
-	if isn.UserAccountID != userAccountID {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you are not the owner of this ISN")
+	// check if user is either the ISN owner or a site owner
+	claims, ok := auth.ContextAccessTokenClaims(r.Context())
+	if !ok {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
+		return
+	}
+
+	isIsnOwner := isn.UserAccountID == userAccountID
+	isSiteOwner := claims.Role == "owner"
+
+	if !isIsnOwner && !isSiteOwner {
+		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you must be either the ISN owner or a site owner to grant permissions")
 		return
 	}
 
@@ -150,22 +160,6 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 		}
 	}
 
-	// create a new batch for users being added to the isn as writes
-	if targetAccount.AccountType == "user" && req.Permission == "write" {
-
-		// create new batch
-		returnedRow, err := i.queries.CreateSignalBatch(r.Context(), database.CreateSignalBatchParams{
-			IsnID:       isn.ID,
-			AccountID:   targetAccountID,
-			AccountType: "user",
-		})
-		if err != nil {
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not create a signals_batch record for user account %v when adding them to isn %v : %v", targetAccountID, isnSlug, err))
-			return
-		}
-		logger.Info().Msgf("new signal_batch %v created for account %v on isn %v", returnedRow.ID, targetAccountID, isnSlug)
-	}
-
 	if updateExisting {
 		_, err = i.queries.UpdateIsnAccount(r.Context(), database.UpdateIsnAccountParams{
 			IsnID:      isn.ID,
@@ -232,8 +226,18 @@ func (i *IsnAccountHandler) RevokeIsnAccountHandler(w http.ResponseWriter, r *ht
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
 	}
-	if isn.UserAccountID != userAccountID {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you are not the owner of this ISN")
+	// check if user is either the ISN owner or a site owner
+	claims, ok := auth.ContextAccessTokenClaims(r.Context())
+	if !ok {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
+		return
+	}
+
+	isIsnOwner := isn.UserAccountID == userAccountID
+	isSiteOwner := claims.Role == "owner"
+
+	if !isIsnOwner && !isSiteOwner {
+		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you must be either the ISN owner or a site owner to revoke permissions")
 		return
 	}
 

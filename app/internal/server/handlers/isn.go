@@ -15,6 +15,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/server/utils"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rs/zerolog"
 
 	signalsd "github.com/information-sharing-networks/signalsd/app"
 )
@@ -42,6 +43,10 @@ type UpdateIsnRequest struct {
 	Visibility *string `json:"visibility" example:"private" enums:"public,private"`
 }
 
+type TransferIsnOwnershipRequest struct {
+	NewAdminAccountID string `json:"new_owner_account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
+}
+
 type CreateIsnResponse struct {
 	ID          uuid.UUID `json:"id" example:"67890684-3b14-42cf-b785-df28ce570400"`
 	Slug        string    `json:"slug" example:"sample-isn--example-org"`
@@ -62,8 +67,8 @@ type IsnAndLinkedInfo struct {
 //	@Description
 //	@Description	visibility = "private" means that signalsd on the network can only be seen by network participants.
 //	@Description
-//	@Description	ISN admins automatically get write permission for their own sites, so this endpoint also starts a signals batch for them.
-//	@Description	Owners automatically get write permission on all isns, so a batch is started for them also.
+//	@Description	ISN admins automatically get write permission for their own ISNs.
+//	@Description	Site owners automatically get write permission on all ISNs.
 //	@Description
 //	@Description	This endpoint can only be used by the site owner or an admin
 //
@@ -89,12 +94,6 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 	userAccountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
-		return
-	}
-
-	claims, ok := auth.ContextAccessTokenClaims(r.Context())
-	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive claims from middleware")
 		return
 	}
 
@@ -164,28 +163,6 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not create ISN: %v", err))
 		return
 	}
-	// crete a signals batch for the user creating the admin
-	_, err = txQueries.CreateSignalBatch(r.Context(), database.CreateSignalBatchParams{
-		IsnID:       returnedIsn.ID,
-		AccountID:   userAccountID,
-		AccountType: "user", // only users can use the ISN configuration endpoints
-	})
-	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not insert signal_batch: %v", err))
-		return
-	}
-
-	// if the isn was created by someone other than owner then create a batch for the owner so they can post to the ISN (owners have unlimited access)
-	if claims.Role != "owner" {
-		_, err = txQueries.CreateOwnerSignalBatch(r.Context(), database.CreateOwnerSignalBatchParams{
-			IsnID:       returnedIsn.ID,
-			AccountType: "user", // only users can use the ISN configuration endpoints
-		})
-		if err != nil {
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not insert signal_batch: %v", err))
-			return
-		}
-	}
 
 	if err := tx.Commit(r.Context()); err != nil {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to commit transaction: %v", err))
@@ -249,8 +226,18 @@ func (i *IsnHandler) UpdateIsnHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if isn.UserAccountID != userAccountID {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you are not the owner of this ISN")
+	// check if user is either the ISN owner or a site owner
+	claims, ok := auth.ContextAccessTokenClaims(r.Context())
+	if !ok {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
+		return
+	}
+
+	isIsnOwner := isn.UserAccountID == userAccountID
+	isSiteOwner := claims.Role == "owner"
+
+	if !isIsnOwner && !isSiteOwner {
+		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you must be either the ISN owner or a site owner to update this ISN")
 		return
 	}
 
@@ -359,4 +346,109 @@ func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 		SignalTypes:               signalTypesRes,
 	}
 	responses.RespondWithJSON(w, http.StatusOK, res)
+}
+
+// TransferIsnOwnershipHandler godoc
+//
+//	@Summary		Transfer ISN ownership
+//	@Description	Transfer ownership of an ISN to another admin account.
+//	@Description	This can be used when an admin leaves or when reorganizing responsibilities.
+//	@Description	Only the site owner can transfer ISN ownership.
+//	@Tags			ISN configuration
+//
+//	@Param			isn_slug	path		string							true	"ISN slug"
+//	@Param			request		body		handlers.TransferIsnOwnershipRequest	true	"Transfer details"
+//
+//	@Success		200
+//	@Failure		400	{object}	responses.ErrorResponse
+//	@Failure		403	{object}	responses.ErrorResponse
+//	@Failure		404	{object}	responses.ErrorResponse
+//
+//	@Security		BearerAccessToken
+//	@Security		RefreshTokenCookieAuth
+//
+//	@Router			/api/isn/{isn_slug}/transfer-ownership [put]
+//
+// Use with RequireRole (owner)
+func (i *IsnHandler) TransferIsnOwnershipHandler(w http.ResponseWriter, r *http.Request) {
+	var req TransferIsnOwnershipRequest
+	logger := zerolog.Ctx(r.Context())
+
+	isnSlug := r.PathValue("isn_slug")
+
+	// check ISN exists
+	isn, err := i.queries.GetIsnBySlug(r.Context(), isnSlug)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
+			return
+		}
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		return
+	}
+
+	defer r.Body.Close()
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
+		return
+	}
+
+	// validate new account ID
+	newAdminAccountID, err := uuid.Parse(req.NewAdminAccountID)
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("invalid new_owner_account_id: %v", err))
+		return
+	}
+
+	// check if new owner account exists and is an admin
+	newAdminAccount, err := i.queries.GetAccountByID(r.Context(), newAdminAccountID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "new owner account not found")
+			return
+		}
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not get new owner account: %v", err))
+		return
+	}
+
+	// verify new owner is an admin or owner
+	if newAdminAccount.AccountType != "user" {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "new owner must be a user account")
+		return
+	}
+
+	if newAdminAccount.AccountRole != "admin" && newAdminAccount.AccountRole != "owner" {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "new owner must be an admin or owner")
+		return
+	}
+
+	// check if account is active
+	if !newAdminAccount.IsActive {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "new owner account is not active")
+		return
+	}
+
+	// prevent transferring to the same account
+	if isn.UserAccountID == newAdminAccountID {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "ISN is already owned by this account")
+		return
+	}
+
+	// update ISN ownership
+	rowsAffected, err := i.queries.UpdateIsnOwner(r.Context(), database.UpdateIsnOwnerParams{
+		ID:            isn.ID,
+		UserAccountID: newAdminAccountID,
+	})
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to update ISN ownership: %v", err))
+		return
+	}
+
+	if rowsAffected == 0 {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "no rows updated during ownership transfer")
+		return
+	}
+
+	logger.Info().Msgf("ISN %v ownership transferred from %v to %v ", isn.Slug, isn.UserAccountID, newAdminAccountID)
+	responses.RespondWithStatusCodeOnly(w, http.StatusOK)
 }

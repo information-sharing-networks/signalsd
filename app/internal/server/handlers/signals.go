@@ -249,11 +249,38 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 		}
 	}
 
+	// Ensure signal batch exists
+	//
+	// Service accounts should are expected to explicitly start batches.
+	// The code below will automatically create batches for web users, assuming the don't already have one.
+	// Note: when a new batch is created for a web user, the batch ID contained in the claims will not be updated until the next access token is issued.
+	// Consequently, we need continue to check the database for the latest batch while the session is open.
+	// This is not ideal, but the alternative (ensuring user batches are always created in advance) is messy as it involves creating new user batches at multiple points in the code.
+
+	signalBatchID := *claims.IsnPerms[isnSlug].SignalBatchID
+
+	if claims.IsnPerms[isnSlug].SignalBatchID == nil {
+		if claims.AccountType == "service_account" {
+			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "Service accounts must create a signal batch for this ISN before posting signals")
+			return
+		} else {
+			// Get existing batch or create new one atomically
+			signalBatchID, err = s.queries.CreateOrGetWebUserSignalBatch(r.Context(), database.CreateOrGetWebUserSignalBatchParams{
+				Slug:      isnSlug,
+				AccountID: accountID,
+			})
+			if err != nil {
+				responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to get or create signal batch: %v", err))
+				return
+			}
+		}
+	}
+
 	createSignalsResponse := CreateSignalsResponse{
 		IsnSlug:        isnSlug,
 		SignalTypePath: signalTypePath,
 		AccountID:      accountID,
-		SignalsBatchID: *claims.IsnPerms[isnSlug].SignalBatchID,
+		SignalsBatchID: signalBatchID,
 		Results: CreateSignalsResults{
 			StoredSignals: make([]StoredSignal, 0),
 			FailedSignals: make([]FailedSignal, 0),

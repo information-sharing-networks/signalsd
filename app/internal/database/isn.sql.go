@@ -281,7 +281,7 @@ func (q *Queries) GetPublicIsnSlugs(ctx context.Context) ([]string, error) {
 
 const UpdateIsn = `-- name: UpdateIsn :execrows
 UPDATE isn SET (
-    updated_at, 
+    updated_at,
     detail,
     is_in_use,
     visibility
@@ -303,6 +303,27 @@ func (q *Queries) UpdateIsn(ctx context.Context, arg UpdateIsnParams) (int64, er
 		arg.IsInUse,
 		arg.Visibility,
 	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const UpdateIsnOwner = `-- name: UpdateIsnOwner :execrows
+UPDATE isn SET (
+    updated_at,
+    user_account_id
+) = (Now(), $2)
+WHERE id = $1
+`
+
+type UpdateIsnOwnerParams struct {
+	ID            uuid.UUID `json:"id"`
+	UserAccountID uuid.UUID `json:"user_account_id"`
+}
+
+func (q *Queries) UpdateIsnOwner(ctx context.Context, arg UpdateIsnOwnerParams) (int64, error) {
+	result, err := q.db.Exec(ctx, UpdateIsnOwner, arg.ID, arg.UserAccountID)
 	if err != nil {
 		return 0, err
 	}

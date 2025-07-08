@@ -89,13 +89,12 @@ type Signal struct {
 }
 
 type SignalBatch struct {
-	ID          uuid.UUID `json:"id"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	IsnID       uuid.UUID `json:"isn_id"`
-	AccountID   uuid.UUID `json:"account_id"`
-	IsLatest    bool      `json:"is_latest"`
-	AccountType string    `json:"account_type"`
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	IsnID     uuid.UUID `json:"isn_id"`
+	AccountID uuid.UUID `json:"account_id"`
+	IsLatest  bool      `json:"is_latest"`
 }
 
 type SignalProcessingFailure struct {

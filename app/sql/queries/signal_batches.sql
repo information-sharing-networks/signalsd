@@ -5,39 +5,49 @@ INSERT INTO signal_batches (
     updated_at,
     isn_id,
     account_id,
-    is_latest,
-    account_type
+    is_latest
 ) VALUES (
     gen_random_uuid(), 
     now(), 
     now(), 
     $1, 
     $2, 
-    TRUE,
-    $3
+    TRUE
 )
 RETURNING *;
 
--- create a batch for the owner on a new ISN created by an admin
--- name: CreateOwnerSignalBatch :one
-INSERT INTO signal_batches (
-    id,
-    created_at,
-    updated_at,
-    isn_id,
-    account_id,
-    is_latest,
-    account_type
-) VALUES (
-    gen_random_uuid(), 
-    now(), 
-    now(), 
-    $1, 
-    (select account_id from users where user_role = 'owner'),
-    TRUE,
-    $2
+-- name: CreateOrGetWebUserSignalBatch :one
+WITH isn AS (
+    SELECT id
+    FROM isn
+    WHERE slug = $1
+),
+inserted AS (
+    INSERT INTO signal_batches (
+        id,
+        created_at,
+        updated_at,
+        isn_id,
+        account_id,
+        is_latest
+    ) VALUES (
+        gen_random_uuid(),
+        now(),
+        now(),
+        isn.id,
+        $2, -- account_id
+        TRUE
+    )
+    ON CONFLICT (account_id, isn_id) WHERE is_latest = TRUE
+    DO NOTHING
+    RETURNING id
 )
-RETURNING *;
+SELECT id as batch_id FROM inserted
+UNION ALL
+SELECT id as batch_id FROM signal_batches
+WHERE account_id = $2 AND isn_id = isn.id AND is_latest = TRUE
+  AND NOT EXISTS (SELECT 1 FROM inserted);
+
 
 -- name: CloseISNSignalBatchByAccountID :execrows
 UPDATE signal_batches 
