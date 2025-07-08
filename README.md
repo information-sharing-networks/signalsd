@@ -289,7 +289,7 @@ Run `sqlc generate` from the root of the project to regenerate the type safe Go 
 
 
 ## Signals
-![signals](https://github.com/user-attachments/assets/607ad390-660e-4f26-bdfa-096c25821b94)
+![signals](https://github.com/user-attachments/assets/49efaa13-d25a-4ce6-8829-990bd8038716)
 
 ## Rate Limits
 The service includes a shared rate limiter for all traffic regardless of source IP or user identity and protects all endpoints including auth, API, and admin routes.
@@ -467,3 +467,6 @@ IDLE_TIMEOUT=120s
 Note that at the time of writing this service operates within the free-tiers offered by Google and Neon.Tech, but you should check the current rules to be sure.
 
 That's it!
+
+
+
