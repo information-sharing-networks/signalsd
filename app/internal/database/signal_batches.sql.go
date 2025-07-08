@@ -32,7 +32,7 @@ func (q *Queries) CloseISNSignalBatchByAccountID(ctx context.Context, arg CloseI
 }
 
 const CreateOrGetWebUserSignalBatch = `-- name: CreateOrGetWebUserSignalBatch :one
-WITH isn AS (
+WITH isn_record AS (
     SELECT id
     FROM isn
     WHERE isn.slug = $1
@@ -50,10 +50,10 @@ inserted AS (
         gen_random_uuid(),
         now(),
         now(),
-        isn.id,
+        isn_record.id,
         $2, -- account_id
         TRUE
-    FROM isn
+    FROM isn_record
     ON CONFLICT (account_id, isn_id) WHERE is_latest = TRUE
     DO NOTHING
     RETURNING id
