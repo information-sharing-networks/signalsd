@@ -320,30 +320,6 @@ func (q *Queries) GetInUseSignalTypesByIsnID(ctx context.Context, isnID uuid.UUI
 	return items, nil
 }
 
-const GetSchemaURLs = `-- name: GetSchemaURLs :many
-SELECT DISTINCT schema_url FROM signal_types
-`
-
-func (q *Queries) GetSchemaURLs(ctx context.Context) ([]string, error) {
-	rows, err := q.db.Query(ctx, GetSchemaURLs)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []string
-	for rows.Next() {
-		var schema_url string
-		if err := rows.Scan(&schema_url); err != nil {
-			return nil, err
-		}
-		items = append(items, schema_url)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const GetSemVerAndSchemaForLatestSlugVersion = `-- name: GetSemVerAndSchemaForLatestSlugVersion :one
 SELECT '0.0.0' AS sem_ver,
        '' AS schema_url
@@ -372,33 +348,6 @@ func (q *Queries) GetSemVerAndSchemaForLatestSlugVersion(ctx context.Context, sl
 	row := q.db.QueryRow(ctx, GetSemVerAndSchemaForLatestSlugVersion, slug)
 	var i GetSemVerAndSchemaForLatestSlugVersionRow
 	err := row.Scan(&i.SemVer, &i.SchemaURL)
-	return i, err
-}
-
-const GetSignalTypeByID = `-- name: GetSignalTypeByID :one
-
-SELECT st.id, st.created_at, st.updated_at, st.isn_id, st.slug, st.schema_url, st.readme_url, st.title, st.detail, st.sem_ver, st.is_in_use, st.schema_content
-FROM signal_types st
-WHERE st.id = $1
-`
-
-func (q *Queries) GetSignalTypeByID(ctx context.Context, id uuid.UUID) (SignalType, error) {
-	row := q.db.QueryRow(ctx, GetSignalTypeByID, id)
-	var i SignalType
-	err := row.Scan(
-		&i.ID,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.IsnID,
-		&i.Slug,
-		&i.SchemaURL,
-		&i.ReadmeURL,
-		&i.Title,
-		&i.Detail,
-		&i.SemVer,
-		&i.IsInUse,
-		&i.SchemaContent,
-	)
 	return i, err
 }
 

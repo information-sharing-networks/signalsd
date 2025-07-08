@@ -18,7 +18,6 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/server/schemas"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/utils"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog"
 )
@@ -90,12 +89,17 @@ type CreateSignalsSummary struct {
 
 // structs used by the search endpoint
 type SearchParams struct {
-	IsnSlug        string
-	SignalTypeSlug string
-	SemVer         string
-	AccountID      *uuid.UUID
-	StartDate      *time.Time
-	EndDate        *time.Time
+	IsnSlug          string
+	SignalTypeSlug   string
+	SemVer           string
+	AccountID        *uuid.UUID
+	StartDate        *time.Time
+	EndDate          *time.Time
+	IncludeWithdrawn bool
+}
+
+type WithdrawSignalRequest struct {
+	LocalRef *string `json:"local_ref,omitempty" example:"item_id_#1"`
 }
 
 type SignalVersion struct {
@@ -109,6 +113,7 @@ type SignalVersion struct {
 	SignalID           uuid.UUID       `json:"signal_id"`
 	CorrelatedLocalRef string          `json:"correlated_local_ref"`
 	CorrelatedSignalID uuid.UUID       `json:"correlated_signal_id"`
+	IsWithdrawn        bool            `json:"is_withdrawn"`
 	Content            json.RawMessage `json:"content"`
 }
 type SignalVersionDoc struct {
@@ -122,12 +127,13 @@ type SignalVersionDoc struct {
 	SignalID           uuid.UUID      `json:"signal_id" example:"4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19"`
 	CorrelatedLocalRef string         `json:"correlated_local_ref" example:"item_id_#2"`
 	CorrelatedSignalID uuid.UUID      `json:"correlated_signal_id" example:"17c50d26-1da6-4ac0-897f-3a2f85f07cd3"`
+	IsWithdrawn        bool           `json:"is_withdrawn" example:"false"`
 	Content            map[string]any `json:"content"`
 }
 
 // SignalsHandler godocs
 //
-//	@Summary		Send signals
+//	@Summary		Create signals
 //	@Tags			Signal sharing
 //
 //	@Description	Submit an array of signals for storage on the ISN
@@ -157,7 +163,7 @@ type SignalVersionDoc struct {
 //	@Description	**Response Status Codes**
 //	@Description	- 200: All signals processed successfully
 //	@Description	- 207: Partial success (some signals succeeded, some failed)
-//	@Description	- 400 / error_code = 'all_signals_failed_processing': All signals failed processing but request format was valid
+//	@Description	- 422: All signals failed processing (the request was valid but all signals failed processing, e.g because they did not validate against the schema)
 //	@Description	- 400 / error_code = 'malformed_body': Invalid request format, authentication, or other request-level errors
 //	@Description	- 400: authentication, or other request-level errors
 //	@Description	- 500: Internal server errors
@@ -171,7 +177,7 @@ type SignalVersionDoc struct {
 //
 //	@Success		200					{object}	handlers.CreateSignalsResponse		"All signals processed successfully"
 //	@Success		207					{object}	handlers.CreateSignalsResponse		"Partial success - some signals succeeded, some failed"
-//	@Success		400					{object}	handlers.CreateSignalsResponse		"All signals failed processing but request was valid"
+//	@Success		422					{object}	handlers.CreateSignalsResponse		"All signals failed processing - returns detailed error information"
 //	@Failure		400					{object}	responses.ErrorResponse				"Invalid request format or authentication failure"
 //	@Failure		500					{object}	responses.ErrorResponse				"Internal server error"
 //
@@ -244,12 +250,12 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 	}
 
 	// Ensure signal batch exists
-	//
-	// Service accounts should are expected to explicitly start batches.
 	// The code below will automatically create batches for web users, assuming the don't already have one.
-	// Note: when a new batch is created for a web user, the batch ID contained in the claims will not be updated until the next access token is issued.
-	// Consequently, we need continue to check the database for the latest batch while the session is open.
+	// Note: when a new batch is created for a web user, the batch ID contained in the claims will not be updated until the next access token is issued -
+	// consequently, we need continue to check the database for the latest batch while the session is open.
 	// This is not ideal, but the alternative (ensuring user batches are always created in advance) is messy as it involves creating new user batches at multiple points in the code.
+	//
+	// Service accounts are expected to explicitly start batches.
 
 	var signalBatchID uuid.UUID
 
@@ -327,6 +333,31 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 				SemVer:         semVer,
 			})
 		} else {
+			// Validate that correlation_id references a valid signal in the same ISN
+			// note there is no longer a db constraint to protect against errors here (the signals table is now partitioned by author and this prevents the use of a foreign key since signals can be correlated to signals from any account)
+			isValid, err := s.queries.WithTx(tx).ValidateCorrelationID(r.Context(), database.ValidateCorrelationIDParams{
+				CorrelationID: *signal.CorrelationId,
+				IsnSlug:       isnSlug,
+			})
+
+			if err != nil {
+				createSignalsResponse.Results.FailedSignals = append(createSignalsResponse.Results.FailedSignals, FailedSignal{
+					LocalRef:     signal.LocalRef,
+					ErrorCode:    string(apperrors.ErrCodeInternalError),
+					ErrorMessage: "Failed to validate correlation_id",
+				})
+				continue
+			}
+
+			if !isValid {
+				createSignalsResponse.Results.FailedSignals = append(createSignalsResponse.Results.FailedSignals, FailedSignal{
+					LocalRef:     signal.LocalRef,
+					ErrorCode:    string(apperrors.ErrCodeMalformedBody),
+					ErrorMessage: fmt.Sprintf("invalid correlation_id %v - signal does not exist in this ISN", signal.CorrelationId),
+				})
+				continue
+			}
+
 			_, signalErr = s.queries.WithTx(tx).CreateOrUpdateSignalWithCorrelationID(r.Context(), database.CreateOrUpdateSignalWithCorrelationIDParams{
 				AccountID:      claims.AccountID,
 				LocalRef:       signal.LocalRef,
@@ -342,16 +373,6 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 				// Log the error but don't try to respond since the request may have already timed out
 				logger := zerolog.Ctx(r.Context())
 				logger.Error().Err(err).Msg("failed to rollback transaction")
-			}
-
-			// Handle correlation ID errors
-			var pgErr *pgconn.PgError
-			if errors.As(signalErr, &pgErr) && pgErr.Code == "23503" && pgErr.ConstraintName == "fk_correlation_id" {
-				createSignalsResponse.Results.FailedSignals = append(createSignalsResponse.Results.FailedSignals, FailedSignal{
-					LocalRef:     signal.LocalRef,
-					ErrorCode:    string(apperrors.ErrCodeMalformedBody),
-					ErrorMessage: fmt.Sprintf("invalid correlation_id %v", signal.CorrelationId),
-				})
 				continue
 			}
 
@@ -431,52 +452,19 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	if createSignalsResponse.Summary.StoredCount == 0 {
+	var httpStatus int
+	switch {
+	case createSignalsResponse.Summary.StoredCount == 0:
 		// All signals failed
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeAllSignalsFailedProcessing, "all signals failed processing")
-		return
-	}
-
-	// Determine appropriate status code based on results
-	var statusCode int
-	if createSignalsResponse.Summary.FailedCount > 0 {
+		httpStatus = http.StatusUnprocessableEntity
+	case createSignalsResponse.Summary.FailedCount > 0:
 		// Partial success
-		statusCode = http.StatusMultiStatus
-	} else {
-		// all signals processed successfully
-		statusCode = http.StatusOK
+		httpStatus = http.StatusMultiStatus
+	default:
+		// All signals processed successfully
+		httpStatus = http.StatusOK
 	}
-
-	responses.RespondWithJSON(w, statusCode, createSignalsResponse)
-}
-
-// DeleteSignalsHandler godocs
-//
-//	@Summary	Withdraw a signal (TODO)
-//	@Tags		Signal sharing
-//
-//	@Failure	501	{object}	responses.ErrorResponse	"Not implemented"
-//
-//	@Router		/isn/{isn_slug}/signal_types/{signal_type_slug}/{signal_id} [delete]
-func (s *SignalsHandler) DeleteSignalHandler(w http.ResponseWriter, r *http.Request) {
-	// mark as withdrawn
-	responses.RespondWithError(w, r, http.StatusNotImplemented, apperrors.ErrCodeNotImplemented, "todo - delete signal not yet implemented")
-}
-
-// GetSignalHandler godocs
-//
-//	@Summary	get a signal (TODO)
-//	@Tags		Signal sharing
-//
-//	@Failure	501	{object}	responses.ErrorResponse	"Not implemented"
-//
-//	@Router		/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/{signal_id} [get]
-func (s *SignalsHandler) GetSignalHandler(w http.ResponseWriter, r *http.Request) {
-	// todo option to
-	// option to search by local ref
-	// reutrn history of versions
-	// return withdrawn
-	responses.RespondWithError(w, r, http.StatusNotImplemented, apperrors.ErrCodeNotImplemented, "todo - iget signal not yet implemented")
+	responses.RespondWithJSON(w, httpStatus, createSignalsResponse)
 }
 
 // SearchPublicSignalsHandler godocs
@@ -504,9 +492,10 @@ func (s *SignalsHandler) SearchPublicSignalsHandler(w http.ResponseWriter, r *ht
 	signalTypePath := fmt.Sprintf("%v/v%v", signalTypeSlug, semVer)
 
 	searchParams := SearchParams{
-		IsnSlug:        isnSlug,
-		SignalTypeSlug: signalTypeSlug,
-		SemVer:         semVer,
+		IsnSlug:          isnSlug,
+		SignalTypeSlug:   signalTypeSlug,
+		SemVer:           semVer,
+		IncludeWithdrawn: false, // Default to false for public endpoints
 	}
 
 	if accountIDString := r.URL.Query().Get("account_id"); accountIDString != "" {
@@ -556,12 +545,13 @@ func (s *SignalsHandler) SearchPublicSignalsHandler(w http.ResponseWriter, r *ht
 	}
 
 	rows, err := s.queries.GetLatestSignalVersionsWithOptionalFilters(r.Context(), database.GetLatestSignalVersionsWithOptionalFiltersParams{
-		IsnSlug:        searchParams.IsnSlug,
-		SignalTypeSlug: searchParams.SignalTypeSlug,
-		SemVer:         searchParams.SemVer,
-		StartDate:      searchParams.StartDate,
-		EndDate:        searchParams.EndDate,
-		AccountID:      searchParams.AccountID,
+		IsnSlug:          searchParams.IsnSlug,
+		SignalTypeSlug:   searchParams.SignalTypeSlug,
+		SemVer:           searchParams.SemVer,
+		StartDate:        searchParams.StartDate,
+		EndDate:          searchParams.EndDate,
+		AccountID:        searchParams.AccountID,
+		IncludeWithdrawn: &searchParams.IncludeWithdrawn,
 	})
 	if err != nil {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to select signals from database: %v", err))
@@ -582,6 +572,7 @@ func (s *SignalsHandler) SearchPublicSignalsHandler(w http.ResponseWriter, r *ht
 			SignalID:           row.SignalID,
 			CorrelatedLocalRef: row.CorrelatedLocalRef,
 			CorrelatedSignalID: row.CorrelatedSignalID,
+			IsWithdrawn:        row.IsWithdrawn,
 			Content:            row.Content,
 		})
 	}
@@ -597,9 +588,10 @@ func (s *SignalsHandler) SearchPublicSignalsHandler(w http.ResponseWriter, r *ht
 //	@Description
 //	@Description	Note the endpoint returns the latest version of each signal and does not include withdrawn or archived signals
 //
-//	@Param			start_date	query		string	false	"Start date for filtering"	example(2006-01-02T15:04:05Z)
-//	@Param			end_date	query		string	false	"End date for filtering"	example(2006-01-02T16:00:00Z
-//	@Param			account_id	query		string	false	"Account ID for filtering"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
+//	@Param			start_date			query		string	false	"Start date for filtering"	example(2006-01-02T15:04:05Z)
+//	@Param			end_date			query		string	false	"End date for filtering"	example(2006-01-02T16:00:00Z
+//	@Param			account_id			query		string	false	"Account ID for filtering"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
+//	@Param			include_withdrawn	query		string	false	"Include withdrawn signals (default: false)"	example(false)
 //
 //	@Success		200			{array}		handlers.SignalVersionDoc
 //	@Failure		400			{object}	responses.ErrorResponse
@@ -615,9 +607,10 @@ func (s *SignalsHandler) SearchPrivateSignalsHandler(w http.ResponseWriter, r *h
 	signalTypePath := fmt.Sprintf("%v/v%v", signalTypeSlug, semVer)
 
 	searchParams := SearchParams{
-		IsnSlug:        isnSlug,
-		SignalTypeSlug: signalTypeSlug,
-		SemVer:         semVer,
+		IsnSlug:          isnSlug,
+		SignalTypeSlug:   signalTypeSlug,
+		SemVer:           semVer,
+		IncludeWithdrawn: false, // Default to false
 	}
 
 	if accountIDString := r.URL.Query().Get("account_id"); accountIDString != "" {
@@ -647,6 +640,11 @@ func (s *SignalsHandler) SearchPrivateSignalsHandler(w http.ResponseWriter, r *h
 		searchParams.EndDate = &endDate
 	}
 
+	if includeWithdrawnString := r.URL.Query().Get("include_withdrawn"); includeWithdrawnString != "" {
+		includeWithdrawn := includeWithdrawnString == "true"
+		searchParams.IncludeWithdrawn = includeWithdrawn
+	}
+
 	// Validate authenticated access to private ISN
 	claims, hasAuth := auth.ContextAccessTokenClaims(r.Context())
 	if !hasAuth {
@@ -674,12 +672,13 @@ func (s *SignalsHandler) SearchPrivateSignalsHandler(w http.ResponseWriter, r *h
 	}
 
 	rows, err := s.queries.GetLatestSignalVersionsWithOptionalFilters(r.Context(), database.GetLatestSignalVersionsWithOptionalFiltersParams{
-		IsnSlug:        searchParams.IsnSlug,
-		SignalTypeSlug: searchParams.SignalTypeSlug,
-		SemVer:         searchParams.SemVer,
-		StartDate:      searchParams.StartDate,
-		EndDate:        searchParams.EndDate,
-		AccountID:      searchParams.AccountID,
+		IsnSlug:          searchParams.IsnSlug,
+		SignalTypeSlug:   searchParams.SignalTypeSlug,
+		SemVer:           searchParams.SemVer,
+		StartDate:        searchParams.StartDate,
+		EndDate:          searchParams.EndDate,
+		AccountID:        searchParams.AccountID,
+		IncludeWithdrawn: &searchParams.IncludeWithdrawn,
 	})
 	if err != nil {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to select signals from database: %v", err))
@@ -700,8 +699,118 @@ func (s *SignalsHandler) SearchPrivateSignalsHandler(w http.ResponseWriter, r *h
 			SignalID:           row.SignalID,
 			CorrelatedLocalRef: row.CorrelatedLocalRef,
 			CorrelatedSignalID: row.CorrelatedSignalID,
+			IsWithdrawn:        row.IsWithdrawn,
 			Content:            row.Content,
 		})
 	}
 	responses.RespondWithJSON(w, http.StatusOK, res)
+}
+
+// WithdrawSignalHandler godoc
+//
+//	@Summary		Withdraw a signal
+//	@Description	Withdraw a signal by signal ID or local reference
+//	@Description
+//	@Description	Signals can only be withdrawn by the account that created the signal.
+//	@Description	Withdrawn signals are hidden from search results by default but remain in the database.
+//	@Description	To reactivate a signal resupply it with the same local_ref.
+//
+//	@Tags			Signal sharing
+//
+//	@Param			isn_slug			path	string						true	"ISN slug"				example(sample-isn--example-org)
+//	@Param			signal_type_slug	path	string						true	"Signal type slug"		example(signal-type-1)
+//	@Param			sem_ver				path	string						true	"Signal type version"	example(0.0.1)
+//	@Param			request				body	handlers.WithdrawSignalRequest	true	"Withdrawal request"
+//
+//	@Success		204
+//	@Failure		400	{object}	responses.ErrorResponse
+//	@Failure		401	{object}	responses.ErrorResponse
+//	@Failure		403	{object}	responses.ErrorResponse
+//	@Failure		404	{object}	responses.ErrorResponse
+//
+//	@Security		BearerAccessToken
+//
+//	@Router			/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/withdraw [put]
+func (s *SignalsHandler) WithdrawSignalHandler(w http.ResponseWriter, r *http.Request) {
+	isnSlug := r.PathValue("isn_slug")
+	signalTypeSlug := r.PathValue("signal_type_slug")
+	semVer := r.PathValue("sem_ver")
+	signalTypePath := fmt.Sprintf("%v/v%v", signalTypeSlug, semVer)
+
+	claims, ok := auth.ContextAccessTokenClaims(r.Context())
+	if !ok {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
+		return
+	}
+
+	accountID, ok := auth.ContextAccountID(r.Context())
+	if !ok {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get accountID from context")
+		return
+	}
+
+	// check that the user is requesting a valid signal type/sem_ver for this isn
+	found := slices.Contains(claims.IsnPerms[isnSlug].SignalTypePaths, signalTypePath)
+	if !found {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("signal type %v is not available on ISN %v", signalTypePath, isnSlug))
+		return
+	}
+
+	// Parse request body
+	var req WithdrawSignalRequest
+	defer r.Body.Close()
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
+		return
+	}
+
+	if req.LocalRef == nil {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must supply a local_ref")
+		return
+	}
+
+	// Get the signal
+	signal, err := s.queries.GetSignalByAccountAndLocalRef(r.Context(), database.GetSignalByAccountAndLocalRefParams{
+		AccountID: accountID,
+		Slug:      signalTypeSlug,
+		SemVer:    semVer,
+		LocalRef:  *req.LocalRef,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "signal not found")
+			return
+		}
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		return
+	}
+
+	// Check if signal is already withdrawn
+	if signal.IsWithdrawn {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeResourceAlreadyExists, "signal is already withdrawn")
+		return
+	}
+
+	// Withdraw the signal
+	rowsAffected, err := s.queries.WithdrawSignalByLocalRef(r.Context(), database.WithdrawSignalByLocalRefParams{
+		AccountID: accountID,
+		Slug:      signalTypeSlug,
+		SemVer:    semVer,
+		LocalRef:  *req.LocalRef,
+	})
+
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to withdraw signal: %v", err))
+		return
+	}
+
+	if rowsAffected == 0 {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "attempt to withdraw signal failed - no rows updated")
+		return
+	}
+
+	logger := zerolog.Ctx(r.Context())
+	logger.Info().Msgf("Signal %v (local ref: %v) withdrawn by %v", signal.ID, signal.LocalRef, accountID)
+
+	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
 }

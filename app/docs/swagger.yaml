@@ -599,6 +599,9 @@ definitions:
       email:
         example: user@example.com
         type: string
+      is_withdrawn:
+        example: false
+        type: boolean
       local_ref:
         example: item_id_#1
         type: string
@@ -667,6 +670,12 @@ definitions:
       readme_url:
         description: 'README file URL: must be a GitHub URL ending in .md'
         example: https://github.com/user/project/blob/2025.01.01/readme.md
+        type: string
+    type: object
+  handlers.WithdrawSignalRequest:
+    properties:
+      local_ref:
+        example: item_id_#1
         type: string
     type: object
   responses.ErrorResponse:
@@ -1538,6 +1547,11 @@ paths:
         in: query
         name: account_id
         type: string
+      - description: 'Include withdrawn signals (default: false)'
+        example: "false"
+        in: query
+        name: include_withdrawn
+        type: string
       responses:
         "200":
           description: OK
@@ -1552,6 +1566,63 @@ paths:
       security:
       - BearerAccessToken: []
       summary: Search for signals in private ISNs
+      tags:
+      - Signal sharing
+  /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/withdraw:
+    put:
+      description: |-
+        Withdraw a signal by signal ID or local reference
+
+        Signals can only be withdrawn by the account that created the signal.
+        Withdrawn signals are hidden from search results by default but remain in the database.
+        To reactivate a signal resupply it with the same local_ref.
+      parameters:
+      - description: ISN slug
+        example: sample-isn--example-org
+        in: path
+        name: isn_slug
+        required: true
+        type: string
+      - description: Signal type slug
+        example: signal-type-1
+        in: path
+        name: signal_type_slug
+        required: true
+        type: string
+      - description: Signal type version
+        example: 0.0.1
+        in: path
+        name: sem_ver
+        required: true
+        type: string
+      - description: Withdrawal request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.WithdrawSignalRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Withdraw a signal
       tags:
       - Signal sharing
   /api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}:
@@ -1950,16 +2021,6 @@ paths:
       summary: Search for batches
       tags:
       - Signal sharing
-  /isn/{isn_slug}/signal_types/{signal_type_slug}/{signal_id}:
-    delete:
-      responses:
-        "501":
-          description: Not implemented
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      summary: Withdraw a signal (TODO)
-      tags:
-      - Signal sharing
   /isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals:
     post:
       description: |-
@@ -1990,7 +2051,7 @@ paths:
         **Response Status Codes**
         - 200: All signals processed successfully
         - 207: Partial success (some signals succeeded, some failed)
-        - 400 / error_code = 'all_signals_failed_processing': All signals failed processing but request format was valid
+        - 422: All signals failed processing (returns CreateSignalsResponse with detailed error information)
         - 400 / error_code = 'malformed_body': Invalid request format, authentication, or other request-level errors
         - 400: authentication, or other request-level errors
         - 500: Internal server errors
@@ -2034,23 +2095,17 @@ paths:
           description: Invalid request format or authentication failure
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
+        "422":
+          description: All signals failed processing - returns detailed error information
+          schema:
+            $ref: '#/definitions/handlers.CreateSignalsResponse'
         "500":
           description: Internal server error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Send signals
-      tags:
-      - Signal sharing
-  /isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}:
-    get:
-      responses:
-        "501":
-          description: Not implemented
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      summary: get a signal (TODO)
+      summary: Create signals
       tags:
       - Signal sharing
   /oauth/revoke:
