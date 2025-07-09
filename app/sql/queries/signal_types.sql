@@ -25,11 +25,7 @@ WHERE id = $1;
 SELECT st.*
 FROM signal_types st;
 
--- name: GetSignalTypeByID :one
 
-SELECT st.*
-FROM signal_types st
-WHERE st.id = $1;
 
 -- name: GetSignalTypeBySlug :one
 
@@ -117,8 +113,7 @@ SELECT EXISTS
    WHERE slug = $1
    AND schema_url = $2) AS EXISTS;
 
--- name: GetSchemaURLs :many
-SELECT DISTINCT schema_url FROM signal_types;
+
 
 -- name: CheckSignalTypeInUse :one
 SELECT EXISTS(

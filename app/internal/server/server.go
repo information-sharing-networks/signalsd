@@ -314,6 +314,9 @@ func (s *Server) registerSignalRoutes() {
 				// signals post
 				r.Post("/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals", signals.CreateSignalsHandler)
 
+				// signal withdrawal
+				r.Put("/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/withdraw", signals.WithdrawSignalHandler)
+
 				// webhooks - todo
 				r.Post("/api/webhooks", webhooks.HandlerWebhooks)
 			})
