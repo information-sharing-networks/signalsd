@@ -740,23 +740,40 @@ info:
 
     ## Authentication & Authorization
 
-    ### Authentication Flow
-    - **Web users**: Login → get JWT + refresh cookie → use JWT for API calls
-    - **Service accounts**: Authenticate with Client credentials → get JWT → use JWT for API calls → re-authenticate when expired
+    ### OAuth
+    This API serves as an OAuth 2.0 Authorization Server for multiple client applications. The server supports web users and service accounts.
 
-    ### Authorization
-    All protected API endpoints expect valid JWT access tokens containing user identity and permissions.
+    ### Authentication Flows
+    - **Web users**: Direct authentication via /auth/login → receive JWT access token + HTTP-only refresh cookie → use bearer tokens for API calls
+    - **Service accounts**: Clients implement OAuth Client Credentials flow → receive JWT access token → use bearer tokens for API calls
 
-    tokens should be supplied using:
-    **Authorization header**: `Bearer <token>`
+    ### Token Usage
+    All protected API endpoints require valid JWT access tokens in the Authorization header:
+    ```
+    Authorization: Bearer <jwt-access-token>
+    ```
 
-    **Token refresh:**
-    - **Web users**: Refresh tokens (HTTP-only cookies) automatically renew access tokens
-    - **Service accounts**: Must re-authenticate with client credentials when tokens expire
+    **Token Refresh (Web Users):**
+    - Client calls `/oauth/token?grant_type=refresh_token` with both bearer token AND HTTP-only cookie
+    - API validates both credentials and issues new access token + rotated refresh cookie
+    - Client receives new bearer token for subsequent API calls
 
-    Access tokens expire in 30 minutes
+    **Token Refresh (Service Accounts):**
+    - Client calls `/oauth/token?grant_type=client_credentials` with client ID/secret
+    - API validates credentials and issues new access token
+    - Client receives new bearer token for subsequent API calls
 
-    Refresh tokens expire in 30 days (web users only)
+    **Token Lifetimes:**
+    - Access tokens: 30 minutes
+    - Refresh tokens: 30 days (web users only)
+
+    ### CSRF Protection
+    The /oauth API endpoints use a http-only cookie to exchange refresh tokens but also require a bearer token, preventing CSRF attacks.
+
+    ### CORS Protection
+    By default the server will start with ALLOWED_ORIGINS=*
+
+    This should not be used in production - you must to specify the list of client origins that are allowed to access the API in the ALLOWED_ORIGINS environment variable before starting the server.
 
     ## Date/Time Handling:
 
@@ -840,7 +857,6 @@ paths:
       description: |-
         **Use Cases:**
         - **Security Incident**: Compromised account needs immediate lockout
-        - **Policy Violation**: Account violated terms and needs suspension
         - **Employee Departure**: Remove access for departed staff
 
         **Actions Performed:**
@@ -1112,13 +1128,14 @@ paths:
     post:
       description: |-
         The response body includes an access token which can be used to access the protected enpoints, assuming the account has the appropriate permissions.
-        The access_token is valid for 30 mins.
+        The access_token is valid for 30 minutes.
 
-        As part of the login response, the server sets a http-only cookie on the client that will allow it to use the /auth/refresh endpoint to renew the access_token
+        As part of the login response, the server sets a http-only cookie on the client that will allow it to use the /oauth/token with grant_type=refresh_token to renew the access_token.
         The refresh_token lasts 30 days unless it is revoked earlier.
+        - To renew the refresh_token, log in again.
+        - To revoke the refresh_token, call the /oauth/revoke endpoint.
 
-        The account's role and permissions are encoded and encloded as part of the jwt access token and also provided in the response body
-        To renew the refresh_token, log in again.
+        The account's role and permissions are encoded as part of the jwt access token and this information is also provided in the response body.
       parameters:
       - description: email and password
         in: body
@@ -1149,7 +1166,7 @@ paths:
   /api/auth/password/reset:
     put:
       description: |
-        Use this api when a user wants to reset their password.  Requires a valid access token and the current password
+        Self-service endpoint for users to reset their password.  Requires a valid access token and the current password
       parameters:
       - description: user details
         in: body
@@ -1176,9 +1193,13 @@ paths:
   /api/auth/register:
     post:
       description: |-
-        The first user to be created for this service will be created with an admin role.
-        Subsequent accounts default to standard member roles.
+        The first user created is granted the "owner" role and has super-user access to the site.
+
+        Web users can register directly and default to standard member roles.
         New members can't access any information beyond the public data on the site until an admin grants them access to an ISN.
+
+        The site owner can grant other users the admin role.
+        Admins can create ISNs and service accounts and grant other accounts permissions to read or write to ISNs they created.
       parameters:
       - description: user details
         in: body
@@ -1239,7 +1260,7 @@ paths:
     post:
       description: |
         Self-service endpoint for service accounts to rotate their client secret.
-        Requires current valid client_id and client_secret for authentication.
+        This endpoint requires current valid client_id and client_secret for authentication.
         The old secret remains valid for 5 minutes to prevent race conditions when multiple instances are involved and to stop clients being locked out where network issues prevent them from receiving the new secret immediately.
 
         **Use Cases:**
@@ -1501,7 +1522,7 @@ paths:
         Authentication is based on the supplied access token:
         the site owner, the isn admin and members with an isn_perm=write can create a batch for the ISN.
 
-        Note this endpoint is not needed for web users (a batch is automatically created when they are granted write permission to an isn and is only closed if their permission to write to the ISN is revoked)
+        Note this endpoint is not needed for web users (a batch is automatically created when they first write to an isn and is only closed if their permission to write to the ISN is revoked)
       responses:
         "201":
           description: Created
@@ -1560,7 +1581,7 @@ paths:
         - Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)
         - Subsequent POSTs to this endpoint that reference a previously submitted title/slug but point to a different schema will increment the version based on the supplied bump_type
 
-        Signal type definitions are referred to with a URL like this: http://{hostname}/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}
+        Signal type definitions are referred to like this: /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver} (e.g., /api/isn/sample-isn--example-org/signal_types/sample-signal--example-org/v0.0.1)
       parameters:
       - description: signal type details
         in: body
@@ -1735,7 +1756,7 @@ paths:
   /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search:
     get:
       description: |-
-        Search for signals by date or account in private ISNs (authentication required)
+        Search for signals by date or account in private ISNs (authentication required - only accounts with read or write permissions to the ISN can access signals)
 
         Note the endpoint returns the latest version of each signal and does not include withdrawn or archived signals
       parameters:
@@ -1777,11 +1798,11 @@ paths:
   /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/withdraw:
     put:
       description: |-
-        Withdraw a signal by signal ID or local reference
+        Withdraw a signal by local reference
 
-        Signals can only be withdrawn by the account that created the signal.
         Withdrawn signals are hidden from search results by default but remain in the database.
-        To reactivate a signal resupply it with the same local_ref.
+        Signals can only be withdrawn by the account that created the signal.
+        To reactivate a signal resupply it with the same local_ref using the 'create signals' end point.
       parameters:
       - description: ISN slug
         example: sample-isn--example-org
@@ -1970,7 +1991,7 @@ paths:
       description: |+
         Returns the status of a batch, including the number of signals loaded and the number of failures for each signal type
 
-        The endpoint returns the full batch status (including per-signal-type breakdown) for the batch
+        The endpoint returns the full batch status for the batch
 
         Where a signal has failed to load as part of the batch and not subsequently been loaded, the failure is considered unresolved and listed as a failure in the batch status
 
@@ -2011,10 +2032,10 @@ paths:
       - Signal sharing
   /isn/{isn_slug}/batches/search:
     get:
-      description: |-
+      description: |
         Search for batches with optional filtering parameters
 
-        The search endpoint returns the full batch status (including per-signal-type breakdown) for each batch.
+        The search endpoint returns the full batch status for each batch.
 
         Where a signal has failed to load as part of the batch and not subsequently been loaded, the failure is considered unresolved and listed as a failure in the batch status
 
@@ -2023,16 +2044,8 @@ paths:
         At least one search criteria must be provided:
         - latest=true (get the latest batch)
         - previous=true (get the previous batch)
-        - created date range (both created_after and created_before)
-        - closed date range (both closed_after and closed_before)
-
-        Accepted timestamp formats (ISO 8601):
-        - 2006-01-02T15:04:05Z (UTC)
-        - 2006-01-02T15:04:05+07:00 (with offset)
-        - 2006-01-02T15:04:05.999999999Z (nano precision)
-
-        Dates (YYYY-MM-DD) can also be used.
-        These are treated as the start of day UTC (so 2006-01-02 is treated as 2006-01-02T00:00:00Z)
+        - created date range
+        - closed date range
       parameters:
       - description: Get the latest batch
         example: true
@@ -2084,10 +2097,10 @@ paths:
     post:
       description: |-
         Submit an array of signals for storage on the ISN
-        - payloads must not mix signals of different types and is subject to the size limits defined on the site.
+        - payloads must not mix signals of different types and are subject to the size limits defined on the site.
         - The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.
-        - If a local reference is received more than once from an account for a specified signal_type it will be stored with a incremented version number.
-        - Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account.
+        - If a local reference is received more than once from an account for the specified signal_type it will be stored with a incremented version number.
+        - Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.
         - requests are only accepted for the open signal batch for this account/ISN.
 
         **Authentication**
@@ -2095,11 +2108,9 @@ paths:
         Requires a valid access token.
         The claims in the access token list the ISNs and signal_types that the account is permitted to use.
 
-        This handler also checks that the signal_type/sem_ver in the url is also listed in the claims (this is to catch mistyped urls)
-
         **Validation and Processing**
 
-        Signals are validated against the json schema specified for the signal type unless validation is disabled on the type definition.
+        Signals are validated against the JSON schema specified for the signal type unless validation is disabled on the type definition.
         Individual signal processing failures (validation errors, incorrect correlation ids, database errors) are recorded in the response but do not prevent other signals from being processed.
 
         When validation is disabled, basic checks are still done on the incoming data and the following issues create a 400 error and cause the entire payload to be rejected:
@@ -2115,7 +2126,7 @@ paths:
         - 400: authentication, or other request-level errors
         - 500: Internal server errors
 
-        Internal server errors cause the whole payload to be rejected.
+        400 and 500 errors cause the whole payload to be rejected (note these failures are not logged on the database and should be handled by the client immediately).
       parameters:
       - description: isn slug
         example: sample-isn--example-org
@@ -2178,10 +2189,10 @@ paths:
 
         **Service Accounts:**
         You must supply your `client ID` and `client secret` in the request body.
-        This revokes **ALL** client secrets for the service account, effectively disabling it.
+        This revokes all client secrets for the service account, effectively disabling it.
 
         **IMPORTANT - Service Account Reinstatement:**
-        - This endpoint does **NOT** permanently disable the service account itself
+        - This endpoint does not permanently disable the service account itself (use `POST /admin/accounts/{account_id}/disable` for that)
         - To restore access, an admin must call `POST /api/auth/register/service-accounts` with the same organization and email
         - This will generate a new setup URL and client secret while preserving the same client_id
         - If the account was disabled by an admin, it must first be re-enabled via `POST /admin/accounts/{account_id}/enable`
@@ -2309,8 +2320,7 @@ securityDefinitions:
     type: apiKey
 swagger: "2.0"
 tags:
-- description: Authentication and authorization endpoints. Web users get JWT + refresh
-    tokens, service accounts use client credentials to get JWT access tokens.
+- description: Authentication and authorization endpoints.
   name: auth
 - description: Site adminstration tools
   name: Site admin

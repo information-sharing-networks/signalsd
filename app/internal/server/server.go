@@ -116,8 +116,10 @@ func (s *Server) Run() {
 // setupMiddleware sets up the middleware that applies to all server requests
 // note that the payload size limit is set on a per-route basis (see registerRoutes)
 func (s *Server) setupMiddleware() {
+	s.router.Use(chimiddleware.Recoverer)
 	s.router.Use(chimiddleware.RequestID)
 	s.router.Use(logger.RequestLogging(s.httpLogger))
+	s.router.Use(chimiddleware.StripSlashes)
 	s.router.Use(SecurityHeaders(s.serverConfig.Environment))
 	s.router.Use(RateLimit(s.serverConfig.RateLimitRPS, s.serverConfig.RateLimitBurst))
 }
@@ -299,7 +301,7 @@ func (s *Server) registerSignalRoutes() {
 	webhooks := handlers.NewWebhookHandler(s.queries)
 	signals := handlers.NewSignalsHandler(s.queries, s.pool)
 
-	// Register write routes - these are always protected endpoints
+	// Register write routes
 	if s.serverConfig.ServiceMode == "all" || s.serverConfig.ServiceMode == "signals" || s.serverConfig.ServiceMode == "signals-write" {
 		s.router.Group(func(r chi.Router) {
 			r.Use(CORS(s.corsConfigs.Protected))

@@ -47,24 +47,41 @@ import (
 //	@description
 //	@description	## Authentication & Authorization
 //	@description
-//	@description	### Authentication Flow
-//	@description	- **Web users**: Login → get JWT + refresh cookie → use JWT for API calls
-//	@description	- **Service accounts**: Authenticate with Client credentials → get JWT → use JWT for API calls → re-authenticate when expired
+//	@description	### OAuth
+//	@description	This API serves as an OAuth 2.0 Authorization Server for multiple client applications. The server supports web users and service accounts.
 //	@description
-//	@description	### Authorization
-//	@description	All protected API endpoints expect valid JWT access tokens containing user identity and permissions.
+//	@description	### Authentication Flows
+//	@description	- **Web users**: Direct authentication via /auth/login → receive JWT access token + HTTP-only refresh cookie → use bearer tokens for API calls
+//	@description	- **Service accounts**: Clients implement OAuth Client Credentials flow → receive JWT access token → use bearer tokens for API calls
 //	@description
-//	@description	tokens should be supplied using:
-//	@description	**Authorization header**: `Bearer <token>`
+//	@description	### Token Usage
+//	@description	All protected API endpoints require valid JWT access tokens in the Authorization header:
+//	@description	```
+//	@description	Authorization: Bearer <jwt-access-token>
+//	@description	```
 //	@description
-//	@description	**Token refresh:**
-//	@description	- **Web users**: Refresh tokens (HTTP-only cookies) automatically renew access tokens
-//	@description	- **Service accounts**: Must re-authenticate with client credentials when tokens expire
+//	@description	**Token Refresh (Web Users):**
+//	@description	- Client calls `/oauth/token?grant_type=refresh_token` with both bearer token AND HTTP-only cookie
+//	@description	- API validates both credentials and issues new access token + rotated refresh cookie
+//	@description	- Client receives new bearer token for subsequent API calls
 //	@description
-//	@description	Access tokens expire in 30 minutes
+//	@description	**Token Refresh (Service Accounts):**
+//	@description	- Client calls `/oauth/token?grant_type=client_credentials` with client ID/secret
+//	@description	- API validates credentials and issues new access token
+//	@description	- Client receives new bearer token for subsequent API calls
 //	@description
-//	@description	Refresh tokens expire in 30 days (web users only)
-//  @description
+//	@description	**Token Lifetimes:**
+//	@description	- Access tokens: 30 minutes
+//	@description	- Refresh tokens: 30 days (web users only)
+//	@description
+//	@description	### CSRF Protection
+//	@description	The /oauth API endpoints use a http-only cookie to exchange refresh tokens but also require a bearer token, preventing CSRF attacks.
+//	@description
+//	@description	### CORS Protection
+//	@description 	By default the server will start with ALLOWED_ORIGINS=*
+//	@description
+//	@description	This should not be used in production - you must to specify the list of client origins that are allowed to access the API in the ALLOWED_ORIGINS environment variable before starting the server.
+//	@description
 //	@description	## Date/Time Handling:
 //	@description
 //	@description	**URL Parameters**: The following ISO 8601 formats are accepted in URL query parameters:
@@ -93,7 +110,7 @@ import (
 //	@description				Bearer {JWT access token}
 
 //	@tag.name			auth
-//	@tag.description	Authentication and authorization endpoints. Web users get JWT + refresh tokens, service accounts use client credentials to get JWT access tokens.
+//	@tag.description	Authentication and authorization endpoints.
 
 //	@tag.name			Site admin
 //	@tag.description	Site adminstration tools

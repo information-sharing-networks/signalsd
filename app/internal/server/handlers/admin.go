@@ -130,7 +130,6 @@ func (a *AdminHandler) VersionHandler(w http.ResponseWriter, r *http.Request) {
 //	@Description
 //	@Description	**Use Cases:**
 //	@Description	- **Security Incident**: Compromised account needs immediate lockout
-//	@Description	- **Policy Violation**: Account violated terms and needs suspension
 //	@Description	- **Employee Departure**: Remove access for departed staff
 //	@Description
 //	@Description	**Actions Performed:**

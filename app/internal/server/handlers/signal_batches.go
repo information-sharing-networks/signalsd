@@ -86,7 +86,7 @@ type BatchSearchParams struct {
 //	@Description	Authentication is based on the supplied access token:
 //	@Description	the site owner, the isn admin and members with an isn_perm=write can create a batch for the ISN.
 //	@Description
-//	@Description	Note this endpoint is not needed for web users (a batch is automatically created when they are granted write permission to an isn and is only closed if their permission to write to the ISN is revoked)
+//	@Description	Note this endpoint is not needed for web users (a batch is automatically created when they first write to an isn and is only closed if their permission to write to the ISN is revoked)
 //	@Description
 //	@Tags		Signal sharing
 //
@@ -170,7 +170,7 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 //	@Summary		Get batch processing status
 //	@Description	Returns the status of a batch, including the number of signals loaded and the number of failures for each signal type
 //	@Description
-//	@Description	The endpoint returns the full batch status (including per-signal-type breakdown) for the batch
+//	@Description	The endpoint returns the full batch status for the batch
 //	@Description
 //	@Description	Where a signal has failed to load as part of the batch and not subsequently been loaded, the failure is considered unresolved and listed as a failure in the batch status
 //	@Description
@@ -333,7 +333,7 @@ func (s *SignalsBatchHandler) getBatchStatusDetails(ctx context.Context, batchID
 //
 //	@Description	Search for batches with optional filtering parameters
 //	@Description
-//	@Description	The search endpoint returns the full batch status (including per-signal-type breakdown) for each batch.
+//	@Description	The search endpoint returns the full batch status for each batch.
 //	@Description
 //	@Description	Where a signal has failed to load as part of the batch and not subsequently been loaded, the failure is considered unresolved and listed as a failure in the batch status
 //	@Description
@@ -342,16 +342,9 @@ func (s *SignalsBatchHandler) getBatchStatusDetails(ctx context.Context, batchID
 //	@Description	At least one search criteria must be provided:
 //	@Description	- latest=true (get the latest batch)
 //	@Description	- previous=true (get the previous batch)
-//	@Description	- created date range (both created_after and created_before)
-//	@Description	- closed date range (both closed_after and closed_before)
+//	@Description	- created date range
+//	@Description	- closed date range
 //	@Description
-//	@Description	Accepted timestamp formats (ISO 8601):
-//	@Description	- 2006-01-02T15:04:05Z (UTC)
-//	@Description	- 2006-01-02T15:04:05+07:00 (with offset)
-//	@Description	- 2006-01-02T15:04:05.999999999Z (nano precision)
-//	@Description
-//	@Description	Dates (YYYY-MM-DD) can also be used.
-//	@Description	These are treated as the start of day UTC (so 2006-01-02 is treated as 2006-01-02T00:00:00Z)
 //
 //	@Param			latest			query		boolean	false	"Get the latest batch"						example(true)
 //	@Param			previous		query		boolean	false	"Get the previous batch"					example(true)

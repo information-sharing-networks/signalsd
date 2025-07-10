@@ -316,11 +316,11 @@ func (a AuthService) NewRefreshTokenCookie(environment string, refreshToken stri
 	newCookie := &http.Cookie{
 		Name:     signalsd.RefreshTokenCookieName,
 		Value:    refreshToken,
-		Path:     "/auth",
+		Path:     "/oauth",
 		Expires:  time.Now().Add(signalsd.RefreshTokenExpiry),
 		HttpOnly: true,
 		Secure:   isProd,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: http.SameSiteNoneMode, // needed for cross-origin requests from multiple clients
 	}
 
 	return newCookie
