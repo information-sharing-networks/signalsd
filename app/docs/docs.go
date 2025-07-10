@@ -1049,7 +1049,7 @@ const docTemplate = `{
                         "type": "string",
                         "example": "sample-signal--example-org",
                         "description": "signal type slug",
-                        "name": "slug",
+                        "name": "signal_type_slug",
                         "in": "path",
                         "required": true
                     },
@@ -1144,8 +1144,8 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "example": "sample-signal--example-org",
-                        "description": "signal definiton slug",
-                        "name": "slug",
+                        "description": "signal type slug",
+                        "name": "signal_type_slug",
                         "in": "path",
                         "required": true
                     },
@@ -1208,8 +1208,8 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "example": "sample-signal--example-org",
-                        "description": "signal definiton slug",
-                        "name": "slug",
+                        "description": "signal type slug",
+                        "name": "signal_type_slug",
                         "in": "path",
                         "required": true
                     },
@@ -1285,7 +1285,7 @@ const docTemplate = `{
                         "type": "string",
                         "example": "sample-signal--example-org",
                         "description": "signal type slug",
-                        "name": "slug",
+                        "name": "signal_type_slug",
                         "in": "path",
                         "required": true
                     },

@@ -1525,7 +1525,7 @@ paths:
       - description: signal type slug
         example: sample-signal--example-org
         in: path
-        name: slug
+        name: signal_type_slug
         required: true
         type: string
       - description: version to be deleted
@@ -1604,7 +1604,7 @@ paths:
       - description: signal type slug
         example: sample-signal--example-org
         in: path
-        name: slug
+        name: signal_type_slug
         required: true
         type: string
       - description: version to be deleted
@@ -1646,10 +1646,10 @@ paths:
         name: isn_slug
         required: true
         type: string
-      - description: signal definiton slug
+      - description: signal type slug
         example: sample-signal--example-org
         in: path
-        name: slug
+        name: signal_type_slug
         required: true
         type: string
       - description: version to be recieved
@@ -1690,10 +1690,10 @@ paths:
         name: isn_slug
         required: true
         type: string
-      - description: signal definiton slug
+      - description: signal type slug
         example: sample-signal--example-org
         in: path
-        name: slug
+        name: signal_type_slug
         required: true
         type: string
       - description: Sem ver
