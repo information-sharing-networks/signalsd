@@ -7,7 +7,6 @@ package database
 
 import (
 	"context"
-	"time"
 
 	"github.com/google/uuid"
 )
@@ -69,47 +68,6 @@ func (q *Queries) ExistsIsnWithSlug(ctx context.Context, slug string) (bool, err
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
-}
-
-const GetForDisplayIsnBySlug = `-- name: GetForDisplayIsnBySlug :one
-SELECT 
-    id,
-    created_at,
-    updated_at,
-    title,
-    slug,
-    detail,
-    is_in_use,
-    visibility
-FROM isn 
-WHERE slug = $1
-`
-
-type GetForDisplayIsnBySlugRow struct {
-	ID         uuid.UUID `json:"id"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
-	Title      string    `json:"title"`
-	Slug       string    `json:"slug"`
-	Detail     string    `json:"detail"`
-	IsInUse    bool      `json:"is_in_use"`
-	Visibility string    `json:"visibility"`
-}
-
-func (q *Queries) GetForDisplayIsnBySlug(ctx context.Context, slug string) (GetForDisplayIsnBySlugRow, error) {
-	row := q.db.QueryRow(ctx, GetForDisplayIsnBySlug, slug)
-	var i GetForDisplayIsnBySlugRow
-	err := row.Scan(
-		&i.ID,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.Title,
-		&i.Slug,
-		&i.Detail,
-		&i.IsInUse,
-		&i.Visibility,
-	)
-	return i, err
 }
 
 const GetIsnByID = `-- name: GetIsnByID :one

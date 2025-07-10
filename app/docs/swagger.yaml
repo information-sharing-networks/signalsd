@@ -99,152 +99,6 @@ definitions:
           type: string
         type: array
     type: object
-  database.GetAccountsByIsnIDRow:
-    properties:
-      account_id:
-        type: string
-      account_role:
-        type: string
-      account_type:
-        type: string
-      client_id:
-        type: string
-      client_organization:
-        type: string
-      created_at:
-        type: string
-      email:
-        type: string
-      id:
-        type: string
-      is_active:
-        type: boolean
-      isn_id:
-        type: string
-      permission:
-        type: string
-      updated_at:
-        type: string
-    type: object
-  database.GetForDisplaySignalTypeByIsnIDRow:
-    properties:
-      created_at:
-        type: string
-      detail:
-        type: string
-      id:
-        type: string
-      is_in_use:
-        type: boolean
-      readme_url:
-        type: string
-      schema_url:
-        type: string
-      sem_ver:
-        type: string
-      slug:
-        type: string
-      title:
-        type: string
-      updated_at:
-        type: string
-    type: object
-  database.GetForDisplayUserByIsnIDRow:
-    properties:
-      account_id:
-        type: string
-      created_at:
-        type: string
-      updated_at:
-        type: string
-    type: object
-  database.GetUserByIDRow:
-    properties:
-      account_id:
-        type: string
-      created_at:
-        type: string
-      email:
-        type: string
-      user_role:
-        type: string
-    type: object
-  database.GetUsersRow:
-    properties:
-      account_id:
-        type: string
-      created_at:
-        type: string
-      email:
-        type: string
-      updated_at:
-        type: string
-      user_role:
-        type: string
-    type: object
-  database.Isn:
-    properties:
-      created_at:
-        type: string
-      detail:
-        type: string
-      id:
-        type: string
-      is_in_use:
-        type: boolean
-      slug:
-        type: string
-      title:
-        type: string
-      updated_at:
-        type: string
-      user_account_id:
-        type: string
-      visibility:
-        type: string
-    type: object
-  database.ServiceAccount:
-    properties:
-      account_id:
-        type: string
-      client_contact_email:
-        type: string
-      client_id:
-        type: string
-      client_organization:
-        type: string
-      created_at:
-        type: string
-      updated_at:
-        type: string
-    type: object
-  database.SignalType:
-    properties:
-      created_at:
-        type: string
-      detail:
-        type: string
-      id:
-        type: string
-      is_in_use:
-        type: boolean
-      isn_id:
-        type: string
-      readme_url:
-        type: string
-      schema_content:
-        type: string
-      schema_url:
-        type: string
-      sem_ver:
-        type: string
-      slug:
-        type: string
-      title:
-        type: string
-      updated_at:
-        type: string
-    type: object
   handlers.BatchStatus:
     properties:
       failed_count:
@@ -341,7 +195,7 @@ definitions:
   handlers.CreateSignalTypeRequest:
     properties:
       bump_type:
-        description: this is used to increment semver for the signal definition
+        description: this is used to increment semver for the signal type
         enum:
         - major
         - minor
@@ -480,30 +334,95 @@ definitions:
       local_ref:
         type: string
     type: object
-  handlers.IsnAndLinkedInfo:
+  handlers.Isn:
     properties:
       created_at:
+        example: "2025-06-03T13:47:47.331787+01:00"
         type: string
       detail:
+        example: Sample ISN description
         type: string
       id:
+        example: 67890684-3b14-42cf-b785-df28ce570400
         type: string
       is_in_use:
+        example: true
         type: boolean
-      signal_types:
-        items:
-          $ref: '#/definitions/database.GetForDisplaySignalTypeByIsnIDRow'
-        type: array
       slug:
+        example: sample-isn--example-org
         type: string
       title:
+        example: Sample ISN @example.org
         type: string
       updated_at:
+        example: "2025-06-03T13:47:47.331787+01:00"
         type: string
-      user:
-        $ref: '#/definitions/database.GetForDisplayUserByIsnIDRow'
       visibility:
+        enum:
+        - public
+        - private
+        example: private
         type: string
+    type: object
+  handlers.IsnAccount:
+    properties:
+      account_id:
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+        type: string
+      account_role:
+        enum:
+        - owner
+        - admin
+        - member
+        example: admin
+        type: string
+      account_type:
+        enum:
+        - user
+        - service_account
+        example: user
+        type: string
+      client_id:
+        example: client-123
+        type: string
+      client_organization:
+        example: Example Organization
+        type: string
+      created_at:
+        example: "2025-06-03T13:47:47.331787+01:00"
+        type: string
+      email:
+        example: user@example.com
+        type: string
+      id:
+        example: 67890684-3b14-42cf-b785-df28ce570400
+        type: string
+      is_active:
+        example: true
+        type: boolean
+      isn_id:
+        example: 67890684-3b14-42cf-b785-df28ce570400
+        type: string
+      permission:
+        enum:
+        - read
+        - write
+        example: write
+        type: string
+      updated_at:
+        example: "2025-06-03T13:47:47.331787+01:00"
+        type: string
+    type: object
+  handlers.IsnAndLinkedInfo:
+    properties:
+      isn:
+        $ref: '#/definitions/handlers.Isn'
+      signal_types:
+        items:
+          $ref: '#/definitions/handlers.SignalType'
+        type: array
+      user:
+        $ref: '#/definitions/handlers.User'
     type: object
   handlers.LoginRequest:
     properties:
@@ -524,6 +443,27 @@ definitions:
   handlers.ResetUserPasswordResponse:
     properties:
       message:
+        type: string
+    type: object
+  handlers.ServiceAccountDetails:
+    properties:
+      account_id:
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+        type: string
+      client_contact_email:
+        example: contact@example.com
+        type: string
+      client_id:
+        example: client-123
+        type: string
+      client_organization:
+        example: Example Organization
+        type: string
+      created_at:
+        example: "2025-06-03T13:47:47.331787+01:00"
+        type: string
+      updated_at:
+        example: "2025-06-03T13:47:47.331787+01:00"
         type: string
     type: object
   handlers.ServiceAccountRotateResponse:
@@ -551,29 +491,70 @@ definitions:
         example: dGhpcyBpcyBhIHNlY3JldA
         type: string
     type: object
-  handlers.SignalTypeAndLinkedInfo:
+  handlers.SignalType:
     properties:
       created_at:
+        example: "2025-06-03T13:47:47.331787+01:00"
         type: string
       detail:
+        example: Sample signal type description
         type: string
       id:
+        example: 67890684-3b14-42cf-b785-df28ce570400
         type: string
       is_in_use:
+        example: true
         type: boolean
-      isn:
-        $ref: '#/definitions/database.Isn'
       readme_url:
+        example: https://example.com/readme.md
         type: string
       schema_url:
+        example: https://example.com/schema.json
         type: string
       sem_ver:
+        example: 1.0.0
         type: string
       slug:
+        example: sample-signal-type
         type: string
       title:
+        example: Sample Signal Type
         type: string
       updated_at:
+        example: "2025-06-03T13:47:47.331787+01:00"
+        type: string
+    type: object
+  handlers.SignalTypeDetail:
+    properties:
+      created_at:
+        example: "2025-06-03T13:47:47.331787+01:00"
+        type: string
+      detail:
+        example: Sample signal type description
+        type: string
+      id:
+        example: 67890684-3b14-42cf-b785-df28ce570400
+        type: string
+      is_in_use:
+        example: true
+        type: boolean
+      readme_url:
+        example: https://github.com/user/project/blob/2025.01.01/readme.md
+        type: string
+      schema_url:
+        example: https://github.com/user/project/blob/2025.01.01/schema.json
+        type: string
+      sem_ver:
+        example: 1.0.0
+        type: string
+      slug:
+        example: sample-signal-type
+        type: string
+      title:
+        example: Sample Signal Type
+        type: string
+      updated_at:
+        example: "2025-06-03T13:47:47.331787+01:00"
         type: string
     type: object
   handlers.SignalVersionDoc:
@@ -670,6 +651,40 @@ definitions:
       readme_url:
         description: 'README file URL: must be a GitHub URL ending in .md'
         example: https://github.com/user/project/blob/2025.01.01/readme.md
+        type: string
+    type: object
+  handlers.User:
+    properties:
+      account_id:
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+        type: string
+      created_at:
+        example: "2025-06-03T13:47:47.331787+01:00"
+        type: string
+      updated_at:
+        example: "2025-06-03T13:47:47.331787+01:00"
+        type: string
+    type: object
+  handlers.UserDetails:
+    properties:
+      account_id:
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+        type: string
+      created_at:
+        example: "2025-06-03T13:47:47.331787+01:00"
+        type: string
+      email:
+        example: user@example.com
+        type: string
+      updated_at:
+        example: "2025-06-03T13:47:47.331787+01:00"
+        type: string
+      user_role:
+        enum:
+        - owner
+        - admin
+        - member
+        example: admin
         type: string
     type: object
   handlers.WithdrawSignalRequest:
@@ -840,6 +855,7 @@ paths:
         Only owners and admins can disable accounts.
       parameters:
       - description: Account ID to disable
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
         in: path
         name: account_id
         required: true
@@ -881,6 +897,7 @@ paths:
         Only owners and admins can enable accounts.
       parameters:
       - description: Account ID to enable
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
         in: path
         name: account_id
         required: true
@@ -934,7 +951,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/database.ServiceAccount'
+              $ref: '#/definitions/handlers.ServiceAccountDetails'
             type: array
         "401":
           description: 'Authentication failed '
@@ -956,6 +973,7 @@ paths:
         Only owners and admins can view service account details.
       parameters:
       - description: Service Account ID
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
         in: path
         name: id
         required: true
@@ -964,7 +982,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/database.ServiceAccount'
+            $ref: '#/definitions/handlers.ServiceAccountDetails'
         "400":
           description: Invalid service account ID format
           schema:
@@ -995,7 +1013,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/database.GetUsersRow'
+              $ref: '#/definitions/handlers.UserDetails'
             type: array
         "401":
           description: 'Authentication failed '
@@ -1025,7 +1043,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/database.GetUserByIDRow'
+            $ref: '#/definitions/handlers.UserDetails'
         "400":
           description: Invalid user ID format
           schema:
@@ -1053,6 +1071,7 @@ paths:
         the user has forgotten their password)
       parameters:
       - description: User Account ID
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
         in: path
         name: user_id
         required: true
@@ -1256,6 +1275,7 @@ paths:
         The setup url is only valid for 48 hours.
       parameters:
       - description: One-time setup ID
+        example: 550e8400-e29b-41d4-a716-446655440000
         in: path
         name: setup_id
         required: true
@@ -1286,7 +1306,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/database.Isn'
+              $ref: '#/definitions/handlers.Isn'
             type: array
       summary: Get the ISNs
       tags:
@@ -1329,6 +1349,31 @@ paths:
       tags:
       - ISN configuration
   /api/isn/{isn_slug}:
+    get:
+      description: Returns details about the ISN
+      parameters:
+      - description: isn slug
+        example: sample-isn--example-org
+        in: path
+        name: isn_slug
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.IsnAndLinkedInfo'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      summary: Get an ISN configurationuration
+      tags:
+      - ISN details
     put:
       description: |-
         Update the ISN details
@@ -1374,9 +1419,10 @@ paths:
     get:
       description: |-
         Get a list of all accounts (users and service accounts) that have permissions on the specified ISN.
-        Only ISN owners and site owners can view this information.
+        Only ISN admins and site owners can view this information.
       parameters:
       - description: ISN slug
+        example: sample-isn--example-org
         in: path
         name: isn_slug
         required: true
@@ -1386,7 +1432,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/database.GetAccountsByIsnIDRow'
+              $ref: '#/definitions/handlers.IsnAccount'
             type: array
         "400":
           description: Bad Request
@@ -1468,24 +1514,42 @@ paths:
       - Signal sharing
   /api/isn/{isn_slug}/signal_types:
     get:
+      description: Get details for the signal types defined on the ISN
+      parameters:
+      - description: ISN slug
+        example: sample-isn--example-org
+        in: path
+        name: isn_slug
+        required: true
+        type: string
+      - description: signal type slug
+        example: sample-signal--example-org
+        in: path
+        name: slug
+        required: true
+        type: string
+      - description: version to be deleted
+        example: 0.0.1
+        in: path
+        name: sem_ver
+        required: true
+        type: string
       responses:
         "200":
           description: OK
           schema:
             items:
-              $ref: '#/definitions/database.SignalType'
+              $ref: '#/definitions/handlers.SignalTypeDetail'
             type: array
-      summary: Get the signal definitions
+      summary: Get Signal types
       tags:
-      - ISN details
+      - Signal types
     post:
       description: |
-        A signal type describes a data set that is sharable over an ISN.  Setup the ISN before defining any signal defs.
         Signal types specify a record that can be shared over the ISN
-        - Each type has a unique title
-        - A URL-friendly slug is created based on the title supplied when you load the first version of a definition.
+        - Each type has a unique title and this is used to create a URL-friendly slug
         - The title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.
-        - The field definition is held as an external JSON schema file
+        - The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading
 
         Schema URL Requirements
         - Must be a valid JSON schema on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)
@@ -1494,11 +1558,11 @@ paths:
         Versions
         - A signal type can have multiple versions - these share the same title/slug but have different JSON schemas
         - Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)
-        - Subsequent POSTs to this endpoint that reference a previously submitted title/slug but point to a different schema will increment the version
+        - Subsequent POSTs to this endpoint that reference a previously submitted title/slug but point to a different schema will increment the version based on the supplied bump_type
 
-        Signal type definitions are referred to with a URL like this: http://{hostname}/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}
+        Signal type definitions are referred to with a URL like this: http://{hostname}/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}
       parameters:
-      - description: signal definition details
+      - description: signal type details
         in: body
         name: request
         required: true
@@ -1523,9 +1587,151 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Create signal type definition
+      summary: Create signal type
       tags:
-      - Signal definitions
+      - Signal types
+  /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}:
+    delete:
+      description: Only signal types that have never been referenced by signals can
+        be deleted
+      parameters:
+      - description: ISN slug
+        example: sample-isn--example-org
+        in: path
+        name: isn_slug
+        required: true
+        type: string
+      - description: signal type slug
+        example: sample-signal--example-org
+        in: path
+        name: slug
+        required: true
+        type: string
+      - description: version to be deleted
+        example: 0.0.1
+        in: path
+        name: sem_ver
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Delete signal type
+      tags:
+      - Signal types
+    get:
+      description: Returns details about the signal type
+      parameters:
+      - description: ISN slug
+        example: sample-isn--example-org
+        in: path
+        name: isn_slug
+        required: true
+        type: string
+      - description: signal definiton slug
+        example: sample-signal--example-org
+        in: path
+        name: slug
+        required: true
+        type: string
+      - description: version to be recieved
+        example: 0.0.1
+        in: path
+        name: sem_ver
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.SignalTypeDetail'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      summary: Get signal type
+      tags:
+      - Signal types
+      - ISN details
+    put:
+      description: |-
+        users can mark the signal type as *in use/not in use* and update the description or link to the readme file
+        Signal types marked as 'not in use' are not returned in signal searches and can not receive new signals
+      parameters:
+      - description: ISN slug
+        example: sample-isn--example-org
+        in: path
+        name: isn_slug
+        required: true
+        type: string
+      - description: signal definiton slug
+        example: sample-signal--example-org
+        in: path
+        name: slug
+        required: true
+        type: string
+      - description: Sem ver
+        example: 0.0.1
+        in: path
+        name: sem_ver
+        required: true
+        type: string
+      - description: signal type details to be updated
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateSignalTypeRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Update signal type
+      tags:
+      - Signal types
   /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search:
     get:
       description: |-
@@ -1625,129 +1831,6 @@ paths:
       summary: Withdraw a signal
       tags:
       - Signal sharing
-  /api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}:
-    delete:
-      description: Only signal types that have never been referenced by signals can
-        be deleted
-      parameters:
-      - description: signal type slug
-        example: sample-signal--example-org
-        in: path
-        name: slug
-        required: true
-        type: string
-      - description: version to be deleted
-        example: 0.0.1
-        in: path
-        name: sem_ver
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Delete a signal definition
-      tags:
-      - Signal definitions
-    get:
-      parameters:
-      - description: signal definiton slug
-        example: sample-signal--example-org
-        in: path
-        name: slug
-        required: true
-        type: string
-      - description: version to be recieved
-        example: 0.0.1
-        in: path
-        name: sem_ver
-        required: true
-        type: string
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.SignalTypeAndLinkedInfo'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      summary: Get a signal definition
-      tags:
-      - ISN details
-    put:
-      description: |-
-        users can mark the signal type as *in use/not in use* and update the description or link to the readme file
-
-        It is not allowed to update the schema url - instead users should create a new declaration with the same title and bump the version
-      parameters:
-      - description: signal definiton slug
-        example: sample-signal--example-org
-        in: path
-        name: slug
-        required: true
-        type: string
-      - description: Sem ver
-        example: 0.0.1
-        in: path
-        name: sem_ver
-        required: true
-        type: string
-      - description: signal type details to be updated
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.UpdateSignalTypeRequest'
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Update signal definition
-      tags:
-      - Signal definitions
   /api/isn/{isn_slug}/transfer-ownership:
     put:
       description: |-
@@ -1787,32 +1870,6 @@ paths:
       summary: Transfer ISN ownership
       tags:
       - ISN configuration
-  /api/isn/{slug}:
-    get:
-      description: Returns details about the ISN
-      parameters:
-      - description: isn slug
-        example: sample-isn--example-org
-        in: path
-        name: isn_slug
-        required: true
-        type: string
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.IsnAndLinkedInfo'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      summary: Get an ISN configurationuration
-      tags:
-      - ISN details
   /api/public/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search:
     get:
       description: |-
@@ -1921,11 +1978,13 @@ paths:
 
       parameters:
       - description: ISN slug
+        example: sample-isn--example-org
         in: path
         name: isn_slug
         required: true
         type: string
       - description: Batch ID
+        example: 67890684-3b14-42cf-b785-df28ce570400
         in: path
         name: batch_id
         required: true
@@ -2051,7 +2110,7 @@ paths:
         **Response Status Codes**
         - 200: All signals processed successfully
         - 207: Partial success (some signals succeeded, some failed)
-        - 422: All signals failed processing (returns CreateSignalsResponse with detailed error information)
+        - 422: All signals failed processing (the request was valid but all signals failed processing, e.g because they did not validate against the schema)
         - 400 / error_code = 'malformed_body': Invalid request format, authentication, or other request-level errors
         - 400: authentication, or other request-level errors
         - 500: Internal server errors
@@ -2263,6 +2322,6 @@ tags:
 - description: View information about the configured ISNs
   name: ISN details
 - description: Define the format of the data being shared in an ISN
-  name: Signal definitions
+  name: Signal types
 - description: Manage service account end points
   name: Service accounts

@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	signalsd "github.com/information-sharing-networks/signalsd/app"
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
@@ -32,6 +32,24 @@ func NewAdminHandler(queries *database.Queries, pool *pgxpool.Pool, authService 
 		pool:        pool,
 		authService: authService,
 	}
+}
+
+// Response structs for GET handlers
+type UserDetails struct {
+	AccountID uuid.UUID `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
+	Email     string    `json:"email" example:"user@example.com"`
+	UserRole  string    `json:"user_role" example:"admin" enums:"owner,admin,member"`
+	CreatedAt time.Time `json:"created_at" example:"2025-06-03T13:47:47.331787+01:00"`
+	UpdatedAt time.Time `json:"updated_at" example:"2025-06-03T13:47:47.331787+01:00"`
+}
+
+type ServiceAccountDetails struct {
+	AccountID          uuid.UUID `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
+	CreatedAt          time.Time `json:"created_at" example:"2025-06-03T13:47:47.331787+01:00"`
+	UpdatedAt          time.Time `json:"updated_at" example:"2025-06-03T13:47:47.331787+01:00"`
+	ClientID           string    `json:"client_id" example:"client-123"`
+	ClientContactEmail string    `json:"client_contact_email" example:"contact@example.com"`
+	ClientOrganization string    `json:"client_organization" example:"Example Organization"`
 }
 
 // ResetHandler godoc
@@ -127,7 +145,7 @@ func (a *AdminHandler) VersionHandler(w http.ResponseWriter, r *http.Request) {
 //	@Description	Only owners and admins can disable accounts.
 //	@Tags			Site admin
 //
-//	@Param			account_id	path	string	true	"Account ID to disable"
+//	@Param			account_id	path	string	true	"Account ID to disable"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
 //	@Success		200
 //	@Failure		400	{object}	responses.ErrorResponse	"Invalid account ID format"
@@ -139,7 +157,7 @@ func (a *AdminHandler) VersionHandler(w http.ResponseWriter, r *http.Request) {
 //
 //	@Router			/admin/accounts/{account_id}/disable [post]
 func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Request) {
-	accountIDString := chi.URLParam(r, "account_id")
+	accountIDString := r.PathValue("account_id")
 	logger := zerolog.Ctx(r.Context())
 
 	accountID, err := uuid.Parse(accountIDString)
@@ -263,7 +281,7 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 //	@Description	Only owners and admins can enable accounts.
 //	@Tags			Site admin
 //
-//	@Param			account_id	path	string	true	"Account ID to enable"
+//	@Param			account_id	path	string	true	"Account ID to enable"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
 //	@Success		200
 //	@Failure		400	{object}	responses.ErrorResponse	"Invalid account ID format"
@@ -275,7 +293,7 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 //
 //	@Router			/admin/accounts/{account_id}/enable [post]
 func (a *AdminHandler) EnableAccountHandler(w http.ResponseWriter, r *http.Request) {
-	accountIDString := chi.URLParam(r, "account_id")
+	accountIDString := r.PathValue("account_id")
 	logger := zerolog.Ctx(r.Context())
 
 	// Parse account ID as UUID
@@ -326,7 +344,7 @@ func (a *AdminHandler) EnableAccountHandler(w http.ResponseWriter, r *http.Reque
 //	@Tags			Site admin
 //
 //	@Param			id	path		string	true	"user id"	example(68fb5f5b-e3f5-4a96-8d35-cd2203a06f73)
-//	@Success		200	{object}	database.GetUserByIDRow
+//	@Success		200	{object}	handlers.UserDetails
 //	@Failure		400	{object}	responses.ErrorResponse	"Invalid user ID format"
 //	@Failure		401	{object}	responses.ErrorResponse	"Authentication failed "
 //	@Failure		403	{object}	responses.ErrorResponse	"Insufficient permissions "
@@ -344,7 +362,7 @@ func (a *AdminHandler) GetUserHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, err := a.queries.GetUserByID(r.Context(), userAccountID)
+	dbUser, err := a.queries.GetUserByID(r.Context(), userAccountID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No user found for id %v", userAccountID))
@@ -353,8 +371,17 @@ func (a *AdminHandler) GetUserHandler(w http.ResponseWriter, r *http.Request) {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the user from the database %v", err))
 		return
 	}
-	//
-	responses.RespondWithJSON(w, http.StatusOK, res)
+
+	// Convert database struct to our response struct
+	user := UserDetails{
+		AccountID: dbUser.AccountID,
+		Email:     dbUser.Email,
+		UserRole:  dbUser.UserRole,
+		CreatedAt: dbUser.CreatedAt,
+		UpdatedAt: dbUser.UpdatedAt,
+	}
+
+	responses.RespondWithJSON(w, http.StatusOK, user)
 }
 
 // GetUsersHandler godoc
@@ -363,7 +390,7 @@ func (a *AdminHandler) GetUserHandler(w http.ResponseWriter, r *http.Request) {
 //	@Description	This api displays all the site users and their email addreses (can only be used by owner account)
 //	@Tags			Site admin
 //
-//	@Success		200	{array}		database.GetUsersRow
+//	@Success		200	{array}		handlers.UserDetails
 //	@Failure		401	{object}	responses.ErrorResponse	"Authentication failed "
 //	@Failure		403	{object}	responses.ErrorResponse	"Insufficient permissions "
 //
@@ -372,12 +399,25 @@ func (a *AdminHandler) GetUserHandler(w http.ResponseWriter, r *http.Request) {
 //	@Router			/admin/users [get]
 func (a *AdminHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 
-	res, err := a.queries.GetUsers(r.Context())
+	dbUsers, err := a.queries.GetUsers(r.Context())
 	if err != nil {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("error getting user from database: %v", err))
 		return
 	}
-	responses.RespondWithJSON(w, http.StatusOK, res)
+
+	// Convert database structs to our response structs
+	users := make([]UserDetails, len(dbUsers))
+	for i, dbUser := range dbUsers {
+		users[i] = UserDetails{
+			AccountID: dbUser.AccountID,
+			Email:     dbUser.Email,
+			UserRole:  dbUser.UserRole,
+			CreatedAt: dbUser.CreatedAt,
+			UpdatedAt: dbUser.UpdatedAt,
+		}
+	}
+
+	responses.RespondWithJSON(w, http.StatusOK, users)
 }
 
 // GetServiceAccountHandler godoc
@@ -387,9 +427,9 @@ func (a *AdminHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 //	@Description	Only owners and admins can view service account details.
 //	@Tags			Site admin
 //
-//	@Param			id	path		string	true	"Service Account ID"
+//	@Param			id	path		string	true	"Service Account ID"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
-//	@Success		200	{object}	database.ServiceAccount
+//	@Success		200	{object}	handlers.ServiceAccountDetails
 //	@Failure		400	{object}	responses.ErrorResponse	"Invalid service account ID format"
 //	@Failure		401	{object}	responses.ErrorResponse	"Authentication failed "
 //	@Failure		403	{object}	responses.ErrorResponse	"Insufficient permissions "
@@ -399,7 +439,7 @@ func (a *AdminHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 //
 //	@Router			/admin/service-accounts/{id} [get]
 func (a *AdminHandler) GetServiceAccountHandler(w http.ResponseWriter, r *http.Request) {
-	serviceAccountIDString := chi.URLParam(r, "id")
+	serviceAccountIDString := r.PathValue("id")
 	logger := zerolog.Ctx(r.Context())
 
 	serviceAccountID, err := uuid.Parse(serviceAccountIDString)
@@ -410,7 +450,7 @@ func (a *AdminHandler) GetServiceAccountHandler(w http.ResponseWriter, r *http.R
 	}
 
 	// Get service account by account ID
-	serviceAccount, err := a.queries.GetServiceAccountByAccountID(r.Context(), serviceAccountID)
+	dbServiceAccount, err := a.queries.GetServiceAccountByAccountID(r.Context(), serviceAccountID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			logger.Warn().Msgf("service account not found: %v", serviceAccountID)
@@ -420,6 +460,16 @@ func (a *AdminHandler) GetServiceAccountHandler(w http.ResponseWriter, r *http.R
 		logger.Error().Err(err).Msgf("database error retrieving service account: %v", serviceAccountID)
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
+	}
+
+	// Convert database struct to our response struct
+	serviceAccount := ServiceAccountDetails{
+		AccountID:          dbServiceAccount.AccountID,
+		CreatedAt:          dbServiceAccount.CreatedAt,
+		UpdatedAt:          dbServiceAccount.UpdatedAt,
+		ClientID:           dbServiceAccount.ClientID,
+		ClientContactEmail: dbServiceAccount.ClientContactEmail,
+		ClientOrganization: dbServiceAccount.ClientOrganization,
 	}
 
 	logger.Info().Msgf("retrieved service account: %v", serviceAccountID)
@@ -433,7 +483,7 @@ func (a *AdminHandler) GetServiceAccountHandler(w http.ResponseWriter, r *http.R
 //	@Description	Only owners and admins can view service account lists.
 //	@Tags			Site admin
 //
-//	@Success		200	{array}		database.ServiceAccount
+//	@Success		200	{array}		handlers.ServiceAccountDetails
 //	@Failure		401	{object}	responses.ErrorResponse	"Authentication failed "
 //	@Failure		403	{object}	responses.ErrorResponse	"Insufficient permissions "
 //
@@ -444,11 +494,24 @@ func (a *AdminHandler) GetServiceAccountsHandler(w http.ResponseWriter, r *http.
 	logger := zerolog.Ctx(r.Context())
 
 	// Get all service accounts
-	serviceAccounts, err := a.queries.GetServiceAccounts(r.Context())
+	dbServiceAccounts, err := a.queries.GetServiceAccounts(r.Context())
 	if err != nil {
 		logger.Error().Err(err).Msg("database error retrieving service accounts")
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
+	}
+
+	// Convert database structs to our response structs
+	serviceAccounts := make([]ServiceAccountDetails, len(dbServiceAccounts))
+	for i, dbServiceAccount := range dbServiceAccounts {
+		serviceAccounts[i] = ServiceAccountDetails{
+			AccountID:          dbServiceAccount.AccountID,
+			CreatedAt:          dbServiceAccount.CreatedAt,
+			UpdatedAt:          dbServiceAccount.UpdatedAt,
+			ClientID:           dbServiceAccount.ClientID,
+			ClientContactEmail: dbServiceAccount.ClientContactEmail,
+			ClientOrganization: dbServiceAccount.ClientOrganization,
+		}
 	}
 
 	logger.Info().Msgf("retrieved %d service accounts", len(serviceAccounts))
@@ -470,7 +533,7 @@ type ResetUserPasswordResponse struct {
 //	@Description	Allows admins to reset a user's password (use this endpoint if the user has forgotten their password)
 //	@Tags			Site admin
 //
-//	@Param			user_id	path		string								true	"User Account ID"
+//	@Param			user_id	path		string								true	"User Account ID"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //	@Param			request	body		handlers.ResetUserPasswordRequest	true	"New password"
 //
 //	@Success		200		{object}	handlers.ResetUserPasswordResponse
@@ -493,7 +556,7 @@ func (a *AdminHandler) ResetUserPasswordHandler(w http.ResponseWriter, r *http.R
 	}
 
 	// Get user ID from URL parameter
-	userIDStr := chi.URLParam(r, "user_id")
+	userIDStr := r.PathValue("user_id")
 	if userIDStr == "" {
 		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "user_id parameter is required")
 		return

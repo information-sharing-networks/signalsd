@@ -107,7 +107,7 @@ import (
 //	@tag.name			ISN details
 //	@tag.description	View information about the configured ISNs
 
-//	@tag.name			Signal definitions
+//	@tag.name			Signal types
 //	@tag.description	Define the format of the data being shared in an ISN
 
 // @tag.name			Service accounts

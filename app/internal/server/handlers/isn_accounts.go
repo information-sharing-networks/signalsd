@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	signalsd "github.com/information-sharing-networks/signalsd/app"
@@ -26,6 +27,22 @@ func NewIsnAccountHandler(queries *database.Queries) *IsnAccountHandler {
 
 type GrantIsnAccountPermissionRequest struct {
 	Permission string `json:"permission" emuns:"write,read" example:"write"`
+}
+
+// Response structs for GET handlers
+type IsnAccount struct {
+	ID                 uuid.UUID `json:"id" example:"67890684-3b14-42cf-b785-df28ce570400"`
+	CreatedAt          time.Time `json:"created_at" example:"2025-06-03T13:47:47.331787+01:00"`
+	UpdatedAt          time.Time `json:"updated_at" example:"2025-06-03T13:47:47.331787+01:00"`
+	IsnID              uuid.UUID `json:"isn_id" example:"67890684-3b14-42cf-b785-df28ce570400"`
+	AccountID          uuid.UUID `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
+	Permission         string    `json:"permission" example:"write" enums:"read,write"`
+	AccountType        string    `json:"account_type" example:"user" enums:"user,service_account"`
+	IsActive           bool      `json:"is_active" example:"true"`
+	Email              string    `json:"email" example:"user@example.com"`
+	AccountRole        string    `json:"account_role" example:"admin" enums:"owner,admin,member"`
+	ClientID           *string   `json:"client_id,omitempty" example:"client-123"`
+	ClientOrganization *string   `json:"client_organization,omitempty" example:"Example Organization"`
 }
 
 // GrantIsnAccountPermission godocs
@@ -305,12 +322,12 @@ func (i *IsnAccountHandler) RevokeIsnAccountHandler(w http.ResponseWriter, r *ht
 //
 //	@Summary		Get all accounts with access to an ISN
 //	@Description	Get a list of all accounts (users and service accounts) that have permissions on the specified ISN.
-//	@Description	Only ISN owners and site owners can view this information.
+//	@Description	Only ISN admins and site owners can view this information.
 //	@Tags			ISN details
 //
-//	@Param			isn_slug	path		string	true	"ISN slug"
+//	@Param			isn_slug	path		string	true	"ISN slug"		example(sample-isn--example-org)
 //
-//	@Success		200			{array}		database.GetAccountsByIsnIDRow
+//	@Success		200			{array}		handlers.IsnAccount
 //	@Failure		400			{object}	responses.ErrorResponse
 //	@Failure		403			{object}	responses.ErrorResponse
 //	@Failure		404			{object}	responses.ErrorResponse
@@ -357,11 +374,30 @@ func (i *IsnAccountHandler) GetIsnAccountsHandler(w http.ResponseWriter, r *http
 	}
 
 	// Get all accounts with access to this ISN
-	accounts, err := i.queries.GetAccountsByIsnID(r.Context(), isn.ID)
+	dbAccounts, err := i.queries.GetAccountsByIsnID(r.Context(), isn.ID)
 	if err != nil {
 		logger.Error().Err(err).Msgf("database error retrieving accounts for ISN: %v", isnSlug)
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
+	}
+
+	// Convert database structs to our response structs
+	accounts := make([]IsnAccount, len(dbAccounts))
+	for i, dbAccount := range dbAccounts {
+		accounts[i] = IsnAccount{
+			ID:                 dbAccount.ID,
+			CreatedAt:          dbAccount.CreatedAt,
+			UpdatedAt:          dbAccount.UpdatedAt,
+			IsnID:              dbAccount.IsnID,
+			AccountID:          dbAccount.AccountID,
+			Permission:         dbAccount.Permission,
+			AccountType:        dbAccount.AccountType,
+			IsActive:           dbAccount.IsActive,
+			Email:              dbAccount.Email,
+			AccountRole:        dbAccount.AccountRole,
+			ClientID:           dbAccount.ClientID,
+			ClientOrganization: dbAccount.ClientOrganization,
+		}
 	}
 
 	logger.Info().Msgf("retrieved %d accounts for ISN: %v", len(accounts), isnSlug)

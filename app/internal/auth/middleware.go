@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	signalsd "github.com/information-sharing-networks/signalsd/app"
@@ -271,7 +270,7 @@ func (a AuthService) RequireIsnPermission(allowedPermissions ...string) func(htt
 				return
 			}
 
-			isnSlug := chi.URLParam(r, "isn_slug")
+			isnSlug := r.PathValue("isn_slug")
 			if isnSlug == "" {
 				responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInvalidRequest, "no isn_slug parameter ")
 				return
@@ -311,7 +310,7 @@ func (a AuthService) RequireISNAccessPermission(isPublicISN func(string) bool) f
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			logger := zerolog.Ctx(r.Context())
 
-			isnSlug := chi.URLParam(r, "isn_slug")
+			isnSlug := r.PathValue("isn_slug")
 			if isnSlug == "" {
 				responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInvalidRequest, "no isn_slug parameter")
 				return

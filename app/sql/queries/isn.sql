@@ -49,19 +49,6 @@ WHERE sd.id = $1;
 SELECT i.* 
 FROM isn i;
 
--- name: GetForDisplayIsnBySlug :one
-SELECT 
-    id,
-    created_at,
-    updated_at,
-    title,
-    slug,
-    detail,
-    is_in_use,
-    visibility
-FROM isn 
-WHERE slug = $1;
-
 -- name: ExistsIsnWithSlug :one
 
 SELECT EXISTS

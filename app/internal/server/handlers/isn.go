@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
@@ -53,11 +54,41 @@ type CreateIsnResponse struct {
 	ResourceURL string    `json:"resource_url" example:"http://localhost:8080/api/isn/sample-isn--example-org"`
 }
 
-// used in GET handler
+// Response structs for GET handlers
+type Isn struct {
+	ID         uuid.UUID `json:"id" example:"67890684-3b14-42cf-b785-df28ce570400"`
+	CreatedAt  time.Time `json:"created_at" example:"2025-06-03T13:47:47.331787+01:00"`
+	UpdatedAt  time.Time `json:"updated_at" example:"2025-06-03T13:47:47.331787+01:00"`
+	Title      string    `json:"title" example:"Sample ISN @example.org"`
+	Slug       string    `json:"slug" example:"sample-isn--example-org"`
+	Detail     string    `json:"detail" example:"Sample ISN description"`
+	IsInUse    bool      `json:"is_in_use" example:"true"`
+	Visibility string    `json:"visibility" example:"private" enums:"public,private"`
+}
+
+type User struct {
+	AccountID uuid.UUID `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
+	CreatedAt time.Time `json:"created_at" example:"2025-06-03T13:47:47.331787+01:00"`
+	UpdatedAt time.Time `json:"updated_at" example:"2025-06-03T13:47:47.331787+01:00"`
+}
+
+type SignalType struct {
+	ID        uuid.UUID `json:"id" example:"67890684-3b14-42cf-b785-df28ce570400"`
+	CreatedAt time.Time `json:"created_at" example:"2025-06-03T13:47:47.331787+01:00"`
+	UpdatedAt time.Time `json:"updated_at" example:"2025-06-03T13:47:47.331787+01:00"`
+	Slug      string    `json:"slug" example:"sample-signal-type"`
+	SchemaURL string    `json:"schema_url" example:"https://example.com/schema.json"`
+	ReadmeURL string    `json:"readme_url" example:"https://example.com/readme.md"`
+	Title     string    `json:"title" example:"Sample Signal Type"`
+	Detail    string    `json:"detail" example:"Sample signal type description"`
+	SemVer    string    `json:"sem_ver" example:"1.0.0"`
+	IsInUse   bool      `json:"is_in_use" example:"true"`
+}
+
 type IsnAndLinkedInfo struct {
-	database.GetForDisplayIsnBySlugRow
-	User        database.GetForDisplayUserByIsnIDRow          `json:"user"`
-	SignalTypes *[]database.GetForDisplaySignalTypeByIsnIDRow `json:"signal_types,omitempty"`
+	Isn         Isn           `json:"isn"`
+	User        User          `json:"user"`
+	SignalTypes *[]SignalType `json:"signal_types,omitempty"`
 }
 
 // CreateIsnHandler godoc
@@ -281,18 +312,32 @@ func (i *IsnHandler) UpdateIsnHandler(w http.ResponseWriter, r *http.Request) {
 //	@Description	get a list of the configured ISNs
 //	@Tags			ISN details
 //
-//	@Success		200	{array}	database.Isn
+//	@Success		200	{array}	handlers.Isn
 //
 //	@Router			/api/isn [get]
 func (s *IsnHandler) GetIsnsHandler(w http.ResponseWriter, r *http.Request) {
 
-	res, err := s.queries.GetIsns(r.Context())
+	dbIsns, err := s.queries.GetIsns(r.Context())
 	if err != nil {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("error getting ISNs from database: %v", err))
 		return
 	}
-	responses.RespondWithJSON(w, http.StatusOK, res)
 
+	isns := make([]Isn, len(dbIsns))
+	for i, dbIsn := range dbIsns {
+		isns[i] = Isn{
+			ID:         dbIsn.ID,
+			CreatedAt:  dbIsn.CreatedAt,
+			UpdatedAt:  dbIsn.UpdatedAt,
+			Title:      dbIsn.Title,
+			Slug:       dbIsn.Slug,
+			Detail:     dbIsn.Detail,
+			IsInUse:    dbIsn.IsInUse,
+			Visibility: dbIsn.Visibility,
+		}
+	}
+
+	responses.RespondWithJSON(w, http.StatusOK, isns)
 }
 
 // GetIsnHandler godoc
@@ -307,13 +352,13 @@ func (s *IsnHandler) GetIsnsHandler(w http.ResponseWriter, r *http.Request) {
 //	@Failure		400	{object}	responses.ErrorResponse
 //	@Failure		404	{object}	responses.ErrorResponse
 //
-//	@Router			/api/isn/{slug} [get]
+//	@Router			/api/isn/{isn_slug} [get]
 func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 
 	slug := r.PathValue("isn_slug")
 
 	// check isn exists
-	isn, err := s.queries.GetForDisplayIsnBySlug(r.Context(), slug)
+	dbIsn, err := s.queries.GetIsnBySlug(r.Context(), slug)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No isn found for %s", slug))
@@ -322,28 +367,62 @@ func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// get the owner of the isn
-	user, err := s.queries.GetForDisplayUserByIsnID(r.Context(), isn.ID)
+	dbUser, err := s.queries.GetUserByIsnID(r.Context(), dbIsn.ID)
 	if err != nil {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the user for this isn: %v", err))
 		return
 	}
 
-	var signalTypesRes *[]database.GetForDisplaySignalTypeByIsnIDRow
-	signalTypes, err := s.queries.GetForDisplaySignalTypeByIsnID(r.Context(), isn.ID)
+	// Convert database structs to our response structs
+	isn := Isn{
+		ID:         dbIsn.ID,
+		CreatedAt:  dbIsn.CreatedAt,
+		UpdatedAt:  dbIsn.UpdatedAt,
+		Title:      dbIsn.Title,
+		Slug:       dbIsn.Slug,
+		Detail:     dbIsn.Detail,
+		IsInUse:    dbIsn.IsInUse,
+		Visibility: dbIsn.Visibility,
+	}
+
+	user := User{
+		AccountID: dbUser.AccountID,
+		CreatedAt: dbUser.CreatedAt,
+		UpdatedAt: dbUser.UpdatedAt,
+	}
+
+	var signalTypes *[]SignalType
+	dbSignalTypes, err := s.queries.GetSignalTypeByIsnID(r.Context(), dbIsn.ID)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 			return
 		}
+		// If no rows found, signalTypes remains nil
 	} else {
-		signalTypesRes = &signalTypes
+		convertedSignalTypes := make([]SignalType, len(dbSignalTypes))
+		for i, st := range dbSignalTypes {
+			convertedSignalTypes[i] = SignalType{
+				ID:        st.ID,
+				CreatedAt: st.CreatedAt,
+				UpdatedAt: st.UpdatedAt,
+				Slug:      st.Slug,
+				SchemaURL: st.SchemaURL,
+				ReadmeURL: st.ReadmeURL,
+				Title:     st.Title,
+				Detail:    st.Detail,
+				SemVer:    st.SemVer,
+				IsInUse:   st.IsInUse,
+			}
+		}
+		signalTypes = &convertedSignalTypes
 	}
 
-	//send response
+	// Send response
 	res := IsnAndLinkedInfo{
-		GetForDisplayIsnBySlugRow: isn,
-		User:                      user,
-		SignalTypes:               signalTypesRes,
+		Isn:         isn,
+		User:        user,
+		SignalTypes: signalTypes,
 	}
 	responses.RespondWithJSON(w, http.StatusOK, res)
 }

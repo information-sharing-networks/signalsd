@@ -20,10 +20,17 @@ RETURNING *;
 UPDATE signal_types SET (updated_at, readme_url, detail, is_in_use) = (NOW(), $2, $3, $4)
 WHERE id = $1;
 
+
 -- name: GetSignalTypes :many
 
 SELECT st.*
 FROM signal_types st;
+
+-- name: GetSignalTypesByIsnID :many
+
+SELECT st.*
+FROM signal_types st
+WHERE st.isn_id = $1;
 
 
 
@@ -34,50 +41,9 @@ FROM signal_types st
 WHERE st.slug = $1
 AND st.sem_ver = $2;
 
--- name: GetForDisplaySignalTypeByID :one
+-- name: GetSignalTypeByIsnID :many
 SELECT 
-    st.id,
-    st.created_at,
-    st.updated_at,
-    st.slug,
-    st.schema_url,
-    st.readme_url,
-    st.title,
-    st.detail,
-    st.sem_ver,
-    st.is_in_use
-FROM signal_types st
-WHERE st.id = $1;
-
--- name: GetForDisplaySignalTypeBySlug :one
-SELECT 
-    st.id,
-    st.created_at,
-    st.updated_at,
-    st.slug,
-    st.schema_url,
-    st.readme_url,
-    st.title,
-    st.detail,
-    st.sem_ver,
-    st.is_in_use
-FROM signal_types st
-WHERE st.slug = $1
-  AND st.sem_ver = $2;
-
-
--- name: GetForDisplaySignalTypeByIsnID :many
-SELECT 
-    st.id,
-    st.created_at,
-    st.updated_at,
-    st.slug,
-    st.schema_url,
-    st.readme_url,
-    st.title,
-    st.detail,
-    st.sem_ver,
-    st.is_in_use
+    st.*
 FROM signal_types st
 WHERE st.isn_id = $1;
 
@@ -115,7 +81,7 @@ SELECT EXISTS
 
 
 
--- name: CheckSignalTypeInUse :one
+-- name: CheckSignalTypeHasSignals :one
 SELECT EXISTS(
     SELECT 1
     FROM signals

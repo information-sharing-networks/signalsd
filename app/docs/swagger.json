@@ -110,6 +110,7 @@
                 "parameters": [
                     {
                         "type": "string",
+                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
                         "description": "Account ID to disable",
                         "name": "account_id",
                         "in": "path",
@@ -162,6 +163,7 @@
                 "parameters": [
                     {
                         "type": "string",
+                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
                         "description": "Account ID to enable",
                         "name": "account_id",
                         "in": "path",
@@ -237,7 +239,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/database.ServiceAccount"
+                                "$ref": "#/definitions/handlers.ServiceAccountDetails"
                             }
                         }
                     },
@@ -271,6 +273,7 @@
                 "parameters": [
                     {
                         "type": "string",
+                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
                         "description": "Service Account ID",
                         "name": "id",
                         "in": "path",
@@ -281,7 +284,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/database.ServiceAccount"
+                            "$ref": "#/definitions/handlers.ServiceAccountDetails"
                         }
                     },
                     "400": {
@@ -329,7 +332,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/database.GetUsersRow"
+                                "$ref": "#/definitions/handlers.UserDetails"
                             }
                         }
                     },
@@ -374,7 +377,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/database.GetUserByIDRow"
+                            "$ref": "#/definitions/handlers.UserDetails"
                         }
                     },
                     "400": {
@@ -419,6 +422,7 @@
                 "parameters": [
                     {
                         "type": "string",
+                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
                         "description": "User Account ID",
                         "name": "user_id",
                         "in": "path",
@@ -687,6 +691,7 @@
                 "parameters": [
                     {
                         "type": "string",
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
                         "description": "One-time setup ID",
                         "name": "setup_id",
                         "in": "path",
@@ -731,7 +736,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/database.Isn"
+                                "$ref": "#/definitions/handlers.Isn"
                             }
                         }
                     }
@@ -787,6 +792,43 @@
             }
         },
         "/api/isn/{isn_slug}": {
+            "get": {
+                "description": "Returns details about the ISN",
+                "tags": [
+                    "ISN details"
+                ],
+                "summary": "Get an ISN configurationuration",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn--example-org",
+                        "description": "isn slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.IsnAndLinkedInfo"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            },
             "put": {
                 "security": [
                     {
@@ -855,7 +897,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Get a list of all accounts (users and service accounts) that have permissions on the specified ISN.\nOnly ISN owners and site owners can view this information.",
+                "description": "Get a list of all accounts (users and service accounts) that have permissions on the specified ISN.\nOnly ISN admins and site owners can view this information.",
                 "tags": [
                     "ISN details"
                 ],
@@ -863,6 +905,7 @@
                 "parameters": [
                     {
                         "type": "string",
+                        "example": "sample-isn--example-org",
                         "description": "ISN slug",
                         "name": "isn_slug",
                         "in": "path",
@@ -875,7 +918,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/database.GetAccountsByIsnIDRow"
+                                "$ref": "#/definitions/handlers.IsnAccount"
                             }
                         }
                     },
@@ -979,17 +1022,44 @@
         },
         "/api/isn/{isn_slug}/signal_types": {
             "get": {
+                "description": "Get details for the signal types defined on the ISN",
                 "tags": [
-                    "ISN details"
+                    "Signal types"
                 ],
-                "summary": "Get the signal definitions",
+                "summary": "Get Signal types",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn--example-org",
+                        "description": "ISN slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "sample-signal--example-org",
+                        "description": "signal type slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "0.0.1",
+                        "description": "version to be deleted",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/database.SignalType"
+                                "$ref": "#/definitions/handlers.SignalTypeDetail"
                             }
                         }
                     }
@@ -1001,14 +1071,14 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "A signal type describes a data set that is sharable over an ISN.  Setup the ISN before defining any signal defs.\nSignal types specify a record that can be shared over the ISN\n- Each type has a unique title\n- A URL-friendly slug is created based on the title supplied when you load the first version of a definition.\n- The title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.\n- The field definition is held as an external JSON schema file\n\nSchema URL Requirements\n- Must be a valid JSON schema on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)\n- To disable schema validation, use: https://github.com/skip/validation/main/schema.json\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas\n- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)\n- Subsequent POSTs to this endpoint that reference a previously submitted title/slug but point to a different schema will increment the version\n\nSignal type definitions are referred to with a URL like this: http://{hostname}/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}\n",
+                "description": "Signal types specify a record that can be shared over the ISN\n- Each type has a unique title and this is used to create a URL-friendly slug\n- The title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.\n- The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading\n\nSchema URL Requirements\n- Must be a valid JSON schema on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)\n- To disable schema validation, use: https://github.com/skip/validation/main/schema.json\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas\n- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)\n- Subsequent POSTs to this endpoint that reference a previously submitted title/slug but point to a different schema will increment the version based on the supplied bump_type\n\nSignal type definitions are referred to with a URL like this: http://{hostname}/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}\n",
                 "tags": [
-                    "Signal definitions"
+                    "Signal types"
                 ],
-                "summary": "Create signal type definition",
+                "summary": "Create signal type",
                 "parameters": [
                     {
-                        "description": "signal definition details",
+                        "description": "signal type details",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -1038,6 +1108,211 @@
                     },
                     "409": {
                         "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}": {
+            "get": {
+                "description": "Returns details about the signal type",
+                "tags": [
+                    "Signal types",
+                    "ISN details"
+                ],
+                "summary": "Get signal type",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn--example-org",
+                        "description": "ISN slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "sample-signal--example-org",
+                        "description": "signal definiton slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "0.0.1",
+                        "description": "version to be recieved",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.SignalTypeDetail"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "users can mark the signal type as *in use/not in use* and update the description or link to the readme file\nSignal types marked as 'not in use' are not returned in signal searches and can not receive new signals",
+                "tags": [
+                    "Signal types"
+                ],
+                "summary": "Update signal type",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn--example-org",
+                        "description": "ISN slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "sample-signal--example-org",
+                        "description": "signal definiton slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "0.0.1",
+                        "description": "Sem ver",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "signal type details to be updated",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdateSignalTypeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Only signal types that have never been referenced by signals can be deleted",
+                "tags": [
+                    "Signal types"
+                ],
+                "summary": "Delete signal type",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn--example-org",
+                        "description": "ISN slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "sample-signal--example-org",
+                        "description": "signal type slug",
+                        "name": "slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "0.0.1",
+                        "description": "version to be deleted",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1183,185 +1458,6 @@
                 }
             }
         },
-        "/api/isn/{isn_slug}/signal_types/{slug}/v{sem_ver}": {
-            "get": {
-                "tags": [
-                    "ISN details"
-                ],
-                "summary": "Get a signal definition",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "sample-signal--example-org",
-                        "description": "signal definiton slug",
-                        "name": "slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "example": "0.0.1",
-                        "description": "version to be recieved",
-                        "name": "sem_ver",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.SignalTypeAndLinkedInfo"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "users can mark the signal type as *in use/not in use* and update the description or link to the readme file\n\nIt is not allowed to update the schema url - instead users should create a new declaration with the same title and bump the version",
-                "tags": [
-                    "Signal definitions"
-                ],
-                "summary": "Update signal definition",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "sample-signal--example-org",
-                        "description": "signal definiton slug",
-                        "name": "slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "example": "0.0.1",
-                        "description": "Sem ver",
-                        "name": "sem_ver",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "signal type details to be updated",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.UpdateSignalTypeRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "Only signal types that have never been referenced by signals can be deleted",
-                "tags": [
-                    "Signal definitions"
-                ],
-                "summary": "Delete a signal definition",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "sample-signal--example-org",
-                        "description": "signal type slug",
-                        "name": "slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "example": "0.0.1",
-                        "description": "version to be deleted",
-                        "name": "sem_ver",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/api/isn/{isn_slug}/transfer-ownership": {
             "put": {
                 "security": [
@@ -1407,45 +1503,6 @@
                     },
                     "403": {
                         "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/isn/{slug}": {
-            "get": {
-                "description": "Returns details about the ISN",
-                "tags": [
-                    "ISN details"
-                ],
-                "summary": "Get an ISN configurationuration",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "sample-isn--example-org",
-                        "description": "isn slug",
-                        "name": "isn_slug",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.IsnAndLinkedInfo"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1681,6 +1738,7 @@
                 "parameters": [
                     {
                         "type": "string",
+                        "example": "sample-isn--example-org",
                         "description": "ISN slug",
                         "name": "isn_slug",
                         "in": "path",
@@ -1688,6 +1746,7 @@
                     },
                     {
                         "type": "string",
+                        "example": "67890684-3b14-42cf-b785-df28ce570400",
                         "description": "Batch ID",
                         "name": "batch_id",
                         "in": "path",
@@ -1729,7 +1788,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Submit an array of signals for storage on the ISN\n- payloads must not mix signals of different types and is subject to the size limits defined on the site.\n- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.\n- If a local reference is received more than once from an account for a specified signal_type it will be stored with a incremented version number.\n- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account.\n- requests are only accepted for the open signal batch for this account/ISN.\n\n**Authentication**\n\nRequires a valid access token.\nThe claims in the access token list the ISNs and signal_types that the account is permitted to use.\n\nThis handler also checks that the signal_type/sem_ver in the url is also listed in the claims (this is to catch mistyped urls)\n\n**Validation and Processing**\n\nSignals are validated against the json schema specified for the signal type unless validation is disabled on the type definition.\nIndividual signal processing failures (validation errors, incorrect correlation ids, database errors) are recorded in the response but do not prevent other signals from being processed.\n\nWhen validation is disabled, basic checks are still done on the incoming data and the following issues create a 400 error and cause the entire payload to be rejected:\n- invalid json format\n- missing fields (the array of signals must be in a json object called signals, and content and local_ref must be present for each record).\n\n\n**Response Status Codes**\n- 200: All signals processed successfully\n- 207: Partial success (some signals succeeded, some failed)\n- 422: All signals failed processing (returns CreateSignalsResponse with detailed error information)\n- 400 / error_code = 'malformed_body': Invalid request format, authentication, or other request-level errors\n- 400: authentication, or other request-level errors\n- 500: Internal server errors\n\nInternal server errors cause the whole payload to be rejected.",
+                "description": "Submit an array of signals for storage on the ISN\n- payloads must not mix signals of different types and is subject to the size limits defined on the site.\n- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.\n- If a local reference is received more than once from an account for a specified signal_type it will be stored with a incremented version number.\n- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account.\n- requests are only accepted for the open signal batch for this account/ISN.\n\n**Authentication**\n\nRequires a valid access token.\nThe claims in the access token list the ISNs and signal_types that the account is permitted to use.\n\nThis handler also checks that the signal_type/sem_ver in the url is also listed in the claims (this is to catch mistyped urls)\n\n**Validation and Processing**\n\nSignals are validated against the json schema specified for the signal type unless validation is disabled on the type definition.\nIndividual signal processing failures (validation errors, incorrect correlation ids, database errors) are recorded in the response but do not prevent other signals from being processed.\n\nWhen validation is disabled, basic checks are still done on the incoming data and the following issues create a 400 error and cause the entire payload to be rejected:\n- invalid json format\n- missing fields (the array of signals must be in a json object called signals, and content and local_ref must be present for each record).\n\n\n**Response Status Codes**\n- 200: All signals processed successfully\n- 207: Partial success (some signals succeeded, some failed)\n- 422: All signals failed processing (the request was valid but all signals failed processing, e.g because they did not validate against the schema)\n- 400 / error_code = 'malformed_body': Invalid request format, authentication, or other request-level errors\n- 400: authentication, or other request-level errors\n- 500: Internal server errors\n\nInternal server errors cause the whole payload to be rejected.",
                 "tags": [
                     "Signal sharing"
                 ],
@@ -2052,229 +2111,6 @@
                 }
             }
         },
-        "database.GetAccountsByIsnIDRow": {
-            "type": "object",
-            "properties": {
-                "account_id": {
-                    "type": "string"
-                },
-                "account_role": {
-                    "type": "string"
-                },
-                "account_type": {
-                    "type": "string"
-                },
-                "client_id": {
-                    "type": "string"
-                },
-                "client_organization": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "email": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "is_active": {
-                    "type": "boolean"
-                },
-                "isn_id": {
-                    "type": "string"
-                },
-                "permission": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "database.GetForDisplaySignalTypeByIsnIDRow": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "detail": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "is_in_use": {
-                    "type": "boolean"
-                },
-                "readme_url": {
-                    "type": "string"
-                },
-                "schema_url": {
-                    "type": "string"
-                },
-                "sem_ver": {
-                    "type": "string"
-                },
-                "slug": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "database.GetForDisplayUserByIsnIDRow": {
-            "type": "object",
-            "properties": {
-                "account_id": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "database.GetUserByIDRow": {
-            "type": "object",
-            "properties": {
-                "account_id": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "email": {
-                    "type": "string"
-                },
-                "user_role": {
-                    "type": "string"
-                }
-            }
-        },
-        "database.GetUsersRow": {
-            "type": "object",
-            "properties": {
-                "account_id": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "email": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "user_role": {
-                    "type": "string"
-                }
-            }
-        },
-        "database.Isn": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "detail": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "is_in_use": {
-                    "type": "boolean"
-                },
-                "slug": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
-                "user_account_id": {
-                    "type": "string"
-                },
-                "visibility": {
-                    "type": "string"
-                }
-            }
-        },
-        "database.ServiceAccount": {
-            "type": "object",
-            "properties": {
-                "account_id": {
-                    "type": "string"
-                },
-                "client_contact_email": {
-                    "type": "string"
-                },
-                "client_id": {
-                    "type": "string"
-                },
-                "client_organization": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "database.SignalType": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "detail": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "is_in_use": {
-                    "type": "boolean"
-                },
-                "isn_id": {
-                    "type": "string"
-                },
-                "readme_url": {
-                    "type": "string"
-                },
-                "schema_content": {
-                    "type": "string"
-                },
-                "schema_url": {
-                    "type": "string"
-                },
-                "sem_ver": {
-                    "type": "string"
-                },
-                "slug": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
         "handlers.BatchStatus": {
             "type": "object",
             "properties": {
@@ -2414,7 +2250,7 @@
             "type": "object",
             "properties": {
                 "bump_type": {
-                    "description": "this is used to increment semver for the signal definition",
+                    "description": "this is used to increment semver for the signal type",
                     "type": "string",
                     "enum": [
                         "major",
@@ -2610,41 +2446,127 @@
                 }
             }
         },
-        "handlers.IsnAndLinkedInfo": {
+        "handlers.Isn": {
             "type": "object",
             "properties": {
                 "created_at": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "2025-06-03T13:47:47.331787+01:00"
                 },
                 "detail": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Sample ISN description"
                 },
                 "id": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "67890684-3b14-42cf-b785-df28ce570400"
                 },
                 "is_in_use": {
-                    "type": "boolean"
+                    "type": "boolean",
+                    "example": true
+                },
+                "slug": {
+                    "type": "string",
+                    "example": "sample-isn--example-org"
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Sample ISN @example.org"
+                },
+                "updated_at": {
+                    "type": "string",
+                    "example": "2025-06-03T13:47:47.331787+01:00"
+                },
+                "visibility": {
+                    "type": "string",
+                    "enum": [
+                        "public",
+                        "private"
+                    ],
+                    "example": "private"
+                }
+            }
+        },
+        "handlers.IsnAccount": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string",
+                    "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3"
+                },
+                "account_role": {
+                    "type": "string",
+                    "enum": [
+                        "owner",
+                        "admin",
+                        "member"
+                    ],
+                    "example": "admin"
+                },
+                "account_type": {
+                    "type": "string",
+                    "enum": [
+                        "user",
+                        "service_account"
+                    ],
+                    "example": "user"
+                },
+                "client_id": {
+                    "type": "string",
+                    "example": "client-123"
+                },
+                "client_organization": {
+                    "type": "string",
+                    "example": "Example Organization"
+                },
+                "created_at": {
+                    "type": "string",
+                    "example": "2025-06-03T13:47:47.331787+01:00"
+                },
+                "email": {
+                    "type": "string",
+                    "example": "user@example.com"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "67890684-3b14-42cf-b785-df28ce570400"
+                },
+                "is_active": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "isn_id": {
+                    "type": "string",
+                    "example": "67890684-3b14-42cf-b785-df28ce570400"
+                },
+                "permission": {
+                    "type": "string",
+                    "enum": [
+                        "read",
+                        "write"
+                    ],
+                    "example": "write"
+                },
+                "updated_at": {
+                    "type": "string",
+                    "example": "2025-06-03T13:47:47.331787+01:00"
+                }
+            }
+        },
+        "handlers.IsnAndLinkedInfo": {
+            "type": "object",
+            "properties": {
+                "isn": {
+                    "$ref": "#/definitions/handlers.Isn"
                 },
                 "signal_types": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/database.GetForDisplaySignalTypeByIsnIDRow"
+                        "$ref": "#/definitions/handlers.SignalType"
                     }
                 },
-                "slug": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                },
                 "user": {
-                    "$ref": "#/definitions/database.GetForDisplayUserByIsnIDRow"
-                },
-                "visibility": {
-                    "type": "string"
+                    "$ref": "#/definitions/handlers.User"
                 }
             }
         },
@@ -2676,6 +2598,35 @@
             "properties": {
                 "message": {
                     "type": "string"
+                }
+            }
+        },
+        "handlers.ServiceAccountDetails": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string",
+                    "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3"
+                },
+                "client_contact_email": {
+                    "type": "string",
+                    "example": "contact@example.com"
+                },
+                "client_id": {
+                    "type": "string",
+                    "example": "client-123"
+                },
+                "client_organization": {
+                    "type": "string",
+                    "example": "Example Organization"
+                },
+                "created_at": {
+                    "type": "string",
+                    "example": "2025-06-03T13:47:47.331787+01:00"
+                },
+                "updated_at": {
+                    "type": "string",
+                    "example": "2025-06-03T13:47:47.331787+01:00"
                 }
             }
         },
@@ -2714,41 +2665,93 @@
                 }
             }
         },
-        "handlers.SignalTypeAndLinkedInfo": {
+        "handlers.SignalType": {
             "type": "object",
             "properties": {
                 "created_at": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "2025-06-03T13:47:47.331787+01:00"
                 },
                 "detail": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Sample signal type description"
                 },
                 "id": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "67890684-3b14-42cf-b785-df28ce570400"
                 },
                 "is_in_use": {
-                    "type": "boolean"
-                },
-                "isn": {
-                    "$ref": "#/definitions/database.Isn"
+                    "type": "boolean",
+                    "example": true
                 },
                 "readme_url": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "https://example.com/readme.md"
                 },
                 "schema_url": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "https://example.com/schema.json"
                 },
                 "sem_ver": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "1.0.0"
                 },
                 "slug": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "sample-signal-type"
                 },
                 "title": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Sample Signal Type"
                 },
                 "updated_at": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "2025-06-03T13:47:47.331787+01:00"
+                }
+            }
+        },
+        "handlers.SignalTypeDetail": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string",
+                    "example": "2025-06-03T13:47:47.331787+01:00"
+                },
+                "detail": {
+                    "type": "string",
+                    "example": "Sample signal type description"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "67890684-3b14-42cf-b785-df28ce570400"
+                },
+                "is_in_use": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "readme_url": {
+                    "type": "string",
+                    "example": "https://github.com/user/project/blob/2025.01.01/readme.md"
+                },
+                "schema_url": {
+                    "type": "string",
+                    "example": "https://github.com/user/project/blob/2025.01.01/schema.json"
+                },
+                "sem_ver": {
+                    "type": "string",
+                    "example": "1.0.0"
+                },
+                "slug": {
+                    "type": "string",
+                    "example": "sample-signal-type"
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Sample Signal Type"
+                },
+                "updated_at": {
+                    "type": "string",
+                    "example": "2025-06-03T13:47:47.331787+01:00"
                 }
             }
         },
@@ -2885,6 +2888,53 @@
                 }
             }
         },
+        "handlers.User": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string",
+                    "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3"
+                },
+                "created_at": {
+                    "type": "string",
+                    "example": "2025-06-03T13:47:47.331787+01:00"
+                },
+                "updated_at": {
+                    "type": "string",
+                    "example": "2025-06-03T13:47:47.331787+01:00"
+                }
+            }
+        },
+        "handlers.UserDetails": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string",
+                    "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3"
+                },
+                "created_at": {
+                    "type": "string",
+                    "example": "2025-06-03T13:47:47.331787+01:00"
+                },
+                "email": {
+                    "type": "string",
+                    "example": "user@example.com"
+                },
+                "updated_at": {
+                    "type": "string",
+                    "example": "2025-06-03T13:47:47.331787+01:00"
+                },
+                "user_role": {
+                    "type": "string",
+                    "enum": [
+                        "owner",
+                        "admin",
+                        "member"
+                    ],
+                    "example": "admin"
+                }
+            }
+        },
         "handlers.WithdrawSignalRequest": {
             "type": "object",
             "properties": {
@@ -2960,7 +3010,7 @@
         },
         {
             "description": "Define the format of the data being shared in an ISN",
-            "name": "Signal definitions"
+            "name": "Signal types"
         },
         {
             "description": "Manage service account end points",

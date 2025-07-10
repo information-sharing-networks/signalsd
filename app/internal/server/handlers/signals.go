@@ -588,13 +588,13 @@ func (s *SignalsHandler) SearchPublicSignalsHandler(w http.ResponseWriter, r *ht
 //	@Description
 //	@Description	Note the endpoint returns the latest version of each signal and does not include withdrawn or archived signals
 //
-//	@Param			start_date			query		string	false	"Start date for filtering"	example(2006-01-02T15:04:05Z)
-//	@Param			end_date			query		string	false	"End date for filtering"	example(2006-01-02T16:00:00Z
-//	@Param			account_id			query		string	false	"Account ID for filtering"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
+//	@Param			start_date			query		string	false	"Start date for filtering"						example(2006-01-02T15:04:05Z)
+//	@Param			end_date			query		string	false	"End date for filtering"						example(2006-01-02T16:00:00Z
+//	@Param			account_id			query		string	false	"Account ID for filtering"						example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //	@Param			include_withdrawn	query		string	false	"Include withdrawn signals (default: false)"	example(false)
 //
-//	@Success		200			{array}		handlers.SignalVersionDoc
-//	@Failure		400			{object}	responses.ErrorResponse
+//	@Success		200					{array}		handlers.SignalVersionDoc
+//	@Failure		400					{object}	responses.ErrorResponse
 //
 //	@Security		BearerAccessToken
 //
@@ -717,9 +717,9 @@ func (s *SignalsHandler) SearchPrivateSignalsHandler(w http.ResponseWriter, r *h
 //
 //	@Tags			Signal sharing
 //
-//	@Param			isn_slug			path	string						true	"ISN slug"				example(sample-isn--example-org)
-//	@Param			signal_type_slug	path	string						true	"Signal type slug"		example(signal-type-1)
-//	@Param			sem_ver				path	string						true	"Signal type version"	example(0.0.1)
+//	@Param			isn_slug			path	string							true	"ISN slug"				example(sample-isn--example-org)
+//	@Param			signal_type_slug	path	string							true	"Signal type slug"		example(signal-type-1)
+//	@Param			sem_ver				path	string							true	"Signal type version"	example(0.0.1)
 //	@Param			request				body	handlers.WithdrawSignalRequest	true	"Withdrawal request"
 //
 //	@Success		204
