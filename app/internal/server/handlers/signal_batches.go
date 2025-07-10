@@ -178,8 +178,8 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 //	@Description
 //	@Description
 //	@Tags		Signal sharing
-//	@Param		isn_slug	path		string	true	"ISN slug"		example(sample-isn--example-org)
-//	@Param		batch_id	path		string	true	"Batch ID"		example(67890684-3b14-42cf-b785-df28ce570400)
+//	@Param		isn_slug	path		string	true	"ISN slug"	example(sample-isn--example-org)
+//	@Param		batch_id	path		string	true	"Batch ID"	example(67890684-3b14-42cf-b785-df28ce570400)
 //	@Success	200			{object}	BatchStatusResponse
 //	@Failure	400			{object}	responses.ErrorResponse
 //	@Failure	404			{object}	responses.ErrorResponse

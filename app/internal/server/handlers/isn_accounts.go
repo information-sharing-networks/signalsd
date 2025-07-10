@@ -325,7 +325,7 @@ func (i *IsnAccountHandler) RevokeIsnAccountHandler(w http.ResponseWriter, r *ht
 //	@Description	Only ISN admins and site owners can view this information.
 //	@Tags			ISN details
 //
-//	@Param			isn_slug	path		string	true	"ISN slug"		example(sample-isn--example-org)
+//	@Param			isn_slug	path		string	true	"ISN slug"	example(sample-isn--example-org)
 //
 //	@Success		200			{array}		handlers.IsnAccount
 //	@Failure		400			{object}	responses.ErrorResponse

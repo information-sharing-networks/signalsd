@@ -269,10 +269,10 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 //	@Description	users can mark the signal type as *in use/not in use* and update the description or link to the readme file
 //	@Description	Signal types marked as 'not in use' are not returned in signal searches and can not receive new signals
 //
-//	@Param			isn_slug	path	string								true	"ISN slug"				example(sample-isn--example-org)
-//	@Param			slug		path	string								true	"signal definiton slug"	example(sample-signal--example-org)
-//	@Param			sem_ver		path	string								true	"Sem ver"				example(0.0.1)
-//	@Param			request		body	handlers.UpdateSignalTypeRequest	true	"signal type details to be updated"
+//	@Param			isn_slug			path	string								true	"ISN slug"			example(sample-isn--example-org)
+//	@Param			signal_type_slug	path	string								true	"signal type slug"	example(sample-signal--example-org)
+//	@Param			sem_ver				path	string								true	"Sem ver"			example(0.0.1)
+//	@Param			request				body	handlers.UpdateSignalTypeRequest	true	"signal type details to be updated"
 //
 //	@Tags			Signal types
 //
@@ -398,9 +398,9 @@ func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *ht
 //	@Summary		Get signal type
 //	@Description	Returns details about the signal type
 //	@Tags			Signal types
-//	@Param			isn_slug	path	string	true	"ISN slug"					example(sample-isn--example-org)
-//	@Param			slug		path	string	true	"signal definiton slug"		example(sample-signal--example-org)
-//	@Param			sem_ver		path	string	true	"version to be recieved"	example(0.0.1)
+//	@Param			isn_slug			path	string	true	"ISN slug"					example(sample-isn--example-org)
+//	@Param			signal_type_slug	path	string	true	"signal type slug"		example(sample-signal--example-org)
+//	@Param			sem_ver				path	string	true	"version to be recieved"	example(0.0.1)
 //
 //	@Tags			ISN details
 //
@@ -460,9 +460,9 @@ func (s *SignalTypeHandler) GetSignalTypeHandler(w http.ResponseWriter, r *http.
 //
 //	@Summary		Get Signal types
 //	@Description	Get details for the signal types defined on the ISN
-//	@Param			isn_slug	path	string	true	"ISN slug"				example(sample-isn--example-org)
-//	@Param			slug		path	string	true	"signal type slug"		example(sample-signal--example-org)
-//	@Param			sem_ver		path	string	true	"version to be deleted"	example(0.0.1)
+//	@Param			isn_slug			path	string	true	"ISN slug"				example(sample-isn--example-org)
+//	@Param			signal_type_slug	path	string	true	"signal type slug"		example(sample-signal--example-org)
+//	@Param			sem_ver				path	string	true	"version to be deleted"	example(0.0.1)
 //	@Tags			Signal types
 //
 //	@Success		200	{array}	handlers.SignalTypeDetail
@@ -513,9 +513,9 @@ func (s *SignalTypeHandler) GetSignalTypesHandler(w http.ResponseWriter, r *http
 //
 //	@Summary		Delete signal type
 //	@Description	Only signal types that have never been referenced by signals can be deleted
-//	@Param			isn_slug	path	string	true	"ISN slug"				example(sample-isn--example-org)
-//	@Param			slug		path	string	true	"signal type slug"		example(sample-signal--example-org)
-//	@Param			sem_ver		path	string	true	"version to be deleted"	example(0.0.1)
+//	@Param			isn_slug			path	string	true	"ISN slug"				example(sample-isn--example-org)
+//	@Param			signal_type_slug	path	string	true	"signal type slug"		example(sample-signal--example-org)
+//	@Param			sem_ver				path	string	true	"version to be deleted"	example(0.0.1)
 //
 //	@Tags			Signal types
 //
