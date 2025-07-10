@@ -73,7 +73,7 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, p
 //	@Description
 //	@Tags		auth
 //
-//	@Param		grant_type	query		string							true	"grant type"	Enums(client_credentials, refresh_token)
+//	@Param		grant_type	query		string						true	"grant type"	Enums(client_credentials, refresh_token)
 //	@Param		request		body		ServiceAccountTokenRequest	false	"Service account credentials (required for client_credentials grant)"
 //
 //	@Success	200			{object}	auth.AccessTokenResponse
@@ -268,11 +268,11 @@ func (a *TokenHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.
 //	@Description
 //	@Tags		auth
 //
-//	@Param		request		body		ServiceAccountTokenRequest	false	"Service account credentials"
+//	@Param		request	body		ServiceAccountTokenRequest	false	"Service account credentials"
 //
-//	@Success	200	{object}	ServiceAccountRotateResponse
-//	@Failure	401	{object}	responses.ErrorResponse	"Authentication failed"
-//	@Failure	500	{object}	responses.ErrorResponse	"Internal server error"
+//	@Success	200		{object}	ServiceAccountRotateResponse
+//	@Failure	401		{object}	responses.ErrorResponse	"Authentication failed"
+//	@Failure	500		{object}	responses.ErrorResponse	"Internal server error"
 //
 //	@Router		/api/auth/service-accounts/rotate-secret [post]
 func (a *TokenHandler) RotateServiceAccountSecretHandler(w http.ResponseWriter, r *http.Request) {

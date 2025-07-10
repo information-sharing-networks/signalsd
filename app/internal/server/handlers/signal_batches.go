@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
@@ -179,19 +178,18 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 //	@Description
 //	@Description
 //	@Tags		Signal sharing
-//	@Param		isn_slug	path		string	true	"ISN slug"
-//	@Param		batch_id	path		string	true	"Batch ID"
+//	@Param		isn_slug	path		string	true	"ISN slug"		example(sample-isn--example-org)
+//	@Param		batch_id	path		string	true	"Batch ID"		example(67890684-3b14-42cf-b785-df28ce570400)
 //	@Success	200			{object}	BatchStatusResponse
 //	@Failure	400			{object}	responses.ErrorResponse
 //	@Failure	404			{object}	responses.ErrorResponse
 //	@Failure	500			{object}	responses.ErrorResponse
 //	@Router		/isn/{isn_slug}/batches/{batch_id}/status [get]
 //
-// todo handle withdrawn signals
 // todo handle the fact that the list of failed local_refs might be very large if errors go undetected for a long time
 func (s *SignalsBatchHandler) GetSignalBatchStatusHandler(w http.ResponseWriter, r *http.Request) {
 	// Extract path parameters
-	batchIDString := chi.URLParam(r, "batch_id")
+	batchIDString := r.PathValue("batch_id")
 
 	// Parse batch ID
 	batchID, err := uuid.Parse(batchIDString)
@@ -221,7 +219,7 @@ func (s *SignalsBatchHandler) GetSignalBatchStatusHandler(w http.ResponseWriter,
 	}
 
 	// Get the ISN to check if user is an ISN admin
-	isn, err := s.queries.GetIsnBySlug(r.Context(), chi.URLParam(r, "isn_slug"))
+	isn, err := s.queries.GetIsnBySlug(r.Context(), r.PathValue("isn_slug"))
 	if err != nil {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
@@ -370,7 +368,7 @@ func (s *SignalsBatchHandler) getBatchStatusDetails(ctx context.Context, batchID
 //	@Router			/isn/{isn_slug}/batches/search [get]
 func (s *SignalsBatchHandler) SearchBatchesHandler(w http.ResponseWriter, r *http.Request) {
 	// Extract path parameters
-	isnSlug := chi.URLParam(r, "isn_slug")
+	isnSlug := r.PathValue("isn_slug")
 
 	// check isn exists
 	isn, err := s.queries.GetIsnBySlug(r.Context(), isnSlug)

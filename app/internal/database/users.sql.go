@@ -39,7 +39,6 @@ func (q *Queries) CreateOwnerUser(ctx context.Context, arg CreateOwnerUserParams
 }
 
 const CreateUser = `-- name: CreateUser :one
-
 INSERT INTO users (account_id, created_at, updated_at, email, hashed_password, user_role)
 VALUES ( $1, NOW(), NOW(), $2, $3, 'member')
 RETURNING account_id, created_at, updated_at, email, hashed_password, user_role
@@ -51,7 +50,6 @@ type CreateUserParams struct {
 	HashedPassword string    `json:"hashed_password"`
 }
 
-// note: don't display emails on public apis ("GetForDisplay*").
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
 	row := q.db.QueryRow(ctx, CreateUser, arg.AccountID, arg.Email, arg.HashedPassword)
 	var i User
@@ -79,46 +77,6 @@ func (q *Queries) ExistsUserWithEmail(ctx context.Context, email string) (bool, 
 	return exists, err
 }
 
-const GetForDisplayUserByIsnID = `-- name: GetForDisplayUserByIsnID :one
-SELECT u.account_id, u.created_at , u.updated_at 
-FROM users u 
-JOIN isn i ON u.account_id = i.user_account_id 
-WHERE i.id = $1
-`
-
-type GetForDisplayUserByIsnIDRow struct {
-	AccountID uuid.UUID `json:"account_id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-func (q *Queries) GetForDisplayUserByIsnID(ctx context.Context, id uuid.UUID) (GetForDisplayUserByIsnIDRow, error) {
-	row := q.db.QueryRow(ctx, GetForDisplayUserByIsnID, id)
-	var i GetForDisplayUserByIsnIDRow
-	err := row.Scan(&i.AccountID, &i.CreatedAt, &i.UpdatedAt)
-	return i, err
-}
-
-const GetForDisplayUserBySignalDefID = `-- name: GetForDisplayUserBySignalDefID :one
-SELECT u.account_id, u.created_at , u.updated_at 
-FROM users u 
-JOIN signal_types sd ON u.account_id = sd.user_account_id 
-WHERE sd.id = $1
-`
-
-type GetForDisplayUserBySignalDefIDRow struct {
-	AccountID uuid.UUID `json:"account_id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-func (q *Queries) GetForDisplayUserBySignalDefID(ctx context.Context, id uuid.UUID) (GetForDisplayUserBySignalDefIDRow, error) {
-	row := q.db.QueryRow(ctx, GetForDisplayUserBySignalDefID, id)
-	var i GetForDisplayUserBySignalDefIDRow
-	err := row.Scan(&i.AccountID, &i.CreatedAt, &i.UpdatedAt)
-	return i, err
-}
-
 const GetUserByEmail = `-- name: GetUserByEmail :one
 SELECT account_id, created_at, updated_at, email, hashed_password, user_role FROM users WHERE email = $1
 `
@@ -138,7 +96,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 }
 
 const GetUserByID = `-- name: GetUserByID :one
-SELECT  u.account_id, u.email, u.user_role, u.created_at  FROM users u WHERE u.account_id = $1
+SELECT  u.account_id, u.email, u.user_role, u.created_at , u.updated_at FROM users u WHERE u.account_id = $1
 `
 
 type GetUserByIDRow struct {
@@ -146,6 +104,7 @@ type GetUserByIDRow struct {
 	Email     string    `json:"email"`
 	UserRole  string    `json:"user_role"`
 	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 func (q *Queries) GetUserByID(ctx context.Context, accountID uuid.UUID) (GetUserByIDRow, error) {
@@ -156,6 +115,28 @@ func (q *Queries) GetUserByID(ctx context.Context, accountID uuid.UUID) (GetUser
 		&i.Email,
 		&i.UserRole,
 		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const GetUserByIsnID = `-- name: GetUserByIsnID :one
+SELECT u.account_id, u.created_at, u.updated_at, u.email, u.hashed_password, u.user_role
+FROM users u 
+JOIN isn i ON u.account_id = i.user_account_id 
+WHERE i.id = $1
+`
+
+func (q *Queries) GetUserByIsnID(ctx context.Context, id uuid.UUID) (User, error) {
+	row := q.db.QueryRow(ctx, GetUserByIsnID, id)
+	var i User
+	err := row.Scan(
+		&i.AccountID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Email,
+		&i.HashedPassword,
+		&i.UserRole,
 	)
 	return i, err
 }

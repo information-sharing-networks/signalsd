@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	signalsd "github.com/information-sharing-networks/signalsd/app"
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
@@ -295,7 +294,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 //	@Description
 //	@Tags		Service accounts
 //
-//	@Param		setup_id	path	string	true	"One-time setup ID"
+//	@Param		setup_id	path	string	true	"One-time setup ID"	example(550e8400-e29b-41d4-a716-446655440000)
 //
 //	@Success	201
 //
@@ -306,7 +305,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 //	@Router		/api/auth/service-accounts/setup/{setup_id} [get]
 func (s *ServiceAccountHandler) SetupServiceAccountHandler(w http.ResponseWriter, r *http.Request) {
 	// Extract token from URL path
-	oneTimeSecretIDString := chi.URLParam(r, "setup_id")
+	oneTimeSecretIDString := r.PathValue("setup_id")
 
 	logger := zerolog.Ctx(r.Context())
 

@@ -214,12 +214,12 @@ func (s *Server) registerAdminRoutes() {
 
 						// ISN management
 						r.Post("/", isn.CreateIsnHandler)
-						r.Put("/i/{isn_slug}", isn.UpdateIsnHandler)
+						r.Put("/{isn_slug}", isn.UpdateIsnHandler)
 
 						// signal types managment
 						r.Post("/{isn_slug}/signal_types", signalTypes.CreateSignalTypeHandler)
-						r.Put("/{isn_slug}/signal_types/{slug}/v{sem_ver}", signalTypes.UpdateSignalTypeHandler)
-						r.Delete("/{isn_slug}/signal_types/{slug}/v{sem_ver}", signalTypes.DeleteSignalTypeHandler)
+						r.Put("/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}", signalTypes.UpdateSignalTypeHandler)
+						r.Delete("/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}", signalTypes.DeleteSignalTypeHandler)
 
 						// ISN account permissions
 						r.Put("/{isn_slug}/accounts/{account_id}", isnAccount.GrantIsnAccountHandler)
@@ -243,7 +243,7 @@ func (s *Server) registerAdminRoutes() {
 					r.Get("/", isn.GetIsnsHandler)
 					r.Get("/{isn_slug}", isn.GetIsnHandler)
 					r.Get("/{isn_slug}/signal_types", signalTypes.GetSignalTypesHandler)
-					r.Get("/{isn_slug}/signal_types/{slug}/v{sem_ver}", signalTypes.GetSignalTypeHandler)
+					r.Get("/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}", signalTypes.GetSignalTypeHandler)
 				})
 
 			})
