@@ -137,10 +137,10 @@ type SignalVersionDoc struct {
 //	@Tags			Signal sharing
 //
 //	@Description	Submit an array of signals for storage on the ISN
-//	@Description	- payloads must not mix signals of different types and is subject to the size limits defined on the site.
+//	@Description	- payloads must not mix signals of different types and are subject to the size limits defined on the site.
 //	@Description	- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.
-//	@Description	- If a local reference is received more than once from an account for a specified signal_type it will be stored with a incremented version number.
-//	@Description	- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account.
+//	@Description	- If a local reference is received more than once from an account for the specified signal_type it will be stored with a incremented version number.
+//	@Description	- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.
 //	@Description	- requests are only accepted for the open signal batch for this account/ISN.
 //	@Description
 //	@Description	**Authentication**
@@ -148,11 +148,9 @@ type SignalVersionDoc struct {
 //	@Description	Requires a valid access token.
 //	@Description	The claims in the access token list the ISNs and signal_types that the account is permitted to use.
 //	@Description
-//	@Description	This handler also checks that the signal_type/sem_ver in the url is also listed in the claims (this is to catch mistyped urls)
-//	@Description
 //	@Description	**Validation and Processing**
 //	@Description
-//	@Description	Signals are validated against the json schema specified for the signal type unless validation is disabled on the type definition.
+//	@Description	Signals are validated against the JSON schema specified for the signal type unless validation is disabled on the type definition.
 //	@Description	Individual signal processing failures (validation errors, incorrect correlation ids, database errors) are recorded in the response but do not prevent other signals from being processed.
 //	@Description
 //	@Description	When validation is disabled, basic checks are still done on the incoming data and the following issues create a 400 error and cause the entire payload to be rejected:
@@ -168,7 +166,7 @@ type SignalVersionDoc struct {
 //	@Description	- 400: authentication, or other request-level errors
 //	@Description	- 500: Internal server errors
 //	@Description
-//	@Description	Internal server errors cause the whole payload to be rejected.
+//	@Description	400 and 500 errors cause the whole payload to be rejected (note these failures are not logged on the database and should be handled by the client immediately).
 //
 //	@Param			isn_slug			path		string								true	"isn slug"						example(sample-isn--example-org)
 //	@Param			signal_type_slug	path		string								true	"signal type slug"				example(sample-signal--example-org)
@@ -584,7 +582,7 @@ func (s *SignalsHandler) SearchPublicSignalsHandler(w http.ResponseWriter, r *ht
 //	@Summary		Search for signals in private ISNs
 //	@Tags			Signal sharing
 //
-//	@Description	Search for signals by date or account in private ISNs (authentication required)
+//	@Description	Search for signals by date or account in private ISNs (authentication required - only accounts with read or write permissions to the ISN can access signals)
 //	@Description
 //	@Description	Note the endpoint returns the latest version of each signal and does not include withdrawn or archived signals
 //
@@ -709,11 +707,11 @@ func (s *SignalsHandler) SearchPrivateSignalsHandler(w http.ResponseWriter, r *h
 // WithdrawSignalHandler godoc
 //
 //	@Summary		Withdraw a signal
-//	@Description	Withdraw a signal by signal ID or local reference
+//	@Description	Withdraw a signal by local reference
 //	@Description
-//	@Description	Signals can only be withdrawn by the account that created the signal.
 //	@Description	Withdrawn signals are hidden from search results by default but remain in the database.
-//	@Description	To reactivate a signal resupply it with the same local_ref.
+//	@Description	Signals can only be withdrawn by the account that created the signal.
+//	@Description	To reactivate a signal resupply it with the same local_ref using the 'create signals' end point.
 //
 //	@Tags			Signal sharing
 //

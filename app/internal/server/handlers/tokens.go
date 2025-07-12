@@ -143,10 +143,10 @@ func (a *TokenHandler) NewAccessTokenHandler(w http.ResponseWriter, r *http.Requ
 //	@Description
 //	@Description	**Service Accounts:**
 //	@Description	You must supply your `client ID` and `client secret` in the request body.
-//	@Description	This revokes **ALL** client secrets for the service account, effectively disabling it.
+//	@Description	This revokes all client secrets for the service account, effectively disabling it.
 //	@Description
 //	@Description	**IMPORTANT - Service Account Reinstatement:**
-//	@Description	- This endpoint does **NOT** permanently disable the service account itself
+//	@Description	- This endpoint does not permanently disable the service account itself (use `POST /admin/accounts/{account_id}/disable` for that)
 //	@Description	- To restore access, an admin must call `POST /api/auth/register/service-accounts` with the same organization and email
 //	@Description	- This will generate a new setup URL and client secret while preserving the same client_id
 //	@Description	- If the account was disabled by an admin, it must first be re-enabled via `POST /admin/accounts/{account_id}/enable`
@@ -256,7 +256,7 @@ func (a *TokenHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.
 //
 //	@Summary		Rotate service account client secret
 //	@Description	Self-service endpoint for service accounts to rotate their client secret.
-//	@Description	Requires current valid client_id and client_secret for authentication.
+//	@Description	This endpoint requires current valid client_id and client_secret for authentication.
 //	@Description	The old secret remains valid for 5 minutes to prevent race conditions when multiple instances are involved and to stop clients being locked out where network issues prevent them from receiving the new secret immediately.
 //
 // y.

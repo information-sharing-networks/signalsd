@@ -48,9 +48,13 @@ type UpdatePasswordRequest struct {
 //	@Tags			auth
 //
 //	@Param			request	body	handlers.CreateUserRequest	true	"user details"
-//	@Description	The first user to be created for this service will be created with an admin role.
-//	@Description	Subsequent accounts default to standard member roles.
+//	@Description	The first user created is granted the "owner" role and has super-user access to the site.
+//	@Description
+//	@Description	Web users can register directly and default to standard member roles.
 //	@Description	New members can't access any information beyond the public data on the site until an admin grants them access to an ISN.
+//	@Description
+//	@Description	The site owner can grant other users the admin role.
+//	@Description	Admins can create ISNs and service accounts and grant other accounts permissions to read or write to ISNs they created.
 //
 //	@Success		201
 //	@Failure		400	{object}	responses.ErrorResponse	"Bad request with possible error codes: malformed_body, password_too_short"
@@ -151,7 +155,7 @@ func (u *UserHandler) RegisterUserHandler(w http.ResponseWriter, r *http.Request
 // UpdatePasswordHandler godoc
 //
 //	@Summary		Password reset
-//	@Description	Use this api when a user wants to reset their password.  Requires a valid access token and the current password
+//	@Description	Self-service endpoint for users to reset their password.  Requires a valid access token and the current password
 //	@Description
 //	@Tags		auth
 //
