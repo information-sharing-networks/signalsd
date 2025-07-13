@@ -4,8 +4,8 @@ import (
 	"crypto/rand"
 	"encoding/base32"
 	"fmt"
+	"io"
 	"net/http"
-	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -46,36 +46,77 @@ func GenerateSlug(input string) (string, error) {
 	return trimmed, nil
 }
 
-// currently links to files in files in public github repos are supported - it is recommended to link to a tagged version of the file,
-// e.g https://github.com/information-sharing-networks/transmission/blob/v2.21.2/locales/af.json
-func CheckSignalTypeURL(rawURL string, urlType string) error {
-	// TODO - additional checks, e.g checking the file exists and - in case of scheam urls - is a valid json schema.
-	parsedURL, err := url.ParseRequestURI(rawURL)
+// ValidateGithubFileURL validates the GitHub URLs for schema and readme files submitted as part of the signal type definition
+func ValidateGithubFileURL(rawURL string, fileType string) error {
+	// Handle special skip validation URL for schemas
+	if fileType == "schema" && rawURL == "https://github.com/skip/validation/main/schema.json" {
+		return nil
+	}
+
+	// Example: https://github.com/user/repo/blob/branch/path/to/file.json
+	pattern := `^https://github\.com/[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+/.+$`
+	matched, err := regexp.MatchString(pattern, rawURL)
 	if err != nil {
-		return fmt.Errorf("invalid URL supplied: %w", err)
+		return fmt.Errorf("internal error validating URL pattern: %w", err)
+	}
+	if !matched {
+		return fmt.Errorf("URL must be a valid GitHub file URL (e.g., https://github.com/user/repo/blob/main/file)")
 	}
 
-	if parsedURL.Scheme != "https" || parsedURL.Host != "github.com" {
-		return fmt.Errorf("expecting an absolute url for a file in a public github repo, e.g https://github.com/user/project/v0.0.1/locales/filename")
-	}
-
-	suffixPattern := `\.(([^\.\/]+$))`
-	re := regexp.MustCompile(suffixPattern)
-	suffix := re.FindStringSubmatch(parsedURL.Path)[0]
-
-	switch urlType {
+	switch fileType {
 	case "schema":
-		if suffix != ".json" {
-			return fmt.Errorf("expected a .json file")
+		if !strings.HasSuffix(rawURL, ".json") {
+			return fmt.Errorf("URL must point to a .json file")
 		}
 	case "readme":
-		if suffix != ".md" {
-			return fmt.Errorf("expected a .md file")
+		if !strings.HasSuffix(rawURL, ".md") {
+			return fmt.Errorf("URL must point to a .md file")
 		}
 	default:
-		return fmt.Errorf("internal server error - invalid url type sent to function %s", urlType)
+		return fmt.Errorf("internal error: unsupported file type '%s' for validation", fileType)
 	}
+
 	return nil
+}
+
+// FetchGithubFileContent fetches content from GitHub URLs specified in the schema and readme fields of signal types
+func FetchGithubFileContent(rawURL string) (string, error) {
+	// Handle special skip validation URL
+	if rawURL == "https://github.com/skip/validation/main/schema.json" {
+		return "{}", nil
+	}
+
+	// Convert GitHub blob URLs to raw URLs
+	// Example: https://github.com/org/repo/blob/main/file.json -> https://raw.githubusercontent.com/org/repo/main/file.json
+	if strings.HasPrefix(rawURL, "https://github.com/") {
+		rawURL = strings.Replace(rawURL, "https://github.com/", "https://raw.githubusercontent.com/", 1)
+		rawURL = strings.Replace(rawURL, "/blob/", "/", 1)
+	}
+
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse // Disable redirects for SSRF protection
+		},
+	}
+
+	// #nosec G107 -- avoid false postive security linter warning - URL is validated to be GitHub-only before this function is called (see ValidateGithubFileURL)
+	res, err := client.Get(rawURL)
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch content: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("fetch failed with status: %d", res.StatusCode)
+	}
+
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		return "", fmt.Errorf("failed to read response: %w", err)
+	}
+
+	return string(bodyBytes), nil
 }
 
 // expects a semver in the form "major.minor.patch" and increments major/minor/patch according to supplied bump_type

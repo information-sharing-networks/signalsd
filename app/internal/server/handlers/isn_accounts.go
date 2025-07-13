@@ -277,7 +277,6 @@ func (i *IsnAccountHandler) RevokeIsnAccountHandler(w http.ResponseWriter, r *ht
 		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, fmt.Sprintf("User account ID: %v cannot revoke ISN permissions for its own account", userAccountID))
 		return
 	}
-	responses.RespondWithError(w, r, http.StatusNoContent, apperrors.ErrCodeNotImplemented, "todo - not yet implemented")
 
 	// check if the target user has an ISN permission to revoke
 	_, err = i.queries.GetIsnAccountByIsnAndAccountID(r.Context(), database.GetIsnAccountByIsnAndAccountIDParams{
