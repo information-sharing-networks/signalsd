@@ -8,7 +8,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
@@ -80,7 +79,7 @@ import (
 //	@description	### CORS Protection
 //	@description 	By default the server will start with ALLOWED_ORIGINS=*
 //	@description
-//	@description	This should not be used in production - you must to specify the list of client origins that are allowed to access the API in the ALLOWED_ORIGINS environment variable before starting the server.
+//	@description	This should not be used in production - you must specify the list of client origins that are allowed to access the API in the ALLOWED_ORIGINS environment variable before starting the server.
 //	@description
 //	@description	## Date/Time Handling:
 //	@description
@@ -148,7 +147,7 @@ func main() {
 				return fmt.Errorf("invalid service mode '%s'. Valid modes: all, admin, signals, signals-read, signals-write", mode)
 			}
 
-			return runServer(mode)
+			return run(mode)
 		},
 	}
 
@@ -167,7 +166,7 @@ func main() {
 	}
 }
 
-func runServer(mode string) error {
+func run(mode string) error {
 	serverLogger := logger.InitServerLogger()
 
 	cfg, corsConfigs, err := signalsd.NewServerConfig(serverLogger)
@@ -207,17 +206,26 @@ func runServer(mode string) error {
 
 	queries := database.New(pool)
 
-	if err := schemas.LoadSchemaCache(ctx, queries); err != nil {
+	schemaCache := schemas.NewSchemaCache()
+	if err := schemaCache.Load(ctx, queries); err != nil {
 		serverLogger.Fatal().Msgf("Failed to load schema cache: %v", err)
 	}
-	serverLogger.Info().Msg("Schema cache loaded")
 
-	if err := isns.LoadPublicISNCache(ctx, queries); err != nil {
+	if schemaCache.Len() > 0 {
+		serverLogger.Info().Msgf("Loaded %d signal schemas into cache", schemaCache.Len())
+	} else {
+		serverLogger.Info().Msgf("No signal schemas defined for this site")
+	}
+
+	publicIsnCache := isns.NewPublicIsnCache()
+	if err := publicIsnCache.Load(ctx, queries); err != nil {
 		serverLogger.Fatal().Msgf("Failed to load public ISN cache: %v", err)
 	}
 
-	if isns.PublicISNCount() >= 0 {
-		serverLogger.Info().Msg("Public ISN cache loaded")
+	if publicIsnCache.Len() > 0 {
+		serverLogger.Info().Msgf("Loaded %d public ISNs into cache", publicIsnCache.Len())
+	} else {
+		serverLogger.Info().Msgf("No public ISNs defined for this site")
 	}
 
 	if cfg.RateLimitRPS <= 0 {
@@ -225,18 +233,6 @@ func runServer(mode string) error {
 	}
 
 	authService := auth.NewAuthService(cfg.SecretKey, cfg.Environment, queries)
-	router := chi.NewRouter()
-
-	server := server.NewServer(&server.Server{
-		Pool:         pool,
-		Queries:      queries,
-		AuthService:  authService,
-		ServerConfig: cfg,
-		CORSConfigs:  corsConfigs,
-		ServerLogger: serverLogger,
-		HTTPLogger:   httpLogger,
-		Router:       router,
-	})
 
 	serverLogger.Info().Msgf("CORS allowed origins: %v", cfg.AllowedOrigins)
 
@@ -245,7 +241,20 @@ func runServer(mode string) error {
 	}
 
 	serverLogger.Info().Msgf("service mode: %s", cfg.ServiceMode)
+
 	serverLogger.Info().Msgf("Starting server (version: %s)", version.Get().Version)
+
+	server := server.NewServer(
+		pool,
+		queries,
+		authService,
+		cfg,
+		corsConfigs,
+		serverLogger,
+		httpLogger,
+		schemaCache,
+		publicIsnCache,
+	)
 
 	server.Run()
 

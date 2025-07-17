@@ -23,14 +23,18 @@ import (
 )
 
 type SignalsHandler struct {
-	queries *database.Queries
-	pool    *pgxpool.Pool
+	queries        *database.Queries
+	pool           *pgxpool.Pool
+	schemaCache    *schemas.SchemaCache
+	publicIsnCache *isns.PublicIsnCache
 }
 
-func NewSignalsHandler(queries *database.Queries, pool *pgxpool.Pool) *SignalsHandler {
+func NewSignalsHandler(queries *database.Queries, pool *pgxpool.Pool, schemaCache *schemas.SchemaCache, publicIsnCache *isns.PublicIsnCache) *SignalsHandler {
 	return &SignalsHandler{
-		queries: queries,
-		pool:    pool,
+		queries:        queries,
+		pool:           pool,
+		schemaCache:    schemaCache,
+		publicIsnCache: publicIsnCache,
 	}
 }
 
@@ -293,7 +297,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 	// Validate all signals against schema - record validation failures
 	validSignals := make([]Signal, 0)
 	for _, signal := range createSignalsRequest.Signals {
-		err = schemas.ValidateSignal(r.Context(), s.queries, signalTypePath, signal.Content)
+		err = s.schemaCache.ValidateSignal(r.Context(), s.queries, signalTypePath, signal.Content)
 		if err != nil {
 			// Add to failed signals list
 			createSignalsResponse.Results.FailedSignals = append(createSignalsResponse.Results.FailedSignals, FailedSignal{
@@ -524,7 +528,7 @@ func (s *SignalsHandler) SearchPublicSignalsHandler(w http.ResponseWriter, r *ht
 	}
 
 	// Validate this is a public ISN
-	if !isns.IsPublicSignalType(isnSlug, signalTypePath) {
+	if !s.publicIsnCache.HasSignalType(isnSlug, signalTypePath) {
 		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("invalid public ISN or signal type %v is not available on this ISN", signalTypePath))
 		return
 	}

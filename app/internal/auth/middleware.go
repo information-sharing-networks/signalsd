@@ -26,7 +26,7 @@ type ServiceAccountTokenRequest struct {
 // (this option is used by /oauth/revoke, which needs to use the userAccountID in the expired token to determine which refresh token to revoke when handling web users)
 //
 // The claims were added to the jwt when it was refreshed and record the account role and ISN read/write permissions.
-func (a AuthService) RequireValidAccessToken(allowExpired bool) func(http.Handler) http.Handler {
+func (a *AuthService) RequireValidAccessToken(allowExpired bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -80,7 +80,7 @@ func (a AuthService) RequireValidAccessToken(allowExpired bool) func(http.Handle
 //
 // Authentication is done by vaildating client credentials (service accounts) or the supplied refresh token (web users).
 // This middleware should be called before allowing an account to get a new access token.
-func (a AuthService) RequireOAuthGrantType(next http.Handler) http.Handler {
+func (a *AuthService) RequireOAuthGrantType(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		grantType := r.URL.Query().Get("grant_type")
 
@@ -99,7 +99,7 @@ func (a AuthService) RequireOAuthGrantType(next http.Handler) http.Handler {
 // RequireValidRefreshToken checks that the refresh token is not expired or revoked and adds the hashedRefreshToken to the Conext
 // for web users
 // Note that this middleware should only be used after RequireOAuthGrantType, which adds the userAccountID to the context
-func (a AuthService) RequireValidRefreshToken(next http.Handler) http.Handler {
+func (a *AuthService) RequireValidRefreshToken(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		logger := zerolog.Ctx(r.Context())
@@ -164,7 +164,7 @@ func (a AuthService) RequireValidRefreshToken(next http.Handler) http.Handler {
 
 // client crentials are used to authenticate service accounts when they want to refresh access tokens
 // no bearer token required - authenticaton is done using the client credentials.
-func (a AuthService) RequireValidClientCredentials(next http.Handler) http.Handler {
+func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		var req ServiceAccountTokenRequest
@@ -219,7 +219,7 @@ func (a AuthService) RequireValidClientCredentials(next http.Handler) http.Handl
 // RequireValidAccountTypeCredentials determines the authentication method based on request structure:
 // - If Authorization header is present: Web user (requires bearer token + refresh token cookie)
 // - If no Authorization header: Service account (requires client credentials in JSON body)
-func (a AuthService) RequireValidAccountTypeCredentials(next http.Handler) http.Handler {
+func (a *AuthService) RequireValidAccountTypeCredentials(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
 
@@ -234,7 +234,7 @@ func (a AuthService) RequireValidAccountTypeCredentials(next http.Handler) http.
 
 // check the account role in the jwt claims matches one of the roles supplied in the function call.
 // RequireRole hould only be used after RequireValidAccessToken middlware, which adds the claims (including the account role) to the context
-func (a AuthService) RequireRole(allowedRoles ...string) func(http.Handler) http.Handler {
+func (a *AuthService) RequireRole(allowedRoles ...string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			logger := zerolog.Ctx(r.Context())
@@ -258,7 +258,7 @@ func (a AuthService) RequireRole(allowedRoles ...string) func(http.Handler) http
 
 // check the access_token claims to ensure the account can write to this isn
 // should only be used after RequireValidAccessToken middlware, which adds the claims in the context
-func (a AuthService) RequireIsnPermission(allowedPermissions ...string) func(http.Handler) http.Handler {
+func (a *AuthService) RequireIsnPermission(allowedPermissions ...string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -289,7 +289,7 @@ func (a AuthService) RequireIsnPermission(allowedPermissions ...string) func(htt
 	}
 }
 
-func (a AuthService) RequireDevEnv(next http.Handler) http.Handler {
+func (a *AuthService) RequireDevEnv(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		logger := zerolog.Ctx(r.Context())
@@ -301,31 +301,4 @@ func (a AuthService) RequireDevEnv(next http.Handler) http.Handler {
 		logger.Info().Msg("Dev environment confirmed")
 		next.ServeHTTP(w, r)
 	})
-}
-
-// RequireISNAccessPermission skips authentication for public ISNs.
-// For private ISNs, it requires valid access token and read/write isn permission.
-func (a AuthService) RequireISNAccessPermission(isPublicISN func(string) bool) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			logger := zerolog.Ctx(r.Context())
-
-			isnSlug := r.PathValue("isn_slug")
-			if isnSlug == "" {
-				responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInvalidRequest, "no isn_slug parameter")
-				return
-			}
-
-			if isPublicISN(isnSlug) {
-				logger.Info().Msgf("Public ISN access granted for: %v", isnSlug)
-				next.ServeHTTP(w, r)
-				return
-			}
-
-			// For private ISNs, apply standard authentication and permission checks
-			a.RequireValidAccessToken(false)(
-				a.RequireIsnPermission("read", "write")(next),
-			).ServeHTTP(w, r)
-		})
-	}
 }

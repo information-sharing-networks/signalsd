@@ -58,7 +58,7 @@ type AccessTokenClaims struct {
 	IsnPerms    map[string]IsnPerms `json:"isn_perms,omitempty" example:"isn1"`
 }
 
-func (a AuthService) HashPassword(password string) (string, error) {
+func (a *AuthService) HashPassword(password string) (string, error) {
 	dat, err := bcrypt.GenerateFromPassword([]byte(password), signalsd.BcryptCost)
 	if err != nil {
 		return "", err
@@ -66,13 +66,13 @@ func (a AuthService) HashPassword(password string) (string, error) {
 	return string(dat), nil
 }
 
-func (a AuthService) CheckPasswordHash(hash, password string) error {
+func (a *AuthService) CheckPasswordHash(hash, password string) error {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 }
 
 // GenerateSecureToken
 // Returns the token as a base64-URL-encoded string for safe transmission/storage
-func (a AuthService) GenerateSecureToken(byteLength int) (string, error) {
+func (a *AuthService) GenerateSecureToken(byteLength int) (string, error) {
 	tokenBytes := make([]byte, byteLength)
 	_, err := io.ReadFull(rand.Reader, tokenBytes)
 	if err != nil {
@@ -83,14 +83,14 @@ func (a AuthService) GenerateSecureToken(byteLength int) (string, error) {
 }
 
 // hash a token using sha512
-func (a AuthService) HashToken(token string) string {
+func (a *AuthService) HashToken(token string) string {
 	hasher := sha512.New()
 	hasher.Write([]byte(token))
 	return base64.URLEncoding.EncodeToString(hasher.Sum(nil))
 }
 
 // check that the hashed value of a token is the same as the supplied hash
-func (a AuthService) CheckTokenHash(hash string, token string) bool {
+func (a *AuthService) CheckTokenHash(hash string, token string) bool {
 	return hash == a.HashToken(token)
 }
 
@@ -117,7 +117,7 @@ func (a AuthService) CheckTokenHash(hash string, token string) bool {
 //
 //	Note that since the tokens last 30 mins, there is the potential for the permissions to become stale.
 //	if there are particular requests that *must* have the latest permissions the handler should check the db rather than using the claims info.
-func (a AuthService) CreateAccessToken(ctx context.Context) (AccessTokenResponse, error) {
+func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenResponse, error) {
 
 	issuedAt := time.Now()
 	expiresAt := issuedAt.Add(signalsd.AccessTokenExpiry)
@@ -261,7 +261,7 @@ func (a AuthService) CreateAccessToken(ctx context.Context) (AccessTokenResponse
 }
 
 // rerturn the JWT access token from Authorization header
-func (a AuthService) GetAccessTokenFromHeader(headers http.Header) (string, error) {
+func (a *AuthService) GetAccessTokenFromHeader(headers http.Header) (string, error) {
 	authorizationHeaderValue := headers.Get("Authorization")
 	if authorizationHeaderValue == "" {
 		return "", fmt.Errorf("authorization header is missing")
@@ -278,7 +278,7 @@ func (a AuthService) GetAccessTokenFromHeader(headers http.Header) (string, erro
 // revoke any open refresh tokens for the user contained in the shared context
 // stores the hashed token
 // returns the new token as plain text
-func (a AuthService) RotateRefreshToken(ctx context.Context) (string, error) {
+func (a *AuthService) RotateRefreshToken(ctx context.Context) (string, error) {
 	userAccountID, ok := ContextAccountID(ctx)
 	if !ok {
 		return "", fmt.Errorf("authservice: did not receive userAccountID from middleware")
@@ -309,7 +309,7 @@ func (a AuthService) RotateRefreshToken(ctx context.Context) (string, error) {
 
 	return plainTextToken, nil
 }
-func (a AuthService) NewRefreshTokenCookie(environment string, refreshToken string) *http.Cookie {
+func (a *AuthService) NewRefreshTokenCookie(environment string, refreshToken string) *http.Cookie {
 
 	isProd := a.environment == "prod" //Secure flag is only true on prod
 

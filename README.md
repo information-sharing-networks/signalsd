@@ -157,6 +157,9 @@ docker compose exec app sh -c "cd /signalsd/app && sqlc generate"
 # Connect to the postgres database
 docker exec -it signalsd-db psql -U signalsd-dev -d signalsd_admin
 
+# run the go app locally and use the docker postgres database 
+DATABASE_URL="postgres://signalsd-dev@localhost:15432/signalsd_admin?sslmode=disable" SECRET_KEY="mysecretkey" go run cmd/signalsd/main.go --mode all
+
 # Stop and remove the environment completely
 docker compose down --rmi local -v
 ```
