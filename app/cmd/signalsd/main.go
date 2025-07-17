@@ -227,7 +227,16 @@ func runServer(mode string) error {
 	authService := auth.NewAuthService(cfg.SecretKey, cfg.Environment, queries)
 	router := chi.NewRouter()
 
-	server := server.NewServer(pool, queries, authService, cfg, corsConfigs, serverLogger, httpLogger, router)
+	server := server.NewServer(&server.Server{
+		Pool:         pool,
+		Queries:      queries,
+		AuthService:  authService,
+		ServerConfig: cfg,
+		CORSConfigs:  corsConfigs,
+		ServerLogger: serverLogger,
+		HTTPLogger:   httpLogger,
+		Router:       router,
+	})
 
 	serverLogger.Info().Msgf("CORS allowed origins: %v", cfg.AllowedOrigins)
 

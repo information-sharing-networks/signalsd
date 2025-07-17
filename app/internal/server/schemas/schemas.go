@@ -4,12 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"regexp"
 	"strings"
 	"sync"
-	"time"
 
 	signalsd "github.com/information-sharing-networks/signalsd/app"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
@@ -33,64 +29,6 @@ var (
 	cache      *schemaCache
 	cacheMutex sync.RWMutex
 )
-
-// FetchSchema gets a JSON schema from a URL
-// if the supplied url is a 'blob' url (i.e. the url rendered by github web interface) it will be converted to a raw url so the actual json content is fetched
-func FetchSchema(url string) (string, error) {
-	originalURL := url
-
-	// Example: https://github.com/org/repo/blob/2025.01.01/file.json
-	//       -> https://raw.githubusercontent.com/org/repo/2025.01.01/file.json
-	if strings.HasPrefix(url, "https://github.com/") {
-		url = strings.Replace(url, "https://github.com/", "https://raw.githubusercontent.com/", 1)
-		url = strings.Replace(url, "/blob/", "/", 1)
-	}
-
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-	}
-
-	// #nosec G107 -- URL is validated to be GitHub-only before this function is called
-	res, err := client.Get(url)
-	if err != nil {
-		return "", fmt.Errorf("failed to fetch schema from %s: %w", originalURL, err)
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		if res.StatusCode == http.StatusNotFound {
-			return "", fmt.Errorf("schema not found at %s", originalURL)
-		}
-		return "", fmt.Errorf("schema fetch failed with status: %d", res.StatusCode)
-	}
-
-	bodyBytes, err := io.ReadAll(res.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	return string(bodyBytes), nil
-}
-
-// checks if URL is a github url ending in .json
-func ValidateSchemaURL(url string) error {
-
-	if SkipValidation(url) {
-		return nil
-	}
-
-	githubPattern := `^https://github\.com/[a-zA-Z0-9_-]+/[a-zA-Z0-9_.-]+/.*\.json$`
-	matched, err := regexp.MatchString(githubPattern, url)
-	if err != nil {
-		return fmt.Errorf("error validating URL pattern: %w", err)
-	}
-
-	if !matched {
-		return fmt.Errorf("schema URL must be a GitHub URL ending in .json (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json) or use %s to skip validation", signalsd.SkipValidationURL)
-	}
-
-	return nil
-}
 
 // ValidateAndCompileSchema validates schema content and returns the compiled schema
 func ValidateAndCompileSchema(schemaURL, content string) (*jsonschema.Schema, error) {

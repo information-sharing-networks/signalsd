@@ -160,11 +160,11 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 		return
 	}
 
-	if err := utils.CheckSignalTypeURL(req.SchemaURL, "schema"); err != nil {
+	if err := utils.ValidateGithubFileURL(req.SchemaURL, "schema"); err != nil {
 		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("invalid schema url: %v", err))
 		return
 	}
-	if err := utils.CheckSignalTypeURL(*req.ReadmeURL, "readme"); err != nil {
+	if err := utils.ValidateGithubFileURL(*req.ReadmeURL, "readme"); err != nil {
 		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("invalid readme url: %v", err))
 		return
 	}
@@ -207,18 +207,13 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 		return
 	}
 
-	if err := schemas.ValidateSchemaURL(req.SchemaURL); err != nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("schema URL validation failed: %v", err))
-		return
-	}
-
-	// Fetch and validate the schema
+	// Fetch and compile the schema
 	var schemaContent string
-	if schemas.SkipValidation(req.SchemaURL) {
+	if req.SchemaURL == "https://github.com/skip/validation/main/schema.json" {
 		// for consistency store the permissive schema in the db
 		schemaContent = "{}"
 	} else {
-		schemaContent, err = schemas.FetchSchema(req.SchemaURL)
+		schemaContent, err = utils.FetchGithubFileContent(req.SchemaURL)
 		if err != nil {
 			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("could not fetch schema from github: %v", err))
 			return
@@ -360,7 +355,7 @@ func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *ht
 	}
 	// prepare struct for update
 	if req.ReadmeURL != nil {
-		if err := utils.CheckSignalTypeURL(*req.ReadmeURL, "readme"); err != nil {
+		if err := utils.ValidateGithubFileURL(*req.ReadmeURL, "readme"); err != nil {
 			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("invalid readme url: %v", err))
 			return
 		}
@@ -489,7 +484,6 @@ func (s *SignalTypeHandler) GetSignalTypesHandler(w http.ResponseWriter, r *http
 		return
 	}
 
-	// Convert database structs to our response structs
 	signalTypes := make([]SignalTypeDetail, len(dbSignalTypes))
 	for i, dbSignalType := range dbSignalTypes {
 		signalTypes[i] = SignalTypeDetail{
