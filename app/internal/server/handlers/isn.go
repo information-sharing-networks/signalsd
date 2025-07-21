@@ -102,6 +102,8 @@ type IsnAndLinkedInfo struct {
 //	@Description	Site owners automatically get write permission on all ISNs.
 //	@Description
 //	@Description	This endpoint can only be used by the site owner or an admin
+//	@Description
+//	@Description	Note there is a cache of public ISNs that is used by the search endpoints. This cache is not dynamically loaded, so adding public ISNs requires a restart of the service
 //
 //	@Tags			ISN configuration
 //
