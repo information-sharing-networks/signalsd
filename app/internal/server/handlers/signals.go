@@ -439,7 +439,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 	if len(createSignalsResponse.Results.FailedSignals) > 0 {
 		for _, failed := range createSignalsResponse.Results.FailedSignals {
 			_, err := s.queries.CreateSignalProcessingFailureDetail(r.Context(), database.CreateSignalProcessingFailureDetailParams{
-				SignalBatchID:    *claims.IsnPerms[isnSlug].SignalBatchID,
+				SignalBatchID:    signalBatchID,
 				SignalTypeSlug:   signalTypeSlug,
 				SignalTypeSemVer: semVer,
 				LocalRef:         failed.LocalRef,
@@ -529,7 +529,7 @@ func (s *SignalsHandler) SearchPublicSignalsHandler(w http.ResponseWriter, r *ht
 
 	// Validate this is a public ISN
 	if !s.publicIsnCache.HasSignalType(isnSlug, signalTypePath) {
-		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("invalid public ISN or signal type %v is not available on this ISN", signalTypePath))
+		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("invalid public ISN or signal type: %v is not available on this ISN", signalTypePath))
 		return
 	}
 

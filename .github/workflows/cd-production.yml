@@ -1,5 +1,5 @@
-# build signalsd image, push to gcloud and deploy to gcloud run
-name: CD
+# Deploy to production environment on version tags
+name: Deploy to Production
 
 on:
   push:
@@ -8,16 +8,16 @@ on:
   workflow_dispatch:
 
 env:
-  # Secrets
+  # Secrets 
   DATABASE_URL: ${{ secrets.DATABASE_URL }}
   SECRET_KEY: ${{ secrets.SECRET_KEY }}
   GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
 
-  # service configuration (GitHub variables with app defaults as fallback)
+  # Service configuration 
   ENVIRONMENT: prod
   LOG_LEVEL: info
 
-  # Google Cloud configuration
+  # Google Cloud configuration 
   SERVICE_NAME: signalsd
   PROJECT_ID: signals-462015
   REGION: europe-west2
@@ -27,10 +27,11 @@ env:
   RUNTIME_SERVICE_ACCOUNT: cloud-run-runtime@signals-462015.iam.gserviceaccount.com
   MAX_INSTANCES: 4
   CPU: 1
+  MEMORY: 512Mi
 
 jobs:
-  tests:
-    name: Deploy
+  deploy:
+    name: Deploy to Production
     runs-on: ubuntu-latest
 
     steps:
@@ -85,13 +86,13 @@ jobs:
 
       - name: Deploy to Cloud Run
         run: |
-          # Build environment variables string for Cloud Run
+          # Build environment variables string for Cloud Run 
           ENV_VARS="DATABASE_URL=${{ env.DATABASE_URL }}"
           ENV_VARS="${ENV_VARS},SECRET_KEY=${{ env.SECRET_KEY }}"
           ENV_VARS="${ENV_VARS},ENVIRONMENT=${{ env.ENVIRONMENT }}"
           ENV_VARS="${ENV_VARS},LOG_LEVEL=${{ env.LOG_LEVEL }}"
 
-          # Add optional configuration variables only if they are set
+          # Add optional configuration variables only if they are set 
           if [ -n "${{ vars.DB_MAX_CONNECTIONS }}" ]; then
             ENV_VARS="${ENV_VARS},DB_MAX_CONNECTIONS=${{ vars.DB_MAX_CONNECTIONS }}"
           fi
@@ -126,7 +127,7 @@ jobs:
             ENV_VARS="${ENV_VARS},IDLE_TIMEOUT=${{ vars.IDLE_TIMEOUT }}"
           fi
 
-          # Deploy to Cloud Run
+          # Deploy to Cloud Run 
           gcloud run deploy ${{ env.SERVICE_NAME }} \
             --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
             --region ${{ env.DEPLOY_REGION }} \
@@ -136,7 +137,7 @@ jobs:
             --set-env-vars "${ENV_VARS}" \
             --args="--mode,all" \
             --port 8080 \
-            --memory 512Mi \
+            --memory ${{ env.MEMORY }} \
             --cpu ${{ env.CPU }} \
             --min-instances 0 \
             --max-instances ${{ env.MAX_INSTANCES }}

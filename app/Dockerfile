@@ -1,4 +1,10 @@
-# build the signalsd service image for prod
+# build the signalsd service image for prod using scratch base.
+#
+# Note that the historical need to copy ca-certificates and tzdata from builder images do not apply in Go 1.24+:
+# - CA root certificates: Go's crypto/x509 package includes embedded root certificates for TLS connections (required by signald when it validates JSON schemas from github)
+# - Timezone data: Go's time/tzdata package can embed timezone data when needed (not required for signalsd)
+# - Static compilation (CGO_ENABLED=0) ensures all dependencies are embedded in the binary 
+#
 FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
@@ -12,27 +18,28 @@ COPY app .
 
 RUN mkdir runtime
 
-# Build args for version info
+# placeholder args for version info
 ARG VERSION=dev
 ARG BUILD_DATE=unknown
 ARG GIT_COMMIT=unknown
 
+# Build static binary 
 RUN CGO_ENABLED=0 GOOS=linux go build \
-    -ldflags "-X github.com/information-sharing-networks/signalsd/app/internal/version.version=${VERSION} -X github.com/information-sharing-networks/signalsd/app/internal/version.buildDate=${BUILD_DATE} -X github.com/information-sharing-networks/signalsd/app/internal/version.gitCommit=${GIT_COMMIT}" \
+    -a -installsuffix cgo \
+    -ldflags "-s -w -extldflags '-static' -X github.com/information-sharing-networks/signalsd/app/internal/version.version=${VERSION} -X github.com/information-sharing-networks/signalsd/app/internal/version.buildDate=${BUILD_DATE} -X github.com/information-sharing-networks/signalsd/app/internal/version.gitCommit=${GIT_COMMIT}" \
     -o runtime/signalsd cmd/signalsd/main.go
 
 COPY /app/docs runtime/docs/
 COPY /app/assets runtime/assets/
 
-# --- Create a runtime image ---
-FROM alpine:3.21
+# --- Create a minimal runtime image using scratch ---
+FROM scratch
 
-RUN addgroup -S signalsd && adduser -S -G signalsd signalsd
+# Copy application files
+COPY --from=builder /app/runtime /app/
 
 WORKDIR /app
 
-COPY --from=builder --chown=signalsd:signalsd /app/runtime .
-
-USER signalsd
+EXPOSE 8080
 
 ENTRYPOINT ["/app/signalsd"]

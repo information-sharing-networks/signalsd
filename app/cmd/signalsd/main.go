@@ -21,6 +21,8 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/version"
 
 	_ "github.com/information-sharing-networks/signalsd/app/docs"
+	// the fallback CA certs are required since the service deploys to a scratch docker image that does not include them (the certs are used when the app does external https requests to validate github hosted schemas)
+	_ "golang.org/x/crypto/x509roots/fallback"
 )
 
 //	@title			Signals ISN API
@@ -142,7 +144,6 @@ func main() {
   signalsd --mode signals-read  # Signal read operations only
   signalsd --mode signals-write # Signal write operations only`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Validate mode
 			if !signalsd.ValidServiceModes[mode] {
 				return fmt.Errorf("invalid service mode '%s'. Valid modes: all, admin, signals, signals-read, signals-write", mode)
 			}
@@ -151,13 +152,11 @@ func main() {
 		},
 	}
 
-	// Add flags
 	cmd.Flags().StringVarP(&mode, "mode", "m", "", "Service mode (required): all, admin, signals, signals-read, or signals-write")
 	if err := cmd.MarkFlagRequired("mode"); err != nil {
 		log.Fatalf("Failed to mark mode flag as required: %v", err)
 	}
 
-	// Version flag is handled automatically by Cobra
 	v := version.Get()
 	cmd.Version = fmt.Sprintf("%s (built %s, commit %s)", v.Version, v.BuildDate, v.GitCommit)
 
@@ -169,14 +168,25 @@ func main() {
 func run(mode string) error {
 	serverLogger := logger.InitServerLogger()
 
+	// get site config from environment variables
 	cfg, corsConfigs, err := signalsd.NewServerConfig(serverLogger)
 	if err != nil {
 		serverLogger.Fatal().Err(err).Msg("Failed to load configuration")
 	}
+
+	// cross-origin resource sharing rules for browser based access to the API (based on the ALLOWED_ORIGINS env config) - the cors middleware will ensure that only the listed partner sites can access the protected endpoints.
+	serverLogger.Info().Msgf("CORS allowed origins: %v", cfg.AllowedOrigins)
+
+	if cfg.Environment == "prod" && (len(cfg.AllowedOrigins) == 0 || (len(cfg.AllowedOrigins) == 1 && strings.TrimSpace(cfg.AllowedOrigins[0]) == "*")) {
+		serverLogger.Warn().Msg("production env is configured to allow all origins for CORS. Use the ALLOWED_ORIGINS env variable to restrict access to specific origins")
+	}
+
+	// the --mode command line param determines which endpoints should be served: all, admin, signals, signals-read, or signals-write
 	cfg.ServiceMode = mode
 
 	httpLogger := logger.InitHttpLogger(cfg.LogLevel, cfg.Environment)
 
+	// set up the pgx database connection pool
 	ctx, cancel := context.WithTimeout(context.Background(), signalsd.DatabasePingTimeout)
 	defer cancel()
 
@@ -204,8 +214,10 @@ func run(mode string) error {
 
 	serverLogger.Info().Msgf("connected to PostgreSQL at %v", safeURL)
 
+	// get the sqlc generated database queries
 	queries := database.New(pool)
 
+	// set up the signal schema cache - these schemas are stored on the database and used to validate the incoming signals (they are cached to avoid database roundtrips when validating signals)
 	schemaCache := schemas.NewSchemaCache()
 	if err := schemaCache.Load(ctx, queries); err != nil {
 		serverLogger.Fatal().Msgf("Failed to load schema cache: %v", err)
@@ -217,6 +229,7 @@ func run(mode string) error {
 		serverLogger.Info().Msgf("No signal schemas defined for this site")
 	}
 
+	// set up the public ISN cache - this is used by the public signal search endpoint (this endpoint can be used by unauthenticated users)
 	publicIsnCache := isns.NewPublicIsnCache()
 	if err := publicIsnCache.Load(ctx, queries); err != nil {
 		serverLogger.Fatal().Msgf("Failed to load public ISN cache: %v", err)
@@ -228,18 +241,15 @@ func run(mode string) error {
 		serverLogger.Info().Msgf("No public ISNs defined for this site")
 	}
 
+	// set up the site level rate limiter (disable if RPS <= 0) - note there are payload size limits in addition to rate limiting and these are set when the routes are created in the server package
 	if cfg.RateLimitRPS <= 0 {
 		serverLogger.Warn().Msg("rate limiting disabled")
 	}
 
+	// set up the authentication service (this provides functions for managing logins, tokens and auth middleware)
 	authService := auth.NewAuthService(cfg.SecretKey, cfg.Environment, queries)
 
-	serverLogger.Info().Msgf("CORS allowed origins: %v", cfg.AllowedOrigins)
-
-	if cfg.Environment == "prod" && (len(cfg.AllowedOrigins) == 0 || (len(cfg.AllowedOrigins) == 1 && strings.TrimSpace(cfg.AllowedOrigins[0]) == "*")) {
-		serverLogger.Warn().Msg("production env is configured to allow all origins for CORS. Use the ALLOWED_ORIGINS env variable to restrict access to specific origins")
-	}
-
+	// run the http server
 	serverLogger.Info().Msgf("service mode: %s", cfg.ServiceMode)
 
 	serverLogger.Info().Msgf("Starting server (version: %s)", version.Get().Version)

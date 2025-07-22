@@ -753,7 +753,7 @@
                         "RefreshTokenCookieAuth": []
                     }
                 ],
-                "description": "Create an Information Sharing Network (ISN)\n\nvisibility = \"private\" means that signalsd on the network can only be seen by network participants.\n\nISN admins automatically get write permission for their own ISNs.\nSite owners automatically get write permission on all ISNs.\n\nThis endpoint can only be used by the site owner or an admin",
+                "description": "Create an Information Sharing Network (ISN)\n\nvisibility = \"private\" means that signalsd on the network can only be seen by network participants.\n\nISN admins automatically get write permission for their own ISNs.\nSite owners automatically get write permission on all ISNs.\n\nThis endpoint can only be used by the site owner or an admin\n\nNote there is a cache of public ISNs that is used by the search endpoints. This cache is not dynamically loaded, so adding public ISNs requires a restart of the service",
                 "tags": [
                     "ISN configuration"
                 ],
