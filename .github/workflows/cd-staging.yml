@@ -9,8 +9,8 @@ on:
 
 env:
   # Secrets
-  DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
-  SECRET_KEY: ${{ secrets.STAGING_SECRET_KEY }}
+  STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+  STAGING_SECRET_KEY: ${{ secrets.STAGING_SECRET_KEY }}
   GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
 
   # Service configuration
@@ -82,13 +82,13 @@ jobs:
       - name: Run migrations
         run: |
           cd app
-          goose -dir sql/schema postgres ${{ env.DATABASE_URL }} up
+          goose -dir sql/schema postgres ${{ env.STAGING_DATABASE_URL }} up
 
       - name: Deploy to Cloud Run
         run: |
           # Build environment variables string for Cloud Run 
-          ENV_VARS="DATABASE_URL=${{ env.DATABASE_URL }}"
-          ENV_VARS="${ENV_VARS},SECRET_KEY=${{ env.SECRET_KEY }}"
+          ENV_VARS="DATABASE_URL=${{ env.STAGING_DATABASE_URL }}"
+          ENV_VARS="${ENV_VARS},SECRET_KEY=${{ env.STAGING_SECRET_KEY }}"
           ENV_VARS="${ENV_VARS},ENVIRONMENT=${{ env.ENVIRONMENT }}"
           ENV_VARS="${ENV_VARS},LOG_LEVEL=${{ env.LOG_LEVEL }}"
 
