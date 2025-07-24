@@ -80,9 +80,8 @@ jobs:
         run: go install github.com/pressly/goose/v3/cmd/goose@latest
 
       - name: Run migrations
-        run: |
-          cd app
-          goose -dir sql/schema postgres ${{ env.DATABASE_URL }} up
+        working-directory: app
+        run: goose -dir sql/schema postgres "${{ env.DATABASE_URL }}" up
 
       - name: Deploy to Cloud Run
         run: |
