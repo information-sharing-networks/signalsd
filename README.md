@@ -28,7 +28,7 @@ The [initial implementation](https://github.com/information-sharing-networks/isn
 This repo contains the second version (work in progress) - it develops the ISN administration facilities and will scale to higher volumes of data.
 
 There are three components:
-- an [API](https://information-sharing-networks.github.io/signalsd/app/docs/index.html) used to configure ISNs, register participants and deploy the data sharing infrastructure
+- an [API](https://signalsd.btddemo.org/docs) used to configure ISNs, register participants and deploy the data sharing infrastructure
 - an associated [framework agreement](https://github.com/information-sharing-networks/Framework) that establishes the responsibilities of the participants in an ISN
 - a demonstration UI
 
