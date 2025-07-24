@@ -18,6 +18,7 @@ require (
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/spf13/cobra v1.9.1
 	github.com/swaggo/swag v1.16.4
+	golang.org/x/crypto/x509roots/fallback v0.0.0-20250711192710-b903b535d3ef
 	golang.org/x/time v0.12.0
 )
 

@@ -3,7 +3,8 @@
 [Technical Overview](#technical-overview)
 
 ![ci](https://github.com/information-sharing-networks/signalsd/actions/workflows/ci.yml/badge.svg)
-![cd](https://github.com/information-sharing-networks/signalsd/actions/workflows/cd.yml/badge.svg)
+ ![cd-staging](https://github.com/information-sharing-networks/signalsd/actions/workflows/cd-staging.yml/badge.svg)
+ ![cd-production](https://github.com/information-sharing-networks/signalsd/actions/workflows/cd-production.yml/badge.svg)
 
 # Information Sharing Networks
 Information Sharing Networks (ISNs) are networks that enable interested parties to share information. The information is shared in the form of "signals".
@@ -126,8 +127,9 @@ docker compose restart app
 
 # For environment variable changes, use up instead of restart
 # This recreates the container with the new environment variables
+
+# start the http server on a different port:
 PORT=8081 docker compose up app
-RATE_LIMIT_RPS=0 docker compose up app  # Disable rate limiting
 
 # Performance testing configuration
 ENVIRONMENT=perf DB_MAX_CONNECTIONS=50 DB_MIN_CONNECTIONS=5 RATE_LIMIT_RPS=0 docker compose up app
@@ -141,10 +143,11 @@ ENVIRONMENT=prod DB_MAX_CONNECTIONS=25 DB_CONNECT_TIMEOUT=10s RATE_LIMIT_RPS=200
 # - Go tool versions (goose, sqlc, swag)
 docker compose up --build app
 
-# Connect to the app container
+# start a shell in the app container
 docker exec -it signalsd-app /bin/bash
 
-# Run individual tools inside the container if needed:
+# Run individual tools inside the container:
+
 # Generate API docs
 docker compose exec app sh -c "cd /signalsd/app && swag init -g ./cmd/signalsd/main.go"
 
@@ -166,7 +169,7 @@ docker compose down --rmi local -v
 
 The service starts on [http://localhost:8080](http://localhost:8080) by default.
 
-The API documentation is hosted as part of the service (alternatively you can see the documentation [here](https://information-sharing-networks.github.io/signalsd/app/docs/index.html))
+The API documentation is hosted as part of the service or you can refer to the [latest released docs](https://signals.btddemo.org/docs)
 
 ## Troubleshooting Docker Development Environment
 
@@ -225,7 +228,7 @@ CREATE DATABASE signalsd_admin;
 export DATABASE_URL="postgres://$(whoami):@localhost:5432/signalsd_admin?sslmode=disable"
 ```
 
-## Database Management
+### Database Management
 database schema migration is managed by [goose](https://github.com/pressly/goose):
 
 Schema changes are made by adding files to `app/sql/schema`:
@@ -236,14 +239,14 @@ Schema changes are made by adding files to `app/sql/schema`:
 ```
 Goose usage:
 ```sh
-# Update the schema to the current version (this command applys any new migrations).  If you are developing locally, Run this after pulling code from the GitHub repo (for docker users the migration is applied automatically whenever you restart the app container)
+# Update the schema to the current version (this command applies any new migrations).  If you are developing locally, run this after pulling code from the GitHub repo (for docker users the migration is applied automatically whenever you restart the app container)
 goose -dir app/sql/schema postgres $DATABASE_URL up
 
 # to reset the database to the initial state, dropping all database objects with
 goose -dir app/sql/schema postgres $DATABASE_URL down-to 0
 ```
 
-### Build and Run
+### Build and Run locally
 ```bash
 cd app
 go build ./cmd/signalsd/
@@ -251,7 +254,6 @@ go build ./cmd/signalsd/
 
 # Or run directly
 go run cmd/signalsd/main.go -mode all
-
 
 # Configure the service environment
 PORT=8081 go run cmd/signalsd/main.go -mode all
@@ -300,9 +302,15 @@ The service includes a shared rate limiter for all traffic regardless of source 
 This just provides basic protection against abuse - in a production environment you should configure your CDN/load balancer/reverse proxy with per-IP rate limiting.
 
 ## CI/CD overview
+Github actions are used to automate checks and deployments.
 
-![ci_cd.0.2.0](https://github.com/user-attachments/assets/d5399e2f-0d0b-420b-9c17-0fbcea6f520c)
+CI checks are run whenever there is a push to main.
 
+The service is deployed to staging whenever there is a push to main and depolyed to production whenever a new version tag (e.g v1.0.0) is pushed. See below for details on using the build script to trigger a new production release.
+
+![CI:CD (v0 11)](https://github.com/user-attachments/assets/6e39cd4b-1fc5-441f-a875-e51c814525ad)
+
+See GitHub Actions workflows in `.github/workflows/`
 
 ### Creating a Release
 ```bash
@@ -312,17 +320,13 @@ cd app && go test ./... && cd ..
 
 # 2. Create and push version tag; build locally with version info
 build.sh -t patch|minor|major
-
 ```
-See GitHub Actions workflows in `.github/workflows/`
-
 
 ## Cloud Deployment
-The service is deployed whenever a new version tag (e.g v1.0.0) is pushed. See the previous section on using the build script to trigger a new release.
 
-The CD pipeline (cd.yml) builds a docker image based on the latest tagged release and deploys it to Google Cloud Run. Google handles HTTPS, firewall, load balancing and autoscaling. The service will scale to zero when not in use.
+This service is deployed to Google Cloud Run.  Google handles HTTPS, firewall, load balancing and autoscaling. The service will scale to zero when not in use.
 
-**Note: This is a pre-production version and should only be used with data that you don't mind being deleted or seen by other people.**
+**Note: This is pre-production software and the cloud deployment should only be used with data that you don't mind being deleted or seen by other people.**
 
 ## Service Mode Configuration
 
@@ -343,7 +347,7 @@ PORT=8082 go run cmd/signalsd/main.go --mode signals-write
 
 ## Deployment Configurations
 ### Basic config
-The simplest configuration is to run containers that serve all endpoints.  This is the configuration used by the github actions CD pipeline and - although fine for testing - it is not recommended for production use.
+The simplest configuration is to run containers that serve all endpoints.  This is the configuration used by the github actions CD pipeline but - although fine for testing - it is not recommended for production use.
 
 ![deploy.0.2.0](https://github.com/user-attachments/assets/942384a7-ccd7-4abb-b2a7-a9e293e23a10)
 
@@ -400,7 +404,9 @@ A more advanced configuration is to separate read and write operations. This wou
 
 ## Google Cloud Run Setup
 
-The steps to set up this environment in Google Cloud are:
+The steps to set up this environment in Google Cloud are below.  This is the configuration used by the github actions CD pipelines.
+
+prerequisites: set up an empty prod and/or staging DB on your postgres provider - you will need the connection URLs and a random secret key for each environment.
 
 ### 1. Create Google Cloud Resources
 - Create a project called `signalsd`
@@ -429,7 +435,7 @@ Download a JSON key for the cloud-run-deploy account:
 **IAM > service accounts > cloud-run-deploy account > keys > add key > Create New**
 
 ### 6. Configure GitHub Secrets and Variables
-The deployment workflow (`.github/workflows/cd.yml`) has been configured to use GitHub variables for non-sensitive configuration and GitHub secrets for sensitive configuration.
+The deployment workflows (`.github/workflows`) are configured to use GitHub variables for non-sensitive configuration and GitHub secrets for sensitive configuration.
 
 
 #### Required GitHub Secrets
@@ -438,8 +444,15 @@ Set up GitHub secrets in your fork of the repo:
 
 You will need three secrets:
 - `GCP_CREDENTIALS` (upload the contents of the JSON key downloaded earlier)
-- `DATABASE_URL` (URL of your postgres service - we are using Neon.tech, but you can use any provider you choose)
+- `DATABASE_URL` (URL of your postgres service - we are using Neon.tech, but any provider that supports current postgres versions should work)
 - `SECRET_KEY` (random secret key for your app - used by the signalsd server to sign JWT tokens)
+
+if you are deploying to a staging environment you need to create a separate database and two additional secrets:
+- `STAGING_DATABASE_URL`
+- `STAGING_SECRET_KEY`
+
+#### DNS
+google will automatically assign a *.run.app domain name to your Gcloud run service(s) and these can be mapped to custom domains using Google Cloud run DNS (see https://cloud.google.com/run/docs/mapping-custom-domains)
 
 #### Optional GitHub Variables 
 For production tuning, you can set GitHub variables:

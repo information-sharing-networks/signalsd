@@ -1,0 +1,143 @@
+# Deploy to staging environment on main branch commits
+name: Deploy to Staging
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  # Secrets
+  DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+  SECRET_KEY: ${{ secrets.STAGING_SECRET_KEY }}
+  GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
+
+  # Service configuration
+  ENVIRONMENT: staging
+  LOG_LEVEL: debug
+
+  # Google Cloud configuration
+  SERVICE_NAME: signalsd-staging
+  PROJECT_ID: signals-462015
+  REGION: europe-west2
+  REPOSITORY: signalsd
+  IMAGE_NAME: signalsd
+  DEPLOY_REGION: europe-west1
+  RUNTIME_SERVICE_ACCOUNT: cloud-run-runtime@signals-462015.iam.gserviceaccount.com
+  MAX_INSTANCES: 2
+  CPU: 0.5
+  MEMORY: 256Mi
+
+jobs:
+  deploy:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history including tags
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.2"
+          cache: true                                
+          cache-dependency-path: app/go.sum
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ env.GCP_CREDENTIALS }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker to use gcloud as credential helper
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      - name: Build and push Docker image
+        run: |
+          # Get version info for Docker build
+          VERSION=$(git describe --tags --abbrev=0 2>/dev/null || git describe --tags --always --dirty)
+          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          GIT_COMMIT=$(git rev-parse --short HEAD)
+
+          docker buildx build \
+          --platform linux/amd64 \
+          -f app/Dockerfile \
+          --build-arg VERSION=${VERSION} \
+          --build-arg BUILD_DATE=${BUILD_DATE} \
+          --build-arg GIT_COMMIT=${GIT_COMMIT} \
+          --push \
+          -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:staging-${{ github.sha }} \
+          -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:staging-latest \
+          .
+      
+      - name: Install goose
+        run: go install github.com/pressly/goose/v3/cmd/goose@latest
+
+      - name: Run migrations
+        run: |
+          cd app
+          goose -dir sql/schema postgres ${{ env.DATABASE_URL }} up
+
+      - name: Deploy to Cloud Run
+        run: |
+          # Build environment variables string for Cloud Run 
+          ENV_VARS="DATABASE_URL=${{ env.DATABASE_URL }}"
+          ENV_VARS="${ENV_VARS},SECRET_KEY=${{ env.SECRET_KEY }}"
+          ENV_VARS="${ENV_VARS},ENVIRONMENT=${{ env.ENVIRONMENT }}"
+          ENV_VARS="${ENV_VARS},LOG_LEVEL=${{ env.LOG_LEVEL }}"
+
+          # Add optional configuration variables only if they are set
+          if [ -n "${{ vars.DB_MAX_CONNECTIONS }}" ]; then
+            ENV_VARS="${ENV_VARS},DB_MAX_CONNECTIONS=${{ vars.DB_MAX_CONNECTIONS }}"
+          fi
+          if [ -n "${{ vars.DB_MIN_CONNECTIONS }}" ]; then
+            ENV_VARS="${ENV_VARS},DB_MIN_CONNECTIONS=${{ vars.DB_MIN_CONNECTIONS }}"
+          fi
+          if [ -n "${{ vars.DB_MAX_CONN_LIFETIME }}" ]; then
+            ENV_VARS="${ENV_VARS},DB_MAX_CONN_LIFETIME=${{ vars.DB_MAX_CONN_LIFETIME }}"
+          fi
+          if [ -n "${{ vars.DB_MAX_CONN_IDLE_TIME }}" ]; then
+            ENV_VARS="${ENV_VARS},DB_MAX_CONN_IDLE_TIME=${{ vars.DB_MAX_CONN_IDLE_TIME }}"
+          fi
+          if [ -n "${{ vars.DB_CONNECT_TIMEOUT }}" ]; then
+            ENV_VARS="${ENV_VARS},DB_CONNECT_TIMEOUT=${{ vars.DB_CONNECT_TIMEOUT }}"
+          fi
+          if [ -n "${{ vars.RATE_LIMIT_RPS }}" ]; then
+            ENV_VARS="${ENV_VARS},RATE_LIMIT_RPS=${{ vars.RATE_LIMIT_RPS }}"
+          fi
+          if [ -n "${{ vars.RATE_LIMIT_BURST }}" ]; then
+            ENV_VARS="${ENV_VARS},RATE_LIMIT_BURST=${{ vars.RATE_LIMIT_BURST }}"
+          fi
+          if [ -n "${{ vars.MAX_SIGNAL_PAYLOAD_SIZE }}" ]; then
+            ENV_VARS="${ENV_VARS},MAX_SIGNAL_PAYLOAD_SIZE=${{ vars.MAX_SIGNAL_PAYLOAD_SIZE }}"
+          fi
+          if [ -n "${{ vars.READ_TIMEOUT }}" ]; then
+            ENV_VARS="${ENV_VARS},READ_TIMEOUT=${{ vars.READ_TIMEOUT }}"
+          fi
+          if [ -n "${{ vars.WRITE_TIMEOUT }}" ]; then
+            ENV_VARS="${ENV_VARS},WRITE_TIMEOUT=${{ vars.WRITE_TIMEOUT }}"
+          fi
+          if [ -n "${{ vars.IDLE_TIMEOUT }}" ]; then
+            ENV_VARS="${ENV_VARS},IDLE_TIMEOUT=${{ vars.IDLE_TIMEOUT }}"
+          fi
+
+          # Deploy to Cloud Run
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:staging-${{ github.sha }} \
+            --region ${{ env.DEPLOY_REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --service-account ${{ env.RUNTIME_SERVICE_ACCOUNT }} \
+            --set-env-vars "${ENV_VARS}" \
+            --args="--mode,all" \
+            --port 8080 \
+            --memory ${{ env.MEMORY }} \
+            --cpu ${{ env.CPU }} \
+            --min-instances 0 \
+            --max-instances ${{ env.MAX_INSTANCES }}
