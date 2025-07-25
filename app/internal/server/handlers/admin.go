@@ -77,38 +77,44 @@ func (a *AdminHandler) ResetHandler(w http.ResponseWriter, r *http.Request) {
 // ReadinessHandler godoc
 //
 //	@Summary		Readiness Check
-//	@Description	check if the signalsd service is ready
-//	@Tags			Site admin
+//	@Description	Check if the signalsd service is ready to accept traffic.
+//	@Tags			Health
+//	@Produce		plain
 //
-//	@Success		200
-//	@Failure		404
+//	@Success		200	{string}	string	"OK - Service is ready"
+//	@Failure		503	{string}	string	"Service Unavailable - Database connection failed"
 //
-//	@Router			/health/ready [Get]
+//	@Router			/health/ready [get]
 func (a *AdminHandler) ReadinessHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), signalsd.ReadinessTimeout)
 	defer cancel()
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+
 	_, err := a.queries.IsDatabaseRunning(ctx)
 	if err == nil {
 		w.WriteHeader(http.StatusOK)
-		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-		_, _ = w.Write([]byte(http.StatusText(http.StatusOK)))
+		_, _ = w.Write([]byte("OK"))
+	} else {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_, _ = w.Write([]byte("Service Unavailable"))
 	}
 }
 
-// Liveness godoc
+// LivenessHandler godoc
 //
-//	@Summary		Liveness check
-//	@Description	check if the signalsd service is up
-//	@Tags			Site admin
+//	@Summary		Liveness Check
+//	@Description	Check if the signalsd http service is alive and responding.
+//	@Tags			Health
+//	@Produce		plain
 //
-//	@Success		200
-//	@Failure		404
+//	@Success		200	{string}	string	"OK - Service is alive"
 //
-//	@Router			/health/live [Get]
+//	@Router			/health/live [get]
 func (a *AdminHandler) LivenessHandler(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	_, _ = w.Write([]byte(http.StatusText(http.StatusOK)))
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("OK"))
 }
 
 // VersionHandler godoc

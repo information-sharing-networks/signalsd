@@ -797,7 +797,7 @@
                 "tags": [
                     "ISN details"
                 ],
-                "summary": "Get an ISN configurationuration",
+                "summary": "Get an ISN configuration",
                 "parameters": [
                     {
                         "type": "string",
@@ -1566,34 +1566,46 @@
         },
         "/health/live": {
             "get": {
-                "description": "check if the signalsd service is up",
-                "tags": [
-                    "Site admin"
+                "description": "Check if the signalsd http service is alive and responding.",
+                "produces": [
+                    "text/plain"
                 ],
-                "summary": "Liveness check",
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Liveness Check",
                 "responses": {
                     "200": {
-                        "description": "OK"
-                    },
-                    "404": {
-                        "description": "Not Found"
+                        "description": "OK - Service is alive",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 }
             }
         },
         "/health/ready": {
             "get": {
-                "description": "check if the signalsd service is ready",
+                "description": "Check if the signalsd service is ready to accept traffic.",
+                "produces": [
+                    "text/plain"
+                ],
                 "tags": [
-                    "Site admin"
+                    "Health"
                 ],
                 "summary": "Readiness Check",
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "OK - Service is ready",
+                        "schema": {
+                            "type": "string"
+                        }
                     },
-                    "404": {
-                        "description": "Not Found"
+                    "503": {
+                        "description": "Service Unavailable - Database connection failed",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 }
             }

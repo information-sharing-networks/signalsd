@@ -379,9 +379,9 @@ func (s *Server) registerStaticAssetRoutes() {
 
 	// API documentation and landing pages
 	s.router.Route("/", func(r chi.Router) {
-		// Main landing page
+		// Redirect root to API documentation
 		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-			http.ServeFile(w, r, "./assets/index.html")
+			http.Redirect(w, r, "/docs", http.StatusMovedPermanently)
 		})
 
 		// API documentation (ReDoc)

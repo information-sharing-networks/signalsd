@@ -1394,7 +1394,7 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-      summary: Get an ISN configurationuration
+      summary: Get an ISN configuration
       tags:
       - ISN details
     put:
@@ -1930,26 +1930,34 @@ paths:
       - Signal sharing
   /health/live:
     get:
-      description: check if the signalsd service is up
+      description: Check if the signalsd http service is alive and responding.
+      produces:
+      - text/plain
       responses:
         "200":
-          description: OK
-        "404":
-          description: Not Found
-      summary: Liveness check
+          description: OK - Service is alive
+          schema:
+            type: string
+      summary: Liveness Check
       tags:
-      - Site admin
+      - Health
   /health/ready:
     get:
-      description: check if the signalsd service is ready
+      description: Check if the signalsd service is ready to accept traffic.
+      produces:
+      - text/plain
       responses:
         "200":
-          description: OK
-        "404":
-          description: Not Found
+          description: OK - Service is ready
+          schema:
+            type: string
+        "503":
+          description: Service Unavailable - Database connection failed
+          schema:
+            type: string
       summary: Readiness Check
       tags:
-      - Site admin
+      - Health
   /isn/{isn_slug}/accounts/{account_id}:
     delete:
       description: |-

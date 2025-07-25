@@ -8,35 +8,39 @@
 
 # Information Sharing Networks
 
-Information Sharing Networks (ISNs) let organizations create data sharing arrangements without building complex custom technology solutions each time. 
+Information Sharing Networks (ISNs) let organisations create new data sharing arrangements without building complex custom technology solutions each time. 
 
-Organizations exchange information through "signals" — simple messages that pass data between network participants.
+Information Sharing Networks (ISNs) enable organisations to establish data sharing arrangements efficiently, without the need to develop complex, customised technology solutions each time. 
+
+Participants exchange information through 'signals' - simple messages that facilitate information transfer between network members.
 
 ## Signals
-Signals notify other organizations when events happen in your business processes. When an order ships, a decision gets made, or a review completes, the relevant signal goes out immediately to authorized participants.
+Signals notify authorised organisations when key events occur within your business processes. For example, when an order ships, a decision is made, or a review is completed, the corresponding signal is sent immediately to authorised participants.
 
-Each signal carries minimal data and follows simple formatting rules. You can link signals together to build up a picture of related events over time and the system manages versions so you can add more detail to previously issued signals as new information emerges.
+Each signal contains minimal data and follows straightforward formatting rules. These signals can be linked to form a timeline of related events, and the system handles version control so you can add more detail to previously issued signals when new information emerges.
 
-Organizations can use signals to share:
-- Events: Order confirmations, delivery notifications, status changes
-- Decisions: Approvals, rejections, policy updates
+Organisations can use signals to share:
+- Events: Order confirmations, delivery notifications, status updates
+- Decisions: Approvals, rejections, policy amendments
 - Analysis: Audit results, risk assessments, compliance findings
-- Verification: Confirmation that information from another organization is accurate
+- Verification: Confirmation of the accuracy of data from other organisations
 
 
 ## Setting Up Networks
-This service provides the ISN management facilities. It is designed to be simple to deploy and support and makes it easy to set up new networks and to control what can be shared and who can access it.
+This service provides the ISN management facilities. It is easy to deploy the service to public cloud infrastructure and is designed to be operated with minimal technical support.
 
-Many data sharing initiatives get into difficulties because they try to anticipate every possible need across multiple organizations and this requires extensive planning, complex agreements, and data models that attempt to cover scenarios that may never occur.
+The service makes it easy to establish new networks and to control the data that can be shared and who can acceess it.
 
-ISNs work differently: you establish a network for a specific business purpose — tracking shipments, sharing compliance data, coordinating approvals — and define only the signals needed for that purpose. When new needs arise, you add new signal types without disrupting existing processes.
+Many data sharing initiatives encounter difficulties because they attempt to anticipate every possible need across multiple organisations, requiring extensive planning, complex agreements, and data models designed to cover scenarios that may never materialise.
 
-This approach delivers working data sharing quickly while maintaining flexibility as business relationships evolve.
+ISNs work differently: a network is set up for a specific business purpose - such as tracking shipments, sharing compliance data, or coordinating approvals - and only the necessary signals for that purpose are defined. As new requirements emerge, additional signal types can be introduced without disrupting existing processes.
+
+This approach enables rapid implementation of effective data sharing, while maintaining flexibility as business relationships evolve.
 
 ## Reference Implementations
-The [initial implementation](https://github.com/information-sharing-networks/isn-ref-impl) was a proof of concept used as part of the UK government's Border Trade Demonstrator (BTD) initiative. The BTDs established ISNs that were used by several government agencies and industry groups to make process improvements at the border by sharing supply chain information.
+The [initial implementation](https://github.com/information-sharing-networks/isn-ref-impl) was a proof of concept used as part of the UK government's Border Trade Demonstrator (BTD) initiative. The BTDs established ISNs that were used by several government agencies and industry groups to improve processes at the border by sharing supply chain information.
 
-This repo contains the second version (work in progress) - it develops the ISN administration facilities and will scale to higher volumes of data.
+This repo contains the second version (work in progress) - it develops the ISN administration facilities and is designed to scale to higher volumes of data.
 
 There are three components:
 - an [API](https://signalsd.btddemo.org/docs) used to configure ISNs, register participants and deploy the data sharing infrastructure
