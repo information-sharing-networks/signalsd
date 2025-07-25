@@ -344,7 +344,7 @@ func (s *IsnHandler) GetIsnsHandler(w http.ResponseWriter, r *http.Request) {
 
 // GetIsnHandler godoc
 //
-//	@Summary		Get an ISN configurationuration
+//	@Summary		Get an ISN configuration
 //	@Description	Returns details about the ISN
 //	@Param			isn_slug	path	string	true	"isn slug"	example(sample-isn--example-org)
 //
