@@ -185,7 +185,7 @@ type SignalVersionDoc struct {
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals [post]
+//	@Router			/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals [post]
 //
 // CreateSignal Handler inserts signals and signal_versions records - signals are the master records containing
 // the local_ref and correlation_id, signal_versions contains the content and links back to the signal.  Multiple versions are created when signals are resupplied, e.g due to corrections being sent.
@@ -474,9 +474,9 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 //	@Summary		Search for signals in public ISNs
 //	@Tags			Signal sharing
 //
-//	@Description	Search for signals by date or account in public ISNs (no authentication required)
+//	@Description	Search for signals by date or account in public ISNs (no authentication required).
 //	@Description
-//	@Description	Note the endpoint returns the latest version of each signal and does not include withdrawn or archived signals
+//	@Description	Note the endpoint returns the latest version of each signal.
 //
 //	@Param			start_date	query		string	false	"Start date for filtering"	example(2006-01-02T15:04:05Z)
 //	@Param			end_date	query		string	false	"End date for filtering"	example(2006-01-02T16:00:00Z
@@ -586,9 +586,9 @@ func (s *SignalsHandler) SearchPublicSignalsHandler(w http.ResponseWriter, r *ht
 //	@Summary		Search for signals in private ISNs
 //	@Tags			Signal sharing
 //
-//	@Description	Search for signals by date or account in private ISNs (authentication required - only accounts with read or write permissions to the ISN can access signals)
+//	@Description	Search for signals by date or account in private ISNs (authentication required - only accounts with read or write permissions to the ISN can access signals).
 //	@Description
-//	@Description	Note the endpoint returns the latest version of each signal and does not include withdrawn or archived signals
+//	@Description	Note the endpoint returns the latest version of each signal.
 //
 //	@Param			start_date			query		string	false	"Start date for filtering"						example(2006-01-02T15:04:05Z)
 //	@Param			end_date			query		string	false	"End date for filtering"						example(2006-01-02T16:00:00Z

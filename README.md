@@ -173,7 +173,7 @@ docker compose exec app bash -c 'cd /signalsd/app && goose -dir sql/schema postg
 docker compose exec app sh -c "cd /signalsd/app && sqlc generate"
 
 # Connect to the postgres database
-docker exec -it signalsd-db psql -U signalsd-dev -d signalsd_admin
+docker compose exec -it db psql -U signalsd-dev -d signalsd_admin
 
 # run the go app locally and use the docker postgres database 
 DATABASE_URL="postgres://signalsd-dev@localhost:15432/signalsd_admin?sslmode=disable" SECRET_KEY="mysecretkey" go run cmd/signalsd/main.go --mode all
@@ -216,6 +216,11 @@ go install github.com/swaggo/swag/cmd/swag@latest         # generates OpenAPI sp
 go install honnef.co/go/tools/cmd/staticcheck@latest  # static analysis
 go install github.com/securecode/gosec/v2/cmd/gosec@latest  # security analysis
 ```
+
+### Testing
+For information about the testing strategy and how to run tests, see the [Integration Testing Documentation](app/test/integration/README.md).
+
+details on performance testing are in [Performance Testing Documentation](test/perf/README.md).
 
 ### Environment Variables
 ```bash
@@ -265,19 +270,19 @@ goose -dir app/sql/schema postgres $DATABASE_URL down-to 0
 ```bash
 cd app
 go build ./cmd/signalsd/
-./signalsd -mode all
+./signalsd --mode all
 
 # Or run directly
-go run cmd/signalsd/main.go -mode all
+go run cmd/signalsd/main.go --mode all
 
 # Configure the service environment
-PORT=8081 go run cmd/signalsd/main.go -mode all
+PORT=8081 go run cmd/signalsd/main.go --mode all
 
 # Performance testing with custom database pool settings
-ENVIRONMENT=perf DB_MAX_CONNECTIONS=50 DB_MIN_CONNECTIONS=5 RATE_LIMIT_RPS=0 go run cmd/signalsd/main.go -mode all
+ENVIRONMENT=perf DB_MAX_CONNECTIONS=50 DB_MIN_CONNECTIONS=5 RATE_LIMIT_RPS=0 go run cmd/signalsd/main.go --mode all
 
 # Production-like settings
-ENVIRONMENT=prod DB_MAX_CONNECTIONS=25 DB_CONNECT_TIMEOUT=10s go run cmd/signalsd/main.go -mode all
+ENVIRONMENT=prod DB_MAX_CONNECTIONS=25 DB_CONNECT_TIMEOUT=10s go run cmd/signalsd/main.go --mode all
 ```
 
 ## API Documentation
@@ -295,7 +300,7 @@ Run `sqlc generate` from the root of the project to regenerate the type safe Go 
 
 
 ## Getting Help
-- Check the [API documentation](https://information-sharing-networks.github.io/signalsd/app/docs/index.html)
+- Check the [API documentation](https://signalsd.btddemo.org/docs)
 - Review logs: `docker compose logs -f`
 - Open an [issue](https://github.com/information-sharing-networks/signalsd/issues) on GitHub
 
@@ -403,7 +408,7 @@ A more advanced configuration is to separate read and write operations. This wou
 # Read operations
 - match:
     path:
-      regex: "^/isn/.*/signal_types/.*/signals/.*"
+      regex: "^/api/isn/.*/signal_types/.*/signals/.*"
     method: "GET"
   route:
     cluster: signalsd-signals-read
