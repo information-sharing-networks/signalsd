@@ -11,7 +11,6 @@ import (
 )
 
 func TestRequestSizeLimits(t *testing.T) {
-	// Create router with realistic route structure
 	router := chi.NewRouter()
 
 	// API routes with 64KB limit
@@ -76,7 +75,7 @@ func TestRateLimit(t *testing.T) {
 	})
 
 	// First few requests should succeed (within burst)
-	for i := 0; i < 5; i++ {
+	for i := range 5 {
 		req := httptest.NewRequest("GET", "/test", nil)
 		rr := httptest.NewRecorder()
 		router.ServeHTTP(rr, req)

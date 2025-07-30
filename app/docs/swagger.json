@@ -1071,7 +1071,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Signal types specify a record that can be shared over the ISN\n- Each type has a unique title and this is used to create a URL-friendly slug\n- The title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.\n- The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading\n\nSchema URL Requirements\n- Must be a valid JSON schema on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)\n- To disable schema validation, use: https://github.com/skip/validation/main/schema.json\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas\n- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)\n- Subsequent POSTs to this endpoint that reference a previously submitted title/slug but point to a different schema will increment the version based on the supplied bump_type\n\nSignal type definitions are referred to like this: /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver} (e.g., /api/isn/sample-isn--example-org/signal_types/sample-signal--example-org/v0.0.1)\n",
+                "description": "Signal types specify a record that can be shared over the ISN\n- Each type has a unique title and this is used to create a URL-friendly slug\n- The title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.\n- The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading\n\nSchema URL Requirements\n- Must be a liink to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)\n- To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas\n- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)\n- Subsequent POSTs to this endpoint that reference a previously submitted title/slug but point to a different schema will increment the version based on the supplied bump_type\n\nSignal type definitions are referred to like this: /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver} (e.g., /api/isn/sample-isn--example-org/signal_types/sample-signal--example-org/v0.0.1)\n",
                 "tags": [
                     "Signal types"
                 ],
@@ -1320,6 +1320,87 @@
                 }
             }
         },
+        "/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Submit an array of signals for storage on the ISN\n- payloads must not mix signals of different types and are subject to the size limits defined on the site.\n- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.\n- If a local reference is received more than once from an account for the specified signal_type it will be stored with a incremented version number.\n- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.\n- requests are only accepted for the open signal batch for this account/ISN.\n\n**Authentication**\n\nRequires a valid access token.\nThe claims in the access token list the ISNs and signal_types that the account is permitted to use.\n\n**Validation and Processing**\n\nSignals are validated against the JSON schema specified for the signal type unless validation is disabled on the type definition.\nIndividual signal processing failures (validation errors, incorrect correlation ids, database errors) are recorded in the response but do not prevent other signals from being processed.\n\nWhen validation is disabled, basic checks are still done on the incoming data and the following issues create a 400 error and cause the entire payload to be rejected:\n- invalid json format\n- missing fields (the array of signals must be in a json object called signals, and content and local_ref must be present for each record).\n\n\n**Response Status Codes**\n- 200: All signals processed successfully\n- 207: Partial success (some signals succeeded, some failed)\n- 422: All signals failed processing (the request was valid but all signals failed processing, e.g because they did not validate against the schema)\n- 400 / error_code = 'malformed_body': Invalid request format, authentication, or other request-level errors\n- 400: authentication, or other request-level errors\n- 500: Internal server errors\n\n400 and 500 errors cause the whole payload to be rejected (note these failures are not logged on the database and should be handled by the client immediately).",
+                "tags": [
+                    "Signal sharing"
+                ],
+                "summary": "Create signals",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn--example-org",
+                        "description": "isn slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "sample-signal--example-org",
+                        "description": "signal type slug",
+                        "name": "signal_type_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "0.0.1",
+                        "description": "signal type sem_ver number",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "create signals",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateSignalsRequestDoc"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "All signals processed successfully",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateSignalsResponse"
+                        }
+                    },
+                    "207": {
+                        "description": "Partial success - some signals succeeded, some failed",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateSignalsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request format or authentication failure",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "All signals failed processing - returns detailed error information",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateSignalsResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search": {
             "get": {
                 "security": [
@@ -1327,7 +1408,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Search for signals by date or account in private ISNs (authentication required - only accounts with read or write permissions to the ISN can access signals)\n\nNote the endpoint returns the latest version of each signal and does not include withdrawn or archived signals",
+                "description": "Search for signals by date or account in private ISNs (authentication required - only accounts with read or write permissions to the ISN can access signals).\n\nNote the endpoint returns the latest version of each signal.",
                 "tags": [
                     "Signal sharing"
                 ],
@@ -1518,7 +1599,7 @@
         },
         "/api/public/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search": {
             "get": {
-                "description": "Search for signals by date or account in public ISNs (no authentication required)\n\nNote the endpoint returns the latest version of each signal and does not include withdrawn or archived signals",
+                "description": "Search for signals by date or account in public ISNs (no authentication required).\n\nNote the endpoint returns the latest version of each signal.",
                 "tags": [
                     "Signal sharing"
                 ],
@@ -1557,6 +1638,23 @@
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/webhooks": {
+            "post": {
+                "description": "register a webhook to recieve signals batch status updates",
+                "tags": [
+                    "Service accounts"
+                ],
+                "summary": "Register webhook (TODO)",
+                "responses": {
+                    "204": {
+                        "description": "Not implemented",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1793,87 +1891,6 @@
                 }
             }
         },
-        "/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "Submit an array of signals for storage on the ISN\n- payloads must not mix signals of different types and are subject to the size limits defined on the site.\n- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.\n- If a local reference is received more than once from an account for the specified signal_type it will be stored with a incremented version number.\n- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.\n- requests are only accepted for the open signal batch for this account/ISN.\n\n**Authentication**\n\nRequires a valid access token.\nThe claims in the access token list the ISNs and signal_types that the account is permitted to use.\n\n**Validation and Processing**\n\nSignals are validated against the JSON schema specified for the signal type unless validation is disabled on the type definition.\nIndividual signal processing failures (validation errors, incorrect correlation ids, database errors) are recorded in the response but do not prevent other signals from being processed.\n\nWhen validation is disabled, basic checks are still done on the incoming data and the following issues create a 400 error and cause the entire payload to be rejected:\n- invalid json format\n- missing fields (the array of signals must be in a json object called signals, and content and local_ref must be present for each record).\n\n\n**Response Status Codes**\n- 200: All signals processed successfully\n- 207: Partial success (some signals succeeded, some failed)\n- 422: All signals failed processing (the request was valid but all signals failed processing, e.g because they did not validate against the schema)\n- 400 / error_code = 'malformed_body': Invalid request format, authentication, or other request-level errors\n- 400: authentication, or other request-level errors\n- 500: Internal server errors\n\n400 and 500 errors cause the whole payload to be rejected (note these failures are not logged on the database and should be handled by the client immediately).",
-                "tags": [
-                    "Signal sharing"
-                ],
-                "summary": "Create signals",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "sample-isn--example-org",
-                        "description": "isn slug",
-                        "name": "isn_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "example": "sample-signal--example-org",
-                        "description": "signal type slug",
-                        "name": "signal_type_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "example": "0.0.1",
-                        "description": "signal type sem_ver number",
-                        "name": "sem_ver",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "create signals",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateSignalsRequestDoc"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "All signals processed successfully",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateSignalsResponse"
-                        }
-                    },
-                    "207": {
-                        "description": "Partial success - some signals succeeded, some failed",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateSignalsResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid request format or authentication failure",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "422": {
-                        "description": "All signals failed processing - returns detailed error information",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateSignalsResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal server error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/oauth/revoke": {
             "post": {
                 "security": [
@@ -1978,23 +1995,6 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/version.Info"
-                        }
-                    }
-                }
-            }
-        },
-        "/webhooks": {
-            "post": {
-                "description": "register a webhook to recieve signals batch status updates",
-                "tags": [
-                    "Service accounts"
-                ],
-                "summary": "Register webhook (TODO)",
-                "responses": {
-                    "204": {
-                        "description": "Not implemented",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }

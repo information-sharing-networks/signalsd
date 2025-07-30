@@ -68,8 +68,8 @@ type SignalTypeDetail struct {
 //	@Description	- The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading
 //	@Description
 //	@Description	Schema URL Requirements
-//	@Description	- Must be a valid JSON schema on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)
-//	@Description	- To disable schema validation, use: https://github.com/skip/validation/main/schema.json
+//	@Description	- Must be a liink to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)
+//	@Description	- To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json
 //	@Description
 //	@Description	Versions
 //	@Description	- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas
