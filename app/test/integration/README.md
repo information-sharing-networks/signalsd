@@ -74,8 +74,8 @@ go test ./...
 ```
 
 ### Test Environment
-- Tests create temporary databases (`tmp_signalsd_integration_test`)
-- HTTP server runs on random available ports
-
-
-The database and server are cleaned up when the tests complete
+- **Local**: Uses the dev Docker Compose PostgreSQL container (port 15432)
+- **CI**: Uses a GitHub Actions PostgreSQL service (port 5432)
+- Each integration test creates a temporary database (`tmp_signalsd_integration_test`) and applies the migrations so the schema reflects the latest code
+-  end-to-end HTTP tests also start the signalsd service on a random available port
+- Database and server are cleaned up after each test completes

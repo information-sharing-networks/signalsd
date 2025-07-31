@@ -60,7 +60,7 @@ func createTestAccount(t *testing.T, ctx context.Context, queries *database.Quer
 			AccountID:          serviceAccount.ID,
 			ClientID:           fmt.Sprintf("test-client-%s", serviceAccount.ID.String()[:8]),
 			ClientContactEmail: email,
-			ClientOrganization: "Test Organization",
+			ClientOrganization: "test client org",
 		})
 		if err != nil {
 			t.Fatalf("Failed to create service account record: %v", err)
@@ -110,12 +110,12 @@ func createTestSignalType(t *testing.T, ctx context.Context, queries *database.Q
 	signalType, err := queries.CreateSignalType(ctx, database.CreateSignalTypeParams{
 		IsnID:         isnID,
 		Slug:          slug,
-		SchemaURL:     "https://github.com/information-sharing-networks/signalsd_test_schemas/blob/main/2025.05.13/integration-test-schema.json",
-		ReadmeURL:     "https://github.com/information-sharing-networks/signalsd_test_schemas/blob/main/2025.05.13/README.md",
+		SchemaURL:     testSchemaURL,
+		ReadmeURL:     testReadmeURL,
 		Title:         title,
-		Detail:        "test signal type",
+		Detail:        testSignalTypeDetail,
 		SemVer:        version,
-		SchemaContent: `{"type": "object", "properties": {"test": {"type": "string"}}, "required": ["test"], "additionalProperties": false }`, // Simple test schema`
+		SchemaContent: testSchemaContent,
 	})
 	if err != nil {
 		t.Fatalf("Failed to create signal type %s/%s: %v", slug, version, err)
