@@ -11,8 +11,9 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 )
 
-// TestCorrelationEnvironment sets up a test environment for correlation ID testing
-func TestCorrelationEnvironment(t *testing.T) {
+// TestCorrelationFunctionality tests both basic correlation functionality and cross-ISN restrictions
+// This comprehensive test combines environment setup to avoid duplication
+func TestCorrelationFunctionality(t *testing.T) {
 	ctx := context.Background()
 	testDB := setupTestDatabase(t, ctx)
 	queries := database.New(testDB)
@@ -20,24 +21,24 @@ func TestCorrelationEnvironment(t *testing.T) {
 	// Create test data
 	t.Log("Creating test environment for correlation ID testing...")
 
-	// Create owner account and ISN
+	// Create owner account and first ISN
 	ownerAccount := createTestAccount(t, ctx, queries, "owner", "user", "owner@correlation-test.com")
-	testISN := createTestISN(t, ctx, queries, "correlation-test-isn", "Correlation Test ISN", ownerAccount.ID, "private")
+	firstISN := createTestISN(t, ctx, queries, "correlation-test-isn", "Correlation Test ISN", ownerAccount.ID, "private")
 
 	// Create signal type for testing
-	signalType := createTestSignalType(t, ctx, queries, testISN.ID, "Correlation Test Signal", "1.0.0")
+	firstSignalType := createTestSignalType(t, ctx, queries, firstISN.ID, "Correlation Test Signal", "1.0.0")
 
 	t.Logf("✅ Test environment created:")
 	t.Logf("   - Owner Account ID: %s", ownerAccount.ID)
-	t.Logf("   - ISN: %s (ID: %s)", testISN.Slug, testISN.ID)
-	t.Logf("   - Signal Type: %s/%s (ID: %s)", signalType.Slug, signalType.SemVer, signalType.ID)
+	t.Logf("   - ISN: %s (ID: %s)", firstISN.Slug, firstISN.ID)
+	t.Logf("   - Signal Type: %s/%s (ID: %s)", firstSignalType.Slug, firstSignalType.SemVer, firstSignalType.ID)
 
 	// Create first signal (will be the target of correlation)
 	firstSignalID, err := queries.CreateSignal(ctx, database.CreateSignalParams{
 		AccountID:      ownerAccount.ID,
 		LocalRef:       "correlation-test-signal-001",
-		SignalTypeSlug: signalType.Slug,
-		SemVer:         signalType.SemVer,
+		SignalTypeSlug: firstSignalType.Slug,
+		SemVer:         firstSignalType.SemVer,
 	})
 	if err != nil {
 		t.Fatalf("Failed to create first signal: %v", err)
@@ -49,8 +50,8 @@ func TestCorrelationEnvironment(t *testing.T) {
 		AccountID:      ownerAccount.ID,
 		LocalRef:       "correlation-test-signal-002",
 		CorrelationID:  firstSignalID,
-		SignalTypeSlug: signalType.Slug,
-		SemVer:         signalType.SemVer,
+		SignalTypeSlug: firstSignalType.Slug,
+		SemVer:         firstSignalType.SemVer,
 	})
 	if err != nil {
 		t.Fatalf("Failed to create second signal with correlation: %v", err)
@@ -60,8 +61,8 @@ func TestCorrelationEnvironment(t *testing.T) {
 	// Get the second signal and verify its correlation_id
 	secondSignal, err := queries.GetSignalByAccountAndLocalRef(ctx, database.GetSignalByAccountAndLocalRefParams{
 		AccountID: ownerAccount.ID,
-		Slug:      signalType.Slug,
-		SemVer:    signalType.SemVer,
+		Slug:      firstSignalType.Slug,
+		SemVer:    firstSignalType.SemVer,
 		LocalRef:  "correlation-test-signal-002",
 	})
 	if err != nil {
@@ -78,7 +79,7 @@ func TestCorrelationEnvironment(t *testing.T) {
 	t.Log("Testing correlation ID validation...")
 	isValid, err := queries.ValidateCorrelationID(ctx, database.ValidateCorrelationIDParams{
 		CorrelationID: firstSignalID,
-		IsnSlug:       testISN.Slug,
+		IsnSlug:       firstISN.Slug,
 	})
 	if err != nil {
 		t.Fatalf("Failed to validate correlation ID: %v", err)
@@ -87,68 +88,30 @@ func TestCorrelationEnvironment(t *testing.T) {
 		t.Errorf("Expected first signal ID to be valid correlation ID, got false")
 	}
 
-	t.Log("✅ Correlation ID validation working correctly")
+	t.Log("Basic correlation functionality working correctly")
 
-	t.Log("🎯 Test environment setup complete and ready for correlation ID testing!")
-	t.Log("   Available test data:")
-	t.Log("   - Owner Account:", ownerAccount.ID)
-	t.Log("   - ISN:", testISN.Slug)
-	t.Log("   - Signal Type:", signalType.Slug+"/"+signalType.SemVer)
-	t.Log("   - First Signal ID:", firstSignalID)
-	t.Log("   - Second Signal ID (correlated):", secondSignalID)
-}
-
-// TestCrossISNCorrelationRestriction tests that signals cannot be correlated across different ISNs
-// This test verifies the business rule that correlation IDs must reference signals within the same ISN
-func TestCrossISNCorrelationRestriction(t *testing.T) {
-	ctx := context.Background()
-	testDB := setupTestDatabase(t, ctx)
-	queries := database.New(testDB)
-
-	t.Log("Testing cross-ISN correlation restriction...")
-
-	// Create owner account
-	ownerAccount := createTestAccount(t, ctx, queries, "owner", "user", "owner@cross-isn-test.com")
-
-	// Create first ISN with signal type and signal
-	firstISN := createTestISN(t, ctx, queries, "first-isn", "First ISN", ownerAccount.ID, "private")
-	firstSignalType := createTestSignalType(t, ctx, queries, firstISN.ID, "First Signal Type", "1.0.0")
-
-	// Create first signal
-	firstSignalID, err := queries.CreateSignal(ctx, database.CreateSignalParams{
-		AccountID:      ownerAccount.ID,
-		LocalRef:       "first-isn-signal-001",
-		SignalTypeSlug: firstSignalType.Slug,
-		SemVer:         firstSignalType.SemVer,
-	})
-	if err != nil {
-		t.Fatalf("Failed to create first signal: %v", err)
-	}
-
-	t.Logf("✅ First ISN setup complete:")
-	t.Logf("   - ISN: %s (ID: %s)", firstISN.Slug, firstISN.ID)
-	t.Logf("   - Signal Type: %s/%s", firstSignalType.Slug, firstSignalType.SemVer)
-	t.Logf("   - Signal ID: %s", firstSignalID)
+	// === PART 2: Test cross-ISN correlation restrictions ===
+	t.Log("\n=== Testing cross-ISN correlation restrictions ===")
 
 	// Create second ISN with signal type and signal
 	secondISN := createTestISN(t, ctx, queries, "second-isn", "Second ISN", ownerAccount.ID, "private")
 	secondSignalType := createTestSignalType(t, ctx, queries, secondISN.ID, "Second Signal Type", "1.0.0")
 
-	// Create second signal
-	secondSignalID, err := queries.CreateSignal(ctx, database.CreateSignalParams{
+	// Create signal in second ISN
+	thirdSignalID, err := queries.CreateSignal(ctx, database.CreateSignalParams{
 		AccountID:      ownerAccount.ID,
 		LocalRef:       "second-isn-signal-001",
 		SignalTypeSlug: secondSignalType.Slug,
 		SemVer:         secondSignalType.SemVer,
 	})
 	if err != nil {
-		t.Fatalf("Failed to create second signal: %v", err)
+		t.Fatalf("Failed to create signal in second ISN: %v", err)
 	}
 
 	t.Logf("✅ Second ISN setup complete:")
 	t.Logf("   - ISN: %s (ID: %s)", secondISN.Slug, secondISN.ID)
 	t.Logf("   - Signal Type: %s/%s", secondSignalType.Slug, secondSignalType.SemVer)
-	t.Logf("   - Signal ID: %s", secondSignalID)
+	t.Logf("   - Signal ID: %s", thirdSignalID)
 
 	// Test 1: Validate that the first signal ID is NOT valid as a correlation ID for the second ISN
 	t.Log("Testing correlation ID validation across ISNs...")
@@ -220,5 +183,15 @@ func TestCrossISNCorrelationRestriction(t *testing.T) {
 		}
 	}
 
-	t.Log("🎯 Cross-ISN correlation restriction test complete!")
+	t.Log("\n🎯 Comprehensive correlation functionality test complete!")
+	t.Log("   Test summary:")
+	t.Log("   ✅ Basic correlation functionality verified")
+	t.Log("   ✅ Cross-ISN correlation restrictions verified")
+	t.Log("   Available test data:")
+	t.Log("   - Owner Account:", ownerAccount.ID)
+	t.Log("   - First ISN:", firstISN.Slug)
+	t.Log("   - Second ISN:", secondISN.Slug)
+	t.Log("   - First Signal ID:", firstSignalID)
+	t.Log("   - Second Signal ID (correlated):", secondSignalID)
+	t.Log("   - Third Signal ID (second ISN):", thirdSignalID)
 }
