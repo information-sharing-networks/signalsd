@@ -28,14 +28,34 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/server/schemas"
 )
 
-// docker container db url
-const postgresDatabaseURL = "postgres://signalsd-dev:@localhost:15432/postgres?sslmode=disable"
+// Test configuration constants
+const (
+	secretKey        = "test-secret"
+	environment      = "test"
+	testDatabaseName = "tmp_signalsd_integration_test"
 
-// test database name and url (this temporary db be created in the existing docker container)
-const testDatabaseName = "tmp_signalsd_integration_test"
-const testDatabaseURL = "postgres://signalsd-dev:@localhost:15432/tmp_signalsd_integration_test?sslmode=disable"
-const secretKey = "test-secret"
-const environment = "test"
+	// CI database configuration
+	ciPostgresDatabaseURL = "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
+	ciTestDatabaseURL     = "postgres://postgres:postgres@localhost:5432/" + testDatabaseName + "?sslmode=disable"
+
+	// Local development database configuration
+	localPostgresDatabaseURL = "postgres://signalsd-dev:@localhost:15432/postgres?sslmode=disable"
+	localTestDatabaseURL     = "postgres://signalsd-dev:@localhost:15432/" + testDatabaseName + "?sslmode=disable"
+
+	// Test signal type
+	testSignalTypeDetail = "Simple test signal type for integration tests"
+	testSchemaURL        = "https://github.com/information-sharing-networks/signalsd_test_schemas/blob/main/2025.05.13/integration-test-schema.json"
+	testReadmeURL        = "https://github.com/information-sharing-networks/signalsd_test_schemas/blob/main/2025.05.13/README.md"
+	testSchemaContent    = `{"type": "object", "properties": {"test": {"type": "string"}}, "required": ["test"], "additionalProperties": false }`
+)
+
+// getTestDatabaseURL returns the appropriate test database URL for the current environment
+func getTestDatabaseURL() string {
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		return ciTestDatabaseURL
+	}
+	return localTestDatabaseURL
+}
 
 // createHttpLogger creates a logger that only logs errors - used to suppress request logs during tests
 // Set ENABLE_SERVER_LOGS=true environment variable to enable full HTTP request/response logging for debugging
@@ -58,37 +78,73 @@ func createHttpLogger() *zerolog.Logger {
 	return &logger
 }
 
-// setupTestDatabase sets up a local integration test environment:
-// - creates a temporary database in the existing docker db container
-// - applies database migrations
-// - drops the database on exit
+// setupTestDatabase sets up a test database environment:
+// - In CI: uses GitHub Actions PostgreSQL service
+// - Locally: uses Docker Compose PostgreSQL container
+// - applies database migrations and drops database on exit
 func setupTestDatabase(t *testing.T, ctx context.Context) *pgxpool.Pool {
 
-	t.Log("Running local integration test")
+	// Check if we're in CI environment
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		return setupCIDatabase(t, ctx)
+	}
+
+	// local dev env
+	return setupLocalDatabase(t, ctx)
+}
+
+// setupCIDatabase uses GitHub Actions PostgreSQL service
+func setupCIDatabase(t *testing.T, ctx context.Context) *pgxpool.Pool {
+	t.Log("Running integration tests")
 
 	// Check PostgreSQL server connectivity
-	postgresDB := setupDatabaseConn(t, postgresDatabaseURL)
-	if err := postgresDB.Ping(ctx); err != nil {
-		t.Fatalf("❌ Can't ping PostgreSQL server %s - is the docker db container running?", postgresDatabaseURL)
+	postgresDatabase := setupDatabaseConn(t, ciPostgresDatabaseURL)
+	if err := postgresDatabase.Ping(ctx); err != nil {
+		t.Fatalf("❌ Can't ping PostgreSQL server %s", ciPostgresDatabaseURL)
 	}
 
 	// create the test database
-	t.Logf("setting up test database %v", testDatabaseURL)
-	createTestDatabase(t, ctx, postgresDB, testDatabaseName)
+	t.Logf("setting up test database %v", ciTestDatabaseURL)
+	createTestDatabase(t, ctx, postgresDatabase, testDatabaseName)
 
-	testDB := setupDatabaseConn(t, testDatabaseURL)
+	testDatabase := setupDatabaseConn(t, ciTestDatabaseURL)
 
-	t.Log("✅ test database created")
+	t.Log("test database created")
 
 	// Apply database migrations
-	if err := runDatabaseMigrations(t, testDB); err != nil {
+	if err := runDatabaseMigrations(t, testDatabase); err != nil {
 		t.Fatalf("❌ Failed to apply database migrations: %v", err)
 	}
 
-	t.Log("✅ Database migrations applied successfully")
+	t.Log("✅ Database created")
 
-	return testDB
+	return testDatabase
+}
 
+// setupLocalDatabase uses Docker Compose database
+func setupLocalDatabase(t *testing.T, ctx context.Context) *pgxpool.Pool {
+	t.Log("Running local integration test")
+
+	// Check PostgreSQL server connectivity
+	postgresDatabase := setupDatabaseConn(t, localPostgresDatabaseURL)
+	if err := postgresDatabase.Ping(ctx); err != nil {
+		t.Fatalf("❌ Can't ping PostgreSQL server %s - is the docker db container running? Run: docker compose up db", localPostgresDatabaseURL)
+	}
+
+	// create the test database
+	t.Logf("setting up test database %v", localTestDatabaseURL)
+	createTestDatabase(t, ctx, postgresDatabase, testDatabaseName)
+
+	testDatabase := setupDatabaseConn(t, localTestDatabaseURL)
+
+	// Apply database migrations
+	if err := runDatabaseMigrations(t, testDatabase); err != nil {
+		t.Fatalf("❌ Failed to apply database migrations: %v", err)
+	}
+
+	t.Log("✅ Database created")
+
+	return testDatabase
 }
 
 func setupDatabaseConn(t *testing.T, databaseURL string) *pgxpool.Pool {
@@ -160,7 +216,7 @@ func createTestDatabase(t *testing.T, ctx context.Context, pool *pgxpool.Pool, d
 }
 
 // startInProcessServer starts the signalsd server in-process for testing - returns the base URL for the API and a shutdown function
-// be sure to load the test data before starting the server so the caches (below) are populated
+// when using public isns be sure to load the test data before starting the server (the public isn cache is not dynamic and is only populated at startup)
 func startInProcessServer(t *testing.T, ctx context.Context, testDB *pgxpool.Pool, testDatabaseURL string) (string, func()) {
 
 	// Set environment variables before calling NewServerConfig

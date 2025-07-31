@@ -18,7 +18,8 @@ import (
 // - Auth database queries
 // - Permission logic
 // - JWT token creation
-// these tests create a temp database in the dev docker db container
+//
+// Each test creates an empty temporary database and applies all the migrations so the schema reflects the latest code. The database is dropped after each test.
 func TestAuth(t *testing.T) {
 	ctx := context.Background()
 	testDB := setupTestDatabase(t, ctx)

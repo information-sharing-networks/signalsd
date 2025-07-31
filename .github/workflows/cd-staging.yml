@@ -2,7 +2,10 @@
 name: Deploy to Staging
 
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types:
+      - completed
     branches:
       - main
   workflow_dispatch:
@@ -33,6 +36,8 @@ jobs:
   deploy:
     name: Deploy to Staging
     runs-on: ubuntu-latest
+    # Only run if the CI workflow succeeded
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       - name: Check out code

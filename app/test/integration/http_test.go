@@ -1,10 +1,11 @@
 //go:build integration
 
-// this end-2-end test starts the signalsd http server and runs tests against it. By default the server logs are suppressed, you can enable them with:
+// this end-2-end test starts the signalsd http server and runs tests against it. By default the server logs are not included in the test output, you can enable them with:
 //
 //	ENABLE_SERVER_LOGS=true go test -tags=integration -v ./test/integration
 //
-// the tests create a temporary database in the existing docker db container and apply migrations so it is identical to latest db version
+// Each test creates an empty temporary database and applies all the migrations so the schema reflects the latest code. The database is dropped after each test.
+//
 // the goal of these tests is to ensure that signals are correctly loaded and can only be seen by authorized users.
 package integration
 
@@ -133,7 +134,9 @@ func TestSignalSubmission(t *testing.T) {
 
 	testEnv := setupTestEnvironment(testDB)
 
-	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testDatabaseURL)
+	// Get the appropriate database URL for the current environment
+	testURL := getTestDatabaseURL()
+	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL)
 	defer stopServer()
 	t.Logf("✅ Server started at %s", baseURL)
 
@@ -508,7 +511,8 @@ func TestSignalSearch(t *testing.T) {
 	memberToken := testEnv.createAuthToken(t, memberAccount.ID)
 
 	// note that the server must be started after the test data is created so the public isn cache is populated
-	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testDatabaseURL)
+	testURL := getTestDatabaseURL()
+	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL)
 	defer stopServer()
 	t.Logf("✅ Server started at %s", baseURL)
 
@@ -733,7 +737,8 @@ func TestCORS(t *testing.T) {
 		ctx := context.Background()
 		testDB := setupTestDatabase(t, ctx)
 		testEnv := setupTestEnvironment(testDB)
-		baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testDatabaseURL)
+		testURL := getTestDatabaseURL()
+		baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL)
 		defer stopServer()
 
 		// Test trusted origin is allowed
