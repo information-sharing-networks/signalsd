@@ -1,6 +1,7 @@
 -- name: CreateSignal :one
--- this query creates one row in signals for every new combination of account_id, signal_type_id, local_ref
--- if a withdrawn signal is received again it is reactivated (is_withdrawn = false)
+-- this query creates one row in the signals table for every new combination of account_id, signal_type_id, local_ref.
+-- if a withdrawn signal is received again it is reactivated (is_withdrawn = false).
+-- returns the signal_id.
 WITH ids AS (
     SELECT st.id AS signal_type_id, 
         st.isn_id,
@@ -32,11 +33,15 @@ SELECT
     false,
     false
 FROM ids
+-- note the only way to update a singlas record is to change the is_withdrawn status
+-- records are reactivated by resubmitting them, so this update ensures the updated_at timestamp is only changed if the record is reactivated
 ON CONFLICT (account_id, signal_type_id, local_ref)
 DO UPDATE SET
     is_withdrawn = false,
-    updated_at = now()
-WHERE signals.is_withdrawn = true
+    updated_at = CASE 
+        WHEN signals.is_withdrawn = true THEN now()
+        ELSE signals.updated_at
+    END
 RETURNING id;
 
 
@@ -238,3 +243,23 @@ SELECT EXISTS(
     WHERE s.id = sqlc.arg(correlation_id)
         AND i.slug = sqlc.arg(isn_slug)
 ) AS is_valid;
+
+
+-- name: GetSignalCorrelationDetails :one
+-- Get signal with its correlation details for verification
+SELECT 
+    s.id,
+    s.local_ref,
+    s.correlation_id,
+    s.isn_id,
+    i.slug as isn_slug,
+    sc.local_ref as correlated_local_ref,
+    sc.id as correlated_signal_id
+FROM signals s
+JOIN signal_types st ON st.id = s.signal_type_id
+JOIN isn i ON i.id = s.isn_id
+join signals sc on sc.id = s.correlation_id
+WHERE s.account_id = $1
+    AND st.slug = $2
+    AND st.sem_ver = $3
+    AND s.local_ref = $4;

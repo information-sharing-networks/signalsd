@@ -49,7 +49,7 @@ const (
 	testSchemaContent    = `{"type": "object", "properties": {"test": {"type": "string"}}, "required": ["test"], "additionalProperties": false }`
 )
 
-// getTestDatabaseURL returns the appropriate test database URL for the current environment
+// getTestDatabaseURL returns the appropriate test database URL for the local docker db when running locally or the CI test database when being run in github action
 func getTestDatabaseURL() string {
 	if os.Getenv("GITHUB_ACTIONS") == "true" {
 		return ciTestDatabaseURL
@@ -303,8 +303,10 @@ func startInProcessServer(t *testing.T, ctx context.Context, testDB *pgxpool.Poo
 		select {
 		case <-serverDone:
 			t.Log("✅ Server shut down")
-		case <-time.After(10 * time.Second):
-			t.Log("⚠️ Server shutdown timeout")
+		case <-time.After(5 * time.Second):
+			// if the server won't shutdown it will most likely be due to bugs, e.g uncommitted transactions or unclosed http requests bodies
+			t.Log("⚠️ Server shutdown timeout - killing service")
+			syscall.Kill(syscall.Getpid(), syscall.SIGKILL)
 		}
 	}
 

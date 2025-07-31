@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -69,6 +70,20 @@ func createValidSignalPayload(localRef string) map[string]any {
 	}
 }
 
+func createValidSignalPayloadWithCorrelatedID(localRef string, correlationID string) map[string]any {
+	return map[string]any{
+		"signals": []map[string]any{
+			{
+				"local_ref":      localRef,
+				"correlation_id": correlationID,
+				"content": map[string]any{
+					"test": "valid content for simple schema",
+				},
+			},
+		},
+	}
+}
+
 func createInvalidSignalPayload(localRef string) map[string]any {
 	return map[string]any{
 		"signals": []map[string]any{
@@ -99,6 +114,33 @@ func createMultipleSignalsPayload(localRefs []string) map[string]any {
 	}
 }
 
+// createMultipleSignalsPayloadPartialFailure creates a payload with multiple signals, one of which will fail schema validation
+func createMultipleSignalsPayloadPartialFailure(localRefs []string) map[string]any {
+	signals := make([]map[string]any, len(localRefs))
+
+	for i, ref := range localRefs {
+		if i == 1 {
+			signals[i] = map[string]any{
+				"local_ref": ref,
+				"content": map[string]any{
+					"invalid_field": "this should fail schema validation",
+					// Missing required "test" field
+				},
+			}
+			continue
+		}
+		signals[i] = map[string]any{
+			"local_ref": ref,
+			"content": map[string]any{
+				"test": fmt.Sprintf("signal content %d", i+1),
+			},
+		}
+	}
+	return map[string]any{
+		"signals": signals,
+	}
+}
+
 // createEmptySignalsPayload creates a payload with empty signals array
 func createEmptySignalsPayload() map[string]any {
 	return map[string]any{
@@ -106,7 +148,6 @@ func createEmptySignalsPayload() map[string]any {
 	}
 }
 
-// logResponseDetails logs detailed response information for debugging failed tests
 func logResponseDetails(t *testing.T, response *http.Response, testName string) {
 	t.Helper()
 
@@ -120,12 +161,101 @@ func logResponseDetails(t *testing.T, response *http.Response, testName string) 
 		t.Logf("Failed to read response body: %v", err)
 	} else {
 		t.Logf("Body: %s", string(bodyBytes))
+		// Restore the body so it can be properly closed later
+		response.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 	}
 
 	t.Logf("=== End Response Details ===")
 }
 
-// TestSignalSubmission tests the signal submission pipeline end-to-end (starts a http server as a go routine)
+// get the id of the created signal (only works when one signal is submitted)
+func getSignalIDFromResponse(t *testing.T, response map[string]any) string {
+	t.Helper()
+
+	results, ok := response["results"].(map[string]any)
+	if !ok {
+		t.Fatal("Failed to get results from response")
+	}
+
+	storedSignals, ok := results["stored_signals"].([]any)
+	if !ok || len(storedSignals) == 0 {
+		t.Fatal("No stored signals in response")
+	}
+	if len(storedSignals) == 0 {
+		t.Fatal("No stored signals in response")
+	}
+
+	firstSignal, ok := storedSignals[0].(map[string]any)
+	if !ok {
+		t.Fatal("First stored signal is not a map")
+	}
+
+	signalID, ok := firstSignal["signal_id"].(string)
+	if !ok {
+		t.Fatal("Signal ID is not a string")
+	}
+
+	return signalID
+
+}
+
+// Helper function to validate response counts
+func validateResponseCounts(t *testing.T, auditTrail map[string]any, expectedStored, expectedFailed int, testName string) bool {
+	t.Helper()
+
+	summary, ok := auditTrail["summary"]
+	if !ok {
+		t.Errorf("Missing summary in response for %s", testName)
+		return false
+	}
+
+	summaryMap, ok := summary.(map[string]any)
+	if !ok {
+		t.Errorf("Summary is not a map for %s", testName)
+		return false
+	}
+
+	var countMismatch bool
+
+	// Verify stored_count
+	if storedCount, ok := summaryMap["stored_count"]; ok {
+		if storedCountFloat, ok := storedCount.(float64); ok {
+			actualStored := int(storedCountFloat)
+			if actualStored != expectedStored {
+				countMismatch = true
+				t.Errorf("Expected stored_count %d, got %d for %s", expectedStored, actualStored, testName)
+			}
+		} else {
+			countMismatch = true
+			t.Errorf("stored_count is not a number for %s", testName)
+		}
+	} else {
+		countMismatch = true
+		t.Errorf("Missing stored_count in summary for %s", testName)
+	}
+
+	// Verify failed_count
+	if failedCount, ok := summaryMap["failed_count"]; ok {
+		if failedCountFloat, ok := failedCount.(float64); ok {
+			actualFailed := int(failedCountFloat)
+			if actualFailed != expectedFailed {
+				countMismatch = true
+				t.Errorf("Expected failed_count %d, got %d for %s", expectedFailed, actualFailed, testName)
+			}
+		} else {
+			countMismatch = true
+			t.Errorf("failed_count is not a number for %s", testName)
+		}
+	} else {
+		countMismatch = true
+		t.Errorf("Missing failed_count in summary for %s", testName)
+	}
+
+	return countMismatch
+}
+
+// TestSignalSubmission tests the signal submission process end-to-end (starts a http server as a go routine)
+// there are tests for standalone and correlated signals
 func TestSignalSubmission(t *testing.T) {
 
 	ctx := context.Background()
@@ -134,7 +264,7 @@ func TestSignalSubmission(t *testing.T) {
 
 	testEnv := setupTestEnvironment(testDB)
 
-	// Get the appropriate database URL for the current environment
+	// select database and start the signalsd server
 	testURL := getTestDatabaseURL()
 	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL)
 	defer stopServer()
@@ -147,217 +277,174 @@ func TestSignalSubmission(t *testing.T) {
 	adminAccount := createTestAccount(t, ctx, testEnv.queries, "admin", "user", "admin@gmail.com")
 	memberAccount := createTestAccount(t, ctx, testEnv.queries, "member", "user", "member@gmail.com")
 
+	ownerISN := createTestISN(t, ctx, testEnv.queries, "owner-isn", "Owner ISN", ownerAccount.ID, "private")
 	adminISN := createTestISN(t, ctx, testEnv.queries, "admin-isn", "Admin ISN", adminAccount.ID, "private")
 
+	ownerSignalType := createTestSignalType(t, ctx, testEnv.queries, ownerISN.ID, "owner ISN signal", "1.0.0")
 	adminSignalType := createTestSignalType(t, ctx, testEnv.queries, adminISN.ID, "admin ISN signal", "1.0.0")
 
 	grantPermission(t, ctx, testEnv.queries, adminISN.ID, memberAccount.ID, "read")
 
-	// todo mixed success / failure batch
-	tests := []struct {
-		name            string
-		accountID       uuid.UUID
-		endpoint        testSignalEndpoint
-		payloadFunc     func() map[string]any
-		expectedStatus  int
-		expectError     bool
-		skipAuthToken   bool
-		customAuthToken string
-		expectedStored  int // Expected stored_count in response
-		expectedFailed  int // Expected failed_count in response
-	}{
-		{
-			name:      "successful_signal_submission_by_admin",
-			accountID: adminAccount.ID,
-			endpoint: testSignalEndpoint{
-				isnSlug:          adminISN.Slug,
-				signalTypeSlug:   adminSignalType.Slug,
-				signalTypeSemVer: adminSignalType.SemVer,
-			},
-			payloadFunc:    func() map[string]any { return createValidSignalPayload("admin-test-001") },
-			expectedStatus: http.StatusOK,
-			expectError:    false,
-			expectedStored: 1,
-			expectedFailed: 0,
-		},
-		{
-			name:      "successful_signal_submission_by_owner",
-			accountID: ownerAccount.ID,
-			endpoint: testSignalEndpoint{
-				isnSlug:          adminISN.Slug,
-				signalTypeSlug:   adminSignalType.Slug,
-				signalTypeSemVer: adminSignalType.SemVer,
-			},
-			payloadFunc:    func() map[string]any { return createValidSignalPayload("owner-test-001") },
-			expectedStatus: http.StatusOK,
-			expectError:    false,
-			expectedStored: 1,
-			expectedFailed: 0,
-		},
-		{
-			name:      "unauthorized_signal_submission_by_member",
-			accountID: memberAccount.ID,
-			endpoint: testSignalEndpoint{
-				isnSlug:          adminISN.Slug,
-				signalTypeSlug:   adminSignalType.Slug,
-				signalTypeSemVer: adminSignalType.SemVer,
-			},
-			payloadFunc:    func() map[string]any { return createValidSignalPayload("member-test-001") },
-			expectedStatus: http.StatusForbidden,
-			expectError:    true,
-			expectedStored: 0, // No response body expected for auth failures
-			expectedFailed: 0,
-		},
-		{
-			name:      "invalid_auth_token",
-			accountID: adminAccount.ID,
-			endpoint: testSignalEndpoint{
-				isnSlug:          adminISN.Slug,
-				signalTypeSlug:   adminSignalType.Slug,
-				signalTypeSemVer: adminSignalType.SemVer,
-			},
-			payloadFunc:     func() map[string]any { return createValidSignalPayload("invalid-auth-001") },
-			expectedStatus:  http.StatusUnauthorized,
-			expectError:     true,
-			customAuthToken: "invalid-token",
-			expectedStored:  0, // No response body expected for auth failures
-			expectedFailed:  0,
-		},
-		{
-			name:      "schema_validation_failure",
-			accountID: adminAccount.ID,
-			endpoint: testSignalEndpoint{
-				isnSlug:          adminISN.Slug,
-				signalTypeSlug:   adminSignalType.Slug,
-				signalTypeSemVer: adminSignalType.SemVer,
-			},
-			payloadFunc:    func() map[string]any { return createInvalidSignalPayload("invalid-schema-001") },
-			expectedStatus: http.StatusUnprocessableEntity,
-			expectError:    false,
-			expectedStored: 0, // Schema validation failure - no signals stored
-			expectedFailed: 1, // One signal failed validation
-		},
-		{
-			name:      "empty_signals_array",
-			accountID: adminAccount.ID,
-			endpoint: testSignalEndpoint{
-				isnSlug:          adminISN.Slug,
-				signalTypeSlug:   adminSignalType.Slug,
-				signalTypeSemVer: adminSignalType.SemVer,
-			},
-			payloadFunc:    func() map[string]any { return createEmptySignalsPayload() },
-			expectedStatus: http.StatusBadRequest,
-			expectError:    true,
-			expectedStored: 0, // No response body expected for bad request
-			expectedFailed: 0,
-		},
-		{
-			name:      "multiple_signals_batch",
-			accountID: adminAccount.ID,
-			endpoint: testSignalEndpoint{
-				isnSlug:          adminISN.Slug,
-				signalTypeSlug:   adminSignalType.Slug,
-				signalTypeSemVer: adminSignalType.SemVer,
-			},
-			payloadFunc: func() map[string]any {
-				return createMultipleSignalsPayload([]string{"batch-001", "batch-002", "batch-003"})
-			},
-			expectedStatus: http.StatusOK,
-			expectError:    false,
-			expectedStored: 3,
-			expectedFailed: 0,
-		},
+	ownerEndpoint := testSignalEndpoint{
+		isnSlug:          ownerISN.Slug,
+		signalTypeSlug:   ownerSignalType.Slug,
+		signalTypeSemVer: ownerSignalType.SemVer,
+	}
+	adminEndpoint := testSignalEndpoint{
+		isnSlug:          adminISN.Slug,
+		signalTypeSlug:   adminSignalType.Slug,
+		signalTypeSemVer: adminSignalType.SemVer,
 	}
 
-	// Run table-driven tests
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var authToken string
-			if tt.customAuthToken != "" {
-				authToken = tt.customAuthToken
-			} else if !tt.skipAuthToken {
-				authToken = testEnv.createAuthToken(t, tt.accountID)
-			}
+	// run the first tests
+	t.Run("signal submission", func(t *testing.T) {
 
-			payload := tt.payloadFunc()
+		tests := []struct {
+			name              string
+			accountID         uuid.UUID
+			endpoint          testSignalEndpoint
+			payloadFunc       func() map[string]any
+			expectedStatus    int
+			expectedErrorCode string
+			skipAuthToken     bool
+			customAuthToken   string
+			expectedStored    int // Expected stored_count in response
+			expectedFailed    int // Expected failed_count in response
+		}{
+			// valid signal loads
+			{
+				name:           "successful_signal_submission_by_admin",
+				accountID:      adminAccount.ID,
+				endpoint:       adminEndpoint,
+				payloadFunc:    func() map[string]any { return createValidSignalPayload("admin-test-001") },
+				expectedStatus: http.StatusOK,
+				expectedStored: 1,
+				expectedFailed: 0,
+			},
+			{
+				name:           "successful_signal_submission_by_owner",
+				accountID:      ownerAccount.ID,
+				endpoint:       adminEndpoint,
+				payloadFunc:    func() map[string]any { return createValidSignalPayload("owner-test-001") },
+				expectedStatus: http.StatusOK,
+				expectedStored: 1,
+				expectedFailed: 0,
+			},
+			{
+				name:      "multiple_signals_batch",
+				accountID: adminAccount.ID,
+				endpoint:  adminEndpoint,
+				payloadFunc: func() map[string]any {
+					return createMultipleSignalsPayload([]string{"batch-001", "batch-002", "batch-003"})
+				},
+				expectedStatus: http.StatusOK,
+				expectedStored: 3,
+				expectedFailed: 0,
+			},
+			// request level failures
+			{
+				name:              "unauthorized_signal_submission_by_member",
+				accountID:         memberAccount.ID,
+				endpoint:          adminEndpoint,
+				payloadFunc:       func() map[string]any { return createValidSignalPayload("member-test-001") },
+				expectedStatus:    http.StatusForbidden,
+				expectedErrorCode: "forbidden",
+			},
+			{
+				name:              "no_auth",
+				accountID:         adminAccount.ID,
+				endpoint:          adminEndpoint,
+				payloadFunc:       func() map[string]any { return createValidSignalPayload("invalid-auth-001") },
+				expectedStatus:    http.StatusUnauthorized,
+				expectedErrorCode: apperrors.ErrCodeAuthorizationFailure.String(),
+				skipAuthToken:     true,
+			},
+			{
+				name:              "invalid_auth_token",
+				accountID:         adminAccount.ID,
+				endpoint:          adminEndpoint,
+				payloadFunc:       func() map[string]any { return createValidSignalPayload("invalid-auth-001") },
+				expectedStatus:    http.StatusUnauthorized,
+				expectedErrorCode: apperrors.ErrCodeAuthorizationFailure.String(),
+				customAuthToken:   "invalid-token",
+			},
+			{
+				name:              "empty_signals_array",
+				accountID:         adminAccount.ID,
+				endpoint:          adminEndpoint,
+				payloadFunc:       func() map[string]any { return createEmptySignalsPayload() },
+				expectedStatus:    http.StatusBadRequest,
+				expectedErrorCode: apperrors.ErrCodeMalformedBody.String(),
+			},
+			// valid request format but individual signal failures
+			{
+				name:           "schema_validation_failure",
+				accountID:      adminAccount.ID,
+				endpoint:       adminEndpoint,
+				payloadFunc:    func() map[string]any { return createInvalidSignalPayload("invalid-schema-001") },
+				expectedStatus: http.StatusUnprocessableEntity,
+				expectedStored: 0,
+				expectedFailed: 1,
+			},
+			{
+				name:      "multiple_signals_batch_partial_failures",
+				accountID: adminAccount.ID,
+				endpoint:  adminEndpoint,
+				payloadFunc: func() map[string]any {
+					return createMultipleSignalsPayloadPartialFailure([]string{"batch-004", "batch-005", "batch-006"})
+				},
+				expectedStatus: http.StatusMultiStatus,
+				expectedStored: 2,
+				expectedFailed: 1,
+			},
+		}
 
-			response := submitSignalRequest(t, baseURL, payload, authToken, tt.endpoint)
-			defer response.Body.Close()
-
-			// Verify response status
-			if response.StatusCode != tt.expectedStatus {
-				logResponseDetails(t, response, tt.name)
-				t.Errorf("Expected status %d, got %d", tt.expectedStatus, response.StatusCode)
-				return // Don't continue with further validation if status is wrong
-			}
-
-			if !tt.expectError || (tt.expectedStatus == http.StatusUnprocessableEntity) {
-				var result map[string]any
-				if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
-					t.Fatalf("Failed to decode response: %v", err)
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				var authToken string
+				if tt.customAuthToken != "" {
+					authToken = tt.customAuthToken
+				} else if !tt.skipAuthToken {
+					authToken = testEnv.createAuthToken(t, tt.accountID)
 				}
 
-				// Verify summary section exists
-				summary, ok := result["summary"]
-				if !ok {
-					t.Error("Missing summary in response")
+				payload := tt.payloadFunc()
+
+				response := submitSignalRequest(t, baseURL, payload, authToken, tt.endpoint)
+				defer response.Body.Close()
+
+				// Verify response status
+				if response.StatusCode != tt.expectedStatus {
+					logResponseDetails(t, response, tt.name)
+					t.Errorf("Expected status %d, got %d", tt.expectedStatus, response.StatusCode)
 					return
 				}
 
-				summaryMap, ok := summary.(map[string]any)
-				if !ok {
-					t.Error("Summary is not a map")
+				// verify errors are handled correctly
+				var auditTrail map[string]any
+				if err := json.NewDecoder(response.Body).Decode(&auditTrail); err != nil {
+					t.Fatalf("Failed to decode response: %v", err)
+				}
+
+				//response level errors have an error_code/error_message response and do not have a summary audit response
+				if response.StatusCode == http.StatusForbidden ||
+					response.StatusCode == http.StatusUnauthorized ||
+					response.StatusCode == http.StatusBadRequest {
+
+					errorCode, ok := auditTrail["error_code"].(string)
+					if !ok {
+						t.Fatalf("Failed to get error code from response: %v", auditTrail)
+					}
+
+					if tt.expectedErrorCode == "" || tt.expectedErrorCode != errorCode {
+						t.Errorf("Expected error code %s, got %s", tt.expectedErrorCode, errorCode)
+					}
 					return
 				}
 
 				// Verify stored_count
 				var countMismatch bool
-
-				if storedCount, ok := summaryMap["stored_count"]; ok {
-					if storedCountFloat, ok := storedCount.(float64); ok {
-						actualStored := int(storedCountFloat)
-						if actualStored != tt.expectedStored {
-							countMismatch = true
-							t.Errorf("Expected stored_count %d, got %d", tt.expectedStored, actualStored)
-						}
-					} else {
-						countMismatch = true
-						t.Error("stored_count is not a number")
-					}
-				} else {
-					countMismatch = true
-					t.Error("Missing stored_count in summary")
-				}
-
-				// Verify failed_count
-				if failedCount, ok := summaryMap["failed_count"]; ok {
-					if failedCountFloat, ok := failedCount.(float64); ok {
-						actualFailed := int(failedCountFloat)
-						if actualFailed != tt.expectedFailed {
-							countMismatch = true
-							t.Errorf("Expected failed_count %d, got %d", tt.expectedFailed, actualFailed)
-						}
-					} else {
-						countMismatch = true
-						t.Error("failed_count is not a number")
-					}
-				} else {
-					countMismatch = true
-					t.Error("Missing failed_count in summary")
-				}
-
-				// Verify total_submitted matches stored + failed
-				if totalSubmitted, ok := summaryMap["total_submitted"]; ok {
-					if totalFloat, ok := totalSubmitted.(float64); ok {
-						actualTotal := int(totalFloat)
-						expectedTotal := tt.expectedStored + tt.expectedFailed
-						if actualTotal != expectedTotal {
-							countMismatch = true
-							t.Errorf("Expected total_submitted %d (stored %d + failed %d), got %d",
-								expectedTotal, tt.expectedStored, tt.expectedFailed, actualTotal)
-						}
-					}
-				}
+				countMismatch = validateResponseCounts(t, auditTrail, tt.expectedStored, tt.expectedFailed, tt.name)
 
 				// If there were count mismatches, show detailed response for debugging
 				if countMismatch {
@@ -366,16 +453,210 @@ func TestSignalSubmission(t *testing.T) {
 					t.Logf("Headers: %v", response.Header)
 
 					// Re-marshal the parsed result to show the response body
-					if responseBody, err := json.MarshalIndent(result, "", "  "); err == nil {
+					if responseBody, err := json.MarshalIndent(auditTrail, "", "  "); err == nil {
 						t.Logf("Body: %s", string(responseBody))
 					} else {
-						t.Logf("Body: %+v", result)
+						t.Logf("Body: %+v", auditTrail)
 					}
 					t.Logf("=== End Response Details ===")
 				}
-			}
-		})
-	}
+			})
+		}
+	})
+	// run the correlated signal tests
+	t.Run("correlated signal submission", func(t *testing.T) {
+
+		ownerToken := testEnv.createAuthToken(t, ownerAccount.ID)
+		adminToken := testEnv.createAuthToken(t, adminAccount.ID)
+
+		// create a signal in the admin isn
+		adminPayload := createValidSignalPayload("admin-correlation-test-signal-001")
+
+		adminSignalResponse := submitSignalRequest(t, baseURL, adminPayload, adminToken, adminEndpoint)
+		defer adminSignalResponse.Body.Close()
+
+		if adminSignalResponse.StatusCode != http.StatusOK {
+			logResponseDetails(t, adminSignalResponse, "correlated signal submission")
+			t.Errorf("Expected status %d, got %d", http.StatusOK, adminSignalResponse.StatusCode)
+			return
+		}
+
+		var adminResponseBody map[string]any
+		if err := json.NewDecoder(adminSignalResponse.Body).Decode(&adminResponseBody); err != nil {
+			t.Fatalf("Failed to decode response: %v", err)
+		}
+
+		// create a signal in the owner isn
+		ownerPayload := createValidSignalPayload("owner-correlation-test-signal-001")
+
+		ownerSignalResponse := submitSignalRequest(t, baseURL, ownerPayload, ownerToken, ownerEndpoint)
+		defer ownerSignalResponse.Body.Close()
+
+		if ownerSignalResponse.StatusCode != http.StatusOK {
+			logResponseDetails(t, ownerSignalResponse, "correlated signal submission")
+			t.Errorf("Expected status %d, got %d", http.StatusOK, ownerSignalResponse.StatusCode)
+			return
+		}
+
+		var ownerResponseBody = map[string]any{}
+
+		if err := json.NewDecoder(ownerSignalResponse.Body).Decode(&ownerResponseBody); err != nil {
+			t.Fatalf("Failed to decode response: %v", err)
+		}
+
+		// get the newly created signal id from the response - these will be used as the correlated ids in the tests below
+		adminSignalID := getSignalIDFromResponse(t, adminResponseBody)
+		ownerSignalID := getSignalIDFromResponse(t, ownerResponseBody)
+
+		// tests run as admin - can write to their own isn but not to the owner isn
+		tests := []struct {
+			name              string
+			correlated_id     string
+			accountID         uuid.UUID
+			endpoint          testSignalEndpoint
+			expectError       bool
+			expectedStatus    int
+			expectedErrorCode string
+		}{
+			{
+				name:              "empty_correlation_id",
+				endpoint:          adminEndpoint,
+				accountID:         adminAccount.ID,
+				expectError:       true,
+				expectedStatus:    400,
+				expectedErrorCode: apperrors.ErrCodeMalformedBody.String(),
+			},
+			{
+				name:              "malformed_correlation_id",
+				endpoint:          adminEndpoint,
+				accountID:         adminAccount.ID,
+				correlated_id:     "not-a-uuid",
+				expectError:       true,
+				expectedStatus:    400,
+				expectedErrorCode: apperrors.ErrCodeMalformedBody.String(),
+			},
+			{
+				name:              "random_correlation_id",
+				endpoint:          adminEndpoint,
+				accountID:         adminAccount.ID,
+				correlated_id:     uuid.New().String(),
+				expectError:       true,
+				expectedStatus:    422,
+				expectedErrorCode: apperrors.ErrCodeInvalidCorrelationID.String(),
+			},
+
+			{
+				name:              "valid_correlation_id_different_isn",
+				endpoint:          adminEndpoint,
+				accountID:         adminAccount.ID,
+				correlated_id:     ownerSignalID,
+				expectError:       true,
+				expectedStatus:    422,
+				expectedErrorCode: apperrors.ErrCodeInvalidCorrelationID.String(),
+			},
+			{
+				name:           "valid_correlation_id_same_isn",
+				endpoint:       adminEndpoint,
+				accountID:      adminAccount.ID,
+				correlated_id:  adminSignalID,
+				expectError:    false,
+				expectedStatus: 200,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				localRef := "admin-correlation-test-signal-001"
+				correlatedPayload := createValidSignalPayloadWithCorrelatedID(localRef, tt.correlated_id)
+
+				authToken := testEnv.createAuthToken(t, tt.accountID)
+
+				correlatedSignalResponse := submitSignalRequest(t, baseURL, correlatedPayload, authToken, tt.endpoint)
+				defer correlatedSignalResponse.Body.Close()
+				var correlatedSignalResponseBody map[string]any
+				if err := json.NewDecoder(correlatedSignalResponse.Body).Decode(&correlatedSignalResponseBody); err != nil {
+					t.Fatalf("Failed to decode response: %v", err)
+				}
+
+				if tt.expectError {
+					var errorCode string
+					var ok bool
+					if tt.expectedStatus != correlatedSignalResponse.StatusCode {
+						logResponseDetails(t, correlatedSignalResponse, "correlated signal submission")
+						t.Errorf("Expected status %d, got %d", tt.expectedStatus, correlatedSignalResponse.StatusCode)
+						return
+					}
+
+					// 400 is for malformed requests - entire request rejected with standard error_code/errror_message response
+					if correlatedSignalResponse.StatusCode == 400 {
+						errorCode, ok = correlatedSignalResponseBody["error_code"].(string)
+						if !ok {
+							t.Fatalf("Failed to get error code from response: %v", correlatedSignalResponseBody)
+						}
+					} else { // 422 is for processing errors - each failed signal has its own error_code/error_message
+						errorCode, ok = correlatedSignalResponseBody["results"].(map[string]any)["failed_signals"].([]any)[0].(map[string]any)["error_code"].(string)
+						if !ok {
+							t.Fatalf("Failed to get error code from response: %v", correlatedSignalResponseBody)
+						}
+					}
+
+					if tt.expectedErrorCode != errorCode {
+						logResponseDetails(t, correlatedSignalResponse, "correlated signal submission")
+						t.Errorf("Expected error code %s, got %s", tt.expectedErrorCode, errorCode)
+					}
+					return
+				}
+
+				if !tt.expectError && correlatedSignalResponse.StatusCode != 200 {
+					logResponseDetails(t, correlatedSignalResponse, "correlated signal submission")
+					t.Errorf("Expected status %d, got %d", http.StatusOK, correlatedSignalResponse.StatusCode)
+					return
+				}
+
+				// For successful correlation, verify database consistency
+				if tt.name == "valid_correlation_id_same_isn" {
+					t.Run("verify_correlation_stored_correctly", func(t *testing.T) {
+						ctx := context.Background()
+
+						// Get the correlated signal details from database
+						correlatedSignal, err := testEnv.queries.GetSignalCorrelationDetails(ctx, database.GetSignalCorrelationDetailsParams{
+							AccountID: tt.accountID,
+							Slug:      tt.endpoint.signalTypeSlug,
+							SemVer:    tt.endpoint.signalTypeSemVer,
+							LocalRef:  localRef,
+						})
+						if err != nil {
+							t.Errorf("Failed to get correlated signal from database: %v", err)
+							return
+						}
+
+						// Verify correlation_id matches what we submitted
+						expectedCorrelationID, err := uuid.Parse(adminSignalID)
+						if err != nil {
+							t.Errorf("Failed to parse admin signal ID: %v", err)
+							return
+						}
+
+						if correlatedSignal.CorrelationID != expectedCorrelationID {
+							t.Errorf("Expected correlation_id %s, got %s", expectedCorrelationID, correlatedSignal.CorrelationID)
+						}
+
+						// Verify the correlation_id is valid in this ISN
+						isValid, err := testEnv.queries.ValidateCorrelationID(ctx, database.ValidateCorrelationIDParams{
+							CorrelationID: correlatedSignal.CorrelationID,
+							IsnSlug:       correlatedSignal.IsnSlug,
+						})
+						if err != nil {
+							t.Errorf("ValidateCorrelationID query failed: %v", err)
+						}
+						if !isValid {
+							t.Errorf("Stored correlation_id %s is not valid in ISN %s", correlatedSignal.CorrelationID, correlatedSignal.IsnSlug)
+						}
+					})
+				}
+			})
+		}
+	})
 
 }
 
@@ -399,7 +680,13 @@ func submitSignalRequest(t *testing.T, baseURL string, payload map[string]any, t
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+			MaxIdleConns:      0,
+		},
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatalf("Failed to submit signals: %v", err)
@@ -426,7 +713,13 @@ func searchPublicSignals(t *testing.T, baseURL string, endpoint testSignalEndpoi
 	q.Add("end_date", oneHourFromNow.Format(time.RFC3339))
 	req.URL.RawQuery = q.Encode()
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+			MaxIdleConns:      0,
+		},
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatalf("Failed to search public signals: %v", err)
@@ -436,7 +729,7 @@ func searchPublicSignals(t *testing.T, baseURL string, endpoint testSignalEndpoi
 }
 
 // searchPrivateSignals searches for signals on private ISNs (authentication required)
-func searchPrivateSignals(t *testing.T, baseURL string, endpoint testSignalEndpoint, token string) *http.Response {
+func searchPrivateSignals(t *testing.T, baseURL string, endpoint testSignalEndpoint, token string, includeWithdrawn bool) *http.Response {
 	url := fmt.Sprintf("%s/api/isn/%s/signal_types/%s/v%s/signals/search",
 		baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
 
@@ -451,16 +744,64 @@ func searchPrivateSignals(t *testing.T, baseURL string, endpoint testSignalEndpo
 	oneHourFromNow := now.Add(1 * time.Hour)
 	q.Add("start_date", oneHourAgo.Format(time.RFC3339))
 	q.Add("end_date", oneHourFromNow.Format(time.RFC3339))
+
+	if includeWithdrawn {
+		q.Add("include_withdrawn", "true")
+	}
+
 	req.URL.RawQuery = q.Encode()
 
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
-	client := &http.Client{Timeout: 30 * time.Second}
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+			MaxIdleConns:      0,
+		},
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatalf("Failed to search private signals: %v", err)
+	}
+
+	return resp
+}
+
+// withdrawSignal withdraws a signal by local reference
+func withdrawSignal(t *testing.T, baseURL string, endpoint testSignalEndpoint, token, localRef string) *http.Response {
+	url := fmt.Sprintf("%s/api/isn/%s/signal_types/%s/v%s/signals/withdraw",
+		baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
+
+	withdrawRequest := map[string]string{
+		"local_ref": localRef,
+	}
+
+	jsonData, err := json.Marshal(withdrawRequest)
+	if err != nil {
+		t.Fatalf("Failed to marshal withdrawal request: %v", err)
+	}
+
+	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		t.Fatalf("Failed to create withdrawal request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+			MaxIdleConns:      0,
+		},
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("Failed to withdraw signal: %v", err)
 	}
 
 	return resp
@@ -668,7 +1009,7 @@ func TestSignalSearch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			response := searchPrivateSignals(t, baseURL, tt.targetEndpoint, tt.requesterToken)
+			response := searchPrivateSignals(t, baseURL, tt.targetEndpoint, tt.requesterToken, false)
 			defer response.Body.Close()
 
 			// Verify response status
@@ -695,7 +1036,8 @@ func TestSignalSearch(t *testing.T) {
 			if response.StatusCode >= 400 {
 				var errorResponse map[string]any
 				if err := json.NewDecoder(response.Body).Decode(&errorResponse); err != nil {
-					t.Fatalf("Failed to decode error response: %v", err)
+					t.Errorf("Failed to decode error response: %v", err)
+					return
 				}
 
 				// Verify error response contains required fields
@@ -726,6 +1068,83 @@ func TestSignalSearch(t *testing.T) {
 			}
 		})
 	}
+
+	// Test withdrawn signals are excluded from search results by default
+	t.Run("withdrawn signals excluded from search", func(t *testing.T) {
+		// First, verify the admin signal is visible in search
+		response := searchPrivateSignals(t, baseURL, adminEndpoint, adminToken, false)
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusOK {
+			logResponseDetails(t, response, "admin ISN search before withdrawal")
+			t.Fatalf("Failed to search admin ISN before withdrawal: %d", response.StatusCode)
+		}
+
+		var signalsBeforeWithdrawal []map[string]any
+		if err := json.NewDecoder(response.Body).Decode(&signalsBeforeWithdrawal); err != nil {
+			t.Fatalf("Failed to decode search response before withdrawal: %v", err)
+		}
+
+		if len(signalsBeforeWithdrawal) != 1 {
+			t.Fatalf("Expected 1 signal before withdrawal, got %d", len(signalsBeforeWithdrawal))
+		}
+
+		// Withdraw the admin signal
+		withdrawResponse := withdrawSignal(t, baseURL, adminEndpoint, adminToken, "admin-search-signal-001")
+		defer withdrawResponse.Body.Close()
+
+		if withdrawResponse.StatusCode != http.StatusNoContent {
+			logResponseDetails(t, withdrawResponse, "signal withdrawal")
+			t.Fatalf("Failed to withdraw signal: %d", withdrawResponse.StatusCode)
+		}
+
+		// Search again - should return no signals (withdrawn signal excluded by default)
+		response = searchPrivateSignals(t, baseURL, adminEndpoint, adminToken, false)
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusOK {
+			logResponseDetails(t, response, "admin ISN search after withdrawal")
+			t.Fatalf("Failed to search admin ISN after withdrawal: %d", response.StatusCode)
+		}
+
+		var signalsAfterWithdrawal []map[string]any
+		if err := json.NewDecoder(response.Body).Decode(&signalsAfterWithdrawal); err != nil {
+			t.Fatalf("Failed to decode search response after withdrawal: %v", err)
+		}
+
+		if len(signalsAfterWithdrawal) != 0 {
+			t.Errorf("Expected 0 signals after withdrawal (withdrawn signals should be excluded), got %d", len(signalsAfterWithdrawal))
+		}
+
+		// Search with include_withdrawn=true - should return the withdrawn signal
+		response = searchPrivateSignals(t, baseURL, adminEndpoint, adminToken, true)
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusOK {
+			logResponseDetails(t, response, "admin ISN search with include_withdrawn=true")
+			t.Fatalf("Failed to search admin ISN with include_withdrawn=true: %d", response.StatusCode)
+		}
+
+		var signalsWithWithdrawn []map[string]any
+		if err := json.NewDecoder(response.Body).Decode(&signalsWithWithdrawn); err != nil {
+			t.Fatalf("Failed to decode search response with include_withdrawn=true: %v", err)
+		}
+
+		if len(signalsWithWithdrawn) != 1 {
+			t.Errorf("Expected 1 signal with include_withdrawn=true, got %d", len(signalsWithWithdrawn))
+		}
+
+		// Verify the returned signal is marked as withdrawn
+		if len(signalsWithWithdrawn) > 0 {
+			signal := signalsWithWithdrawn[0]
+			isWithdrawn, exists := signal["is_withdrawn"]
+			if !exists {
+				t.Error("Signal response missing 'is_withdrawn' field")
+			} else if isWithdrawn != true {
+				t.Errorf("Expected withdrawn signal to have is_withdrawn=true, got %v", isWithdrawn)
+			}
+		}
+	})
 }
 
 // TestCORS tests that protected endpoints respect ALLOWED_ORIGINS configuration and that untrusted origins are blocked

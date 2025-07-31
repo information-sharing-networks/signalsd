@@ -1,4 +1,4 @@
-# Signalsd Testing 
+# Signalsd Testing
 
 ## Integration Tests
 
@@ -8,6 +8,8 @@ The integration tests are designed to ensure that signal data is handled correct
 - `setup_test_env.go` - Test environment setup and server lifecycle management
 - `auth_test.go` - Authentication and authorization system testing
 - `http_test.go` - HTTP API endpoint testing with full request/response validation (signal submission & search) + CORS security
+- `batch_test.go` - Service account batch lifecycle and validation testing
+- `correlation_test.go` - Signal correlation ID functionality and cross-ISN restriction testing
 - `database.go` - Shared database test helpers
 
 ## Unit Tests 
@@ -31,28 +33,48 @@ Unit tests are used to test a couple of areas:
 - ✅ Signal type paths - correct signal type paths are included in permissions
 
 
-### 2. HTTP API Testing (`http_test.go`)
+### 2. HTTP API end-to-end testing (`http_test.go`)
 
 **What it tests:**
-- ✅ Signal submission pipeline end-to-end
-- ✅ Signal search functionality with authorization controls
-- ✅ Schema validation and data integrity (includes test schema retrieval from GitHub)
+- ✅ Signal submission process
+- ✅ Signal search functionality 
+- ✅ Signal withdrawal 
+- ✅ Schema validation 
 - ✅ Response structure and error response validation
 - ✅ Authentication failures and authorization errors
 - ✅ Batch processing with mixed success/failure scenarios
 - ✅ CORS security configuration and enforcement
 
-**Privacy & Security Coverage:**
+
+**Privacy & Security:**
 - ✅ Tests that unauthorized users cannot submit signals
 - ✅ Ensures proper error handling error responses
-- ✅ Verifies private ISNs are not accessible via public endpoints 
+- ✅ Verifies private ISNs are not accessible via public endpoints
 - ✅ Tests CORS configuration prevents unauthorized cross-origin access
+- ✅ Verifies withdrawn signals are excluded from search results by default
+- ✅ Tests that withdrawn signals can be included when explicitly requested
+
+
+### 3. Service Account Batch Management (`batch_test.go`)
+
+**What it tests:**
+- ✅ Service account batch lifecycle management
+- ✅ Batch creation and automatic closure when new batch is created
+- ✅ Service account signal submission requirements (must have active batch)
+- ✅ Batch validation and error handling
+
+
+### 4. Signal Correlation Features (`correlation_test.go`)
+
+**What it tests:**
+- ✅ Signal correlation ID creation and validation
+- ✅ Cross-ISN correlation restriction enforcement
+- ✅ Correlation relationship verification and database consistency
+- ✅ ValidateCorrelationID query functionality
 
 
 **TODO**
   - **rate limiting integration tests** - only unit tests exist
-  - **withdrawn signal privacy** - no tests ensure withdrawn signals don't leak data
-  - **correlation ID handling** - no tests ensure correlation IDs don't leak across permission boundaries
   - **admin endpoints** - currently there are no automated tests for the admin endpoints. Test manually when making changes to the handlers
 
 ## Running the tests

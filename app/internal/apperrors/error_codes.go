@@ -25,3 +25,7 @@ const (
 	ErrCodeResourceNotFound           ErrorCode = "resource_not_found"
 	ErrCodeTokenInvalid               ErrorCode = "token_invalid"
 )
+
+func (e ErrorCode) String() string {
+	return string(e)
+}

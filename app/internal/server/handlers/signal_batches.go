@@ -346,19 +346,19 @@ func (s *SignalsBatchHandler) getBatchStatusDetails(ctx context.Context, batchID
 //	@Description	- closed date range
 //	@Description
 //
-//	@Param			latest			query		boolean	false	"Get the latest batch"						example(true)
-//	@Param			previous		query		boolean	false	"Get the previous batch"					example(true)
-//	@Param			created_after	query		string	false	"Start date for batch creation filtering"	example(2006-01-02T15:04:05Z)
-//	@Param			created_before	query		string	false	"End date for batch creation filtering"		example(2006-01-02T16:00:00Z)
-//	@Param			closed_after	query		string	false	"Start date for batch closure filtering"	example(2006-01-02T15:04:05Z)
-//	@Param			closed_before	query		string	false	"End date for batch closure filtering"		example(2006-01-02T16:00:00Z)
+//	@Param		latest			query		boolean	false	"Get the latest batch"						example(true)
+//	@Param		previous		query		boolean	false	"Get the previous batch"					example(true)
+//	@Param		created_after	query		string	false	"Start date for batch creation filtering"	example(2006-01-02T15:04:05Z)
+//	@Param		created_before	query		string	false	"End date for batch creation filtering"		example(2006-01-02T16:00:00Z)
+//	@Param		closed_after	query		string	false	"Start date for batch closure filtering"	example(2006-01-02T15:04:05Z)
+//	@Param		closed_before	query		string	false	"End date for batch closure filtering"		example(2006-01-02T16:00:00Z)
 //
-//	@Success		200				{array}		BatchStatusResponse
-//	@Failure		400				{object}	responses.ErrorResponse
+//	@Success	200				{array}		BatchStatusResponse
+//	@Failure	400				{object}	responses.ErrorResponse
 //
-//	@Security		BearerAccessToken
+//	@Security	BearerAccessToken
 //
-//	@Router			/isn/{isn_slug}/batches/search [get]
+//	@Router		/isn/{isn_slug}/batches/search [get]
 func (s *SignalsBatchHandler) SearchBatchesHandler(w http.ResponseWriter, r *http.Request) {
 	// Extract path parameters
 	isnSlug := r.PathValue("isn_slug")

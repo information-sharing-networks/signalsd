@@ -601,6 +601,9 @@ definitions:
       local_ref:
         example: item_id_#1
         type: string
+      signal_id:
+        example: b8ded113-ac0e-4a2c-a89f-0876fe97b440
+        type: string
       signal_version_id:
         example: 835788bd-789d-4091-96e3-db0f51ccbabc
         type: string
@@ -722,6 +725,9 @@ info:
 
     ## Common Error Responses
     All endpoints may return:
+    - `400` Malformed request (invalid json, missing required fields, etc.)
+    - `401` Unauthorized (invalid credentials)
+    - `403` Forbidden (insufficient permissions)
     - `413` Request body exceeds size limit
     - `429` Rate limit exceeded
     - `500` Internal server error
@@ -1761,34 +1767,47 @@ paths:
         Submit an array of signals for storage on the ISN
         - payloads must not mix signals of different types and are subject to the size limits defined on the site.
         - The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.
-        - If a local reference is received more than once from an account for the specified signal_type it will be stored with a incremented version number.
+        - If a local reference is received more than once from an account for the specified signal_type a new version of the signal will be stored with a incremented version number.
         - Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.
-        - requests are only accepted for the open signal batch for this account/ISN.
+        - requests are only accepted for the open signal batch for this account/ISN (service accounts need to manually create batches, web users have a batch automatically created when they first write to an ISN).
 
         **Authentication**
 
         Requires a valid access token.
         The claims in the access token list the ISNs and signal_types that the account is permitted to use.
 
-        **Validation and Processing**
+        **Error handling**
+
+        if the request is a vaild format but individual signals contain errors (validation errors, incorrect correlation ids, database errors) the errors are recorded in the response but do not prevent other signals from being processed.
+        Individual failures are logged and can be tracked using the signals_batch_id returned in the response - see the batch status endpoint.
+
+        Errors that relate to the entire request  - e.g invalid json, authentication, permission and server errors (400, 401, 403, 500) - are not recorded and should be handled by the client immediately.
+
+        **JSON Schema Validation**
 
         Signals are validated against the JSON schema specified for the signal type unless validation is disabled on the type definition.
-        Individual signal processing failures (validation errors, incorrect correlation ids, database errors) are recorded in the response but do not prevent other signals from being processed.
 
         When validation is disabled, basic checks are still done on the incoming data and the following issues create a 400 error and cause the entire payload to be rejected:
         - invalid json format
         - missing fields (the array of signals must be in a json object called signals, and content and local_ref must be present for each record).
 
+        **Signal versions**
+
+        Multiple versions are created when signals are resupplied, e.g. because the client wants to correct a previously publsihed signal.
+        By default search will return the latest version of the signal.
+        If a signal has been withdrawn it will be reactivated if you resubmit it using the same local_ref.
+
+        **Correlating signals**
+
+        Correlation IDs can be used to link signals together.  Signals can only be correlated within the same ISN.
+        If the supplied correlation_id is not found in the same ISN as the signal being submitted, the response will contain a 422 or 207 status code and the error_code for the failed signal will be `invalid_correlation_id`.
 
         **Response Status Codes**
-        - 200: All signals processed successfully
-        - 207: Partial success (some signals succeeded, some failed)
-        - 422: All signals failed processing (the request was valid but all signals failed processing, e.g because they did not validate against the schema)
-        - 400 / error_code = 'malformed_body': Invalid request format, authentication, or other request-level errors
-        - 400: authentication, or other request-level errors
-        - 500: Internal server errors
+        - `200`: All signals processed successfully
+        - `207`: Partial success (some signals succeeded, some failed)
+        - `422`: All signals failed processing (the request was valid but all signals failed processing, e.g because they did not conform with the JSON schema for this signal type)
 
-        400 and 500 errors cause the whole payload to be rejected (note these failures are not logged on the database and should be handled by the client immediately).
+        request level errors (e.g. invalid json, authentication failure etc) return a simple error_code/error_message response rather than a detailed audit log
       parameters:
       - description: isn slug
         example: sample-isn--example-org
@@ -1824,17 +1843,22 @@ paths:
           schema:
             $ref: '#/definitions/handlers.CreateSignalsResponse'
         "400":
-          description: Invalid request format or authentication failure
+          description: Invalid request format (error_code = malformed_body)
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: Unauthorized request (invalid credentials, error_code = authentication_error)
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Forbidden (insufficient permissions, error_code = forbidden)
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "422":
-          description: All signals failed processing - returns detailed error information
+          description: Valid request format but all signals failed processing - returns
+            detailed error information
           schema:
             $ref: '#/definitions/handlers.CreateSignalsResponse'
-        "500":
-          description: Internal server error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
       summary: Create signals
