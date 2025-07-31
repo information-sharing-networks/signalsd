@@ -436,7 +436,7 @@ func searchPublicSignals(t *testing.T, baseURL string, endpoint testSignalEndpoi
 }
 
 // searchPrivateSignals searches for signals on private ISNs (authentication required)
-func searchPrivateSignals(t *testing.T, baseURL string, endpoint testSignalEndpoint, token string) *http.Response {
+func searchPrivateSignals(t *testing.T, baseURL string, endpoint testSignalEndpoint, token string, includeWithdrawn bool) *http.Response {
 	url := fmt.Sprintf("%s/api/isn/%s/signal_types/%s/v%s/signals/search",
 		baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
 
@@ -451,6 +451,12 @@ func searchPrivateSignals(t *testing.T, baseURL string, endpoint testSignalEndpo
 	oneHourFromNow := now.Add(1 * time.Hour)
 	q.Add("start_date", oneHourAgo.Format(time.RFC3339))
 	q.Add("end_date", oneHourFromNow.Format(time.RFC3339))
+
+	// Add include_withdrawn parameter if specified
+	if includeWithdrawn {
+		q.Add("include_withdrawn", "true")
+	}
+
 	req.URL.RawQuery = q.Encode()
 
 	if token != "" {
@@ -461,6 +467,37 @@ func searchPrivateSignals(t *testing.T, baseURL string, endpoint testSignalEndpo
 	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatalf("Failed to search private signals: %v", err)
+	}
+
+	return resp
+}
+
+// withdrawSignal withdraws a signal by local reference
+func withdrawSignal(t *testing.T, baseURL string, endpoint testSignalEndpoint, token, localRef string) *http.Response {
+	url := fmt.Sprintf("%s/api/isn/%s/signal_types/%s/v%s/signals/withdraw",
+		baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
+
+	withdrawRequest := map[string]string{
+		"local_ref": localRef,
+	}
+
+	jsonData, err := json.Marshal(withdrawRequest)
+	if err != nil {
+		t.Fatalf("Failed to marshal withdrawal request: %v", err)
+	}
+
+	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		t.Fatalf("Failed to create withdrawal request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("Failed to withdraw signal: %v", err)
 	}
 
 	return resp
@@ -668,7 +705,7 @@ func TestSignalSearch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			response := searchPrivateSignals(t, baseURL, tt.targetEndpoint, tt.requesterToken)
+			response := searchPrivateSignals(t, baseURL, tt.targetEndpoint, tt.requesterToken, false)
 			defer response.Body.Close()
 
 			// Verify response status
@@ -726,6 +763,83 @@ func TestSignalSearch(t *testing.T) {
 			}
 		})
 	}
+
+	// Test withdrawn signals are excluded from search results by default
+	t.Run("withdrawn signals excluded from search", func(t *testing.T) {
+		// First, verify the admin signal is visible in search
+		response := searchPrivateSignals(t, baseURL, adminEndpoint, adminToken, false)
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusOK {
+			logResponseDetails(t, response, "admin ISN search before withdrawal")
+			t.Fatalf("Failed to search admin ISN before withdrawal: %d", response.StatusCode)
+		}
+
+		var signalsBeforeWithdrawal []map[string]any
+		if err := json.NewDecoder(response.Body).Decode(&signalsBeforeWithdrawal); err != nil {
+			t.Fatalf("Failed to decode search response before withdrawal: %v", err)
+		}
+
+		if len(signalsBeforeWithdrawal) != 1 {
+			t.Fatalf("Expected 1 signal before withdrawal, got %d", len(signalsBeforeWithdrawal))
+		}
+
+		// Withdraw the admin signal
+		withdrawResponse := withdrawSignal(t, baseURL, adminEndpoint, adminToken, "admin-search-signal-001")
+		defer withdrawResponse.Body.Close()
+
+		if withdrawResponse.StatusCode != http.StatusNoContent {
+			logResponseDetails(t, withdrawResponse, "signal withdrawal")
+			t.Fatalf("Failed to withdraw signal: %d", withdrawResponse.StatusCode)
+		}
+
+		// Search again - should return no signals (withdrawn signal excluded by default)
+		response = searchPrivateSignals(t, baseURL, adminEndpoint, adminToken, false)
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusOK {
+			logResponseDetails(t, response, "admin ISN search after withdrawal")
+			t.Fatalf("Failed to search admin ISN after withdrawal: %d", response.StatusCode)
+		}
+
+		var signalsAfterWithdrawal []map[string]any
+		if err := json.NewDecoder(response.Body).Decode(&signalsAfterWithdrawal); err != nil {
+			t.Fatalf("Failed to decode search response after withdrawal: %v", err)
+		}
+
+		if len(signalsAfterWithdrawal) != 0 {
+			t.Errorf("Expected 0 signals after withdrawal (withdrawn signals should be excluded), got %d", len(signalsAfterWithdrawal))
+		}
+
+		// Search with include_withdrawn=true - should return the withdrawn signal
+		response = searchPrivateSignals(t, baseURL, adminEndpoint, adminToken, true)
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusOK {
+			logResponseDetails(t, response, "admin ISN search with include_withdrawn=true")
+			t.Fatalf("Failed to search admin ISN with include_withdrawn=true: %d", response.StatusCode)
+		}
+
+		var signalsWithWithdrawn []map[string]any
+		if err := json.NewDecoder(response.Body).Decode(&signalsWithWithdrawn); err != nil {
+			t.Fatalf("Failed to decode search response with include_withdrawn=true: %v", err)
+		}
+
+		if len(signalsWithWithdrawn) != 1 {
+			t.Errorf("Expected 1 signal with include_withdrawn=true, got %d", len(signalsWithWithdrawn))
+		}
+
+		// Verify the returned signal is marked as withdrawn
+		if len(signalsWithWithdrawn) > 0 {
+			signal := signalsWithWithdrawn[0]
+			isWithdrawn, exists := signal["is_withdrawn"]
+			if !exists {
+				t.Error("Signal response missing 'is_withdrawn' field")
+			} else if isWithdrawn != true {
+				t.Errorf("Expected withdrawn signal to have is_withdrawn=true, got %v", isWithdrawn)
+			}
+		}
+	})
 }
 
 // TestCORS tests that protected endpoints respect ALLOWED_ORIGINS configuration and that untrusted origins are blocked
