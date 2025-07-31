@@ -63,11 +63,19 @@ JOIN isn i
 WHERE account_id = $1
 AND is_latest = TRUE;
 
+-- name: GetLatestBatchByAccountAndIsnSlug :one
+SELECT sb.*, i.slug as isn_slug FROM signal_batches sb
+JOIN isn i
+ON i.id = sb.isn_id
+WHERE sb.account_id = $1
+AND i.slug = $2
+AND sb.is_latest = TRUE;
+
 -- name: GetLatestSignalBatchByIsnSlugAndBatchID :one
 SELECT sb.*, i.slug as isn_slug FROM signal_batches sb
-JOIN isn i 
+JOIN isn i
 ON i.id = sb.isn_id
-WHERE i.slug = $1 
+WHERE i.slug = $1
 AND sb.id = $2
 AND sb.is_latest = TRUE;
 

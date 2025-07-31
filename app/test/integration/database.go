@@ -5,12 +5,14 @@ package integration
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 
 	"github.com/google/uuid"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/utils"
+	"github.com/jackc/pgx/v5"
 )
 
 // DATA HELPERS
@@ -99,6 +101,39 @@ func createTestISN(t *testing.T, ctx context.Context, queries *database.Queries,
 		Title:         title,
 		IsInUse:       true,
 		Visibility:    visibility,
+	}
+}
+
+// getLatestBatchForAccountAndISN returns the latest batch for a specific account and ISN, or nil if none exists
+func getLatestBatchForAccountAndISN(t *testing.T, ctx context.Context, queries *database.Queries, accountID uuid.UUID, isnSlug string) *database.GetLatestBatchByAccountAndIsnSlugRow {
+	t.Helper()
+
+	// Use the dedicated query that returns exactly what we need: 0 or 1 batch
+	batch, err := queries.GetLatestBatchByAccountAndIsnSlug(ctx, database.GetLatestBatchByAccountAndIsnSlugParams{
+		AccountID: accountID,
+		Slug:      isnSlug,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil // No batch found
+		}
+		t.Fatalf("Failed to get latest batch: %v", err)
+	}
+
+	return &batch
+}
+
+// assertBatchState verifies the state of a batch
+func assertBatchState(t *testing.T, ctx context.Context, queries *database.Queries, batchID uuid.UUID, expectedIsLatest bool) {
+	t.Helper()
+
+	batch, err := queries.GetSignalBatchByID(ctx, batchID)
+	if err != nil {
+		t.Fatalf("Failed to get batch %v: %v", batchID, err)
+	}
+
+	if batch.IsLatest != expectedIsLatest {
+		t.Errorf("Expected batch %v is_latest to be %v, got %v", batchID, expectedIsLatest, batch.IsLatest)
 	}
 }
 

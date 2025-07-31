@@ -297,6 +297,45 @@ func (q *Queries) GetFailedSignalsByBatchID(ctx context.Context, id uuid.UUID) (
 	return items, nil
 }
 
+const GetLatestBatchByAccountAndIsnSlug = `-- name: GetLatestBatchByAccountAndIsnSlug :one
+SELECT sb.id, sb.created_at, sb.updated_at, sb.isn_id, sb.account_id, sb.is_latest, i.slug as isn_slug FROM signal_batches sb
+JOIN isn i
+ON i.id = sb.isn_id
+WHERE sb.account_id = $1
+AND i.slug = $2
+AND sb.is_latest = TRUE
+`
+
+type GetLatestBatchByAccountAndIsnSlugParams struct {
+	AccountID uuid.UUID `json:"account_id"`
+	Slug      string    `json:"slug"`
+}
+
+type GetLatestBatchByAccountAndIsnSlugRow struct {
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	IsnID     uuid.UUID `json:"isn_id"`
+	AccountID uuid.UUID `json:"account_id"`
+	IsLatest  bool      `json:"is_latest"`
+	IsnSlug   string    `json:"isn_slug"`
+}
+
+func (q *Queries) GetLatestBatchByAccountAndIsnSlug(ctx context.Context, arg GetLatestBatchByAccountAndIsnSlugParams) (GetLatestBatchByAccountAndIsnSlugRow, error) {
+	row := q.db.QueryRow(ctx, GetLatestBatchByAccountAndIsnSlug, arg.AccountID, arg.Slug)
+	var i GetLatestBatchByAccountAndIsnSlugRow
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsnID,
+		&i.AccountID,
+		&i.IsLatest,
+		&i.IsnSlug,
+	)
+	return i, err
+}
+
 const GetLatestIsnSignalBatchesByAccountID = `-- name: GetLatestIsnSignalBatchesByAccountID :many
 SELECT sb.id, sb.created_at, sb.updated_at, sb.isn_id, sb.account_id, sb.is_latest, i.slug as isn_slug FROM signal_batches sb 
 JOIN isn i
@@ -345,9 +384,9 @@ func (q *Queries) GetLatestIsnSignalBatchesByAccountID(ctx context.Context, acco
 
 const GetLatestSignalBatchByIsnSlugAndBatchID = `-- name: GetLatestSignalBatchByIsnSlugAndBatchID :one
 SELECT sb.id, sb.created_at, sb.updated_at, sb.isn_id, sb.account_id, sb.is_latest, i.slug as isn_slug FROM signal_batches sb
-JOIN isn i 
+JOIN isn i
 ON i.id = sb.isn_id
-WHERE i.slug = $1 
+WHERE i.slug = $1
 AND sb.id = $2
 AND sb.is_latest = TRUE
 `
