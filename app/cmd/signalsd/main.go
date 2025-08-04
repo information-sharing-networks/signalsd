@@ -30,6 +30,9 @@ import (
 //	@description
 //	@description	## Common Error Responses
 //	@description	All endpoints may return:
+//	@description	- `400` Malformed request (invalid json, missing required fields, etc.)
+//	@description	- `401` Unauthorized (invalid credentials)
+//	@description	- `403` Forbidden (insufficient permissions)
 //	@description	- `413` Request body exceeds size limit
 //	@description	- `429` Rate limit exceeded
 //	@description	- `500` Internal server error

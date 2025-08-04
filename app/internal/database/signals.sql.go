@@ -118,8 +118,10 @@ FROM ids
 ON CONFLICT (account_id, signal_type_id, local_ref)
 DO UPDATE SET
     is_withdrawn = false,
-    updated_at = now()
-WHERE signals.is_withdrawn = true
+    updated_at = CASE 
+        WHEN signals.is_withdrawn = true THEN now()
+        ELSE signals.updated_at
+    END
 RETURNING id
 `
 
@@ -130,8 +132,11 @@ type CreateSignalParams struct {
 	SemVer         string    `json:"sem_ver"`
 }
 
-// this query creates one row in signals for every new combination of account_id, signal_type_id, local_ref
-// if a withdrawn signal is received again it is reactivated (is_withdrawn = false)
+// this query creates one row in the signals table for every new combination of account_id, signal_type_id, local_ref.
+// if a withdrawn signal is received again it is reactivated (is_withdrawn = false).
+// returns the signal_id.
+// note the only way to update a singlas record is to change the is_withdrawn status
+// records are reactivated by resubmitting them, so this update ensures the updated_at timestamp is only changed if the record is reactivated
 func (q *Queries) CreateSignal(ctx context.Context, arg CreateSignalParams) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, CreateSignal,
 		arg.AccountID,
@@ -411,6 +416,63 @@ func (q *Queries) GetSignalByAccountAndLocalRef(ctx context.Context, arg GetSign
 		&i.IsnSlug,
 		&i.SignalTypeSlug,
 		&i.SemVer,
+	)
+	return i, err
+}
+
+const GetSignalCorrelationDetails = `-- name: GetSignalCorrelationDetails :one
+SELECT 
+    s.id,
+    s.local_ref,
+    s.correlation_id,
+    s.isn_id,
+    i.slug as isn_slug,
+    sc.local_ref as correlated_local_ref,
+    sc.id as correlated_signal_id
+FROM signals s
+JOIN signal_types st ON st.id = s.signal_type_id
+JOIN isn i ON i.id = s.isn_id
+join signals sc on sc.id = s.correlation_id
+WHERE s.account_id = $1
+    AND st.slug = $2
+    AND st.sem_ver = $3
+    AND s.local_ref = $4
+`
+
+type GetSignalCorrelationDetailsParams struct {
+	AccountID uuid.UUID `json:"account_id"`
+	Slug      string    `json:"slug"`
+	SemVer    string    `json:"sem_ver"`
+	LocalRef  string    `json:"local_ref"`
+}
+
+type GetSignalCorrelationDetailsRow struct {
+	ID                 uuid.UUID `json:"id"`
+	LocalRef           string    `json:"local_ref"`
+	CorrelationID      uuid.UUID `json:"correlation_id"`
+	IsnID              uuid.UUID `json:"isn_id"`
+	IsnSlug            string    `json:"isn_slug"`
+	CorrelatedLocalRef string    `json:"correlated_local_ref"`
+	CorrelatedSignalID uuid.UUID `json:"correlated_signal_id"`
+}
+
+// Get signal with its correlation details for verification
+func (q *Queries) GetSignalCorrelationDetails(ctx context.Context, arg GetSignalCorrelationDetailsParams) (GetSignalCorrelationDetailsRow, error) {
+	row := q.db.QueryRow(ctx, GetSignalCorrelationDetails,
+		arg.AccountID,
+		arg.Slug,
+		arg.SemVer,
+		arg.LocalRef,
+	)
+	var i GetSignalCorrelationDetailsRow
+	err := row.Scan(
+		&i.ID,
+		&i.LocalRef,
+		&i.CorrelationID,
+		&i.IsnID,
+		&i.IsnSlug,
+		&i.CorrelatedLocalRef,
+		&i.CorrelatedSignalID,
 	)
 	return i, err
 }

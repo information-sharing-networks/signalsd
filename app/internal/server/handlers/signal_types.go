@@ -394,7 +394,7 @@ func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *ht
 //	@Description	Returns details about the signal type
 //	@Tags			Signal types
 //	@Param			isn_slug			path	string	true	"ISN slug"					example(sample-isn--example-org)
-//	@Param			signal_type_slug	path	string	true	"signal type slug"		example(sample-signal--example-org)
+//	@Param			signal_type_slug	path	string	true	"signal type slug"			example(sample-signal--example-org)
 //	@Param			sem_ver				path	string	true	"version to be recieved"	example(0.0.1)
 //
 //	@Tags			ISN details

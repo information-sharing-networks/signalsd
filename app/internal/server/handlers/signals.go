@@ -75,6 +75,7 @@ type CreateSignalsResults struct {
 
 type StoredSignal struct {
 	LocalRef        string    `json:"local_ref" example:"item_id_#1"`
+	SignalID        uuid.UUID `json:"signal_id" example:"b8ded113-ac0e-4a2c-a89f-0876fe97b440"`
 	SignalVersionID uuid.UUID `json:"signal_version_id" example:"835788bd-789d-4091-96e3-db0f51ccbabc"`
 	VersionNumber   int32     `json:"version_number" example:"1"`
 }
@@ -143,34 +144,47 @@ type SignalVersionDoc struct {
 //	@Description	Submit an array of signals for storage on the ISN
 //	@Description	- payloads must not mix signals of different types and are subject to the size limits defined on the site.
 //	@Description	- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.
-//	@Description	- If a local reference is received more than once from an account for the specified signal_type it will be stored with a incremented version number.
+//	@Description	- If a local reference is received more than once from an account for the specified signal_type a new version of the signal will be stored with a incremented version number.
 //	@Description	- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.
-//	@Description	- requests are only accepted for the open signal batch for this account/ISN.
+//	@Description	- requests are only accepted for the open signal batch for this account/ISN (service accounts need to manually create batches, web users have a batch automatically created when they first write to an ISN).
 //	@Description
 //	@Description	**Authentication**
 //	@Description
 //	@Description	Requires a valid access token.
 //	@Description	The claims in the access token list the ISNs and signal_types that the account is permitted to use.
 //	@Description
-//	@Description	**Validation and Processing**
+//	@Description	**Error handling**
+//	@Description
+//	@Description	if the request is a vaild format but individual signals contain errors (validation errors, incorrect correlation ids, database errors) the errors are recorded in the response but do not prevent other signals from being processed.
+//	@Description	Individual failures are logged and can be tracked using the signals_batch_id returned in the response - see the batch status endpoint.
+//	@Description
+//	@Description	Errors that relate to the entire request  - e.g invalid json, authentication, permission and server errors (400, 401, 403, 500) - are not recorded and should be handled by the client immediately.
+//	@Description
+//	@Description	**JSON Schema Validation**
 //	@Description
 //	@Description	Signals are validated against the JSON schema specified for the signal type unless validation is disabled on the type definition.
-//	@Description	Individual signal processing failures (validation errors, incorrect correlation ids, database errors) are recorded in the response but do not prevent other signals from being processed.
 //	@Description
 //	@Description	When validation is disabled, basic checks are still done on the incoming data and the following issues create a 400 error and cause the entire payload to be rejected:
 //	@Description	- invalid json format
 //	@Description	- missing fields (the array of signals must be in a json object called signals, and content and local_ref must be present for each record).
 //	@Description
+//	@Description	**Signal versions**
+//	@Description
+//	@Description	Multiple versions are created when signals are resupplied, e.g. because the client wants to correct a previously publsihed signal.
+//	@Description	By default search will return the latest version of the signal.
+//	@Description	If a signal has been withdrawn it will be reactivated if you resubmit it using the same local_ref.
+//	@Description
+//	@Description	**Correlating signals**
+//	@Description
+//	@Description	Correlation IDs can be used to link signals together.  Signals can only be correlated within the same ISN.
+//	@Description	If the supplied correlation_id is not found in the same ISN as the signal being submitted, the response will contain a 422 or 207 status code and the error_code for the failed signal will be `invalid_correlation_id`.
 //	@Description
 //	@Description	**Response Status Codes**
-//	@Description	- 200: All signals processed successfully
-//	@Description	- 207: Partial success (some signals succeeded, some failed)
-//	@Description	- 422: All signals failed processing (the request was valid but all signals failed processing, e.g because they did not validate against the schema)
-//	@Description	- 400 / error_code = 'malformed_body': Invalid request format, authentication, or other request-level errors
-//	@Description	- 400: authentication, or other request-level errors
-//	@Description	- 500: Internal server errors
+//	@Description	- `200`: All signals processed successfully
+//	@Description	- `207`: Partial success (some signals succeeded, some failed)
+//	@Description	- `422`: All signals failed processing (the request was valid but all signals failed processing, e.g because they did not conform with the JSON schema for this signal type)
 //	@Description
-//	@Description	400 and 500 errors cause the whole payload to be rejected (note these failures are not logged on the database and should be handled by the client immediately).
+//	@Description	request level errors (e.g. invalid json, authentication failure etc) return a simple error_code/error_message response rather than a detailed audit log
 //
 //	@Param			isn_slug			path		string								true	"isn slug"						example(sample-isn--example-org)
 //	@Param			signal_type_slug	path		string								true	"signal type slug"				example(sample-signal--example-org)
@@ -179,19 +193,18 @@ type SignalVersionDoc struct {
 //
 //	@Success		200					{object}	handlers.CreateSignalsResponse		"All signals processed successfully"
 //	@Success		207					{object}	handlers.CreateSignalsResponse		"Partial success - some signals succeeded, some failed"
-//	@Success		422					{object}	handlers.CreateSignalsResponse		"All signals failed processing - returns detailed error information"
-//	@Failure		400					{object}	responses.ErrorResponse				"Invalid request format or authentication failure"
-//	@Failure		500					{object}	responses.ErrorResponse				"Internal server error"
+//	@Success		422					{object}	handlers.CreateSignalsResponse		"Valid request format but all signals failed processing - returns detailed error information"
+//	@Failure		400					{object}	responses.ErrorResponse				"Invalid request format (error_code = malformed_body)
+//	@Failure		401					{object}	responses.ErrorResponse				"Unauthorized request (invalid credentials, error_code = authentication_error)"
+//	@Failure		403					{object}	responses.ErrorResponse				"Forbidden (insufficient permissions, error_code = forbidden)"
 //
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals [post]
 //
 // CreateSignal Handler inserts signals and signal_versions records - signals are the master records containing
-// the local_ref and correlation_id, signal_versions contains the content and links back to the signal.  Multiple versions are created when signals are resupplied, e.g due to corrections being sent.
-//
+// the local_ref and correlation_id, signal_versions contains the content and links back to the signal.
 // the handler will record errors encountered when processing individual signals (see the signal_processing_failures table).
-// Errors that relate to the entire request - e.g invalid json, permissions and authentication - are not recorded and should be handled by the client when they occur.
 func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Request) {
 
 	isnSlug := r.PathValue("isn_slug")
@@ -325,10 +338,11 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 			continue
 		}
 
-		// Create the signal
+		// Create the signal master record
 		var signalErr error
+		var signalID uuid.UUID
 		if signal.CorrelationId == nil {
-			_, signalErr = s.queries.WithTx(tx).CreateSignal(r.Context(), database.CreateSignalParams{
+			signalID, signalErr = s.queries.WithTx(tx).CreateSignal(r.Context(), database.CreateSignalParams{
 				AccountID:      claims.AccountID,
 				LocalRef:       signal.LocalRef,
 				SignalTypeSlug: signalTypeSlug,
@@ -336,13 +350,16 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 			})
 		} else {
 			// Validate that correlation_id references a valid signal in the same ISN
-			// note there is no longer a db constraint to protect against errors here (the signals table is now partitioned by author and this prevents the use of a foreign key since signals can be correlated to signals from any account)
 			isValid, err := s.queries.WithTx(tx).ValidateCorrelationID(r.Context(), database.ValidateCorrelationIDParams{
 				CorrelationID: *signal.CorrelationId,
 				IsnSlug:       isnSlug,
 			})
 
 			if err != nil {
+				if rollbackErr := tx.Rollback(r.Context()); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+					logger := zerolog.Ctx(r.Context())
+					logger.Error().Err(rollbackErr).Msg("failed to rollback transaction")
+				}
 				createSignalsResponse.Results.FailedSignals = append(createSignalsResponse.Results.FailedSignals, FailedSignal{
 					LocalRef:     signal.LocalRef,
 					ErrorCode:    string(apperrors.ErrCodeInternalError),
@@ -352,15 +369,20 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 			}
 
 			if !isValid {
+				if rollbackErr := tx.Rollback(r.Context()); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
+					logger := zerolog.Ctx(r.Context())
+					logger.Error().Err(rollbackErr).Msg("failed to rollback transaction")
+				}
 				createSignalsResponse.Results.FailedSignals = append(createSignalsResponse.Results.FailedSignals, FailedSignal{
 					LocalRef:     signal.LocalRef,
-					ErrorCode:    string(apperrors.ErrCodeMalformedBody),
+					ErrorCode:    string(apperrors.ErrCodeInvalidCorrelationID),
 					ErrorMessage: fmt.Sprintf("invalid correlation_id %v - signal does not exist in this ISN", signal.CorrelationId),
 				})
 				continue
 			}
 
-			_, signalErr = s.queries.WithTx(tx).CreateOrUpdateSignalWithCorrelationID(r.Context(), database.CreateOrUpdateSignalWithCorrelationIDParams{
+			// create correlated signal master record
+			signalID, signalErr = s.queries.WithTx(tx).CreateOrUpdateSignalWithCorrelationID(r.Context(), database.CreateOrUpdateSignalWithCorrelationIDParams{
 				AccountID:      claims.AccountID,
 				LocalRef:       signal.LocalRef,
 				CorrelationID:  *signal.CorrelationId,
@@ -369,6 +391,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 			})
 		}
 
+		// unexpected error creating signals master record
 		if signalErr != nil && !errors.Is(signalErr, pgx.ErrNoRows) {
 			// Rollback this transaction
 			if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
@@ -378,7 +401,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 				continue
 			}
 
-			// Handle other database errors
+			// record database errors in the failed signals array
 			createSignalsResponse.Results.FailedSignals = append(createSignalsResponse.Results.FailedSignals, FailedSignal{
 				LocalRef:     signal.LocalRef,
 				ErrorCode:    string(apperrors.ErrCodeMalformedBody),
@@ -387,7 +410,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 			continue
 		}
 
-		// Signal creation succeeded, now try to create the signal_version entry
+		// Signal creation succeeded, now create the signal_version entry
 		versionResult, versionErr := s.queries.WithTx(tx).CreateSignalVersion(r.Context(), database.CreateSignalVersionParams{
 			AccountID:      claims.AccountID,
 			SignalBatchID:  signalBatchID,
@@ -423,9 +446,10 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 			continue
 		}
 
-		// Success - add to stored signals
+		// Success - add to stored signals array
 		createSignalsResponse.Results.StoredSignals = append(createSignalsResponse.Results.StoredSignals, StoredSignal{
 			LocalRef:        signal.LocalRef,
+			SignalID:        signalID,
 			SignalVersionID: versionResult.ID,
 			VersionNumber:   versionResult.VersionNumber,
 		})
