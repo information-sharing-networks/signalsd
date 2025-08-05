@@ -90,40 +90,32 @@ WHERE sb.id = $1;
 -- count of sucessfully loaded signals grouped by signal type (note that a local_ref can be submitted multiple times and only the latest version is counted).
 --
 -- where a signal has failed processing and has not subsequently been loaded again, it is not counted
-WITH LatestSignals AS (
-    SELECT
-        s.local_ref,
-        st.slug AS signal_type_slug,
-        st.sem_ver AS signal_type_sem_ver,
-        sv.version_number,
-        sv.created_at,
-        sv.id AS signal_version_id,
-        sv.signal_id,
-        ROW_NUMBER() OVER (PARTITION BY sv.signal_id ORDER BY sv.version_number DESC) AS rn
-    FROM
-        signal_batches sb 
-    JOIN
-        signal_versions sv ON sv.signal_batch_id = sb.id
-    JOIN
-        signals s ON s.id = sv.signal_id
-    JOIN 
-        signal_types st on st.id = s.signal_type_id
-    WHERE sb.id = $1
-)
+-- Uses latest_signal_versions view to avoid ROW_NUMBER() window function
 SELECT
-    COUNT(*) as submitted_count, ls.signal_type_slug, ls.signal_type_sem_ver 
+    COUNT(*) as submitted_count,
+    st.slug AS signal_type_slug,
+    st.sem_ver AS signal_type_sem_ver
 FROM
-    LatestSignals ls
-WHERE ls.rn = 1
-AND NOT EXISTS ( -- do not count signals that failed processing and have not been corrected yet
-    SELECT 1 FROM signal_processing_failures spf 
-    WHERE spf.signal_batch_id = $1
-        AND spf.local_ref = ls.local_ref
-        AND spf.signal_type_slug = ls.signal_type_slug
-        AND spf.signal_type_sem_ver = ls.signal_type_sem_ver
-        AND spf.created_at > ls.created_at
-    )
-GROUP BY ls.signal_type_slug, ls.signal_type_sem_ver;
+    signal_batches sb
+JOIN
+    signal_versions sv ON sv.signal_batch_id = sb.id
+JOIN
+    latest_signal_versions lsv ON lsv.signal_id = sv.signal_id AND lsv.id = sv.id
+JOIN
+    signals s ON s.id = lsv.signal_id
+JOIN
+    signal_types st on st.id = s.signal_type_id
+WHERE
+    sb.id = $1
+    AND NOT EXISTS ( -- do not count signals that failed processing and have not been corrected yet
+        SELECT 1 FROM signal_processing_failures spf
+        WHERE spf.signal_batch_id = $1
+            AND spf.local_ref = s.local_ref
+            AND spf.signal_type_slug = st.slug
+            AND spf.signal_type_sem_ver = st.sem_ver
+            AND spf.created_at > lsv.created_at
+        )
+GROUP BY st.slug, st.sem_ver;
 
 -- name: GetFailedSignalsByBatchID :many
 -- failed local_refs that were not subsequently loaded

@@ -134,72 +134,52 @@ JOIN signals s
 RETURNING id, version_number;
 
 -- name: GetLatestSignalVersionsWithOptionalFilters :many
--- Note the get queries:
--- require isn_slug,signal_type_slug & sem_ver params
-WITH LatestSignals AS (
-    SELECT
-        a.id AS account_id,
-        a.account_type,
-        COALESCE(u.email, si.client_contact_email) AS email, -- show either the user or service account email
-        s.local_ref,
-        sv.version_number,
-        sv.created_at,
-        sv.id AS signal_version_id,
-        sv.signal_id,
-        s2.local_ref AS correlated_local_ref,
-        s2.id AS correlated_signal_id,
-        s.is_withdrawn,
-        sv.content,
-        ROW_NUMBER() OVER (PARTITION BY sv.signal_id ORDER BY sv.version_number DESC) AS rn
-    FROM
-        signal_versions sv
-    JOIN
-        signals s ON s.id = sv.signal_id
-    JOIN
-        signals s2 ON s2.id = s.correlation_id
-    JOIN 
-        accounts a ON a.id = s.account_id
-    JOIN 
-        signal_types st on st.id = s.signal_type_id
-    JOIN 
-        isn i ON i.id = st.isn_id 
-    LEFT OUTER JOIN 
-        users u ON u.account_id = a.id
-    LEFT OUTER JOIN 
-        service_accounts si ON si.account_id = a.id
-    WHERE i.slug = sqlc.arg(isn_slug)
-        AND st.slug = sqlc.arg(signal_type_slug)
-        AND st.sem_ver = sqlc.arg(sem_ver)
-        AND i.is_in_use = true
-        AND st.is_in_use = true
-        AND (sqlc.narg('include_withdrawn')::boolean = true OR s.is_withdrawn = false)
-        AND (sqlc.narg('account_id')::uuid IS NULL OR a.id = sqlc.narg('account_id')::uuid)
-        AND (sqlc.narg('signal_id')::uuid IS NULL OR s.id = sqlc.narg('signal_id')::uuid)
-        AND (sqlc.narg('local_ref')::text IS NULL OR s.local_ref = sqlc.narg('local_ref')::text)
-        AND (sqlc.narg('start_date')::timestamptz IS NULL OR sv.created_at >= sqlc.narg('start_date')::timestamptz)
-        AND (sqlc.narg('end_date')::timestamptz IS NULL OR sv.created_at <= sqlc.narg('end_date')::timestamptz)
-)
+-- Note the get queries require isn_slug,signal_type_slug & sem_ver params
 SELECT
-    ls.account_id,
-    ls.account_type,
-    ls.email,
-    ls.local_ref,
-    ls.version_number,
-    ls.created_at,
-    ls.signal_version_id,
-    ls.signal_id,
-    ls.correlated_local_ref,
-    ls.correlated_signal_id,
-    ls.is_withdrawn,
-    ls.content
+    a.id AS account_id,
+    a.account_type,
+    COALESCE(u.email, si.client_contact_email) AS email, -- show either the user or service account email
+    s.local_ref,
+    lsv.version_number,
+    lsv.created_at,
+    lsv.id AS signal_version_id,
+    lsv.signal_id,
+    s2.local_ref AS correlated_local_ref,
+    s2.id AS correlated_signal_id,
+    s.is_withdrawn,
+    lsv.content
 FROM
-    LatestSignals ls
+    latest_signal_versions lsv
+JOIN
+    signals s ON s.id = lsv.signal_id
+JOIN
+    signals s2 ON s2.id = s.correlation_id
+JOIN
+    accounts a ON a.id = s.account_id
+JOIN
+    signal_types st on st.id = s.signal_type_id
+JOIN
+    isn i ON i.id = st.isn_id
+LEFT OUTER JOIN
+    users u ON u.account_id = a.id
+LEFT OUTER JOIN
+    service_accounts si ON si.account_id = a.id
 WHERE
-    ls.rn = 1
+    i.slug = sqlc.arg(isn_slug)
+    AND st.slug = sqlc.arg(signal_type_slug)
+    AND st.sem_ver = sqlc.arg(sem_ver)
+    AND i.is_in_use = true
+    AND st.is_in_use = true
+    AND (sqlc.narg('include_withdrawn')::boolean = true OR s.is_withdrawn = false)
+    AND (sqlc.narg('account_id')::uuid IS NULL OR a.id = sqlc.narg('account_id')::uuid)
+    AND (sqlc.narg('signal_id')::uuid IS NULL OR s.id = sqlc.narg('signal_id')::uuid)
+    AND (sqlc.narg('local_ref')::text IS NULL OR s.local_ref = sqlc.narg('local_ref')::text)
+    AND (sqlc.narg('start_date')::timestamptz IS NULL OR lsv.created_at >= sqlc.narg('start_date')::timestamptz)
+    AND (sqlc.narg('end_date')::timestamptz IS NULL OR lsv.created_at <= sqlc.narg('end_date')::timestamptz)
 ORDER BY
-    ls.local_ref,
-    ls.version_number,
-    ls.signal_version_id;
+    s.local_ref,
+    lsv.version_number,
+    lsv.id;
 
 -- name: WithdrawSignalByID :execrows
 UPDATE signals
