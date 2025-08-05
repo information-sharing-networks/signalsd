@@ -92,17 +92,6 @@ type CreateSignalsSummary struct {
 	FailedCount    int `json:"failed_count" example:"5"`
 }
 
-// structs used by the search endpoint
-type SearchParams struct {
-	IsnSlug          string
-	SignalTypeSlug   string
-	SemVer           string
-	AccountID        *uuid.UUID
-	StartDate        *time.Time
-	EndDate          *time.Time
-	IncludeWithdrawn bool
-}
-
 type WithdrawSignalRequest struct {
 	LocalRef *string `json:"local_ref,omitempty" example:"item_id_#1"`
 }
@@ -134,6 +123,96 @@ type SignalVersionDoc struct {
 	CorrelatedSignalID uuid.UUID      `json:"correlated_signal_id" example:"17c50d26-1da6-4ac0-897f-3a2f85f07cd3"`
 	IsWithdrawn        bool           `json:"is_withdrawn" example:"false"`
 	Content            map[string]any `json:"content"`
+}
+
+// struct used by the search endpoint
+type SearchParams struct {
+	isnSlug          string
+	signalTypeSlug   string
+	semVer           string
+	accountID        *uuid.UUID
+	startDate        *time.Time
+	endDate          *time.Time
+	localRef         *string
+	signalID         *uuid.UUID
+	includeWithdrawn bool
+}
+
+// parseSearchParams parses all search parameters from the signal search request
+func parseSearchParams(r *http.Request) (SearchParams, error) {
+	searchParams := SearchParams{
+		isnSlug:          r.PathValue("isn_slug"),
+		signalTypeSlug:   r.PathValue("signal_type_slug"),
+		semVer:           r.PathValue("sem_ver"),
+		includeWithdrawn: false, // Default to false
+	}
+
+	// Parse account_id
+	if accountIDString := r.URL.Query().Get("account_id"); accountIDString != "" {
+		accountID, err := uuid.Parse(accountIDString)
+		if err != nil {
+			return searchParams, fmt.Errorf("account_id is not a valid UUID")
+		}
+		searchParams.accountID = &accountID
+	}
+
+	// Parse start_date
+	if startDateString := r.URL.Query().Get("start_date"); startDateString != "" {
+		startDate, err := utils.ParseDateTime(startDateString)
+		if err != nil {
+			return searchParams, err
+		}
+		searchParams.startDate = &startDate
+	}
+
+	// Parse end_date
+	if endDateString := r.URL.Query().Get("end_date"); endDateString != "" {
+		endDate, err := utils.ParseDateTime(endDateString)
+		if err != nil {
+			return searchParams, err
+		}
+		searchParams.endDate = &endDate
+	}
+
+	// Parse signal_id
+	if signalIDString := r.URL.Query().Get("signal_id"); signalIDString != "" {
+		signalID, err := uuid.Parse(signalIDString)
+		if err != nil {
+			return searchParams, fmt.Errorf("signal_id is not a valid UUID")
+		}
+		searchParams.signalID = &signalID
+	}
+
+	// Parse local_ref
+	if localRef := r.URL.Query().Get("local_ref"); localRef != "" {
+		searchParams.localRef = &localRef
+	}
+
+	// Parse include_withdrawn
+	if includeWithdrawnString := r.URL.Query().Get("include_withdrawn"); includeWithdrawnString != "" {
+		searchParams.includeWithdrawn = includeWithdrawnString == "true"
+	}
+
+	return searchParams, nil
+}
+
+// validateSearchParams conforms that the combination of search parameters is valid
+func validateSearchParams(params SearchParams) error {
+	hasPartialDateRange := (params.startDate != nil) != (params.endDate != nil)
+	if hasPartialDateRange {
+		return fmt.Errorf("you must supply both start_date and end_date search parameters")
+	}
+
+	hasDateRange := params.startDate != nil && params.endDate != nil
+	hasAccount := params.accountID != nil
+	hasSignalID := params.signalID != nil
+	hasLocalRef := params.localRef != nil
+
+	if !hasDateRange && !hasAccount && !hasSignalID && !hasLocalRef {
+		return fmt.Errorf("you must supply a search parameter")
+	}
+
+	return nil
 }
 
 // SignalsHandler godocs
@@ -502,82 +581,49 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 //	@Description
 //	@Description	Note the endpoint returns the latest version of each signal.
 //
-//	@Param			start_date	query		string	false	"Start date for filtering"	example(2006-01-02T15:04:05Z)
-//	@Param			end_date	query		string	false	"End date for filtering"	example(2006-01-02T16:00:00Z
-//	@Param			account_id	query		string	false	"Account ID for filtering"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
+//	@Param			start_date			query		string	false	"Start date"									example(2006-01-02T15:04:05Z)
+//	@Param			end_date			query		string	false	"End date"										example(2006-01-02T16:00:00Z)
+//	@Param			account_id			query		string	false	"Account ID"									example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
+//	@Param			signal_id			query		string	false	"Signal ID"										example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
+//	@Param			local_ref			query		string	false	"Local reference"								example(item_id_#1)
+//	@Param			include_withdrawn	query		string	false	"Include withdrawn signals (default: false)"	example(true)
 //
-//	@Success		200			{array}		handlers.SignalVersionDoc
-//	@Failure		400			{object}	responses.ErrorResponse
+//	@Success		200					{array}		handlers.SignalVersionDoc
+//	@Failure		400					{object}	responses.ErrorResponse
 //
 //	@Router			/api/public/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search [get]
 func (s *SignalsHandler) SearchPublicSignalsHandler(w http.ResponseWriter, r *http.Request) {
-	// set up params
-	isnSlug := r.PathValue("isn_slug")
-	signalTypeSlug := r.PathValue("signal_type_slug")
-	semVer := r.PathValue("sem_ver")
-	signalTypePath := fmt.Sprintf("%v/v%v", signalTypeSlug, semVer)
-
-	searchParams := SearchParams{
-		IsnSlug:          isnSlug,
-		SignalTypeSlug:   signalTypeSlug,
-		SemVer:           semVer,
-		IncludeWithdrawn: false, // Default to false for public endpoints
+	// Parse all search parameters
+	searchParams, err := parseSearchParams(r)
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
+		return
 	}
 
-	if accountIDString := r.URL.Query().Get("account_id"); accountIDString != "" {
-		accountID, err := uuid.Parse(accountIDString)
-		if err != nil {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "account_id is not a valid UUID")
-			return
-		}
-		searchParams.AccountID = &accountID
-	}
-
-	if startDateString := r.URL.Query().Get("start_date"); startDateString != "" {
-		startDate, err := utils.ParseDateTime(startDateString)
-		if err != nil {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
-			return
-		}
-		searchParams.StartDate = &startDate
-	}
-
-	if endDateString := r.URL.Query().Get("end_date"); endDateString != "" {
-		endDate, err := utils.ParseDateTime(endDateString)
-		if err != nil {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
-			return
-		}
-		searchParams.EndDate = &endDate
-	}
+	signalTypePath := fmt.Sprintf("%v/v%v", searchParams.signalTypeSlug, searchParams.semVer)
 
 	// Validate this is a public ISN
-	if !s.publicIsnCache.HasSignalType(isnSlug, signalTypePath) {
+	if !s.publicIsnCache.HasSignalType(searchParams.isnSlug, signalTypePath) {
 		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("invalid public ISN or signal type: %v is not available on this ISN", signalTypePath))
 		return
 	}
 
-	hasPartialDateRange := (searchParams.StartDate != nil) != (searchParams.EndDate != nil)
-	hasDateRange := searchParams.StartDate != nil && searchParams.EndDate != nil
-	hasAccount := searchParams.AccountID != nil
-
-	if hasPartialDateRange {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "you must supply both start_date and end_date search parameters")
-		return
-	}
-	if !hasDateRange && !hasAccount {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "you must supply a search paramenter")
+	// Validate search parameters
+	if err := validateSearchParams(searchParams); err != nil {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
 		return
 	}
 
 	rows, err := s.queries.GetLatestSignalVersionsWithOptionalFilters(r.Context(), database.GetLatestSignalVersionsWithOptionalFiltersParams{
-		IsnSlug:          searchParams.IsnSlug,
-		SignalTypeSlug:   searchParams.SignalTypeSlug,
-		SemVer:           searchParams.SemVer,
-		StartDate:        searchParams.StartDate,
-		EndDate:          searchParams.EndDate,
-		AccountID:        searchParams.AccountID,
-		IncludeWithdrawn: &searchParams.IncludeWithdrawn,
+		IsnSlug:          searchParams.isnSlug,
+		SignalTypeSlug:   searchParams.signalTypeSlug,
+		SemVer:           searchParams.semVer,
+		StartDate:        searchParams.startDate,
+		EndDate:          searchParams.endDate,
+		AccountID:        searchParams.accountID,
+		SignalID:         searchParams.signalID,
+		LocalRef:         searchParams.localRef,
+		IncludeWithdrawn: &searchParams.includeWithdrawn,
 	})
 	if err != nil {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to select signals from database: %v", err))
@@ -614,10 +660,12 @@ func (s *SignalsHandler) SearchPublicSignalsHandler(w http.ResponseWriter, r *ht
 //	@Description
 //	@Description	Note the endpoint returns the latest version of each signal.
 //
-//	@Param			start_date			query		string	false	"Start date for filtering"						example(2006-01-02T15:04:05Z)
-//	@Param			end_date			query		string	false	"End date for filtering"						example(2006-01-02T16:00:00Z
-//	@Param			account_id			query		string	false	"Account ID for filtering"						example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
-//	@Param			include_withdrawn	query		string	false	"Include withdrawn signals (default: false)"	example(false)
+//	@Param			start_date			query		string	false	"Start date"									example(2006-01-02T15:04:05Z)
+//	@Param			end_date			query		string	false	"End date"										example(2006-01-02T16:00:00Z
+//	@Param			account_id			query		string	false	"Account ID"									example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
+//	@Param			signal_id			query		string	false	"Signal ID"										example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
+//	@Param			local_ref			query		string	false	"Local reference"								example(item_id_#1)
+//	@Param			include_withdrawn	query		string	false	"Include withdrawn signals (default: false)"	example(true)
 //
 //	@Success		200					{array}		handlers.SignalVersionDoc
 //	@Failure		400					{object}	responses.ErrorResponse
@@ -625,51 +673,17 @@ func (s *SignalsHandler) SearchPublicSignalsHandler(w http.ResponseWriter, r *ht
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search [get]
+//
+// todo include correlated signals
 func (s *SignalsHandler) SearchPrivateSignalsHandler(w http.ResponseWriter, r *http.Request) {
-	// set up params
-	isnSlug := r.PathValue("isn_slug")
-	signalTypeSlug := r.PathValue("signal_type_slug")
-	semVer := r.PathValue("sem_ver")
-	signalTypePath := fmt.Sprintf("%v/v%v", signalTypeSlug, semVer)
-
-	searchParams := SearchParams{
-		IsnSlug:          isnSlug,
-		SignalTypeSlug:   signalTypeSlug,
-		SemVer:           semVer,
-		IncludeWithdrawn: false, // Default to false
+	// Parse all search parameters
+	searchParams, err := parseSearchParams(r)
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
+		return
 	}
 
-	if accountIDString := r.URL.Query().Get("account_id"); accountIDString != "" {
-		accountID, err := uuid.Parse(accountIDString)
-		if err != nil {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "account_id is not a valid UUID")
-			return
-		}
-		searchParams.AccountID = &accountID
-	}
-
-	if startDateString := r.URL.Query().Get("start_date"); startDateString != "" {
-		startDate, err := utils.ParseDateTime(startDateString)
-		if err != nil {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
-			return
-		}
-		searchParams.StartDate = &startDate
-	}
-
-	if endDateString := r.URL.Query().Get("end_date"); endDateString != "" {
-		endDate, err := utils.ParseDateTime(endDateString)
-		if err != nil {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
-			return
-		}
-		searchParams.EndDate = &endDate
-	}
-
-	if includeWithdrawnString := r.URL.Query().Get("include_withdrawn"); includeWithdrawnString != "" {
-		includeWithdrawn := includeWithdrawnString == "true"
-		searchParams.IncludeWithdrawn = includeWithdrawn
-	}
+	signalTypePath := fmt.Sprintf("%v/v%v", searchParams.signalTypeSlug, searchParams.semVer)
 
 	// Validate authenticated access to private ISN
 	claims, hasAuth := auth.ContextAccessTokenClaims(r.Context())
@@ -679,32 +693,27 @@ func (s *SignalsHandler) SearchPrivateSignalsHandler(w http.ResponseWriter, r *h
 	}
 
 	// Check if user has access to this signal type
-	if !slices.Contains(claims.IsnPerms[isnSlug].SignalTypePaths, signalTypePath) {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, fmt.Sprintf("access denied to signal type %v on ISN %v", signalTypePath, isnSlug))
+	if !slices.Contains(claims.IsnPerms[searchParams.isnSlug].SignalTypePaths, signalTypePath) {
+		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, fmt.Sprintf("access denied to signal type %v on ISN %v", signalTypePath, searchParams.isnSlug))
 		return
 	}
 
-	hasPartialDateRange := (searchParams.StartDate != nil) != (searchParams.EndDate != nil)
-	hasDateRange := searchParams.StartDate != nil && searchParams.EndDate != nil
-	hasAccount := searchParams.AccountID != nil
-
-	if hasPartialDateRange {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "you must supply both start_date and end_date search parameters")
-		return
-	}
-	if !hasDateRange && !hasAccount {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "you must supply a search paramenter")
+	// Validate search parameters
+	if err := validateSearchParams(searchParams); err != nil {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
 		return
 	}
 
 	rows, err := s.queries.GetLatestSignalVersionsWithOptionalFilters(r.Context(), database.GetLatestSignalVersionsWithOptionalFiltersParams{
-		IsnSlug:          searchParams.IsnSlug,
-		SignalTypeSlug:   searchParams.SignalTypeSlug,
-		SemVer:           searchParams.SemVer,
-		StartDate:        searchParams.StartDate,
-		EndDate:          searchParams.EndDate,
-		AccountID:        searchParams.AccountID,
-		IncludeWithdrawn: &searchParams.IncludeWithdrawn,
+		IsnSlug:          searchParams.isnSlug,
+		SignalTypeSlug:   searchParams.signalTypeSlug,
+		SemVer:           searchParams.semVer,
+		StartDate:        searchParams.startDate,
+		EndDate:          searchParams.endDate,
+		AccountID:        searchParams.accountID,
+		SignalID:         searchParams.signalID,
+		LocalRef:         searchParams.localRef,
+		IncludeWithdrawn: &searchParams.includeWithdrawn,
 	})
 	if err != nil {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to select signals from database: %v", err))

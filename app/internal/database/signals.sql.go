@@ -219,14 +219,6 @@ func (q *Queries) CreateSignalVersion(ctx context.Context, arg CreateSignalVersi
 }
 
 const GetLatestSignalVersionsWithOptionalFilters = `-- name: GetLatestSignalVersionsWithOptionalFilters :many
-
-
-
-
-
-
-
-
 WITH LatestSignals AS (
     SELECT
         a.id AS account_id,
@@ -265,8 +257,10 @@ WITH LatestSignals AS (
         AND st.is_in_use = true
         AND ($4::boolean = true OR s.is_withdrawn = false)
         AND ($5::uuid IS NULL OR a.id = $5::uuid)
-        AND ($6::timestamptz IS NULL OR sv.created_at >= $6::timestamptz)
-        AND ($7::timestamptz IS NULL OR sv.created_at <= $7::timestamptz)
+        AND ($6::uuid IS NULL OR s.id = $6::uuid)
+        AND ($7::text IS NULL OR s.local_ref = $7::text)
+        AND ($8::timestamptz IS NULL OR sv.created_at >= $8::timestamptz)
+        AND ($9::timestamptz IS NULL OR sv.created_at <= $9::timestamptz)
 )
 SELECT
     ls.account_id,
@@ -297,6 +291,8 @@ type GetLatestSignalVersionsWithOptionalFiltersParams struct {
 	SemVer           string     `json:"sem_ver"`
 	IncludeWithdrawn *bool      `json:"include_withdrawn"`
 	AccountID        *uuid.UUID `json:"account_id"`
+	SignalID         *uuid.UUID `json:"signal_id"`
+	LocalRef         *string    `json:"local_ref"`
 	StartDate        *time.Time `json:"start_date"`
 	EndDate          *time.Time `json:"end_date"`
 }
@@ -317,7 +313,6 @@ type GetLatestSignalVersionsWithOptionalFiltersRow struct {
 }
 
 // Note the get queries:
-// do not check validity status
 // require isn_slug,signal_type_slug & sem_ver params
 func (q *Queries) GetLatestSignalVersionsWithOptionalFilters(ctx context.Context, arg GetLatestSignalVersionsWithOptionalFiltersParams) ([]GetLatestSignalVersionsWithOptionalFiltersRow, error) {
 	rows, err := q.db.Query(ctx, GetLatestSignalVersionsWithOptionalFilters,
@@ -326,6 +321,8 @@ func (q *Queries) GetLatestSignalVersionsWithOptionalFilters(ctx context.Context
 		arg.SemVer,
 		arg.IncludeWithdrawn,
 		arg.AccountID,
+		arg.SignalID,
+		arg.LocalRef,
 		arg.StartDate,
 		arg.EndDate,
 	)

@@ -1423,26 +1423,40 @@
                     {
                         "type": "string",
                         "example": "2006-01-02T15:04:05Z",
-                        "description": "Start date for filtering",
+                        "description": "Start date",
                         "name": "start_date",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "End date for filtering",
+                        "description": "End date",
                         "name": "end_date",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
-                        "description": "Account ID for filtering",
+                        "description": "Account ID",
                         "name": "account_id",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "example": "false",
+                        "example": "4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19",
+                        "description": "Signal ID",
+                        "name": "signal_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "item_id_#1",
+                        "description": "Local reference",
+                        "name": "local_ref",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "true",
                         "description": "Include withdrawn signals (default: false)",
                         "name": "include_withdrawn",
                         "in": "query"
@@ -1614,21 +1628,43 @@
                     {
                         "type": "string",
                         "example": "2006-01-02T15:04:05Z",
-                        "description": "Start date for filtering",
+                        "description": "Start date",
                         "name": "start_date",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "End date for filtering",
+                        "example": "2006-01-02T16:00:00Z",
+                        "description": "End date",
                         "name": "end_date",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
-                        "description": "Account ID for filtering",
+                        "description": "Account ID",
                         "name": "account_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19",
+                        "description": "Signal ID",
+                        "name": "signal_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "item_id_#1",
+                        "description": "Local reference",
+                        "name": "local_ref",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "true",
+                        "description": "Include withdrawn signals (default: false)",
+                        "name": "include_withdrawn",
                         "in": "query"
                     }
                 ],

@@ -133,18 +133,9 @@ JOIN signals s
     AND s.local_ref = sqlc.arg(local_ref)
 RETURNING id, version_number;
 
--- Note the get queries:
--- do not check validity status
--- require isn_slug,signal_type_slug & sem_ver params
-
-
-
-
-
-
-
-
 -- name: GetLatestSignalVersionsWithOptionalFilters :many
+-- Note the get queries:
+-- require isn_slug,signal_type_slug & sem_ver params
 WITH LatestSignals AS (
     SELECT
         a.id AS account_id,
@@ -183,6 +174,8 @@ WITH LatestSignals AS (
         AND st.is_in_use = true
         AND (sqlc.narg('include_withdrawn')::boolean = true OR s.is_withdrawn = false)
         AND (sqlc.narg('account_id')::uuid IS NULL OR a.id = sqlc.narg('account_id')::uuid)
+        AND (sqlc.narg('signal_id')::uuid IS NULL OR s.id = sqlc.narg('signal_id')::uuid)
+        AND (sqlc.narg('local_ref')::text IS NULL OR s.local_ref = sqlc.narg('local_ref')::text)
         AND (sqlc.narg('start_date')::timestamptz IS NULL OR sv.created_at >= sqlc.narg('start_date')::timestamptz)
         AND (sqlc.narg('end_date')::timestamptz IS NULL OR sv.created_at <= sqlc.narg('end_date')::timestamptz)
 )

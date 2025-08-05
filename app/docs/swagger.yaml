@@ -1871,22 +1871,32 @@ paths:
 
         Note the endpoint returns the latest version of each signal.
       parameters:
-      - description: Start date for filtering
+      - description: Start date
         example: "2006-01-02T15:04:05Z"
         in: query
         name: start_date
         type: string
-      - description: End date for filtering
+      - description: End date
         in: query
         name: end_date
         type: string
-      - description: Account ID for filtering
+      - description: Account ID
         example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
         in: query
         name: account_id
         type: string
+      - description: Signal ID
+        example: 4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19
+        in: query
+        name: signal_id
+        type: string
+      - description: Local reference
+        example: item_id_#1
+        in: query
+        name: local_ref
+        type: string
       - description: 'Include withdrawn signals (default: false)'
-        example: "false"
+        example: "true"
         in: query
         name: include_withdrawn
         type: string
@@ -2009,19 +2019,35 @@ paths:
 
         Note the endpoint returns the latest version of each signal.
       parameters:
-      - description: Start date for filtering
+      - description: Start date
         example: "2006-01-02T15:04:05Z"
         in: query
         name: start_date
         type: string
-      - description: End date for filtering
+      - description: End date
+        example: "2006-01-02T16:00:00Z"
         in: query
         name: end_date
         type: string
-      - description: Account ID for filtering
+      - description: Account ID
         example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
         in: query
         name: account_id
+        type: string
+      - description: Signal ID
+        example: 4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19
+        in: query
+        name: signal_id
+        type: string
+      - description: Local reference
+        example: item_id_#1
+        in: query
+        name: local_ref
+        type: string
+      - description: 'Include withdrawn signals (default: false)'
+        example: "true"
+        in: query
+        name: include_withdrawn
         type: string
       responses:
         "200":
