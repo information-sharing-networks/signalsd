@@ -331,7 +331,7 @@ func TestSignalSubmission(t *testing.T) {
 				expectedFailed: 0,
 			},
 			{
-				name:      "multiple_signals_batch",
+				name:      "multiple_signals_payload",
 				accountID: adminAccount.ID,
 				endpoint:  adminEndpoint,
 				payloadFunc: func() map[string]any {
@@ -387,7 +387,7 @@ func TestSignalSubmission(t *testing.T) {
 				expectedFailed: 1,
 			},
 			{
-				name:      "multiple_signals_batch_partial_failures",
+				name:      "multiple_signals_payload_partial_failures",
 				accountID: adminAccount.ID,
 				endpoint:  adminEndpoint,
 				payloadFunc: func() map[string]any {
@@ -511,7 +511,7 @@ func TestSignalSubmission(t *testing.T) {
 		// tests run as admin - can write to their own isn but not to the owner isn
 		tests := []struct {
 			name              string
-			correlated_id     string
+			correlatedID      string
 			accountID         uuid.UUID
 			endpoint          testSignalEndpoint
 			expectError       bool
@@ -530,7 +530,7 @@ func TestSignalSubmission(t *testing.T) {
 				name:              "malformed_correlation_id",
 				endpoint:          adminEndpoint,
 				accountID:         adminAccount.ID,
-				correlated_id:     "not-a-uuid",
+				correlatedID:      "not-a-uuid",
 				expectError:       true,
 				expectedStatus:    400,
 				expectedErrorCode: apperrors.ErrCodeMalformedBody.String(),
@@ -539,7 +539,7 @@ func TestSignalSubmission(t *testing.T) {
 				name:              "random_correlation_id",
 				endpoint:          adminEndpoint,
 				accountID:         adminAccount.ID,
-				correlated_id:     uuid.New().String(),
+				correlatedID:      uuid.New().String(),
 				expectError:       true,
 				expectedStatus:    422,
 				expectedErrorCode: apperrors.ErrCodeInvalidCorrelationID.String(),
@@ -549,7 +549,7 @@ func TestSignalSubmission(t *testing.T) {
 				name:              "valid_correlation_id_different_isn",
 				endpoint:          adminEndpoint,
 				accountID:         adminAccount.ID,
-				correlated_id:     ownerSignalID,
+				correlatedID:      ownerSignalID,
 				expectError:       true,
 				expectedStatus:    422,
 				expectedErrorCode: apperrors.ErrCodeInvalidCorrelationID.String(),
@@ -558,7 +558,7 @@ func TestSignalSubmission(t *testing.T) {
 				name:           "valid_correlation_id_same_isn",
 				endpoint:       adminEndpoint,
 				accountID:      adminAccount.ID,
-				correlated_id:  adminSignalID,
+				correlatedID:   adminSignalID,
 				expectError:    false,
 				expectedStatus: 200,
 			},
@@ -567,7 +567,7 @@ func TestSignalSubmission(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				localRef := "admin-correlation-test-signal-001"
-				correlatedPayload := createValidSignalPayloadWithCorrelatedID(localRef, tt.correlated_id)
+				correlatedPayload := createValidSignalPayloadWithCorrelatedID(localRef, tt.correlatedID)
 
 				authToken := testEnv.createAuthToken(t, tt.accountID)
 
@@ -695,6 +695,7 @@ func submitSignalRequest(t *testing.T, baseURL string, payload map[string]any, t
 	return resp
 }
 
+// todo add additional params
 // searchPublicSignals searches for signals on public ISNs (no authentication required)
 func searchPublicSignals(t *testing.T, baseURL string, endpoint testSignalEndpoint) *http.Response {
 	url := fmt.Sprintf("%s/api/public/isn/%s/signal_types/%s/v%s/signals/search",
@@ -728,8 +729,8 @@ func searchPublicSignals(t *testing.T, baseURL string, endpoint testSignalEndpoi
 	return resp
 }
 
-// searchPrivateSignals searches for signals on private ISNs (authentication required)
-func searchPrivateSignals(t *testing.T, baseURL string, endpoint testSignalEndpoint, token string, includeWithdrawn bool) *http.Response {
+// searchPrivateSignals searches for signals on private ISNs with optional correlated signals
+func searchPrivateSignals(t *testing.T, baseURL string, endpoint testSignalEndpoint, token string, includeWithdrawn bool, includeCorrelated bool) *http.Response {
 	url := fmt.Sprintf("%s/api/isn/%s/signal_types/%s/v%s/signals/search",
 		baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
 
@@ -747,6 +748,10 @@ func searchPrivateSignals(t *testing.T, baseURL string, endpoint testSignalEndpo
 
 	if includeWithdrawn {
 		q.Add("include_withdrawn", "true")
+	}
+
+	if includeCorrelated {
+		q.Add("include_correlated", "true")
 	}
 
 	req.URL.RawQuery = q.Encode()
@@ -878,28 +883,27 @@ func TestSignalSearch(t *testing.T) {
 
 	// create owner ISN signal
 	payload := createValidSignalPayload("owner-search-signal-001")
-	response := submitSignalRequest(t, baseURL, payload, ownerToken, ownerEndpoint)
-	if response.StatusCode != http.StatusOK {
-		logResponseDetails(t, response, "owner ISN signal submission")
-		response.Body.Close()
-		t.Fatalf("Failed to submit signal to owner ISN: %d", response.StatusCode)
+	ownerResponse := submitSignalRequest(t, baseURL, payload, ownerToken, ownerEndpoint)
+	defer ownerResponse.Body.Close()
+	if ownerResponse.StatusCode != http.StatusOK {
+		logResponseDetails(t, ownerResponse, "owner ISN signal submission")
+		t.Fatalf("Failed to submit signal to owner ISN: %d", ownerResponse.StatusCode)
 	}
-	response.Body.Close()
 
 	// create admin ISN signal
 	payload = createValidSignalPayload("admin-search-signal-001")
-	response = submitSignalRequest(t, baseURL, payload, adminToken, adminEndpoint)
-	response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		t.Fatalf("Failed to submit signal to admin ISN: %d", response.StatusCode)
+	adminResponse := submitSignalRequest(t, baseURL, payload, adminToken, adminEndpoint)
+	defer adminResponse.Body.Close()
+	if adminResponse.StatusCode != http.StatusOK {
+		t.Fatalf("Failed to submit signal to admin ISN: %d", adminResponse.StatusCode)
 	}
 
 	// create public ISN signal
 	payload = createValidSignalPayload("public-search-signal-001")
-	response = submitSignalRequest(t, baseURL, payload, adminToken, publicEndpoint)
-	response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		t.Fatalf("Failed to submit signal to public ISN: %d", response.StatusCode)
+	publicResponse := submitSignalRequest(t, baseURL, payload, adminToken, publicEndpoint)
+	publicResponse.Body.Close()
+	if publicResponse.StatusCode != http.StatusOK {
+		t.Fatalf("Failed to submit signal to public ISN: %d", publicResponse.StatusCode)
 	}
 
 	// check signal on public isn can be searched w/o auth
@@ -1009,7 +1013,7 @@ func TestSignalSearch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			response := searchPrivateSignals(t, baseURL, tt.targetEndpoint, tt.requesterToken, false)
+			response := searchPrivateSignals(t, baseURL, tt.targetEndpoint, tt.requesterToken, false, false)
 			defer response.Body.Close()
 
 			// Verify response status
@@ -1072,7 +1076,7 @@ func TestSignalSearch(t *testing.T) {
 	// Test withdrawn signals are excluded from search results by default
 	t.Run("withdrawn signals excluded from search", func(t *testing.T) {
 		// First, verify the admin signal is visible in search
-		response := searchPrivateSignals(t, baseURL, adminEndpoint, adminToken, false)
+		response := searchPrivateSignals(t, baseURL, adminEndpoint, adminToken, false, false)
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusOK {
@@ -1099,7 +1103,7 @@ func TestSignalSearch(t *testing.T) {
 		}
 
 		// Search again - should return no signals (withdrawn signal excluded by default)
-		response = searchPrivateSignals(t, baseURL, adminEndpoint, adminToken, false)
+		response = searchPrivateSignals(t, baseURL, adminEndpoint, adminToken, false, false)
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusOK {
@@ -1117,7 +1121,7 @@ func TestSignalSearch(t *testing.T) {
 		}
 
 		// Search with include_withdrawn=true - should return the withdrawn signal
-		response = searchPrivateSignals(t, baseURL, adminEndpoint, adminToken, true)
+		response = searchPrivateSignals(t, baseURL, adminEndpoint, adminToken, true, false)
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusOK {
@@ -1200,4 +1204,147 @@ func testCORSOrigin(t *testing.T, baseURL, endpoint, origin string, shouldAllow 
 			t.Errorf("Origin %s should be blocked but got Access-Control-Allow-Origin: '%s'", origin, corsOrigin)
 		}
 	}
+}
+
+// TestCorrelatedSignalsSearch tests the include_correlated functionality
+func TestCorrelatedSignalsSearch(t *testing.T) {
+	ctx := context.Background()
+
+	testDB := setupTestDatabase(t, ctx)
+	testEnv := setupTestEnvironment(testDB)
+
+	// select database and start the signalsd server
+	testURL := getTestDatabaseURL()
+	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL)
+	defer stopServer()
+	t.Logf("✅ Server started at %s", baseURL)
+
+	// create test data
+	t.Log("Creating test data...")
+
+	ownerAccount := createTestAccount(t, ctx, testEnv.queries, "owner", "user", "admin@correlated.com")
+
+	ownerISN := createTestISN(t, ctx, testEnv.queries, "owner-correlated-isn", "Owner correlated ISN", ownerAccount.ID, "private")
+
+	ownerSignalType := createTestSignalType(t, ctx, testEnv.queries, ownerISN.ID, "Owner correlated signal", "1.0.0")
+
+	ownerAuthToken := testEnv.createAuthToken(t, ownerAccount.ID)
+
+	ownerEndpoint := testSignalEndpoint{
+		isnSlug:          ownerISN.Slug,
+		signalTypeSlug:   ownerSignalType.Slug,
+		signalTypeSemVer: ownerSignalType.SemVer,
+	}
+
+	// create master-001 signal (will have two correlated signals)
+	master001LocalRef := "master-001"
+	payload := createValidSignalPayload(master001LocalRef)
+
+	master001SignalResponse := submitSignalRequest(t, baseURL, payload, ownerAuthToken, ownerEndpoint)
+	defer master001SignalResponse.Body.Close()
+
+	if master001SignalResponse.StatusCode != http.StatusOK {
+		t.Fatalf("Failed to submit signal to owner ISN: %d", master001SignalResponse.StatusCode)
+	}
+
+	// create master-002 (no correlated signals)
+	master002LocalRef := "master-002"
+	payload = createValidSignalPayload(master002LocalRef)
+
+	master002SignalResponse := submitSignalRequest(t, baseURL, payload, ownerAuthToken, ownerEndpoint)
+	defer master002SignalResponse.Body.Close()
+	if master002SignalResponse.StatusCode != http.StatusOK {
+		t.Fatalf("Failed to submit signal to owner ISN: %d", master002SignalResponse.StatusCode)
+	}
+
+	// get signal ID from master 1
+	var master001SignalResponseBody map[string]any
+	if err := json.NewDecoder(master001SignalResponse.Body).Decode(&master001SignalResponseBody); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	master001SignalID := getSignalIDFromResponse(t, master001SignalResponseBody)
+
+	// create two signals that are correlated with master_001
+	correlated001LocalRef := "item-002>master-001"
+	payload = createValidSignalPayloadWithCorrelatedID(correlated001LocalRef, master001SignalID)
+
+	correlated001SignalResponse := submitSignalRequest(t, baseURL, payload, ownerAuthToken, ownerEndpoint)
+	defer correlated001SignalResponse.Body.Close()
+	if correlated001SignalResponse.StatusCode != http.StatusOK {
+		t.Fatalf("Failed to submit signal to owner ISN: %d", correlated001SignalResponse.StatusCode)
+	}
+
+	correlated002LocalRef := "item-003>master-001"
+	payload = createValidSignalPayloadWithCorrelatedID(correlated002LocalRef, master001SignalID)
+
+	correlated002SignalResponse := submitSignalRequest(t, baseURL, payload, ownerAuthToken, ownerEndpoint)
+	defer correlated002SignalResponse.Body.Close()
+	if correlated002SignalResponse.StatusCode != http.StatusOK {
+		t.Fatalf("Failed to submit signal to owner ISN: %d", correlated002SignalResponse.StatusCode)
+	}
+
+	t.Run("search without correlated signals", func(t *testing.T) {
+		response := searchPrivateSignals(t, baseURL, ownerEndpoint, ownerAuthToken, false, false)
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusOK {
+			logResponseDetails(t, response, "search without correlated signals")
+			t.Fatalf("Failed to search signals: %d", response.StatusCode)
+		}
+
+		var signals []map[string]any
+		if err := json.NewDecoder(response.Body).Decode(&signals); err != nil {
+			t.Fatalf("Failed to decode search response: %v", err)
+		}
+
+		// Should have 4 signals (2 masters + 2 correlated)
+		if len(signals) != 4 {
+			t.Errorf("Expected 3 signals, got %d", len(signals))
+		}
+		for i := range signals {
+			if signals[i]["correlated_signals"] != nil {
+				t.Errorf("Expected no correlated signals when include_correlated=false, but found %d", len(signals[i]["correlated_signals"].([]any)))
+			}
+		}
+
+	})
+	t.Run("search including correlated signals", func(t *testing.T) {
+		response := searchPrivateSignals(t, baseURL, ownerEndpoint, ownerAuthToken, false, true)
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusOK {
+			logResponseDetails(t, response, "search without correlated signals")
+			t.Fatalf("Failed to search signals: %d", response.StatusCode)
+		}
+
+		var signals []map[string]any
+		if err := json.NewDecoder(response.Body).Decode(&signals); err != nil {
+			t.Fatalf("Failed to decode search response: %v", err)
+		}
+
+		// Should have 4 signals (2 masters + 2 correlated)
+		if len(signals) != 4 {
+			t.Errorf("Expected 3 signals, got %d", len(signals))
+		}
+		for i := range signals {
+			localRef := signals[i]["local_ref"].(string)
+
+			correlated_signals, ok := signals[i]["correlated_signals"].([]any)
+
+			switch localRef {
+			case master001LocalRef:
+				if len(correlated_signals) != 2 {
+					t.Errorf("Expected 2 correlated signals for %s, got %d", localRef, len(correlated_signals))
+				}
+			case master002LocalRef, correlated001LocalRef, correlated002LocalRef:
+				if ok {
+					t.Errorf("Expected 0 correlated signals for %s, got %d", localRef, len(correlated_signals))
+				}
+			default:
+				t.Errorf("Unexpected local_ref in search results: %s", localRef)
+			}
+		}
+
+	})
 }

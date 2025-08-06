@@ -218,125 +218,6 @@ func (q *Queries) CreateSignalVersion(ctx context.Context, arg CreateSignalVersi
 	return i, err
 }
 
-const GetLatestSignalVersionsWithOptionalFilters = `-- name: GetLatestSignalVersionsWithOptionalFilters :many
-SELECT
-    a.id AS account_id,
-    a.account_type,
-    COALESCE(u.email, si.client_contact_email) AS email, -- show either the user or service account email
-    s.local_ref,
-    lsv.version_number,
-    lsv.created_at,
-    lsv.id AS signal_version_id,
-    lsv.signal_id,
-    s2.local_ref AS correlated_local_ref,
-    s2.id AS correlated_signal_id,
-    s.is_withdrawn,
-    lsv.content
-FROM
-    latest_signal_versions lsv
-JOIN
-    signals s ON s.id = lsv.signal_id
-JOIN
-    signals s2 ON s2.id = s.correlation_id
-JOIN
-    accounts a ON a.id = s.account_id
-JOIN
-    signal_types st on st.id = s.signal_type_id
-JOIN
-    isn i ON i.id = st.isn_id
-LEFT OUTER JOIN
-    users u ON u.account_id = a.id
-LEFT OUTER JOIN
-    service_accounts si ON si.account_id = a.id
-WHERE
-    i.slug = $1
-    AND st.slug = $2
-    AND st.sem_ver = $3
-    AND i.is_in_use = true
-    AND st.is_in_use = true
-    AND ($4::boolean = true OR s.is_withdrawn = false)
-    AND ($5::uuid IS NULL OR a.id = $5::uuid)
-    AND ($6::uuid IS NULL OR s.id = $6::uuid)
-    AND ($7::text IS NULL OR s.local_ref = $7::text)
-    AND ($8::timestamptz IS NULL OR lsv.created_at >= $8::timestamptz)
-    AND ($9::timestamptz IS NULL OR lsv.created_at <= $9::timestamptz)
-ORDER BY
-    s.local_ref,
-    lsv.version_number,
-    lsv.id
-`
-
-type GetLatestSignalVersionsWithOptionalFiltersParams struct {
-	IsnSlug          string     `json:"isn_slug"`
-	SignalTypeSlug   string     `json:"signal_type_slug"`
-	SemVer           string     `json:"sem_ver"`
-	IncludeWithdrawn *bool      `json:"include_withdrawn"`
-	AccountID        *uuid.UUID `json:"account_id"`
-	SignalID         *uuid.UUID `json:"signal_id"`
-	LocalRef         *string    `json:"local_ref"`
-	StartDate        *time.Time `json:"start_date"`
-	EndDate          *time.Time `json:"end_date"`
-}
-
-type GetLatestSignalVersionsWithOptionalFiltersRow struct {
-	AccountID          uuid.UUID       `json:"account_id"`
-	AccountType        string          `json:"account_type"`
-	Email              string          `json:"email"`
-	LocalRef           string          `json:"local_ref"`
-	VersionNumber      int32           `json:"version_number"`
-	CreatedAt          time.Time       `json:"created_at"`
-	SignalVersionID    uuid.UUID       `json:"signal_version_id"`
-	SignalID           uuid.UUID       `json:"signal_id"`
-	CorrelatedLocalRef string          `json:"correlated_local_ref"`
-	CorrelatedSignalID uuid.UUID       `json:"correlated_signal_id"`
-	IsWithdrawn        bool            `json:"is_withdrawn"`
-	Content            json.RawMessage `json:"content"`
-}
-
-// Note the get queries require isn_slug,signal_type_slug & sem_ver params
-func (q *Queries) GetLatestSignalVersionsWithOptionalFilters(ctx context.Context, arg GetLatestSignalVersionsWithOptionalFiltersParams) ([]GetLatestSignalVersionsWithOptionalFiltersRow, error) {
-	rows, err := q.db.Query(ctx, GetLatestSignalVersionsWithOptionalFilters,
-		arg.IsnSlug,
-		arg.SignalTypeSlug,
-		arg.SemVer,
-		arg.IncludeWithdrawn,
-		arg.AccountID,
-		arg.SignalID,
-		arg.LocalRef,
-		arg.StartDate,
-		arg.EndDate,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetLatestSignalVersionsWithOptionalFiltersRow
-	for rows.Next() {
-		var i GetLatestSignalVersionsWithOptionalFiltersRow
-		if err := rows.Scan(
-			&i.AccountID,
-			&i.AccountType,
-			&i.Email,
-			&i.LocalRef,
-			&i.VersionNumber,
-			&i.CreatedAt,
-			&i.SignalVersionID,
-			&i.SignalID,
-			&i.CorrelatedLocalRef,
-			&i.CorrelatedSignalID,
-			&i.IsWithdrawn,
-			&i.Content,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const GetSignalByAccountAndLocalRef = `-- name: GetSignalByAccountAndLocalRef :one
 SELECT s.id, s.created_at, s.updated_at, s.account_id, s.isn_id, s.signal_type_id, s.local_ref, s.correlation_id, s.is_withdrawn, s.is_archived, i.slug as isn_slug, st.slug as signal_type_slug, st.sem_ver
 FROM signals s
@@ -398,7 +279,7 @@ func (q *Queries) GetSignalByAccountAndLocalRef(ctx context.Context, arg GetSign
 }
 
 const GetSignalCorrelationDetails = `-- name: GetSignalCorrelationDetails :one
-SELECT 
+SELECT
     s.id,
     s.local_ref,
     s.correlation_id,
@@ -433,7 +314,7 @@ type GetSignalCorrelationDetailsRow struct {
 	CorrelatedSignalID uuid.UUID `json:"correlated_signal_id"`
 }
 
-// Get signal with its correlation details for verification
+// Get signal with its correlation details for verification during integration tests
 func (q *Queries) GetSignalCorrelationDetails(ctx context.Context, arg GetSignalCorrelationDetailsParams) (GetSignalCorrelationDetailsRow, error) {
 	row := q.db.QueryRow(ctx, GetSignalCorrelationDetails,
 		arg.AccountID,
@@ -452,6 +333,220 @@ func (q *Queries) GetSignalCorrelationDetails(ctx context.Context, arg GetSignal
 		&i.CorrelatedSignalID,
 	)
 	return i, err
+}
+
+const GetSignalsByCorrelationIDs = `-- name: GetSignalsByCorrelationIDs :many
+SELECT
+    a.id AS account_id,
+    a.account_type,
+    COALESCE(u.email, si.client_contact_email) AS email,
+    s.id as signal_id,
+    s.local_ref,
+    s.created_at signal_created_at,
+    lsv.id AS signal_version_id,
+    lsv.version_number,
+    lsv.created_at version_created_at,
+    s.correlation_id as correlated_to_signal_id,
+    s.is_withdrawn,
+    lsv.content
+FROM
+    latest_signal_versions lsv
+JOIN
+    signals s ON s.id = lsv.signal_id
+JOIN
+    accounts a ON a.id = s.account_id
+JOIN
+    signal_types st on st.id = s.signal_type_id
+JOIN
+    isn i ON i.id = st.isn_id
+LEFT OUTER JOIN
+    users u ON u.account_id = a.id
+LEFT OUTER JOIN
+    service_accounts si ON si.account_id = a.id
+WHERE
+    s.correlation_id = ANY($1)
+    AND s.correlation_id != s.id  -- exclude self-referencing signals
+    AND i.is_in_use = true
+    AND st.is_in_use = true
+    AND ($2::boolean = true OR s.is_withdrawn = false)
+ORDER BY
+    s.correlation_id,
+    s.local_ref,
+    lsv.version_number,
+    lsv.id
+`
+
+type GetSignalsByCorrelationIDsParams struct {
+	CorrelationIds   []uuid.UUID `json:"correlation_ids"`
+	IncludeWithdrawn *bool       `json:"include_withdrawn"`
+}
+
+type GetSignalsByCorrelationIDsRow struct {
+	AccountID            uuid.UUID       `json:"account_id"`
+	AccountType          string          `json:"account_type"`
+	Email                string          `json:"email"`
+	SignalID             uuid.UUID       `json:"signal_id"`
+	LocalRef             string          `json:"local_ref"`
+	SignalCreatedAt      time.Time       `json:"signal_created_at"`
+	SignalVersionID      uuid.UUID       `json:"signal_version_id"`
+	VersionNumber        int32           `json:"version_number"`
+	VersionCreatedAt     time.Time       `json:"version_created_at"`
+	CorrelatedToSignalID uuid.UUID       `json:"correlated_to_signal_id"`
+	IsWithdrawn          bool            `json:"is_withdrawn"`
+	Content              json.RawMessage `json:"content"`
+}
+
+// Get all signals that correlate to the provided signal IDs (for embedding correlated signals)
+func (q *Queries) GetSignalsByCorrelationIDs(ctx context.Context, arg GetSignalsByCorrelationIDsParams) ([]GetSignalsByCorrelationIDsRow, error) {
+	rows, err := q.db.Query(ctx, GetSignalsByCorrelationIDs, arg.CorrelationIds, arg.IncludeWithdrawn)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetSignalsByCorrelationIDsRow
+	for rows.Next() {
+		var i GetSignalsByCorrelationIDsRow
+		if err := rows.Scan(
+			&i.AccountID,
+			&i.AccountType,
+			&i.Email,
+			&i.SignalID,
+			&i.LocalRef,
+			&i.SignalCreatedAt,
+			&i.SignalVersionID,
+			&i.VersionNumber,
+			&i.VersionCreatedAt,
+			&i.CorrelatedToSignalID,
+			&i.IsWithdrawn,
+			&i.Content,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const GetSignalsWithOptionalFilters = `-- name: GetSignalsWithOptionalFilters :many
+SELECT
+
+
+ a.id AS account_id,
+    a.account_type,
+    COALESCE(u.email, si.client_contact_email) AS email,
+    s.id as signal_id,
+    s.local_ref,
+    s.created_at signal_created_at,
+    lsv.id AS signal_version_id,
+    lsv.version_number,
+    lsv.created_at version_created_at,
+    s.correlation_id as correlated_to_signal_id,
+    s.is_withdrawn,
+    lsv.content
+FROM
+    latest_signal_versions lsv
+JOIN
+    signals s ON s.id = lsv.signal_id
+JOIN
+    accounts a ON a.id = s.account_id
+JOIN
+    signal_types st on st.id = s.signal_type_id
+JOIN
+    isn i ON i.id = st.isn_id
+LEFT OUTER JOIN
+    users u ON u.account_id = a.id
+LEFT OUTER JOIN
+    service_accounts si ON si.account_id = a.id
+WHERE
+    i.slug = $1
+    AND st.slug = $2
+    AND st.sem_ver = $3
+    AND i.is_in_use = true
+    AND st.is_in_use = true
+    AND ($4::boolean = true OR s.is_withdrawn = false)
+    AND ($5::uuid IS NULL OR a.id = $5::uuid)
+    AND ($6::uuid IS NULL OR s.id = $6::uuid)
+    AND ($7::text IS NULL OR s.local_ref = $7::text)
+    AND ($8::timestamptz IS NULL OR lsv.created_at >= $8::timestamptz)
+    AND ($9::timestamptz IS NULL OR lsv.created_at <= $9::timestamptz)
+ORDER BY
+    lsv.created_at,
+    s.local_ref,
+    lsv.version_number
+`
+
+type GetSignalsWithOptionalFiltersParams struct {
+	IsnSlug          string     `json:"isn_slug"`
+	SignalTypeSlug   string     `json:"signal_type_slug"`
+	SemVer           string     `json:"sem_ver"`
+	IncludeWithdrawn *bool      `json:"include_withdrawn"`
+	AccountID        *uuid.UUID `json:"account_id"`
+	SignalID         *uuid.UUID `json:"signal_id"`
+	LocalRef         *string    `json:"local_ref"`
+	StartDate        *time.Time `json:"start_date"`
+	EndDate          *time.Time `json:"end_date"`
+}
+
+type GetSignalsWithOptionalFiltersRow struct {
+	AccountID            uuid.UUID       `json:"account_id"`
+	AccountType          string          `json:"account_type"`
+	Email                string          `json:"email"`
+	SignalID             uuid.UUID       `json:"signal_id"`
+	LocalRef             string          `json:"local_ref"`
+	SignalCreatedAt      time.Time       `json:"signal_created_at"`
+	SignalVersionID      uuid.UUID       `json:"signal_version_id"`
+	VersionNumber        int32           `json:"version_number"`
+	VersionCreatedAt     time.Time       `json:"version_created_at"`
+	CorrelatedToSignalID uuid.UUID       `json:"correlated_to_signal_id"`
+	IsWithdrawn          bool            `json:"is_withdrawn"`
+	Content              json.RawMessage `json:"content"`
+}
+
+// Note the get queries require isn_slug,signal_type_slug & sem_ver params
+func (q *Queries) GetSignalsWithOptionalFilters(ctx context.Context, arg GetSignalsWithOptionalFiltersParams) ([]GetSignalsWithOptionalFiltersRow, error) {
+	rows, err := q.db.Query(ctx, GetSignalsWithOptionalFilters,
+		arg.IsnSlug,
+		arg.SignalTypeSlug,
+		arg.SemVer,
+		arg.IncludeWithdrawn,
+		arg.AccountID,
+		arg.SignalID,
+		arg.LocalRef,
+		arg.StartDate,
+		arg.EndDate,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetSignalsWithOptionalFiltersRow
+	for rows.Next() {
+		var i GetSignalsWithOptionalFiltersRow
+		if err := rows.Scan(
+			&i.AccountID,
+			&i.AccountType,
+			&i.Email,
+			&i.SignalID,
+			&i.LocalRef,
+			&i.SignalCreatedAt,
+			&i.SignalVersionID,
+			&i.VersionNumber,
+			&i.VersionCreatedAt,
+			&i.CorrelatedToSignalID,
+			&i.IsWithdrawn,
+			&i.Content,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const ValidateCorrelationID = `-- name: ValidateCorrelationID :one

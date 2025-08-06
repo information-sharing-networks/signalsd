@@ -1,6 +1,6 @@
 //go:build integration
 
-// set up the integration test db.
+// this packate is used to set up the integration test db.
 package integration
 
 import (

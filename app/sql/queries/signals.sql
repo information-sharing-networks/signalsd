@@ -133,27 +133,27 @@ JOIN signals s
     AND s.local_ref = sqlc.arg(local_ref)
 RETURNING id, version_number;
 
--- name: GetLatestSignalVersionsWithOptionalFilters :many
+-- name: GetSignalsWithOptionalFilters :many
 -- Note the get queries require isn_slug,signal_type_slug & sem_ver params
 SELECT
-    a.id AS account_id,
+
+
+ a.id AS account_id,
     a.account_type,
-    COALESCE(u.email, si.client_contact_email) AS email, -- show either the user or service account email
+    COALESCE(u.email, si.client_contact_email) AS email,
+    s.id as signal_id,
     s.local_ref,
-    lsv.version_number,
-    lsv.created_at,
+    s.created_at signal_created_at,
     lsv.id AS signal_version_id,
-    lsv.signal_id,
-    s2.local_ref AS correlated_local_ref,
-    s2.id AS correlated_signal_id,
+    lsv.version_number,
+    lsv.created_at version_created_at,
+    s.correlation_id as correlated_to_signal_id,
     s.is_withdrawn,
     lsv.content
 FROM
     latest_signal_versions lsv
 JOIN
     signals s ON s.id = lsv.signal_id
-JOIN
-    signals s2 ON s2.id = s.correlation_id
 JOIN
     accounts a ON a.id = s.account_id
 JOIN
@@ -177,9 +177,9 @@ WHERE
     AND (sqlc.narg('start_date')::timestamptz IS NULL OR lsv.created_at >= sqlc.narg('start_date')::timestamptz)
     AND (sqlc.narg('end_date')::timestamptz IS NULL OR lsv.created_at <= sqlc.narg('end_date')::timestamptz)
 ORDER BY
+    lsv.created_at,
     s.local_ref,
-    lsv.version_number,
-    lsv.id;
+    lsv.version_number;
 
 -- name: WithdrawSignalByID :execrows
 UPDATE signals
@@ -219,8 +219,8 @@ SELECT EXISTS(
 
 
 -- name: GetSignalCorrelationDetails :one
--- Get signal with its correlation details for verification
-SELECT 
+-- Get signal with its correlation details for verification during integration tests
+SELECT
     s.id,
     s.local_ref,
     s.correlation_id,
@@ -236,3 +236,44 @@ WHERE s.account_id = $1
     AND st.slug = $2
     AND st.sem_ver = $3
     AND s.local_ref = $4;
+
+-- name: GetSignalsByCorrelationIDs :many
+-- Get all signals that correlate to the provided signal IDs (for embedding correlated signals)
+SELECT
+    a.id AS account_id,
+    a.account_type,
+    COALESCE(u.email, si.client_contact_email) AS email,
+    s.id as signal_id,
+    s.local_ref,
+    s.created_at signal_created_at,
+    lsv.id AS signal_version_id,
+    lsv.version_number,
+    lsv.created_at version_created_at,
+    s.correlation_id as correlated_to_signal_id,
+    s.is_withdrawn,
+    lsv.content
+FROM
+    latest_signal_versions lsv
+JOIN
+    signals s ON s.id = lsv.signal_id
+JOIN
+    accounts a ON a.id = s.account_id
+JOIN
+    signal_types st on st.id = s.signal_type_id
+JOIN
+    isn i ON i.id = st.isn_id
+LEFT OUTER JOIN
+    users u ON u.account_id = a.id
+LEFT OUTER JOIN
+    service_accounts si ON si.account_id = a.id
+WHERE
+    s.correlation_id = ANY(sqlc.slice(correlation_ids))
+    AND s.correlation_id != s.id  -- exclude self-referencing signals
+    AND i.is_in_use = true
+    AND st.is_in_use = true
+    AND (sqlc.narg('include_withdrawn')::boolean = true OR s.is_withdrawn = false)
+ORDER BY
+    s.correlation_id,
+    s.local_ref,
+    lsv.version_number,
+    lsv.id;

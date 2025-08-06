@@ -1372,7 +1372,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.CreateSignalsRequestDoc"
+                            "$ref": "#/definitions/handlers.CreateSignalsRequest"
                         }
                     }
                 ],
@@ -1427,24 +1427,25 @@ const docTemplate = `{
                 "tags": [
                     "Signal sharing"
                 ],
-                "summary": "Search for signals in private ISNs",
+                "summary": "Signal Search (private ISNs)",
                 "parameters": [
                     {
                         "type": "string",
-                        "example": "2006-01-02T15:04:05Z",
+                        "example": "2006-01-02T15:05:00Z",
                         "description": "Start date",
                         "name": "start_date",
                         "in": "query"
                     },
                     {
                         "type": "string",
+                        "example": "2006-01-02T15:15:00Z",
                         "description": "End date",
                         "name": "end_date",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
+                        "example": "def87f89-dab6-4607-95f7-593d61cb5742",
                         "description": "Account ID",
                         "name": "account_id",
                         "in": "query"
@@ -1469,6 +1470,13 @@ const docTemplate = `{
                         "description": "Include withdrawn signals (default: false)",
                         "name": "include_withdrawn",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "true",
+                        "description": "Include signals that link to each returned signal (default: false)",
+                        "name": "include_correlated",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1477,7 +1485,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handlers.SignalVersionDoc"
+                                "$ref": "#/definitions/handlers.SearchSignalResponse"
                             }
                         }
                     },
@@ -1628,29 +1636,29 @@ const docTemplate = `{
         },
         "/api/public/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search": {
             "get": {
-                "description": "Search for signals by date or account in public ISNs (no authentication required).\n\nNote the endpoint returns the latest version of each signal.",
+                "description": "Search for signals in public ISNs (no authentication required).\n\nNote the endpoint returns the latest version of each signal.",
                 "tags": [
                     "Signal sharing"
                 ],
-                "summary": "Search for signals in public ISNs",
+                "summary": "Signal Search (public ISNs)",
                 "parameters": [
                     {
                         "type": "string",
-                        "example": "2006-01-02T15:04:05Z",
+                        "example": "2006-01-02T15:05:00Z",
                         "description": "Start date",
                         "name": "start_date",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "example": "2006-01-02T16:00:00Z",
+                        "example": "2006-01-02T15:15:00Z",
                         "description": "End date",
                         "name": "end_date",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
+                        "example": "def87f89-dab6-4607-95f7-593d61cb5742",
                         "description": "Account ID",
                         "name": "account_id",
                         "in": "query"
@@ -1675,6 +1683,13 @@ const docTemplate = `{
                         "description": "Include withdrawn signals (default: false)",
                         "name": "include_withdrawn",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "true",
+                        "description": "Include signals that link to each returned signal (default: false)",
+                        "name": "include_correlated",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1683,7 +1698,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handlers.SignalVersionDoc"
+                                "$ref": "#/definitions/handlers.SearchSignalResponse"
                             }
                         }
                     },
@@ -2309,6 +2324,23 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.CreateSignal": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "object"
+                },
+                "correlation_id": {
+                    "description": "optional - supply the id of another signal if you want to link to it",
+                    "type": "string",
+                    "example": "75b45fe1-ecc2-4629-946b-fd9058c3b2ca"
+                },
+                "local_ref": {
+                    "type": "string",
+                    "example": "item_id_#1"
+                }
+            }
+        },
         "handlers.CreateSignalTypeRequest": {
             "type": "object",
             "properties": {
@@ -2378,27 +2410,13 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.CreateSignalsRequestDoc": {
+        "handlers.CreateSignalsRequest": {
             "type": "object",
             "properties": {
                 "signals": {
                     "type": "array",
                     "items": {
-                        "type": "object",
-                        "properties": {
-                            "content": {
-                                "type": "object",
-                                "additionalProperties": {}
-                            },
-                            "correlation_id": {
-                                "type": "string",
-                                "example": "75b45fe1-ecc2-4629-946b-fd9058c3b2ca"
-                            },
-                            "local_ref": {
-                                "type": "string",
-                                "example": "item_id_#1"
-                            }
-                        }
+                        "$ref": "#/definitions/handlers.CreateSignal"
                     }
                 }
             }
@@ -2664,6 +2682,105 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.SearchSignal": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                },
+                "account_type": {
+                    "type": "string"
+                },
+                "content": {
+                    "type": "object"
+                },
+                "correlated_to_signal_id": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "is_withdrawn": {
+                    "type": "boolean"
+                },
+                "local_ref": {
+                    "type": "string"
+                },
+                "signal_created_at": {
+                    "type": "string"
+                },
+                "signal_id": {
+                    "type": "string"
+                },
+                "signal_version_id": {
+                    "type": "string"
+                },
+                "version_created_at": {
+                    "type": "string"
+                },
+                "version_number": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.SearchSignalResponse": {
+            "type": "object",
+            "properties": {
+                "signals": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.SearchSignalWithCorrelations"
+                    }
+                }
+            }
+        },
+        "handlers.SearchSignalWithCorrelations": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string"
+                },
+                "account_type": {
+                    "type": "string"
+                },
+                "content": {
+                    "type": "object"
+                },
+                "correlated_signals": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.SearchSignal"
+                    }
+                },
+                "correlated_to_signal_id": {
+                    "type": "string"
+                },
+                "email": {
+                    "type": "string"
+                },
+                "is_withdrawn": {
+                    "type": "boolean"
+                },
+                "local_ref": {
+                    "type": "string"
+                },
+                "signal_created_at": {
+                    "type": "string"
+                },
+                "signal_id": {
+                    "type": "string"
+                },
+                "signal_version_id": {
+                    "type": "string"
+                },
+                "version_created_at": {
+                    "type": "string"
+                },
+                "version_number": {
+                    "type": "integer"
+                }
+            }
+        },
         "handlers.ServiceAccountDetails": {
             "type": "object",
             "properties": {
@@ -2815,59 +2932,6 @@ const docTemplate = `{
                 "updated_at": {
                     "type": "string",
                     "example": "2025-06-03T13:47:47.331787+01:00"
-                }
-            }
-        },
-        "handlers.SignalVersionDoc": {
-            "type": "object",
-            "properties": {
-                "account_id": {
-                    "type": "string",
-                    "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3"
-                },
-                "account_type": {
-                    "type": "string",
-                    "example": "user"
-                },
-                "content": {
-                    "type": "object",
-                    "additionalProperties": {}
-                },
-                "correlated_local_ref": {
-                    "type": "string",
-                    "example": "item_id_#2"
-                },
-                "correlated_signal_id": {
-                    "type": "string",
-                    "example": "17c50d26-1da6-4ac0-897f-3a2f85f07cd3"
-                },
-                "created_at": {
-                    "type": "string",
-                    "example": "2025-06-03T13:47:47.331787+01:00"
-                },
-                "email": {
-                    "type": "string",
-                    "example": "user@example.com"
-                },
-                "is_withdrawn": {
-                    "type": "boolean",
-                    "example": false
-                },
-                "local_ref": {
-                    "type": "string",
-                    "example": "item_id_#1"
-                },
-                "signal_id": {
-                    "type": "string",
-                    "example": "4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19"
-                },
-                "signal_version_id": {
-                    "type": "string",
-                    "example": "835788bd-789d-4091-96e3-db0f51ccbabc"
-                },
-                "version_number": {
-                    "type": "integer",
-                    "example": 1
                 }
             }
         },

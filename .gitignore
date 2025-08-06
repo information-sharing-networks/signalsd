@@ -5,4 +5,5 @@ notes.md
 .DS_store
 /app/signalsd
 /signalsd
+/todo.md
 tmp/

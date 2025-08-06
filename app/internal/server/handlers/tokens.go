@@ -106,8 +106,6 @@ func (a *TokenHandler) NewAccessTokenHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// todo account is active?
-
 	// create new access token refresh
 	accessTokenResponse, err := a.authService.CreateAccessToken(r.Context())
 	if err != nil {
