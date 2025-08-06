@@ -148,57 +148,6 @@ func createEmptySignalsPayload() map[string]any {
 	}
 }
 
-func logResponseDetails(t *testing.T, response *http.Response, testName string) {
-	t.Helper()
-
-	t.Logf("=== Response Details for %s ===", testName)
-	t.Logf("Status: %d %s", response.StatusCode, response.Status)
-	t.Logf("Headers: %v", response.Header)
-
-	// Read response body for logging (this consumes the body)
-	bodyBytes, err := io.ReadAll(response.Body)
-	if err != nil {
-		t.Logf("Failed to read response body: %v", err)
-	} else {
-		t.Logf("Body: %s", string(bodyBytes))
-		// Restore the body so it can be properly closed later
-		response.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-	}
-
-	t.Logf("=== End Response Details ===")
-}
-
-// get the id of the created signal (only works when one signal is submitted)
-func getSignalIDFromResponse(t *testing.T, response map[string]any) string {
-	t.Helper()
-
-	results, ok := response["results"].(map[string]any)
-	if !ok {
-		t.Fatal("Failed to get results from response")
-	}
-
-	storedSignals, ok := results["stored_signals"].([]any)
-	if !ok || len(storedSignals) == 0 {
-		t.Fatal("No stored signals in response")
-	}
-	if len(storedSignals) == 0 {
-		t.Fatal("No stored signals in response")
-	}
-
-	firstSignal, ok := storedSignals[0].(map[string]any)
-	if !ok {
-		t.Fatal("First stored signal is not a map")
-	}
-
-	signalID, ok := firstSignal["signal_id"].(string)
-	if !ok {
-		t.Fatal("Signal ID is not a string")
-	}
-
-	return signalID
-
-}
-
 // Helper function to validate response counts
 func validateResponseCounts(t *testing.T, auditTrail map[string]any, expectedStored, expectedFailed int, testName string) bool {
 	t.Helper()
@@ -252,6 +201,209 @@ func validateResponseCounts(t *testing.T, auditTrail map[string]any, expectedSto
 	}
 
 	return countMismatch
+}
+
+// submitCreateSignalRequest submits a signal payload with authentication
+func submitCreateSignalRequest(t *testing.T, baseURL string, payload map[string]any, token string, endpoint testSignalEndpoint) *http.Response {
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("Failed to marshal payload: %v", err)
+	}
+
+	url := fmt.Sprintf("%s/api/isn/%s/signal_types/%s/v%s/signals",
+		baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonPayload))
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+			MaxIdleConns:      0,
+		},
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("Failed to submit signals: %v", err)
+	}
+
+	return resp
+}
+
+// todo add additional params
+// searchPublicSignals searches for signals on public ISNs (no authentication required)
+func searchPublicSignals(t *testing.T, baseURL string, endpoint testSignalEndpoint) *http.Response {
+	url := fmt.Sprintf("%s/api/public/isn/%s/signal_types/%s/v%s/signals/search",
+		baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+
+	q := req.URL.Query()
+	now := time.Now()
+	oneHourAgo := now.Add(-1 * time.Hour)
+	oneHourFromNow := now.Add(1 * time.Hour)
+	q.Add("start_date", oneHourAgo.Format(time.RFC3339))
+	q.Add("end_date", oneHourFromNow.Format(time.RFC3339))
+	req.URL.RawQuery = q.Encode()
+
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+			MaxIdleConns:      0,
+		},
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("Failed to search public signals: %v", err)
+	}
+
+	return resp
+}
+
+// searchPrivateSignals searches for signals on private ISNs with optional correlated signals
+func searchPrivateSignals(t *testing.T, baseURL string, endpoint testSignalEndpoint, token string, includeWithdrawn bool, includeCorrelated bool) *http.Response {
+	url := fmt.Sprintf("%s/api/isn/%s/signal_types/%s/v%s/signals/search",
+		baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+
+	q := req.URL.Query()
+	now := time.Now()
+	oneHourAgo := now.Add(-1 * time.Hour)
+	oneHourFromNow := now.Add(1 * time.Hour)
+	q.Add("start_date", oneHourAgo.Format(time.RFC3339))
+	q.Add("end_date", oneHourFromNow.Format(time.RFC3339))
+
+	if includeWithdrawn {
+		q.Add("include_withdrawn", "true")
+	}
+
+	if includeCorrelated {
+		q.Add("include_correlated", "true")
+	}
+
+	req.URL.RawQuery = q.Encode()
+
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+			MaxIdleConns:      0,
+		},
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("Failed to search private signals: %v", err)
+	}
+
+	return resp
+}
+
+// withdrawSignal withdraws a signal by local reference
+func withdrawSignal(t *testing.T, baseURL string, endpoint testSignalEndpoint, token, localRef string) *http.Response {
+	url := fmt.Sprintf("%s/api/isn/%s/signal_types/%s/v%s/signals/withdraw",
+		baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
+
+	withdrawRequest := map[string]string{
+		"local_ref": localRef,
+	}
+
+	jsonData, err := json.Marshal(withdrawRequest)
+	if err != nil {
+		t.Fatalf("Failed to marshal withdrawal request: %v", err)
+	}
+
+	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		t.Fatalf("Failed to create withdrawal request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+			MaxIdleConns:      0,
+		},
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("Failed to withdraw signal: %v", err)
+	}
+
+	return resp
+}
+
+// get the id of the created signal (only works when one signal is submitted)
+func getSignalIDFromCreateSignalResponse(t *testing.T, response map[string]any) string {
+	t.Helper()
+
+	results, ok := response["results"].(map[string]any)
+	if !ok {
+		t.Fatal("Failed to get results from response")
+	}
+
+	storedSignals, ok := results["stored_signals"].([]any)
+	if !ok || len(storedSignals) == 0 {
+		t.Fatal("No stored signals in response")
+	}
+	if len(storedSignals) == 0 {
+		t.Fatal("No stored signals in response")
+	}
+
+	firstSignal, ok := storedSignals[0].(map[string]any)
+	if !ok {
+		t.Fatal("First stored signal is not a map")
+	}
+
+	signalID, ok := firstSignal["signal_id"].(string)
+	if !ok {
+		t.Fatal("Signal ID is not a string")
+	}
+
+	return signalID
+
+}
+
+func logResponseDetails(t *testing.T, response *http.Response, testName string) {
+	t.Helper()
+
+	t.Logf("=== Response Details for %s ===", testName)
+	t.Logf("Status: %d %s", response.StatusCode, response.Status)
+	t.Logf("Headers: %v", response.Header)
+
+	// Read response body for logging (this consumes the body)
+	bodyBytes, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Logf("Failed to read response body: %v", err)
+	} else {
+		t.Logf("Body: %s", string(bodyBytes))
+		// Restore the body so it can be properly closed later
+		response.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+	}
+
+	t.Logf("=== End Response Details ===")
 }
 
 // TestSignalSubmission tests the signal submission process end-to-end (starts a http server as a go routine)
@@ -410,7 +562,7 @@ func TestSignalSubmission(t *testing.T) {
 
 				payload := tt.payloadFunc()
 
-				response := submitSignalRequest(t, baseURL, payload, authToken, tt.endpoint)
+				response := submitCreateSignalRequest(t, baseURL, payload, authToken, tt.endpoint)
 				defer response.Body.Close()
 
 				// Verify response status
@@ -472,7 +624,7 @@ func TestSignalSubmission(t *testing.T) {
 		// create a signal in the admin isn
 		adminPayload := createValidSignalPayload("admin-correlation-test-signal-001")
 
-		adminSignalResponse := submitSignalRequest(t, baseURL, adminPayload, adminToken, adminEndpoint)
+		adminSignalResponse := submitCreateSignalRequest(t, baseURL, adminPayload, adminToken, adminEndpoint)
 		defer adminSignalResponse.Body.Close()
 
 		if adminSignalResponse.StatusCode != http.StatusOK {
@@ -489,7 +641,7 @@ func TestSignalSubmission(t *testing.T) {
 		// create a signal in the owner isn
 		ownerPayload := createValidSignalPayload("owner-correlation-test-signal-001")
 
-		ownerSignalResponse := submitSignalRequest(t, baseURL, ownerPayload, ownerToken, ownerEndpoint)
+		ownerSignalResponse := submitCreateSignalRequest(t, baseURL, ownerPayload, ownerToken, ownerEndpoint)
 		defer ownerSignalResponse.Body.Close()
 
 		if ownerSignalResponse.StatusCode != http.StatusOK {
@@ -505,8 +657,8 @@ func TestSignalSubmission(t *testing.T) {
 		}
 
 		// get the newly created signal id from the response - these will be used as the correlated ids in the tests below
-		adminSignalID := getSignalIDFromResponse(t, adminResponseBody)
-		ownerSignalID := getSignalIDFromResponse(t, ownerResponseBody)
+		adminSignalID := getSignalIDFromCreateSignalResponse(t, adminResponseBody)
+		ownerSignalID := getSignalIDFromCreateSignalResponse(t, ownerResponseBody)
 
 		// tests run as admin - can write to their own isn but not to the owner isn
 		tests := []struct {
@@ -571,7 +723,7 @@ func TestSignalSubmission(t *testing.T) {
 
 				authToken := testEnv.createAuthToken(t, tt.accountID)
 
-				correlatedSignalResponse := submitSignalRequest(t, baseURL, correlatedPayload, authToken, tt.endpoint)
+				correlatedSignalResponse := submitCreateSignalRequest(t, baseURL, correlatedPayload, authToken, tt.endpoint)
 				defer correlatedSignalResponse.Body.Close()
 				var correlatedSignalResponseBody map[string]any
 				if err := json.NewDecoder(correlatedSignalResponse.Body).Decode(&correlatedSignalResponseBody); err != nil {
@@ -660,158 +812,6 @@ func TestSignalSubmission(t *testing.T) {
 
 }
 
-// submitSignalRequest submits a signal payload with authentication
-func submitSignalRequest(t *testing.T, baseURL string, payload map[string]any, token string, endpoint testSignalEndpoint) *http.Response {
-	jsonPayload, err := json.Marshal(payload)
-	if err != nil {
-		t.Fatalf("Failed to marshal payload: %v", err)
-	}
-
-	url := fmt.Sprintf("%s/api/isn/%s/signal_types/%s/v%s/signals",
-		baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
-
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonPayload))
-	if err != nil {
-		t.Fatalf("Failed to create request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			DisableKeepAlives: true,
-			MaxIdleConns:      0,
-		},
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		t.Fatalf("Failed to submit signals: %v", err)
-	}
-
-	return resp
-}
-
-// todo add additional params
-// searchPublicSignals searches for signals on public ISNs (no authentication required)
-func searchPublicSignals(t *testing.T, baseURL string, endpoint testSignalEndpoint) *http.Response {
-	url := fmt.Sprintf("%s/api/public/isn/%s/signal_types/%s/v%s/signals/search",
-		baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		t.Fatalf("Failed to create request: %v", err)
-	}
-
-	q := req.URL.Query()
-	now := time.Now()
-	oneHourAgo := now.Add(-1 * time.Hour)
-	oneHourFromNow := now.Add(1 * time.Hour)
-	q.Add("start_date", oneHourAgo.Format(time.RFC3339))
-	q.Add("end_date", oneHourFromNow.Format(time.RFC3339))
-	req.URL.RawQuery = q.Encode()
-
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			DisableKeepAlives: true,
-			MaxIdleConns:      0,
-		},
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		t.Fatalf("Failed to search public signals: %v", err)
-	}
-
-	return resp
-}
-
-// searchPrivateSignals searches for signals on private ISNs with optional correlated signals
-func searchPrivateSignals(t *testing.T, baseURL string, endpoint testSignalEndpoint, token string, includeWithdrawn bool, includeCorrelated bool) *http.Response {
-	url := fmt.Sprintf("%s/api/isn/%s/signal_types/%s/v%s/signals/search",
-		baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		t.Fatalf("Failed to create request: %v", err)
-	}
-
-	q := req.URL.Query()
-	now := time.Now()
-	oneHourAgo := now.Add(-1 * time.Hour)
-	oneHourFromNow := now.Add(1 * time.Hour)
-	q.Add("start_date", oneHourAgo.Format(time.RFC3339))
-	q.Add("end_date", oneHourFromNow.Format(time.RFC3339))
-
-	if includeWithdrawn {
-		q.Add("include_withdrawn", "true")
-	}
-
-	if includeCorrelated {
-		q.Add("include_correlated", "true")
-	}
-
-	req.URL.RawQuery = q.Encode()
-
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			DisableKeepAlives: true,
-			MaxIdleConns:      0,
-		},
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		t.Fatalf("Failed to search private signals: %v", err)
-	}
-
-	return resp
-}
-
-// withdrawSignal withdraws a signal by local reference
-func withdrawSignal(t *testing.T, baseURL string, endpoint testSignalEndpoint, token, localRef string) *http.Response {
-	url := fmt.Sprintf("%s/api/isn/%s/signal_types/%s/v%s/signals/withdraw",
-		baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
-
-	withdrawRequest := map[string]string{
-		"local_ref": localRef,
-	}
-
-	jsonData, err := json.Marshal(withdrawRequest)
-	if err != nil {
-		t.Fatalf("Failed to marshal withdrawal request: %v", err)
-	}
-
-	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(jsonData))
-	if err != nil {
-		t.Fatalf("Failed to create withdrawal request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			DisableKeepAlives: true,
-			MaxIdleConns:      0,
-		},
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		t.Fatalf("Failed to withdraw signal: %v", err)
-	}
-
-	return resp
-}
-
 // TestSignalSearch tests that the search signals endpoint returns the correct number of signals and that accounts only see signals they have access to
 func TestSignalSearch(t *testing.T) {
 	ctx := context.Background()
@@ -883,7 +883,7 @@ func TestSignalSearch(t *testing.T) {
 
 	// create owner ISN signal
 	payload := createValidSignalPayload("owner-search-signal-001")
-	ownerResponse := submitSignalRequest(t, baseURL, payload, ownerToken, ownerEndpoint)
+	ownerResponse := submitCreateSignalRequest(t, baseURL, payload, ownerToken, ownerEndpoint)
 	defer ownerResponse.Body.Close()
 	if ownerResponse.StatusCode != http.StatusOK {
 		logResponseDetails(t, ownerResponse, "owner ISN signal submission")
@@ -892,7 +892,7 @@ func TestSignalSearch(t *testing.T) {
 
 	// create admin ISN signal
 	payload = createValidSignalPayload("admin-search-signal-001")
-	adminResponse := submitSignalRequest(t, baseURL, payload, adminToken, adminEndpoint)
+	adminResponse := submitCreateSignalRequest(t, baseURL, payload, adminToken, adminEndpoint)
 	defer adminResponse.Body.Close()
 	if adminResponse.StatusCode != http.StatusOK {
 		t.Fatalf("Failed to submit signal to admin ISN: %d", adminResponse.StatusCode)
@@ -900,7 +900,7 @@ func TestSignalSearch(t *testing.T) {
 
 	// create public ISN signal
 	payload = createValidSignalPayload("public-search-signal-001")
-	publicResponse := submitSignalRequest(t, baseURL, payload, adminToken, publicEndpoint)
+	publicResponse := submitCreateSignalRequest(t, baseURL, payload, adminToken, publicEndpoint)
 	publicResponse.Body.Close()
 	if publicResponse.StatusCode != http.StatusOK {
 		t.Fatalf("Failed to submit signal to public ISN: %d", publicResponse.StatusCode)
@@ -1151,33 +1151,12 @@ func TestSignalSearch(t *testing.T) {
 	})
 }
 
-// TestCORS tests that protected endpoints respect ALLOWED_ORIGINS configuration and that untrusted origins are blocked
-func TestCORS(t *testing.T) {
-	t.Run("protected_endpoints_respect_allowed_origins", func(t *testing.T) {
-		// Configure specific allowed origin
-		t.Setenv("ALLOWED_ORIGINS", "https://trusted-app.example.com")
-
-		ctx := context.Background()
-		testDB := setupTestDatabase(t, ctx)
-		testEnv := setupTestEnvironment(testDB)
-		testURL := getTestDatabaseURL()
-		baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL)
-		defer stopServer()
-
-		// Test trusted origin is allowed
-		testCORSOrigin(t, baseURL, "/api/accounts", "https://trusted-app.example.com", true)
-
-		// Test untrusted origin is blocked
-		testCORSOrigin(t, baseURL, "/api/accounts", "https://malicious-site.com", false)
-	})
-}
-
-// testCORSOrigin tests CORS behavior for a specific origin on a specific endpoint
-func testCORSOrigin(t *testing.T, baseURL, endpoint, origin string, shouldAllow bool) {
+// checkOriginIsAllowed checks if the given origin is allowed for the given endpoint - all errors are fatal
+func checkOriginIsAllowed(t *testing.T, endpoint, origin string) (bool, string) {
 	t.Helper()
 
 	// make a preflight request with an Origin header and check he Access-Control-Allow-Origin response header
-	req, err := http.NewRequest("OPTIONS", baseURL+endpoint, nil)
+	req, err := http.NewRequest("OPTIONS", endpoint, nil)
 	if err != nil {
 		t.Fatalf("Failed to create request: %v", err)
 	}
@@ -1194,16 +1173,55 @@ func testCORSOrigin(t *testing.T, baseURL, endpoint, origin string, shouldAllow 
 	// the returned Access-Control-Allow-Origin header only contains the origin if it is allowed
 	corsOrigin := resp.Header.Get("Access-Control-Allow-Origin")
 
-	if shouldAllow {
-		if corsOrigin != origin {
-			t.Errorf("Expected origin %s to be allowed, but got Access-Control-Allow-Origin: '%s'", origin, corsOrigin)
-		}
-	} else {
-		// For disallowed origins, the header should be empty or not present
-		if corsOrigin != "" && corsOrigin != "null" {
-			t.Errorf("Origin %s should be blocked but got Access-Control-Allow-Origin: '%s'", origin, corsOrigin)
-		}
+	// all origins allowed
+	if corsOrigin == "*" {
+		return true, corsOrigin
 	}
+
+	return corsOrigin == origin, corsOrigin
+}
+
+// TestCORS tests that protected endpoints respect ALLOWED_ORIGINS configuration and that untrusted origins are blocked
+func TestCORS(t *testing.T) {
+	// Configure specific allowed origin
+	allowedOrigin := "https://trusted-app.example.com"
+	disallowedOrigin := "https://malicious-site.com"
+
+	t.Setenv("ALLOWED_ORIGINS", allowedOrigin)
+
+	ctx := context.Background()
+	testDB := setupTestDatabase(t, ctx)
+	testEnv := setupTestEnvironment(testDB)
+	testDatabaseURL := getTestDatabaseURL()
+	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testDatabaseURL)
+	privateEndpoint := baseURL + "/api/accounts"
+	publicEndpoint := baseURL + "/health/live"
+
+	defer stopServer()
+
+	t.Run("trusted origin allowed", func(t *testing.T) {
+		// Test trusted origin is allowed
+		allowed, returnedOrigin := checkOriginIsAllowed(t, privateEndpoint, allowedOrigin)
+		if !allowed {
+			t.Errorf("Expected origin %s to be allowed, but got Access-Control-Allow-Origin: %s", allowedOrigin, returnedOrigin)
+		}
+	})
+
+	t.Run("untrusted origin blocked", func(t *testing.T) {
+		// Test untrusted origin is blocked
+		allowed, returnedOrigin := checkOriginIsAllowed(t, privateEndpoint, disallowedOrigin)
+		if allowed {
+			t.Errorf("Expected origin %s to be blocked, but got Access-Control-Allow-Origin: %s", disallowedOrigin, returnedOrigin)
+		}
+	})
+
+	// publics endpoints can be used by everyone, even badies
+	t.Run("public endpoint allows all origins", func(t *testing.T) {
+		allowed, returnedOrigin := checkOriginIsAllowed(t, publicEndpoint, disallowedOrigin)
+		if !allowed {
+			t.Errorf("Expected origin %s to be allowed to use publc endpoint, but got Access-Control-Allow-Origin: %s", disallowedOrigin, returnedOrigin)
+		}
+	})
 }
 
 // TestCorrelatedSignalsSearch tests the include_correlated functionality
@@ -1240,7 +1258,7 @@ func TestCorrelatedSignalsSearch(t *testing.T) {
 	master001LocalRef := "master-001"
 	payload := createValidSignalPayload(master001LocalRef)
 
-	master001SignalResponse := submitSignalRequest(t, baseURL, payload, ownerAuthToken, ownerEndpoint)
+	master001SignalResponse := submitCreateSignalRequest(t, baseURL, payload, ownerAuthToken, ownerEndpoint)
 	defer master001SignalResponse.Body.Close()
 
 	if master001SignalResponse.StatusCode != http.StatusOK {
@@ -1251,7 +1269,7 @@ func TestCorrelatedSignalsSearch(t *testing.T) {
 	master002LocalRef := "master-002"
 	payload = createValidSignalPayload(master002LocalRef)
 
-	master002SignalResponse := submitSignalRequest(t, baseURL, payload, ownerAuthToken, ownerEndpoint)
+	master002SignalResponse := submitCreateSignalRequest(t, baseURL, payload, ownerAuthToken, ownerEndpoint)
 	defer master002SignalResponse.Body.Close()
 	if master002SignalResponse.StatusCode != http.StatusOK {
 		t.Fatalf("Failed to submit signal to owner ISN: %d", master002SignalResponse.StatusCode)
@@ -1263,13 +1281,13 @@ func TestCorrelatedSignalsSearch(t *testing.T) {
 		t.Fatalf("Failed to decode response: %v", err)
 	}
 
-	master001SignalID := getSignalIDFromResponse(t, master001SignalResponseBody)
+	master001SignalID := getSignalIDFromCreateSignalResponse(t, master001SignalResponseBody)
 
 	// create two signals that are correlated with master_001
 	correlated001LocalRef := "item-002>master-001"
 	payload = createValidSignalPayloadWithCorrelatedID(correlated001LocalRef, master001SignalID)
 
-	correlated001SignalResponse := submitSignalRequest(t, baseURL, payload, ownerAuthToken, ownerEndpoint)
+	correlated001SignalResponse := submitCreateSignalRequest(t, baseURL, payload, ownerAuthToken, ownerEndpoint)
 	defer correlated001SignalResponse.Body.Close()
 	if correlated001SignalResponse.StatusCode != http.StatusOK {
 		t.Fatalf("Failed to submit signal to owner ISN: %d", correlated001SignalResponse.StatusCode)
@@ -1278,7 +1296,7 @@ func TestCorrelatedSignalsSearch(t *testing.T) {
 	correlated002LocalRef := "item-003>master-001"
 	payload = createValidSignalPayloadWithCorrelatedID(correlated002LocalRef, master001SignalID)
 
-	correlated002SignalResponse := submitSignalRequest(t, baseURL, payload, ownerAuthToken, ownerEndpoint)
+	correlated002SignalResponse := submitCreateSignalRequest(t, baseURL, payload, ownerAuthToken, ownerEndpoint)
 	defer correlated002SignalResponse.Body.Close()
 	if correlated002SignalResponse.StatusCode != http.StatusOK {
 		t.Fatalf("Failed to submit signal to owner ISN: %d", correlated002SignalResponse.StatusCode)
