@@ -115,7 +115,7 @@ type SearchParams struct {
 type SearchSignal struct {
 	AccountID            uuid.UUID       `json:"account_id"`
 	AccountType          string          `json:"account_type"`
-	Email                string          `json:"email"`
+	Email                string          `json:"email,omitempty"` // not included in public ISN searches
 	SignalID             uuid.UUID       `json:"signal_id"`
 	LocalRef             string          `json:"local_ref"`
 	SignalCreatedAt      time.Time       `json:"signal_created_at"`

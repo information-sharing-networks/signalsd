@@ -9,7 +9,6 @@ The integration tests are designed to ensure that signal data is handled correct
 - `auth_test.go` - Authentication and authorization system testing
 - `http_test.go` - HTTP API endpoint testing with full request/response validation (signal submission & search) + CORS security
 - `batch_test.go` - Service account batch lifecycle and validation testing
-- `correlation_test.go` - Signal correlation ID functionality and cross-ISN restriction testing
 - `database.go` - Shared database test helpers
 
 ## Unit Tests 
@@ -33,26 +32,35 @@ Unit tests are used to test a couple of areas:
 - ✅ Signal type paths - correct signal type paths are included in permissions
 
 
-### 2. HTTP API end-to-end testing (`http_test.go`)
+### 2. End-to-end Testing (`http_test.go`)
 
 **What it tests:**
-- ✅ Signal submission process
-- ✅ Signal search functionality 
-- ✅ Signal withdrawal 
-- ✅ Schema validation 
-- ✅ Response structure and error response validation
-- ✅ Authentication failures and authorization errors
-- ✅ Batch processing with mixed success/failure scenarios
-- ✅ CORS security configuration and enforcement
+
+***Signals Creation:***
+ - ✅ Successful submission
+ - ✅ Failed submission due to validation errors
+ - ✅ Failed submission due to authorization errors
+ - ✅ Failed submission due to request errors (e.g. invalid JSON)
+ - ✅ Signal versioning and reactivation of withdrawn signals
+ - ✅ loading signals with Correlation IDs
+ - ✅ Multi-signal payload processing with mixed success/failure scenarios
+
+***Signal Search:***
+ - ✅ Search results (with and without correlated signals)
+ - ✅ Authorization errors
+ - ✅ Request errors (e.g. invalid JSON)
+ - ✅ Response structure and error response validation
+ - ✅ public/priviate ISN visibility
+ - ✅ Verifies withdrawn signals are excluded from search results by default
+ - ✅ Tests that withdrawn signals can be included when explicitly requested
 
 
 **Privacy & Security:**
-- ✅ Tests that unauthorized users cannot submit signals
-- ✅ Ensures proper error handling error responses
+- ✅ Tests that unauthorized users cannot submit or view signals on private ISNs
+- ✅ Ensures proper error handling and correctly structured error responses
 - ✅ Verifies private ISNs are not accessible via public endpoints
 - ✅ Tests CORS configuration prevents unauthorized cross-origin access
-- ✅ Verifies withdrawn signals are excluded from search results by default
-- ✅ Tests that withdrawn signals can be included when explicitly requested
+- ✅ Middleware authentication and authorization functionality
 
 
 ### 3. Service Account Batch Management (`batch_test.go`)
@@ -63,19 +71,9 @@ Unit tests are used to test a couple of areas:
 - ✅ Service account signal submission requirements (must have active batch)
 - ✅ Batch validation and error handling
 
-
-### 4. Signal Correlation Features (`correlation_test.go`)
-
-**What it tests:**
-- ✅ Signal correlation ID creation and validation
-- ✅ Cross-ISN correlation restriction enforcement
-- ✅ Correlation relationship verification and database consistency
-- ✅ ValidateCorrelationID query functionality
-
-
 **TODO**
-  - **rate limiting integration tests** - only unit tests exist
-  - **admin endpoints** - currently there are no automated tests for the admin endpoints. Test manually when making changes to the handlers
+  - **rate limiting integration tests** - only unit tests avaialable
+  - **admin endpoints** - currently there are no automated tests for the admin endpoints, beyond the auth tests. Test manually when making changes to the handlers
 
 ## Running the tests
 ```bash

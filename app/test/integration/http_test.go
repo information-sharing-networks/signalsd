@@ -928,6 +928,11 @@ func TestSignalSearch(t *testing.T) {
 			t.Errorf("Expected 1 signal, got %d", len(signals))
 			return
 		}
+
+		// check the email is empty - should not be shown in public isns
+		if email, ok := signals[0]["email"].(string); ok && email != "" {
+			t.Errorf("Found email %s in public isn search - emails are not to be shown in public ISNs searches", email)
+		}
 	})
 
 	// verify private isns are not accessible via public endpoints
