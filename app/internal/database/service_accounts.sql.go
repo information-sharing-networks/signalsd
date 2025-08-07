@@ -12,6 +12,21 @@ import (
 	"github.com/google/uuid"
 )
 
+const CountActiveClientSecrets = `-- name: CountActiveClientSecrets :one
+SELECT COUNT(*) as active_client_secrets 
+FROM client_secrets
+WHERE service_account_account_id = $1
+AND revoked_at IS NOT NULL
+`
+
+// used in integration tests
+func (q *Queries) CountActiveClientSecrets(ctx context.Context, serviceAccountAccountID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, CountActiveClientSecrets, serviceAccountAccountID)
+	var active_client_secrets int64
+	err := row.Scan(&active_client_secrets)
+	return active_client_secrets, err
+}
+
 const CreateClientSecret = `-- name: CreateClientSecret :one
 INSERT INTO client_secrets (hashed_secret, service_account_account_id, created_at, updated_at, expires_at)
 VALUES ( $1,$2, NOW(), NOW(), $3 )
@@ -243,7 +258,8 @@ func (q *Queries) GetServiceAccountWithOrganizationAndEmail(ctx context.Context,
 }
 
 const GetServiceAccounts = `-- name: GetServiceAccounts :many
-SELECT sa.account_id, sa.created_at, sa.updated_at, sa.client_id, sa.client_contact_email, sa.client_organization FROM service_accounts sa
+SELECT sa.account_id, sa.created_at, sa.updated_at, sa.client_id, sa.client_contact_email, sa.client_organization 
+FROM service_accounts sa
 `
 
 func (q *Queries) GetServiceAccounts(ctx context.Context) ([]ServiceAccount, error) {

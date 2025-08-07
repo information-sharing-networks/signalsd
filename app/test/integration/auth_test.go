@@ -254,3 +254,84 @@ func testRolePermissions(t *testing.T, authService *auth.AuthService, accountID 
 		}
 	}
 }
+
+// TestDisabledAccounts checks the behaviour of account.is_active = false
+//
+//  1. confirms the primary control in CreateAccessToken prevents new access tokens being created by disabled accounts, thereby preventing them using any of the proteced endpoints (note there are secondary controls in the middleware and login handler)
+//  2. That the following items are revoked
+//     - client secrets/one time secrets (service accounts)
+//     - refresh tokens (users)
+func TestDisabledAccounts(t *testing.T) {
+	ctx := context.Background()
+	testDB := setupTestDatabase(t, ctx)
+
+	queries := database.New(testDB)
+
+	authService := auth.NewAuthService(secretKey, "test", queries)
+
+	// create test data
+	t.Log("Creating test data...")
+
+	ownerAccount := createTestAccount(t, ctx, queries, "owner", "user", "owner@caniuse.com")
+
+	ownerISN := createTestISN(t, ctx, queries, "owner-correlated-isn", "Owner caniuse ISN", ownerAccount.ID, "private")
+
+	memberAccount := createTestAccount(t, ctx, queries, "member", "user", "member@caniuse.com")
+
+	serviceAccount := createTestAccount(t, ctx, queries, "member", "service_account", "serviceaccount@caniuse.com")
+
+	// grant members access to the isn
+	grantPermission(t, ctx, queries, ownerISN.ID, memberAccount.ID, "write")
+	grantPermission(t, ctx, queries, ownerISN.ID, serviceAccount.ID, "write")
+
+	// note the authservice uses the accountID in the context to determine the account being accessed
+	ctx = auth.ContextWithAccountID(context.Background(), memberAccount.ID)
+	t.Run("disabled web user account access denied", func(t *testing.T) {
+		disableAccount(t, ctx, queries, memberAccount.ID)
+		_, err := authService.CreateAccessToken(ctx)
+		if err == nil {
+			t.Errorf("disabled web user account %v was allowed to create an access token ", memberAccount.ID)
+		}
+
+		// check the user's refresh token was revoked
+		count, err := queries.CountActiveRefreshTokens(ctx, memberAccount.ID)
+		if err != nil {
+			t.Fatalf("failed to query refresh_tokens for web user: %v", err)
+		}
+
+		if count != 0 {
+			t.Errorf("found %v unrevoked tokens for disabled web user account %v", count, memberAccount.ID)
+		}
+	})
+
+	t.Run("reinstated web user account access allowed", func(t *testing.T) {
+
+		enableAccount(t, ctx, queries, memberAccount.ID)
+		_, err := authService.CreateAccessToken(ctx)
+		if err != nil {
+			t.Errorf("reinstated web user account %v was not allowed to create an access token ", memberAccount.ID)
+		}
+		// note enabling web accounts does not automatically create a refresh token (this is done when they next log in)
+	})
+
+	ctx = auth.ContextWithAccountID(context.Background(), serviceAccount.ID)
+
+	t.Run("disabled service account access denied", func(t *testing.T) {
+		disableAccount(t, ctx, queries, serviceAccount.ID)
+		_, err := authService.CreateAccessToken(ctx)
+		if err == nil {
+			t.Errorf("disabled web user account %v was allowed to create an access token ", serviceAccount.ID)
+		}
+
+		// check the client secret was revoked
+		count, err := queries.CountActiveClientSecrets(ctx, serviceAccount.ID)
+		if err != nil {
+			t.Fatalf("failed to query client_secrets for web user: %v", err)
+		}
+
+		if count != 0 {
+			t.Errorf("found %v active client secrets for disabled service account %v", count, memberAccount.ID)
+		}
+
+	})
+}

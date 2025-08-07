@@ -259,7 +259,7 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 	return result, nil
 }
 
-// SignalsHandler godocs
+// CreateSignalsHandler godocs
 //
 //	@Summary		Create signals
 //	@Tags			Signal sharing
@@ -302,11 +302,6 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 //	@Description	Correlation IDs can be used to link signals together.  Signals can only be correlated within the same ISN.
 //	@Description	If the supplied correlation_id is not found in the same ISN as the signal being submitted, the response will contain a 422 or 207 status code and the error_code for the failed signal will be `invalid_correlation_id`.
 //	@Description
-//	@Description	**Response Status Codes**
-//	@Description	- `200`: All signals processed successfully
-//	@Description	- `207`: Partial success (some signals succeeded, some failed)
-//	@Description	- `422`: All signals failed processing (the request was valid but all signals failed processing, e.g because they did not conform with the JSON schema for this signal type)
-//	@Description
 //	@Description	request level errors (e.g. invalid json, authentication failure etc) return a simple error_code/error_message response rather than a detailed audit log
 //
 //	@Param			isn_slug			path		string							true	"isn slug"						example(sample-isn--example-org)
@@ -319,7 +314,8 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 //	@Success		422					{object}	handlers.CreateSignalsResponse	"Valid request format but all signals failed processing - returns detailed error information"
 //	@Failure		400					{object}	responses.ErrorResponse			"Invalid request format (error_code = malformed_body)
 //	@Failure		401					{object}	responses.ErrorResponse			"Unauthorized request (invalid credentials, error_code = authentication_error)"
-//	@Failure		403					{object}	responses.ErrorResponse			"Forbidden (insufficient permissions, error_code = forbidden)"
+//	@Failure		403					{object}	responses.ErrorResponse			"Forbidden (no permission to write to ISN, error_code = forbidden)"
+//	@Failure		404					{object}	responses.ErrorResponse			"Not Found (mistyped url or signal_type marked 'not in use')
 //
 //	@Security		BearerAccessToken
 //
@@ -350,7 +346,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 	// check that the user is requesting a valid signal type/sem_ver for this isn
 	found := slices.Contains(claims.IsnPerms[isnSlug].SignalTypePaths, signalTypePath)
 	if !found {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("signal type %v is not available on ISN %v", signalTypePath, isnSlug))
+		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("signal type %v is not available on ISN %v", signalTypePath, isnSlug))
 		return
 	}
 
@@ -636,6 +632,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 //
 //	@Success		200					{array}		handlers.SearchSignalResponse
 //	@Failure		400					{object}	responses.ErrorResponse
+//	@Failure		400					{object}	responses.ErrorResponse
 //
 //	@Router			/api/public/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search [get]
 func (s *SignalsHandler) SearchPublicSignalsHandler(w http.ResponseWriter, r *http.Request) {
@@ -768,7 +765,7 @@ func (s *SignalsHandler) SearchPrivateSignalsHandler(w http.ResponseWriter, r *h
 
 	// Check if user has access to this signal type
 	if !slices.Contains(claims.IsnPerms[searchParams.isnSlug].SignalTypePaths, signalTypePath) {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, fmt.Sprintf("access denied to signal type %v on ISN %v", signalTypePath, searchParams.isnSlug))
+		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("signal type %v not found on ISN %v", signalTypePath, searchParams.isnSlug))
 		return
 	}
 

@@ -12,6 +12,21 @@ import (
 	"github.com/google/uuid"
 )
 
+const CountActiveRefreshTokens = `-- name: CountActiveRefreshTokens :one
+SELECT COUNT(*) AS unrevoked_count 
+FROM refresh_tokens
+WHERE user_account_id = $1
+AND revoked_at IS NOT NULL
+`
+
+// used as part of integration tests
+func (q *Queries) CountActiveRefreshTokens(ctx context.Context, userAccountID uuid.UUID) (int64, error) {
+	row := q.db.QueryRow(ctx, CountActiveRefreshTokens, userAccountID)
+	var unrevoked_count int64
+	err := row.Scan(&unrevoked_count)
+	return unrevoked_count, err
+}
+
 const GetRefreshToken = `-- name: GetRefreshToken :one
 SELECT user_account_id, expires_at, revoked_at FROM refresh_tokens where hashed_token = $1
 `

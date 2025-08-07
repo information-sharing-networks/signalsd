@@ -49,6 +49,13 @@ WHERE sd.id = $1;
 SELECT i.* 
 FROM isn i;
 
+
+-- name: GetInUseIsns :many
+-- only returns ISNs where is_in_use = true
+SELECT i.* 
+FROM isn i
+WHERE is_in_use = true;
+
 -- name: ExistsIsnWithSlug :one
 
 SELECT EXISTS
@@ -59,7 +66,7 @@ SELECT EXISTS
 -- name: GetPublicIsnSlugs :many
 SELECT slug FROM isn WHERE visibility = 'public' AND is_in_use = true;
 
--- name: GetPublicIsnSignalTypes :many
+-- name: GetInUsePublicIsnSignalTypes :many
 SELECT
     i.slug as isn_slug,
     st.slug as signal_type_slug,

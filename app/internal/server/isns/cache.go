@@ -27,7 +27,7 @@ func (p *PublicIsnCache) Load(ctx context.Context, queries *database.Queries) er
 	p.isnSlugs = make(map[string]bool)
 	p.signalTypes = make(map[string]map[string]bool)
 
-	publicSignalTypes, err := queries.GetPublicIsnSignalTypes(ctx)
+	publicSignalTypes, err := queries.GetInUsePublicIsnSignalTypes(ctx)
 	if err != nil {
 		return fmt.Errorf("failed to get public ISN signal types from database: %w", err)
 	}

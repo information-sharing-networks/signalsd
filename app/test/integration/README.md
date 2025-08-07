@@ -30,6 +30,7 @@ Unit tests are used to test a couple of areas:
 - ✅ Explicit permission grants - member gets read access where granted
 - ✅ Service account batch handling - service accounts require batch IDs for write permissions
 - ✅ Signal type paths - correct signal type paths are included in permissions
+- ✅ Disabled account handling
 
 
 ### 2. End-to-end Testing (`http_test.go`)
