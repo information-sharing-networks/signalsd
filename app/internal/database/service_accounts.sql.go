@@ -323,6 +323,7 @@ type GetValidClientSecretByServiceAccountAccountIdRow struct {
 	ExpiresAt    time.Time `json:"expires_at"`
 }
 
+// only returns unrevoked/unexpired secrets
 func (q *Queries) GetValidClientSecretByServiceAccountAccountId(ctx context.Context, serviceAccountAccountID uuid.UUID) (GetValidClientSecretByServiceAccountAccountIdRow, error) {
 	row := q.db.QueryRow(ctx, GetValidClientSecretByServiceAccountAccountId, serviceAccountAccountID)
 	var i GetValidClientSecretByServiceAccountAccountIdRow

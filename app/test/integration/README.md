@@ -22,7 +22,6 @@ Unit tests are used to test a couple of areas:
 
 **What it tests:**
 
-- ✅ Database queries work correctly
 - ✅ JWT token structure - tokens are properly signed and parseable
 - ✅ JWT claims (ISN permissions, role etc) match database 
 - ✅ Token metadata - expiration, issued time, issuer, subject are correct
@@ -31,6 +30,8 @@ Unit tests are used to test a couple of areas:
 - ✅ Service account batch handling - service accounts require batch IDs for write permissions
 - ✅ Signal type paths - correct signal type paths are included in permissions
 - ✅ Disabled account handling
+- ✅ Login - password validation, account status checks, access/refresh token generation, refresh token rotation
+- ✅ service account authentication - client credentials validation, revoked and expired secrets
 
 
 ### 2. End-to-end Testing (`http_test.go`)
@@ -73,8 +74,9 @@ Unit tests are used to test a couple of areas:
 - ✅ Batch validation and error handling
 
 **TODO**
-  - **rate limiting integration tests** - only unit tests avaialable
-  - **admin endpoints** - currently there are no automated tests for the admin endpoints, beyond the auth tests. Test manually when making changes to the handlers
+  - **rate limiting integration tests** - unit tests, but actual behaviour is only tested indirectly (see perf tests, which can be set up to trigger the rate limiter)
+  - **admin endpoints** - although the auth functionality is tested, there are no end-2-end http tests for the admin endpoints. Test manually when making changes to the handlers
+  - **env setup** - each test sets up a fresh database.  This is convenient - because the tests are guaranteed to be isolated - but not very efficient. If the test are too slow then look at starting 1 db and clearing down before each test.
 
 ## Running the tests
 ```bash

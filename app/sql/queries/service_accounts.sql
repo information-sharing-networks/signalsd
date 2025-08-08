@@ -33,6 +33,7 @@ WHERE service_account_account_id = (SELECT account_id
 AND expires_at > NOW();
 
 -- name: GetValidClientSecretByServiceAccountAccountId :one
+-- only returns unrevoked/unexpired secrets
 SELECT hashed_secret, expires_at
 FROM client_secrets
 WHERE service_account_account_id = $1
