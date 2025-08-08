@@ -36,7 +36,7 @@ type LoginRequest struct {
 //	@Description	The response body includes an access token which can be used to access the protected enpoints, assuming the account has the appropriate permissions.
 //	@Description	The access_token is valid for 30 minutes.
 //	@Description
-//	@Description	As part of the login response, the server sets a http-only cookie on the client that will allow it to use the /oauth/token with grant_type=refresh_token to renew the access_token.
+//	@Description	As part of the login response, the server sets a http-only cookie on the client that will allow it to refresh the token (use the /oauth/token endpoint with a grant_type=refresh_token param)
 //	@Description	The refresh_token lasts 30 days unless it is revoked earlier.
 //	@Description	- To renew the refresh_token, log in again.
 //	@Description	- To revoke the refresh_token, call the /oauth/revoke endpoint.
