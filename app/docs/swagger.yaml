@@ -192,6 +192,19 @@ definitions:
         example: https://api.example.com/api/auth/service-accounts/setup/550e8400-e29b-41d4-a716-446655440000
         type: string
     type: object
+  handlers.CreateSignal:
+    properties:
+      content:
+        type: object
+      correlation_id:
+        description: optional - supply the id of another signal if you want to link
+          to it
+        example: 75b45fe1-ecc2-4629-946b-fd9058c3b2ca
+        type: string
+      local_ref:
+        example: item_id_#1
+        type: string
+    type: object
   handlers.CreateSignalTypeRequest:
     properties:
       bump_type:
@@ -244,21 +257,11 @@ definitions:
         example: b51faf05-aaed-4250-b334-2258ccdf1ff2
         type: string
     type: object
-  handlers.CreateSignalsRequestDoc:
+  handlers.CreateSignalsRequest:
     properties:
       signals:
         items:
-          properties:
-            content:
-              additionalProperties: {}
-              type: object
-            correlation_id:
-              example: 75b45fe1-ecc2-4629-946b-fd9058c3b2ca
-              type: string
-            local_ref:
-              example: item_id_#1
-              type: string
-          type: object
+          $ref: '#/definitions/handlers.CreateSignal'
         type: array
     type: object
   handlers.CreateSignalsResponse:
@@ -445,6 +448,71 @@ definitions:
       message:
         type: string
     type: object
+  handlers.SearchSignal:
+    properties:
+      account_id:
+        type: string
+      account_type:
+        type: string
+      content:
+        type: object
+      correlated_to_signal_id:
+        type: string
+      email:
+        type: string
+      is_withdrawn:
+        type: boolean
+      local_ref:
+        type: string
+      signal_created_at:
+        type: string
+      signal_id:
+        type: string
+      signal_version_id:
+        type: string
+      version_created_at:
+        type: string
+      version_number:
+        type: integer
+    type: object
+  handlers.SearchSignalResponse:
+    properties:
+      signals:
+        items:
+          $ref: '#/definitions/handlers.SearchSignalWithCorrelations'
+        type: array
+    type: object
+  handlers.SearchSignalWithCorrelations:
+    properties:
+      account_id:
+        type: string
+      account_type:
+        type: string
+      content:
+        type: object
+      correlated_signals:
+        items:
+          $ref: '#/definitions/handlers.SearchSignal'
+        type: array
+      correlated_to_signal_id:
+        type: string
+      email:
+        type: string
+      is_withdrawn:
+        type: boolean
+      local_ref:
+        type: string
+      signal_created_at:
+        type: string
+      signal_id:
+        type: string
+      signal_version_id:
+        type: string
+      version_created_at:
+        type: string
+      version_number:
+        type: integer
+    type: object
   handlers.ServiceAccountDetails:
     properties:
       account_id:
@@ -556,45 +624,6 @@ definitions:
       updated_at:
         example: "2025-06-03T13:47:47.331787+01:00"
         type: string
-    type: object
-  handlers.SignalVersionDoc:
-    properties:
-      account_id:
-        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
-        type: string
-      account_type:
-        example: user
-        type: string
-      content:
-        additionalProperties: {}
-        type: object
-      correlated_local_ref:
-        example: item_id_#2
-        type: string
-      correlated_signal_id:
-        example: 17c50d26-1da6-4ac0-897f-3a2f85f07cd3
-        type: string
-      created_at:
-        example: "2025-06-03T13:47:47.331787+01:00"
-        type: string
-      email:
-        example: user@example.com
-        type: string
-      is_withdrawn:
-        example: false
-        type: boolean
-      local_ref:
-        example: item_id_#1
-        type: string
-      signal_id:
-        example: 4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19
-        type: string
-      signal_version_id:
-        example: 835788bd-789d-4091-96e3-db0f51ccbabc
-        type: string
-      version_number:
-        example: 1
-        type: integer
     type: object
   handlers.StoredSignal:
     properties:
@@ -1832,7 +1861,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/handlers.CreateSignalsRequestDoc'
+          $ref: '#/definitions/handlers.CreateSignalsRequest'
       responses:
         "200":
           description: All signals processed successfully
@@ -1871,31 +1900,48 @@ paths:
 
         Note the endpoint returns the latest version of each signal.
       parameters:
-      - description: Start date for filtering
-        example: "2006-01-02T15:04:05Z"
+      - description: Start date
+        example: "2006-01-02T15:05:00Z"
         in: query
         name: start_date
         type: string
-      - description: End date for filtering
+      - description: End date
+        example: "2006-01-02T15:15:00Z"
         in: query
         name: end_date
         type: string
-      - description: Account ID for filtering
-        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+      - description: Account ID
+        example: def87f89-dab6-4607-95f7-593d61cb5742
         in: query
         name: account_id
         type: string
+      - description: Signal ID
+        example: 4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19
+        in: query
+        name: signal_id
+        type: string
+      - description: Local reference
+        example: item_id_#1
+        in: query
+        name: local_ref
+        type: string
       - description: 'Include withdrawn signals (default: false)'
-        example: "false"
+        example: "true"
         in: query
         name: include_withdrawn
+        type: string
+      - description: 'Include signals that link to each returned signal (default:
+          false)'
+        example: "true"
+        in: query
+        name: include_correlated
         type: string
       responses:
         "200":
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handlers.SignalVersionDoc'
+              $ref: '#/definitions/handlers.SearchSignalResponse'
             type: array
         "400":
           description: Bad Request
@@ -1903,7 +1949,7 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Search for signals in private ISNs
+      summary: Signal Search (private ISNs)
       tags:
       - Signal sharing
   /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/withdraw:
@@ -2005,36 +2051,58 @@ paths:
   /api/public/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search:
     get:
       description: |-
-        Search for signals by date or account in public ISNs (no authentication required).
+        Search for signals in public ISNs (no authentication required).
 
         Note the endpoint returns the latest version of each signal.
       parameters:
-      - description: Start date for filtering
-        example: "2006-01-02T15:04:05Z"
+      - description: Start date
+        example: "2006-01-02T15:05:00Z"
         in: query
         name: start_date
         type: string
-      - description: End date for filtering
+      - description: End date
+        example: "2006-01-02T15:15:00Z"
         in: query
         name: end_date
         type: string
-      - description: Account ID for filtering
-        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+      - description: Account ID
+        example: def87f89-dab6-4607-95f7-593d61cb5742
         in: query
         name: account_id
+        type: string
+      - description: Signal ID
+        example: 4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19
+        in: query
+        name: signal_id
+        type: string
+      - description: Local reference
+        example: item_id_#1
+        in: query
+        name: local_ref
+        type: string
+      - description: 'Include withdrawn signals (default: false)'
+        example: "true"
+        in: query
+        name: include_withdrawn
+        type: string
+      - description: 'Include signals that link to each returned signal (default:
+          false)'
+        example: "true"
+        in: query
+        name: include_correlated
         type: string
       responses:
         "200":
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handlers.SignalVersionDoc'
+              $ref: '#/definitions/handlers.SearchSignalResponse'
             type: array
         "400":
           description: Bad Request
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-      summary: Search for signals in public ISNs
+      summary: Signal Search (public ISNs)
       tags:
       - Signal sharing
   /api/webhooks:

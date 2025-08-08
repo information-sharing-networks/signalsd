@@ -49,6 +49,16 @@ type IsnAccount struct {
 	Permission string    `json:"permission"`
 }
 
+type LatestSignalVersion struct {
+	ID            uuid.UUID       `json:"id"`
+	CreatedAt     time.Time       `json:"created_at"`
+	AccountID     uuid.UUID       `json:"account_id"`
+	SignalBatchID uuid.UUID       `json:"signal_batch_id"`
+	SignalID      uuid.UUID       `json:"signal_id"`
+	VersionNumber int32           `json:"version_number"`
+	Content       json.RawMessage `json:"content"`
+}
+
 type OneTimeClientSecret struct {
 	ID                      uuid.UUID `json:"id"`
 	CreatedAt               time.Time `json:"created_at"`

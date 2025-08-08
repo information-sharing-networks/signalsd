@@ -1,6 +1,6 @@
 //go:build integration
 
-// set up the integration test db.
+// this packate is used to set up the integration test db.
 package integration
 
 import (
@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/utils"
 	"github.com/jackc/pgx/v5"
@@ -173,6 +174,20 @@ func grantPermission(t *testing.T, ctx context.Context, queries *database.Querie
 	}
 }
 
+func disableAccount(t *testing.T, ctx context.Context, queries *database.Queries, accountID uuid.UUID) {
+	_, err := queries.DisableAccount(ctx, accountID)
+	if err != nil {
+		t.Fatalf("failed to disable account %s: %v", accountID, err)
+	}
+}
+
+func enableAccount(t *testing.T, ctx context.Context, queries *database.Queries, accountID uuid.UUID) {
+	_, err := queries.EnableAccount(ctx, accountID)
+	if err != nil {
+		t.Fatalf("failed to disable account %s: %v", accountID, err)
+	}
+}
+
 // createTestSignalBatch creates a signal batch for an account and ISN
 func createTestSignalBatch(t *testing.T, ctx context.Context, queries *database.Queries, isnID, accountID uuid.UUID) database.SignalBatch {
 
@@ -186,4 +201,50 @@ func createTestSignalBatch(t *testing.T, ctx context.Context, queries *database.
 	}
 
 	return batch
+}
+
+// createTestUserWithPassword creates a user account with a specific hashed password for login testing
+func createTestUserWithPassword(t *testing.T, ctx context.Context, queries *database.Queries, authService *auth.AuthService, role, email, password string) database.GetAccountByIDRow {
+	t.Helper()
+
+	hashedPassword, err := authService.HashPassword(password)
+	if err != nil {
+		t.Fatalf("Failed to hash password: %v", err)
+	}
+
+	// Create account record
+	account, err := queries.CreateUserAccount(ctx)
+	if err != nil {
+		t.Fatalf("Failed to create account: %v", err)
+	}
+
+	if role == "owner" { // first user is always the owner
+		_, err = queries.CreateOwnerUser(ctx, database.CreateOwnerUserParams{
+			AccountID:      account.ID,
+			Email:          email,
+			HashedPassword: hashedPassword,
+		})
+	} else {
+		_, err = queries.CreateUser(ctx, database.CreateUserParams{
+			AccountID:      account.ID,
+			Email:          email,
+			HashedPassword: hashedPassword,
+		})
+	}
+	if err != nil {
+		t.Fatalf("Failed to create user: %v", err)
+	}
+
+	if role == "admin" {
+		_, err = queries.UpdateUserAccountToAdmin(ctx, account.ID)
+		if err != nil {
+			t.Fatalf("Failed to update user to admin: %v", err)
+		}
+	}
+
+	return database.GetAccountByIDRow{
+		ID:          account.ID,
+		AccountType: account.AccountType,
+		AccountRole: role,
+	}
 }

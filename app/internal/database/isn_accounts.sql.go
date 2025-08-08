@@ -134,6 +134,53 @@ func (q *Queries) GetAccountsByIsnID(ctx context.Context, isnID uuid.UUID) ([]Ge
 	return items, nil
 }
 
+const GetActiveIsnAccountsByAccountID = `-- name: GetActiveIsnAccountsByAccountID :many
+SELECT ia.id, ia.created_at, ia.updated_at, ia.isn_id, ia.account_id, ia.permission, i.slug as isn_slug FROM isn_accounts ia
+JOIN isn i
+ON i.id = ia.isn_id
+WHERE ia.account_id = $1
+and i.is_in_use = true
+`
+
+type GetActiveIsnAccountsByAccountIDRow struct {
+	ID         uuid.UUID `json:"id"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+	IsnID      uuid.UUID `json:"isn_id"`
+	AccountID  uuid.UUID `json:"account_id"`
+	Permission string    `json:"permission"`
+	IsnSlug    string    `json:"isn_slug"`
+}
+
+// get all the active isns an account has access to.
+func (q *Queries) GetActiveIsnAccountsByAccountID(ctx context.Context, accountID uuid.UUID) ([]GetActiveIsnAccountsByAccountIDRow, error) {
+	rows, err := q.db.Query(ctx, GetActiveIsnAccountsByAccountID, accountID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetActiveIsnAccountsByAccountIDRow
+	for rows.Next() {
+		var i GetActiveIsnAccountsByAccountIDRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.IsnID,
+			&i.AccountID,
+			&i.Permission,
+			&i.IsnSlug,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const GetIsnAccountByIsnAndAccountID = `-- name: GetIsnAccountByIsnAndAccountID :one
 SELECT ia.id, ia.created_at, ia.updated_at, ia.isn_id, ia.account_id, ia.permission, i.slug as isn_slug FROM isn_accounts ia
 JOIN isn i 
@@ -170,52 +217,6 @@ func (q *Queries) GetIsnAccountByIsnAndAccountID(ctx context.Context, arg GetIsn
 		&i.IsnSlug,
 	)
 	return i, err
-}
-
-const GetIsnAccountsByAccountID = `-- name: GetIsnAccountsByAccountID :many
-SELECT ia.id, ia.created_at, ia.updated_at, ia.isn_id, ia.account_id, ia.permission, i.slug as isn_slug FROM isn_accounts ia
-JOIN isn i
-ON i.id = ia.isn_id
-WHERE ia.account_id = $1
-`
-
-type GetIsnAccountsByAccountIDRow struct {
-	ID         uuid.UUID `json:"id"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
-	IsnID      uuid.UUID `json:"isn_id"`
-	AccountID  uuid.UUID `json:"account_id"`
-	Permission string    `json:"permission"`
-	IsnSlug    string    `json:"isn_slug"`
-}
-
-// get all the isns an account has access to.
-func (q *Queries) GetIsnAccountsByAccountID(ctx context.Context, accountID uuid.UUID) ([]GetIsnAccountsByAccountIDRow, error) {
-	rows, err := q.db.Query(ctx, GetIsnAccountsByAccountID, accountID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetIsnAccountsByAccountIDRow
-	for rows.Next() {
-		var i GetIsnAccountsByAccountIDRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.IsnID,
-			&i.AccountID,
-			&i.Permission,
-			&i.IsnSlug,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const UpdateIsnAccount = `-- name: UpdateIsnAccount :one

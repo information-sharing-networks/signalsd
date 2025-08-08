@@ -137,20 +137,25 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 		return AccessTokenResponse{}, fmt.Errorf("database error getting user %v: %w", accountID, err)
 	}
 
+	// this should be caught by the middleware, but double check here in case of bugs elsewhere
+	if !account.IsActive {
+		return AccessTokenResponse{}, fmt.Errorf("account %v is disabled", accountID)
+	}
+
 	if !signalsd.ValidRoles[account.AccountRole] {
 		return AccessTokenResponse{}, fmt.Errorf("invalid user role %v for user %v", account.AccountRole, accountID)
 	}
 
-	// get all the Isns on this site
-	siteIsns, err := a.queries.GetIsns(ctx)
+	// get all the active ISNs on this site
+	inUseIsns, err := a.queries.GetInUseIsns(ctx)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return AccessTokenResponse{}, fmt.Errorf("database error getting ISNs: %w", err)
 	}
 
 	// create a map of theIsns with their available signal_type paths (sample-signal--example-org/0.0.1 etc)
 	// this list is included in the claims assuming the user has permission for the isn
-	siteIsnsSignalTypePaths := make(map[string][]string)
-	for _, isn := range siteIsns {
+	isnSignalTypePaths := make(map[string][]string)
+	for _, isn := range inUseIsns {
 
 		signalTypeRows, err := a.queries.GetInUseSignalTypesByIsnID(ctx, isn.ID)
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
@@ -163,11 +168,11 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 			signalTypePaths = append(signalTypePaths, ver)
 		}
 
-		siteIsnsSignalTypePaths[isn.Slug] = signalTypePaths
+		isnSignalTypePaths[isn.Slug] = signalTypePaths
 	}
 
-	// get the isns this account's has access to.
-	isnsAccessibleByAccount, err := a.queries.GetIsnAccountsByAccountID(ctx, accountID)
+	// get the active isns this account's has been granted access to.
+	isnsAccessibleByAccount, err := a.queries.GetActiveIsnAccountsByAccountID(ctx, accountID)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return AccessTokenResponse{}, fmt.Errorf("database error getting ISN accounts: %w", err)
 	}
@@ -187,32 +192,32 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 	switch account.AccountRole {
 	case "owner":
 		// owner can write to all ISNs
-		for _, siteIsn := range siteIsns {
+		for _, siteIsn := range inUseIsns {
 			isnPerms[siteIsn.Slug] = IsnPerms{
 				Permission:      "write",
 				SignalBatchID:   latestSignalBatchIDs[siteIsn.Slug],
-				SignalTypePaths: siteIsnsSignalTypePaths[siteIsn.Slug],
+				SignalTypePaths: isnSignalTypePaths[siteIsn.Slug],
 			}
 		}
 
 	case "admin":
 		// Admin can write to any ISN they created
-		for _, siteIsn := range siteIsns {
+		for _, siteIsn := range inUseIsns {
 			if account.ID == siteIsn.UserAccountID {
 				isnPerms[siteIsn.Slug] = IsnPerms{
 					Permission:      "write",
 					SignalBatchID:   latestSignalBatchIDs[siteIsn.Slug],
-					SignalTypePaths: siteIsnsSignalTypePaths[siteIsn.Slug],
+					SignalTypePaths: isnSignalTypePaths[siteIsn.Slug],
 				}
 			}
 		}
-		//.. and access any ISN where they were granted read or write permission by the isn owner
+		//.. and access any ISN where they were granted read or write permission by another admin or owner
 
 		for _, accessibleIsn := range isnsAccessibleByAccount {
 			isnPerms[accessibleIsn.IsnSlug] = IsnPerms{
 				Permission:      accessibleIsn.Permission,
 				SignalBatchID:   latestSignalBatchIDs[accessibleIsn.IsnSlug],
-				SignalTypePaths: siteIsnsSignalTypePaths[accessibleIsn.IsnSlug],
+				SignalTypePaths: isnSignalTypePaths[accessibleIsn.IsnSlug],
 			}
 		}
 	case "member":
@@ -221,7 +226,7 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 			isnPerms[accessibleIsn.IsnSlug] = IsnPerms{
 				Permission:      accessibleIsn.Permission,
 				SignalBatchID:   latestSignalBatchIDs[accessibleIsn.IsnSlug],
-				SignalTypePaths: siteIsnsSignalTypePaths[accessibleIsn.IsnSlug],
+				SignalTypePaths: isnSignalTypePaths[accessibleIsn.IsnSlug],
 			}
 		}
 	default:

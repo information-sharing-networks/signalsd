@@ -33,6 +33,7 @@ WHERE service_account_account_id = (SELECT account_id
 AND expires_at > NOW();
 
 -- name: GetValidClientSecretByServiceAccountAccountId :one
+-- only returns unrevoked/unexpired secrets
 SELECT hashed_secret, expires_at
 FROM client_secrets
 WHERE service_account_account_id = $1
@@ -47,6 +48,13 @@ WHERE hashed_secret = $1;
 UPDATE client_secrets SET (updated_at, revoked_at) = (NOW(), NOW())
 WHERE service_account_account_id = $1
 AND revoked_at IS NULL;
+
+-- name: CountActiveClientSecrets :one
+-- used in integration tests
+SELECT COUNT(*) as active_client_secrets 
+FROM client_secrets
+WHERE service_account_account_id = $1
+AND revoked_at IS NOT NULL;
 
 -- name: ScheduleRevokeAllClientSecretsForAccount :execrows
 UPDATE client_secrets SET (updated_at, revoked_at) = (NOW() + INTERVAL '5 minutes', NOW())
@@ -85,4 +93,5 @@ SELECT sa.* FROM service_accounts sa
 WHERE sa.account_id = $1;
 
 -- name: GetServiceAccounts :many
-SELECT sa.account_id, sa.created_at, sa.updated_at, sa.client_id, sa.client_contact_email, sa.client_organization FROM service_accounts sa;
+SELECT sa.account_id, sa.created_at, sa.updated_at, sa.client_id, sa.client_contact_email, sa.client_organization 
+FROM service_accounts sa;

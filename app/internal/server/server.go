@@ -164,8 +164,8 @@ func (s *Server) registerAdminRoutes() {
 		r.Route("/oauth", func(r chi.Router) {
 
 			r.Group(func(r chi.Router) {
-				// the RequireOAuthGrantType middleware calls the appropriate authentication middleware for the grant_type (client_credentials or refresh_token)
-				r.Use(s.authService.RequireOAuthGrantType)
+				// select the authentication method based on the suppled the grant_type URL param (client_credentials or refresh_token)
+				r.Use(s.authService.AuthenticateByGrantType)
 
 				// get new access tokens
 				r.Post("/token", tokens.NewAccessTokenHandler)
@@ -173,8 +173,8 @@ func (s *Server) registerAdminRoutes() {
 
 			r.Group(func(r chi.Router) {
 
-				// the RequireValidAccountTypeCredentials middleware calls the appropriate authentication middleware for the user account type (user or service_account)
-				r.Use(s.authService.RequireValidAccountTypeCredentials)
+				// select the appropriate authentication method based on the user account type (user or service_account)
+				r.Use(s.authService.AuthenticateByCredentalType)
 
 				// revoke a client secret (service accounts) or refresh token (web users)
 				r.Post("/revoke", tokens.RevokeTokenHandler)

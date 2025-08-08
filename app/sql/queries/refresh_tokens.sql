@@ -23,4 +23,11 @@ UPDATE refresh_tokens SET (updated_at, revoked_at) = (NOW(), NOW())
 WHERE user_account_id = $1
 AND revoked_at IS NULL;
 
+-- name: CountActiveRefreshTokens :one
+-- used as part of integration tests
+SELECT COUNT(*) AS unrevoked_count 
+FROM refresh_tokens
+WHERE user_account_id = $1
+AND revoked_at IS NOT NULL;
+
 

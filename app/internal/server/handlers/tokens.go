@@ -87,7 +87,7 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, p
 // NewAccessTokenHandler handles requests for both service accounts and web users.
 // For web users, a new refresh tokens is sent as http-only cookies whenever the client uses this endpoint.
 //
-// Use with the RequireOAuthGrantType middleware
+// Use with the AuthenticateByGrantType middleware
 // this calls the appropriate authentication middleware for the grant_type (client_credentials or refresh_token)) and adds the authenticated accountID to the context
 func (a *TokenHandler) NewAccessTokenHandler(w http.ResponseWriter, r *http.Request) {
 
@@ -105,8 +105,6 @@ func (a *TokenHandler) NewAccessTokenHandler(w http.ResponseWriter, r *http.Requ
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive accountType from middleware")
 		return
 	}
-
-	// todo account is active?
 
 	// create new access token refresh
 	accessTokenResponse, err := a.authService.CreateAccessToken(r.Context())
@@ -178,7 +176,7 @@ func (a *TokenHandler) NewAccessTokenHandler(w http.ResponseWriter, r *http.Requ
 //
 //	@Router		/oauth/revoke [post]
 //
-// Use with RequireValidAccountTypeCredentials middleware which will ensure the requestor is authenticated and add the accountID and accountType to the context
+// Use with AuthenticateByCredentalType middleware which will ensure the requestor is authenticated and add the accountID and accountType to the context
 func (a *TokenHandler) RevokeTokenHandler(w http.ResponseWriter, r *http.Request) {
 	accountType, ok := auth.ContextAccountType(r.Context())
 	if !ok {

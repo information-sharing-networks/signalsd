@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -38,26 +39,20 @@ func NewSignalsHandler(queries *database.Queries, pool *pgxpool.Pool, schemaCach
 	}
 }
 
-// request json
-type Signal struct {
+// CREATE SIGNALS
+
+// create signals request json
+type CreateSignal struct {
 	LocalRef      string          `json:"local_ref" example:"item_id_#1"`
 	CorrelationId *uuid.UUID      `json:"correlation_id" example:"75b45fe1-ecc2-4629-946b-fd9058c3b2ca"` //optional - supply the id of another signal if you want to link to it
-	Content       json.RawMessage `json:"content"`
+	Content       json.RawMessage `json:"content" swaggertype:"object"`
 }
 
 type CreateSignalsRequest struct {
-	Signals []Signal `json:"signals"`
+	Signals []CreateSignal `json:"signals"`
 }
 
-// workaround this struct is only needed for Swaggo documentation (swaggo does not understand json.RawMessage type)
-type CreateSignalsRequestDoc struct {
-	Signals []struct {
-		LocalRef      string         `json:"local_ref" example:"item_id_#1"`
-		CorrelationId *uuid.UUID     `json:"correlation_id" example:"75b45fe1-ecc2-4629-946b-fd9058c3b2ca"`
-		Content       map[string]any `json:"content"`
-	} `json:"signals"`
-}
-
+// structs - partial loads are possible - c.f StoredSignal and FailedSignal
 type CreateSignalsResponse struct {
 	IsnSlug        string               `json:"isn_slug" example:"sample-isn--example-org"`
 	SignalTypePath string               `json:"signal_type_path" example:"signal-type-1/v0.0.1"`
@@ -67,7 +62,6 @@ type CreateSignalsResponse struct {
 	Summary        CreateSignalsSummary `json:"summary"`
 }
 
-// partial loads are possible - this struct tracks failures
 type CreateSignalsResults struct {
 	StoredSignals []StoredSignal `json:"stored_signals"`
 	FailedSignals []FailedSignal `json:"failed_signals,omitempty"`
@@ -92,51 +86,180 @@ type CreateSignalsSummary struct {
 	FailedCount    int `json:"failed_count" example:"5"`
 }
 
-// structs used by the search endpoint
-type SearchParams struct {
-	IsnSlug          string
-	SignalTypeSlug   string
-	SemVer           string
-	AccountID        *uuid.UUID
-	StartDate        *time.Time
-	EndDate          *time.Time
-	IncludeWithdrawn bool
-}
+// WITHDRAW SIGNALS
 
+// withdraw signals request
 type WithdrawSignalRequest struct {
 	LocalRef *string `json:"local_ref,omitempty" example:"item_id_#1"`
 }
 
-type SignalVersion struct {
-	AccountID          uuid.UUID       `json:"account_id"`
-	AccountType        string          `json:"account_type"`
-	Email              string          `json:"email,omitempty"`
-	LocalRef           string          `json:"local_ref"`
-	VersionNumber      int32           `json:"version_number"`
-	CreatedAt          time.Time       `json:"created_at"`
-	SignalVersionID    uuid.UUID       `json:"signal_version_id"`
-	SignalID           uuid.UUID       `json:"signal_id"`
-	CorrelatedLocalRef string          `json:"correlated_local_ref"`
-	CorrelatedSignalID uuid.UUID       `json:"correlated_signal_id"`
-	IsWithdrawn        bool            `json:"is_withdrawn"`
-	Content            json.RawMessage `json:"content"`
-}
-type SignalVersionDoc struct {
-	AccountID          uuid.UUID      `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
-	AccountType        string         `json:"account_type" example:"user"`
-	Email              string         `json:"email" example:"user@example.com"`
-	LocalRef           string         `json:"local_ref" example:"item_id_#1"`
-	VersionNumber      int32          `json:"version_number" example:"1"`
-	CreatedAt          time.Time      `json:"created_at" example:"2025-06-03T13:47:47.331787+01:00"`
-	SignalVersionID    uuid.UUID      `json:"signal_version_id" example:"835788bd-789d-4091-96e3-db0f51ccbabc"`
-	SignalID           uuid.UUID      `json:"signal_id" example:"4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19"`
-	CorrelatedLocalRef string         `json:"correlated_local_ref" example:"item_id_#2"`
-	CorrelatedSignalID uuid.UUID      `json:"correlated_signal_id" example:"17c50d26-1da6-4ac0-897f-3a2f85f07cd3"`
-	IsWithdrawn        bool           `json:"is_withdrawn" example:"false"`
-	Content            map[string]any `json:"content"`
+// SEARCH SIGNALS
+
+// structs used by the search endpoint
+type SearchParams struct {
+	isnSlug           string
+	signalTypeSlug    string
+	semVer            string
+	accountID         *uuid.UUID
+	startDate         *time.Time
+	endDate           *time.Time
+	localRef          *string
+	signalID          *uuid.UUID
+	includeWithdrawn  bool
+	includeCorrelated bool
 }
 
-// SignalsHandler godocs
+// search signals reponse
+
+// SearchSignal represents a signal returned from the database
+type SearchSignal struct {
+	AccountID            uuid.UUID       `json:"account_id"`
+	AccountType          string          `json:"account_type"`
+	Email                string          `json:"email,omitempty"` // not included in public ISN searches
+	SignalID             uuid.UUID       `json:"signal_id"`
+	LocalRef             string          `json:"local_ref"`
+	SignalCreatedAt      time.Time       `json:"signal_created_at"`
+	SignalVersionID      uuid.UUID       `json:"signal_version_id"`
+	VersionNumber        int32           `json:"version_number"`
+	VersionCreatedAt     time.Time       `json:"version_created_at"`
+	CorrelatedToSignalID uuid.UUID       `json:"correlated_to_signal_id"`
+	IsWithdrawn          bool            `json:"is_withdrawn"`
+	Content              json.RawMessage `json:"content" swaggertype:"object"`
+}
+
+// optionally the search can return the signals correlated with a returned signal
+type SearchSignalWithCorrelations struct {
+	SearchSignal
+	CorrelatedSignals []SearchSignal `json:"correlated_signals,omitempty"`
+}
+
+type SearchSignalResponse struct {
+	Signals []SearchSignalWithCorrelations `json:"signals"`
+}
+
+// parseSearchParams parses all search parameters from the signal search request
+func parseSearchParams(r *http.Request) (SearchParams, error) {
+	searchParams := SearchParams{
+		isnSlug:           r.PathValue("isn_slug"),
+		signalTypeSlug:    r.PathValue("signal_type_slug"),
+		semVer:            r.PathValue("sem_ver"),
+		includeWithdrawn:  false,
+		includeCorrelated: false,
+	}
+
+	// Parse account_id
+	if accountIDString := r.URL.Query().Get("account_id"); accountIDString != "" {
+		accountID, err := uuid.Parse(accountIDString)
+		if err != nil {
+			return searchParams, fmt.Errorf("account_id is not a valid UUID")
+		}
+		searchParams.accountID = &accountID
+	}
+
+	// Parse start_date
+	if startDateString := r.URL.Query().Get("start_date"); startDateString != "" {
+		startDate, err := utils.ParseDateTime(startDateString)
+		if err != nil {
+			return searchParams, err
+		}
+		searchParams.startDate = &startDate
+	}
+
+	// Parse end_date
+	if endDateString := r.URL.Query().Get("end_date"); endDateString != "" {
+		endDate, err := utils.ParseDateTime(endDateString)
+		if err != nil {
+			return searchParams, err
+		}
+		searchParams.endDate = &endDate
+	}
+
+	// Parse signal_id
+	if signalIDString := r.URL.Query().Get("signal_id"); signalIDString != "" {
+		signalID, err := uuid.Parse(signalIDString)
+		if err != nil {
+			return searchParams, fmt.Errorf("signal_id is not a valid UUID")
+		}
+		searchParams.signalID = &signalID
+	}
+
+	// Parse local_ref
+	if localRef := r.URL.Query().Get("local_ref"); localRef != "" {
+		searchParams.localRef = &localRef
+	}
+
+	// Parse include_withdrawn
+	if includeWithdrawnString := r.URL.Query().Get("include_withdrawn"); includeWithdrawnString != "" {
+		searchParams.includeWithdrawn = includeWithdrawnString == "true"
+	}
+
+	// Parse include_correlated
+	if includeCorrelatedString := r.URL.Query().Get("include_correlated"); includeCorrelatedString != "" {
+		searchParams.includeCorrelated = includeCorrelatedString == "true"
+	}
+
+	return searchParams, nil
+}
+
+// validateSearchParams conforms that the combination of search parameters is valid
+func validateSearchParams(params SearchParams) error {
+	hasPartialDateRange := (params.startDate != nil) != (params.endDate != nil)
+	if hasPartialDateRange {
+		return fmt.Errorf("you must supply both start_date and end_date search parameters")
+	}
+
+	hasDateRange := params.startDate != nil && params.endDate != nil
+	hasAccount := params.accountID != nil
+	hasSignalID := params.signalID != nil
+	hasLocalRef := params.localRef != nil
+
+	if !hasDateRange && !hasAccount && !hasSignalID && !hasLocalRef {
+		return fmt.Errorf("you must supply a search parameter")
+	}
+
+	return nil
+}
+
+// getCorrelatedSignals fetches all signals that have a correlated_id that references one of the provided signal IDs
+func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []uuid.UUID, params SearchParams) (map[uuid.UUID][]SearchSignal, error) {
+	if len(signalIDs) == 0 {
+		return make(map[uuid.UUID][]SearchSignal), nil
+	}
+
+	correlatedSignals, err := s.queries.GetSignalsByCorrelationIDs(ctx, database.GetSignalsByCorrelationIDsParams{
+		CorrelationIds:   signalIDs,
+		IncludeWithdrawn: &params.includeWithdrawn,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, err // not all signals have correlated signals
+		}
+		return nil, fmt.Errorf("error retrieving correlated signals %v", err)
+	}
+
+	// Group correlated signals by their correlation_id
+	result := make(map[uuid.UUID][]SearchSignal)
+	for _, signal := range correlatedSignals {
+		correlatedSignal := SearchSignal{
+			AccountID:            signal.AccountID,
+			Email:                signal.Email,
+			SignalID:             signal.SignalID,
+			LocalRef:             signal.LocalRef,
+			SignalCreatedAt:      signal.SignalCreatedAt,
+			SignalVersionID:      signal.SignalVersionID,
+			VersionNumber:        signal.VersionNumber,
+			VersionCreatedAt:     signal.VersionCreatedAt,
+			CorrelatedToSignalID: signal.CorrelatedToSignalID,
+			IsWithdrawn:          signal.IsWithdrawn,
+			Content:              signal.Content,
+		}
+		result[signal.CorrelatedToSignalID] = append(result[signal.CorrelatedToSignalID], correlatedSignal)
+	}
+
+	return result, nil
+}
+
+// CreateSignalsHandler godocs
 //
 //	@Summary		Create signals
 //	@Tags			Signal sharing
@@ -179,24 +302,20 @@ type SignalVersionDoc struct {
 //	@Description	Correlation IDs can be used to link signals together.  Signals can only be correlated within the same ISN.
 //	@Description	If the supplied correlation_id is not found in the same ISN as the signal being submitted, the response will contain a 422 or 207 status code and the error_code for the failed signal will be `invalid_correlation_id`.
 //	@Description
-//	@Description	**Response Status Codes**
-//	@Description	- `200`: All signals processed successfully
-//	@Description	- `207`: Partial success (some signals succeeded, some failed)
-//	@Description	- `422`: All signals failed processing (the request was valid but all signals failed processing, e.g because they did not conform with the JSON schema for this signal type)
-//	@Description
 //	@Description	request level errors (e.g. invalid json, authentication failure etc) return a simple error_code/error_message response rather than a detailed audit log
 //
-//	@Param			isn_slug			path		string								true	"isn slug"						example(sample-isn--example-org)
-//	@Param			signal_type_slug	path		string								true	"signal type slug"				example(sample-signal--example-org)
-//	@Param			sem_ver				path		string								true	"signal type sem_ver number"	example(0.0.1)
-//	@Param			request				body		handlers.CreateSignalsRequestDoc	true	"create signals"
+//	@Param			isn_slug			path		string							true	"isn slug"						example(sample-isn--example-org)
+//	@Param			signal_type_slug	path		string							true	"signal type slug"				example(sample-signal--example-org)
+//	@Param			sem_ver				path		string							true	"signal type sem_ver number"	example(0.0.1)
+//	@Param			request				body		handlers.CreateSignalsRequest	true	"create signals"
 //
-//	@Success		200					{object}	handlers.CreateSignalsResponse		"All signals processed successfully"
-//	@Success		207					{object}	handlers.CreateSignalsResponse		"Partial success - some signals succeeded, some failed"
-//	@Success		422					{object}	handlers.CreateSignalsResponse		"Valid request format but all signals failed processing - returns detailed error information"
-//	@Failure		400					{object}	responses.ErrorResponse				"Invalid request format (error_code = malformed_body)
-//	@Failure		401					{object}	responses.ErrorResponse				"Unauthorized request (invalid credentials, error_code = authentication_error)"
-//	@Failure		403					{object}	responses.ErrorResponse				"Forbidden (insufficient permissions, error_code = forbidden)"
+//	@Success		200					{object}	handlers.CreateSignalsResponse	"All signals processed successfully"
+//	@Success		207					{object}	handlers.CreateSignalsResponse	"Partial success - some signals succeeded, some failed"
+//	@Success		422					{object}	handlers.CreateSignalsResponse	"Valid request format but all signals failed processing - returns detailed error information"
+//	@Failure		400					{object}	responses.ErrorResponse			"Invalid request format (error_code = malformed_body)
+//	@Failure		401					{object}	responses.ErrorResponse			"Unauthorized request (invalid credentials, error_code = authentication_error)"
+//	@Failure		403					{object}	responses.ErrorResponse			"Forbidden (no permission to write to ISN, error_code = forbidden)"
+//	@Failure		404					{object}	responses.ErrorResponse			"Not Found (mistyped url or signal_type marked 'not in use')
 //
 //	@Security		BearerAccessToken
 //
@@ -227,7 +346,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 	// check that the user is requesting a valid signal type/sem_ver for this isn
 	found := slices.Contains(claims.IsnPerms[isnSlug].SignalTypePaths, signalTypePath)
 	if !found {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("signal type %v is not available on ISN %v", signalTypePath, isnSlug))
+		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("signal type %v is not available on ISN %v", signalTypePath, isnSlug))
 		return
 	}
 
@@ -308,7 +427,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 	}
 
 	// Validate all signals against schema - record validation failures
-	validSignals := make([]Signal, 0)
+	validSignals := make([]CreateSignal, 0)
 	for _, signal := range createSignalsRequest.Signals {
 		err = s.schemaCache.ValidateSignal(r.Context(), s.queries, signalTypePath, signal.Content)
 		if err != nil {
@@ -493,183 +612,149 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 	responses.RespondWithJSON(w, httpStatus, createSignalsResponse)
 }
 
+// todo sync with private
 // SearchPublicSignalsHandler godocs
 //
-//	@Summary		Search for signals in public ISNs
+//	@Summary		Signal Search (public ISNs)
 //	@Tags			Signal sharing
 //
-//	@Description	Search for signals by date or account in public ISNs (no authentication required).
+//	@Description	Search for signals in public ISNs (no authentication required).
 //	@Description
 //	@Description	Note the endpoint returns the latest version of each signal.
 //
-//	@Param			start_date	query		string	false	"Start date for filtering"	example(2006-01-02T15:04:05Z)
-//	@Param			end_date	query		string	false	"End date for filtering"	example(2006-01-02T16:00:00Z
-//	@Param			account_id	query		string	false	"Account ID for filtering"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
+//	@Param			start_date			query		string	false	"Start date"															example(2006-01-02T15:05:00Z)
+//	@Param			end_date			query		string	false	"End date"																example(2006-01-02T15:15:00Z)
+//	@Param			account_id			query		string	false	"Account ID"															example(def87f89-dab6-4607-95f7-593d61cb5742)
+//	@Param			signal_id			query		string	false	"Signal ID"																example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
+//	@Param			local_ref			query		string	false	"Local reference"														example(item_id_#1)
+//	@Param			include_withdrawn	query		string	false	"Include withdrawn signals (default: false)"							example(true)
+//	@Param			include_correlated	query		string	false	"Include signals that link to each returned signal (default: false)"	example(true)
 //
-//	@Success		200			{array}		handlers.SignalVersionDoc
-//	@Failure		400			{object}	responses.ErrorResponse
+//	@Success		200					{array}		handlers.SearchSignalResponse
+//	@Failure		400					{object}	responses.ErrorResponse
+//	@Failure		400					{object}	responses.ErrorResponse
 //
 //	@Router			/api/public/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search [get]
 func (s *SignalsHandler) SearchPublicSignalsHandler(w http.ResponseWriter, r *http.Request) {
-	// set up params
-	isnSlug := r.PathValue("isn_slug")
-	signalTypeSlug := r.PathValue("signal_type_slug")
-	semVer := r.PathValue("sem_ver")
-	signalTypePath := fmt.Sprintf("%v/v%v", signalTypeSlug, semVer)
 
-	searchParams := SearchParams{
-		IsnSlug:          isnSlug,
-		SignalTypeSlug:   signalTypeSlug,
-		SemVer:           semVer,
-		IncludeWithdrawn: false, // Default to false for public endpoints
+	// Parse all search parameters
+	searchParams, err := parseSearchParams(r)
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
+		return
 	}
 
-	if accountIDString := r.URL.Query().Get("account_id"); accountIDString != "" {
-		accountID, err := uuid.Parse(accountIDString)
-		if err != nil {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "account_id is not a valid UUID")
-			return
-		}
-		searchParams.AccountID = &accountID
-	}
-
-	if startDateString := r.URL.Query().Get("start_date"); startDateString != "" {
-		startDate, err := utils.ParseDateTime(startDateString)
-		if err != nil {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
-			return
-		}
-		searchParams.StartDate = &startDate
-	}
-
-	if endDateString := r.URL.Query().Get("end_date"); endDateString != "" {
-		endDate, err := utils.ParseDateTime(endDateString)
-		if err != nil {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
-			return
-		}
-		searchParams.EndDate = &endDate
-	}
+	signalTypePath := fmt.Sprintf("%v/v%v", searchParams.signalTypeSlug, searchParams.semVer)
 
 	// Validate this is a public ISN
-	if !s.publicIsnCache.HasSignalType(isnSlug, signalTypePath) {
+	if !s.publicIsnCache.HasSignalType(searchParams.isnSlug, signalTypePath) {
 		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("invalid public ISN or signal type: %v is not available on this ISN", signalTypePath))
 		return
 	}
 
-	hasPartialDateRange := (searchParams.StartDate != nil) != (searchParams.EndDate != nil)
-	hasDateRange := searchParams.StartDate != nil && searchParams.EndDate != nil
-	hasAccount := searchParams.AccountID != nil
-
-	if hasPartialDateRange {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "you must supply both start_date and end_date search parameters")
-		return
-	}
-	if !hasDateRange && !hasAccount {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "you must supply a search paramenter")
+	// Validate search parameters
+	if err := validateSearchParams(searchParams); err != nil {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
 		return
 	}
 
-	rows, err := s.queries.GetLatestSignalVersionsWithOptionalFilters(r.Context(), database.GetLatestSignalVersionsWithOptionalFiltersParams{
-		IsnSlug:          searchParams.IsnSlug,
-		SignalTypeSlug:   searchParams.SignalTypeSlug,
-		SemVer:           searchParams.SemVer,
-		StartDate:        searchParams.StartDate,
-		EndDate:          searchParams.EndDate,
-		AccountID:        searchParams.AccountID,
-		IncludeWithdrawn: &searchParams.IncludeWithdrawn,
+	returnedSignals, err := s.queries.GetSignalsWithOptionalFilters(r.Context(), database.GetSignalsWithOptionalFiltersParams{
+		IsnSlug:          searchParams.isnSlug,
+		SignalTypeSlug:   searchParams.signalTypeSlug,
+		SemVer:           searchParams.semVer,
+		StartDate:        searchParams.startDate,
+		EndDate:          searchParams.endDate,
+		AccountID:        searchParams.accountID,
+		SignalID:         searchParams.signalID,
+		LocalRef:         searchParams.localRef,
+		IncludeWithdrawn: &searchParams.includeWithdrawn,
 	})
 	if err != nil {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to select signals from database: %v", err))
 		return
 	}
 
-	res := make([]SignalVersion, 0, len(rows))
-	for _, row := range rows {
-		// Always hide email addresses for public ISN responses for privacy
-		res = append(res, SignalVersion{
-			AccountID:          row.AccountID,
-			AccountType:        row.AccountType,
-			Email:              "", // hidden for public ISNs
-			LocalRef:           row.LocalRef,
-			VersionNumber:      row.VersionNumber,
-			CreatedAt:          row.CreatedAt,
-			SignalVersionID:    row.SignalVersionID,
-			SignalID:           row.SignalID,
-			CorrelatedLocalRef: row.CorrelatedLocalRef,
-			CorrelatedSignalID: row.CorrelatedSignalID,
-			IsWithdrawn:        row.IsWithdrawn,
-			Content:            row.Content,
-		})
+	response := make([]SearchSignalWithCorrelations, 0, len(returnedSignals))
+
+	// Get correlated signals if requested
+	var correlatedSignalsMap map[uuid.UUID][]SearchSignal
+	if searchParams.includeCorrelated {
+
+		// Collect all signal IDs from the main results
+		signalIDs := make([]uuid.UUID, 0, len(returnedSignals))
+		for _, row := range returnedSignals {
+			signalIDs = append(signalIDs, row.SignalID)
+		}
+
+		correlatedSignalsMap, err = s.getCorrelatedSignals(r.Context(), signalIDs, searchParams)
+		if err != nil {
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to get correlated signals: %v", err))
+			return
+		}
 	}
-	responses.RespondWithJSON(w, http.StatusOK, res)
+
+	for _, returnedSignal := range returnedSignals {
+		signal := SearchSignalWithCorrelations{
+			SearchSignal: SearchSignal{
+				AccountID:            returnedSignal.AccountID,
+				Email:                "", // do not show email addresses in public ISNs
+				SignalID:             returnedSignal.SignalID,
+				LocalRef:             returnedSignal.LocalRef,
+				SignalCreatedAt:      returnedSignal.SignalCreatedAt,
+				SignalVersionID:      returnedSignal.SignalVersionID,
+				VersionNumber:        returnedSignal.VersionNumber,
+				VersionCreatedAt:     returnedSignal.VersionCreatedAt,
+				CorrelatedToSignalID: returnedSignal.CorrelatedToSignalID,
+				IsWithdrawn:          returnedSignal.IsWithdrawn,
+				Content:              returnedSignal.Content,
+			},
+		}
+
+		// Add correlated signals if requested
+		if searchParams.includeCorrelated {
+			if correlatedSignals, exists := correlatedSignalsMap[returnedSignal.SignalID]; exists {
+				signal.CorrelatedSignals = correlatedSignals
+			}
+		}
+
+		response = append(response, signal)
+	}
+	responses.RespondWithJSON(w, http.StatusOK, response)
 }
 
 // SearchPrivateSignalsHandler godocs
 //
-//	@Summary		Search for signals in private ISNs
+//	@Summary		Signal Search (private ISNs)
 //	@Tags			Signal sharing
 //
 //	@Description	Search for signals by date or account in private ISNs (authentication required - only accounts with read or write permissions to the ISN can access signals).
 //	@Description
 //	@Description	Note the endpoint returns the latest version of each signal.
 //
-//	@Param			start_date			query		string	false	"Start date for filtering"						example(2006-01-02T15:04:05Z)
-//	@Param			end_date			query		string	false	"End date for filtering"						example(2006-01-02T16:00:00Z
-//	@Param			account_id			query		string	false	"Account ID for filtering"						example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
-//	@Param			include_withdrawn	query		string	false	"Include withdrawn signals (default: false)"	example(false)
+//	@Param			start_date			query		string	false	"Start date"															example(2006-01-02T15:05:00Z)
+//	@Param			end_date			query		string	false	"End date"																example(2006-01-02T15:15:00Z)
+//	@Param			account_id			query		string	false	"Account ID"															example(def87f89-dab6-4607-95f7-593d61cb5742)
+//	@Param			signal_id			query		string	false	"Signal ID"																example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
+//	@Param			local_ref			query		string	false	"Local reference"														example(item_id_#1)
+//	@Param			include_withdrawn	query		string	false	"Include withdrawn signals (default: false)"							example(true)
+//	@Param			include_correlated	query		string	false	"Include signals that link to each returned signal (default: false)"	example(true)
 //
-//	@Success		200					{array}		handlers.SignalVersionDoc
+//	@Success		200					{array}		handlers.SearchSignalResponse
 //	@Failure		400					{object}	responses.ErrorResponse
 //
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search [get]
 func (s *SignalsHandler) SearchPrivateSignalsHandler(w http.ResponseWriter, r *http.Request) {
-	// set up params
-	isnSlug := r.PathValue("isn_slug")
-	signalTypeSlug := r.PathValue("signal_type_slug")
-	semVer := r.PathValue("sem_ver")
-	signalTypePath := fmt.Sprintf("%v/v%v", signalTypeSlug, semVer)
 
-	searchParams := SearchParams{
-		IsnSlug:          isnSlug,
-		SignalTypeSlug:   signalTypeSlug,
-		SemVer:           semVer,
-		IncludeWithdrawn: false, // Default to false
+	// Parse all search parameters
+	searchParams, err := parseSearchParams(r)
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
+		return
 	}
 
-	if accountIDString := r.URL.Query().Get("account_id"); accountIDString != "" {
-		accountID, err := uuid.Parse(accountIDString)
-		if err != nil {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "account_id is not a valid UUID")
-			return
-		}
-		searchParams.AccountID = &accountID
-	}
-
-	if startDateString := r.URL.Query().Get("start_date"); startDateString != "" {
-		startDate, err := utils.ParseDateTime(startDateString)
-		if err != nil {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
-			return
-		}
-		searchParams.StartDate = &startDate
-	}
-
-	if endDateString := r.URL.Query().Get("end_date"); endDateString != "" {
-		endDate, err := utils.ParseDateTime(endDateString)
-		if err != nil {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
-			return
-		}
-		searchParams.EndDate = &endDate
-	}
-
-	if includeWithdrawnString := r.URL.Query().Get("include_withdrawn"); includeWithdrawnString != "" {
-		includeWithdrawn := includeWithdrawnString == "true"
-		searchParams.IncludeWithdrawn = includeWithdrawn
-	}
+	signalTypePath := fmt.Sprintf("%v/v%v", searchParams.signalTypeSlug, searchParams.semVer)
 
 	// Validate authenticated access to private ISN
 	claims, hasAuth := auth.ContextAccessTokenClaims(r.Context())
@@ -679,57 +764,79 @@ func (s *SignalsHandler) SearchPrivateSignalsHandler(w http.ResponseWriter, r *h
 	}
 
 	// Check if user has access to this signal type
-	if !slices.Contains(claims.IsnPerms[isnSlug].SignalTypePaths, signalTypePath) {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, fmt.Sprintf("access denied to signal type %v on ISN %v", signalTypePath, isnSlug))
+	if !slices.Contains(claims.IsnPerms[searchParams.isnSlug].SignalTypePaths, signalTypePath) {
+		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("signal type %v not found on ISN %v", signalTypePath, searchParams.isnSlug))
 		return
 	}
 
-	hasPartialDateRange := (searchParams.StartDate != nil) != (searchParams.EndDate != nil)
-	hasDateRange := searchParams.StartDate != nil && searchParams.EndDate != nil
-	hasAccount := searchParams.AccountID != nil
-
-	if hasPartialDateRange {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "you must supply both start_date and end_date search parameters")
-		return
-	}
-	if !hasDateRange && !hasAccount {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "you must supply a search paramenter")
+	// Validate search parameters
+	if err := validateSearchParams(searchParams); err != nil {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
 		return
 	}
 
-	rows, err := s.queries.GetLatestSignalVersionsWithOptionalFilters(r.Context(), database.GetLatestSignalVersionsWithOptionalFiltersParams{
-		IsnSlug:          searchParams.IsnSlug,
-		SignalTypeSlug:   searchParams.SignalTypeSlug,
-		SemVer:           searchParams.SemVer,
-		StartDate:        searchParams.StartDate,
-		EndDate:          searchParams.EndDate,
-		AccountID:        searchParams.AccountID,
-		IncludeWithdrawn: &searchParams.IncludeWithdrawn,
+	returnedSignals, err := s.queries.GetSignalsWithOptionalFilters(r.Context(), database.GetSignalsWithOptionalFiltersParams{
+		IsnSlug:          searchParams.isnSlug,
+		SignalTypeSlug:   searchParams.signalTypeSlug,
+		SemVer:           searchParams.semVer,
+		StartDate:        searchParams.startDate,
+		EndDate:          searchParams.endDate,
+		AccountID:        searchParams.accountID,
+		SignalID:         searchParams.signalID,
+		LocalRef:         searchParams.localRef,
+		IncludeWithdrawn: &searchParams.includeWithdrawn,
 	})
 	if err != nil {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to select signals from database: %v", err))
 		return
 	}
 
-	res := make([]SignalVersion, 0, len(rows))
-	for _, row := range rows {
-		// Include full information including email addresses for authenticated users
-		res = append(res, SignalVersion{
-			AccountID:          row.AccountID,
-			AccountType:        row.AccountType,
-			Email:              row.Email,
-			LocalRef:           row.LocalRef,
-			VersionNumber:      row.VersionNumber,
-			CreatedAt:          row.CreatedAt,
-			SignalVersionID:    row.SignalVersionID,
-			SignalID:           row.SignalID,
-			CorrelatedLocalRef: row.CorrelatedLocalRef,
-			CorrelatedSignalID: row.CorrelatedSignalID,
-			IsWithdrawn:        row.IsWithdrawn,
-			Content:            row.Content,
-		})
+	response := make([]SearchSignalWithCorrelations, 0, len(returnedSignals))
+
+	// Get correlated signals if requested
+	var correlatedSignalsMap map[uuid.UUID][]SearchSignal
+	if searchParams.includeCorrelated {
+
+		// Collect all signal IDs from the main results
+		signalIDs := make([]uuid.UUID, 0, len(returnedSignals))
+		for _, row := range returnedSignals {
+			signalIDs = append(signalIDs, row.SignalID)
+		}
+
+		correlatedSignalsMap, err = s.getCorrelatedSignals(r.Context(), signalIDs, searchParams)
+		if err != nil {
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to get correlated signals: %v", err))
+			return
+		}
 	}
-	responses.RespondWithJSON(w, http.StatusOK, res)
+
+	for _, returnedSignal := range returnedSignals {
+		signal := SearchSignalWithCorrelations{
+			SearchSignal: SearchSignal{
+				AccountID:            returnedSignal.AccountID,
+				Email:                returnedSignal.Email,
+				SignalID:             returnedSignal.SignalID,
+				LocalRef:             returnedSignal.LocalRef,
+				SignalCreatedAt:      returnedSignal.SignalCreatedAt,
+				SignalVersionID:      returnedSignal.SignalVersionID,
+				VersionNumber:        returnedSignal.VersionNumber,
+				VersionCreatedAt:     returnedSignal.VersionCreatedAt,
+				CorrelatedToSignalID: returnedSignal.CorrelatedToSignalID,
+				IsWithdrawn:          returnedSignal.IsWithdrawn,
+				Content:              returnedSignal.Content,
+			},
+		}
+
+		// Add correlated signals if requested
+		if searchParams.includeCorrelated {
+			if correlatedSignals, exists := correlatedSignalsMap[returnedSignal.SignalID]; exists {
+				signal.CorrelatedSignals = correlatedSignals
+			}
+		}
+
+		response = append(response, signal)
+	}
+	responses.RespondWithJSON(w, http.StatusOK, response)
 }
 
 // WithdrawSignalHandler godoc

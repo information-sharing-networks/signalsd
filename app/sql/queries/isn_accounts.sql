@@ -30,12 +30,13 @@ ON i.id = ia.isn_id
 WHERE ia.isn_id = $1 
 AND ia.account_id = $2;
 
--- get all the isns an account has access to.
--- name: GetIsnAccountsByAccountID :many
+-- name: GetActiveIsnAccountsByAccountID :many
+-- get all the active isns an account has access to.
 SELECT ia.*, i.slug as isn_slug FROM isn_accounts ia
 JOIN isn i
 ON i.id = ia.isn_id
-WHERE ia.account_id = $1;
+WHERE ia.account_id = $1
+and i.is_in_use = true;
 
 -- get all accounts that have access to a specific ISN
 -- name: GetAccountsByIsnID :many
