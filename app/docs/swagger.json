@@ -474,7 +474,7 @@
         },
         "/api/auth/login": {
             "post": {
-                "description": "The response body includes an access token which can be used to access the protected enpoints, assuming the account has the appropriate permissions.\nThe access_token is valid for 30 minutes.\n\nAs part of the login response, the server sets a http-only cookie on the client that will allow it to use the /oauth/token with grant_type=refresh_token to renew the access_token.\nThe refresh_token lasts 30 days unless it is revoked earlier.\n- To renew the refresh_token, log in again.\n- To revoke the refresh_token, call the /oauth/revoke endpoint.\n\nThe account's role and permissions are encoded as part of the jwt access token and this information is also provided in the response body.",
+                "description": "The response body includes an access token which can be used to access the protected enpoints, assuming the account has the appropriate permissions.\nThe access_token is valid for 30 minutes.\n\nAs part of the login response, the server sets a http-only cookie on the client that will allow it to refresh the token (use the /oauth/token endpoint with a grant_type=refresh_token param)\nThe refresh_token lasts 30 days unless it is revoked earlier.\n- To renew the refresh_token, log in again.\n- To revoke the refresh_token, call the /oauth/revoke endpoint.\n\nThe account's role and permissions are encoded as part of the jwt access token and this information is also provided in the response body.",
                 "tags": [
                     "auth"
                 ],
@@ -1327,7 +1327,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Submit an array of signals for storage on the ISN\n- payloads must not mix signals of different types and are subject to the size limits defined on the site.\n- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.\n- If a local reference is received more than once from an account for the specified signal_type a new version of the signal will be stored with a incremented version number.\n- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.\n- requests are only accepted for the open signal batch for this account/ISN (service accounts need to manually create batches, web users have a batch automatically created when they first write to an ISN).\n\n**Authentication**\n\nRequires a valid access token.\nThe claims in the access token list the ISNs and signal_types that the account is permitted to use.\n\n**Error handling**\n\nif the request is a vaild format but individual signals contain errors (validation errors, incorrect correlation ids, database errors) the errors are recorded in the response but do not prevent other signals from being processed.\nIndividual failures are logged and can be tracked using the signals_batch_id returned in the response - see the batch status endpoint.\n\nErrors that relate to the entire request  - e.g invalid json, authentication, permission and server errors (400, 401, 403, 500) - are not recorded and should be handled by the client immediately.\n\n**JSON Schema Validation**\n\nSignals are validated against the JSON schema specified for the signal type unless validation is disabled on the type definition.\n\nWhen validation is disabled, basic checks are still done on the incoming data and the following issues create a 400 error and cause the entire payload to be rejected:\n- invalid json format\n- missing fields (the array of signals must be in a json object called signals, and content and local_ref must be present for each record).\n\n**Signal versions**\n\nMultiple versions are created when signals are resupplied, e.g. because the client wants to correct a previously publsihed signal.\nBy default search will return the latest version of the signal.\nIf a signal has been withdrawn it will be reactivated if you resubmit it using the same local_ref.\n\n**Correlating signals**\n\nCorrelation IDs can be used to link signals together.  Signals can only be correlated within the same ISN.\nIf the supplied correlation_id is not found in the same ISN as the signal being submitted, the response will contain a 422 or 207 status code and the error_code for the failed signal will be `invalid_correlation_id`.\n\n**Response Status Codes**\n- `200`: All signals processed successfully\n- `207`: Partial success (some signals succeeded, some failed)\n- `422`: All signals failed processing (the request was valid but all signals failed processing, e.g because they did not conform with the JSON schema for this signal type)\n\nrequest level errors (e.g. invalid json, authentication failure etc) return a simple error_code/error_message response rather than a detailed audit log",
+                "description": "Submit an array of signals for storage on the ISN\n- payloads must not mix signals of different types and are subject to the size limits defined on the site.\n- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.\n- If a local reference is received more than once from an account for the specified signal_type a new version of the signal will be stored with a incremented version number.\n- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.\n- requests are only accepted for the open signal batch for this account/ISN (service accounts need to manually create batches, web users have a batch automatically created when they first write to an ISN).\n\n**Authentication**\n\nRequires a valid access token.\nThe claims in the access token list the ISNs and signal_types that the account is permitted to use.\n\n**Error handling**\n\nif the request is a vaild format but individual signals contain errors (validation errors, incorrect correlation ids, database errors) the errors are recorded in the response but do not prevent other signals from being processed.\nIndividual failures are logged and can be tracked using the signals_batch_id returned in the response - see the batch status endpoint.\n\nErrors that relate to the entire request  - e.g invalid json, authentication, permission and server errors (400, 401, 403, 500) - are not recorded and should be handled by the client immediately.\n\n**JSON Schema Validation**\n\nSignals are validated against the JSON schema specified for the signal type unless validation is disabled on the type definition.\n\nWhen validation is disabled, basic checks are still done on the incoming data and the following issues create a 400 error and cause the entire payload to be rejected:\n- invalid json format\n- missing fields (the array of signals must be in a json object called signals, and content and local_ref must be present for each record).\n\n**Signal versions**\n\nMultiple versions are created when signals are resupplied, e.g. because the client wants to correct a previously publsihed signal.\nBy default search will return the latest version of the signal.\nIf a signal has been withdrawn it will be reactivated if you resubmit it using the same local_ref.\n\n**Correlating signals**\n\nCorrelation IDs can be used to link signals together.  Signals can only be correlated within the same ISN.\nIf the supplied correlation_id is not found in the same ISN as the signal being submitted, the response will contain a 422 or 207 status code and the error_code for the failed signal will be `invalid_correlation_id`.\n\nrequest level errors (e.g. invalid json, authentication failure etc) return a simple error_code/error_message response rather than a detailed audit log",
                 "tags": [
                     "Signal sharing"
                 ],
@@ -1393,7 +1393,13 @@
                         }
                     },
                     "403": {
-                        "description": "Forbidden (insufficient permissions, error_code = forbidden)",
+                        "description": "Forbidden (no permission to write to ISN, error_code = forbidden)",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found (mistyped url or signal_type marked 'not in use')",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -2689,6 +2695,7 @@
                     "type": "string"
                 },
                 "email": {
+                    "description": "not included in public ISN searches",
                     "type": "string"
                 },
                 "is_withdrawn": {
@@ -2747,6 +2754,7 @@
                     "type": "string"
                 },
                 "email": {
+                    "description": "not included in public ISN searches",
                     "type": "string"
                 },
                 "is_withdrawn": {

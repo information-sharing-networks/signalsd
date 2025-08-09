@@ -28,6 +28,23 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/server/schemas"
 )
 
+// testEnvironment holds common test dependencies
+type testEnvironment struct {
+	dbConn      *pgxpool.Pool
+	queries     *database.Queries
+	authService *auth.AuthService
+}
+
+// setupTestEnvironment creates a new test environment with database connection and services
+func setupTestEnvironment(dbConn *pgxpool.Pool) *testEnvironment {
+	env := &testEnvironment{
+		dbConn:      dbConn,
+		queries:     database.New(dbConn),
+		authService: auth.NewAuthService(secretKey, environment, database.New(dbConn)),
+	}
+	return env
+}
+
 // Test configuration constants
 const (
 	secretKey        = "test-secret"

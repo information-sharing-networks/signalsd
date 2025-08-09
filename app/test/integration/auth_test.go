@@ -11,6 +11,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	signalsd "github.com/information-sharing-networks/signalsd/app"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 )
@@ -121,7 +122,7 @@ func TestPermissions(t *testing.T) {
 }
 
 // checkPermissions is a helper that tests the permissions for a given account
-// tests are done on the returned struct from CreateAccessToken and the parsed JWT token
+// tests are done on the struct returned from CreateAccessToken and the parsed JWT token
 func checkPermissions(t *testing.T, authService *auth.AuthService, accountID uuid.UUID, accountType string, expectedRole string, expectedPerms map[string]string, validSignalTypePaths map[string]string) {
 	t.Helper()
 
@@ -155,7 +156,7 @@ func checkPermissions(t *testing.T, authService *auth.AuthService, accountID uui
 			t.Errorf("expected %s permission for %s, got %s", expectedPermission, isnSlug, perm.Permission)
 		}
 
-		// service account was set up with a batch for the public ISN
+		// service account was set up with a batch for the public ISN (which it has write access to)
 		if perm.Permission == "write" && accountType == "service_account" && perm.SignalBatchID == nil {
 			t.Errorf("expected signal batch ID for %s, got nil", isnSlug)
 		}
@@ -217,7 +218,7 @@ func checkPermissions(t *testing.T, authService *auth.AuthService, accountID uui
 	if claims.Subject != accountID.String() {
 		t.Errorf("expected subject %s in JWT, got %s", accountID.String(), claims.Subject)
 	}
-	if claims.Issuer != "Signalsd" { // This should match signalsd.TokenIssuerName
+	if claims.Issuer != signalsd.TokenIssuerName {
 		t.Errorf("expected issuer 'Signalsd' in JWT, got %s", claims.Issuer)
 	}
 
@@ -275,14 +276,14 @@ func createClientSecret(t *testing.T, ctx context.Context, queries *database.Que
 	return hashedClientSecret, nil
 }
 
-// TestLogins tests:
+// TestLoginAuth tests:
 // - Successful login with valid credentials
 // - Failed login with invalid credentials
 // - that account ID/role/accountType on the database are correctly returned in the JWT claims
 // - that refresh tokens are correctly created and rotated
 //
 // note this is a very slow test as it has to hash the passwords for each sub-test
-func TestLogins(t *testing.T) {
+func TestLoginAuth(t *testing.T) {
 	ctx := context.Background()
 	testDB := setupTestDatabase(t, ctx)
 
@@ -522,13 +523,13 @@ func TestClientCredentialsAuth(t *testing.T) {
 	})
 }
 
-// TestDisabledAccounts checks the behaviour of account.is_active = false
+// TestDisabledAccountAuth checks the behaviour of account.is_active = false
 //
 //  1. confirms the primary control in CreateAccessToken prevents new access tokens being created by disabled accounts, thereby preventing them using any of the proteced endpoints (note there are secondary controls in the middleware and login handler)
 //  2. That the following items are revoked
 //     - client secrets/one time secrets (service accounts)
 //     - refresh tokens (users)
-func TestDisabledAccounts(t *testing.T) {
+func TestDisabledAccountAuth(t *testing.T) {
 	ctx := context.Background()
 	testDB := setupTestDatabase(t, ctx)
 
@@ -577,7 +578,7 @@ func TestDisabledAccounts(t *testing.T) {
 		}
 	})
 
-	t.Run("reinstated web user account access allowed", func(t *testing.T) {
+	t.Run("reinstated web user account allowed to create access token", func(t *testing.T) {
 
 		enableAccount(t, ctx, queries, memberAccount.ID)
 		_, err := authService.CreateAccessToken(ctx)
@@ -593,7 +594,7 @@ func TestDisabledAccounts(t *testing.T) {
 		disableAccount(t, ctx, queries, serviceAccount.ID)
 		_, err := authService.CreateAccessToken(ctx)
 		if err == nil {
-			t.Errorf("disabled web user account %v was allowed to create an access token ", serviceAccount.ID)
+			t.Errorf("disabled service account %v was allowed to create an access token ", serviceAccount.ID)
 		}
 
 		// check the client secret was revoked

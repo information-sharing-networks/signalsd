@@ -66,7 +66,11 @@ func (a *AuthService) RequireValidAccessToken(allowExpired bool) func(http.Handl
 				return
 			}
 
-			logger.Info().Msgf("account %v access_token validated", accountID)
+			if allowExpired {
+				logger.Info().Msgf("account %v access_token validated (allowExpired = true)", accountID)
+			} else {
+				logger.Info().Msgf("account %v access_token validated", accountID)
+			}
 
 			// add user and claims to context
 			ctx := ContextWithAccountID(r.Context(), accountID)

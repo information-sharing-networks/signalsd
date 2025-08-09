@@ -459,6 +459,7 @@ definitions:
       correlated_to_signal_id:
         type: string
       email:
+        description: not included in public ISN searches
         type: string
       is_withdrawn:
         type: boolean
@@ -497,6 +498,7 @@ definitions:
       correlated_to_signal_id:
         type: string
       email:
+        description: not included in public ISN searches
         type: string
       is_withdrawn:
         type: boolean
@@ -1165,7 +1167,7 @@ paths:
         The response body includes an access token which can be used to access the protected enpoints, assuming the account has the appropriate permissions.
         The access_token is valid for 30 minutes.
 
-        As part of the login response, the server sets a http-only cookie on the client that will allow it to use the /oauth/token with grant_type=refresh_token to renew the access_token.
+        As part of the login response, the server sets a http-only cookie on the client that will allow it to refresh the token (use the /oauth/token endpoint with a grant_type=refresh_token param)
         The refresh_token lasts 30 days unless it is revoked earlier.
         - To renew the refresh_token, log in again.
         - To revoke the refresh_token, call the /oauth/revoke endpoint.
@@ -1831,11 +1833,6 @@ paths:
         Correlation IDs can be used to link signals together.  Signals can only be correlated within the same ISN.
         If the supplied correlation_id is not found in the same ISN as the signal being submitted, the response will contain a 422 or 207 status code and the error_code for the failed signal will be `invalid_correlation_id`.
 
-        **Response Status Codes**
-        - `200`: All signals processed successfully
-        - `207`: Partial success (some signals succeeded, some failed)
-        - `422`: All signals failed processing (the request was valid but all signals failed processing, e.g because they did not conform with the JSON schema for this signal type)
-
         request level errors (e.g. invalid json, authentication failure etc) return a simple error_code/error_message response rather than a detailed audit log
       parameters:
       - description: isn slug
@@ -1880,7 +1877,11 @@ paths:
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
-          description: Forbidden (insufficient permissions, error_code = forbidden)
+          description: Forbidden (no permission to write to ISN, error_code = forbidden)
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found (mistyped url or signal_type marked 'not in use')
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "422":
