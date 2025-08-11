@@ -82,7 +82,7 @@ import (
 //	@description	The /oauth API endpoints use a http-only cookie to exchange refresh tokens but also require a bearer token, preventing CSRF attacks.
 //	@description
 //	@description	### CORS Protection
-//	@description 	By default the server will start with ALLOWED_ORIGINS=*
+//	@description	By default the server will start with ALLOWED_ORIGINS=*
 //	@description
 //	@description	This should not be used in production - you must specify the list of client origins that are allowed to access the API in the ALLOWED_ORIGINS environment variable before starting the server.
 //	@description
@@ -100,9 +100,9 @@ import (
 //	@description	- Example: "2025-06-03T13:47:47.331787+01:00"
 //	@license.name	MIT
 
-//	@servers.url		https://api.example.com
+//	@servers.url			https://api.example.com
 //	@servers.description	Production server
-//	@servers.url		http://localhost:8080
+//	@servers.url			http://localhost:8080
 //	@servers.description	Development server
 
 //	@accept		json
@@ -132,7 +132,7 @@ import (
 //	@tag.description	Define the format of the data being shared in an ISN
 
 // @tag.name			Service accounts
-// @tag.description		Manage service account end points
+// @tag.description	Manage service account end points
 func main() {
 	var mode string
 

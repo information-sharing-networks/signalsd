@@ -132,7 +132,7 @@ func (a *AdminHandler) VersionHandler(w http.ResponseWriter, r *http.Request) {
 
 // DisableAccountHandler godoc
 //
-//	@Summary		Disable an account
+//	@Summary	Disable an account
 //	@Description
 //	@Description	**Use Cases:**
 //	@Description	- **Security Incident**: Compromised account needs immediate lockout
@@ -275,7 +275,7 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 
 // EnableAccountHandler godoc
 //
-//	@Summary	Enable an account
+//	@Summary		Enable an account
 //	@Description	**Administrative endpoint to re-enable previously disabled accounts.**
 //	@Description	Sets account status to `is_active = true` (does not create new tokens).
 //	@Description

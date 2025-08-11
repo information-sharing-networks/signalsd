@@ -35,7 +35,9 @@ ISNs work differently: a network is set up for a specific business purpose - suc
 This approach enables rapid implementation of effective data sharing, while maintaining flexibility as business relationships evolve.
 
 ## Integrating with existing systems
-The service supports logged-in web users and system-to-system access via service accounts.  Authentication follows Oauth 2.0 standards and data is submitted and received as JSON over simple REST APIs. Signal types are defined as JSON schema and the service can (optionally) validate data against the nominated schema prior to loading.
+The service supports logged-in web users and system-to-system access via service accounts.  Authentication follows Oauth 2.0 standards and data is submitted and received as JSON over simple REST APIs.
+
+Signal types are defined as JSON schema and the service can (optionally) validate data against the nominated schema prior to loading.
 
 ## Reference Implementations
 The [initial implementation](https://github.com/information-sharing-networks/isn-ref-impl) was a proof of concept used as part of the UK government's Border Trade Demonstrator (BTD) initiative. The BTDs established ISNs that were used by several government agencies and industry groups to improve processes at the border by sharing supply chain information.
@@ -80,47 +82,21 @@ ALLOWED_ORIGINS=*               # CORS origins (default: *, comma-separated for 
 
 # Database Connection Pool (the default used are the same as those used by pgx )
 DB_MAX_CONNECTIONS=4
-DB_MIN_CONNECTIONS=0
+DB_MIN_CONNECTIONS=0            # Allow scaling to zero (Cloud Run)
 DB_MAX_CONN_LIFETIME=60m
 DB_MAX_CONN_IDLE_TIME=30m
 DB_CONNECT_TIMEOUT=5s
 ```
 
-**Note**: In the Docker development environment, DATABASE_URL and SECRET_KEY are automatically configured with development-appropriate defaults.
-
-## Environment-Specific Configuration Examples
-
-### Performance Testing Configuration
-For load testing and performance evaluation:
-```bash
-# Performance testing environment
-ENVIRONMENT=perf
-DB_MAX_CONNECTIONS=50
-DB_MIN_CONNECTIONS=5
-DB_MAX_CONN_LIFETIME=30m
-DB_MAX_CONN_IDLE_TIME=15m
-RATE_LIMIT_RPS=0                # Disable rate limiting for testing
-MAX_SIGNAL_PAYLOAD_SIZE=10485760 # 10MB for larger test payloads
-
-go run cmd/signalsd/main.go --mode all
-```
-
-### Production Configuration
-These are the settings used for the Neon.tech production deployment:
-```bash
-DB_MAX_CONNECTIONS=25           
-DB_MIN_CONNECTIONS=0            # Allow scaling to zero (Cloud Run)
-DB_MAX_CONN_LIFETIME=120m  
-DB_MAX_CONN_IDLE_TIME=20m
-DB_CONNECT_TIMEOUT=10s
-
-go run cmd/signalsd/main.go --mode all
-```
+**Note**: In the Docker development environment, DATABASE_URL and SECRET_KEY are automatically configured with development-appropriate defaults. In production you should use a secret management service to supply these two settings.
 
 
 ## Quick Start (Docker Development Environment)
 
-**Prerequisites**: [Docker Desktop](https://docs.docker.com/get-docker) installed on your system.
+**Prerequisites**: 
+The following must be installed on your system
+- [Docker Desktop](https://docs.docker.com/get-docker) 
+- [go 1.24+](https://go.dev/doc/install)
 
 Clone the repo:
 ```bash
@@ -128,20 +104,25 @@ git clone https://github.com/information-sharing-networks/signalsd.git
 cd signalsd
 ```
 
-Using the development environment:
+### Using the Docker Environment
+the docker compose file in the root of the repo (`docker-compose.yml`) starts the service and a PostgreSQL database (the containers are called `app` and `db` respectively)
+
+the docker compose file mounts the local repo directory into the app container, so you can edit code locally and see the changes immediately after restarting the app container.  The app container has all the tools you need to test and run the service.
 ```bash
-# Start the service
+# Start the service and database
 docker compose up
 
-# Stop the service
+# Stop the service and database
 docker compose down
 
 # Restart the app container to compile and run the latest code
-# Note: This will rerun sqlc, swag, goose, etc
+# Note: This will build the app and rerun sqlc code generation, swag docs generation and goose migrations
 docker compose restart app
 
-# For environment variable changes, use up instead of restart
-# This recreates the container with the new environment variables
+# restart the database container
+docker compose restart db
+
+# For environment variable changes use "up" to recreate the container with the new env vars, for example:
 
 # start the http server on a different port:
 PORT=8081 docker compose up app
@@ -155,14 +136,36 @@ ENVIRONMENT=prod DB_MAX_CONNECTIONS=25 DB_CONNECT_TIMEOUT=10s RATE_LIMIT_RPS=200
 # Rebuild the image when you change:
 # - dockerfile_inline content
 # - go.mod/go.sum (new dependencies)
-# - Go tool versions (goose, sqlc, swag)
+# - Go tool versions (goose, sqlc, swag etc)
 docker compose up --build app
 
 # start a shell in the app container
 docker exec -it signalsd-app /bin/bash
+```
 
-# Run individual tools inside the container:
+The service starts on [http://localhost:8080](http://localhost:8080) by default.
 
+The API documentation is hosted as part of the service or you can refer to the [latest released docs](https://signals.btddemo.org/docs)
+
+### Development Tools
+
+You can use the Makefile for common development tasks:
+
+```bash
+# Start containers first
+docker compose up -d
+
+# Then...
+make help     # See available commands
+make check    # Run all pre-commit checks and generate sqlc code and api docs
+make generate # Generate sqlc code and api docs
+make migrate  # Run database migrations
+...
+```
+
+alternatively, you can use docker compose to run the same commands inside the app container individually:
+
+```bash
 # Generate API docs
 docker compose exec app sh -c "cd /signalsd/app && swag init -g ./cmd/signalsd/main.go"
 
@@ -171,6 +174,12 @@ docker compose exec app bash -c 'cd /signalsd/app && goose -dir sql/schema postg
 
 # Generate type-safe SQL code
 docker compose exec app sh -c "cd /signalsd/app && sqlc generate"
+
+# run the linter
+docker compose exec app sh -c "cd /signalsd/app && staticcheck ./..."
+
+# run the security scan 
+docker compose exec app sh -c "cd /signalsd/app && gosec -exclude-generated ./..."
 
 # Connect to the postgres database
 docker compose exec -it db psql -U signalsd-dev -d signalsd_admin
@@ -182,47 +191,72 @@ DATABASE_URL="postgres://signalsd-dev@localhost:15432/signalsd_admin?sslmode=dis
 docker compose down --rmi local -v
 ```
 
-The service starts on [http://localhost:8080](http://localhost:8080) by default.
-
-The API documentation is hosted as part of the service or you can refer to the [latest released docs](https://signals.btddemo.org/docs)
-
-## Troubleshooting Docker Development Environment
-
 ### Tool Version Issues
-If you encounter errors or missing features in development tools (goose, sqlc, swag), this is likely due to Docker layer caching using older tool versions.
+If you encounter errors or missing features in development tools (goose, sqlc, swag etc), this is likely due to Docker layer caching using older tool versions.
 
-**Solution**: Force rebuild the Docker image to get the latest tool versions:
+Force rebuild the Docker image to get the latest tool versions:
 ```bash
 docker compose up --build
 ```
 
 
-## Local Development Setup
-### Prerequisites (macOS)
+## Database Schema Management
+database schema migration is managed using [goose](https://github.com/pressly/goose).  
+
+Schema changes are made by adding files to `app/sql/schema`:
+```
+001_foo.sql
+002_bar.sql
+...
+```
+For docker users the migration are applied automatically whenever you restart the app container (use `make migrate` to run mannually). 
+
+If you are developing locally, run the goose `up` command after pulling code from the GitHub repo or adding new migration files:
+```bash
+# Update the database to the current version (this command applies any new migrations):
+goose -dir app/sql/schema postgres $DATABASE_URL up # if goose is installed locally
+
+# to reset the database to the initial state, dropping all database objects with
+goose -dir app/sql/schema postgres $DATABASE_URL down-to 0
+```
+
+## API Documentation
+To generate the OpenAPI docs:
+```bash
+swag init -g cmd/signalsd/main.go
+```
+For docker users, the docs are automatically created when ever you restart the app container.
+
+## SQL Queries
+SQL queries are kept in `app/sql/queries`.
+
+Run `sqlc generate` from the root of the project to regenerate the type safe Go code after adding or altering any queries (runs automatically for docker users on restarting the app)
+
+## Testing
+For information about the testing strategy and how to run tests, see the [Integration Testing Documentation](app/test/integration/README.md).
+
+details on performance testing are in [Performance Testing Documentation](test/perf/README.md).
+
+## Local Development Setup (macOS)
+
+if you do not want to use Docker, you need to install the following dependencies:
+
+### Prerequisites
 Install the following:
 - Go 1.24 or above
 - PostgreSQL@17 or above
 
 ### Go Development tools
-the following dependencies are used when devloping the service:
+the following go tools are used in the dev environment
 ```bash
-go install github.com/pressly/goose/v3/cmd/goose@latest    # database migrations
-go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest       # type safe code for SQL queries
-go install github.com/swaggo/swag/cmd/swag@latest         # generates OpenAPI specs from go comments
+go install github.com/pressly/goose/v3/cmd/goose@latest     # database migrations
+go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest         # type safe code for SQL queries
+go install github.com/swaggo/swag/cmd/swag@latest           # generates OpenAPI specs from go comments
+go install honnef.co/go/tools/cmd/staticcheck@latest        # linter
+go install github.com/securego/gosec/v2/cmd/gosec@latest    # security analysis
 ```
 
-### Quality Assurance Tools
-```bash
-go install honnef.co/go/tools/cmd/staticcheck@latest  # static analysis
-go install github.com/securecode/gosec/v2/cmd/gosec@latest  # security analysis
-```
-
-### Testing
-For information about the testing strategy and how to run tests, see the [Integration Testing Documentation](app/test/integration/README.md).
-
-details on performance testing are in [Performance Testing Documentation](test/perf/README.md).
-
-### Environment Variables
+### Local Development Environment Variables
 ```bash
 # local dev service config
 DATABASE_URL="postgres://username:@localhost:5432/signalsd_admin?sslmode=disable"  # On macOS, username is your login username
@@ -248,24 +282,6 @@ CREATE DATABASE signalsd_admin;
 export DATABASE_URL="postgres://$(whoami):@localhost:5432/signalsd_admin?sslmode=disable"
 ```
 
-### Database Management
-database schema migration is managed by [goose](https://github.com/pressly/goose):
-
-Schema changes are made by adding files to `app/sql/schema`:
-```
-001_foo.sql
-002_bar.sql
-...
-```
-Goose usage:
-```sh
-# Update the schema to the current version (this command applies any new migrations).  If you are developing locally, run this after pulling code from the GitHub repo (for docker users the migration is applied automatically whenever you restart the app container)
-goose -dir app/sql/schema postgres $DATABASE_URL up
-
-# to reset the database to the initial state, dropping all database objects with
-goose -dir app/sql/schema postgres $DATABASE_URL down-to 0
-```
-
 ### Build and Run locally
 ```bash
 cd app
@@ -284,20 +300,6 @@ ENVIRONMENT=perf DB_MAX_CONNECTIONS=50 DB_MIN_CONNECTIONS=5 RATE_LIMIT_RPS=0 go 
 # Production-like settings
 ENVIRONMENT=prod DB_MAX_CONNECTIONS=25 DB_CONNECT_TIMEOUT=10s go run cmd/signalsd/main.go --mode all
 ```
-
-## API Documentation
-To generate the OpenAPI docs:
-```bash
-swag init -g cmd/signalsd/main.go
-```
-The docs are hosted as part of the signalsd service: [API docs](http://localhost:8080/docs)
-
-
-## SQL Queries
-SQL queries are kept in `app/sql/queries`.
-
-Run `sqlc generate` from the root of the project to regenerate the type safe Go code after adding or altering any queries.
-
 
 ## Getting Help
 - Check the [API documentation](https://signalsd.btddemo.org/docs)
