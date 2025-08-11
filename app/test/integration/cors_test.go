@@ -1,0 +1,82 @@
+//go:build integration
+
+package integration
+
+import (
+	"context"
+	"net/http"
+	"testing"
+)
+
+// checkOriginIsAllowed checks if the given origin is allowed for the given endpoint - all errors are fatal
+func checkOriginIsAllowed(t *testing.T, endpoint, origin string) (bool, string) {
+	t.Helper()
+
+	// make a preflight request with an Origin header and check he Access-Control-Allow-Origin response header
+	req, err := http.NewRequest("OPTIONS", endpoint, nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+	req.Header.Set("Origin", origin)
+	req.Header.Set("Access-Control-Request-Method", "GET")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("Failed to make request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// the returned Access-Control-Allow-Origin header only contains the origin if it is allowed
+	corsOrigin := resp.Header.Get("Access-Control-Allow-Origin")
+
+	// all origins allowed
+	if corsOrigin == "*" {
+		return true, corsOrigin
+	}
+
+	return corsOrigin == origin, corsOrigin
+}
+
+// TestCORS tests that protected endpoints respect ALLOWED_ORIGINS configuration and that untrusted origins are blocked
+func TestCORS(t *testing.T) {
+	// Configure specific allowed origin
+	allowedOrigin := "https://trusted-app.example.com"
+	disallowedOrigin := "https://malicious-site.com"
+
+	t.Setenv("ALLOWED_ORIGINS", allowedOrigin)
+
+	ctx := context.Background()
+	testDB := setupTestDatabase(t, ctx)
+	testEnv := setupTestEnvironment(testDB)
+	testDatabaseURL := getTestDatabaseURL()
+	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testDatabaseURL)
+	privateEndpoint := baseURL + "/api/accounts"
+	publicEndpoint := baseURL + "/health/live"
+
+	defer stopServer()
+
+	t.Run("trusted origin allowed", func(t *testing.T) {
+		// Test trusted origin is allowed
+		allowed, returnedOrigin := checkOriginIsAllowed(t, privateEndpoint, allowedOrigin)
+		if !allowed {
+			t.Errorf("Expected origin %s to be allowed, but got Access-Control-Allow-Origin: %s", allowedOrigin, returnedOrigin)
+		}
+	})
+
+	t.Run("untrusted origin blocked", func(t *testing.T) {
+		// Test untrusted origin is blocked
+		allowed, returnedOrigin := checkOriginIsAllowed(t, privateEndpoint, disallowedOrigin)
+		if allowed {
+			t.Errorf("Expected origin %s to be blocked, but got Access-Control-Allow-Origin: %s", disallowedOrigin, returnedOrigin)
+		}
+	})
+
+	// publics endpoints can be used by everyone, even badies
+	t.Run("public endpoint allows all origins", func(t *testing.T) {
+		allowed, returnedOrigin := checkOriginIsAllowed(t, publicEndpoint, disallowedOrigin)
+		if !allowed {
+			t.Errorf("Expected origin %s to be allowed to use publc endpoint, but got Access-Control-Allow-Origin: %s", disallowedOrigin, returnedOrigin)
+		}
+	})
+}

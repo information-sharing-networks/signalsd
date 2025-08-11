@@ -437,8 +437,8 @@ func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 //	@Description	Only the site owner can transfer ISN ownership.
 //	@Tags			ISN configuration
 //
-//	@Param			isn_slug	path		string							true	"ISN slug"
-//	@Param			request		body		handlers.TransferIsnOwnershipRequest	true	"Transfer details"
+//	@Param			isn_slug	path	string									true	"ISN slug"
+//	@Param			request		body	handlers.TransferIsnOwnershipRequest	true	"Transfer details"
 //
 //	@Success		200
 //	@Failure		400	{object}	responses.ErrorResponse

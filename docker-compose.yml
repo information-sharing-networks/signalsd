@@ -36,7 +36,9 @@ services:
         # Install Go tools
         RUN go install github.com/pressly/goose/v3/cmd/goose@latest && \
             go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest && \
-            go install github.com/swaggo/swag/cmd/swag@latest
+            go install github.com/swaggo/swag/cmd/swag@latest && \
+            go install honnef.co/go/tools/cmd/staticcheck@latest && \
+            go install github.com/securego/gosec/v2/cmd/gosec@latest
         # Pre-download common Go modules for faster startup
         WORKDIR /tmp/app
         COPY app/go.mod app/go.sum ./

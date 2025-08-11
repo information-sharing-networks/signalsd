@@ -15,7 +15,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 type ServiceAccountTokenRequest struct {
@@ -245,7 +244,8 @@ func (a *TokenHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	log.Info().Msgf("refresh token revoked by userAccountID %v", userAccountId)
+	logger := zerolog.Ctx(r.Context())
+	logger.Info().Msgf("refresh token revoked by userAccountID %v", userAccountId)
 	responses.RespondWithStatusCodeOnly(w, http.StatusOK)
 
 }

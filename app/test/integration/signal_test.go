@@ -14,7 +14,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"testing"
 	"time"
@@ -23,23 +22,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
-
-type testEnvironment struct {
-	dbConn      *pgxpool.Pool
-	queries     *database.Queries
-	authService *auth.AuthService
-}
-
-func setupTestEnvironment(dbConn *pgxpool.Pool) *testEnvironment {
-	env := &testEnvironment{
-		dbConn:      dbConn,
-		queries:     database.New(dbConn),
-		authService: auth.NewAuthService(secretKey, environment, database.New(dbConn)),
-	}
-	return env
-}
 
 func (env *testEnvironment) createAuthToken(t *testing.T, accountID uuid.UUID) string {
 	ctx := auth.ContextWithAccountID(context.Background(), accountID)
@@ -238,7 +221,6 @@ func submitCreateSignalRequest(t *testing.T, baseURL string, payload map[string]
 	return resp
 }
 
-// todo add additional params
 // searchPublicSignals searches for signals on public ISNs (no authentication required)
 func searchPublicSignals(t *testing.T, baseURL string, endpoint testSignalEndpoint) *http.Response {
 	url := fmt.Sprintf("%s/api/public/isn/%s/signal_types/%s/v%s/signals/search",
@@ -386,28 +368,11 @@ func getSignalIDFromCreateSignalResponse(t *testing.T, response map[string]any) 
 
 }
 
-func logResponseDetails(t *testing.T, response *http.Response, testName string) {
-	t.Helper()
-
-	t.Logf("=== Response Details for %s ===", testName)
-	t.Logf("Status: %d %s", response.StatusCode, response.Status)
-	t.Logf("Headers: %v", response.Header)
-
-	// Read response body for logging (this consumes the body)
-	bodyBytes, err := io.ReadAll(response.Body)
-	if err != nil {
-		t.Logf("Failed to read response body: %v", err)
-	} else {
-		t.Logf("Body: %s", string(bodyBytes))
-		// Restore the body so it can be properly closed later
-		response.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-	}
-
-	t.Logf("=== End Response Details ===")
-}
-
-// TestSignalSubmission tests the signal submission process end-to-end (starts a http server as a go routine)
-// there are tests for standalone and correlated signals
+// TestSignalSubmission tests the signal submission process end-to-end including:
+// - Successful signal submission by authorized users
+// - Authorization failures (missing/invalid/expired tokens)
+// - Schema validation and correlation handling
+// - Multi-signal payload processing with partial failures
 func TestSignalSubmission(t *testing.T) {
 
 	ctx := context.Background()
@@ -521,6 +486,24 @@ func TestSignalSubmission(t *testing.T) {
 				customAuthToken:   "invalid-token",
 			},
 			{
+				name:              "expired_access_token",
+				accountID:         adminAccount.ID,
+				endpoint:          adminEndpoint,
+				payloadFunc:       func() map[string]any { return createValidSignalPayload("expired-token-001") },
+				expectedStatus:    http.StatusUnauthorized,
+				expectedErrorCode: apperrors.ErrCodeAccessTokenExpired.String(),
+				customAuthToken:   "EXPIRED_TOKEN", // trigger generation of an expired token in test
+			},
+			{
+				name:              "malformed_jwt_token",
+				accountID:         adminAccount.ID,
+				endpoint:          adminEndpoint,
+				payloadFunc:       func() map[string]any { return createValidSignalPayload("malformed-jwt-001") },
+				expectedStatus:    http.StatusUnauthorized,
+				expectedErrorCode: apperrors.ErrCodeAuthorizationFailure.String(),
+				customAuthToken:   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.malformed.signature", // Malformed JWT
+			},
+			{
 				name:              "empty_signals_array",
 				accountID:         adminAccount.ID,
 				endpoint:          adminEndpoint,
@@ -554,7 +537,10 @@ func TestSignalSubmission(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				var authToken string
-				if tt.customAuthToken != "" {
+				if tt.customAuthToken == "EXPIRED_TOKEN" {
+					// Create an expired token for this account
+					authToken = createExpiredAccessToken(t, tt.accountID)
+				} else if tt.customAuthToken != "" {
 					authToken = tt.customAuthToken
 				} else if !tt.skipAuthToken {
 					authToken = testEnv.createAuthToken(t, tt.accountID)
@@ -567,7 +553,6 @@ func TestSignalSubmission(t *testing.T) {
 
 				// Verify response status
 				if response.StatusCode != tt.expectedStatus {
-					logResponseDetails(t, response, tt.name)
 					t.Errorf("Expected status %d, got %d", tt.expectedStatus, response.StatusCode)
 					return
 				}
@@ -628,7 +613,6 @@ func TestSignalSubmission(t *testing.T) {
 		defer adminSignalResponse.Body.Close()
 
 		if adminSignalResponse.StatusCode != http.StatusOK {
-			logResponseDetails(t, adminSignalResponse, "correlated signal submission")
 			t.Errorf("Expected status %d, got %d", http.StatusOK, adminSignalResponse.StatusCode)
 			return
 		}
@@ -645,7 +629,6 @@ func TestSignalSubmission(t *testing.T) {
 		defer ownerSignalResponse.Body.Close()
 
 		if ownerSignalResponse.StatusCode != http.StatusOK {
-			logResponseDetails(t, ownerSignalResponse, "correlated signal submission")
 			t.Errorf("Expected status %d, got %d", http.StatusOK, ownerSignalResponse.StatusCode)
 			return
 		}
@@ -734,7 +717,6 @@ func TestSignalSubmission(t *testing.T) {
 					var errorCode string
 					var ok bool
 					if tt.expectedStatus != correlatedSignalResponse.StatusCode {
-						logResponseDetails(t, correlatedSignalResponse, "correlated signal submission")
 						t.Errorf("Expected status %d, got %d", tt.expectedStatus, correlatedSignalResponse.StatusCode)
 						return
 					}
@@ -753,14 +735,12 @@ func TestSignalSubmission(t *testing.T) {
 					}
 
 					if tt.expectedErrorCode != errorCode {
-						logResponseDetails(t, correlatedSignalResponse, "correlated signal submission")
 						t.Errorf("Expected error code %s, got %s", tt.expectedErrorCode, errorCode)
 					}
 					return
 				}
 
 				if !tt.expectError && correlatedSignalResponse.StatusCode != 200 {
-					logResponseDetails(t, correlatedSignalResponse, "correlated signal submission")
 					t.Errorf("Expected status %d, got %d", http.StatusOK, correlatedSignalResponse.StatusCode)
 					return
 				}
@@ -813,7 +793,6 @@ func TestSignalSubmission(t *testing.T) {
 
 }
 
-// todo sort out name in searcPrivateSignals and baseURL
 // check that isns/signal types marked as is_in_use = false can't be read or written.
 func TestIsInUseStatus(t *testing.T) {
 
@@ -1029,7 +1008,6 @@ func TestIsInUseStatus(t *testing.T) {
 
 					// Verify response status
 					if response.StatusCode != tt.expectedStatus {
-						logResponseDetails(t, response, tt.name)
 						t.Errorf("Expected status %d, got %d. %s", tt.expectedStatus, response.StatusCode, tt.name)
 						return
 					}
@@ -1039,16 +1017,15 @@ func TestIsInUseStatus(t *testing.T) {
 			})
 		}
 
-		// check they can still write to the owner
-		// disable isn
-		// try a write
-		// try a read
-
 	})
 
 }
 
-// TestSignalSearch tests that the search signals endpoint returns the correct number of signals and that accounts only see signals they have access to
+// TestSignalSearch tests signal search functionality including:
+// - Authorization controls (users only see signals they have access to)
+// - Public vs private ISN visibility
+// - Token validation (expired tokens are rejected)
+// - Withdrawn signal handling
 func TestSignalSearch(t *testing.T) {
 	ctx := context.Background()
 
@@ -1122,7 +1099,6 @@ func TestSignalSearch(t *testing.T) {
 	ownerResponse := submitCreateSignalRequest(t, baseURL, payload, ownerToken, ownerEndpoint)
 	defer ownerResponse.Body.Close()
 	if ownerResponse.StatusCode != http.StatusOK {
-		logResponseDetails(t, ownerResponse, "owner ISN signal submission")
 		t.Fatalf("Failed to submit signal to owner ISN: %d", ownerResponse.StatusCode)
 	}
 
@@ -1149,7 +1125,6 @@ func TestSignalSearch(t *testing.T) {
 
 		// Verify response status
 		if response.StatusCode != http.StatusOK {
-			logResponseDetails(t, response, "public ISN search")
 			t.Errorf("Expected status %d, got %d", http.StatusOK, response.StatusCode)
 			return
 		}
@@ -1179,7 +1154,6 @@ func TestSignalSearch(t *testing.T) {
 
 		// Should return 404 Not Found (ISN not in public cache)
 		if response.StatusCode != http.StatusNotFound {
-			logResponseDetails(t, response, "private ISN via public endpoint")
 			t.Errorf("Private ISN possibly accessible via public endpoint: Expected 404, got %d", response.StatusCode)
 			return
 		}
@@ -1250,6 +1224,15 @@ func TestSignalSearch(t *testing.T) {
 			shouldSeeData:   false,
 			description:     "Member should not access owner's ISN",
 		},
+		{
+			name:            "expired_token_rejected",
+			requesterToken:  createExpiredAccessToken(t, adminAccount.ID),
+			targetEndpoint:  adminEndpoint,
+			expectedStatus:  http.StatusUnauthorized,
+			expectedSignals: 0,
+			shouldSeeData:   false,
+			description:     "Expired access token should be rejected",
+		},
 	}
 
 	for _, tt := range tests {
@@ -1259,7 +1242,6 @@ func TestSignalSearch(t *testing.T) {
 
 			// Verify response status
 			if response.StatusCode != tt.expectedStatus {
-				logResponseDetails(t, response, tt.name)
 				t.Errorf("Expected status %d, got %d. %s", tt.expectedStatus, response.StatusCode, tt.description)
 				return
 			}
@@ -1321,7 +1303,6 @@ func TestSignalSearch(t *testing.T) {
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusOK {
-			logResponseDetails(t, response, "admin ISN search before withdrawal")
 			t.Fatalf("Failed to search admin ISN before withdrawal: %d", response.StatusCode)
 		}
 
@@ -1339,7 +1320,6 @@ func TestSignalSearch(t *testing.T) {
 		defer withdrawResponse.Body.Close()
 
 		if withdrawResponse.StatusCode != http.StatusNoContent {
-			logResponseDetails(t, withdrawResponse, "signal withdrawal")
 			t.Fatalf("Failed to withdraw signal: %d", withdrawResponse.StatusCode)
 		}
 
@@ -1348,7 +1328,6 @@ func TestSignalSearch(t *testing.T) {
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusOK {
-			logResponseDetails(t, response, "admin ISN search after withdrawal")
 			t.Fatalf("Failed to search admin ISN after withdrawal: %d", response.StatusCode)
 		}
 
@@ -1366,7 +1345,6 @@ func TestSignalSearch(t *testing.T) {
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusOK {
-			logResponseDetails(t, response, "admin ISN search with include_withdrawn=true")
 			t.Fatalf("Failed to search admin ISN with include_withdrawn=true: %d", response.StatusCode)
 		}
 
@@ -1388,79 +1366,6 @@ func TestSignalSearch(t *testing.T) {
 			} else if isWithdrawn != true {
 				t.Errorf("Expected withdrawn signal to have is_withdrawn=true, got %v", isWithdrawn)
 			}
-		}
-	})
-}
-
-// checkOriginIsAllowed checks if the given origin is allowed for the given endpoint - all errors are fatal
-func checkOriginIsAllowed(t *testing.T, endpoint, origin string) (bool, string) {
-	t.Helper()
-
-	// make a preflight request with an Origin header and check he Access-Control-Allow-Origin response header
-	req, err := http.NewRequest("OPTIONS", endpoint, nil)
-	if err != nil {
-		t.Fatalf("Failed to create request: %v", err)
-	}
-	req.Header.Set("Origin", origin)
-	req.Header.Set("Access-Control-Request-Method", "GET")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		t.Fatalf("Failed to make request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	// the returned Access-Control-Allow-Origin header only contains the origin if it is allowed
-	corsOrigin := resp.Header.Get("Access-Control-Allow-Origin")
-
-	// all origins allowed
-	if corsOrigin == "*" {
-		return true, corsOrigin
-	}
-
-	return corsOrigin == origin, corsOrigin
-}
-
-// TestCORS tests that protected endpoints respect ALLOWED_ORIGINS configuration and that untrusted origins are blocked
-func TestCORS(t *testing.T) {
-	// Configure specific allowed origin
-	allowedOrigin := "https://trusted-app.example.com"
-	disallowedOrigin := "https://malicious-site.com"
-
-	t.Setenv("ALLOWED_ORIGINS", allowedOrigin)
-
-	ctx := context.Background()
-	testDB := setupTestDatabase(t, ctx)
-	testEnv := setupTestEnvironment(testDB)
-	testDatabaseURL := getTestDatabaseURL()
-	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testDatabaseURL)
-	privateEndpoint := baseURL + "/api/accounts"
-	publicEndpoint := baseURL + "/health/live"
-
-	defer stopServer()
-
-	t.Run("trusted origin allowed", func(t *testing.T) {
-		// Test trusted origin is allowed
-		allowed, returnedOrigin := checkOriginIsAllowed(t, privateEndpoint, allowedOrigin)
-		if !allowed {
-			t.Errorf("Expected origin %s to be allowed, but got Access-Control-Allow-Origin: %s", allowedOrigin, returnedOrigin)
-		}
-	})
-
-	t.Run("untrusted origin blocked", func(t *testing.T) {
-		// Test untrusted origin is blocked
-		allowed, returnedOrigin := checkOriginIsAllowed(t, privateEndpoint, disallowedOrigin)
-		if allowed {
-			t.Errorf("Expected origin %s to be blocked, but got Access-Control-Allow-Origin: %s", disallowedOrigin, returnedOrigin)
-		}
-	})
-
-	// publics endpoints can be used by everyone, even badies
-	t.Run("public endpoint allows all origins", func(t *testing.T) {
-		allowed, returnedOrigin := checkOriginIsAllowed(t, publicEndpoint, disallowedOrigin)
-		if !allowed {
-			t.Errorf("Expected origin %s to be allowed to use publc endpoint, but got Access-Control-Allow-Origin: %s", disallowedOrigin, returnedOrigin)
 		}
 	})
 }
@@ -1548,7 +1453,6 @@ func TestCorrelatedSignalsSearch(t *testing.T) {
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusOK {
-			logResponseDetails(t, response, "search without correlated signals")
 			t.Fatalf("Failed to search signals: %d", response.StatusCode)
 		}
 
@@ -1573,7 +1477,6 @@ func TestCorrelatedSignalsSearch(t *testing.T) {
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusOK {
-			logResponseDetails(t, response, "search without correlated signals")
 			t.Fatalf("Failed to search signals: %d", response.StatusCode)
 		}
 
