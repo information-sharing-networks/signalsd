@@ -20,11 +20,10 @@ import (
 
 const testTolerance = 30 * time.Second // use this when checking that token expiriy dates are in the expected range
 
-// TestOAuthTokenEndpoint tests the http requests made to /oauth/token for client credentials and refresh token grants
-// tests service_accounts can only get access tokens with valid client ID/client secret
-// tests that web users only get access tokens with valid refresh token (http-only cookie) and access token
-//   - check the cookies are rotated correctly
-//   - check the cookies are properly configured.
+// TestOAuthTokenEndpoint tests OAuth token generation including:
+// - Client credentials grant (service accounts)
+// - Refresh token grant (web users) with cookie rotation
+// - Invalid credential handling and error responses
 func TestOAuthTokenEndpoint(t *testing.T) {
 
 	// set up test env

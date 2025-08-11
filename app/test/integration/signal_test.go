@@ -368,8 +368,11 @@ func getSignalIDFromCreateSignalResponse(t *testing.T, response map[string]any) 
 
 }
 
-// TestSignalSubmission tests the signal submission process end-to-end (starts a http server as a go routine)
-// there are tests for standalone and correlated signals
+// TestSignalSubmission tests the signal submission process end-to-end including:
+// - Successful signal submission by authorized users
+// - Authorization failures (missing/invalid/expired tokens)
+// - Schema validation and correlation handling
+// - Multi-signal payload processing with partial failures
 func TestSignalSubmission(t *testing.T) {
 
 	ctx := context.Background()
@@ -1018,7 +1021,11 @@ func TestIsInUseStatus(t *testing.T) {
 
 }
 
-// TestSignalSearch tests that the search signals endpoint returns the correct number of signals and that accounts only see signals they have access to
+// TestSignalSearch tests signal search functionality including:
+// - Authorization controls (users only see signals they have access to)
+// - Public vs private ISN visibility
+// - Token validation (expired tokens are rejected)
+// - Withdrawn signal handling
 func TestSignalSearch(t *testing.T) {
 	ctx := context.Background()
 
