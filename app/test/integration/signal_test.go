@@ -483,6 +483,24 @@ func TestSignalSubmission(t *testing.T) {
 				customAuthToken:   "invalid-token",
 			},
 			{
+				name:              "expired_access_token",
+				accountID:         adminAccount.ID,
+				endpoint:          adminEndpoint,
+				payloadFunc:       func() map[string]any { return createValidSignalPayload("expired-token-001") },
+				expectedStatus:    http.StatusUnauthorized,
+				expectedErrorCode: apperrors.ErrCodeAccessTokenExpired.String(),
+				customAuthToken:   "EXPIRED_TOKEN", // trigger generation of an expired token in test
+			},
+			{
+				name:              "malformed_jwt_token",
+				accountID:         adminAccount.ID,
+				endpoint:          adminEndpoint,
+				payloadFunc:       func() map[string]any { return createValidSignalPayload("malformed-jwt-001") },
+				expectedStatus:    http.StatusUnauthorized,
+				expectedErrorCode: apperrors.ErrCodeAuthorizationFailure.String(),
+				customAuthToken:   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.malformed.signature", // Malformed JWT
+			},
+			{
 				name:              "empty_signals_array",
 				accountID:         adminAccount.ID,
 				endpoint:          adminEndpoint,
@@ -516,7 +534,10 @@ func TestSignalSubmission(t *testing.T) {
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				var authToken string
-				if tt.customAuthToken != "" {
+				if tt.customAuthToken == "EXPIRED_TOKEN" {
+					// Create an expired token for this account
+					authToken = createExpiredAccessToken(t, tt.accountID)
+				} else if tt.customAuthToken != "" {
 					authToken = tt.customAuthToken
 				} else if !tt.skipAuthToken {
 					authToken = testEnv.createAuthToken(t, tt.accountID)
@@ -1195,6 +1216,15 @@ func TestSignalSearch(t *testing.T) {
 			expectedSignals: 1,
 			shouldSeeData:   false,
 			description:     "Member should not access owner's ISN",
+		},
+		{
+			name:            "expired_token_rejected",
+			requesterToken:  createExpiredAccessToken(t, adminAccount.ID),
+			targetEndpoint:  adminEndpoint,
+			expectedStatus:  http.StatusUnauthorized,
+			expectedSignals: 0,
+			shouldSeeData:   false,
+			description:     "Expired access token should be rejected",
 		},
 	}
 

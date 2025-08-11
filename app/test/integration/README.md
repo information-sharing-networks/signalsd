@@ -64,6 +64,7 @@ These tests verify the behaviour of the signals exchange endpoints by making HTT
  - ✅ Signal versioning and reactivation of withdrawn signals
  - ✅ loading signals with Correlation IDs
  - ✅ Multi-signal payload processing with mixed success/failure scenarios
+ - ✅ Expired and malformed access token rejection with proper error codes
 
 ***Signal Search:***
  - ✅ Search results (with and without correlated signals)
@@ -71,12 +72,11 @@ These tests verify the behaviour of the signals exchange endpoints by making HTT
  - ✅ Request errors (e.g. invalid JSON)
  - ✅ Response structure and error response validation
  - ✅ public/priviate ISN visibility
- - ✅ Verifies withdrawn signals are excluded from search results by default
- - ✅ Tests that withdrawn signals can be included when explicitly requested
+ - ✅ Verifies withdrawn signals are excluded from search results by default and can be included when explicitly requested§
 
 
 **Privacy & Security:**
-- ✅ Tests that unauthorized users cannot submit or view signals on private ISNs
+- ✅ Tests that unauthorized/unauthenticated users cannot submit or view signals on private ISNs
 - ✅ Ensures proper error handling and correctly structured error responses
 - ✅ Verifies private ISNs are not accessible via public endpoints
 - ✅ Tests CORS configuration prevents unauthorized cross-origin access
