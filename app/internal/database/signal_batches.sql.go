@@ -129,14 +129,14 @@ WITH RankedBatches AS (
     FROM signal_batches sb
     JOIN isn i ON i.id = sb.isn_id
     WHERE i.slug = $4
-        -- Account permission: users see own batches, owner role sees all
+        -- Account permission: users see own batches, owner or ISN admin role sees all
         AND (sb.account_id = $5::uuid
-             OR $2::boolean = true)
-        AND ($6::timestamptz IS NULL OR sb.created_at >= $6::timestamptz)
-        AND ($7::timestamptz IS NULL OR sb.created_at <= $7::timestamptz)
+             OR $6::boolean = true)
+        AND ($7::timestamptz IS NULL OR sb.created_at >= $7::timestamptz)
+        AND ($8::timestamptz IS NULL OR sb.created_at <= $8::timestamptz)
         -- Closed date filters (only apply to closed batches: is_latest = false)
-        AND ($8::timestamptz IS NULL OR (sb.is_latest = false AND sb.updated_at >= $8::timestamptz))
-        AND ($9::timestamptz IS NULL OR (sb.is_latest = false AND sb.updated_at <= $9::timestamptz))
+        AND ($9::timestamptz IS NULL OR (sb.is_latest = false AND sb.updated_at >= $9::timestamptz))
+        AND ($10::timestamptz IS NULL OR (sb.is_latest = false AND sb.updated_at <= $10::timestamptz))
 )
 SELECT
     batch_id,
@@ -173,6 +173,7 @@ type GetBatchesWithOptionalFiltersParams struct {
 	Previous            *bool      `json:"previous"`
 	IsnSlug             string     `json:"isn_slug"`
 	RequestingAccountID *uuid.UUID `json:"requesting_account_id"`
+	IsOwnerOrAdmin      *bool      `json:"is_owner_or_admin"`
 	CreatedAfter        *time.Time `json:"created_after"`
 	CreatedBefore       *time.Time `json:"created_before"`
 	ClosedAfter         *time.Time `json:"closed_after"`
@@ -195,6 +196,7 @@ func (q *Queries) GetBatchesWithOptionalFilters(ctx context.Context, arg GetBatc
 		arg.Previous,
 		arg.IsnSlug,
 		arg.RequestingAccountID,
+		arg.IsOwnerOrAdmin,
 		arg.CreatedAfter,
 		arg.CreatedBefore,
 		arg.ClosedAfter,

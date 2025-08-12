@@ -1824,7 +1824,7 @@ paths:
 
         **Signal versions**
 
-        Multiple versions are created when signals are resupplied, e.g. because the client wants to correct a previously publsihed signal.
+        Multiple versions are created when signals are resupplied using the same local_ref, e.g. because the client wants to correct a previously publsihed signal.
         By default search will return the latest version of the signal.
         If a signal has been withdrawn it will be reactivated if you resubmit it using the same local_ref.
 
@@ -2187,15 +2187,19 @@ paths:
       - ISN Permissions
   /isn/{isn_slug}/batches/{batch_id}/status:
     get:
-      description: |+
+      description: |
         Returns the status of a batch, including the number of signals loaded and the number of failures for each signal type
 
         The endpoint returns the full batch status for the batch
 
         Where a signal has failed to load as part of the batch and not subsequently been loaded, the failure is considered unresolved and listed as a failure in the batch status
 
-        Only admins/owners can use this endpoint (admins can only see status for batches they created)
+        Note:  Unresolved failures are signals that failed to load in this batch and have not been successfully loaded since the failure occurred.
+        If a signal is fixed but subsequently fails again in a later batch, it will be recorded as a new failure, and this new failure will appear in that batch's status.
 
+        Member accounts can see the status of batches that they created.
+        ISN Admins can see the status of any batch created for ISNs they administer.
+        The site owner can see the status of any batch on the site.
       parameters:
       - description: ISN slug
         example: sample-isn--example-org

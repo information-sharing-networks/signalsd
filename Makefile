@@ -1,10 +1,12 @@
 # Docker-based Makefile for signalsd
 # Uses tools installed in Docker containers instead of local installations
 
-.PHONY: help check generate docs swag-fmt sqlc fmt vet lint security test clean docker-up docker-down
+.PHONY: help psql check generate docs swag-fmt sqlc fmt vet lint security test clean docker-up docker-down
 
 # Docker compose service name
 APP_SERVICE = app
+DB_ACCOUNT = signalsd-dev 
+DB_NAME = signalsd_admin
 
 # Default target - show available commands
 help:
@@ -18,7 +20,7 @@ help:
 	@echo "  make generate        - Generate docs and code (swagger + sqlc)"
 	@echo "  make docs            - Generate swagger documentation"
 	@echo "  make swag-fmt        - format swag comments"
-	@echo "  make sqlc            - Generate type-safe SQL code"
+	@echo "  make sqlc            - Generate sqlc code"
 	@echo "  make fmt             - Format code"
 	@echo "  make vet             - Run go vet"
 	@echo "  make lint            - Run staticcheck"
@@ -28,6 +30,7 @@ help:
 	@echo "  make migrate         - Run database migrations (up)"
 	@echo "  make docker-up       - Start Docker containers"
 	@echo "  make docker-down     - Stop Docker containers"
+	@echo "  make psql            - run psql agaist the dev database"
 
 # Docker management
 docker-up:
@@ -44,7 +47,7 @@ check: generate fmt swag-fmt vet lint security test
 	@echo "✅ All checks passed! Ready to commit."
 
 # Generate all code and documentation
-generate: docs sqlc
+generate: docs sqlc swag-fmt
 
 # Generate swagger documentation
 docs:
@@ -58,7 +61,7 @@ swag-fmt:
 
 # Generate type-safe SQL code
 sqlc:
-	@echo "🔄 Generating SQLC code..."
+	@echo "🔄 Generating sqlc code..."
 	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && sqlc generate"
 
 # Format code
@@ -107,3 +110,8 @@ check-containers:
 	@echo "🔍 Checking if containers are running..."
 	@docker compose ps $(APP_SERVICE) | grep -q "Up" || (echo "❌ Containers not running. Run 'make docker-up' first." && exit 1)
 	@echo "✅ Containers are running"
+
+# Run psql on the docker database
+psql:
+	@echo "🔄 Running psql on dev database container"
+	docker compose exec -it db psql -U $(DB_ACCOUNT) -d $(DB_NAME)

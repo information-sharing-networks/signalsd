@@ -174,8 +174,12 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 //	@Description
 //	@Description	Where a signal has failed to load as part of the batch and not subsequently been loaded, the failure is considered unresolved and listed as a failure in the batch status
 //	@Description
-//	@Description	Only admins/owners can use this endpoint (admins can only see status for batches they created)
+//	@Description	Note:  Unresolved failures are signals that failed to load in this batch and have not been successfully loaded since the failure occurred.
+//	@Description	If a signal is fixed but subsequently fails again in a later batch, it will be recorded as a new failure, and this new failure will appear in that batch's status.
 //	@Description
+//	@Description	Member accounts can see the status of batches that they created.
+//	@Description	ISN Admins can see the status of any batch created for ISNs they administer.
+//	@Description	The site owner can see the status of any batch on the site.
 //	@Description
 //	@Tags		Signal sharing
 //	@Param		isn_slug	path		string	true	"ISN slug"	example(sample-isn--example-org)
@@ -471,20 +475,20 @@ func (s *SignalsBatchHandler) SearchBatchesHandler(w http.ResponseWriter, r *htt
 	}
 
 	// Access control rules:
-	// - Member accounts can only see batches they have created
-	// - ISN Admins can see batches for ISNs they administer
-	// - Site owner can see all batches
-	isAdmin := claims.Role == "owner" || isn.UserAccountID == claims.AccountID
+	// - the site owner can see all batches
+	// - ISN Admins can see any batches created in ISNs that they own
+	// - Member accounts can only see batches they created
+	isOwnerOrAdmin := claims.Role == "owner" || isn.UserAccountID == claims.AccountID
 	var requestingAccountID *uuid.UUID
-	if !isAdmin {
+	if !isOwnerOrAdmin {
 		requestingAccountID = &claims.AccountID
 	}
 
-	// when isAdmin is true, all batches are returned for the isn, otherwise only batches for the requesting account are returned
+	// when isOwnerOrAdmin is true, all mathing batches are returned for the isn, otherwise only batches for the requesting account are returned
 	batches, err := s.queries.GetBatchesWithOptionalFilters(r.Context(), database.GetBatchesWithOptionalFiltersParams{
 		IsnSlug:             searchParams.IsnSlug,
 		RequestingAccountID: requestingAccountID,
-		IsAdmin:             &isAdmin,
+		IsOwnerOrAdmin:      &isOwnerOrAdmin,
 		CreatedAfter:        searchParams.CreatedAfter,
 		CreatedBefore:       searchParams.CreatedBefore,
 		ClosedAfter:         searchParams.ClosedAfter,

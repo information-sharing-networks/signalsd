@@ -1,7 +1,10 @@
 # Makefile for signalsd using locally installed go tools
 # Simple automation for common development tasks
 
-.PHONY: help check generate docs swag-fmt sqlc fmt vet lint security test clean
+DATABASE_URL = "postgres://$(USER):@localhost:5432/signalsd_admin?sslmode=disable"
+
+.PHONY: help psql check generate docs swag-fmt sqlc fmt vet lint security test clean
+
 
 # Default target - show available commands
 help:
@@ -9,15 +12,15 @@ help:
 	@echo "  make check     - Run all pre-commit checks (recommended before committing)"
 	@echo "  make generate  - Generate docs and code (swagger + sqlc)"
 	@echo "  make docs      - Generate swagger documentation"
-	@echo "  make swag-fmt        - format swag comments"
-	@echo "  make sqlc      - Generate type-safe SQL code"
-	@echo "  make sqlc-fmt
+	@echo "  make swag-fmt  - format swag comments"
+	@echo "  make sqlc      - Generate sqlc code"
 	@echo "  make fmt       - Format code"
 	@echo "  make vet       - Run go vet"
 	@echo "  make lint      - Run staticcheck"
 	@echo "  make security  - Run gosec security analysis"
 	@echo "  make test      - Run tests"
 	@echo "  make clean     - Clean build artifacts"
+	@echo "  make psql      - run psql agaist the dev database"
 
 # Main target: run all checks before committing
 check: generate fmt swag-fmt vet lint security test
@@ -25,7 +28,7 @@ check: generate fmt swag-fmt vet lint security test
 	@echo "✅ All checks passed! Ready to commit."
 
 # Generate all code and documentation
-generate: docs sqlc
+generate: docs sqlc swag-fmt
 
 # Generate swagger documentation
 docs:
@@ -73,4 +76,8 @@ test:
 clean:
 	@echo "🔄 Cleaning..."
 	@cd app && go clean -cache -testcache
-	@rm -f app/signalsd
+	@rm appu/signalsd
+
+psql: 
+	@echo "🔄 running psql on local postgres db "
+	psql ${DATABASE_URL}

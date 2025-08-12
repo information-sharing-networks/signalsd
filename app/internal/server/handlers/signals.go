@@ -293,7 +293,7 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 //	@Description
 //	@Description	**Signal versions**
 //	@Description
-//	@Description	Multiple versions are created when signals are resupplied, e.g. because the client wants to correct a previously publsihed signal.
+//	@Description	Multiple versions are created when signals are resupplied using the same local_ref, e.g. because the client wants to correct a previously publsihed signal.
 //	@Description	By default search will return the latest version of the signal.
 //	@Description	If a signal has been withdrawn it will be reactivated if you resubmit it using the same local_ref.
 //	@Description

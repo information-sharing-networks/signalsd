@@ -156,6 +156,7 @@ func (s *Server) registerAdminRoutes() {
 	// signal batches
 	signalBatches := handlers.NewSignalsBatchHandler(s.queries)
 
+	// protected routes
 	s.router.Group(func(r chi.Router) {
 		r.Use(CORS(s.corsConfigs.Protected))
 		r.Use(RequestSizeLimit(s.serverConfig.MaxAPIRequestSize))
