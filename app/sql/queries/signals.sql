@@ -33,8 +33,8 @@ SELECT
     false,
     false
 FROM ids
--- note the only way to update a singlas record is to change the is_withdrawn status
--- records are reactivated by resubmitting them, so this update ensures the updated_at timestamp is only changed if the record is reactivated
+-- deactivated records (is_withdrawn = true) are reactivated by resubmitting them - the update below ensures the updated_at timestamp is only changed if the record is reactivated
+-- the only other signals field that can be updated is the correlation_id (handled by CreateOrUpdateSignalWithCorrelationID)
 ON CONFLICT (account_id, signal_type_id, local_ref)
 DO UPDATE SET
     is_withdrawn = false,
@@ -43,7 +43,6 @@ DO UPDATE SET
         ELSE signals.updated_at
     END
 RETURNING id;
-
 
 -- name: CreateOrUpdateSignalWithCorrelationID :one
 -- note if there is already a master record for this local_ref, then:
@@ -134,10 +133,8 @@ JOIN signals s
 RETURNING id, version_number;
 
 -- name: GetSignalsWithOptionalFilters :many
--- Note the get queries require isn_slug,signal_type_slug & sem_ver params
+-- you must supply the isn_slug,signal_type_slug & sem_ver params - other filters are optional
 SELECT
-
-
  a.id AS account_id,
     a.account_type,
     COALESCE(u.email, si.client_contact_email) AS email,
