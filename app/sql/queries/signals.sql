@@ -132,6 +132,22 @@ JOIN signals s
     AND s.local_ref = sqlc.arg(local_ref)
 RETURNING id, version_number;
 
+-- name: WithdrawSignalByID :execrows
+UPDATE signals
+SET is_withdrawn = true, updated_at = NOW()
+WHERE id = $1;
+
+-- name: WithdrawSignalByLocalRef :execrows
+UPDATE signals
+SET is_withdrawn = true, updated_at = NOW()
+WHERE account_id = $1
+    AND signal_type_id = (
+        SELECT st.id
+        FROM signal_types st
+        WHERE st.slug = $2 AND st.sem_ver = $3
+    )
+    AND local_ref = $4;
+
 -- name: GetSignalsWithOptionalFilters :many
 -- you must supply the isn_slug,signal_type_slug & sem_ver params - other filters are optional
 SELECT
@@ -178,22 +194,6 @@ ORDER BY
     s.local_ref,
     lsv.version_number;
 
--- name: WithdrawSignalByID :execrows
-UPDATE signals
-SET is_withdrawn = true, updated_at = NOW()
-WHERE id = $1;
-
--- name: WithdrawSignalByLocalRef :execrows
-UPDATE signals
-SET is_withdrawn = true, updated_at = NOW()
-WHERE account_id = $1
-    AND signal_type_id = (
-        SELECT st.id
-        FROM signal_types st
-        WHERE st.slug = $2 AND st.sem_ver = $3
-    )
-    AND local_ref = $4;
-
 -- name: GetSignalByAccountAndLocalRef :one
 SELECT s.*, i.slug as isn_slug, st.slug as signal_type_slug, st.sem_ver
 FROM signals s
@@ -213,7 +213,6 @@ SELECT EXISTS(
     WHERE s.id = sqlc.arg(correlation_id)
         AND i.slug = sqlc.arg(isn_slug)
 ) AS is_valid;
-
 
 -- name: GetSignalCorrelationDetails :one
 -- Get signal with its correlation details for verification during integration tests
@@ -274,3 +273,13 @@ ORDER BY
     s.local_ref,
     lsv.version_number,
     lsv.id;
+
+-- name: GetPreviousSignalVersions :many
+-- get the previous versions for the supplied signals (no rows returned if the signal only has 1 version)
+SELECT sv.signal_id, id as signal_version_id, sv.created_at, sv.version_number, sv.content
+FROM signal_versions  sv
+WHERE
+    sv.signal_id = ANY(sqlc.slice(signal_ids))
+    -- exclude the latest version 
+    AND sv.id != (SELECT id from latest_signal_versions lsv WHERE lsv.signal_id = sv.signal_id)
+    ORDER BY sv.created_at;

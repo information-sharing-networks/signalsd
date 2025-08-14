@@ -135,8 +135,8 @@ type CreateSignalParams struct {
 // this query creates one row in the signals table for every new combination of account_id, signal_type_id, local_ref.
 // if a withdrawn signal is received again it is reactivated (is_withdrawn = false).
 // returns the signal_id.
-// note the only way to update a singlas record is to change the is_withdrawn status
-// records are reactivated by resubmitting them, so this update ensures the updated_at timestamp is only changed if the record is reactivated
+// deactivated records (is_withdrawn = true) are reactivated by resubmitting them - the update below ensures the updated_at timestamp is only changed if the record is reactivated
+// the only other signals field that can be updated is the correlation_id (handled by CreateOrUpdateSignalWithCorrelationID)
 func (q *Queries) CreateSignal(ctx context.Context, arg CreateSignalParams) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, CreateSignal,
 		arg.AccountID,
@@ -216,6 +216,51 @@ func (q *Queries) CreateSignalVersion(ctx context.Context, arg CreateSignalVersi
 	var i CreateSignalVersionRow
 	err := row.Scan(&i.ID, &i.VersionNumber)
 	return i, err
+}
+
+const GetPreviousSignalVersions = `-- name: GetPreviousSignalVersions :many
+SELECT sv.signal_id, id as signal_version_id, sv.created_at, sv.version_number, sv.content
+FROM signal_versions  sv
+WHERE
+    sv.signal_id = ANY($1)
+    -- exclude the latest version 
+    AND sv.id != (SELECT id from latest_signal_versions lsv WHERE lsv.signal_id = sv.signal_id)
+    ORDER BY sv.created_at
+`
+
+type GetPreviousSignalVersionsRow struct {
+	SignalID        uuid.UUID       `json:"signal_id"`
+	SignalVersionID uuid.UUID       `json:"signal_version_id"`
+	CreatedAt       time.Time       `json:"created_at"`
+	VersionNumber   int32           `json:"version_number"`
+	Content         json.RawMessage `json:"content"`
+}
+
+// get the previous versions for the supplied signals (no rows returned if the signal only has 1 version)
+func (q *Queries) GetPreviousSignalVersions(ctx context.Context, signalIds []uuid.UUID) ([]GetPreviousSignalVersionsRow, error) {
+	rows, err := q.db.Query(ctx, GetPreviousSignalVersions, signalIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetPreviousSignalVersionsRow
+	for rows.Next() {
+		var i GetPreviousSignalVersionsRow
+		if err := rows.Scan(
+			&i.SignalID,
+			&i.SignalVersionID,
+			&i.CreatedAt,
+			&i.VersionNumber,
+			&i.Content,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const GetSignalByAccountAndLocalRef = `-- name: GetSignalByAccountAndLocalRef :one
@@ -432,8 +477,6 @@ func (q *Queries) GetSignalsByCorrelationIDs(ctx context.Context, arg GetSignals
 
 const GetSignalsWithOptionalFilters = `-- name: GetSignalsWithOptionalFilters :many
 SELECT
-
-
  a.id AS account_id,
     a.account_type,
     COALESCE(u.email, si.client_contact_email) AS email,
@@ -505,7 +548,7 @@ type GetSignalsWithOptionalFiltersRow struct {
 	Content              json.RawMessage `json:"content"`
 }
 
-// Note the get queries require isn_slug,signal_type_slug & sem_ver params
+// you must supply the isn_slug,signal_type_slug & sem_ver params - other filters are optional
 func (q *Queries) GetSignalsWithOptionalFilters(ctx context.Context, arg GetSignalsWithOptionalFiltersParams) ([]GetSignalsWithOptionalFiltersRow, error) {
 	rows, err := q.db.Query(ctx, GetSignalsWithOptionalFilters,
 		arg.IsnSlug,
