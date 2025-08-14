@@ -1474,7 +1474,7 @@ func TestCorrelatedAndPreviousVersionsSearch(t *testing.T) {
 
 		// Should have 4 signals (2 masters + 2 correlated)
 		if len(signals) != 4 {
-			t.Errorf("Expected 3 signals, got %d", len(signals))
+			t.Errorf("Expected 4 signals, got %d", len(signals))
 		}
 		for i := range signals {
 			if signals[i]["correlated_signals"] != nil {
@@ -1496,11 +1496,6 @@ func TestCorrelatedAndPreviousVersionsSearch(t *testing.T) {
 
 		if err := json.NewDecoder(response.Body).Decode(&signals); err != nil {
 			t.Fatalf("Failed to decode search response: %v", err)
-		}
-
-		// Should have 4 signals (2 masters + 2 correlated)
-		if len(signals) != 4 {
-			t.Errorf("Expected 3 signals, got %d", len(signals))
 		}
 
 		localRef := ""
