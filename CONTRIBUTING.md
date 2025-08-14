@@ -44,7 +44,7 @@ Run all the pre-commit checks using `make`:
 make check
 ```
 
-#Or check each item individually:
+Or check each item individually:
 - [ ] Db migrations have been applied (`make migrate` or `goose up`)
 - [ ] Generated code is up to date (`make generate`)
 - [ ] Code is formatted (`make fmt` or `go fmt ./...`)

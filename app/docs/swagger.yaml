@@ -437,6 +437,17 @@ definitions:
         example: lkIB53@6O^Y
         type: string
     type: object
+  handlers.PreviousSignalVersion:
+    properties:
+      content:
+        type: object
+      created_at:
+        type: string
+      signal_version_id:
+        type: string
+      version_number:
+        type: integer
+    type: object
   handlers.ResetUserPasswordRequest:
     properties:
       new_password:
@@ -480,10 +491,10 @@ definitions:
     properties:
       signals:
         items:
-          $ref: '#/definitions/handlers.SearchSignalWithCorrelations'
+          $ref: '#/definitions/handlers.SearchSignalWithCorrelationsAndVersions'
         type: array
     type: object
-  handlers.SearchSignalWithCorrelations:
+  handlers.SearchSignalWithCorrelationsAndVersions:
     properties:
       account_id:
         type: string
@@ -504,6 +515,10 @@ definitions:
         type: boolean
       local_ref:
         type: string
+      previous_signal_versions:
+        items:
+          $ref: '#/definitions/handlers.PreviousSignalVersion'
+        type: array
       signal_created_at:
         type: string
       signal_id:
@@ -1937,6 +1952,12 @@ paths:
         in: query
         name: include_correlated
         type: string
+      - description: 'Include previous versions of each returned signal (default:
+          false)'
+        example: "true"
+        in: query
+        name: include_previous_versions
+        type: string
       responses:
         "200":
           description: OK
@@ -2091,6 +2112,12 @@ paths:
         example: "true"
         in: query
         name: include_correlated
+        type: string
+      - description: 'Include previous versions of each returned signal (default:
+          false)'
+        example: "true"
+        in: query
+        name: include_previous_versions
         type: string
       responses:
         "200":

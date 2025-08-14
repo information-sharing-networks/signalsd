@@ -1483,6 +1483,13 @@ const docTemplate = `{
                         "description": "Include signals that link to each returned signal (default: false)",
                         "name": "include_correlated",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "true",
+                        "description": "Include previous versions of each returned signal (default: false)",
+                        "name": "include_previous_versions",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1695,6 +1702,13 @@ const docTemplate = `{
                         "example": "true",
                         "description": "Include signals that link to each returned signal (default: false)",
                         "name": "include_correlated",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "true",
+                        "description": "Include previous versions of each returned signal (default: false)",
+                        "name": "include_previous_versions",
                         "in": "query"
                     }
                 ],
@@ -2671,6 +2685,23 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.PreviousSignalVersion": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "object"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "signal_version_id": {
+                    "type": "string"
+                },
+                "version_number": {
+                    "type": "integer"
+                }
+            }
+        },
         "handlers.ResetUserPasswordRequest": {
             "type": "object",
             "properties": {
@@ -2736,12 +2767,12 @@ const docTemplate = `{
                 "signals": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/handlers.SearchSignalWithCorrelations"
+                        "$ref": "#/definitions/handlers.SearchSignalWithCorrelationsAndVersions"
                     }
                 }
             }
         },
-        "handlers.SearchSignalWithCorrelations": {
+        "handlers.SearchSignalWithCorrelationsAndVersions": {
             "type": "object",
             "properties": {
                 "account_id": {
@@ -2771,6 +2802,12 @@ const docTemplate = `{
                 },
                 "local_ref": {
                     "type": "string"
+                },
+                "previous_signal_versions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.PreviousSignalVersion"
+                    }
                 },
                 "signal_created_at": {
                     "type": "string"

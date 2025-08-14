@@ -255,7 +255,7 @@ func searchPublicSignals(t *testing.T, baseURL string, endpoint testSignalEndpoi
 }
 
 // searchPrivateSignals searches for signals on private ISNs with optional correlated signals
-func searchPrivateSignals(t *testing.T, baseURL string, endpoint testSignalEndpoint, token string, includeWithdrawn bool, includeCorrelated bool) *http.Response {
+func searchPrivateSignals(t *testing.T, baseURL string, endpoint testSignalEndpoint, token string, includeWithdrawn bool, includeCorrelated bool, includePrevious bool) *http.Response {
 	url := fmt.Sprintf("%s/api/isn/%s/signal_types/%s/v%s/signals/search",
 		baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
 
@@ -277,6 +277,10 @@ func searchPrivateSignals(t *testing.T, baseURL string, endpoint testSignalEndpo
 
 	if includeCorrelated {
 		q.Add("include_correlated", "true")
+	}
+
+	if includePrevious {
+		q.Add("include_previous_versions", "true")
 	}
 
 	req.URL.RawQuery = q.Encode()
@@ -1003,7 +1007,7 @@ func TestIsInUseStatus(t *testing.T) {
 						return
 					}
 				case "read":
-					response := searchPrivateSignals(t, baseURL, tt.endpoint, authToken, false, false)
+					response := searchPrivateSignals(t, baseURL, tt.endpoint, authToken, false, false, false)
 					defer response.Body.Close()
 
 					// Verify response status
@@ -1237,7 +1241,7 @@ func TestSignalSearch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			response := searchPrivateSignals(t, baseURL, tt.targetEndpoint, tt.requesterToken, false, false)
+			response := searchPrivateSignals(t, baseURL, tt.targetEndpoint, tt.requesterToken, false, false, false)
 			defer response.Body.Close()
 
 			// Verify response status
@@ -1299,7 +1303,7 @@ func TestSignalSearch(t *testing.T) {
 	// Test withdrawn signals are excluded from search results by default
 	t.Run("withdrawn signals excluded from search", func(t *testing.T) {
 		// First, verify the admin signal is visible in search
-		response := searchPrivateSignals(t, baseURL, adminEndpoint, adminToken, false, false)
+		response := searchPrivateSignals(t, baseURL, adminEndpoint, adminToken, false, false, false)
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusOK {
@@ -1324,7 +1328,7 @@ func TestSignalSearch(t *testing.T) {
 		}
 
 		// Search again - should return no signals (withdrawn signal excluded by default)
-		response = searchPrivateSignals(t, baseURL, adminEndpoint, adminToken, false, false)
+		response = searchPrivateSignals(t, baseURL, adminEndpoint, adminToken, false, false, false)
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusOK {
@@ -1341,7 +1345,7 @@ func TestSignalSearch(t *testing.T) {
 		}
 
 		// Search with include_withdrawn=true - should return the withdrawn signal
-		response = searchPrivateSignals(t, baseURL, adminEndpoint, adminToken, true, false)
+		response = searchPrivateSignals(t, baseURL, adminEndpoint, adminToken, true, false, false)
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusOK {
@@ -1370,8 +1374,8 @@ func TestSignalSearch(t *testing.T) {
 	})
 }
 
-// TestCorrelatedSignalsSearch tests the include_correlated functionality
-func TestCorrelatedSignalsSearch(t *testing.T) {
+// TestCorrelatedAndPreviousVersionsSearch tests the include_correlated and include_previous_versions functionality
+func TestCorrelatedAndPreviousVersionsSearch(t *testing.T) {
 	ctx := context.Background()
 
 	testDB := setupTestDatabase(t, ctx)
@@ -1408,7 +1412,7 @@ func TestCorrelatedSignalsSearch(t *testing.T) {
 	defer master001SignalResponse.Body.Close()
 
 	if master001SignalResponse.StatusCode != http.StatusOK {
-		t.Fatalf("Failed to submit signal to owner ISN: %d", master001SignalResponse.StatusCode)
+		t.Fatalf("Failed to submit signal %v to owner ISN: %d", master001LocalRef, master001SignalResponse.StatusCode)
 	}
 
 	// create master-002 (no correlated signals)
@@ -1418,7 +1422,14 @@ func TestCorrelatedSignalsSearch(t *testing.T) {
 	master002SignalResponse := submitCreateSignalRequest(t, baseURL, payload, ownerAuthToken, ownerEndpoint)
 	defer master002SignalResponse.Body.Close()
 	if master002SignalResponse.StatusCode != http.StatusOK {
-		t.Fatalf("Failed to submit signal to owner ISN: %d", master002SignalResponse.StatusCode)
+		t.Fatalf("Failed to submit signal %v to owner ISN: %d", master002LocalRef, master002SignalResponse.StatusCode)
+	}
+
+	// create a second version of master-002
+	master002SignalResponseV2 := submitCreateSignalRequest(t, baseURL, payload, ownerAuthToken, ownerEndpoint)
+	defer master002SignalResponseV2.Body.Close()
+	if master002SignalResponseV2.StatusCode != http.StatusOK {
+		t.Fatalf("Failed to submit version 2 of signal %v to owner ISN: %d", master002LocalRef, master002SignalResponse.StatusCode)
 	}
 
 	// get signal ID from master 1
@@ -1449,7 +1460,7 @@ func TestCorrelatedSignalsSearch(t *testing.T) {
 	}
 
 	t.Run("search without correlated signals", func(t *testing.T) {
-		response := searchPrivateSignals(t, baseURL, ownerEndpoint, ownerAuthToken, false, false)
+		response := searchPrivateSignals(t, baseURL, ownerEndpoint, ownerAuthToken, false, false, false)
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusOK {
@@ -1472,8 +1483,53 @@ func TestCorrelatedSignalsSearch(t *testing.T) {
 		}
 
 	})
+
+	t.Run("search including previous versions", func(t *testing.T) {
+		response := searchPrivateSignals(t, baseURL, ownerEndpoint, ownerAuthToken, false, false, true)
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusOK {
+			t.Fatalf("Failed to search signals: %d", response.StatusCode)
+		}
+
+		var signals []map[string]any
+
+		if err := json.NewDecoder(response.Body).Decode(&signals); err != nil {
+			t.Fatalf("Failed to decode search response: %v", err)
+		}
+
+		// Should have 4 signals (2 masters + 2 correlated)
+		if len(signals) != 4 {
+			t.Errorf("Expected 3 signals, got %d", len(signals))
+		}
+
+		localRef := ""
+		previousVersions := 0
+		for i := range signals {
+
+			if signals[i]["previous_signal_versions"] != nil {
+				localRef = signals[i]["local_ref"].(string)
+				previousVersions = len(signals[i]["previous_signal_versions"].([]any))
+			} else {
+				continue
+			}
+
+			if localRef != master002LocalRef {
+				t.Errorf("Expected previous versions for %s, got %s", master002LocalRef, localRef)
+			}
+
+		}
+		if localRef == "" {
+			t.Errorf("Expected %v to have a previous version", master002LocalRef)
+		}
+
+		if previousVersions != 1 {
+			t.Errorf("Expected 1 previous version for %s, got %d", master002LocalRef, previousVersions)
+		}
+	})
+
 	t.Run("search including correlated signals", func(t *testing.T) {
-		response := searchPrivateSignals(t, baseURL, ownerEndpoint, ownerAuthToken, false, true)
+		response := searchPrivateSignals(t, baseURL, ownerEndpoint, ownerAuthToken, false, true, false)
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusOK {

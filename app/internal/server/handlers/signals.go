@@ -97,16 +97,17 @@ type WithdrawSignalRequest struct {
 
 // structs used by the search endpoint
 type SearchParams struct {
-	isnSlug           string
-	signalTypeSlug    string
-	semVer            string
-	accountID         *uuid.UUID
-	startDate         *time.Time
-	endDate           *time.Time
-	localRef          *string
-	signalID          *uuid.UUID
-	includeWithdrawn  bool
-	includeCorrelated bool
+	isnSlug                       string
+	signalTypeSlug                string
+	semVer                        string
+	accountID                     *uuid.UUID
+	startDate                     *time.Time
+	endDate                       *time.Time
+	localRef                      *string
+	signalID                      *uuid.UUID
+	includeWithdrawn              bool
+	includeCorrelated             bool
+	includePreviousSignalVersions bool
 }
 
 // search signals reponse
@@ -127,27 +128,37 @@ type SearchSignal struct {
 	Content              json.RawMessage `json:"content" swaggertype:"object"`
 }
 
+// optionally the search can return the history of a signal
+type PreviousSignalVersion struct {
+	SignalVersionID uuid.UUID       `json:"signal_version_id"`
+	CreatedAt       time.Time       `json:"created_at"`
+	VersionNumber   int32           `json:"version_number"`
+	Content         json.RawMessage `json:"content" swaggertype:"object"`
+}
+
 // optionally the search can return the signals correlated with a returned signal
-type SearchSignalWithCorrelations struct {
+type SearchSignalWithCorrelationsAndVersions struct {
 	SearchSignal
-	CorrelatedSignals []SearchSignal `json:"correlated_signals,omitempty"`
+	CorrelatedSignals      []SearchSignal          `json:"correlated_signals,omitempty"`
+	PreviousSignalVersions []PreviousSignalVersion `json:"previous_signal_versions,omitempty"`
 }
 
 type SearchSignalResponse struct {
-	Signals []SearchSignalWithCorrelations `json:"signals"`
+	Signals []SearchSignalWithCorrelationsAndVersions `json:"signals"`
 }
 
 // parseSearchParams parses all search parameters from the signal search request
 func parseSearchParams(r *http.Request) (SearchParams, error) {
 	searchParams := SearchParams{
-		isnSlug:           r.PathValue("isn_slug"),
-		signalTypeSlug:    r.PathValue("signal_type_slug"),
-		semVer:            r.PathValue("sem_ver"),
-		includeWithdrawn:  false,
-		includeCorrelated: false,
+		isnSlug:                       r.PathValue("isn_slug"),
+		signalTypeSlug:                r.PathValue("signal_type_slug"),
+		semVer:                        r.PathValue("sem_ver"),
+		includeWithdrawn:              false,
+		includeCorrelated:             false,
+		includePreviousSignalVersions: false,
 	}
 
-	// Parse account_id
+	// account_id
 	if accountIDString := r.URL.Query().Get("account_id"); accountIDString != "" {
 		accountID, err := uuid.Parse(accountIDString)
 		if err != nil {
@@ -156,7 +167,7 @@ func parseSearchParams(r *http.Request) (SearchParams, error) {
 		searchParams.accountID = &accountID
 	}
 
-	// Parse start_date
+	// start_date
 	if startDateString := r.URL.Query().Get("start_date"); startDateString != "" {
 		startDate, err := utils.ParseDateTime(startDateString)
 		if err != nil {
@@ -165,7 +176,7 @@ func parseSearchParams(r *http.Request) (SearchParams, error) {
 		searchParams.startDate = &startDate
 	}
 
-	// Parse end_date
+	// end_date
 	if endDateString := r.URL.Query().Get("end_date"); endDateString != "" {
 		endDate, err := utils.ParseDateTime(endDateString)
 		if err != nil {
@@ -174,7 +185,7 @@ func parseSearchParams(r *http.Request) (SearchParams, error) {
 		searchParams.endDate = &endDate
 	}
 
-	// Parse signal_id
+	// signal_id
 	if signalIDString := r.URL.Query().Get("signal_id"); signalIDString != "" {
 		signalID, err := uuid.Parse(signalIDString)
 		if err != nil {
@@ -183,21 +194,25 @@ func parseSearchParams(r *http.Request) (SearchParams, error) {
 		searchParams.signalID = &signalID
 	}
 
-	// Parse local_ref
+	// local_ref
 	if localRef := r.URL.Query().Get("local_ref"); localRef != "" {
 		searchParams.localRef = &localRef
 	}
 
-	// Parse include_withdrawn
+	// include_withdrawn
 	if includeWithdrawnString := r.URL.Query().Get("include_withdrawn"); includeWithdrawnString != "" {
 		searchParams.includeWithdrawn = includeWithdrawnString == "true"
 	}
 
-	// Parse include_correlated
+	// include_correlated
 	if includeCorrelatedString := r.URL.Query().Get("include_correlated"); includeCorrelatedString != "" {
 		searchParams.includeCorrelated = includeCorrelatedString == "true"
 	}
 
+	// include_previous_versions
+	if includePreviousString := r.URL.Query().Get("include_previous_versions"); includePreviousString != "" {
+		searchParams.includePreviousSignalVersions = includePreviousString == "true"
+	}
 	return searchParams, nil
 }
 
@@ -220,7 +235,36 @@ func validateSearchParams(params SearchParams) error {
 	return nil
 }
 
-// getCorrelatedSignals fetches all signals that have a correlated_id that references one of the provided signal IDs
+// getSignals version fetches all the previous versions for a set of signals and returns them as a map of signal_id to versions
+func (s *SignalsHandler) getPreviousSignalVersions(ctx context.Context, signalIDs []uuid.UUID) (map[uuid.UUID][]PreviousSignalVersion, error) {
+	if len(signalIDs) == 0 {
+		return make(map[uuid.UUID][]PreviousSignalVersion), nil
+	}
+
+	previousSignalVersions, err := s.queries.GetPreviousSignalVersions(ctx, signalIDs)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return make(map[uuid.UUID][]PreviousSignalVersion), nil // not all signals have versions
+		}
+		return nil, fmt.Errorf("error retrieving signal versions %v", err)
+	}
+
+	// Group signal versions by their signal_id
+	result := make(map[uuid.UUID][]PreviousSignalVersion)
+	for _, previousSignalVersion := range previousSignalVersions {
+		previousVersion := PreviousSignalVersion{
+			SignalVersionID: previousSignalVersion.SignalVersionID,
+			CreatedAt:       previousSignalVersion.CreatedAt,
+			VersionNumber:   previousSignalVersion.VersionNumber,
+			Content:         previousSignalVersion.Content,
+		}
+		result[previousSignalVersion.SignalID] = append(result[previousSignalVersion.SignalID], previousVersion)
+	}
+
+	return result, nil
+}
+
+// getCorrelatedSignals fetches all signals that have a correlated_id that references one of the provided signal IDs - returns a map of signal_id to correlated signals
 func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []uuid.UUID, params SearchParams) (map[uuid.UUID][]SearchSignal, error) {
 	if len(signalIDs) == 0 {
 		return make(map[uuid.UUID][]SearchSignal), nil
@@ -622,17 +666,18 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 //	@Description
 //	@Description	Note the endpoint returns the latest version of each signal.
 //
-//	@Param			start_date			query		string	false	"Start date"															example(2006-01-02T15:05:00Z)
-//	@Param			end_date			query		string	false	"End date"																example(2006-01-02T15:15:00Z)
-//	@Param			account_id			query		string	false	"Account ID"															example(def87f89-dab6-4607-95f7-593d61cb5742)
-//	@Param			signal_id			query		string	false	"Signal ID"																example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
-//	@Param			local_ref			query		string	false	"Local reference"														example(item_id_#1)
-//	@Param			include_withdrawn	query		string	false	"Include withdrawn signals (default: false)"							example(true)
-//	@Param			include_correlated	query		string	false	"Include signals that link to each returned signal (default: false)"	example(true)
+//	@Param			start_date					query		string	false	"Start date"															example(2006-01-02T15:05:00Z)
+//	@Param			end_date					query		string	false	"End date"																example(2006-01-02T15:15:00Z)
+//	@Param			account_id					query		string	false	"Account ID"															example(def87f89-dab6-4607-95f7-593d61cb5742)
+//	@Param			signal_id					query		string	false	"Signal ID"																example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
+//	@Param			local_ref					query		string	false	"Local reference"														example(item_id_#1)
+//	@Param			include_withdrawn			query		string	false	"Include withdrawn signals (default: false)"							example(true)
+//	@Param			include_correlated			query		string	false	"Include signals that link to each returned signal (default: false)"	example(true)
+//	@Param			include_previous_versions	query		string	false	"Include previous versions of each returned signal (default: false)"	example(true)
 //
-//	@Success		200					{array}		handlers.SearchSignalResponse
-//	@Failure		400					{object}	responses.ErrorResponse
-//	@Failure		400					{object}	responses.ErrorResponse
+//	@Success		200							{array}		handlers.SearchSignalResponse
+//	@Failure		400							{object}	responses.ErrorResponse
+//	@Failure		400							{object}	responses.ErrorResponse
 //
 //	@Router			/api/public/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search [get]
 func (s *SignalsHandler) SearchPublicSignalsHandler(w http.ResponseWriter, r *http.Request) {
@@ -674,27 +719,40 @@ func (s *SignalsHandler) SearchPublicSignalsHandler(w http.ResponseWriter, r *ht
 		return
 	}
 
-	response := make([]SearchSignalWithCorrelations, 0, len(returnedSignals))
+	response := make([]SearchSignalWithCorrelationsAndVersions, 0, len(returnedSignals))
 
-	// Get correlated signals if requested
-	var correlatedSignalsMap map[uuid.UUID][]SearchSignal
-	if searchParams.includeCorrelated {
+	// the (optional) signal_versions and correlated_signals fields are populated using separte queries and then merged into the response
+	// ...not very efficient but assumption is that these options will most likely be used with individual signals rather than in bulk (needs monitoring to confirm)
+	signalIDs := make([]uuid.UUID, 0, len(returnedSignals))
 
-		// Collect all signal IDs from the main results
-		signalIDs := make([]uuid.UUID, 0, len(returnedSignals))
+	if searchParams.includeCorrelated || searchParams.includePreviousSignalVersions {
 		for _, row := range returnedSignals {
 			signalIDs = append(signalIDs, row.SignalID)
 		}
+	}
 
-		correlatedSignalsMap, err = s.getCorrelatedSignals(r.Context(), signalIDs, searchParams)
+	// Get correlated signals if requested
+	var correlatedSignalBySignalID map[uuid.UUID][]SearchSignal
+	if searchParams.includeCorrelated {
+
+		// create a map of signal_id to their correlated signals
+		correlatedSignalBySignalID, err = s.getCorrelatedSignals(r.Context(), signalIDs, searchParams)
 		if err != nil {
 			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to get correlated signals: %v", err))
 			return
 		}
 	}
+	var previousVersionsBySignalID map[uuid.UUID][]PreviousSignalVersion
+	if searchParams.includePreviousSignalVersions {
+		previousVersionsBySignalID, err = s.getPreviousSignalVersions(r.Context(), signalIDs)
+		if err != nil {
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to get signal versions: %v", err))
+			return
+		}
+	}
 
 	for _, returnedSignal := range returnedSignals {
-		signal := SearchSignalWithCorrelations{
+		signal := SearchSignalWithCorrelationsAndVersions{
 			SearchSignal: SearchSignal{
 				AccountID:            returnedSignal.AccountID,
 				Email:                "", // do not show email addresses in public ISNs
@@ -709,11 +767,17 @@ func (s *SignalsHandler) SearchPublicSignalsHandler(w http.ResponseWriter, r *ht
 				Content:              returnedSignal.Content,
 			},
 		}
-
 		// Add correlated signals if requested
 		if searchParams.includeCorrelated {
-			if correlatedSignals, exists := correlatedSignalsMap[returnedSignal.SignalID]; exists {
+			if correlatedSignals, exists := correlatedSignalBySignalID[returnedSignal.SignalID]; exists {
 				signal.CorrelatedSignals = correlatedSignals
+			}
+		}
+
+		// add previous versions
+		if searchParams.includePreviousSignalVersions {
+			if previousVersions, exists := previousVersionsBySignalID[returnedSignal.SignalID]; exists {
+				signal.PreviousSignalVersions = previousVersions
 			}
 		}
 
@@ -731,16 +795,17 @@ func (s *SignalsHandler) SearchPublicSignalsHandler(w http.ResponseWriter, r *ht
 //	@Description
 //	@Description	Note the endpoint returns the latest version of each signal.
 //
-//	@Param			start_date			query		string	false	"Start date"															example(2006-01-02T15:05:00Z)
-//	@Param			end_date			query		string	false	"End date"																example(2006-01-02T15:15:00Z)
-//	@Param			account_id			query		string	false	"Account ID"															example(def87f89-dab6-4607-95f7-593d61cb5742)
-//	@Param			signal_id			query		string	false	"Signal ID"																example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
-//	@Param			local_ref			query		string	false	"Local reference"														example(item_id_#1)
-//	@Param			include_withdrawn	query		string	false	"Include withdrawn signals (default: false)"							example(true)
-//	@Param			include_correlated	query		string	false	"Include signals that link to each returned signal (default: false)"	example(true)
+//	@Param			start_date					query		string	false	"Start date"															example(2006-01-02T15:05:00Z)
+//	@Param			end_date					query		string	false	"End date"																example(2006-01-02T15:15:00Z)
+//	@Param			account_id					query		string	false	"Account ID"															example(def87f89-dab6-4607-95f7-593d61cb5742)
+//	@Param			signal_id					query		string	false	"Signal ID"																example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
+//	@Param			local_ref					query		string	false	"Local reference"														example(item_id_#1)
+//	@Param			include_withdrawn			query		string	false	"Include withdrawn signals (default: false)"							example(true)
+//	@Param			include_correlated			query		string	false	"Include signals that link to each returned signal (default: false)"	example(true)
+//	@Param			include_previous_versions	query		string	false	"Include previous versions of each returned signal (default: false)"	example(true)
 //
-//	@Success		200					{array}		handlers.SearchSignalResponse
-//	@Failure		400					{object}	responses.ErrorResponse
+//	@Success		200							{array}		handlers.SearchSignalResponse
+//	@Failure		400							{object}	responses.ErrorResponse
 //
 //	@Security		BearerAccessToken
 //
@@ -791,27 +856,40 @@ func (s *SignalsHandler) SearchPrivateSignalsHandler(w http.ResponseWriter, r *h
 		return
 	}
 
-	response := make([]SearchSignalWithCorrelations, 0, len(returnedSignals))
+	response := make([]SearchSignalWithCorrelationsAndVersions, 0, len(returnedSignals))
 
-	// Get correlated signals if requested
-	var correlatedSignalsMap map[uuid.UUID][]SearchSignal
-	if searchParams.includeCorrelated {
+	// the (optional) signal_versions and correlated_signals fields are populated using separte queries and then merged into the response
+	// ...not very efficient but assumption is that these options will most likely be used with individual signals rather than in bulk (needs monitoring to confirm)
+	signalIDs := make([]uuid.UUID, 0, len(returnedSignals))
 
-		// Collect all signal IDs from the main results
-		signalIDs := make([]uuid.UUID, 0, len(returnedSignals))
+	if searchParams.includeCorrelated || searchParams.includePreviousSignalVersions {
 		for _, row := range returnedSignals {
 			signalIDs = append(signalIDs, row.SignalID)
 		}
+	}
 
-		correlatedSignalsMap, err = s.getCorrelatedSignals(r.Context(), signalIDs, searchParams)
+	// Get correlated signals if requested
+	var correlatedSignalBySignalID map[uuid.UUID][]SearchSignal
+	if searchParams.includeCorrelated {
+
+		// create a map of signal_id to their correlated signals
+		correlatedSignalBySignalID, err = s.getCorrelatedSignals(r.Context(), signalIDs, searchParams)
 		if err != nil {
 			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to get correlated signals: %v", err))
 			return
 		}
 	}
+	var previousVersionsBySignalID map[uuid.UUID][]PreviousSignalVersion
+	if searchParams.includePreviousSignalVersions {
+		previousVersionsBySignalID, err = s.getPreviousSignalVersions(r.Context(), signalIDs)
+		if err != nil {
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to get signal versions: %v", err))
+			return
+		}
+	}
 
 	for _, returnedSignal := range returnedSignals {
-		signal := SearchSignalWithCorrelations{
+		signal := SearchSignalWithCorrelationsAndVersions{
 			SearchSignal: SearchSignal{
 				AccountID:            returnedSignal.AccountID,
 				Email:                returnedSignal.Email,
@@ -829,11 +907,17 @@ func (s *SignalsHandler) SearchPrivateSignalsHandler(w http.ResponseWriter, r *h
 
 		// Add correlated signals if requested
 		if searchParams.includeCorrelated {
-			if correlatedSignals, exists := correlatedSignalsMap[returnedSignal.SignalID]; exists {
+			if correlatedSignals, exists := correlatedSignalBySignalID[returnedSignal.SignalID]; exists {
 				signal.CorrelatedSignals = correlatedSignals
 			}
 		}
 
+		// add previous versions
+		if searchParams.includePreviousSignalVersions {
+			if previousVersions, exists := previousVersionsBySignalID[returnedSignal.SignalID]; exists {
+				signal.PreviousSignalVersions = previousVersions
+			}
+		}
 		response = append(response, signal)
 	}
 	responses.RespondWithJSON(w, http.StatusOK, response)

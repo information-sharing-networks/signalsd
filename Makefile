@@ -26,11 +26,13 @@ help:
 	@echo "  make lint            - Run staticcheck"
 	@echo "  make security        - Run gosec security analysis"
 	@echo "  make test            - Run tests"
-	@echo "  make clean           - Clean build artifacts"
 	@echo "  make migrate         - Run database migrations (up)"
 	@echo "  make docker-up       - Start Docker containers"
 	@echo "  make docker-down     - Stop Docker containers"
+	@echo "  make restart         - restart the docker app"
+	@echo "  make logs       	  - follow docker logs"
 	@echo "  make psql            - run psql agaist the dev database"
+	@echo "  make clean           - Clean build artifacts"
 
 # Docker management
 docker-up:
@@ -40,6 +42,14 @@ docker-up:
 docker-down:
 	@echo "🐳 Stopping Docker containers..."
 	@docker compose down
+
+restart:
+	@echo "🐳 restarting app"
+	@docker compose restart app
+
+logs:
+	@echo "🐳 openning docker logs"
+	@docker compose logs -f
 
 # Main target: run all checks before committing
 check: generate fmt swag-fmt vet lint security test

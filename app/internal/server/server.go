@@ -251,7 +251,7 @@ func (s *Server) registerAdminRoutes() {
 						r.Get("/{isn_slug}/batches/search", signalBatches.SearchBatchesHandler)
 					})
 
-					// unrestricted
+					// view ISN and signal type details
 					r.Get("/", isn.GetIsnsHandler)
 					r.Get("/{isn_slug}", isn.GetIsnHandler)
 					r.Get("/{isn_slug}/signal_types", signalTypes.GetSignalTypesHandler)
@@ -265,7 +265,7 @@ func (s *Server) registerAdminRoutes() {
 		r.Route("/admin", func(r chi.Router) {
 			r.Group(func(r chi.Router) {
 
-				// route below only works in dev
+				// route below only works in dev - take care! this endpoint deletes all the content on the database
 				r.Use(s.authService.RequireDevEnv)
 
 				// delete all users and content
@@ -374,12 +374,16 @@ func (s *Server) registerCommonRoutes() {
 func (s *Server) registerStaticAssetRoutes() {
 	// Static file server for assets (CSS, JS, images, etc.)
 	s.router.Route("/assets", func(r chi.Router) {
+		r.Use(CORS(s.corsConfigs.Public))
+
 		fs := http.FileServer(http.Dir("assets"))
 		r.Get("/*", http.StripPrefix("/assets/", fs).ServeHTTP)
 	})
 
 	// API documentation and landing pages
 	s.router.Route("/", func(r chi.Router) {
+		r.Use(CORS(s.corsConfigs.Public))
+
 		// Redirect root to API documentation
 		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/docs", http.StatusMovedPermanently)

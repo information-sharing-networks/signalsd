@@ -33,8 +33,8 @@ SELECT
     false,
     false
 FROM ids
--- note the only way to update a singlas record is to change the is_withdrawn status
--- records are reactivated by resubmitting them, so this update ensures the updated_at timestamp is only changed if the record is reactivated
+-- deactivated records (is_withdrawn = true) are reactivated by resubmitting them - the update below ensures the updated_at timestamp is only changed if the record is reactivated
+-- the only other signals field that can be updated is the correlation_id (handled by CreateOrUpdateSignalWithCorrelationID)
 ON CONFLICT (account_id, signal_type_id, local_ref)
 DO UPDATE SET
     is_withdrawn = false,
@@ -43,7 +43,6 @@ DO UPDATE SET
         ELSE signals.updated_at
     END
 RETURNING id;
-
 
 -- name: CreateOrUpdateSignalWithCorrelationID :one
 -- note if there is already a master record for this local_ref, then:
@@ -133,11 +132,25 @@ JOIN signals s
     AND s.local_ref = sqlc.arg(local_ref)
 RETURNING id, version_number;
 
+-- name: WithdrawSignalByID :execrows
+UPDATE signals
+SET is_withdrawn = true, updated_at = NOW()
+WHERE id = $1;
+
+-- name: WithdrawSignalByLocalRef :execrows
+UPDATE signals
+SET is_withdrawn = true, updated_at = NOW()
+WHERE account_id = $1
+    AND signal_type_id = (
+        SELECT st.id
+        FROM signal_types st
+        WHERE st.slug = $2 AND st.sem_ver = $3
+    )
+    AND local_ref = $4;
+
 -- name: GetSignalsWithOptionalFilters :many
--- Note the get queries require isn_slug,signal_type_slug & sem_ver params
+-- you must supply the isn_slug,signal_type_slug & sem_ver params - other filters are optional
 SELECT
-
-
  a.id AS account_id,
     a.account_type,
     COALESCE(u.email, si.client_contact_email) AS email,
@@ -181,22 +194,6 @@ ORDER BY
     s.local_ref,
     lsv.version_number;
 
--- name: WithdrawSignalByID :execrows
-UPDATE signals
-SET is_withdrawn = true, updated_at = NOW()
-WHERE id = $1;
-
--- name: WithdrawSignalByLocalRef :execrows
-UPDATE signals
-SET is_withdrawn = true, updated_at = NOW()
-WHERE account_id = $1
-    AND signal_type_id = (
-        SELECT st.id
-        FROM signal_types st
-        WHERE st.slug = $2 AND st.sem_ver = $3
-    )
-    AND local_ref = $4;
-
 -- name: GetSignalByAccountAndLocalRef :one
 SELECT s.*, i.slug as isn_slug, st.slug as signal_type_slug, st.sem_ver
 FROM signals s
@@ -216,7 +213,6 @@ SELECT EXISTS(
     WHERE s.id = sqlc.arg(correlation_id)
         AND i.slug = sqlc.arg(isn_slug)
 ) AS is_valid;
-
 
 -- name: GetSignalCorrelationDetails :one
 -- Get signal with its correlation details for verification during integration tests
@@ -277,3 +273,13 @@ ORDER BY
     s.local_ref,
     lsv.version_number,
     lsv.id;
+
+-- name: GetPreviousSignalVersions :many
+-- get the previous versions for the supplied signals (no rows returned if the signal only has 1 version)
+SELECT sv.signal_id, id as signal_version_id, sv.created_at, sv.version_number, sv.content
+FROM signal_versions  sv
+WHERE
+    sv.signal_id = ANY(sqlc.slice(signal_ids))
+    -- exclude the latest version 
+    AND sv.id != (SELECT id from latest_signal_versions lsv WHERE lsv.signal_id = sv.signal_id)
+    ORDER BY sv.created_at;
