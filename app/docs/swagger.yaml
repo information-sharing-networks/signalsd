@@ -337,6 +337,12 @@ definitions:
       local_ref:
         type: string
     type: object
+  handlers.GrantIsnAccountPermissionRequest:
+    properties:
+      permission:
+        example: write
+        type: string
+    type: object
   handlers.Isn:
     properties:
       created_at:
@@ -1532,6 +1538,12 @@ paths:
         Grant an account read or write access to an isn.
         This end point can only be used by the site owner or the isn admin account.
       parameters:
+      - description: permission details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.GrantIsnAccountPermissionRequest'
       - description: isn slug
         example: sample-isn--example-org
         in: path
