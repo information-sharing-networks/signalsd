@@ -966,6 +966,15 @@ const docTemplate = `{
                 "summary": "Grant ISN access permission",
                 "parameters": [
                     {
+                        "description": "permission details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.GrantIsnAccountPermissionRequest"
+                        }
+                    },
+                    {
                         "type": "string",
                         "example": "sample-isn--example-org",
                         "description": "isn slug",
@@ -2544,6 +2553,15 @@ const docTemplate = `{
                 },
                 "local_ref": {
                     "type": "string"
+                }
+            }
+        },
+        "handlers.GrantIsnAccountPermissionRequest": {
+            "type": "object",
+            "properties": {
+                "permission": {
+                    "type": "string",
+                    "example": "write"
                 }
             }
         },

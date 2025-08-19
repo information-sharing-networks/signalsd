@@ -53,8 +53,9 @@ type IsnAccount struct {
 //	@Description	Grant an account read or write access to an isn.
 //	@Description	This end point can only be used by the site owner or the isn admin account.
 //
-//	@Param			isn_slug	path	string	true	"isn slug"		example(sample-isn--example-org)
-//	@Param			account_id	path	string	true	"account id"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
+//	@Param			request		body	handlers.GrantIsnAccountPermissionRequest	true	"permission details"
+//	@Param			isn_slug	path	string										true	"isn slug"		example(sample-isn--example-org)
+//	@Param			account_id	path	string										true	"account id"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
 //	@Success		204
 //	@Failure		400	{object}	responses.ErrorResponse
