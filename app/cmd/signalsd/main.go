@@ -6,7 +6,9 @@ import (
 	"log"
 	"net/url"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
@@ -169,6 +171,7 @@ func main() {
 }
 
 func run(mode string) error {
+	// command line logger
 	serverLogger := logger.InitServerLogger()
 
 	// get site config from environment variables
@@ -190,8 +193,8 @@ func run(mode string) error {
 	httpLogger := logger.InitHttpLogger(cfg.LogLevel, cfg.Environment)
 
 	// set up the pgx database connection pool
-	ctx, cancel := context.WithTimeout(context.Background(), signalsd.DatabasePingTimeout)
-	defer cancel()
+	dbCtx, dbCancel := context.WithTimeout(context.Background(), signalsd.DatabasePingTimeout)
+	defer dbCancel()
 
 	poolConfig, err := pgxpool.ParseConfig(cfg.DatabaseURL)
 	if err != nil {
@@ -204,12 +207,12 @@ func run(mode string) error {
 	poolConfig.MaxConnIdleTime = cfg.DBMaxConnIdleTime
 	poolConfig.ConnConfig.ConnectTimeout = cfg.DBConnectTimeout
 
-	pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
+	pool, err := pgxpool.NewWithConfig(dbCtx, poolConfig)
 	if err != nil {
 		serverLogger.Fatal().Err(err).Msg("Unable to create connection pool")
 	}
 
-	if err = pool.Ping(ctx); err != nil {
+	if err = pool.Ping(dbCtx); err != nil {
 		serverLogger.Fatal().Err(err).Msg("Error pinging database via pool")
 	}
 
@@ -222,7 +225,7 @@ func run(mode string) error {
 
 	// set up the signal schema cache - these schemas are stored on the database and used to validate the incoming signals (they are cached to avoid database roundtrips when validating signals)
 	schemaCache := schemas.NewSchemaCache()
-	if err := schemaCache.Load(ctx, queries); err != nil {
+	if err := schemaCache.Load(dbCtx, queries); err != nil {
 		serverLogger.Fatal().Msgf("Failed to load schema cache: %v", err)
 	}
 
@@ -234,7 +237,7 @@ func run(mode string) error {
 
 	// set up the public ISN cache - this is used by the public signal search endpoint (this endpoint can be used by unauthenticated users)
 	publicIsnCache := isns.NewPublicIsnCache()
-	if err := publicIsnCache.Load(ctx, queries); err != nil {
+	if err := publicIsnCache.Load(dbCtx, queries); err != nil {
 		serverLogger.Fatal().Msgf("Failed to load public ISN cache: %v", err)
 	}
 
@@ -254,7 +257,6 @@ func run(mode string) error {
 
 	// run the http server
 	serverLogger.Info().Msgf("service mode: %s", cfg.ServiceMode)
-
 	serverLogger.Info().Msgf("Starting server (version: %s)", version.Get().Version)
 
 	server := server.NewServer(
@@ -269,7 +271,17 @@ func run(mode string) error {
 		publicIsnCache,
 	)
 
-	server.Run()
+	// Set up graceful shutdown handling
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	defer server.DatabaseShutdown()
+
+	// Run the server
+	if err := server.Start(ctx); err != nil {
+		serverLogger.Error().Msgf("Server error: %v", err)
+		return err
+	}
 
 	serverLogger.Info().Msg("server shutdown complete")
 	return nil
