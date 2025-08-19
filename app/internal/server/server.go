@@ -4,9 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
@@ -45,7 +42,7 @@ func NewServer(
 	schemaCache *schemas.SchemaCache,
 	publicIsnCache *isns.PublicIsnCache,
 ) *Server {
-	s := &Server{
+	server := &Server{
 		pool:           pool,
 		queries:        queries,
 		authService:    authService,
@@ -58,30 +55,30 @@ func NewServer(
 		publicIsnCache: publicIsnCache,
 	}
 
-	s.setupMiddleware()
-	s.registerCommonRoutes()
+	server.setupMiddleware()
+	server.registerCommonRoutes()
 
-	switch s.serverConfig.ServiceMode {
+	switch server.serverConfig.ServiceMode {
 	case "all":
-		s.registerAdminRoutes()
-		s.registerSignalReadRoutes()
-		s.registerSignalWriteRoutes()
-		s.registerStaticAssetRoutes()
+		server.registerAdminRoutes()
+		server.registerSignalReadRoutes()
+		server.registerSignalWriteRoutes()
+		server.registerStaticAssetRoutes()
 	case "admin":
-		s.registerAdminRoutes()
-		s.registerStaticAssetRoutes()
+		server.registerAdminRoutes()
+		server.registerStaticAssetRoutes()
 	case "signals":
-		s.registerSignalReadRoutes()
-		s.registerSignalWriteRoutes()
+		server.registerSignalReadRoutes()
+		server.registerSignalWriteRoutes()
 	case "signals-read":
-		s.registerSignalReadRoutes()
+		server.registerSignalReadRoutes()
 	case "signals-write":
-		s.registerSignalWriteRoutes()
+		server.registerSignalWriteRoutes()
 	}
-	return s
+	return server
 }
 
-func (s *Server) Run() {
+func (s *Server) Start(ctx context.Context) error {
 	serverAddr := fmt.Sprintf("%s:%d", s.serverConfig.Host, s.serverConfig.Port)
 
 	httpServer := &http.Server{
@@ -92,37 +89,47 @@ func (s *Server) Run() {
 		IdleTimeout:  s.serverConfig.IdleTimeout,
 	}
 
-	defer func() {
-		s.pool.Close()
-		s.serverLogger.Info().Msg("database connection closed")
-	}()
+	serverErrors := make(chan error, 1)
 
+	// Start HTTP server
 	go func() {
-		s.serverLogger.Info().Msgf("%s service listening on %s \n", s.serverConfig.Environment, serverAddr)
+		s.serverLogger.Info().Msgf("%s service listening on %s", s.serverConfig.Environment, serverAddr)
 
 		err := httpServer.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
-			s.serverLogger.Fatal().Err(err).Msg("Server failed to start")
+			serverErrors <- fmt.Errorf("server failed to start: %w", err)
 		}
 	}()
 
-	sigint := make(chan os.Signal, 1)
-
-	signal.Notify(sigint, os.Interrupt, syscall.SIGTERM)
-
-	<-sigint
-
-	s.serverLogger.Info().Msg("service shutting down")
-
-	// force an exit if server does not shutdown within configured timeout
-	ctx, cancel := context.WithTimeout(context.Background(), signalsd.ServerShutdownTimeout)
-
-	defer cancel()
-
-	err := httpServer.Shutdown(ctx)
-	if err != nil {
-		s.serverLogger.Warn().Msgf("shutdown error: %v", err)
+	// Wait for shutdown signal or server error
+	select {
+	case err := <-serverErrors:
+		return err
+	case <-ctx.Done():
+		s.serverLogger.Info().Msg("shutdown signal received")
 	}
+
+	// Graceful shutdown with timeout
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), signalsd.ServerShutdownTimeout)
+	defer shutdownCancel()
+
+	s.serverLogger.Info().Msg("shutting down HTTP server")
+
+	err := httpServer.Shutdown(shutdownCtx)
+	if err != nil {
+		s.serverLogger.Warn().Msgf("HTTP server shutdown error: %v", err)
+		return fmt.Errorf("HTTP server shutdown failed: %w", err)
+	}
+
+	s.serverLogger.Info().Msg("HTTP server shutdown complete")
+	return nil
+}
+
+// DatabaseShutdown gracefully shutsdown the database
+func (s *Server) DatabaseShutdown() {
+	s.serverLogger.Info().Msg("closing database connections")
+	s.pool.Close()
+	s.serverLogger.Info().Msg("database connections closed")
 }
 
 // setupMiddleware sets up the middleware that applies to all server requests

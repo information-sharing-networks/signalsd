@@ -10,7 +10,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"syscall"
 	"testing"
 	"time"
 
@@ -303,30 +302,40 @@ func startInProcessServer(t *testing.T, ctx context.Context, testDB *pgxpool.Poo
 		publicIsnCache,
 	)
 
+	// Create a cancellable context for server shutdown
+	serverCtx, serverCancel := context.WithCancel(ctx)
+
 	// Start server
-	serverDone := make(chan struct{})
+	serverDone := make(chan error, 1)
 	go func() {
 		defer close(serverDone)
-		serverInstance.Run() // This will block until SIGINT/SIGTERM
+		if err := serverInstance.Start(serverCtx); err != nil {
+			serverDone <- err
+		}
 	}()
 
 	// Create shutdown function to be called by the test
 	shutdownFunc := func() {
 		t.Log("Stopping server...")
 
-		if err := syscall.Kill(syscall.Getpid(), syscall.SIGINT); err != nil {
-			t.Logf("Warning: Failed to send SIGINT: %v", err)
-		}
+		// Cancel the server context to trigger graceful shutdown
+		serverCancel()
 
 		// Wait for server to shut down gracefully with timeout
 		select {
-		case <-serverDone:
-			t.Log("✅ Server shut down")
+		case err := <-serverDone:
+			if err != nil {
+				t.Logf("Server shutdown with error: %v", err)
+			} else {
+				t.Log("✅ Server shut down gracefully")
+			}
 		case <-time.After(5 * time.Second):
 			// if the server won't shutdown it will most likely be due to bugs, e.g uncommitted transactions or unclosed http requests bodies
-			t.Log("⚠️ Server shutdown timeout - killing service")
-			syscall.Kill(syscall.Getpid(), syscall.SIGKILL)
+			t.Log("⚠️ Server shutdown timeout")
 		}
+
+		// Ensure database connections are closed
+		serverInstance.DatabaseShutdown()
 	}
 
 	baseURL := fmt.Sprintf("http://localhost:%d", cfg.Port)

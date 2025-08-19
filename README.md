@@ -270,7 +270,7 @@ The secret key is used to sign the JWT access tokens used by the service.
 ```bash
 # 1. Install and start PostgreSQL server
 brew install postgresql@17
-brew services start postgresql@17  # Use "start" to register the service to start at login
+brew services start postgresql@17  # Use "start" to register the service to start at login (use "run" to start without registring)
 
 # 2. Connect to PostgreSQL server
 psql postgres
