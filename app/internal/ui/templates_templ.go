@@ -688,7 +688,7 @@ func SearchResults(signals []SearchSignalWithCorrelationsAndVersions) templ.Comp
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "\" class=\"toggle-json text-xs text-indigo-600 hover:text-indigo-500 font-medium\">Pretty Print</button></div><div class=\"json-container\"><pre id=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "\" class=\"pretty-print-btn text-xs text-indigo-600 hover:text-indigo-500 font-medium\">Pretty Print</button></div><div class=\"json-container\"><pre id=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -913,7 +913,7 @@ func SearchResults(signals []SearchSignalWithCorrelationsAndVersions) templ.Comp
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 75, "</div><script>\n\t\tdocument.addEventListener('DOMContentLoaded', function() {\n\t\t\t// Store original JSON content for each signal\n\t\t\tconst originalJsonContent = new Map();\n\n\t\t\t// Initialize original content storage\n\t\t\tfunction initializeJsonContent() {\n\t\t\t\tdocument.querySelectorAll('[id^=\"json-\"]').forEach(function(element) {\n\t\t\t\t\tconst signalId = element.id.replace('json-', '');\n\t\t\t\t\tif (!originalJsonContent.has(signalId)) {\n\t\t\t\t\t\toriginalJsonContent.set(signalId, element.textContent.trim());\n\t\t\t\t\t}\n\t\t\t\t});\n\t\t\t}\n\n\t\t\t// Initialize now and after HTMX swaps\n\t\t\tinitializeJsonContent();\n\t\t\tdocument.body.addEventListener('htmx:afterSwap', initializeJsonContent);\n\n\t\t\t// Pretty print JSON toggle\n\t\t\tdocument.addEventListener('click', function(e) {\n\t\t\t\tif (e.target.classList.contains('toggle-json')) {\n\t\t\t\t\tconst signalId = e.target.getAttribute('data-signal-id');\n\t\t\t\t\tconst jsonElement = document.getElementById('json-' + signalId);\n\n\t\t\t\t\tif (!jsonElement) {\n\t\t\t\t\t\tconsole.error('JSON element not found for signal:', signalId);\n\t\t\t\t\t\treturn;\n\t\t\t\t\t}\n\n\t\t\t\t\t// Get or initialize original content\n\t\t\t\t\tlet originalContent = originalJsonContent.get(signalId);\n\t\t\t\t\tif (!originalContent) {\n\t\t\t\t\t\toriginalContent = jsonElement.textContent.trim();\n\t\t\t\t\t\toriginalJsonContent.set(signalId, originalContent);\n\t\t\t\t\t}\n\n\t\t\t\t\ttry {\n\t\t\t\t\t\tif (e.target.textContent.trim() === 'Pretty Print') {\n\t\t\t\t\t\t\t// Parse and pretty print JSON\n\t\t\t\t\t\t\tconst parsed = JSON.parse(originalContent);\n\t\t\t\t\t\t\tjsonElement.textContent = JSON.stringify(parsed, null, 2);\n\t\t\t\t\t\t\te.target.textContent = 'Compact';\n\t\t\t\t\t\t\tjsonElement.classList.add('pretty-printed');\n\t\t\t\t\t\t} else {\n\t\t\t\t\t\t\t// Restore original compact JSON\n\t\t\t\t\t\t\tjsonElement.textContent = originalContent;\n\t\t\t\t\t\t\te.target.textContent = 'Pretty Print';\n\t\t\t\t\t\t\tjsonElement.classList.remove('pretty-printed');\n\t\t\t\t\t\t}\n\t\t\t\t\t} catch (error) {\n\t\t\t\t\t\tconsole.error('Invalid JSON, cannot format:', error);\n\t\t\t\t\t\t// Show error message briefly\n\t\t\t\t\t\tconst originalText = e.target.textContent;\n\t\t\t\t\t\te.target.textContent = 'Invalid JSON';\n\t\t\t\t\t\te.target.classList.add('text-red-600');\n\t\t\t\t\t\tsetTimeout(function() {\n\t\t\t\t\t\t\te.target.textContent = originalText;\n\t\t\t\t\t\t\te.target.classList.remove('text-red-600');\n\t\t\t\t\t\t}, 2000);\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t});\n\t\t});\n\t</script>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 75, "</div><script>\n\t\t// Store original JSON content for each signal\n\t\tconst originalJsonContent = new Map();\n\n\t\t// Event delegation for pretty print buttons\n\t\tdocument.addEventListener('click', function(e) {\n\t\t\tif (e.target.classList.contains('pretty-print-btn')) {\n\t\t\t\tconst signalId = e.target.getAttribute('data-signal-id');\n\t\t\t\tconst jsonElement = document.getElementById('json-' + signalId);\n\n\t\t\t\tif (!jsonElement) {\n\t\t\t\t\treturn;\n\t\t\t\t}\n\n\t\t\t\t// Get or store original content\n\t\t\t\tlet originalContent = originalJsonContent.get(signalId);\n\t\t\t\tif (!originalContent) {\n\t\t\t\t\toriginalContent = jsonElement.textContent.trim();\n\t\t\t\t\toriginalJsonContent.set(signalId, originalContent);\n\t\t\t\t}\n\n\t\t\t\ttry {\n\t\t\t\t\tconst currentButtonText = e.target.textContent.trim();\n\n\t\t\t\t\tif (currentButtonText === 'Pretty Print') {\n\t\t\t\t\t\t// Parse and pretty print JSON\n\t\t\t\t\t\tconst parsed = JSON.parse(originalContent);\n\t\t\t\t\t\tjsonElement.textContent = JSON.stringify(parsed, null, 2);\n\t\t\t\t\t\te.target.textContent = 'Compact';\n\t\t\t\t\t\tjsonElement.classList.add('pretty-printed');\n\t\t\t\t\t} else {\n\t\t\t\t\t\t// Restore original compact JSON\n\t\t\t\t\t\tjsonElement.textContent = originalContent;\n\t\t\t\t\t\te.target.textContent = 'Pretty Print';\n\t\t\t\t\t\tjsonElement.classList.remove('pretty-printed');\n\t\t\t\t\t}\n\t\t\t\t} catch (error) {\n\t\t\t\t\t// Show error message briefly\n\t\t\t\t\tconst originalText = e.target.textContent;\n\t\t\t\t\te.target.textContent = 'Invalid JSON';\n\t\t\t\t\te.target.classList.add('text-red-600');\n\t\t\t\t\tsetTimeout(function() {\n\t\t\t\t\t\te.target.textContent = originalText;\n\t\t\t\t\t\te.target.classList.remove('text-red-600');\n\t\t\t\t\t}, 2000);\n\t\t\t\t}\n\t\t\t}\n\t\t});\n\t</script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -972,7 +972,7 @@ func SignalSearchPage(isns []ISN, perms map[string]IsnPerms, results []SearchSig
 						var templ_7745c5c3_Var46 string
 						templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.JoinStringErrs(isn.Slug)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates.templ`, Line: 485, Col: 36}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates.templ`, Line: 469, Col: 36}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var46))
 						if templ_7745c5c3_Err != nil {
@@ -985,7 +985,7 @@ func SignalSearchPage(isns []ISN, perms map[string]IsnPerms, results []SearchSig
 						var templ_7745c5c3_Var47 string
 						templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinStringErrs(isn.Title)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates.templ`, Line: 485, Col: 50}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates.templ`, Line: 469, Col: 50}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var47))
 						if templ_7745c5c3_Err != nil {

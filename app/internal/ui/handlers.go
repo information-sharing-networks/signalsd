@@ -51,9 +51,6 @@ func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Debug: log the full login response
-	s.logger.Debug().Msgf("Login response: %+v", loginResp)
-
 	// Set access token cookie (the API automatically sets the refresh token cookie)
 	http.SetCookie(w, &http.Cookie{
 		Name:     "access_token",
@@ -65,14 +62,11 @@ func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	})
 
 	// Store permissions data for dropdown population
-	s.logger.Debug().Msgf("Login response Perms field: %+v", loginResp.Perms)
 	if len(loginResp.Perms) > 0 {
 		permsJSON, err := json.Marshal(loginResp.Perms)
 		if err == nil {
 			// Base64 encode to avoid cookie encoding issues
 			encodedPerms := base64.StdEncoding.EncodeToString(permsJSON)
-			s.logger.Debug().Msgf("Storing permissions cookie (base64): %s", encodedPerms)
-			s.logger.Debug().Msgf("Original JSON: %s", string(permsJSON))
 			http.SetCookie(w, &http.Cookie{
 				Name:     "user_perms",
 				Value:    encodedPerms,
@@ -81,11 +75,7 @@ func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 				Secure:   s.config.Environment == "prod",
 				MaxAge:   loginResp.ExpiresIn,
 			})
-		} else {
-			s.logger.Error().Err(err).Msg("Failed to marshal permissions")
 		}
-	} else {
-		s.logger.Debug().Msg("No permissions in login response or permissions map is empty")
 	}
 
 	// Return success response for HTMX

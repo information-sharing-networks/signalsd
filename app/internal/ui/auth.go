@@ -172,9 +172,6 @@ func (a *AuthService) AuthenticateUser(email, password string) (*LoginResponse, 
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	// Log the raw response for debugging
-	fmt.Printf("Raw login response: %s\n", string(bodyBytes))
-
 	var loginResp LoginResponse
 	if err := json.Unmarshal(bodyBytes, &loginResp); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
