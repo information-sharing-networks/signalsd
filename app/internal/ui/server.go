@@ -51,6 +51,11 @@ func (s *Server) setupRoutes() {
 	s.router.Post("/login", s.handleLoginPost)
 	s.router.Post("/logout", s.handleLogout)
 	s.router.Get("/dashboard", s.handleDashboard)
+	s.router.Get("/search", s.handleSignalSearch)
+
+	// HTMX endpoints
+	s.router.Post("/api/signal-types", s.handleGetSignalTypes)
+	s.router.Post("/api/search-signals", s.handleSearchSignals)
 
 	// Redirect to existing swagger docs
 	s.router.Get("/docs", s.handleDocs)

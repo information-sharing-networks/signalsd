@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"net/http"
 )
 
@@ -107,6 +108,121 @@ func (s *Server) handleDocs(w http.ResponseWriter, r *http.Request) {
 	// Redirect to the existing swagger documentation on the API server
 	docsURL := s.config.APIBaseURL + "/docs"
 	http.Redirect(w, r, docsURL, http.StatusSeeOther)
+}
+
+func (s *Server) handleSignalSearch(w http.ResponseWriter, r *http.Request) {
+	if !s.isAuthenticatedWithRefresh(w, r) {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	// Get access token for API calls
+	accessTokenCookie, err := r.Cookie("access_token")
+	if err != nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	// Get ISNs for the dropdown
+	isns, err := s.authService.GetISNs(accessTokenCookie.Value)
+	if err != nil {
+		s.logger.Error().Err(err).Msg("Failed to get ISNs")
+		// Render search page without ISNs
+		component := SignalSearchPage(nil, nil, nil, "")
+		component.Render(r.Context(), w)
+		return
+	}
+
+	// Render search page
+	component := SignalSearchPage(isns, nil, nil, "")
+	component.Render(r.Context(), w)
+}
+
+func (s *Server) handleGetSignalTypes(w http.ResponseWriter, r *http.Request) {
+	if !s.isAuthenticatedWithRefresh(w, r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	isnSlug := r.FormValue("isn_slug")
+	if isnSlug == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// Get access token for API calls
+	accessTokenCookie, err := r.Cookie("access_token")
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	// Get signal types for the ISN
+	signalTypes, err := s.authService.GetSignalTypes(accessTokenCookie.Value, isnSlug)
+	if err != nil {
+		s.logger.Error().Err(err).Msg("Failed to get signal types")
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Render signal types dropdown options
+	component := SignalTypeOptions(signalTypes)
+	component.Render(r.Context(), w)
+}
+
+func (s *Server) handleSearchSignals(w http.ResponseWriter, r *http.Request) {
+	if !s.isAuthenticatedWithRefresh(w, r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	// Parse search parameters
+	params := SignalSearchParams{
+		ISNSlug:                 r.FormValue("isn_slug"),
+		SignalTypeSlug:          r.FormValue("signal_type_slug"),
+		SemVer:                  r.FormValue("sem_ver"),
+		IsPublic:                r.FormValue("is_public") == "true",
+		StartDate:               r.FormValue("start_date"),
+		EndDate:                 r.FormValue("end_date"),
+		AccountID:               r.FormValue("account_id"),
+		SignalID:                r.FormValue("signal_id"),
+		LocalRef:                r.FormValue("local_ref"),
+		IncludeWithdrawn:        r.FormValue("include_withdrawn") == "true",
+		IncludeCorrelated:       r.FormValue("include_correlated") == "true",
+		IncludePreviousVersions: r.FormValue("include_previous_versions") == "true",
+	}
+
+	// Validate required parameters
+	if params.ISNSlug == "" || params.SignalTypeSlug == "" || params.SemVer == "" {
+		component := SearchError("ISN, Signal Type, and Version are required")
+		component.Render(r.Context(), w)
+		return
+	}
+
+	// Get access token for API calls
+	var accessToken string
+	if !params.IsPublic {
+		accessTokenCookie, err := r.Cookie("access_token")
+		if err != nil {
+			component := SearchError("Authentication required for private ISN search")
+			component.Render(r.Context(), w)
+			return
+		}
+		accessToken = accessTokenCookie.Value
+	}
+
+	// Perform search
+	searchResp, err := s.authService.SearchSignals(accessToken, params)
+	if err != nil {
+		s.logger.Error().Err(err).Msg("Signal search failed")
+		component := SearchError(fmt.Sprintf("Search failed: %v", err))
+		component.Render(r.Context(), w)
+		return
+	}
+
+	// Render search results
+	component := SearchResults(searchResp.Signals)
+	component.Render(r.Context(), w)
 }
 
 // Helper methods

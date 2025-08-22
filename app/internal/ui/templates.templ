@@ -1,5 +1,10 @@
 package ui
 
+import (
+	"fmt"
+	"github.com/google/uuid"
+)
+
 templ BaseLayout(title string) {
 	<!DOCTYPE html>
 	<html lang="en">
@@ -28,6 +33,9 @@ templ Navigation() {
 					<div class="hidden md:ml-6 md:flex md:space-x-8">
 						<a href="/dashboard" class="text-gray-900 hover:text-gray-700 px-3 py-2 text-sm font-medium">
 							Dashboard
+						</a>
+						<a href="/search" class="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm font-medium">
+							Search Signals
 						</a>
 						<a href="/docs" class="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm font-medium">
 							API Docs
@@ -175,7 +183,9 @@ templ DashboardPage() {
 												Signal Management
 											</dt>
 											<dd class="text-lg font-medium text-gray-900">
-												View Signals
+												<a href="/search" class="text-indigo-600 hover:text-indigo-500">
+													Search Signals
+												</a>
 											</dd>
 										</dl>
 									</div>
@@ -183,6 +193,298 @@ templ DashboardPage() {
 							</div>
 						</div>
 					</div>
+				</div>
+			</div>
+		</div>
+	}
+
+}
+
+templ SignalTypeOptions(signalTypes []SignalType) {
+	<select id="signal_type_slug" name="signal_type_slug" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+		<option value="">Select Signal Type...</option>
+		for _, signalType := range signalTypes {
+			<option value={ signalType.Slug }>{ signalType.Title }</option>
+		}
+	</select>
+}
+
+templ SearchError(message string) {
+	<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+		{ message }
+	</div>
+}
+
+templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
+	<div class="bg-white shadow rounded-lg">
+		<div class="px-6 py-4 border-b border-gray-200">
+			<h3 class="text-lg font-medium text-gray-900">Search Results ({ fmt.Sprintf("%d", len(signals)) } signals found)</h3>
+		</div>
+
+		if len(signals) == 0 {
+			<div class="px-6 py-8 text-center text-gray-500">
+				No signals found matching your search criteria.
+			</div>
+		} else {
+			<div class="divide-y divide-gray-200">
+				for _, signal := range signals {
+					<div class="px-6 py-4">
+						<div class="flex items-start justify-between">
+							<div class="flex-1">
+								<div class="flex items-center space-x-2">
+									<span class="text-sm font-medium text-gray-900">Signal ID:</span>
+									<span class="text-sm text-gray-600 font-mono">{ signal.SignalID.String() }</span>
+									if signal.IsWithdrawn {
+										<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+											Withdrawn
+										</span>
+									}
+								</div>
+
+								if signal.LocalRef != "" {
+									<div class="mt-1 flex items-center space-x-2">
+										<span class="text-sm font-medium text-gray-900">Local Ref:</span>
+										<span class="text-sm text-gray-600">{ signal.LocalRef }</span>
+									</div>
+								}
+
+								<div class="mt-1 flex items-center space-x-4 text-sm text-gray-500">
+									<span>Version { fmt.Sprintf("%d", signal.VersionNumber) }</span>
+									<span>Created: { signal.SignalCreatedAt.Format("2006-01-02 15:04:05") }</span>
+									if signal.Email != "" {
+										<span>By: { signal.Email }</span>
+									}
+								</div>
+
+								if signal.CorrelatedToSignalID != uuid.Nil {
+									<div class="mt-2 text-sm text-blue-600">
+										Correlated to: { signal.CorrelatedToSignalID.String() }
+									</div>
+								}
+							</div>
+
+							<div class="ml-4">
+								<button
+									type="button"
+									data-signal-id={ signal.SignalID.String() }
+									class="toggle-content text-indigo-600 hover:text-indigo-500 text-sm font-medium"
+								>
+									View Content
+								</button>
+							</div>
+						</div>
+
+						<div id={ fmt.Sprintf("content-%s", signal.SignalID.String()) } class="hidden mt-4">
+							<div class="bg-gray-50 rounded-md p-4">
+								<h4 class="text-sm font-medium text-gray-900 mb-2">Signal Content:</h4>
+								<pre class="text-sm text-gray-600 whitespace-pre-wrap overflow-x-auto">{ string(signal.Content) }</pre>
+							</div>
+						</div>
+
+						if len(signal.CorrelatedSignals) > 0 {
+							<div class="mt-4">
+								<h4 class="text-sm font-medium text-gray-900 mb-2">Correlated Signals:</h4>
+								<div class="space-y-2">
+									for _, correlated := range signal.CorrelatedSignals {
+										<div class="text-sm text-gray-600 pl-4 border-l-2 border-blue-200">
+											{ correlated.SignalID.String() } (v{ fmt.Sprintf("%d", correlated.VersionNumber) })
+										</div>
+									}
+								</div>
+							</div>
+						}
+
+						if len(signal.PreviousSignalVersions) > 0 {
+							<div class="mt-4">
+								<h4 class="text-sm font-medium text-gray-900 mb-2">Previous Versions:</h4>
+								<div class="space-y-2">
+									for _, version := range signal.PreviousSignalVersions {
+										<div class="text-sm text-gray-600 pl-4 border-l-2 border-gray-200">
+											Version { fmt.Sprintf("%d", version.VersionNumber) } - { version.CreatedAt.Format("2006-01-02 15:04:05") }
+										</div>
+									}
+								</div>
+							</div>
+						}
+					</div>
+				}
+			</div>
+		}
+	</div>
+
+	<script>
+		document.addEventListener('DOMContentLoaded', function() {
+			document.addEventListener('click', function(e) {
+				if (e.target.classList.contains('toggle-content')) {
+					const signalId = e.target.getAttribute('data-signal-id');
+					const element = document.getElementById('content-' + signalId);
+					if (element.classList.contains('hidden')) {
+						element.classList.remove('hidden');
+						e.target.textContent = 'Hide Content';
+					} else {
+						element.classList.add('hidden');
+						e.target.textContent = 'View Content';
+					}
+				}
+			});
+		});
+	</script>
+}
+
+templ SignalSearchPage(isns []ISN, signalTypes []SignalType, results []SearchSignalWithCorrelationsAndVersions, errorMsg string) {
+	@BaseLayout("Signal Search") {
+		@Navigation()
+		<div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+			<div class="px-4 py-6 sm:px-0">
+				<h1 class="text-2xl font-bold text-gray-900 mb-6">Search Signals</h1>
+
+				<div class="bg-white shadow rounded-lg p-6 mb-6">
+					<form hx-post="/api/search-signals" hx-target="#search-results" class="space-y-4">
+						<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+							<div>
+								<label for="isn_slug" class="block text-sm font-medium text-gray-700">ISN</label>
+								<select
+									id="isn_slug"
+									name="isn_slug"
+									required
+									hx-post="/api/signal-types"
+									hx-target="#signal-type-select"
+									hx-trigger="change"
+									class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+								>
+									<option value="">Select ISN...</option>
+									if isns != nil {
+										for _, isn := range isns {
+											if isn.IsInUse {
+												<option value={ isn.Slug }>{ isn.Title }</option>
+											}
+										}
+									}
+								</select>
+							</div>
+
+							<div id="signal-type-select">
+								<label for="signal_type_slug" class="block text-sm font-medium text-gray-700">Signal Type</label>
+								<select
+									id="signal_type_slug"
+									name="signal_type_slug"
+									required
+									class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+								>
+									<option value="">Select Signal Type...</option>
+								</select>
+							</div>
+
+							<div>
+								<label for="sem_ver" class="block text-sm font-medium text-gray-700">Version</label>
+								<input
+									type="text"
+									id="sem_ver"
+									name="sem_ver"
+									placeholder="e.g., 1.0.0"
+									required
+									class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+								/>
+							</div>
+						</div>
+
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+							<div>
+								<label for="start_date" class="block text-sm font-medium text-gray-700">Start Date</label>
+								<input
+									type="datetime-local"
+									id="start_date"
+									name="start_date"
+									class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+								/>
+							</div>
+
+							<div>
+								<label for="end_date" class="block text-sm font-medium text-gray-700">End Date</label>
+								<input
+									type="datetime-local"
+									id="end_date"
+									name="end_date"
+									class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+								/>
+							</div>
+						</div>
+
+						<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+							<div>
+								<label for="local_ref" class="block text-sm font-medium text-gray-700">Local Reference</label>
+								<input
+									type="text"
+									id="local_ref"
+									name="local_ref"
+									placeholder="e.g., item_id_#1"
+									class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+								/>
+							</div>
+
+							<div>
+								<label for="signal_id" class="block text-sm font-medium text-gray-700">Signal ID</label>
+								<input
+									type="text"
+									id="signal_id"
+									name="signal_id"
+									placeholder="UUID"
+									class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+								/>
+							</div>
+
+							<div>
+								<label for="account_id" class="block text-sm font-medium text-gray-700">Account ID</label>
+								<input
+									type="text"
+									id="account_id"
+									name="account_id"
+									placeholder="UUID"
+									class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+								/>
+							</div>
+						</div>
+
+						<div class="flex flex-wrap gap-4">
+							<label class="flex items-center">
+								<input type="checkbox" name="is_public" value="true" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"/>
+								<span class="ml-2 text-sm text-gray-700">Public ISN (no auth required)</span>
+							</label>
+
+							<label class="flex items-center">
+								<input type="checkbox" name="include_withdrawn" value="true" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"/>
+								<span class="ml-2 text-sm text-gray-700">Include withdrawn signals</span>
+							</label>
+
+							<label class="flex items-center">
+								<input type="checkbox" name="include_correlated" value="true" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"/>
+								<span class="ml-2 text-sm text-gray-700">Include correlated signals</span>
+							</label>
+
+							<label class="flex items-center">
+								<input type="checkbox" name="include_previous_versions" value="true" class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"/>
+								<span class="ml-2 text-sm text-gray-700">Include previous versions</span>
+							</label>
+						</div>
+
+						<div>
+							<button
+								type="submit"
+								class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200"
+							>
+								Search Signals
+							</button>
+						</div>
+					</form>
+				</div>
+
+				<div id="search-results">
+					if errorMsg != "" {
+						@SearchError(errorMsg)
+					}
+					if results != nil {
+						@SearchResults(results)
+					}
 				</div>
 			</div>
 		</div>
