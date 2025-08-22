@@ -395,17 +395,36 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 			const originalJsonContent = new Map();
 
 			// Initialize original content storage
-			document.querySelectorAll('[id^="json-"]').forEach(function(element) {
-				const signalId = element.id.replace('json-', '');
-				originalJsonContent.set(signalId, element.textContent.trim());
-			});
+			function initializeJsonContent() {
+				document.querySelectorAll('[id^="json-"]').forEach(function(element) {
+					const signalId = element.id.replace('json-', '');
+					if (!originalJsonContent.has(signalId)) {
+						originalJsonContent.set(signalId, element.textContent.trim());
+					}
+				});
+			}
+
+			// Initialize now and after HTMX swaps
+			initializeJsonContent();
+			document.body.addEventListener('htmx:afterSwap', initializeJsonContent);
 
 			// Pretty print JSON toggle
 			document.addEventListener('click', function(e) {
 				if (e.target.classList.contains('toggle-json')) {
 					const signalId = e.target.getAttribute('data-signal-id');
 					const jsonElement = document.getElementById('json-' + signalId);
-					const originalContent = originalJsonContent.get(signalId);
+
+					if (!jsonElement) {
+						console.error('JSON element not found for signal:', signalId);
+						return;
+					}
+
+					// Get or initialize original content
+					let originalContent = originalJsonContent.get(signalId);
+					if (!originalContent) {
+						originalContent = jsonElement.textContent.trim();
+						originalJsonContent.set(signalId, originalContent);
+					}
 
 					try {
 						if (e.target.textContent.trim() === 'Pretty Print') {
@@ -432,8 +451,6 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 						}, 2000);
 					}
 				}
-
-
 			});
 		});
 	</script>
@@ -505,7 +522,7 @@ templ SignalSearchPage(isns []ISN, perms map[string]IsnPerms, results []SearchSi
 							<div>
 								<label for="start_date" class="block text-sm font-medium text-gray-700">Start Date</label>
 								<input
-									type="datetime-local"
+									type="date"
 									id="start_date"
 									name="start_date"
 									class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
@@ -515,7 +532,7 @@ templ SignalSearchPage(isns []ISN, perms map[string]IsnPerms, results []SearchSi
 							<div>
 								<label for="end_date" class="block text-sm font-medium text-gray-700">End Date</label>
 								<input
-									type="datetime-local"
+									type="date"
 									id="end_date"
 									name="end_date"
 									class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
