@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -24,9 +25,20 @@ type LoginRequest struct {
 
 // LoginResponse represents the login response from the API
 type LoginResponse struct {
-	AccessToken string `json:"access_token"`
-	TokenType   string `json:"token_type"`
-	ExpiresIn   int    `json:"expires_in"`
+	AccessToken string              `json:"access_token"`
+	TokenType   string              `json:"token_type"`
+	ExpiresIn   int                 `json:"expires_in"`
+	AccountID   string              `json:"account_id"`
+	AccountType string              `json:"account_type"`
+	Role        string              `json:"role"`
+	Perms       map[string]IsnPerms `json:"isn_perms,omitempty"`
+}
+
+// IsnPerms represents permissions for an ISN
+type IsnPerms struct {
+	Permission      string   `json:"permission"`
+	SignalBatchID   string   `json:"signal_batch_id"`
+	SignalTypePaths []string `json:"signal_types"`
 }
 
 // ErrorResponse represents an error response from the API
@@ -154,8 +166,17 @@ func (a *AuthService) AuthenticateUser(email, password string) (*LoginResponse, 
 		return nil, fmt.Errorf("authentication failed: %s", errorResp.Message)
 	}
 
+	// Read the response body for debugging
+	bodyBytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	// Log the raw response for debugging
+	fmt.Printf("Raw login response: %s\n", string(bodyBytes))
+
 	var loginResp LoginResponse
-	if err := json.NewDecoder(resp.Body).Decode(&loginResp); err != nil {
+	if err := json.Unmarshal(bodyBytes, &loginResp); err != nil {
 		return nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
@@ -281,6 +302,48 @@ func (a *AuthService) GetSignalTypes(accessToken, isnSlug string) ([]SignalType,
 	}
 
 	return signalTypes, nil
+}
+
+// GetSignalVersions retrieves available versions for a specific signal type
+func (a *AuthService) GetSignalVersions(accessToken, isnSlug, signalTypeSlug string) ([]string, error) {
+	url := fmt.Sprintf("%s/api/isn/%s/signal_types/%s", a.apiBaseURL, isnSlug, signalTypeSlug)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+
+	resp, err := a.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get signal versions: status %d", resp.StatusCode)
+	}
+
+	var signalTypes []SignalType
+	if err := json.NewDecoder(resp.Body).Decode(&signalTypes); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	// Extract unique versions
+	versionSet := make(map[string]bool)
+	for _, st := range signalTypes {
+		if st.IsInUse {
+			versionSet[st.SemVer] = true
+		}
+	}
+
+	// Convert to sorted slice
+	versions := make([]string, 0, len(versionSet))
+	for version := range versionSet {
+		versions = append(versions, version)
+	}
+
+	return versions, nil
 }
 
 // SearchSignals searches for signals using the signalsd API

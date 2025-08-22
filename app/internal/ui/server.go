@@ -55,6 +55,7 @@ func (s *Server) setupRoutes() {
 
 	// HTMX endpoints
 	s.router.Post("/api/signal-types", s.handleGetSignalTypes)
+	s.router.Post("/api/signal-versions", s.handleGetSignalVersions)
 	s.router.Post("/api/search-signals", s.handleSearchSignals)
 
 	// Redirect to existing swagger docs

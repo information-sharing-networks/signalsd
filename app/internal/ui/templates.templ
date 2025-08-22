@@ -200,10 +200,51 @@ templ DashboardPage() {
 }
 
 templ SignalTypeOptions(signalTypes []SignalType) {
-	<select id="signal_type_slug" name="signal_type_slug" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
+	<select
+		id="signal_type_slug"
+		name="signal_type_slug"
+		required
+		hx-post="/api/signal-versions"
+		hx-target="#version-select"
+		hx-trigger="change"
+		hx-include="#isn_slug, this"
+		class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+	>
 		<option value="">Select Signal Type...</option>
 		for _, signalType := range signalTypes {
 			<option value={ signalType.Slug }>{ signalType.Title }</option>
+		}
+	</select>
+}
+
+templ SignalTypeOptionsFromStrings(signalTypes []string) {
+	<select
+		id="signal_type_slug"
+		name="signal_type_slug"
+		required
+		hx-post="/api/signal-versions"
+		hx-target="#version-select"
+		hx-trigger="change"
+		hx-include="#isn_slug, this"
+		class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+	>
+		<option value="">Select Signal Type...</option>
+		for _, signalType := range signalTypes {
+			<option value={ signalType }>{ signalType }</option>
+		}
+	</select>
+}
+
+templ VersionOptions(versions []string) {
+	<select
+		id="sem_ver"
+		name="sem_ver"
+		required
+		class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+	>
+		<option value="">Select Version...</option>
+		for _, version := range versions {
+			<option value={ version }>{ version }</option>
 		}
 	</select>
 }
@@ -398,7 +439,7 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 	</script>
 }
 
-templ SignalSearchPage(isns []ISN, signalTypes []SignalType, results []SearchSignalWithCorrelationsAndVersions, errorMsg string) {
+templ SignalSearchPage(isns []ISN, perms map[string]IsnPerms, results []SearchSignalWithCorrelationsAndVersions, errorMsg string) {
 	@BaseLayout("Signal Search") {
 		@Navigation()
 		<div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
@@ -417,7 +458,7 @@ templ SignalSearchPage(isns []ISN, signalTypes []SignalType, results []SearchSig
 									hx-post="/api/signal-types"
 									hx-target="#signal-type-select"
 									hx-trigger="change"
-									hx-include="this"
+									hx-include="#isn_slug, this"
 									class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
 								>
 									<option value="">Select ISN...</option>
@@ -437,22 +478,26 @@ templ SignalSearchPage(isns []ISN, signalTypes []SignalType, results []SearchSig
 									id="signal_type_slug"
 									name="signal_type_slug"
 									required
+									hx-post="/api/signal-versions"
+									hx-target="#version-select"
+									hx-trigger="change"
+									hx-include="this"
 									class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
 								>
 									<option value="">Select Signal Type...</option>
 								</select>
 							</div>
 
-							<div>
+							<div id="version-select">
 								<label for="sem_ver" class="block text-sm font-medium text-gray-700">Version</label>
-								<input
-									type="text"
+								<select
 									id="sem_ver"
 									name="sem_ver"
-									placeholder="e.g., 1.0.0"
 									required
 									class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
-								/>
+								>
+									<option value="">Select Version...</option>
+								</select>
 							</div>
 						</div>
 

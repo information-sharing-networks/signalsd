@@ -1,8 +1,11 @@
 package ui
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
@@ -48,6 +51,9 @@ func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Debug: log the full login response
+	s.logger.Debug().Msgf("Login response: %+v", loginResp)
+
 	// Set access token cookie (the API automatically sets the refresh token cookie)
 	http.SetCookie(w, &http.Cookie{
 		Name:     "access_token",
@@ -57,6 +63,30 @@ func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 		Secure:   s.config.Environment == "prod",
 		MaxAge:   loginResp.ExpiresIn,
 	})
+
+	// Store permissions data for dropdown population
+	s.logger.Debug().Msgf("Login response Perms field: %+v", loginResp.Perms)
+	if len(loginResp.Perms) > 0 {
+		permsJSON, err := json.Marshal(loginResp.Perms)
+		if err == nil {
+			// Base64 encode to avoid cookie encoding issues
+			encodedPerms := base64.StdEncoding.EncodeToString(permsJSON)
+			s.logger.Debug().Msgf("Storing permissions cookie (base64): %s", encodedPerms)
+			s.logger.Debug().Msgf("Original JSON: %s", string(permsJSON))
+			http.SetCookie(w, &http.Cookie{
+				Name:     "user_perms",
+				Value:    encodedPerms,
+				Path:     "/",
+				HttpOnly: true,
+				Secure:   s.config.Environment == "prod",
+				MaxAge:   loginResp.ExpiresIn,
+			})
+		} else {
+			s.logger.Error().Err(err).Msg("Failed to marshal permissions")
+		}
+	} else {
+		s.logger.Debug().Msg("No permissions in login response or permissions map is empty")
+	}
 
 	// Return success response for HTMX
 	w.Header().Set("HX-Redirect", "/dashboard")
@@ -79,6 +109,16 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		Name:     "refresh_token",
 		Value:    "",
 		Path:     "/oauth",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   s.config.Environment == "prod",
+	})
+
+	// Clear permissions cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "user_perms",
+		Value:    "",
+		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   s.config.Environment == "prod",
@@ -116,25 +156,41 @@ func (s *Server) handleSignalSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get access token for API calls
-	accessTokenCookie, err := r.Cookie("access_token")
+	// Get permissions data from cookie
+	permsCookie, err := r.Cookie("user_perms")
 	if err != nil {
+		s.logger.Error().Err(err).Msg("No permissions cookie found")
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
 
-	// Get ISNs for the dropdown
-	isns, err := s.authService.GetISNs(accessTokenCookie.Value)
+	// Decode base64 cookie value
+	decodedPerms, err := base64.StdEncoding.DecodeString(permsCookie.Value)
 	if err != nil {
-		s.logger.Error().Err(err).Msg("Failed to get ISNs")
-		// Render search page without ISNs
-		component := SignalSearchPage(nil, nil, nil, "")
-		component.Render(r.Context(), w)
+		s.logger.Error().Err(err).Msgf("Failed to decode permissions cookie: %s", permsCookie.Value)
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
 
+	var perms map[string]IsnPerms
+	if err := json.Unmarshal(decodedPerms, &perms); err != nil {
+		s.logger.Error().Err(err).Msgf("Failed to parse permissions JSON: %s", string(decodedPerms))
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	// Convert permissions to ISN list for dropdown
+	isns := make([]ISN, 0, len(perms))
+	for isnSlug := range perms {
+		isns = append(isns, ISN{
+			Slug:    isnSlug,
+			Title:   isnSlug, // Use slug as title for now
+			IsInUse: true,
+		})
+	}
+
 	// Render search page
-	component := SignalSearchPage(isns, nil, nil, "")
+	component := SignalSearchPage(isns, perms, nil, "")
 	component.Render(r.Context(), w)
 }
 
@@ -150,23 +206,110 @@ func (s *Server) handleGetSignalTypes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get access token for API calls
-	accessTokenCookie, err := r.Cookie("access_token")
+	// Get permissions data from cookie
+	permsCookie, err := r.Cookie("user_perms")
 	if err != nil {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
-	// Get signal types for the ISN
-	signalTypes, err := s.authService.GetSignalTypes(accessTokenCookie.Value, isnSlug)
+	// Decode base64 cookie value
+	decodedPerms, err := base64.StdEncoding.DecodeString(permsCookie.Value)
 	if err != nil {
-		s.logger.Error().Err(err).Msg("Failed to get signal types")
+		s.logger.Error().Err(err).Msgf("Failed to decode permissions cookie in signal types handler: %s", permsCookie.Value)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
+	var perms map[string]IsnPerms
+	if err := json.Unmarshal(decodedPerms, &perms); err != nil {
+		s.logger.Error().Err(err).Msgf("Failed to parse permissions JSON in signal types handler: %s", string(decodedPerms))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Get signal types for the selected ISN
+	isnPerm, exists := perms[isnSlug]
+	if !exists {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	// Parse signal type paths to extract unique signal types
+	signalTypeMap := make(map[string]bool)
+	for _, path := range isnPerm.SignalTypePaths {
+		// Path format: "signal-type-slug/v1.0.0"
+		parts := strings.Split(path, "/v")
+		if len(parts) == 2 {
+			signalTypeMap[parts[0]] = true
+		}
+	}
+
+	// Convert to slice
+	signalTypes := make([]string, 0, len(signalTypeMap))
+	for signalType := range signalTypeMap {
+		signalTypes = append(signalTypes, signalType)
+	}
+
 	// Render signal types dropdown options
-	component := SignalTypeOptions(signalTypes)
+	component := SignalTypeOptionsFromStrings(signalTypes)
+	component.Render(r.Context(), w)
+}
+
+func (s *Server) handleGetSignalVersions(w http.ResponseWriter, r *http.Request) {
+	if !s.isAuthenticatedWithRefresh(w, r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	isnSlug := r.FormValue("isn_slug")
+	signalTypeSlug := r.FormValue("signal_type_slug")
+	if isnSlug == "" || signalTypeSlug == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	// Get permissions data from cookie
+	permsCookie, err := r.Cookie("user_perms")
+	if err != nil {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	// Decode base64 cookie value
+	decodedPerms, err := base64.StdEncoding.DecodeString(permsCookie.Value)
+	if err != nil {
+		s.logger.Error().Err(err).Msgf("Failed to decode permissions cookie in versions handler: %s", permsCookie.Value)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	var perms map[string]IsnPerms
+	if err := json.Unmarshal(decodedPerms, &perms); err != nil {
+		s.logger.Error().Err(err).Msgf("Failed to parse permissions JSON in versions handler: %s", string(decodedPerms))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Get signal types for the selected ISN
+	isnPerm, exists := perms[isnSlug]
+	if !exists {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	// Find versions for the specific signal type
+	versions := make([]string, 0)
+	for _, path := range isnPerm.SignalTypePaths {
+		// Path format: "signal-type-slug/v1.0.0"
+		parts := strings.Split(path, "/v")
+		if len(parts) == 2 && parts[0] == signalTypeSlug {
+			versions = append(versions, parts[1])
+		}
+	}
+
+	// Render version dropdown options
+	component := VersionOptions(versions)
 	component.Render(r.Context(), w)
 }
 
