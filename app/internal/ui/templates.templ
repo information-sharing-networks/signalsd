@@ -1,0 +1,190 @@
+package ui
+
+templ BaseLayout(title string) {
+	<!DOCTYPE html>
+	<html lang="en">
+	<head>
+		<meta charset="UTF-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+		<title>{ title } - Signalsd</title>
+		<script src="https://unpkg.com/htmx.org@2.0.4"></script>
+		<link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet"/>
+		<link href="/static/css/app.css" rel="stylesheet"/>
+	</head>
+	<body class="bg-gray-50 min-h-screen">
+		{ children... }
+	</body>
+	</html>
+}
+
+templ Navigation() {
+	<nav class="bg-white shadow-sm border-b">
+		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+			<div class="flex justify-between h-16">
+				<div class="flex items-center">
+					<div class="flex-shrink-0">
+						<h1 class="text-xl font-semibold text-gray-900">Signalsd</h1>
+					</div>
+					<div class="hidden md:ml-6 md:flex md:space-x-8">
+						<a href="/dashboard" class="text-gray-900 hover:text-gray-700 px-3 py-2 text-sm font-medium">
+							Dashboard
+						</a>
+						<a href="/docs" class="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm font-medium">
+							API Docs
+						</a>
+					</div>
+				</div>
+				<div class="flex items-center">
+					<button 
+						hx-post="/logout" 
+						hx-confirm="Are you sure you want to logout?"
+						class="text-gray-500 hover:text-gray-700 px-3 py-2 text-sm font-medium"
+					>
+						Logout
+					</button>
+				</div>
+			</div>
+		</div>
+	</nav>
+}
+
+templ LoginPage() {
+	@BaseLayout("Login") {
+		<div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+			<div class="max-w-md w-full space-y-8">
+				<div>
+					<h2 class="mt-6 text-center text-3xl font-extrabold text-gray-900">
+						Sign in to Signalsd
+					</h2>
+				</div>
+				<form class="mt-8 space-y-6" hx-post="/login" hx-target="#login-error">
+					<div class="rounded-md shadow-sm -space-y-px">
+						<div>
+							<label for="email" class="sr-only">Email address</label>
+							<input 
+								id="email" 
+								name="email" 
+								type="email" 
+								required 
+								class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm" 
+								placeholder="Email address"
+							/>
+						</div>
+						<div>
+							<label for="password" class="sr-only">Password</label>
+							<input 
+								id="password" 
+								name="password" 
+								type="password" 
+								required 
+								class="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm" 
+								placeholder="Password"
+							/>
+						</div>
+					</div>
+
+					<div id="login-error"></div>
+
+					<div>
+						<button 
+							type="submit" 
+							class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+						>
+							Sign in
+						</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	}
+}
+
+templ LoginError(message string) {
+	<div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+		{ message }
+	</div>
+}
+
+templ DashboardPage() {
+	@BaseLayout("Dashboard") {
+		@Navigation()
+		<div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+			<div class="px-4 py-6 sm:px-0">
+				<div class="border-4 border-dashed border-gray-200 rounded-lg p-8">
+					<h1 class="text-2xl font-bold text-gray-900 mb-4">Dashboard</h1>
+					<p class="text-gray-600 mb-6">Welcome to the Signalsd management interface.</p>
+					
+					<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+						<div class="bg-white overflow-hidden shadow rounded-lg">
+							<div class="p-5">
+								<div class="flex items-center">
+									<div class="flex-shrink-0">
+										<div class="w-8 h-8 bg-indigo-500 rounded-md flex items-center justify-center">
+											<span class="text-white text-sm font-medium">ISN</span>
+										</div>
+									</div>
+									<div class="ml-5 w-0 flex-1">
+										<dl>
+											<dt class="text-sm font-medium text-gray-500 truncate">
+												Information Sharing Networks
+											</dt>
+											<dd class="text-lg font-medium text-gray-900">
+												Manage ISNs
+											</dd>
+										</dl>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<div class="bg-white overflow-hidden shadow rounded-lg">
+							<div class="p-5">
+								<div class="flex items-center">
+									<div class="flex-shrink-0">
+										<div class="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
+											<span class="text-white text-sm font-medium">API</span>
+										</div>
+									</div>
+									<div class="ml-5 w-0 flex-1">
+										<dl>
+											<dt class="text-sm font-medium text-gray-500 truncate">
+												API Documentation
+											</dt>
+											<dd class="text-lg font-medium text-gray-900">
+												<a href="/docs" class="text-indigo-600 hover:text-indigo-500">
+													View Docs
+												</a>
+											</dd>
+										</dl>
+									</div>
+								</div>
+							</div>
+						</div>
+
+						<div class="bg-white overflow-hidden shadow rounded-lg">
+							<div class="p-5">
+								<div class="flex items-center">
+									<div class="flex-shrink-0">
+										<div class="w-8 h-8 bg-yellow-500 rounded-md flex items-center justify-center">
+											<span class="text-white text-sm font-medium">SIG</span>
+										</div>
+									</div>
+									<div class="ml-5 w-0 flex-1">
+										<dl>
+											<dt class="text-sm font-medium text-gray-500 truncate">
+												Signal Management
+											</dt>
+											<dd class="text-lg font-medium text-gray-900">
+												View Signals
+											</dd>
+										</dl>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	}
+}
