@@ -221,7 +221,7 @@ func (s *Server) handleSearchSignals(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Render search results
-	component := SearchResults(searchResp.Signals)
+	component := SearchResults(*searchResp)
 	component.Render(r.Context(), w)
 }
 

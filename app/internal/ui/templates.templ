@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"github.com/google/uuid"
 )
 
 templ BaseLayout(title string) {
@@ -233,7 +232,7 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 							<div class="flex-1">
 								<div class="flex items-center space-x-2">
 									<span class="text-sm font-medium text-gray-900">Signal ID:</span>
-									<span class="text-sm text-gray-600 font-mono">{ signal.SignalID.String() }</span>
+									<span class="text-sm text-gray-600 font-mono">{ signal.SignalID }</span>
 									if signal.IsWithdrawn {
 										<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
 											Withdrawn
@@ -250,15 +249,15 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 
 								<div class="mt-1 flex items-center space-x-4 text-sm text-gray-500">
 									<span>Version { fmt.Sprintf("%d", signal.VersionNumber) }</span>
-									<span>Created: { signal.SignalCreatedAt.Format("2006-01-02 15:04:05") }</span>
+									<span>Created: { signal.SignalCreatedAt }</span>
 									if signal.Email != "" {
 										<span>By: { signal.Email }</span>
 									}
 								</div>
 
-								if signal.CorrelatedToSignalID != uuid.Nil {
+								if signal.CorrelatedToSignalID != "" {
 									<div class="mt-2 text-sm text-blue-600">
-										Correlated to: { signal.CorrelatedToSignalID.String() }
+										Correlated to: { signal.CorrelatedToSignalID }
 									</div>
 								}
 							</div>
@@ -266,7 +265,7 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 							<div class="ml-4">
 								<button
 									type="button"
-									data-signal-id={ signal.SignalID.String() }
+									data-signal-id={ signal.SignalID }
 									class="toggle-content text-indigo-600 hover:text-indigo-500 text-sm font-medium"
 								>
 									View Content
@@ -274,7 +273,7 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 							</div>
 						</div>
 
-						<div id={ fmt.Sprintf("content-%s", signal.SignalID.String()) } class="hidden mt-4">
+						<div id={ fmt.Sprintf("content-%s", signal.SignalID) } class="hidden mt-4">
 							<div class="bg-gray-50 rounded-md p-4">
 								<h4 class="text-sm font-medium text-gray-900 mb-2">Signal Content:</h4>
 								<pre class="text-sm text-gray-600 whitespace-pre-wrap overflow-x-auto">{ string(signal.Content) }</pre>
@@ -287,7 +286,7 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 								<div class="space-y-2">
 									for _, correlated := range signal.CorrelatedSignals {
 										<div class="text-sm text-gray-600 pl-4 border-l-2 border-blue-200">
-											{ correlated.SignalID.String() } (v{ fmt.Sprintf("%d", correlated.VersionNumber) })
+											{ correlated.SignalID } (v{ fmt.Sprintf("%d", correlated.VersionNumber) })
 										</div>
 									}
 								</div>
@@ -300,7 +299,7 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 								<div class="space-y-2">
 									for _, version := range signal.PreviousSignalVersions {
 										<div class="text-sm text-gray-600 pl-4 border-l-2 border-gray-200">
-											Version { fmt.Sprintf("%d", version.VersionNumber) } - { version.CreatedAt.Format("2006-01-02 15:04:05") }
+											Version { fmt.Sprintf("%d", version.VersionNumber) } - { version.CreatedAt }
 										</div>
 									}
 								</div>
@@ -350,6 +349,7 @@ templ SignalSearchPage(isns []ISN, signalTypes []SignalType, results []SearchSig
 									hx-post="/api/signal-types"
 									hx-target="#signal-type-select"
 									hx-trigger="change"
+									hx-include="this"
 									class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
 								>
 									<option value="">Select ISN...</option>

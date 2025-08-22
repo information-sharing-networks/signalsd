@@ -79,24 +79,24 @@ type SignalSearchParams struct {
 
 // SearchSignal represents a signal in search results
 type SearchSignal struct {
-	AccountID            uuid.UUID       `json:"account_id"`
+	AccountID            string          `json:"account_id"`
 	AccountType          string          `json:"account_type"`
 	Email                string          `json:"email,omitempty"`
-	SignalID             uuid.UUID       `json:"signal_id"`
+	SignalID             string          `json:"signal_id"`
 	LocalRef             string          `json:"local_ref"`
-	SignalCreatedAt      time.Time       `json:"signal_created_at"`
-	SignalVersionID      uuid.UUID       `json:"signal_version_id"`
+	SignalCreatedAt      string          `json:"signal_created_at"`
+	SignalVersionID      string          `json:"signal_version_id"`
 	VersionNumber        int32           `json:"version_number"`
-	VersionCreatedAt     time.Time       `json:"version_created_at"`
-	CorrelatedToSignalID uuid.UUID       `json:"correlated_to_signal_id"`
+	VersionCreatedAt     string          `json:"version_created_at"`
+	CorrelatedToSignalID string          `json:"correlated_to_signal_id"`
 	IsWithdrawn          bool            `json:"is_withdrawn"`
 	Content              json.RawMessage `json:"content"`
 }
 
 // PreviousSignalVersion represents a previous version of a signal
 type PreviousSignalVersion struct {
-	SignalVersionID uuid.UUID       `json:"signal_version_id"`
-	CreatedAt       time.Time       `json:"created_at"`
+	SignalVersionID string          `json:"signal_version_id"`
+	CreatedAt       string          `json:"created_at"`
 	VersionNumber   int32           `json:"version_number"`
 	Content         json.RawMessage `json:"content"`
 }
@@ -108,10 +108,8 @@ type SearchSignalWithCorrelationsAndVersions struct {
 	PreviousSignalVersions []PreviousSignalVersion `json:"previous_signal_versions,omitempty"`
 }
 
-// SignalSearchResponse represents the response from signal search
-type SignalSearchResponse struct {
-	Signals []SearchSignalWithCorrelationsAndVersions `json:"signals"`
-}
+// SignalSearchResponse represents the response from signal search (direct array)
+type SignalSearchResponse []SearchSignalWithCorrelationsAndVersions
 
 func NewAuthService(apiBaseURL string) *AuthService {
 	return &AuthService{
