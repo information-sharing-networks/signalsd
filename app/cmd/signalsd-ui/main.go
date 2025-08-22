@@ -11,8 +11,6 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui"
 	"github.com/information-sharing-networks/signalsd/app/internal/version"
 	"github.com/spf13/cobra"
-
-	signalsd "github.com/information-sharing-networks/signalsd/app"
 )
 
 func main() {
@@ -37,22 +35,17 @@ func run() error {
 	// Initialize logger
 	serverLogger := logger.InitServerLogger()
 
-	// Load configuration
-	cfg, corsConfigs, err := signalsd.NewServerConfig(serverLogger)
+	// Load UI configuration
+	cfg, err := ui.NewUIConfig(serverLogger)
 	if err != nil {
-		serverLogger.Fatal().Err(err).Msg("Failed to load configuration")
-	}
-
-	// Override port for UI if not set
-	if cfg.Port == 8080 {
-		cfg.Port = 3000
+		serverLogger.Fatal().Err(err).Msg("Failed to load UI configuration")
 	}
 
 	serverLogger.Info().Msgf("Starting UI server (version: %s)", version.Get().Version)
 	serverLogger.Info().Msgf("UI server will run on port %d", cfg.Port)
 
 	// Create UI server
-	server := ui.NewServer(cfg, corsConfigs, serverLogger)
+	server := ui.NewServer(cfg, serverLogger)
 
 	// Set up graceful shutdown handling
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

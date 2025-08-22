@@ -8,32 +8,27 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	signalsd "github.com/information-sharing-networks/signalsd/app"
 	"github.com/rs/zerolog"
 )
 
+const (
+	// ServerShutdownTimeout is the timeout for graceful server shutdown
+	ServerShutdownTimeout = 10 * time.Second
+)
+
 type Server struct {
-	router       *chi.Mux
-	serverConfig *signalsd.ServerConfig
-	corsConfigs  *signalsd.CORSConfigs
-	logger       *zerolog.Logger
-	authService  *AuthService
+	router      *chi.Mux
+	config      *UIConfig
+	logger      *zerolog.Logger
+	authService *AuthService
 }
 
-func NewServer(cfg *signalsd.ServerConfig, corsConfigs *signalsd.CORSConfigs, logger *zerolog.Logger) *Server {
-	// Determine API base URL for authentication
-	apiBaseURL := "http://localhost:8080"
-	if cfg.Environment == "production" {
-		// TODO: Set production API URL from environment variable
-		apiBaseURL = "https://api.yourdomain.com"
-	}
-
+func NewServer(cfg *UIConfig, logger *zerolog.Logger) *Server {
 	s := &Server{
-		router:       chi.NewRouter(),
-		serverConfig: cfg,
-		corsConfigs:  corsConfigs,
-		logger:       logger,
-		authService:  NewAuthService(apiBaseURL),
+		router:      chi.NewRouter(),
+		config:      cfg,
+		logger:      logger,
+		authService: NewAuthService(cfg.APIBaseURL),
 	}
 
 	s.setupRoutes()
@@ -63,14 +58,14 @@ func (s *Server) setupRoutes() {
 }
 
 func (s *Server) Start(ctx context.Context) error {
-	addr := fmt.Sprintf("%s:%d", s.serverConfig.Host, s.serverConfig.Port)
+	addr := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
 
 	server := &http.Server{
 		Addr:         addr,
 		Handler:      s.router,
-		ReadTimeout:  s.serverConfig.ReadTimeout,
-		WriteTimeout: s.serverConfig.WriteTimeout,
-		IdleTimeout:  s.serverConfig.IdleTimeout,
+		ReadTimeout:  s.config.ReadTimeout,
+		WriteTimeout: s.config.WriteTimeout,
+		IdleTimeout:  s.config.IdleTimeout,
 	}
 
 	// Start server in a goroutine
@@ -89,7 +84,7 @@ func (s *Server) Start(ctx context.Context) error {
 	case <-ctx.Done():
 		s.logger.Info().Msg("Shutting down UI server...")
 
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), signalsd.ServerShutdownTimeout)
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), ServerShutdownTimeout)
 		defer cancel()
 
 		if err := server.Shutdown(shutdownCtx); err != nil {

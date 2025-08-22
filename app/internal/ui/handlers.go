@@ -53,7 +53,7 @@ func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 		Value:    loginResp.AccessToken,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   s.serverConfig.Environment == "production",
+		Secure:   s.config.Environment == "prod",
 		MaxAge:   loginResp.ExpiresIn,
 	})
 
@@ -70,7 +70,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
-		Secure:   s.serverConfig.Environment == "production",
+		Secure:   s.config.Environment == "prod",
 	})
 
 	// Redirect to login page
@@ -94,15 +94,8 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDocs(w http.ResponseWriter, r *http.Request) {
-	// Redirect to the existing swagger documentation
-	// Assuming the API server runs on port 8080
-	apiBaseURL := "http://localhost:8080"
-	if s.serverConfig.Environment == "production" {
-		// TODO: Set production API URL
-		apiBaseURL = "https://api.yourdomain.com"
-	}
-
-	docsURL := apiBaseURL + "/docs"
+	// Redirect to the existing swagger documentation on the API server
+	docsURL := s.config.APIBaseURL + "/docs"
 	http.Redirect(w, r, docsURL, http.StatusSeeOther)
 }
 

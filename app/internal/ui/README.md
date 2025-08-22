@@ -64,12 +64,18 @@ make templ-generate
 
 ## Configuration
 
-The UI uses the same configuration system as the main signalsd service. Key environment variables:
+The UI has its own simplified configuration system, separate from the main signalsd API. Key environment variables:
 
 - `PORT`: UI server port (default: 3000)
 - `HOST`: Server host (default: 0.0.0.0)
-- `ENVIRONMENT`: Environment mode (dev/production)
-- `SECRET_KEY`: Required for session management
+- `ENVIRONMENT`: Environment mode (dev/test/perf/staging/prod, default: dev)
+- `LOG_LEVEL`: Logging level (default: debug)
+- `API_BASE_URL`: Base URL of the signalsd API (default: http://localhost:8080)
+- `READ_TIMEOUT`: HTTP read timeout (default: 15s)
+- `WRITE_TIMEOUT`: HTTP write timeout (default: 15s)
+- `IDLE_TIMEOUT`: HTTP idle timeout (default: 60s)
+
+**No database or secret configuration required** - the UI is a simple web server that calls the signalsd API.
 
 ## Authentication Flow
 
@@ -83,7 +89,7 @@ The UI uses the same configuration system as the main signalsd service. Key envi
 
 The UI integrates with the existing signalsd API:
 
-- **Login**: `POST /auth/login`
+- **Login**: `POST /api/auth/login`
 - **Token Validation**: `GET /api/isn` (used to validate tokens)
 - **Documentation**: Redirects to `/docs` on the API server
 
