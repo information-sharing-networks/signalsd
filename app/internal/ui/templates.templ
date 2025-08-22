@@ -244,15 +244,23 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 									}
 								</div>
 
-								<div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
+								<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm text-gray-600">
+									<div>
+										<span class="font-medium text-gray-900">Signal ID:</span>
+										<div class="font-mono text-xs mt-1">{ signal.SignalID }</div>
+									</div>
+									<div>
+										<span class="font-medium text-gray-900">Version ID:</span>
+										<div class="font-mono text-xs mt-1">{ signal.SignalVersionID }</div>
+									</div>
+									<div>
+										<span class="font-medium text-gray-900">Version:</span> { fmt.Sprintf("%d", signal.VersionNumber) }
+									</div>
 									<div>
 										<span class="font-medium text-gray-900">Created:</span> { signal.SignalCreatedAt }
 									</div>
 									<div>
 										<span class="font-medium text-gray-900">Updated:</span> { signal.VersionCreatedAt }
-									</div>
-									<div>
-										<span class="font-medium text-gray-900">Version:</span> { fmt.Sprintf("%d", signal.VersionNumber) }
 									</div>
 									if signal.Email != "" {
 										<div>
@@ -283,8 +291,8 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 									Pretty Print
 								</button>
 							</div>
-							<div class="bg-white border rounded-md">
-								<pre id={ fmt.Sprintf("json-%s", signal.SignalID) } class="p-4 text-sm text-gray-800 overflow-x-auto whitespace-pre-wrap">{ string(signal.Content) }</pre>
+							<div class="json-container">
+								<pre id={ fmt.Sprintf("json-%s", signal.SignalID) } class="json-content">{ string(signal.Content) }</pre>
 							</div>
 						</div>
 
@@ -320,24 +328,20 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 							</div>
 						}
 
-						<!-- Technical Details (Collapsible) -->
-						<div class="mt-4 pt-3 border-t border-gray-200">
-							<button
-								type="button"
-								data-signal-id={ signal.SignalID }
-								class="toggle-details text-xs text-gray-500 hover:text-gray-700 font-medium"
-							>
-								Show Technical Details
-							</button>
-							<div id={ fmt.Sprintf("details-%s", signal.SignalID) } class="hidden mt-2 text-xs text-gray-500 space-y-1">
-								<div><span class="font-medium">Signal ID:</span> { signal.SignalID }</div>
-								<div><span class="font-medium">Version ID:</span> { signal.SignalVersionID }</div>
-								<div><span class="font-medium">Account ID:</span> { signal.AccountID }</div>
-								if signal.AccountType != "" {
-									<div><span class="font-medium">Account Type:</span> { signal.AccountType }</div>
-								}
+						<!-- Additional Technical Info -->
+						if signal.AccountID != "" || signal.AccountType != "" {
+							<div class="mt-4 pt-3 border-t border-gray-200">
+								<h6 class="text-xs font-medium text-gray-500 mb-2">Additional Information</h6>
+								<div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-gray-500">
+									if signal.AccountID != "" {
+										<div><span class="font-medium">Account ID:</span> <span class="font-mono">{ signal.AccountID }</span></div>
+									}
+									if signal.AccountType != "" {
+										<div><span class="font-medium">Account Type:</span> { signal.AccountType }</div>
+									}
+								</div>
 							</div>
-						</div>
+						}
 					</div>
 				}
 			</div>
@@ -346,42 +350,49 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 
 	<script>
 		document.addEventListener('DOMContentLoaded', function() {
+			// Store original JSON content for each signal
+			const originalJsonContent = new Map();
+
+			// Initialize original content storage
+			document.querySelectorAll('[id^="json-"]').forEach(function(element) {
+				const signalId = element.id.replace('json-', '');
+				originalJsonContent.set(signalId, element.textContent.trim());
+			});
+
 			// Pretty print JSON toggle
 			document.addEventListener('click', function(e) {
 				if (e.target.classList.contains('toggle-json')) {
 					const signalId = e.target.getAttribute('data-signal-id');
 					const jsonElement = document.getElementById('json-' + signalId);
-					const currentText = jsonElement.textContent;
+					const originalContent = originalJsonContent.get(signalId);
 
 					try {
-						if (e.target.textContent === 'Pretty Print') {
+						if (e.target.textContent.trim() === 'Pretty Print') {
 							// Parse and pretty print JSON
-							const parsed = JSON.parse(currentText);
+							const parsed = JSON.parse(originalContent);
 							jsonElement.textContent = JSON.stringify(parsed, null, 2);
 							e.target.textContent = 'Compact';
+							jsonElement.classList.add('pretty-printed');
 						} else {
-							// Compact JSON
-							const parsed = JSON.parse(currentText);
-							jsonElement.textContent = JSON.stringify(parsed);
+							// Restore original compact JSON
+							jsonElement.textContent = originalContent;
 							e.target.textContent = 'Pretty Print';
+							jsonElement.classList.remove('pretty-printed');
 						}
 					} catch (error) {
-						console.log('Invalid JSON, cannot format');
+						console.error('Invalid JSON, cannot format:', error);
+						// Show error message briefly
+						const originalText = e.target.textContent;
+						e.target.textContent = 'Invalid JSON';
+						e.target.classList.add('text-red-600');
+						setTimeout(function() {
+							e.target.textContent = originalText;
+							e.target.classList.remove('text-red-600');
+						}, 2000);
 					}
 				}
 
-				// Technical details toggle
-				if (e.target.classList.contains('toggle-details')) {
-					const signalId = e.target.getAttribute('data-signal-id');
-					const element = document.getElementById('details-' + signalId);
-					if (element.classList.contains('hidden')) {
-						element.classList.remove('hidden');
-						e.target.textContent = 'Hide Technical Details';
-					} else {
-						element.classList.add('hidden');
-						e.target.textContent = 'Show Technical Details';
-					}
-				}
+
 			});
 		});
 	</script>

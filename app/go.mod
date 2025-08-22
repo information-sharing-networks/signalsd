@@ -10,6 +10,7 @@ require (
 )
 
 require (
+	github.com/a-h/templ v0.3.943
 	github.com/go-chi/chi/v5 v5.2.2
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/jub0bs/cors v0.7.0
@@ -25,7 +26,6 @@ require (
 
 require (
 	github.com/KyleBanks/depth v1.2.1 // indirect
-	github.com/a-h/templ v0.3.943 // indirect
 	github.com/go-openapi/jsonpointer v0.21.1 // indirect
 	github.com/go-openapi/jsonreference v0.21.0 // indirect
 	github.com/go-openapi/spec v0.21.0 // indirect

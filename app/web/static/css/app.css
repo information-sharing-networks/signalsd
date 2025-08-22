@@ -80,6 +80,12 @@
     @apply p-4 text-sm text-gray-800 overflow-x-auto whitespace-pre-wrap font-mono;
     max-height: 400px;
     overflow-y: auto;
+    line-height: 1.4;
+}
+
+.json-content.pretty-printed {
+    @apply text-gray-900;
+    line-height: 1.6;
 }
 
 .json-content::-webkit-scrollbar {
