@@ -110,3 +110,41 @@ func (a *AuthService) ValidateToken(token string) error {
 
 	return nil
 }
+
+// RefreshToken attempts to refresh an access token using the refresh token
+func (a *AuthService) RefreshToken(currentAccessToken string, refreshTokenCookie *http.Cookie) (*LoginResponse, error) {
+	url := fmt.Sprintf("%s/oauth/token?grant_type=refresh_token", a.apiBaseURL)
+
+	req, err := http.NewRequest("POST", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Set the current access token as bearer token (required for CSRF protection)
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", currentAccessToken))
+	req.Header.Set("Content-Type", "application/json")
+
+	// Add the refresh token cookie
+	req.AddCookie(refreshTokenCookie)
+
+	resp, err := a.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var errorResp ErrorResponse
+		if err := json.NewDecoder(resp.Body).Decode(&errorResp); err != nil {
+			return nil, fmt.Errorf("token refresh failed with status %d", resp.StatusCode)
+		}
+		return nil, fmt.Errorf("token refresh failed: %s", errorResp.Message)
+	}
+
+	var loginResp LoginResponse
+	if err := json.NewDecoder(resp.Body).Decode(&loginResp); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &loginResp, nil
+}

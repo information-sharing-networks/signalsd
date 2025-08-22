@@ -79,11 +79,18 @@ The UI has its own simplified configuration system, separate from the main signa
 
 ## Authentication Flow
 
-1. User submits login form via HTMX
-2. UI calls signalsd API `/auth/login` endpoint
-3. On success, JWT token is stored in HTTP-only cookie
-4. Subsequent requests validate token with signalsd API
-5. Logout clears the authentication cookie
+1. **Login**: User submits form → UI calls `/api/auth/login`
+2. **Token Storage**:
+   - API returns access token (30 min) in JSON response
+   - API automatically sets refresh token (30 days) as HTTP-only cookie
+   - UI stores access token in its own HTTP-only cookie
+3. **Authentication Check**: UI validates access token with API
+4. **Automatic Refresh**: When access token expires:
+   - UI detects 401 response from API
+   - UI calls `/oauth/token?grant_type=refresh_token` with both tokens
+   - API returns new access token + rotates refresh token cookie
+   - User stays logged in seamlessly
+5. **Logout**: Clears both access token and refresh token cookies
 
 ## API Integration
 

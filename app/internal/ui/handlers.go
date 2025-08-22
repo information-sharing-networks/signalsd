@@ -5,8 +5,8 @@ import (
 )
 
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
-	// Check if user is authenticated
-	if !s.isAuthenticated(r) {
+	// Check if user is authenticated (with automatic refresh)
+	if !s.isAuthenticatedWithRefresh(w, r) {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
@@ -17,7 +17,7 @@ func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	// If already authenticated, redirect to dashboard
-	if s.isAuthenticated(r) {
+	if s.isAuthenticatedWithRefresh(w, r) {
 		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 		return
 	}
@@ -47,9 +47,9 @@ func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Set authentication cookie with the JWT token
+	// Set access token cookie (the API automatically sets the refresh token cookie)
 	http.SetCookie(w, &http.Cookie{
-		Name:     "auth_token",
+		Name:     "access_token",
 		Value:    loginResp.AccessToken,
 		Path:     "/",
 		HttpOnly: true,
@@ -63,11 +63,21 @@ func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
-	// Clear authentication cookie
+	// Clear access token cookie
 	http.SetCookie(w, &http.Cookie{
-		Name:     "auth_token",
+		Name:     "access_token",
 		Value:    "",
 		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   s.config.Environment == "prod",
+	})
+
+	// Clear refresh token cookie (matches signalsd API cookie settings)
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    "",
+		Path:     "/oauth",
 		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   s.config.Environment == "prod",
@@ -83,7 +93,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
-	if !s.isAuthenticated(r) {
+	if !s.isAuthenticatedWithRefresh(w, r) {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
@@ -100,17 +110,45 @@ func (s *Server) handleDocs(w http.ResponseWriter, r *http.Request) {
 }
 
 // Helper methods
-func (s *Server) isAuthenticated(r *http.Request) bool {
-	cookie, err := r.Cookie("auth_token")
+
+// isAuthenticatedWithRefresh checks authentication and attempts token refresh if needed
+func (s *Server) isAuthenticatedWithRefresh(w http.ResponseWriter, r *http.Request) bool {
+	accessTokenCookie, err := r.Cookie("access_token")
 	if err != nil {
 		return false
 	}
 
-	// Validate JWT token with signalsd API
-	if err := s.authService.ValidateToken(cookie.Value); err != nil {
-		s.logger.Debug().Err(err).Msg("Token validation failed")
+	// Try to validate current access token
+	if err := s.authService.ValidateToken(accessTokenCookie.Value); err == nil {
+		return true // Token is valid
+	}
+
+	s.logger.Debug().Msg("Access token invalid, attempting refresh")
+
+	// Access token is invalid, try to refresh
+	refreshTokenCookie, err := r.Cookie("refresh_token")
+	if err != nil {
+		s.logger.Debug().Msg("No refresh token cookie found")
 		return false
 	}
 
+	// Attempt token refresh
+	loginResp, err := s.authService.RefreshToken(accessTokenCookie.Value, refreshTokenCookie)
+	if err != nil {
+		s.logger.Debug().Err(err).Msg("Token refresh failed")
+		return false
+	}
+
+	// Set new access token cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "access_token",
+		Value:    loginResp.AccessToken,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   s.config.Environment == "prod",
+		MaxAge:   loginResp.ExpiresIn,
+	})
+
+	s.logger.Debug().Msg("Token refreshed successfully")
 	return true
 }
