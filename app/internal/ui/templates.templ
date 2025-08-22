@@ -225,14 +225,18 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 				No signals found matching your search criteria.
 			</div>
 		} else {
-			<div class="divide-y divide-gray-200">
+			<div class="space-y-6 p-6">
 				for _, signal := range signals {
-					<div class="px-6 py-4">
-						<div class="flex items-start justify-between">
+					<div class="bg-gray-50 rounded-lg p-6 border border-gray-200">
+						<!-- Signal Header -->
+						<div class="flex items-start justify-between mb-4">
 							<div class="flex-1">
-								<div class="flex items-center space-x-2">
-									<span class="text-sm font-medium text-gray-900">Signal ID:</span>
-									<span class="text-sm text-gray-600 font-mono">{ signal.SignalID }</span>
+								<div class="flex items-center space-x-3 mb-2">
+									if signal.LocalRef != "" {
+										<h4 class="text-lg font-semibold text-gray-900">{ signal.LocalRef }</h4>
+									} else {
+										<h4 class="text-lg font-semibold text-gray-900">Signal { signal.SignalID[:8] }...</h4>
+									}
 									if signal.IsWithdrawn {
 										<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
 											Withdrawn
@@ -240,53 +244,62 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 									}
 								</div>
 
-								if signal.LocalRef != "" {
-									<div class="mt-1 flex items-center space-x-2">
-										<span class="text-sm font-medium text-gray-900">Local Ref:</span>
-										<span class="text-sm text-gray-600">{ signal.LocalRef }</span>
+								<div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
+									<div>
+										<span class="font-medium text-gray-900">Created:</span> { signal.SignalCreatedAt }
 									</div>
-								}
-
-								<div class="mt-1 flex items-center space-x-4 text-sm text-gray-500">
-									<span>Version { fmt.Sprintf("%d", signal.VersionNumber) }</span>
-									<span>Created: { signal.SignalCreatedAt }</span>
+									<div>
+										<span class="font-medium text-gray-900">Updated:</span> { signal.VersionCreatedAt }
+									</div>
+									<div>
+										<span class="font-medium text-gray-900">Version:</span> { fmt.Sprintf("%d", signal.VersionNumber) }
+									</div>
 									if signal.Email != "" {
-										<span>By: { signal.Email }</span>
+										<div>
+											<span class="font-medium text-gray-900">Created by:</span> { signal.Email }
+										</div>
 									}
 								</div>
 
 								if signal.CorrelatedToSignalID != "" {
-									<div class="mt-2 text-sm text-blue-600">
-										Correlated to: { signal.CorrelatedToSignalID }
+									<div class="mt-3 p-2 bg-blue-50 rounded border-l-4 border-blue-400">
+										<span class="text-sm text-blue-800">
+											<span class="font-medium">Correlated to:</span> { signal.CorrelatedToSignalID }
+										</span>
 									</div>
 								}
 							</div>
+						</div>
 
-							<div class="ml-4">
+						<!-- Signal Content -->
+						<div class="mt-4">
+							<div class="flex items-center justify-between mb-2">
+								<h5 class="text-sm font-medium text-gray-900">Signal Content</h5>
 								<button
 									type="button"
 									data-signal-id={ signal.SignalID }
-									class="toggle-content text-indigo-600 hover:text-indigo-500 text-sm font-medium"
+									class="toggle-json text-xs text-indigo-600 hover:text-indigo-500 font-medium"
 								>
-									View Content
+									Pretty Print
 								</button>
 							</div>
-						</div>
-
-						<div id={ fmt.Sprintf("content-%s", signal.SignalID) } class="hidden mt-4">
-							<div class="bg-gray-50 rounded-md p-4">
-								<h4 class="text-sm font-medium text-gray-900 mb-2">Signal Content:</h4>
-								<pre class="text-sm text-gray-600 whitespace-pre-wrap overflow-x-auto">{ string(signal.Content) }</pre>
+							<div class="bg-white border rounded-md">
+								<pre id={ fmt.Sprintf("json-%s", signal.SignalID) } class="p-4 text-sm text-gray-800 overflow-x-auto whitespace-pre-wrap">{ string(signal.Content) }</pre>
 							</div>
 						</div>
 
+						<!-- Additional Information -->
 						if len(signal.CorrelatedSignals) > 0 {
-							<div class="mt-4">
-								<h4 class="text-sm font-medium text-gray-900 mb-2">Correlated Signals:</h4>
-								<div class="space-y-2">
+							<div class="mt-4 p-3 bg-blue-50 rounded-md">
+								<h5 class="text-sm font-medium text-gray-900 mb-2">Correlated Signals ({ fmt.Sprintf("%d", len(signal.CorrelatedSignals)) })</h5>
+								<div class="space-y-1">
 									for _, correlated := range signal.CorrelatedSignals {
-										<div class="text-sm text-gray-600 pl-4 border-l-2 border-blue-200">
-											{ correlated.SignalID } (v{ fmt.Sprintf("%d", correlated.VersionNumber) })
+										<div class="text-sm text-gray-700">
+											<span class="font-mono">{ correlated.SignalID[:8] }...</span>
+											if correlated.LocalRef != "" {
+												<span class="ml-2">({ correlated.LocalRef })</span>
+											}
+											<span class="ml-2 text-gray-500">v{ fmt.Sprintf("%d", correlated.VersionNumber) }</span>
 										</div>
 									}
 								</div>
@@ -294,17 +307,37 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 						}
 
 						if len(signal.PreviousSignalVersions) > 0 {
-							<div class="mt-4">
-								<h4 class="text-sm font-medium text-gray-900 mb-2">Previous Versions:</h4>
-								<div class="space-y-2">
+							<div class="mt-4 p-3 bg-gray-100 rounded-md">
+								<h5 class="text-sm font-medium text-gray-900 mb-2">Previous Versions ({ fmt.Sprintf("%d", len(signal.PreviousSignalVersions)) })</h5>
+								<div class="space-y-1">
 									for _, version := range signal.PreviousSignalVersions {
-										<div class="text-sm text-gray-600 pl-4 border-l-2 border-gray-200">
-											Version { fmt.Sprintf("%d", version.VersionNumber) } - { version.CreatedAt }
+										<div class="text-sm text-gray-700">
+											<span class="font-medium">Version { fmt.Sprintf("%d", version.VersionNumber) }</span>
+											<span class="ml-2 text-gray-500">{ version.CreatedAt }</span>
 										</div>
 									}
 								</div>
 							</div>
 						}
+
+						<!-- Technical Details (Collapsible) -->
+						<div class="mt-4 pt-3 border-t border-gray-200">
+							<button
+								type="button"
+								data-signal-id={ signal.SignalID }
+								class="toggle-details text-xs text-gray-500 hover:text-gray-700 font-medium"
+							>
+								Show Technical Details
+							</button>
+							<div id={ fmt.Sprintf("details-%s", signal.SignalID) } class="hidden mt-2 text-xs text-gray-500 space-y-1">
+								<div><span class="font-medium">Signal ID:</span> { signal.SignalID }</div>
+								<div><span class="font-medium">Version ID:</span> { signal.SignalVersionID }</div>
+								<div><span class="font-medium">Account ID:</span> { signal.AccountID }</div>
+								if signal.AccountType != "" {
+									<div><span class="font-medium">Account Type:</span> { signal.AccountType }</div>
+								}
+							</div>
+						</div>
 					</div>
 				}
 			</div>
@@ -313,16 +346,40 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 
 	<script>
 		document.addEventListener('DOMContentLoaded', function() {
+			// Pretty print JSON toggle
 			document.addEventListener('click', function(e) {
-				if (e.target.classList.contains('toggle-content')) {
+				if (e.target.classList.contains('toggle-json')) {
 					const signalId = e.target.getAttribute('data-signal-id');
-					const element = document.getElementById('content-' + signalId);
+					const jsonElement = document.getElementById('json-' + signalId);
+					const currentText = jsonElement.textContent;
+
+					try {
+						if (e.target.textContent === 'Pretty Print') {
+							// Parse and pretty print JSON
+							const parsed = JSON.parse(currentText);
+							jsonElement.textContent = JSON.stringify(parsed, null, 2);
+							e.target.textContent = 'Compact';
+						} else {
+							// Compact JSON
+							const parsed = JSON.parse(currentText);
+							jsonElement.textContent = JSON.stringify(parsed);
+							e.target.textContent = 'Pretty Print';
+						}
+					} catch (error) {
+						console.log('Invalid JSON, cannot format');
+					}
+				}
+
+				// Technical details toggle
+				if (e.target.classList.contains('toggle-details')) {
+					const signalId = e.target.getAttribute('data-signal-id');
+					const element = document.getElementById('details-' + signalId);
 					if (element.classList.contains('hidden')) {
 						element.classList.remove('hidden');
-						e.target.textContent = 'Hide Content';
+						e.target.textContent = 'Hide Technical Details';
 					} else {
 						element.classList.add('hidden');
-						e.target.textContent = 'View Content';
+						e.target.textContent = 'Show Technical Details';
 					}
 				}
 			});

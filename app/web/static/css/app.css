@@ -62,3 +62,69 @@
 .alert-warning {
     @apply bg-yellow-50 border border-yellow-200 text-yellow-700;
 }
+
+/* Signal results styling */
+.signal-card {
+    @apply bg-gray-50 rounded-lg p-6 border border-gray-200 transition-shadow duration-200;
+}
+
+.signal-card:hover {
+    @apply shadow-md;
+}
+
+.json-container {
+    @apply bg-white border rounded-md;
+}
+
+.json-content {
+    @apply p-4 text-sm text-gray-800 overflow-x-auto whitespace-pre-wrap font-mono;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.json-content::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.json-content::-webkit-scrollbar-track {
+    @apply bg-gray-100 rounded;
+}
+
+.json-content::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded;
+}
+
+.json-content::-webkit-scrollbar-thumb:hover {
+    @apply bg-gray-400;
+}
+
+/* Signal metadata grid */
+.signal-metadata {
+    @apply grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600;
+}
+
+.signal-metadata-item {
+    @apply flex flex-col;
+}
+
+.signal-metadata-label {
+    @apply font-medium text-gray-900;
+}
+
+/* Correlation and version info */
+.correlation-info {
+    @apply mt-3 p-2 bg-blue-50 rounded border-l-4 border-blue-400;
+}
+
+.correlated-signals {
+    @apply mt-4 p-3 bg-blue-50 rounded-md;
+}
+
+.previous-versions {
+    @apply mt-4 p-3 bg-gray-100 rounded-md;
+}
+
+.technical-details {
+    @apply mt-4 pt-3 border-t border-gray-200;
+}
