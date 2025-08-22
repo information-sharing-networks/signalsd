@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	signalsd "github.com/information-sharing-networks/signalsd/app"
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
+	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
 	"github.com/jackc/pgx/v5"
 	"github.com/rs/zerolog"

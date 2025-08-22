@@ -7,13 +7,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	signalsd "github.com/information-sharing-networks/signalsd/app"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
+	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/handlers"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/isns"
+	"github.com/information-sharing-networks/signalsd/app/internal/server/middleware"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/schemas"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/rs/zerolog"
 )
@@ -63,10 +65,17 @@ func NewServer(
 		server.registerAdminRoutes()
 		server.registerSignalReadRoutes()
 		server.registerSignalWriteRoutes()
-		server.registerStaticAssetRoutes()
+		server.registerApiDocoRoutes()
+		server.registerUIRoutes()
+
+	case "api":
+		server.registerAdminRoutes()
+		server.registerSignalReadRoutes()
+		server.registerSignalWriteRoutes()
+		server.registerApiDocoRoutes()
 	case "admin":
 		server.registerAdminRoutes()
-		server.registerStaticAssetRoutes()
+		server.registerApiDocoRoutes()
 	case "signals":
 		server.registerSignalReadRoutes()
 		server.registerSignalWriteRoutes()
@@ -139,8 +148,8 @@ func (s *Server) setupMiddleware() {
 	s.router.Use(chimiddleware.RequestID)
 	s.router.Use(logger.RequestLogging(s.httpLogger))
 	s.router.Use(chimiddleware.StripSlashes)
-	s.router.Use(SecurityHeaders(s.serverConfig.Environment))
-	s.router.Use(RateLimit(s.serverConfig.RateLimitRPS, s.serverConfig.RateLimitBurst))
+	s.router.Use(middleware.SecurityHeaders(s.serverConfig.Environment))
+	s.router.Use(middleware.RateLimit(s.serverConfig.RateLimitRPS, s.serverConfig.RateLimitBurst))
 }
 
 func (s *Server) registerAdminRoutes() {
@@ -165,8 +174,8 @@ func (s *Server) registerAdminRoutes() {
 
 	// protected routes
 	s.router.Group(func(r chi.Router) {
-		r.Use(CORS(s.corsConfigs.Protected))
-		r.Use(RequestSizeLimit(s.serverConfig.MaxAPIRequestSize))
+		r.Use(middleware.CORS(s.corsConfigs.Protected))
+		r.Use(middleware.RequestSizeLimit(s.serverConfig.MaxAPIRequestSize))
 
 		//oauth2.0 token handling
 		r.Route("/oauth", func(r chi.Router) {
@@ -318,8 +327,8 @@ func (s *Server) registerSignalWriteRoutes() {
 	signals := handlers.NewSignalsHandler(s.queries, s.pool, s.schemaCache, s.publicIsnCache)
 
 	s.router.Group(func(r chi.Router) {
-		r.Use(CORS(s.corsConfigs.Protected))
-		r.Use(RequestSizeLimit(s.serverConfig.MaxSignalPayloadSize))
+		r.Use(middleware.CORS(s.corsConfigs.Protected))
+		r.Use(middleware.RequestSizeLimit(s.serverConfig.MaxSignalPayloadSize))
 		r.Use(s.authService.RequireValidAccessToken(false))
 		r.Use(s.authService.RequireIsnPermission("write"))
 
@@ -340,13 +349,13 @@ func (s *Server) registerSignalReadRoutes() {
 
 	// Public ISN signal search - no authentication required
 	s.router.Group(func(r chi.Router) {
-		r.Use(CORS(s.corsConfigs.Public))
+		r.Use(middleware.CORS(s.corsConfigs.Public))
 		r.Get("/api/public/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search", signals.SearchPublicSignalsHandler)
 	})
 
 	// Private ISN signal search - authentication required
 	s.router.Group(func(r chi.Router) {
-		r.Use(CORS(s.corsConfigs.Protected))
+		r.Use(middleware.CORS(s.corsConfigs.Protected))
 		r.Use(s.authService.RequireValidAccessToken(false))
 		r.Use(s.authService.RequireIsnPermission("read", "write"))
 		r.Get("/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search", signals.SearchPrivateSignalsHandler)
@@ -361,7 +370,7 @@ func (s *Server) registerCommonRoutes() {
 
 	// Health check endpoints
 	s.router.Route("/health", func(r chi.Router) {
-		r.Use(CORS(s.corsConfigs.Public))
+		r.Use(middleware.CORS(s.corsConfigs.Public))
 
 		// Readiness - checks if the service is ready to accept traffic (includes database connectivity)
 		r.Get("/ready", admin.ReadinessHandler)
@@ -372,31 +381,34 @@ func (s *Server) registerCommonRoutes() {
 
 	// Version information
 	s.router.Route("/version", func(r chi.Router) {
-		r.Use(CORS(s.corsConfigs.Public))
+		r.Use(middleware.CORS(s.corsConfigs.Public))
 		r.Get("/", admin.VersionHandler)
 	})
 }
 
-// registerStaticAssetRoutes serves public static assets and API documentation
-func (s *Server) registerStaticAssetRoutes() {
+// registerApiDocoRoutes serves public static assets and API documentation
+func (s *Server) registerApiDocoRoutes() {
 	// Static file server for assets (CSS, JS, images, etc.)
 	s.router.Route("/assets", func(r chi.Router) {
-		r.Use(CORS(s.corsConfigs.Public))
+		r.Use(middleware.CORS(s.corsConfigs.Public))
 
 		fs := http.FileServer(http.Dir("assets"))
 		r.Get("/*", http.StripPrefix("/assets/", fs).ServeHTTP)
 	})
 
-	// API documentation and landing pages
+	// API documentation routes
 	s.router.Route("/", func(r chi.Router) {
-		r.Use(CORS(s.corsConfigs.Public))
+		r.Use(middleware.CORS(s.corsConfigs.Public))
 
-		// Redirect root to API documentation
-		r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, "/docs", http.StatusMovedPermanently)
-		})
+		// When UI is integrated (mode "all"), the UI handles the root route
+		if s.serverConfig.ServiceMode != "all" {
+			// Redirect root to API documentation for API-only modes
+			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+				http.Redirect(w, r, "/docs", http.StatusMovedPermanently)
+			})
+		}
 
-		// API documentation (ReDoc)
+		// API documentation
 		r.Get("/docs", func(w http.ResponseWriter, r *http.Request) {
 			http.ServeFile(w, r, "./docs/redoc.html")
 		})
@@ -406,4 +418,25 @@ func (s *Server) registerStaticAssetRoutes() {
 			http.ServeFile(w, r, "./docs/swagger.json")
 		})
 	})
+}
+
+// registerUIRoutes registers web UI routes directly on the main router
+func (s *Server) registerUIRoutes() {
+	// Create UI configuration pointing to localhost API
+	uiConfig := &ui.UIConfig{
+		Environment:  s.serverConfig.Environment,
+		Host:         s.serverConfig.Host,
+		Port:         s.serverConfig.Port, // Same port as API
+		LogLevel:     s.serverLogger.GetLevel(),
+		ReadTimeout:  s.serverConfig.ReadTimeout,
+		WriteTimeout: s.serverConfig.WriteTimeout,
+		IdleTimeout:  s.serverConfig.IdleTimeout,
+		APIBaseURL:   fmt.Sprintf("http://localhost:%d", s.serverConfig.Port), // use the API port
+	}
+
+	// Create UI server and register its routes on our main router
+	uiServer := ui.NewServer(uiConfig, s.serverLogger)
+	uiServer.RegisterRoutes(s.router)
+
+	s.serverLogger.Info().Msg("UI routes registered")
 }

@@ -98,6 +98,13 @@ definitions:
         items:
           type: string
         type: array
+      visibility:
+        description: ISN visibility setting
+        enum:
+        - public
+        - private
+        example: private
+        type: string
     type: object
   handlers.BatchStatus:
     properties:

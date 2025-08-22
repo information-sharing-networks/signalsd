@@ -355,14 +355,15 @@ This service is deployed to Google Cloud Run.  Google handles HTTPS, firewall, l
 You can run multiple instances of the signalsd service, each in a different mode.  This enables you to, for example, run a separate service for admin and signal processing workloads.
 The service mode is specified using the `-mode` command line flag:
 
-- **`all`**: Serves all endpoints 
+- **`all`**: Serves all API endpoints + UI
+- **`api`**: Serves all API endpoints 
 - **`admin`**: Serves only admin API endpoints (excludes signal exchange)
 - **`signals`**: Serves signal exchange endpoints (both read and write operations)
 - **`signals-read`**: Serves only signal read operations 
 - **`signals-write`**: Serves only signal write operations
 
 ```sh
-PORT=8080 go run cmd/signalsd/main.go --mode admin
+PORT=8080 go run cmd/signalsd/main.go --mode all
 PORT=8081 go run cmd/signalsd/main.go --mode signals-read
 PORT=8082 go run cmd/signalsd/main.go --mode signals-write
 ```

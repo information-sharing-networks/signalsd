@@ -1,7 +1,7 @@
 # Docker-based Makefile for signalsd
 # Uses tools installed in Docker containers instead of local installations
 
-.PHONY: help psql check generate docs swag-fmt sqlc fmt vet lint security test clean docker-up docker-down
+.PHONY: help psql check generate docs swag-fmt sqlc fmt vet lint security test clean docker-up docker-down ui-dev ui-build templ-generate
 
 # Docker compose service name
 APP_SERVICE = app
@@ -32,6 +32,9 @@ help:
 	@echo "  make restart         - restart the docker app"
 	@echo "  make logs       	  - follow docker logs"
 	@echo "  make psql            - run psql agaist the dev database"
+	@echo "  make ui-dev          - Run UI in development mode"
+	@echo "  make ui-build        - Build UI binary"
+	@echo "  make templ-generate  - Generate templ templates"
 	@echo "  make clean           - Clean build artifacts"
 
 # Docker management
@@ -125,3 +128,16 @@ check-containers:
 psql:
 	@echo "🔄 Running psql on dev database container"
 	docker compose exec -it db psql -U $(DB_ACCOUNT) -d $(DB_NAME)
+
+# UI development commands
+ui-dev:
+	@echo "🔄 Running UI in development mode..."
+	@sh -c "cd app && go run ./cmd/signalsd-ui/main.go"
+
+ui-build:
+	@echo "🔄 Building UI binary..."
+	@sh -c "cd app && go build -o signalsd-ui ./cmd/signalsd-ui/main.go"
+
+templ-generate:
+	@echo "🔄 Generating templ templates..."
+	@sh -c "cd app && templ generate"

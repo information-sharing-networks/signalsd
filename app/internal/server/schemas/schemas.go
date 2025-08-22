@@ -7,8 +7,8 @@ import (
 	"strings"
 	"sync"
 
-	signalsd "github.com/information-sharing-networks/signalsd/app"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
+	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/santhosh-tekuri/jsonschema/v5"
 )
 

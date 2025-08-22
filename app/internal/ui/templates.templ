@@ -1,0 +1,552 @@
+package ui
+
+import (
+	"fmt"
+)
+
+// =============================================================================
+// BASE LAYOUT & STRUCTURE
+// =============================================================================
+
+templ BaseLayout(title string) {
+	<!DOCTYPE html>
+	<html lang="en">
+	<head>
+		<meta charset="UTF-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+		<title>{ title } - Signalsd</title>
+		<script src="https://unpkg.com/htmx.org@2.0.4"></script>
+		<link href="/static/css/app.css" rel="stylesheet"/>
+	</head>
+	<body>
+		{ children... }
+	</body>
+	</html>
+}
+
+// =============================================================================
+// NAVIGATION COMPONENT
+// =============================================================================
+
+templ Navigation() {
+	<nav class="navigation">
+		<div class="nav-container">
+			<div class="nav-content">
+				<div class="nav-brand">
+					<h1 class="nav-title">Signalsd</h1>
+					<div class="nav-links">
+						<a href="/dashboard" class="nav-link active">
+							Dashboard
+						</a>
+						<a href="/search" class="nav-link">
+							Search Signals
+						</a>
+						<a href="/docs" class="nav-link">
+							API Docs
+						</a>
+					</div>
+				</div>
+				<div class="nav-actions">
+					<button
+						hx-post="/logout"
+						hx-confirm="Are you sure you want to logout?"
+						class="nav-link"
+					>
+						Logout
+					</button>
+				</div>
+			</div>
+		</div>
+	</nav>
+}
+
+// =============================================================================
+// LOGIN
+// =============================================================================
+
+templ LoginPage() {
+	@BaseLayout("Login") {
+		<div class="form-container">
+			<div class="form-card">
+				<h2 class="form-title">
+					Sign in to Signalsd
+				</h2>
+				<form hx-post="/login" hx-target="#login-error">
+					<div class="form-group">
+						<div class="form-group-stacked">
+							<label for="email" class="form-label-sr">Email address</label>
+							<input
+								id="email"
+								name="email"
+								type="email"
+								required
+								class="form-input form-input-stacked"
+								placeholder="Email address"
+							/>
+						</div>
+						<div class="form-group-stacked">
+							<label for="password" class="form-label-sr">Password</label>
+							<input
+								id="password"
+								name="password"
+								type="password"
+								required
+								class="form-input form-input-stacked"
+								placeholder="Password"
+							/>
+						</div>
+					</div>
+
+					<div id="login-error"></div>
+
+					<div class="form-group">
+						<button type="submit" class="btn btn-primary btn-full">
+							Sign in
+						</button>
+					</div>
+				</form>
+			</div>
+		</div>
+	}
+}
+
+templ LoginError(message string) {
+	<div class="alert alert-error">
+		{ message }
+	</div>
+}
+
+// =============================================================================
+// DASHBOARD PAGE
+// =============================================================================
+
+templ DashboardPage() {
+	@BaseLayout("Dashboard") {
+		@Navigation()
+		<div class="page-container">
+			<h1 class="page-title">Dashboard</h1>
+			<p class="text-muted mb-6">Welcome to the Signalsd management interface.</p>
+
+			<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+				<div class="card">
+					<div class="card-body">
+						<h3 class="card-title">Signal Management</h3>
+						<p class="text-muted mb-4">Search and manage signals across Information Sharing Networks.</p>
+						<a href="/search" class="btn btn-secondary">Search Signals</a>
+					</div>
+				</div>
+
+				<div class="card">
+					<div class="card-body">
+						<h3 class="card-title">API Documentation</h3>
+						<p class="text-muted mb-4">View the complete API reference and interactive documentation.</p>
+						<a href="/docs" target="_blank" class="btn btn-secondary">
+							View Docs ↗
+						</a>
+					</div>
+				</div>
+
+				<div class="card">
+					<div class="card-body">
+						<h3 class="card-title">Information Sharing Networks</h3>
+						<p class="text-muted mb-4">Manage ISNs and configure data sharing.</p>
+						<a href="#" class="btn btn-secondary">Manage ISNs</a>
+					</div>
+				</div>
+			</div>
+
+
+		</div>
+	}
+}
+
+// =============================================================================
+// REUSABLE COMPONENTS
+// =============================================================================
+
+templ SignalMetadataItem(label, value string) {
+	<div class="signal-metadata-item">
+		<span class="signal-metadata-label">{ label }:</span>
+		<div class="signal-metadata-value">{ value }</div>
+	</div>
+}
+
+templ SignalMetadataSimple(label, value string) {
+	<div class="signal-metadata-item">
+		<span class="signal-metadata-label">{ label }:</span> { value }
+	</div>
+}
+
+templ CheckboxField(name, value, label string) {
+	<label class="checkbox-field">
+		<input type="checkbox" name={ name } value={ value } class="checkbox-input"/>
+		<span class="text-sm">{ label }</span>
+	</label>
+}
+
+// =============================================================================
+// REUSABLE FORM COMPONENTS
+// =============================================================================
+
+
+templ SignalTypeOptions(signalTypes []string) {
+	<select
+		id="signal_type_slug"
+		name="signal_type_slug"
+		required
+		hx-post="/ui-api/signal-versions"
+		hx-target="#sem_ver"
+		hx-swap="outerHTML"
+		hx-trigger="change"
+		hx-include="#isn_slug, this"
+		class="form-select"
+	>
+		<option value="">Select Signal Type...</option>
+		for _, signalType := range signalTypes {
+			<option value={ signalType }>{ signalType }</option>
+		}
+	</select>
+}
+
+templ VersionOptions(versions []string) {
+	<select
+		id="sem_ver"
+		name="sem_ver"
+		required
+		class="form-select"
+	>
+		<option value="">Select Version...</option>
+		for _, version := range versions {
+			<option value={ version }>{ version }</option>
+		}
+	</select>
+}
+
+templ SearchError(message string) {
+	<div class="alert alert-error">
+		{ message }
+	</div>
+}
+
+templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
+	<div class="card">
+		<div class="card-header">
+			<h3 class="card-title">Search Results ({ fmt.Sprintf("%d", len(signals)) } signals found)</h3>
+		</div>
+
+		if len(signals) == 0 {
+			<div class="card-body text-center text-muted">
+				No signals found matching your search criteria.
+			</div>
+		} else {
+			<div class="card-body space-y-6">
+				for _, signal := range signals {
+					<div class="signal-card">
+						<!-- Signal Header -->
+						<div class="signal-header">
+							<div style="flex: 1;">
+								<div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+									if signal.LocalRef != "" {
+										<h4 class="signal-title">{ signal.LocalRef }</h4>
+									} else {
+										<h4 class="signal-title">Signal { signal.SignalID[:8] }...</h4>
+									}
+									if signal.IsWithdrawn {
+										<span class="signal-badge signal-badge-withdrawn">
+											Withdrawn
+										</span>
+									}
+								</div>
+
+								<div class="signal-metadata">
+									@SignalMetadataItem("Signal ID", signal.SignalID)
+									@SignalMetadataItem("Version ID", signal.SignalVersionID)
+									@SignalMetadataSimple("Version", fmt.Sprintf("%d", signal.VersionNumber))
+									@SignalMetadataSimple("Created", signal.SignalCreatedAt)
+									@SignalMetadataSimple("Updated", signal.VersionCreatedAt)
+									if signal.Email != "" {
+										@SignalMetadataSimple("Created by", signal.Email)
+									}
+								</div>
+
+								if signal.CorrelatedToSignalID != "" {
+									<div class="correlation-info">
+										<span class="text-sm" style="color: #1e40af;">
+											<span style="font-weight: 500;">Correlated to:</span> { signal.CorrelatedToSignalID }
+										</span>
+									</div>
+								}
+							</div>
+						</div>
+
+						<!-- Signal Content -->
+						<div style="margin-top: 1rem;">
+							<div class="json-header">
+								<h5 class="text-sm" style="font-weight: 500; color: #111827;">Signal Content</h5>
+								<button
+									type="button"
+									data-signal-id={ signal.SignalID }
+									class="pretty-print-btn btn btn-secondary text-xs"
+								>
+									Pretty Print
+								</button>
+							</div>
+							<div class="json-container">
+								<pre id={ fmt.Sprintf("json-%s", signal.SignalID) } class="json-content">{ string(signal.Content) }</pre>
+							</div>
+						</div>
+
+						<!-- Additional Information -->
+						if len(signal.CorrelatedSignals) > 0 {
+							<div class="correlated-signals">
+								<h5 class="text-sm" style="font-weight: 500; color: #111827; margin-bottom: 0.5rem;">Correlated Signals ({ fmt.Sprintf("%d", len(signal.CorrelatedSignals)) })</h5>
+								<div class="space-y-1">
+									for _, correlated := range signal.CorrelatedSignals {
+										<div class="text-sm" style="color: #374151;">
+											<span class="font-mono">{ correlated.SignalID[:8] }...</span>
+											if correlated.LocalRef != "" {
+												<span style="margin-left: 0.5rem;">({ correlated.LocalRef })</span>
+											}
+											<span style="margin-left: 0.5rem; color: #6b7280;">v{ fmt.Sprintf("%d", correlated.VersionNumber) }</span>
+										</div>
+									}
+								</div>
+							</div>
+						}
+
+						if len(signal.PreviousSignalVersions) > 0 {
+							<div class="previous-versions">
+								<h5 class="text-sm" style="font-weight: 500; color: #111827; margin-bottom: 0.5rem;">Previous Versions ({ fmt.Sprintf("%d", len(signal.PreviousSignalVersions)) })</h5>
+								<div class="space-y-1">
+									for _, version := range signal.PreviousSignalVersions {
+										<div class="text-sm" style="color: #374151;">
+											<span style="font-weight: 500;">Version { fmt.Sprintf("%d", version.VersionNumber) }</span>
+											<span style="margin-left: 0.5rem; color: #6b7280;">{ version.CreatedAt }</span>
+										</div>
+									}
+								</div>
+							</div>
+						}
+
+						<!-- Additional Technical Info -->
+						if signal.AccountID != "" || signal.AccountType != "" {
+							<div class="technical-details">
+								<h6 class="text-xs" style="font-weight: 500; color: #6b7280; margin-bottom: 0.5rem;">Additional Information</h6>
+								<div class="signal-metadata text-xs" style="color: #6b7280;">
+									if signal.AccountID != "" {
+										<div><span style="font-weight: 500;">Account ID:</span> <span class="font-mono">{ signal.AccountID }</span></div>
+									}
+									if signal.AccountType != "" {
+										<div><span style="font-weight: 500;">Account Type:</span> { signal.AccountType }</div>
+									}
+								</div>
+							</div>
+						}
+					</div>
+				}
+			</div>
+		}
+	</div>
+
+	<script>
+		// Store original JSON content for each signal
+		const originalJsonContent = new Map();
+
+		// Event delegation for pretty print buttons
+		document.addEventListener('click', function(e) {
+			if (e.target.classList.contains('pretty-print-btn')) {
+				const signalId = e.target.getAttribute('data-signal-id');
+				const jsonElement = document.getElementById('json-' + signalId);
+
+				if (!jsonElement) {
+					return;
+				}
+
+				// Get or store original content
+				let originalContent = originalJsonContent.get(signalId);
+				if (!originalContent) {
+					originalContent = jsonElement.textContent.trim();
+					originalJsonContent.set(signalId, originalContent);
+				}
+
+				try {
+					const currentButtonText = e.target.textContent.trim();
+
+					if (currentButtonText === 'Pretty Print') {
+						// Parse and pretty print JSON
+						const parsed = JSON.parse(originalContent);
+						jsonElement.textContent = JSON.stringify(parsed, null, 2);
+						e.target.textContent = 'Compact';
+						jsonElement.classList.add('pretty-printed');
+					} else {
+						// Restore original compact JSON
+						jsonElement.textContent = originalContent;
+						e.target.textContent = 'Pretty Print';
+						jsonElement.classList.remove('pretty-printed');
+					}
+				} catch (error) {
+					// Show error message briefly
+					const originalText = e.target.textContent;
+					e.target.textContent = 'Invalid JSON';
+					e.target.classList.add('text-red-600');
+					setTimeout(function() {
+						e.target.textContent = originalText;
+						e.target.classList.remove('text-red-600');
+					}, 2000);
+				}
+			}
+		});
+	</script>
+}
+
+// =============================================================================
+// SIGNAL SEARCH PAGE & RESULTS
+// =============================================================================
+
+templ SignalSearchPage(isns []ISN, perms map[string]IsnPerms, results []SearchSignalWithCorrelationsAndVersions, errorMsg string) {
+	@BaseLayout("Signal Search") {
+		@Navigation()
+		<div class="page-container">
+			<h1 class="page-title">Search Signals</h1>
+
+			<div class="card mb-6">
+				<div class="card-body">
+					<form hx-post="/ui-api/search-signals" hx-target="#search-results" class="space-y-4">
+						<div class="grid grid-cols-1 md:grid-cols-3">
+							<div class="form-group">
+								<label for="isn_slug" class="form-label">ISN</label>
+								<select
+									id="isn_slug"
+									name="isn_slug"
+									required
+									hx-post="/ui-api/signal-types"
+									hx-target="#signal_type_slug"
+									hx-swap="outerHTML"
+									hx-trigger="change"
+									hx-include="#isn_slug, this"
+									class="form-select"
+								>
+									<option value="">Select ISN...</option>
+									if isns != nil {
+										for _, isn := range isns {
+											if isn.IsInUse {
+												<option value={ isn.Slug }>{ isn.Title }</option>
+											}
+										}
+									}
+								</select>
+							</div>
+
+							<div id="signal-type-select" class="form-group">
+								<label for="signal_type_slug" class="form-label">Signal Type</label>
+								<select
+									id="signal_type_slug"
+									name="signal_type_slug"
+									required
+									hx-post="/ui-api/signal-versions"
+									hx-target="#sem_ver"
+									hx-swap="outerHTML"
+									hx-trigger="change"
+									hx-include="#isn_slug, this"
+									class="form-select"
+								>
+									<option value="">Select Signal Type...</option>
+								</select>
+							</div>
+
+							<div id="version-select" class="form-group">
+								<label for="sem_ver" class="form-label">Version</label>
+								<select
+									id="sem_ver"
+									name="sem_ver"
+									required
+									class="form-select"
+								>
+									<option value="">Select Version...</option>
+								</select>
+							</div>
+						</div>
+
+						<div class="grid grid-cols-1 md:grid-cols-2">
+							<div class="form-group">
+								<label for="start_date" class="form-label">Start Date</label>
+								<input
+									type="date"
+									id="start_date"
+									name="start_date"
+									class="form-input"
+								/>
+							</div>
+
+							<div class="form-group">
+								<label for="end_date" class="form-label">End Date</label>
+								<input
+									type="date"
+									id="end_date"
+									name="end_date"
+									class="form-input"
+								/>
+							</div>
+						</div>
+
+						<div class="grid grid-cols-1 md:grid-cols-3">
+							<div class="form-group">
+								<label for="local_ref" class="form-label">Local Reference</label>
+								<input
+									type="text"
+									id="local_ref"
+									name="local_ref"
+									placeholder="e.g., item_id_#1"
+									class="form-input"
+								/>
+							</div>
+
+							<div class="form-group">
+								<label for="signal_id" class="form-label">Signal ID</label>
+								<input
+									type="text"
+									id="signal_id"
+									name="signal_id"
+									placeholder="UUID"
+									class="form-input"
+								/>
+							</div>
+
+							<div class="form-group">
+								<label for="account_id" class="form-label">Account ID</label>
+								<input
+									type="text"
+									id="account_id"
+									name="account_id"
+									placeholder="UUID"
+									class="form-input"
+								/>
+							</div>
+						</div>
+
+						<div class="checkbox-group">
+							@CheckboxField("include_withdrawn", "true", "Include withdrawn signals")
+							@CheckboxField("include_correlated", "true", "Include correlated signals")
+							@CheckboxField("include_previous_versions", "true", "Include previous versions")
+						</div>
+
+						<div class="form-group">
+							<button type="submit" class="btn btn-primary">
+								Search Signals
+							</button>
+						</div>
+					</form>
+				</div>
+			</div>
+
+			<div id="search-results">
+				if errorMsg != "" {
+					@SearchError(errorMsg)
+				}
+				if results != nil {
+					@SearchResults(results)
+				}
+			</div>
+		</div>
+	}
+}
