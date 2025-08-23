@@ -1,11 +1,11 @@
 # build the signalsd service image for prod using scratch base.
 #
-# Note that the historical need to copy ca-certificates and tzdata from builder images do not apply in Go 1.24+:
+# Note that the historical need to copy ca-certificates and tzdata from builder images do not apply in Go 1.2525
 # - CA root certificates: Go's crypto/x509 package includes embedded root certificates for TLS connections (required by signald when it validates JSON schemas from github)
 # - Timezone data: Go's time/tzdata package can embed timezone data when needed (not required for signalsd)
 # - Static compilation (CGO_ENABLED=0) ensures all dependencies are embedded in the binary 
 #
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 

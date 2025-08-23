@@ -96,7 +96,7 @@ DB_CONNECT_TIMEOUT=5s
 **Prerequisites**: 
 The following must be installed on your system
 - [Docker Desktop](https://docs.docker.com/get-docker) 
-- [go 1.24+](https://go.dev/doc/install)
+- [go 1.25+](https://go.dev/doc/install)
 
 Clone the repo:
 ```bash
@@ -243,7 +243,7 @@ if you do not want to use Docker, you need to install the following dependencies
 
 ### Prerequisites
 Install the following:
-- Go 1.24 or above
+- Go 1.25 or above
 - PostgreSQL@17 or above
 
 ### Go Development tools
