@@ -14,7 +14,7 @@ require (
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/jub0bs/cors v0.7.0
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/pressly/goose/v3 v3.24.3
+	github.com/pressly/goose/v3 v3.25.0
 	github.com/rs/zerolog v1.34.0
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/spf13/cobra v1.9.1
