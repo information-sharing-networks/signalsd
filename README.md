@@ -301,6 +301,9 @@ ENVIRONMENT=perf DB_MAX_CONNECTIONS=50 DB_MIN_CONNECTIONS=5 RATE_LIMIT_RPS=0 go 
 ENVIRONMENT=prod DB_MAX_CONNECTIONS=25 DB_CONNECT_TIMEOUT=10s go run cmd/signalsd/main.go --mode all
 ```
 
+## User Interface
+By default the signalsd service starts with a basic web interface. If you want to modify, replace or disable the UI see the [UI Documentation](app/internal/ui/README.md).
+
 ## Getting Help
 - Check the [API documentation](https://signalsd.btddemo.org/docs)
 - Review logs: `docker compose logs -f`
