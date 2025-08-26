@@ -134,13 +134,17 @@ When running as a separate service, the UI has its own configuration:
 ## Prerequisites
 
 1. Have Go 1.25+ installed
-2. Install templ: `go install github.com/a-h/templ/cmd/templ@latest`
-3. Set up database (see main signalsd README)
+2. Set up database (see main signalsd README)
 
 ## Template Development
-
 When modifying `.templ` files, regenerate the Go code:
 
+if developing locally, install templ: `go install github.com/a-h/templ/cmd/templ@latest`
+
 ```bash
-make templ-generate
+# For docker users
+make templ
+
+# For local users
+cd app && templ generate"
 ```

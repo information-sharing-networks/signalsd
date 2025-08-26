@@ -1,7 +1,7 @@
 # Docker-based Makefile for signalsd
 # Uses tools installed in Docker containers instead of local installations
 
-.PHONY: help psql check generate docs swag-fmt sqlc fmt vet lint security test clean docker-up docker-down ui-dev ui-build templ-generate
+.PHONY: help psql check generate docs swag-fmt sqlc fmt vet lint security test clean docker-up docker-down templ
 
 # Docker compose service name
 APP_SERVICE = app
@@ -17,10 +17,11 @@ help:
 	@echo ""
 	@echo "Available commands:"
 	@echo "  make check           - Run all pre-commit checks (recommended before committing)"
-	@echo "  make generate        - Generate docs and code (swagger + sqlc)"
+	@echo "  make generate        - Generate docs and code (swagger + sqlc + templ)"
 	@echo "  make docs            - Generate swagger documentation"
 	@echo "  make swag-fmt        - format swag comments"
 	@echo "  make sqlc            - Generate sqlc code"
+	@echo "  make templ           - Generate templ template code (UI)"
 	@echo "  make fmt             - Format code"
 	@echo "  make vet             - Run go vet"
 	@echo "  make lint            - Run staticcheck"
@@ -32,9 +33,6 @@ help:
 	@echo "  make restart         - restart the docker app"
 	@echo "  make logs       	  - follow docker logs"
 	@echo "  make psql            - run psql agaist the dev database"
-	@echo "  make ui-dev          - Run UI in development mode"
-	@echo "  make ui-build        - Build UI binary"
-	@echo "  make templ-generate  - Generate templ templates"
 	@echo "  make clean           - Clean build artifacts"
 
 # Docker management
@@ -60,7 +58,7 @@ check: generate fmt swag-fmt vet lint security test
 	@echo "✅ All checks passed! Ready to commit."
 
 # Generate all code and documentation
-generate: docs sqlc swag-fmt
+generate: docs sqlc swag-fmt templ
 
 # Generate swagger documentation
 docs:
@@ -76,6 +74,11 @@ swag-fmt:
 sqlc:
 	@echo "🔄 Generating sqlc code..."
 	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && sqlc generate"
+
+# Generate templ templates
+templ:
+	@echo "🔄 Generating templ templates..."
+	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && templ generate"
 
 # Format code
 fmt:
@@ -128,16 +131,3 @@ check-containers:
 psql:
 	@echo "🔄 Running psql on dev database container"
 	docker compose exec -it db psql -U $(DB_ACCOUNT) -d $(DB_NAME)
-
-# UI development commands
-ui-dev:
-	@echo "🔄 Running UI in development mode..."
-	@sh -c "cd app && go run ./cmd/signalsd-ui/main.go"
-
-ui-build:
-	@echo "🔄 Building UI binary..."
-	@sh -c "cd app && go build -o signalsd-ui ./cmd/signalsd-ui/main.go"
-
-templ-generate:
-	@echo "🔄 Generating templ templates..."
-	@sh -c "cd app && templ generate"
