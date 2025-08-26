@@ -14,8 +14,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	signalsd "github.com/information-sharing-networks/signalsd/app"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
+	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/jackc/pgx/v5"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -48,6 +48,7 @@ type IsnPerms struct {
 	Permission      string     `json:"permission" enums:"read,write" example:"read"`
 	SignalBatchID   *uuid.UUID `json:"signal_batch_id,omitempty" example:"967affe9-5628-4fdd-921f-020051344a12"`
 	SignalTypePaths []string   `json:"signal_types,omitempty" example:"signal-type-1/v0.0.1,signal-type-2/v1.0.0"` // list of available signal types for the isn
+	Visibility      string     `json:"visibility" enums:"public,private" example:"private"`                        // ISN visibility setting
 }
 
 type AccessTokenClaims struct {
@@ -155,6 +156,7 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 	// create a map of theIsns with their available signal_type paths (sample-signal--example-org/0.0.1 etc)
 	// this list is included in the claims assuming the user has permission for the isn
 	isnSignalTypePaths := make(map[string][]string)
+	isnVisibility := make(map[string]string)
 	for _, isn := range inUseIsns {
 
 		signalTypeRows, err := a.queries.GetInUseSignalTypesByIsnID(ctx, isn.ID)
@@ -169,6 +171,7 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 		}
 
 		isnSignalTypePaths[isn.Slug] = signalTypePaths
+		isnVisibility[isn.Slug] = isn.Visibility
 	}
 
 	// get the active isns this account's has been granted access to.
@@ -197,6 +200,7 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 				Permission:      "write",
 				SignalBatchID:   latestSignalBatchIDs[siteIsn.Slug],
 				SignalTypePaths: isnSignalTypePaths[siteIsn.Slug],
+				Visibility:      isnVisibility[siteIsn.Slug],
 			}
 		}
 
@@ -208,6 +212,7 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 					Permission:      "write",
 					SignalBatchID:   latestSignalBatchIDs[siteIsn.Slug],
 					SignalTypePaths: isnSignalTypePaths[siteIsn.Slug],
+					Visibility:      isnVisibility[siteIsn.Slug],
 				}
 			}
 		}
@@ -218,6 +223,7 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 				Permission:      accessibleIsn.Permission,
 				SignalBatchID:   latestSignalBatchIDs[accessibleIsn.IsnSlug],
 				SignalTypePaths: isnSignalTypePaths[accessibleIsn.IsnSlug],
+				Visibility:      isnVisibility[accessibleIsn.IsnSlug],
 			}
 		}
 	case "member":
@@ -227,6 +233,7 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 				Permission:      accessibleIsn.Permission,
 				SignalBatchID:   latestSignalBatchIDs[accessibleIsn.IsnSlug],
 				SignalTypePaths: isnSignalTypePaths[accessibleIsn.IsnSlug],
+				Visibility:      isnVisibility[accessibleIsn.IsnSlug],
 			}
 		}
 	default:
@@ -316,16 +323,16 @@ func (a *AuthService) RotateRefreshToken(ctx context.Context) (string, error) {
 }
 func (a *AuthService) NewRefreshTokenCookie(environment string, refreshToken string) *http.Cookie {
 
-	isProd := a.environment == "prod" //Secure flag is only true on prod
+	isProd := a.environment == "prod" //secure flag only true on prod
 
 	newCookie := &http.Cookie{
 		Name:     signalsd.RefreshTokenCookieName,
 		Value:    refreshToken,
-		Path:     "/oauth",
-		Expires:  time.Now().Add(signalsd.RefreshTokenExpiry),
+		Path:     "/",
+		MaxAge:   int(signalsd.RefreshTokenExpiry.Seconds()),
 		HttpOnly: true,
 		Secure:   isProd,
-		SameSite: http.SameSiteNoneMode, // needed for cross-origin requests from multiple clients
+		SameSite: http.SameSiteLaxMode,
 	}
 
 	return newCookie

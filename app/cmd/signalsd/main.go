@@ -14,12 +14,14 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/server"
+	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/isns"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/schemas"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 
-	signalsd "github.com/information-sharing-networks/signalsd/app"
 	"github.com/information-sharing-networks/signalsd/app/internal/version"
 
 	_ "github.com/information-sharing-networks/signalsd/app/docs"
@@ -143,21 +145,24 @@ func main() {
 		Short: "Signalsd service for ISNs",
 		Long:  `Signalsd provides APIs for operating a Signals Information Sharing Network`,
 		Example: `
-  signalsd --mode all           # Single service with all endpoints
-  signalsd --mode admin         # Admin service only
+  signalsd --mode all           # Single service with all endpoints + UI
+  signalsd --mode api           # API endpoints only (no UI)
+  signalsd --mode ui            # Standalone UI server (requires separate API)
+  signalsd --mode admin         # Admin endpoints only
   signalsd --mode signals       # Signal exchange service (read + write)
   signalsd --mode signals-read  # Signal read operations only
-  signalsd --mode signals-write # Signal write operations only`,
+  signalsd --mode signals-write # Signal write operations only
+  signalsd --mode ui            # Web UI service only`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !signalsd.ValidServiceModes[mode] {
-				return fmt.Errorf("invalid service mode '%s'. Valid modes: all, admin, signals, signals-read, signals-write", mode)
+				return fmt.Errorf("invalid service mode '%s'. Valid modes: all, api, admin, signals, signals-read, signals-write, ui", mode)
 			}
 
 			return run(mode)
 		},
 	}
 
-	cmd.Flags().StringVarP(&mode, "mode", "m", "", "Service mode (required): all, admin, signals, signals-read, or signals-write")
+	cmd.Flags().StringVarP(&mode, "mode", "m", "", "Service mode (required): all, api, admin, signals, signals-read, signals-write, or ui")
 	if err := cmd.MarkFlagRequired("mode"); err != nil {
 		log.Fatalf("Failed to mark mode flag as required: %v", err)
 	}
@@ -174,6 +179,11 @@ func run(mode string) error {
 	// command line logger
 	serverLogger := logger.InitServerLogger()
 
+	// Special case: UI-only mode runs standalone UI server
+	if mode == "ui" {
+		return runStandaloneUI(serverLogger)
+	}
+
 	// get site config from environment variables
 	cfg, corsConfigs, err := signalsd.NewServerConfig(serverLogger)
 	if err != nil {
@@ -187,7 +197,7 @@ func run(mode string) error {
 		serverLogger.Warn().Msg("production env is configured to allow all origins for CORS. Use the ALLOWED_ORIGINS env variable to restrict access to specific origins")
 	}
 
-	// the --mode command line param determines which endpoints should be served: all, admin, signals, signals-read, or signals-write
+	// the --mode command line param determines which endpoints should be served: all, admin, signals, signals-read, signals-write, or ui
 	cfg.ServiceMode = mode
 
 	httpLogger := logger.InitHttpLogger(cfg.LogLevel, cfg.Environment)
@@ -284,6 +294,35 @@ func run(mode string) error {
 	}
 
 	serverLogger.Info().Msg("server shutdown complete")
+	return nil
+}
+
+// runStandaloneUI runs the UI server without database or API infrastructure
+func runStandaloneUI(serverLogger *zerolog.Logger) error {
+	serverLogger.Info().Msg("Starting standalone UI server")
+
+	// Load UI configuration
+	cfg, err := ui.NewConfig(serverLogger)
+	if err != nil {
+		serverLogger.Fatal().Err(err).Msg("Failed to load UI configuration")
+	}
+
+	serverLogger.Info().Msgf("Using signalsd API at: %s", cfg.APIBaseURL)
+
+	// Create UI server
+	server := ui.NewServer(cfg, serverLogger)
+
+	// Set up graceful shutdown handling
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	// Run the server
+	if err := server.Start(ctx); err != nil {
+		serverLogger.Error().Msgf("UI server error: %v", err)
+		return err
+	}
+
+	serverLogger.Info().Msg("UI server shutdown complete")
 	return nil
 }
 

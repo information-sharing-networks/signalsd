@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	signalsd "github.com/information-sharing-networks/signalsd/app"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
+	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 )
 
 const testTolerance = 30 * time.Second // use this when checking that token expiriy dates are in the expected range
@@ -222,7 +222,7 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 				cookie: &http.Cookie{
 					Name:  signalsd.RefreshTokenCookieName,
 					Value: "invalid-token",
-					Path:  "/oauth",
+					Path:  "/",
 				},
 				accessToken:    accessToken,
 				expectedStatus: http.StatusUnauthorized,
@@ -284,12 +284,25 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 				earliestExpiry := expectedExpiry.Add(signalsd.RefreshTokenExpiry).Add(-testTolerance)
 
 				//check the cookie is correctly configured
-				if !latestExpiry.After(latestRefreshTokenCookie.Expires) || earliestExpiry.After(latestRefreshTokenCookie.Expires) {
-					t.Errorf("the refresh token should expire between %v and %v but got : %v", earliestExpiry, latestExpiry, latestRefreshTokenCookie.Expires)
+				// Handle both MaxAge and Expires approaches
+				var cookieExpiry time.Time
+				if latestRefreshTokenCookie.MaxAge > 0 {
+					// Cookie uses MaxAge - calculate expiry from current time
+					cookieExpiry = time.Now().Add(time.Duration(latestRefreshTokenCookie.MaxAge) * time.Second)
+				} else if !latestRefreshTokenCookie.Expires.IsZero() {
+					// Cookie uses Expires field
+					cookieExpiry = latestRefreshTokenCookie.Expires
+				} else {
+					t.Error("Cookie has neither MaxAge nor Expires set")
+					return
 				}
 
-				if latestRefreshTokenCookie.Path != "/oauth" {
-					t.Errorf("Expected the cookie path to be oauth but got %v", latestRefreshTokenCookie.Path)
+				if !latestExpiry.After(cookieExpiry) || earliestExpiry.After(cookieExpiry) {
+					t.Errorf("the refresh token should expire between %v and %v but got : %v", earliestExpiry, latestExpiry, cookieExpiry)
+				}
+
+				if latestRefreshTokenCookie.Path != "/" {
+					t.Errorf("Expected the cookie path to be / but got %v", latestRefreshTokenCookie.Path)
 				}
 				if !latestRefreshTokenCookie.HttpOnly {
 					t.Errorf("httpOnly should be set to true but found :%v ", latestRefreshTokenCookie.HttpOnly)
@@ -346,7 +359,7 @@ func makeOAuthTokenRequest(t *testing.T, baseURL, grantType string, payload map[
 		req.AddCookie(&http.Cookie{
 			Name:  signalsd.RefreshTokenCookieName,
 			Value: refreshToken,
-			Path:  "/oauth",
+			Path:  "/",
 		})
 	}
 
@@ -391,7 +404,7 @@ func makeOAuthRevokeRequest(t *testing.T, baseURL string, payload map[string]str
 		req.AddCookie(&http.Cookie{
 			Name:  signalsd.RefreshTokenCookieName,
 			Value: refreshToken,
-			Path:  "/oauth",
+			Path:  "/",
 		})
 	}
 

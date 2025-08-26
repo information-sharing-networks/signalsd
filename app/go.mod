@@ -10,6 +10,7 @@ require (
 )
 
 require (
+	github.com/a-h/templ v0.3.943
 	github.com/go-chi/chi/v5 v5.2.2
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/jub0bs/cors v0.8.0
