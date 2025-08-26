@@ -31,6 +31,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 
 COPY /app/docs runtime/docs/
 COPY /app/assets runtime/assets/
+COPY /app/web runtime/web
 
 # --- Create a minimal runtime image using scratch ---
 FROM scratch
