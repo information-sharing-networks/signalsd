@@ -2,9 +2,6 @@ package ui
 
 import (
 	"encoding/json"
-	"time"
-
-	"github.com/google/uuid"
 )
 
 // =============================================================================
@@ -41,33 +38,21 @@ type ErrorResponse struct {
 }
 
 // =============================================================================
-// CORE DOMAIN TYPES
+// DROPDOWN OPTIONS
 // =============================================================================
 
-// ISN represents an Information Sharing Network
-type ISN struct {
-	ID         uuid.UUID `json:"id"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
-	Title      string    `json:"title"`
-	Slug       string    `json:"slug"`
-	Detail     string    `json:"detail"`
-	IsInUse    bool      `json:"is_in_use"`
-	Visibility string    `json:"visibility"`
+type IsnDropdown struct {
+	Slug       string `json:"slug"`
+	IsInUse    bool   `json:"is_in_use"`
+	Visibility string `json:"visibility"`
 }
 
-// SignalType represents a signal type definition
-type SignalType struct {
-	ID        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Slug      string    `json:"slug"`
-	SchemaURL string    `json:"schema_url"`
-	ReadmeURL string    `json:"readme_url"`
-	Title     string    `json:"title"`
-	Detail    string    `json:"detail"`
-	SemVer    string    `json:"sem_ver"`
-	IsInUse   bool      `json:"is_in_use"`
+type SignalTypeDropdown struct {
+	Slug string `json:"slug"`
+}
+
+type VersionDropdown struct {
+	Version string `json:"version"`
 }
 
 // =============================================================================

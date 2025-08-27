@@ -100,6 +100,7 @@ func (s *Server) setupStandaloneRoutes() {
 	})
 }
 
+// Start the UI server in standalone mode
 func (s *Server) Start(ctx context.Context) error {
 	addr := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
 

@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"strings"
 )
 
 // =============================================================================
@@ -189,7 +190,7 @@ templ CheckboxField(name, value, label string) {
 // =============================================================================
 
 
-templ SignalTypeOptions(signalTypes []string) {
+templ SignalTypeOptions(signalTypes []SignalTypeDropdown) {
 	<select
 		id="signal_type_slug"
 		name="signal_type_slug"
@@ -203,12 +204,12 @@ templ SignalTypeOptions(signalTypes []string) {
 	>
 		<option value="">Select Signal Type...</option>
 		for _, signalType := range signalTypes {
-			<option value={ signalType }>{ signalType }</option>
+			<option value={ signalType.Slug }>{ strings.ReplaceAll(signalType.Slug, "-", " ") }</option>
 		}
 	</select>
 }
 
-templ VersionOptions(versions []string) {
+templ VersionOptions(versions []VersionDropdown) {
 	<select
 		id="sem_ver"
 		name="sem_ver"
@@ -217,7 +218,7 @@ templ VersionOptions(versions []string) {
 	>
 		<option value="">Select Version...</option>
 		for _, version := range versions {
-			<option value={ version }>{ version }</option>
+			<option value={ version.Version }>{ version.Version }</option>
 		}
 	</select>
 }
@@ -403,7 +404,7 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 // SIGNAL SEARCH PAGE & RESULTS
 // =============================================================================
 
-templ SignalSearchPage(isns []ISN, perms map[string]IsnPerms, results []SearchSignalWithCorrelationsAndVersions, errorMsg string) {
+templ SignalSearchPage(isns []IsnDropdown, perms map[string]IsnPerms, results []SearchSignalWithCorrelationsAndVersions, errorMsg string) {
 	@BaseLayout("Signal Search") {
 		@Navigation()
 		<div class="page-container">
@@ -430,7 +431,7 @@ templ SignalSearchPage(isns []ISN, perms map[string]IsnPerms, results []SearchSi
 									if isns != nil {
 										for _, isn := range isns {
 											if isn.IsInUse {
-												<option value={ isn.Slug }>{ isn.Title }</option>
+												<option value={ isn.Slug }>{ strings.ReplaceAll(isn.Slug, "-", " ") }</option>
 											}
 										}
 									}

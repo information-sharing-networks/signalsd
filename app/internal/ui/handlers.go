@@ -30,7 +30,6 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 // handleLoginPost authenticates the user and adds three cookies to the response:
 // - the server generated refresh token cookie
 // - a cookie containing the access token provided by the server,
-// - a cookie containing the ISN permissions
 // - a cookie containg the isn permissions as JSON.
 func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
@@ -59,20 +58,18 @@ func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	// Set all authentication cookies using shared method
 	if err := s.authService.SetAuthCookies(w, loginResp, refreshTokenCookie, s.config.Environment); err != nil {
 		s.logger.Error().Err(err).Msg("Failed to set authentication cookies")
-		component := LoginError("Login successful but failed to set cookies")
+		component := LoginError("System error: authentication failed")
 		if err := component.Render(r.Context(), w); err != nil {
 			s.logger.Error().Err(err).Msg("Failed to render login error")
 		}
 		return
 	}
 
-	// Return success response for HTMX
 	w.Header().Set("HX-Redirect", "/dashboard")
 	w.WriteHeader(http.StatusOK)
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
-	// Clear all authentication cookies using shared method
 	s.authService.ClearAuthCookies(w, s.config.Environment)
 
 	// Redirect to login page
@@ -85,7 +82,6 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
-	// Render dashboard page
 	component := DashboardPage()
 	if err := component.Render(r.Context(), w); err != nil {
 		s.logger.Error().Err(err).Msg("Failed to render dashboard page")
@@ -93,7 +89,6 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSignalSearch(w http.ResponseWriter, r *http.Request) {
-	// Get permissions data from cookie
 	permsCookie, err := r.Cookie(isnPermsCookieName)
 	if err != nil {
 		s.logger.Error().Err(err).Msg("No permissions cookie found")
@@ -117,11 +112,10 @@ func (s *Server) handleSignalSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert permissions to ISN list for dropdown
-	isns := make([]ISN, 0, len(perms))
+	isns := make([]IsnDropdown, 0, len(perms))
 	for isnSlug := range perms {
-		isns = append(isns, ISN{
+		isns = append(isns, IsnDropdown{
 			Slug:    isnSlug,
-			Title:   isnSlug, // Use slug as title for now
 			IsInUse: true,
 		})
 	}
@@ -179,10 +173,12 @@ func (s *Server) handleGetSignalTypes(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Convert to slice
-	signalTypes := make([]string, 0, len(signalTypeMap))
+	// Convert to slice of SignalTypeDropdown
+	signalTypes := make([]SignalTypeDropdown, 0, len(signalTypeMap))
 	for signalType := range signalTypeMap {
-		signalTypes = append(signalTypes, signalType)
+		signalTypes = append(signalTypes, SignalTypeDropdown{
+			Slug: signalType,
+		})
 	}
 
 	// Render signal types dropdown options
@@ -230,12 +226,14 @@ func (s *Server) handleGetSignalVersions(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Find versions for the specific signal type
-	versions := make([]string, 0)
+	versions := make([]VersionDropdown, 0)
 	for _, path := range isnPerm.SignalTypePaths {
 		// Path format: "signal-type-slug/v1.0.0"
 		parts := strings.Split(path, "/v")
 		if len(parts) == 2 && parts[0] == signalTypeSlug {
-			versions = append(versions, parts[1])
+			versions = append(versions, VersionDropdown{
+				Version: parts[1],
+			})
 		}
 	}
 
