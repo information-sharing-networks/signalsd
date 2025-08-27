@@ -50,6 +50,8 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 	// Public routes (no auth required)
 	router.Get("/login", s.handleLogin)
 	router.Post("/login", s.handleLoginPost)
+	router.Get("/register", s.handleRegister)
+	router.Post("/register", s.handleRegisterPost)
 
 	// redirects to dashboard if authenticated, login if not
 	router.Get("/", s.handleHome)
@@ -83,6 +85,8 @@ func (s *Server) setupStandaloneRoutes() {
 	// Public routes (no auth required)
 	s.router.Get("/login", s.handleLogin)
 	s.router.Post("/login", s.handleLoginPost)
+	s.router.Get("/register", s.handleRegister)
+	s.router.Post("/register", s.handleRegisterPost)
 
 	// redirects to dashboard if authenticated, login if not
 	s.router.Get("/", s.handleHome)

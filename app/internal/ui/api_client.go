@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -92,4 +93,44 @@ func (c *APIClient) SearchSignals(accessToken string, params SignalSearchParams,
 	}
 
 	return &searchResp, nil
+}
+
+// RegisterUser creates a new user account using the signalsd API
+func (c *APIClient) RegisterUser(email, password string) error {
+	registerReq := struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}{
+		Email:    email,
+		Password: password,
+	}
+
+	jsonData, err := json.Marshal(registerReq)
+	if err != nil {
+		return fmt.Errorf("failed to marshal registration request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/api/auth/register", c.baseURL)
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		var errorResp ErrorResponse
+		if err := json.NewDecoder(resp.Body).Decode(&errorResp); err != nil {
+			return fmt.Errorf("registration failed with status %d", resp.StatusCode)
+		}
+		return fmt.Errorf("registration failed: %s", errorResp.Message)
+	}
+
+	return nil
 }

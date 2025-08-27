@@ -27,6 +27,14 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
+	// Render registration page
+	component := RegisterPage()
+	if err := component.Render(r.Context(), w); err != nil {
+		s.logger.Error().Err(err).Msg("Failed to render registration page")
+	}
+}
+
 // handleLoginPost authenticates the user and adds three cookies to the response:
 // - the server generated refresh token cookie
 // - a cookie containing the access token provided by the server,
@@ -37,7 +45,7 @@ func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 
 	if email == "" || password == "" {
 		// Return error fragment for HTMX
-		component := LoginError("Email and password are required")
+		component := AuthError("Email and password are required")
 		if err := component.Render(r.Context(), w); err != nil {
 			s.logger.Error().Err(err).Msg("Failed to render login error")
 		}
@@ -48,7 +56,7 @@ func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	loginResp, refreshTokenCookie, err := s.authService.AuthenticateUser(email, password)
 	if err != nil {
 		s.logger.Error().Err(err).Msg("Authentication failed")
-		component := LoginError("Invalid email or password")
+		component := AuthError("Invalid email or password")
 		if err := component.Render(r.Context(), w); err != nil {
 			s.logger.Error().Err(err).Msg("Failed to render login error")
 		}
@@ -58,7 +66,7 @@ func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	// Set all authentication cookies using shared method
 	if err := s.authService.SetAuthCookies(w, loginResp, refreshTokenCookie, s.config.Environment); err != nil {
 		s.logger.Error().Err(err).Msg("Failed to set authentication cookies")
-		component := LoginError("System error: authentication failed")
+		component := AuthError("System error: authentication failed")
 		if err := component.Render(r.Context(), w); err != nil {
 			s.logger.Error().Err(err).Msg("Failed to render login error")
 		}
@@ -67,6 +75,49 @@ func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("HX-Redirect", "/dashboard")
 	w.WriteHeader(http.StatusOK)
+}
+
+// handleRegisterPost processes user registration
+func (s *Server) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
+	email := r.FormValue("email")
+	password := r.FormValue("password")
+	confirmPassword := r.FormValue("confirm_password")
+
+	if email == "" || password == "" || confirmPassword == "" {
+		// Return error fragment for HTMX
+		component := AuthError("All fields are required")
+		if err := component.Render(r.Context(), w); err != nil {
+			s.logger.Error().Err(err).Msg("Failed to render registration error")
+		}
+		return
+	}
+
+	if password != confirmPassword {
+		component := AuthError("Passwords do not match")
+		if err := component.Render(r.Context(), w); err != nil {
+			s.logger.Error().Err(err).Msg("Failed to render registration error")
+		}
+		return
+	}
+
+	// Register user with signalsd API
+	err := s.apiClient.RegisterUser(email, password)
+	if err != nil {
+		s.logger.Error().Err(err).Msg("Registration failed")
+
+		component := AuthError(err.Error())
+		if err := component.Render(r.Context(), w); err != nil {
+			s.logger.Error().Err(err).Msg("Failed to render registration error")
+		}
+		return
+	}
+
+	// Registration successful - show success message and redirect to login after delay
+	w.Header().Set("HX-Trigger-After-Settle", "registrationSuccess")
+	component := RegistrationSuccess()
+	if err := component.Render(r.Context(), w); err != nil {
+		s.logger.Error().Err(err).Msg("Failed to render registration success")
+	}
 }
 
 func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
