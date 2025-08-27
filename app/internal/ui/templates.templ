@@ -8,27 +8,25 @@ import (
 // =============================================================================
 // BASE LAYOUT & STRUCTURE
 // =============================================================================
-
 templ BaseLayout(title string) {
 	<!DOCTYPE html>
 	<html lang="en">
-	<head>
-		<meta charset="UTF-8"/>
-		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-		<title>{ title } - Signalsd</title>
-		<script src="https://unpkg.com/htmx.org@2.0.4"></script>
-		<link href="/static/css/app.css" rel="stylesheet"/>
-	</head>
-	<body>
-		{ children... }
-	</body>
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>{ title } - Signalsd</title>
+			<script src="https://unpkg.com/htmx.org@2.0.4"></script>
+			<link href="/static/css/app.css" rel="stylesheet"/>
+		</head>
+		<body>
+			{ children... }
+		</body>
 	</html>
 }
 
 // =============================================================================
 // NAVIGATION COMPONENT
 // =============================================================================
-
 templ Navigation() {
 	<nav class="navigation">
 		<div class="nav-container">
@@ -62,9 +60,8 @@ templ Navigation() {
 }
 
 // =============================================================================
-// LOGIN
+// LOGIN & REGISTRATION
 // =============================================================================
-
 templ LoginPage() {
 	@BaseLayout("Login") {
 		<div class="form-container">
@@ -72,7 +69,7 @@ templ LoginPage() {
 				<h2 class="form-title">
 					Sign in to Signalsd
 				</h2>
-				<form hx-post="/login" hx-target="#login-error">
+				<form hx-post="/login" hx-target="#auth-error">
 					<div class="form-group">
 						<div class="form-group-stacked">
 							<label for="email" class="form-label-sr">Email address</label>
@@ -97,37 +94,136 @@ templ LoginPage() {
 							/>
 						</div>
 					</div>
-
-					<div id="login-error"></div>
-
+					<div id="auth-error"></div>
 					<div class="form-group">
 						<button type="submit" class="btn btn-primary btn-full">
 							Sign in
 						</button>
 					</div>
 				</form>
+				<div class="form-group text-center">
+					<p class="text-muted">Don't have an account?</p>
+					<button
+						hx-get="/register"
+						hx-target="body"
+						hx-swap="outerHTML"
+						class="btn btn-secondary"
+					>
+						Create Account
+					</button>
+				</div>
 			</div>
 		</div>
 	}
 }
 
-templ LoginError(message string) {
+templ RegisterPage() {
+	@BaseLayout("Register") {
+		<div class="form-container">
+			<div class="form-card">
+				<h2 class="form-title">
+					Create Account
+				</h2>
+				<div class="alert alert-info">
+					<strong>Note:</strong> After creating your account, you will not be able to search for signals until an administrator adds you to one or more Information Sharing Networks (ISNs).
+				</div>
+				<form hx-post="/register" hx-target="#auth-error">
+					<div class="form-group">
+						<div class="form-group-stacked">
+							<label for="reg-email" class="form-label-sr">Email address</label>
+							<input
+								id="reg-email"
+								name="email"
+								type="email"
+								required
+								class="form-input form-input-stacked"
+								placeholder="Email address"
+							/>
+						</div>
+						<div class="form-group-stacked">
+							<label for="reg-password" class="form-label-sr">Password</label>
+							<input
+								id="reg-password"
+								name="password"
+								type="password"
+								required
+								minlength="11"
+								class="form-input form-input-stacked"
+								placeholder="Password (minimum 11 characters)"
+							/>
+						</div>
+						<div class="form-group-stacked">
+							<label for="reg-confirm-password" class="form-label-sr">Confirm Password</label>
+							<input
+								id="reg-confirm-password"
+								name="confirm_password"
+								type="password"
+								required
+								class="form-input form-input-stacked"
+								placeholder="Confirm Password"
+							/>
+						</div>
+					</div>
+					<div id="auth-error"></div>
+					<div class="form-group">
+						<button type="submit" class="btn btn-primary btn-full">
+							Create Account
+						</button>
+					</div>
+				</form>
+				<div class="form-group text-center">
+					<p class="text-muted">Already have an account?</p>
+					<button
+						hx-get="/login"
+						hx-target="body"
+						hx-swap="outerHTML"
+						class="btn btn-secondary"
+					>
+						Sign In
+					</button>
+				</div>
+			</div>
+		</div>
+	}
+}
+
+templ AuthError(message string) {
 	<div class="alert alert-error">
 		{ message }
 	</div>
 }
 
+templ RegistrationSuccess() {
+	<div class="alert alert-success">
+		<strong>Account created successfully!</strong> You can now sign in. Please note that you will need to be added to one or more ISNs by an administrator before you can search for signals.
+		<div class="form-group text-center" style="margin-top: 1rem;">
+			<button
+				hx-get="/login"
+				hx-target="body"
+				hx-swap="outerHTML"
+				class="btn btn-primary"
+			>
+				Continue to Sign In
+			</button>
+		</div>
+	</div>
+	<script>
+		// Auto-redirect to login after 5 seconds
+		setTimeout(function() {
+			htmx.ajax('GET', '/login', {target: 'body', swap: 'outerHTML'});
+		}, 5000);
+	</script>
+}
+
 // =============================================================================
 // DASHBOARD PAGE
 // =============================================================================
-
 templ DashboardPage() {
 	@BaseLayout("Dashboard") {
 		@Navigation()
 		<div class="page-container">
 			<h1 class="page-title">Dashboard</h1>
 			<p class="text-muted mb-6">Welcome to the Signalsd management interface.</p>
-
 			<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
 				<div class="card">
 					<div class="card-body">
@@ -136,7 +232,6 @@ templ DashboardPage() {
 						<a href="/search" class="btn btn-secondary">Search Signals</a>
 					</div>
 				</div>
-
 				<div class="card">
 					<div class="card-body">
 						<h3 class="card-title">API Documentation</h3>
@@ -146,7 +241,6 @@ templ DashboardPage() {
 						</a>
 					</div>
 				</div>
-
 				<div class="card">
 					<div class="card-body">
 						<h3 class="card-title">Information Sharing Networks</h3>
@@ -155,8 +249,6 @@ templ DashboardPage() {
 					</div>
 				</div>
 			</div>
-
-
 		</div>
 	}
 }
@@ -164,7 +256,6 @@ templ DashboardPage() {
 // =============================================================================
 // REUSABLE COMPONENTS
 // =============================================================================
-
 templ SignalMetadataItem(label, value string) {
 	<div class="signal-metadata-item">
 		<span class="signal-metadata-label">{ label }:</span>
@@ -188,8 +279,6 @@ templ CheckboxField(name, value, label string) {
 // =============================================================================
 // REUSABLE FORM COMPONENTS
 // =============================================================================
-
-
 templ SignalTypeOptions(signalTypes []SignalTypeDropdown) {
 	<select
 		id="signal_type_slug"
@@ -234,7 +323,6 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 		<div class="card-header">
 			<h3 class="card-title">Search Results ({ fmt.Sprintf("%d", len(signals)) } signals found)</h3>
 		</div>
-
 		if len(signals) == 0 {
 			<div class="card-body text-center text-muted">
 				No signals found matching your search criteria.
@@ -258,7 +346,6 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 										</span>
 									}
 								</div>
-
 								<div class="signal-metadata">
 									@SignalMetadataItem("Signal ID", signal.SignalID)
 									@SignalMetadataItem("Version ID", signal.SignalVersionID)
@@ -269,7 +356,6 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 										@SignalMetadataSimple("Created by", signal.Email)
 									}
 								</div>
-
 								if signal.CorrelatedToSignalID != "" {
 									<div class="correlation-info">
 										<span class="text-sm" style="color: #1e40af;">
@@ -279,7 +365,6 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 								}
 							</div>
 						</div>
-
 						<!-- Signal Content -->
 						<div style="margin-top: 1rem;">
 							<div class="json-header">
@@ -296,7 +381,6 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 								<pre id={ fmt.Sprintf("json-%s", signal.SignalID) } class="json-content">{ string(signal.Content) }</pre>
 							</div>
 						</div>
-
 						<!-- Additional Information -->
 						if len(signal.CorrelatedSignals) > 0 {
 							<div class="correlated-signals">
@@ -314,7 +398,6 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 								</div>
 							</div>
 						}
-
 						if len(signal.PreviousSignalVersions) > 0 {
 							<div class="previous-versions">
 								<h5 class="text-sm" style="font-weight: 500; color: #111827; margin-bottom: 0.5rem;">Previous Versions ({ fmt.Sprintf("%d", len(signal.PreviousSignalVersions)) })</h5>
@@ -328,7 +411,6 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 								</div>
 							</div>
 						}
-
 						<!-- Additional Technical Info -->
 						if signal.AccountID != "" || signal.AccountType != "" {
 							<div class="technical-details">
@@ -348,7 +430,6 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 			</div>
 		}
 	</div>
-
 	<script>
 		// Store original JSON content for each signal
 		const originalJsonContent = new Map();
@@ -403,13 +484,11 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 // =============================================================================
 // SIGNAL SEARCH PAGE & RESULTS
 // =============================================================================
-
 templ SignalSearchPage(isns []IsnDropdown, perms map[string]IsnPerms, results []SearchSignalWithCorrelationsAndVersions, errorMsg string) {
 	@BaseLayout("Signal Search") {
 		@Navigation()
 		<div class="page-container">
 			<h1 class="page-title">Search Signals</h1>
-
 			<div class="card mb-6">
 				<div class="card-body">
 					<form hx-post="/ui-api/search-signals" hx-target="#search-results" class="space-y-4">
@@ -437,7 +516,6 @@ templ SignalSearchPage(isns []IsnDropdown, perms map[string]IsnPerms, results []
 									}
 								</select>
 							</div>
-
 							<div id="signal-type-select" class="form-group">
 								<label for="signal_type_slug" class="form-label">Signal Type</label>
 								<select
@@ -454,7 +532,6 @@ templ SignalSearchPage(isns []IsnDropdown, perms map[string]IsnPerms, results []
 									<option value="">Select Signal Type...</option>
 								</select>
 							</div>
-
 							<div id="version-select" class="form-group">
 								<label for="sem_ver" class="form-label">Version</label>
 								<select
@@ -467,7 +544,6 @@ templ SignalSearchPage(isns []IsnDropdown, perms map[string]IsnPerms, results []
 								</select>
 							</div>
 						</div>
-
 						<div class="grid grid-cols-1 md:grid-cols-2">
 							<div class="form-group">
 								<label for="start_date" class="form-label">Start Date</label>
@@ -478,7 +554,6 @@ templ SignalSearchPage(isns []IsnDropdown, perms map[string]IsnPerms, results []
 									class="form-input"
 								/>
 							</div>
-
 							<div class="form-group">
 								<label for="end_date" class="form-label">End Date</label>
 								<input
@@ -489,7 +564,6 @@ templ SignalSearchPage(isns []IsnDropdown, perms map[string]IsnPerms, results []
 								/>
 							</div>
 						</div>
-
 						<div class="grid grid-cols-1 md:grid-cols-3">
 							<div class="form-group">
 								<label for="local_ref" class="form-label">Local Reference</label>
@@ -501,7 +575,6 @@ templ SignalSearchPage(isns []IsnDropdown, perms map[string]IsnPerms, results []
 									class="form-input"
 								/>
 							</div>
-
 							<div class="form-group">
 								<label for="signal_id" class="form-label">Signal ID</label>
 								<input
@@ -512,7 +585,6 @@ templ SignalSearchPage(isns []IsnDropdown, perms map[string]IsnPerms, results []
 									class="form-input"
 								/>
 							</div>
-
 							<div class="form-group">
 								<label for="account_id" class="form-label">Account ID</label>
 								<input
@@ -524,13 +596,11 @@ templ SignalSearchPage(isns []IsnDropdown, perms map[string]IsnPerms, results []
 								/>
 							</div>
 						</div>
-
 						<div class="checkbox-group">
 							@CheckboxField("include_withdrawn", "true", "Include withdrawn signals")
 							@CheckboxField("include_correlated", "true", "Include correlated signals")
 							@CheckboxField("include_previous_versions", "true", "Include previous versions")
 						</div>
-
 						<div class="form-group">
 							<button type="submit" class="btn btn-primary">
 								Search Signals
@@ -539,7 +609,6 @@ templ SignalSearchPage(isns []IsnDropdown, perms map[string]IsnPerms, results []
 					</form>
 				</div>
 			</div>
-
 			<div id="search-results">
 				if errorMsg != "" {
 					@SearchError(errorMsg)
