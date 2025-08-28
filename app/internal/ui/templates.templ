@@ -32,7 +32,7 @@ templ Navigation() {
 		<div class="nav-container">
 			<div class="nav-content">
 				<div class="nav-brand">
-					<h1 class="nav-title">Signalsd</h1>
+					<h1 class="nav-title">Signals</h1>
 					<div class="nav-links">
 						<a href="/dashboard" class="nav-link active">
 							Dashboard
@@ -67,7 +67,7 @@ templ LoginPage() {
 		<div class="form-container">
 			<div class="form-card">
 				<h2 class="form-title">
-					Sign in to Signalsd
+					Sign in to Signals ISN
 				</h2>
 				<form hx-post="/login" hx-target="#auth-error">
 					<div class="form-group">
@@ -124,9 +124,6 @@ templ RegisterPage() {
 				<h2 class="form-title">
 					Create Account
 				</h2>
-				<div class="alert alert-info">
-					<strong>Note:</strong> After creating your account, you will not be able to search for signals until an administrator adds you to one or more Information Sharing Networks (ISNs).
-				</div>
 				<form hx-post="/register" hx-target="#auth-error">
 					<div class="form-group">
 						<div class="form-group-stacked">
@@ -195,7 +192,7 @@ templ AuthError(message string) {
 
 templ RegistrationSuccess() {
 	<div class="alert alert-success">
-		<strong>Account created successfully!</strong> You can now sign in. Please note that you will need to be added to one or more ISNs by an administrator before you can search for signals.
+		<strong>Account created!</strong> You can now sign in.
 		<div class="form-group text-center" style="margin-top: 1rem;">
 			<button
 				hx-get="/login"
@@ -315,6 +312,20 @@ templ VersionOptions(versions []VersionDropdown) {
 templ SearchError(message string) {
 	<div class="alert alert-error">
 		{ message }
+	</div>
+}
+
+templ NoIsnAccessNotification() {
+	<div class="card mb-6">
+		<div class="card-body text-center">
+			<div class="alert alert-info mb-4">
+				<strong>Access Required</strong>
+				<p class="mt-2 mb-0">You need to be granted access to one or more Information Sharing Networks (ISNs) before you can use the search functionality.</p>
+			</div>
+			<div class="text-muted">
+				<p>Contact your administrator to request access.</p>
+			</div>
+		</div>
 	</div>
 }
 
@@ -489,33 +500,36 @@ templ SignalSearchPage(isns []IsnDropdown, perms map[string]IsnPerms, results []
 		@Navigation()
 		<div class="page-container">
 			<h1 class="page-title">Search Signals</h1>
-			<div class="card mb-6">
-				<div class="card-body">
-					<form hx-post="/ui-api/search-signals" hx-target="#search-results" class="space-y-4">
-						<div class="grid grid-cols-1 md:grid-cols-3">
-							<div class="form-group">
-								<label for="isn_slug" class="form-label">ISN</label>
-								<select
-									id="isn_slug"
-									name="isn_slug"
-									required
-									hx-post="/ui-api/signal-types"
-									hx-target="#signal_type_slug"
-									hx-swap="outerHTML"
-									hx-trigger="change"
-									hx-include="#isn_slug, this"
-									class="form-select"
-								>
-									<option value="">Select ISN...</option>
-									if isns != nil {
-										for _, isn := range isns {
-											if isn.IsInUse {
-												<option value={ isn.Slug }>{ strings.ReplaceAll(isn.Slug, "-", " ") }</option>
+			if len(isns) == 0 {
+				@NoIsnAccessNotification()
+			} else {
+				<div class="card mb-6">
+					<div class="card-body">
+						<form hx-post="/ui-api/search-signals" hx-target="#search-results" class="space-y-4">
+							<div class="grid grid-cols-1 md:grid-cols-3">
+								<div class="form-group">
+									<label for="isn_slug" class="form-label">ISN</label>
+									<select
+										id="isn_slug"
+										name="isn_slug"
+										required
+										hx-post="/ui-api/signal-types"
+										hx-target="#signal_type_slug"
+										hx-swap="outerHTML"
+										hx-trigger="change"
+										hx-include="#isn_slug, this"
+										class="form-select"
+									>
+										<option value="">Select ISN...</option>
+										if isns != nil {
+											for _, isn := range isns {
+												if isn.IsInUse {
+													<option value={ isn.Slug }>{ strings.ReplaceAll(isn.Slug, "-", " ") }</option>
+												}
 											}
 										}
-									}
-								</select>
-							</div>
+									</select>
+								</div>
 							<div id="signal-type-select" class="form-group">
 								<label for="signal_type_slug" class="form-label">Signal Type</label>
 								<select
@@ -617,6 +631,7 @@ templ SignalSearchPage(isns []IsnDropdown, perms map[string]IsnPerms, results []
 					@SearchResults(results)
 				}
 			</div>
+			}
 		</div>
 	}
 }

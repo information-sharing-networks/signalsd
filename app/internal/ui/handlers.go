@@ -140,30 +140,31 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSignalSearch(w http.ResponseWriter, r *http.Request) {
+	// Initialize empty permissions and ISN list
+	var perms map[string]IsnPerms = make(map[string]IsnPerms)
+	var isns []IsnDropdown
+
+	// Try to get permissions cookie - if it doesn't exist or is invalid,
+	// we'll show the search page with no ISNs (triggering the notification)
 	permsCookie, err := r.Cookie(isnPermsCookieName)
 	if err != nil {
-		s.logger.Error().Err(err).Msg("No permissions cookie found")
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-
-	// Decode base64 cookie value
-	decodedPerms, err := base64.StdEncoding.DecodeString(permsCookie.Value)
-	if err != nil {
-		s.logger.Error().Err(err).Msgf("Failed to decode permissions cookie: %s", permsCookie.Value)
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-
-	var perms map[string]IsnPerms
-	if err := json.Unmarshal(decodedPerms, &perms); err != nil {
-		s.logger.Error().Err(err).Msgf("Failed to parse permissions JSON: %s", string(decodedPerms))
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
+		s.logger.Info().Msg("No permissions cookie found - user has no ISN access")
+	} else {
+		// Decode base64 cookie value
+		decodedPerms, err := base64.StdEncoding.DecodeString(permsCookie.Value)
+		if err != nil {
+			s.logger.Error().Err(err).Msgf("Failed to decode permissions cookie: %s", permsCookie.Value)
+		} else {
+			// Parse permissions JSON
+			if err := json.Unmarshal(decodedPerms, &perms); err != nil {
+				s.logger.Error().Err(err).Msgf("Failed to parse permissions JSON: %s", string(decodedPerms))
+				perms = make(map[string]IsnPerms) // Reset to empty map on error
+			}
+		}
 	}
 
 	// Convert permissions to ISN list for dropdown
-	isns := make([]IsnDropdown, 0, len(perms))
+	isns = make([]IsnDropdown, 0, len(perms))
 	for isnSlug := range perms {
 		isns = append(isns, IsnDropdown{
 			Slug:    isnSlug,
@@ -171,7 +172,7 @@ func (s *Server) handleSignalSearch(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	// Render search page
+	// Render search page (will show notification if len(isns) == 0)
 	component := SignalSearchPage(isns, perms, nil, "")
 	if err := component.Render(r.Context(), w); err != nil {
 		s.logger.Error().Err(err).Msg("Failed to render signal search page")
