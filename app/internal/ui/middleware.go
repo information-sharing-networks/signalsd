@@ -18,10 +18,10 @@ func (s *Server) RequireAuth(next http.Handler) http.Handler {
 		case TokenMissing, TokenInvalid:
 			s.redirectToLogin(w, r)
 			return
-		case TokenExpired:
-			// attempt refresh
+		case TokenExpired: // attempt refresh
 			refreshTokenCookie, err := r.Cookie(signalsd.RefreshTokenCookieName)
 			if err != nil {
+				s.logger.Err(err).Msg("Failed to get refresh token cookie")
 				s.redirectToLogin(w, r)
 				return
 			}
@@ -29,11 +29,12 @@ func (s *Server) RequireAuth(next http.Handler) http.Handler {
 			// Need to get the access token cookie for refresh
 			accessTokenCookie, err := r.Cookie(accessTokenCookieName)
 			if err != nil {
+				s.logger.Err(err).Msg("Failed to get access token cookie")
 				s.redirectToLogin(w, r)
 				return
 			}
 
-			// Attempt token refresh (forwarding refresh token cookie to API)
+			// Attempt token refresh
 			loginResp, newRefreshTokenCookie, err := s.authService.RefreshToken(accessTokenCookie, refreshTokenCookie)
 			if err != nil {
 				s.logger.Error().Err(err).Msg("Token refresh failed")
