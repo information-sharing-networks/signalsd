@@ -67,7 +67,7 @@ templ LoginPage() {
 		<div class="form-container">
 			<div class="form-card">
 				<h2 class="form-title">
-					Sign in to Signals ISN
+					Sign in to Signal ISN 
 				</h2>
 				<form hx-post="/login" hx-target="#auth-error">
 					<div class="form-group">
@@ -442,53 +442,56 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 		}
 	</div>
 	<script>
-		// Store original JSON content for each signal
-		const originalJsonContent = new Map();
 
 		// Event delegation for pretty print buttons
 		document.addEventListener('click', function(e) {
-			if (e.target.classList.contains('pretty-print-btn')) {
-				const signalId = e.target.getAttribute('data-signal-id');
-				const jsonElement = document.getElementById('json-' + signalId);
+		if (!e.target.classList.contains('pretty-print-btn')) {
+			return
+		}
 
-				if (!jsonElement) {
-					return;
-				}
+		// Store original JSON content for each signal
+		const originalJsonContent = new Map();
 
-				// Get or store original content
-				let originalContent = originalJsonContent.get(signalId);
-				if (!originalContent) {
-					originalContent = jsonElement.textContent.trim();
-					originalJsonContent.set(signalId, originalContent);
-				}
+		const signalId = e.target.getAttribute('data-signal-id');
+		const jsonElement = document.getElementById('json-' + signalId);
 
-				try {
-					const currentButtonText = e.target.textContent.trim();
+		if (!jsonElement) {
+			return;
+		}
 
-					if (currentButtonText === 'Pretty Print') {
-						// Parse and pretty print JSON
-						const parsed = JSON.parse(originalContent);
-						jsonElement.textContent = JSON.stringify(parsed, null, 2);
-						e.target.textContent = 'Compact';
-						jsonElement.classList.add('pretty-printed');
-					} else {
-						// Restore original compact JSON
-						jsonElement.textContent = originalContent;
-						e.target.textContent = 'Pretty Print';
-						jsonElement.classList.remove('pretty-printed');
-					}
-				} catch (error) {
-					// Show error message briefly
-					const originalText = e.target.textContent;
-					e.target.textContent = 'Invalid JSON';
-					e.target.classList.add('text-red-600');
-					setTimeout(function() {
-						e.target.textContent = originalText;
-						e.target.classList.remove('text-red-600');
-					}, 2000);
-				}
+		// Get or store original content
+		let originalContent = originalJsonContent.get(signalId);
+		if (!originalContent) {
+			originalContent = jsonElement.textContent.trim();
+			originalJsonContent.set(signalId, originalContent);
+		}
+
+		try {
+			const currentButtonText = e.target.textContent.trim();
+
+			if (currentButtonText === 'Pretty Print') {
+				// Parse and pretty print JSON
+				const parsed = JSON.parse(originalContent);
+				jsonElement.textContent = JSON.stringify(parsed, null, 2);
+				e.target.textContent = 'Compact';
+				jsonElement.classList.add('pretty-printed');
+			} else {
+				// Restore original compact JSON
+				jsonElement.textContent = originalContent;
+				e.target.textContent = 'Pretty Print';
+				jsonElement.classList.remove('pretty-printed');
 			}
-		});
+		} catch (error) {
+			// Show error message briefly
+			const originalText = e.target.textContent;
+			e.target.textContent = 'Invalid JSON';
+			e.target.classList.add('text-red-600');
+			setTimeout(function() {
+				e.target.textContent = originalText;
+				e.target.classList.remove('text-red-600');
+			}, 2000);
+		}
+	});
 	</script>
 }
 
