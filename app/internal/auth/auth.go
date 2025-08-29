@@ -51,7 +51,7 @@ type IsnPerms struct {
 	Visibility      string     `json:"visibility" enums:"public,private" example:"private"`                        // ISN visibility setting
 }
 
-type AccessTokenClaims struct {
+type Claims struct {
 	jwt.RegisteredClaims
 	AccountID   uuid.UUID           `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
 	AccountType string              `json:"account_type" enums:"user,service_account"`
@@ -241,7 +241,7 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 	}
 
 	// claims
-	claims := AccessTokenClaims{
+	claims := Claims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   accountID.String(),
 			IssuedAt:  jwt.NewNumericDate(issuedAt),

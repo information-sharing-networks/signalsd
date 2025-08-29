@@ -40,7 +40,7 @@ func (a *AuthService) RequireValidAccessToken(allowExpired bool) func(http.Handl
 				return
 			}
 
-			claims := &AccessTokenClaims{}
+			claims := &Claims{}
 
 			// extract the claims from the jwt and validate the signature
 			_, err = jwt.ParseWithClaims(accessToken, claims, func(token *jwt.Token) (any, error) {
@@ -75,7 +75,7 @@ func (a *AuthService) RequireValidAccessToken(allowExpired bool) func(http.Handl
 			// add user and claims to context
 			ctx := ContextWithAccountID(r.Context(), accountID)
 			ctx = ContextWithAccountType(ctx, claims.AccountType)
-			ctx = ContextWithAccessTokenClaims(ctx, claims)
+			ctx = ContextWithClaims(ctx, claims)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -133,7 +133,7 @@ func (a *AuthService) RequireValidRefreshToken(next http.Handler) http.Handler {
 
 		logger := zerolog.Ctx(r.Context())
 
-		claims, ok := ContextAccessTokenClaims(r.Context())
+		claims, ok := ContextClaims(r.Context())
 		if !ok {
 			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
 			return
@@ -252,7 +252,7 @@ func (a *AuthService) RequireRole(allowedRoles ...string) func(http.Handler) htt
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			logger := zerolog.Ctx(r.Context())
-			claims, ok := ContextAccessTokenClaims(r.Context())
+			claims, ok := ContextClaims(r.Context())
 			if !ok {
 				responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
 				return
@@ -279,7 +279,7 @@ func (a *AuthService) RequireIsnPermission(allowedPermissions ...string) func(ht
 
 			logger := zerolog.Ctx(r.Context())
 
-			claims, ok := ContextAccessTokenClaims(r.Context())
+			claims, ok := ContextClaims(r.Context())
 			if !ok {
 				responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
 				return

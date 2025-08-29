@@ -259,7 +259,7 @@ func (i *IsnHandler) UpdateIsnHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// check if user is either the ISN owner or a site owner
-	claims, ok := auth.ContextAccessTokenClaims(r.Context())
+	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
 		return

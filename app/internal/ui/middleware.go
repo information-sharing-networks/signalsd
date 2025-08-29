@@ -6,14 +6,23 @@ import (
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 )
 
-// RequireAuth is middleware that checks authentication and attempts token refresh if needed
+// RequireAuth is middleware that checks authentication and attempts token refresh if needed.
+// For HTMX requests with expired tokens, it returns HX-Refresh header to trigger a page refresh
+// which allows HTMX to retry the request with the new token cookies.
 func (s *Server) RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		status := s.authService.CheckTokenStatus(r)
 
 		switch status {
 		case TokenValid:
-			next.ServeHTTP(w, r)
+			// Add the current valid access token to context for handlers to use
+			accessTokenCookie, err := r.Cookie(accessTokenCookieName)
+			if err == nil {
+				ctx := ContextWithAccessToken(r.Context(), accessTokenCookie.Value)
+				next.ServeHTTP(w, r.WithContext(ctx))
+			} else {
+				next.ServeHTTP(w, r)
+			}
 			return
 		case TokenMissing, TokenInvalid:
 			s.redirectToLogin(w, r)
@@ -49,8 +58,12 @@ func (s *Server) RequireAuth(next http.Handler) http.Handler {
 				return
 			}
 
-			s.logger.Info().Msg("Access token refreshed successfully")
-			next.ServeHTTP(w, r) // Continue with refreshed token
+			// Add the new access token to the request context so handlers can use it
+			//todoctx := r.Context()
+			//ctx = context.WithValue(ctx, "access_token", loginResp.AccessToken)
+			ctx := ContextWithAccessToken(r.Context(), loginResp.AccessToken)
+
+			next.ServeHTTP(w, r.WithContext(ctx)) // Continue with refreshed token in context
 		}
 	})
 }

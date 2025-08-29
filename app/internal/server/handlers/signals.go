@@ -375,7 +375,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 	semVer := r.PathValue("sem_ver")
 	signalTypePath := fmt.Sprintf("%v/v%v", signalTypeSlug, semVer)
 
-	claims, ok := auth.ContextAccessTokenClaims(r.Context())
+	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
 		return
@@ -822,7 +822,7 @@ func (s *SignalsHandler) SearchPrivateSignalsHandler(w http.ResponseWriter, r *h
 	signalTypePath := fmt.Sprintf("%v/v%v", searchParams.signalTypeSlug, searchParams.semVer)
 
 	// Validate authenticated access to private ISN
-	claims, hasAuth := auth.ContextAccessTokenClaims(r.Context())
+	claims, hasAuth := auth.ContextClaims(r.Context())
 	if !hasAuth {
 		responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "authentication required for private ISN access")
 		return
@@ -954,7 +954,7 @@ func (s *SignalsHandler) WithdrawSignalHandler(w http.ResponseWriter, r *http.Re
 	semVer := r.PathValue("sem_ver")
 	signalTypePath := fmt.Sprintf("%v/v%v", signalTypeSlug, semVer)
 
-	claims, ok := auth.ContextAccessTokenClaims(r.Context())
+	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
 		return

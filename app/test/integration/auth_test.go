@@ -185,7 +185,7 @@ func checkPermissions(t *testing.T, authService *auth.AuthService, accountID uui
 	}
 
 	// parse the claims (confirms signature and structure)
-	claims := &auth.AccessTokenClaims{}
+	claims := &auth.Claims{}
 	_, err = jwt.ParseWithClaims(response.AccessToken, claims, func(token *jwt.Token) (any, error) {
 		return []byte(secretKey), nil
 	})

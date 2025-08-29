@@ -399,7 +399,7 @@ func createExpiredAccessToken(t *testing.T, accountID uuid.UUID) string {
 	issuedAt := time.Now().Add(-2 * time.Hour)  // 2 hours ago
 	expiresAt := time.Now().Add(-1 * time.Hour) // 1 hour ago (expired)
 
-	claims := auth.AccessTokenClaims{
+	claims := auth.Claims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   accountID.String(),
 			IssuedAt:  jwt.NewNumericDate(issuedAt),

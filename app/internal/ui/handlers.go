@@ -331,10 +331,10 @@ func (s *Server) handleSearchSignals(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get access token for API calls
-	accessTokenCookie, err := r.Cookie(accessTokenCookieName)
-	if err != nil {
-		component := SearchError("Authentication required")
+	// Get access token from context (set by RequireAuth middleware)
+	accessToken, ok := ContextAccessToken(r.Context())
+	if !ok {
+		component := SearchError("Internal error - access token not set, please login again")
 		if err := component.Render(r.Context(), w); err != nil {
 			s.logger.Error().Err(err).Msg("Failed to render search error")
 		}
@@ -342,7 +342,7 @@ func (s *Server) handleSearchSignals(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Perform search using ISN visibility to determine endpoint
-	searchResp, err := s.apiClient.SearchSignals(accessTokenCookie.Value, params, isnPerm.Visibility)
+	searchResp, err := s.apiClient.SearchSignals(accessToken, params, isnPerm.Visibility)
 	if err != nil {
 		s.logger.Error().Err(err).Msg("Signal search failed")
 		component := SearchError(fmt.Sprintf("Search failed: %v", err))
