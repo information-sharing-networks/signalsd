@@ -18,13 +18,13 @@ const (
 
 type Server struct {
 	router      *chi.Mux
-	config      *UIConfig
+	config      *Config
 	logger      *zerolog.Logger
 	authService *AuthService
 	apiClient   *APIClient
 }
 
-func NewServer(cfg *UIConfig, logger *zerolog.Logger) *Server {
+func NewServer(cfg *Config, logger *zerolog.Logger) *Server {
 	s := &Server{
 		router:      chi.NewRouter(),
 		config:      cfg,

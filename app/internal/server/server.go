@@ -423,7 +423,7 @@ func (s *Server) registerApiDocoRoutes() {
 // registerUIRoutes registers web UI routes directly on the main router
 func (s *Server) registerUIRoutes() {
 	// Create UI configuration pointing to localhost API
-	uiConfig := &ui.UIConfig{
+	uiConfig := &ui.Config{
 		Environment:  s.serverConfig.Environment,
 		Host:         s.serverConfig.Host,
 		Port:         s.serverConfig.Port, // Same port as API

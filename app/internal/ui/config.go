@@ -9,7 +9,7 @@ import (
 )
 
 // UI server config - used when the ui is run in standalone mode
-type UIConfig struct {
+type Config struct {
 	Environment  string        `envconfig:"ENVIRONMENT" default:"dev"`
 	Host         string        `envconfig:"HOST" default:"0.0.0.0"`
 	Port         int           `envconfig:"PORT" default:"3000"`
@@ -31,8 +31,8 @@ var validEnvs = map[string]bool{
 const accessTokenCookieName = "access_token"
 const isnPermsCookieName = "isn_perms"
 
-func NewConfig(logger *zerolog.Logger) (*UIConfig, error) {
-	var cfg UIConfig
+func NewConfig(logger *zerolog.Logger) (*Config, error) {
+	var cfg Config
 
 	if err := envconfig.Process("", &cfg); err != nil {
 		return nil, fmt.Errorf("failed to process environment variables: %w", err)
@@ -45,7 +45,7 @@ func NewConfig(logger *zerolog.Logger) (*UIConfig, error) {
 	return &cfg, nil
 }
 
-func validateUIConfig(cfg *UIConfig) error {
+func validateUIConfig(cfg *Config) error {
 	if !validEnvs[cfg.Environment] {
 		return fmt.Errorf("invalid environment '%s'. Valid environments: dev, test, perf, staging, prod", cfg.Environment)
 	}
