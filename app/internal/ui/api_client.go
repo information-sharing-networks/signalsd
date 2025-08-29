@@ -134,3 +134,88 @@ func (c *APIClient) RegisterUser(email, password string) error {
 
 	return nil
 }
+
+// UserLookupResponse represents a user lookup response
+type UserLookupResponse struct {
+	AccountID string `json:"account_id"`
+	Email     string `json:"email"`
+}
+
+// LookupUserByEmail looks up a user by email address using the admin endpoint
+// Note: This requires admin/owner permissions
+func (c *APIClient) LookupUserByEmail(accessToken, email string) (*UserLookupResponse, error) {
+	// Use the combined admin users endpoint with email query parameter
+	url := fmt.Sprintf("%s/api/admin/users?email=%s", c.baseURL, email)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		var errorResp ErrorResponse
+		if err := json.NewDecoder(resp.Body).Decode(&errorResp); err != nil {
+			return nil, fmt.Errorf("user lookup failed with status %d", resp.StatusCode)
+		}
+		return nil, fmt.Errorf("user lookup failed: %s", errorResp.Message)
+	}
+
+	// Parse the single user response
+	var user UserLookupResponse
+	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
+		return nil, fmt.Errorf("failed to decode user response: %w", err)
+	}
+
+	return &user, nil
+}
+
+// AddAccountToIsn adds an account to an ISN with the specified permission
+func (c *APIClient) AddAccountToIsn(accessToken, isnSlug, accountEmail, permission string) error {
+	user, err := c.LookupUserByEmail(accessToken, accountEmail)
+	if err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf("%s/api/isn/%s/accounts/%s", c.baseURL, isnSlug, user.AccountID)
+
+	requestBody := map[string]string{
+		"permission": permission,
+	}
+
+	jsonData, err := json.Marshal(requestBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		var errorResp ErrorResponse
+		if err := json.NewDecoder(resp.Body).Decode(&errorResp); err != nil {
+			return fmt.Errorf("request failed with status %d", resp.StatusCode)
+		}
+		return fmt.Errorf("%s", errorResp.Message)
+	}
+
+	return nil
+}

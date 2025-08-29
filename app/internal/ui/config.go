@@ -30,6 +30,7 @@ var validEnvs = map[string]bool{
 
 const accessTokenCookieName = "access_token"
 const isnPermsCookieName = "isn_perms"
+const accountInfoCookieName = "account_info"
 
 func NewConfig(logger *zerolog.Logger) (*Config, error) {
 	var cfg Config

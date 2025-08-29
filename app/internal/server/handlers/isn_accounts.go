@@ -162,7 +162,7 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 	if !errors.Is(err, pgx.ErrNoRows) {
 		// user has permission on this isn already
 		if req.Permission == isnAccount.Permission {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeResourceAlreadyExists, fmt.Sprintf("%v already has %v permission on isn %v", targetAccountID, req.Permission, isnSlug))
+			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeResourceAlreadyExists, fmt.Sprintf("account already has %v permission on isn %v", req.Permission, isnSlug))
 			return
 		}
 		updateExisting = true // flag for update rather than create

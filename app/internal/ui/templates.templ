@@ -190,6 +190,8 @@ templ AuthError(message string) {
 	</div>
 }
 
+
+
 templ RegistrationSuccess() {
 	<div class="alert alert-success">
 		<strong>Account created!</strong> You can now sign in.
@@ -215,12 +217,13 @@ templ RegistrationSuccess() {
 // =============================================================================
 // DASHBOARD PAGE
 // =============================================================================
-templ DashboardPage() {
+templ DashboardPage(errorMsg string) {
 	@BaseLayout("Dashboard") {
 		@Navigation()
 		<div class="page-container">
 			<h1 class="page-title">Dashboard</h1>
 			<p class="text-muted mb-6">Welcome to the Signalsd management interface.</p>
+
 			<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
 				<div class="card">
 					<div class="card-body">
@@ -242,10 +245,14 @@ templ DashboardPage() {
 					<div class="card-body">
 						<h3 class="card-title">Information Sharing Networks</h3>
 						<p class="text-muted mb-4">Manage ISNs and configure data sharing.</p>
-						<a href="#" class="btn btn-secondary">Manage ISNs</a>
+						<a href="/admin" class="btn btn-secondary">Manage ISNs</a>
 					</div>
 				</div>
 			</div>
+			if errorMsg != "" {
+				<br/>
+				@ErrorAlert(errorMsg)
+			}
 		</div>
 	}
 }
@@ -309,8 +316,14 @@ templ VersionOptions(versions []VersionDropdown) {
 	</select>
 }
 
-templ SearchError(message string) {
+templ ErrorAlert(message string) {
 	<div class="alert alert-error">
+		{ message }
+	</div>
+}
+
+templ SuccessAlert(message string) {
+	<div class="alert alert-success">
 		{ message }
 	</div>
 }
@@ -490,9 +503,171 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 				e.target.textContent = originalText;
 				e.target.classList.remove('text-red-600');
 			}, 2000);
-		}
-	});
-	</script>
+			}
+		});
+		</script>
+	}
+
+// =============================================================================
+// ISN ACCOUNTS ADMIN PAGE
+// =============================================================================
+templ IsnAccountsAdminPage(isns []IsnDropdown) {
+	@BaseLayout("ISN Account Management") {
+		@Navigation()
+		<div class="page-container">
+			<h1 class="page-title">ISN Account Management</h1>
+			<p class="text-muted mb-6">Add accounts to Information Sharing Networks.</p>
+
+			if len(isns) == 0 {
+				<div class="card">
+					<div class="card-body text-center">
+						<div class="alert alert-info">
+							<strong>No ISNs Available</strong>
+							<p class="mt-2 mb-0">You need admin access to at least one ISN to manage accounts.</p>
+						</div>
+					</div>
+				</div>
+			} else {
+				<div class="card mb-6">
+					<div class="card-header">
+						<h3 class="card-title">Add Account to ISN</h3>
+					</div>
+					<div class="card-body">
+						<form hx-post="/ui-api/add-isn-account" hx-target="#admin-result" class="space-y-4">
+							<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+								<div class="form-group">
+									<label for="isn_slug" class="form-label">ISN</label>
+									<select
+										id="isn_slug"
+										name="isn_slug"
+										required
+										class="form-select"
+									>
+										<option value="">Select ISN...</option>
+										for _, isn := range isns {
+											<option value={ isn.Slug }>{ strings.ReplaceAll(isn.Slug, "-", " ") }</option>
+										}
+									</select>
+								</div>
+								<div class="form-group">
+									<label for="account_email" class="form-label">Account Email</label>
+									<input
+										type="email"
+										id="account_email"
+										name="account_email"
+										required
+										placeholder="user@example.com"
+										class="form-input"
+									/>
+								</div>
+							</div>
+							<div class="form-group">
+								<label for="permission" class="form-label">Permission Level</label>
+								<select
+									id="permission"
+									name="permission"
+									required
+									class="form-select"
+								>
+									<option value="">Select Permission...</option>
+									<option value="read">Read - Can view signals</option>
+									<option value="write">Write - Can create and view signals</option>
+								</select>
+							</div>
+							<div class="form-group">
+								<button type="submit" class="btn btn-primary">
+									Add Account to ISN
+								</button>
+							</div>
+						</form>
+					</div>
+				</div>
+
+				<div id="admin-result">
+					<!-- Results will appear here -->
+				</div>
+			}
+		</div>
+	}
+}
+
+// =============================================================================
+// ADMIN DASHBOARD PAGE
+// =============================================================================
+templ AdminDashboardPage(errorMsg string) {
+	@BaseLayout("ISN Administration") {
+		@Navigation()
+		<div class="page-container">
+			<h1 class="page-title">ISN Administration</h1>
+			<p class="text-muted mb-6">Manage Information Sharing Networks and user access.</p>
+
+			if errorMsg != "" {
+				@ErrorAlert(errorMsg)
+			}
+
+			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+				<!-- Account Management -->
+				<div class="card">
+					<div class="card-body">
+						<h3 class="card-title">Account Management</h3>
+						<p class="text-muted mb-4">Add and manage user access to ISNs.</p>
+						<a href="/admin/isn-accounts" class="btn btn-primary">Manage ISN Accounts</a>
+					</div>
+				</div>
+
+				<!-- ISN Configuration -->
+				<div class="card">
+					<div class="card-body">
+						<h3 class="card-title">ISN Configuration</h3>
+						<p class="text-muted mb-4">Create and configure Information Sharing Networks.</p>
+						<button class="btn btn-secondary" disabled>Create ISN</button>
+						<p class="text-xs text-muted mt-2">Coming soon</p>
+					</div>
+				</div>
+
+				<!-- Signal Types -->
+				<div class="card">
+					<div class="card-body">
+						<h3 class="card-title">Signal Types</h3>
+						<p class="text-muted mb-4">Manage signal type definitions and schemas.</p>
+						<button class="btn btn-secondary" disabled>Manage Signal Types</button>
+						<p class="text-xs text-muted mt-2">Coming soon</p>
+					</div>
+				</div>
+
+				<!-- User Management -->
+				<div class="card">
+					<div class="card-body">
+						<h3 class="card-title">User Management</h3>
+						<p class="text-muted mb-4">Manage user accounts and permissions.</p>
+						<button class="btn btn-secondary" disabled>Manage Users</button>
+						<p class="text-xs text-muted mt-2">Coming soon</p>
+					</div>
+				</div>
+
+				<!-- Service Accounts -->
+				<div class="card">
+					<div class="card-body">
+						<h3 class="card-title">Service Accounts</h3>
+						<p class="text-muted mb-4">Manage API service accounts and credentials.</p>
+						<button class="btn btn-secondary" disabled>Manage Service Accounts</button>
+						<p class="text-xs text-muted mt-2">Coming soon</p>
+					</div>
+				</div>
+
+				<!-- System Settings -->
+				<div class="card">
+					<div class="card-body">
+						<h3 class="card-title">System Settings</h3>
+						<p class="text-muted mb-4">Configure system-wide settings and preferences.</p>
+						<button class="btn btn-secondary" disabled>System Settings</button>
+						<p class="text-xs text-muted mt-2">Coming soon</p>
+					</div>
+				</div>
+			</div>
+
+		</div>
+	}
 }
 
 // =============================================================================
@@ -628,7 +803,7 @@ templ SignalSearchPage(isns []IsnDropdown, perms map[string]IsnPerms, results []
 			</div>
 			<div id="search-results">
 				if errorMsg != "" {
-					@SearchError(errorMsg)
+					@ErrorAlert(errorMsg)
 				}
 				if results != nil {
 					@SearchResults(results)

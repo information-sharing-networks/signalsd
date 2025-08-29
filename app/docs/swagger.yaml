@@ -1126,46 +1126,28 @@ paths:
       - Site admin
   /api/admin/users:
     get:
-      description: This api displays all the site users and their email addreses (can
-        only be used by owner account)
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/handlers.UserDetails'
-            type: array
-        "401":
-          description: 'Authentication failed '
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "403":
-          description: 'Insufficient permissions '
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Get registered users
-      tags:
-      - Site admin
-  /api/admin/users/{id}:
-    get:
-      description: This api displays a site user and their email addreses (can only
-        be used by owner account)
+      description: |-
+        This api displays site users and their email addresses (can only be used by owner account)
+        No query parameters = return all users
+        With query parameters = return specific user: ?id=uuid or ?email=address
       parameters:
-      - description: user id
+      - description: user account ID
         example: 68fb5f5b-e3f5-4a96-8d35-cd2203a06f73
-        in: path
+        in: query
         name: id
-        required: true
+        type: string
+      - description: user email address
+        example: user@example.com
+        in: query
+        name: email
         type: string
       responses:
         "200":
-          description: OK
+          description: Specific user (when query params provided)
           schema:
             $ref: '#/definitions/handlers.UserDetails'
         "400":
-          description: Invalid user ID format
+          description: Invalid request - cannot provide both id and email parameters
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
@@ -1182,7 +1164,7 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Get registered user
+      summary: Get registered users or specific user
       tags:
       - Site admin
   /api/admin/users/{user_id}/reset-password:

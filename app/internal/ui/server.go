@@ -63,11 +63,14 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 		r.Post("/logout", s.handleLogout)
 		r.Get("/dashboard", s.handleDashboard)
 		r.Get("/search", s.handleSignalSearch)
+		r.Get("/admin", s.handleAdminDashboard)
+		r.Get("/admin/isn-accounts", s.handleIsnAccountsAdmin)
 
 		// UI API endpoints (used when rendering ui components)
 		r.Post("/ui-api/signal-types", s.handleGetSignalTypes)
 		r.Post("/ui-api/signal-versions", s.handleGetSignalVersions)
 		r.Post("/ui-api/search-signals", s.handleSearchSignals)
+		r.Post("/ui-api/add-isn-account", s.handleAddIsnAccount)
 	})
 }
 
@@ -98,9 +101,11 @@ func (s *Server) setupStandaloneRoutes() {
 		r.Post("/logout", s.handleLogout)
 		r.Get("/dashboard", s.handleDashboard)
 		r.Get("/search", s.handleSignalSearch)
+		r.Get("/admin/isn-accounts", s.handleIsnAccountsAdmin)
 		r.Post("/ui-api/signal-types", s.handleGetSignalTypes)
 		r.Post("/ui-api/signal-versions", s.handleGetSignalVersions)
 		r.Post("/ui-api/search-signals", s.handleSearchSignals)
+		r.Post("/ui-api/add-isn-account", s.handleAddIsnAccount)
 	})
 }
 
