@@ -281,7 +281,7 @@ func (s *Server) registerAdminRoutes() {
 		r.Route("/api/admin", func(r chi.Router) {
 			r.Group(func(r chi.Router) {
 
-				// route below only works in dev - take care! this endpoint deletes all the content on the database
+				// route below only works in dev - take care! this endpoint deletes all the content in the database
 				r.Use(s.authService.RequireDevEnv)
 
 				// delete all users and content
@@ -291,10 +291,9 @@ func (s *Server) registerAdminRoutes() {
 			r.Group(func(r chi.Router) {
 
 				r.Use(s.authService.RequireValidAccessToken(false))
-				r.Use(s.authService.RequireRole("owner"))
+				r.Use(s.authService.RequireRole("owner", "admin"))
 
-				// routes below can only be used by the owner as they expose the email addresses of all users on the site
-				r.Get("/users/{id}", admin.GetUserHandler)
+				// User management
 				r.Get("/users", admin.GetUsersHandler)
 
 				// Admin role management
@@ -303,13 +302,6 @@ func (s *Server) registerAdminRoutes() {
 
 				// ISN ownership transfer
 				r.Put("/isn/{isn_slug}/transfer-ownership", isn.TransferIsnOwnershipHandler)
-			})
-
-			r.Group(func(r chi.Router) {
-
-				// routes below can only be used by owners and admins
-				r.Use(s.authService.RequireValidAccessToken(false))
-				r.Use(s.authService.RequireRole("owner", "admin"))
 
 				r.Post("/accounts/{account_id}/disable", admin.DisableAccountHandler)
 				r.Post("/accounts/{account_id}/enable", admin.EnableAccountHandler)
