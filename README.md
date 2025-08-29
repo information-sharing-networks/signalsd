@@ -225,12 +225,12 @@ To generate the OpenAPI docs:
 ```bash
 swag init -g cmd/signalsd/main.go
 ```
-For docker users, the docs are automatically created when ever you restart the app container.
+For docker users, the docs are automatically created when Air live reload restarts the app container.
 
 ## SQL Queries
 SQL queries are kept in `app/sql/queries`.
 
-Run `sqlc generate` from the root of the project to regenerate the type safe Go code after adding or altering any queries (runs automatically for docker users on restarting the app)
+Run `sqlc generate` from the root of the project to regenerate the type safe Go code after adding or altering any queries (runs automatically for docker users)
 
 ## Testing
 For information about the testing strategy and how to run tests, see the [Integration Testing Documentation](app/test/integration/README.md).

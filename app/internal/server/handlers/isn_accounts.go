@@ -96,7 +96,7 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 		return
 	}
 	// check if user is either the ISN owner or a site owner
-	claims, ok := auth.ContextAccessTokenClaims(r.Context())
+	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
 		return
@@ -162,7 +162,7 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 	if !errors.Is(err, pgx.ErrNoRows) {
 		// user has permission on this isn already
 		if req.Permission == isnAccount.Permission {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeResourceAlreadyExists, fmt.Sprintf("%v already has %v permission on isn %v", targetAccountID, req.Permission, isnSlug))
+			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeResourceAlreadyExists, fmt.Sprintf("account already has %v permission on isn %v", req.Permission, isnSlug))
 			return
 		}
 		updateExisting = true // flag for update rather than create
@@ -245,7 +245,7 @@ func (i *IsnAccountHandler) RevokeIsnAccountHandler(w http.ResponseWriter, r *ht
 		return
 	}
 	// check if user is either the ISN owner or a site owner
-	claims, ok := auth.ContextAccessTokenClaims(r.Context())
+	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
 		return
@@ -359,7 +359,7 @@ func (i *IsnAccountHandler) GetIsnAccountsHandler(w http.ResponseWriter, r *http
 	}
 
 	// check if user is either the ISN owner or a site owner
-	claims, ok := auth.ContextAccessTokenClaims(r.Context())
+	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
 		return

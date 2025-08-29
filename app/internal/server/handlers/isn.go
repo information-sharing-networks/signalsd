@@ -259,7 +259,7 @@ func (i *IsnHandler) UpdateIsnHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// check if user is either the ISN owner or a site owner
-	claims, ok := auth.ContextAccessTokenClaims(r.Context())
+	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
 		return
@@ -447,7 +447,7 @@ func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 //	@Security		BearerAccessToken
 //	@Security		RefreshTokenCookieAuth
 //
-//	@Router			/api/isn/{isn_slug}/transfer-ownership [put]
+//	@Router			/api/admin/isn/{isn_slug}/transfer-ownership [put]
 //
 // Use with RequireRole (owner)
 func (i *IsnHandler) TransferIsnOwnershipHandler(w http.ResponseWriter, r *http.Request) {

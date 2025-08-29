@@ -101,7 +101,7 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 	logger := zerolog.Ctx(r.Context())
 
 	// these checks have been done already in the middleware so - if there is an error here - it is a bug.
-	_, ok := auth.ContextAccessTokenClaims(r.Context())
+	_, ok := auth.ContextClaims(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, " could not get claims from context")
 		return
@@ -216,7 +216,7 @@ func (s *SignalsBatchHandler) GetSignalBatchStatusHandler(w http.ResponseWriter,
 	// - Member accounts can only see batches they have created
 	// - ISN Admins can see batches for ISNs they administer
 	// - Site owner can see all batches
-	claims, ok := auth.ContextAccessTokenClaims(r.Context())
+	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
 		return
@@ -427,7 +427,7 @@ func (s *SignalsBatchHandler) SearchBatchesHandler(w http.ResponseWriter, r *htt
 	}
 
 	// Get authentication claims for permission checking
-	claims, ok := auth.ContextAccessTokenClaims(r.Context())
+	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
 		return

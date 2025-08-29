@@ -119,7 +119,7 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 		return
 	}
 	// check if user is either the ISN owner or a site owner
-	claims, ok := auth.ContextAccessTokenClaims(r.Context())
+	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
 		return
@@ -318,7 +318,7 @@ func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *ht
 	}
 
 	// check if user is either the ISN owner or a site owner
-	claims, ok := auth.ContextAccessTokenClaims(r.Context())
+	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
 		return
@@ -546,7 +546,7 @@ func (s *SignalTypeHandler) DeleteSignalTypeHandler(w http.ResponseWriter, r *ht
 	}
 
 	// check if user is either the ISN owner or a site owner
-	claims, ok := auth.ContextAccessTokenClaims(r.Context())
+	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
 		return

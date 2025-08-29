@@ -19,6 +19,13 @@ type LoginResponse struct {
 	Perms       map[string]IsnPerms `json:"isn_perms,omitempty"`
 }
 
+// AccountInfo represents the user's account information stored in cookies
+type AccountInfo struct {
+	AccountID   string `json:"account_id"`
+	AccountType string `json:"account_type"`
+	Role        string `json:"role"`
+}
+
 // IsnPerms represents permissions for an ISN
 type IsnPerms struct {
 	Permission      string   `json:"permission"`

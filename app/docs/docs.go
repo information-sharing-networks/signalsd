@@ -24,7 +24,7 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/admin/accounts/{account_id}/admin-role": {
+        "/api/admin/accounts/{account_id}/admin-role": {
             "put": {
                 "security": [
                     {
@@ -104,7 +104,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/accounts/{account_id}/disable": {
+        "/api/admin/accounts/{account_id}/disable": {
             "post": {
                 "security": [
                     {
@@ -157,7 +157,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/accounts/{account_id}/enable": {
+        "/api/admin/accounts/{account_id}/enable": {
             "post": {
                 "security": [
                     {
@@ -210,7 +210,65 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/reset": {
+        "/api/admin/isn/{isn_slug}/transfer-ownership": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    },
+                    {
+                        "RefreshTokenCookieAuth": []
+                    }
+                ],
+                "description": "Transfer ownership of an ISN to another admin account.\nThis can be used when an admin leaves or when reorganizing responsibilities.\nOnly the site owner can transfer ISN ownership.",
+                "tags": [
+                    "ISN configuration"
+                ],
+                "summary": "Transfer ISN ownership",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ISN slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Transfer details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.TransferIsnOwnershipRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/reset": {
             "post": {
                 "description": "Delete all registered users and associated data.\nThis endpoint only works on environments configured as 'dev'",
                 "tags": [
@@ -230,7 +288,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/service-accounts": {
+        "/api/admin/service-accounts": {
             "get": {
                 "security": [
                     {
@@ -267,7 +325,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/service-accounts/{id}": {
+        "/api/admin/service-accounts/{id}": {
             "get": {
                 "security": [
                     {
@@ -323,74 +381,43 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/users": {
+        "/api/admin/users": {
             "get": {
                 "security": [
                     {
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "This api displays all the site users and their email addreses (can only be used by owner account)",
+                "description": "This api displays site users and their email addresses (can only be used by owner account)\nNo query parameters = return all users\nWith query parameters = return specific user: ?id=uuid or ?email=address",
                 "tags": [
                     "Site admin"
                 ],
-                "summary": "Get registered users",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/handlers.UserDetails"
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Authentication failed ",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Insufficient permissions ",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/admin/users/{id}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "This api displays a site user and their email addreses (can only be used by owner account)",
-                "tags": [
-                    "Site admin"
-                ],
-                "summary": "Get registered user",
+                "summary": "Get registered users or specific user",
                 "parameters": [
                     {
                         "type": "string",
                         "example": "68fb5f5b-e3f5-4a96-8d35-cd2203a06f73",
-                        "description": "user id",
+                        "description": "user account ID",
                         "name": "id",
-                        "in": "path",
-                        "required": true
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "user@example.com",
+                        "description": "user email address",
+                        "name": "email",
+                        "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Specific user (when query params provided)",
                         "schema": {
                             "$ref": "#/definitions/handlers.UserDetails"
                         }
                     },
                     "400": {
-                        "description": "Invalid user ID format",
+                        "description": "Invalid request - cannot provide both id and email parameters",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -416,7 +443,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/users/{user_id}/reset-password": {
+        "/api/admin/users/{user_id}/reset-password": {
             "put": {
                 "security": [
                     {
@@ -1579,64 +1606,6 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/isn/{isn_slug}/transfer-ownership": {
-            "put": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    },
-                    {
-                        "RefreshTokenCookieAuth": []
-                    }
-                ],
-                "description": "Transfer ownership of an ISN to another admin account.\nThis can be used when an admin leaves or when reorganizing responsibilities.\nOnly the site owner can transfer ISN ownership.",
-                "tags": [
-                    "ISN configuration"
-                ],
-                "summary": "Transfer ISN ownership",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "ISN slug",
-                        "name": "isn_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Transfer details",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.TransferIsnOwnershipRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK"
-                    },
-                    "400": {
-                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }

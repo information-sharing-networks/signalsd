@@ -188,6 +188,7 @@ func (a *AuthService) CheckTokenStatus(r *http.Request) TokenStatus {
 //   - refresh token cookie (forwarded directly from signalsd API)
 //   - a cookie containing the access token provided by the server,
 //   - a cookie containg the isn permissions as JSON.
+//   - a cookie containing the account information (ID, type, role) as JSON.
 func (a *AuthService) SetAuthCookies(w http.ResponseWriter, loginResp *LoginResponse, refreshTokenCookie *http.Cookie, environment string) error {
 	isProd := environment == "prod"
 
@@ -223,6 +224,28 @@ func (a *AuthService) SetAuthCookies(w http.ResponseWriter, loginResp *LoginResp
 		})
 	}
 
+	// Set account information cookie (base64 encoded JSON)
+	accountInfo := AccountInfo{
+		AccountID:   loginResp.AccountID,
+		AccountType: loginResp.AccountType,
+		Role:        loginResp.Role,
+	}
+
+	accountInfoJSON, err := json.Marshal(accountInfo)
+	if err != nil {
+		return fmt.Errorf("failed to marshal account information: %w", err)
+	}
+
+	accountInfoBase64 := base64.StdEncoding.EncodeToString(accountInfoJSON)
+	http.SetCookie(w, &http.Cookie{
+		Name:     accountInfoCookieName,
+		Value:    accountInfoBase64,
+		Path:     "/",
+		HttpOnly: false, // JavaScript may need to read this for UI decisions
+		Secure:   isProd,
+		MaxAge:   loginResp.ExpiresIn + 60, // JWT expiry + 1 minute buffer
+	})
+
 	return nil
 }
 
@@ -257,6 +280,16 @@ func (a *AuthService) ClearAuthCookies(w http.ResponseWriter, environment string
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
+		Secure:   isProd,
+	})
+
+	// Clear account info cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     accountInfoCookieName,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: false,
 		Secure:   isProd,
 	})
 }

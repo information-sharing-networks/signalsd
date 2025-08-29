@@ -137,14 +137,23 @@ When running as a separate service, the UI has its own configuration:
 2. Set up database (see main signalsd README)
 
 ## Template Development
-When modifying `.templ` files, regenerate the Go code:
-
-if developing locally, install templ: `go install github.com/a-h/templ/cmd/templ@latest`
-
+if developing locally, install templ and air (live reload): 
 ```bash
-# For docker users
-make templ
+go install github.com/a-h/templ/cmd/templ@latest
+go install github.com/air-verse/air@latest
+
+#run the app with live reload (using docker db)
+cd app
+DATABASE_URL="postgres://signalsd-dev@localhost:15432/signalsd_admin?sslmode=disable" SECRET_KEY="mysecretkey" air
+```
+
+For docker users, air will handle live reloads when you change the templates. 
+
+You can manually generate the templates code with:
+```bash
+#For docker users
+make templ 
 
 # For local users
-cd app && templ generate"
+cd app && templ generate
 ```

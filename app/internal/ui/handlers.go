@@ -133,37 +133,47 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
-	component := DashboardPage()
+	var errorMsg string
+
+	// Check for error messages from redirects
+	errorParam := r.URL.Query().Get("error")
+	switch errorParam {
+	case "admin_access_denied":
+		errorMsg = "You do not have permission to access the admin dashboard"
+	}
+
+	component := DashboardPage(errorMsg)
 	if err := component.Render(r.Context(), w); err != nil {
 		s.logger.Error().Err(err).Msg("Failed to render dashboard page")
 	}
 }
 
 func (s *Server) handleSignalSearch(w http.ResponseWriter, r *http.Request) {
+	// Initialize empty permissions and ISN list
+	var perms map[string]IsnPerms = make(map[string]IsnPerms)
+	var isns []IsnDropdown
+
+	// Try to get permissions cookie - if it doesn't exist or is invalid,
+	// we'll show the search page with no ISNs (triggering the notification)
 	permsCookie, err := r.Cookie(isnPermsCookieName)
 	if err != nil {
-		s.logger.Error().Err(err).Msg("No permissions cookie found")
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-
-	// Decode base64 cookie value
-	decodedPerms, err := base64.StdEncoding.DecodeString(permsCookie.Value)
-	if err != nil {
-		s.logger.Error().Err(err).Msgf("Failed to decode permissions cookie: %s", permsCookie.Value)
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
-
-	var perms map[string]IsnPerms
-	if err := json.Unmarshal(decodedPerms, &perms); err != nil {
-		s.logger.Error().Err(err).Msgf("Failed to parse permissions JSON: %s", string(decodedPerms))
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
+		s.logger.Info().Msg("No permissions cookie found - user has no ISN access")
+	} else {
+		// Decode base64 cookie value
+		decodedPerms, err := base64.StdEncoding.DecodeString(permsCookie.Value)
+		if err != nil {
+			s.logger.Error().Err(err).Msgf("Failed to decode permissions cookie: %s", permsCookie.Value)
+		} else {
+			// Parse permissions JSON
+			if err := json.Unmarshal(decodedPerms, &perms); err != nil {
+				s.logger.Error().Err(err).Msgf("Failed to parse permissions JSON: %s", string(decodedPerms))
+				perms = make(map[string]IsnPerms) // Reset to empty map on error
+			}
+		}
 	}
 
 	// Convert permissions to ISN list for dropdown
-	isns := make([]IsnDropdown, 0, len(perms))
+	isns = make([]IsnDropdown, 0, len(perms))
 	for isnSlug := range perms {
 		isns = append(isns, IsnDropdown{
 			Slug:    isnSlug,
@@ -171,7 +181,7 @@ func (s *Server) handleSignalSearch(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	// Render search page
+	// Render search page (will show notification if len(isns) == 0)
 	component := SignalSearchPage(isns, perms, nil, "")
 	if err := component.Render(r.Context(), w); err != nil {
 		s.logger.Error().Err(err).Msg("Failed to render signal search page")
@@ -313,9 +323,9 @@ func (s *Server) handleSearchSignals(w http.ResponseWriter, r *http.Request) {
 
 	// Validate required parameters
 	if params.ISNSlug == "" || params.SignalTypeSlug == "" || params.SemVer == "" {
-		component := SearchError("ISN, Signal Type, and Version are required")
+		component := ErrorAlert("ISN, Signal Type, and Version are required")
 		if err := component.Render(r.Context(), w); err != nil {
-			s.logger.Error().Err(err).Msg("Failed to render search error")
+			s.logger.Error().Err(err).Msg("Failed to render error")
 		}
 		return
 	}
@@ -323,30 +333,30 @@ func (s *Server) handleSearchSignals(w http.ResponseWriter, r *http.Request) {
 	// Get user permissions to validate ISN access and determine visibility
 	isnPerm, err := s.getIsnPermissions(r, params.ISNSlug)
 	if err != nil {
-		component := SearchError(err.Error())
+		component := ErrorAlert(err.Error())
 		if err := component.Render(r.Context(), w); err != nil {
-			s.logger.Error().Err(err).Msg("Failed to render search error")
+			s.logger.Error().Err(err).Msg("Failed to render error")
 		}
 		return
 	}
 
-	// Get access token for API calls
-	accessTokenCookie, err := r.Cookie(accessTokenCookieName)
-	if err != nil {
-		component := SearchError("Authentication required")
+	// Get access token from context (set by RequireAuth middleware)
+	accessToken, ok := ContextAccessToken(r.Context())
+	if !ok {
+		component := ErrorAlert("Internal error - access token not set, please login again")
 		if err := component.Render(r.Context(), w); err != nil {
-			s.logger.Error().Err(err).Msg("Failed to render search error")
+			s.logger.Error().Err(err).Msg("Failed to render error")
 		}
 		return
 	}
 
 	// Perform search using ISN visibility to determine endpoint
-	searchResp, err := s.apiClient.SearchSignals(accessTokenCookie.Value, params, isnPerm.Visibility)
+	searchResp, err := s.apiClient.SearchSignals(accessToken, params, isnPerm.Visibility)
 	if err != nil {
 		s.logger.Error().Err(err).Msg("Signal search failed")
-		component := SearchError(fmt.Sprintf("Search failed: %v", err))
+		component := ErrorAlert(fmt.Sprintf("Search failed: %v", err))
 		if err := component.Render(r.Context(), w); err != nil {
-			s.logger.Error().Err(err).Msg("Failed to render search error")
+			s.logger.Error().Err(err).Msg("Failed to render error")
 		}
 		return
 	}
@@ -355,6 +365,102 @@ func (s *Server) handleSearchSignals(w http.ResponseWriter, r *http.Request) {
 	component := SearchResults(*searchResp)
 	if err := component.Render(r.Context(), w); err != nil {
 		s.logger.Error().Err(err).Msg("Failed to render search results")
+	}
+}
+
+// handleAdminDashboard renders the main admin dashboard page
+func (s *Server) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
+	// Get user permissions from context
+	accountInfo, ok := ContextAccountInfo(r.Context())
+
+	if !ok {
+		component := ErrorAlert("Internal error - account info not set, please login again")
+		if err := component.Render(r.Context(), w); err != nil {
+			s.logger.Error().Err(err).Msg("Failed to render error")
+		}
+		return
+	}
+
+	if accountInfo.Role != "owner" && accountInfo.Role != "admin" {
+		// Redirect back to main dashboard with error message
+		// TODO: Add flash message support to show error on main dashboard
+		http.Redirect(w, r, "/dashboard?error=admin_access_denied", http.StatusSeeOther)
+		return
+	}
+
+	// Render admin dashboard (no error message needed - access is validated above)
+	component := AdminDashboardPage("")
+	if err := component.Render(r.Context(), w); err != nil {
+		s.logger.Error().Err(err).Msg("Failed to render admin dashboard")
+	}
+}
+
+// handleIsnAccountsAdmin renders the ISN accounts administration page
+func (s *Server) handleIsnAccountsAdmin(w http.ResponseWriter, r *http.Request) {
+	// Get user permissions from context (not cookies directly - see context.go for explanation)
+	perms, _ := ContextIsnPerms(r.Context())
+	var isns []IsnDropdown
+
+	// Convert permissions to ISN list for dropdown (only ISNs where user has admin rights)
+	isns = make([]IsnDropdown, 0, len(perms))
+	for isnSlug, perm := range perms {
+		// Only show ISNs where user has write permission (admins/owners)
+		if perm.Permission == "write" {
+			isns = append(isns, IsnDropdown{
+				Slug:    isnSlug,
+				IsInUse: true,
+			})
+		}
+	}
+
+	// Render admin page
+	component := IsnAccountsAdminPage(isns)
+	if err := component.Render(r.Context(), w); err != nil {
+		s.logger.Error().Err(err).Msg("Failed to render ISN accounts admin page")
+	}
+}
+
+// handleAddIsnAccount handles the form submission to add an account to an ISN
+func (s *Server) handleAddIsnAccount(w http.ResponseWriter, r *http.Request) {
+	// Parse form data
+	isnSlug := r.FormValue("isn_slug")
+	accountEmail := r.FormValue("account_email")
+	permission := r.FormValue("permission")
+
+	// Validate required fields
+	if isnSlug == "" || accountEmail == "" || permission == "" {
+		component := ErrorAlert("All fields are required")
+		if err := component.Render(r.Context(), w); err != nil {
+			s.logger.Error().Err(err).Msg("Failed to render error")
+		}
+		return
+	}
+
+	// Get access token from context
+	accessToken, ok := ContextAccessToken(r.Context())
+	if !ok {
+		component := ErrorAlert("Authentication required")
+		if err := component.Render(r.Context(), w); err != nil {
+			s.logger.Info().Err(err).Msg("Failed to render error")
+		}
+		return
+	}
+
+	// Call the API to add the account to the ISN
+	err := s.apiClient.AddAccountToIsn(accessToken, isnSlug, accountEmail, permission)
+	if err != nil {
+		s.logger.Info().Err(err).Msg("Failed to add account to ISN")
+		component := ErrorAlert(fmt.Sprintf("Failed to add account to ISN: %v", err))
+		if err := component.Render(r.Context(), w); err != nil {
+			s.logger.Error().Err(err).Msg("Failed to render error")
+		}
+		return
+	}
+
+	// Success response
+	component := SuccessAlert("Account successfully added to ISN")
+	if err := component.Render(r.Context(), w); err != nil {
+		s.logger.Error().Err(err).Msg("Failed to render success message")
 	}
 }
 
@@ -370,21 +476,10 @@ func (s *Server) redirectToLogin(w http.ResponseWriter, r *http.Request) {
 
 // getIsnPermissions validates user has access to the ISN and returns the ISN permissions
 func (s *Server) getIsnPermissions(r *http.Request, isnSlug string) (*IsnPerms, error) {
-	// Get permissions cookie
-	permsCookie, err := r.Cookie(isnPermsCookieName)
-	if err != nil {
+	// Get permissions from context (not cookies directly - see context.go for explanation)
+	perms, ok := ContextIsnPerms(r.Context())
+	if !ok {
 		return nil, fmt.Errorf("authentication required")
-	}
-
-	// Decode permissions
-	decodedPerms, err := base64.StdEncoding.DecodeString(permsCookie.Value)
-	if err != nil {
-		return nil, fmt.Errorf("invalid permissions")
-	}
-
-	var perms map[string]IsnPerms
-	if err := json.Unmarshal(decodedPerms, &perms); err != nil {
-		return nil, fmt.Errorf("invalid permissions format")
 	}
 
 	// Validate user has access to this ISN

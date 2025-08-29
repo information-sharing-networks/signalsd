@@ -39,7 +39,8 @@ services:
             go install github.com/swaggo/swag/cmd/swag@latest && \
             go install honnef.co/go/tools/cmd/staticcheck@latest && \
             go install github.com/securego/gosec/v2/cmd/gosec@latest && \
-            go install github.com/a-h/templ/cmd/templ@latest
+            go install github.com/a-h/templ/cmd/templ@latest && \
+            go install github.com/air-verse/air@latest
         # Pre-download common Go modules for faster startup
         WORKDIR /tmp/app
         COPY app/go.mod app/go.sum ./
@@ -85,10 +86,11 @@ services:
         swag init -g ./cmd/signalsd/main.go &&
         echo 'Running database migrations...' &&
         goose -dir sql/schema postgres \"$$DATABASE_URL\" -env=none up &&
-        echo 'Starting signalsd service...' &&
-        go run -mod=readonly cmd/signalsd/main.go --mode all
+        echo 'Starting signalsd service (live reload)...' &&
+        air 
       "
     networks:
+        #go run -mod=readonly cmd/signalsd/main.go --mode all
       - app-network
     deploy:
       resources:

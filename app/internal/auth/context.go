@@ -14,7 +14,7 @@ type contextKey struct {
 var (
 	accountIDKey          = contextKey{"account-id"}
 	accountTypeKey        = contextKey{"account-type"}
-	accessTokenClaimsKey  = contextKey{"access-token-claims"}
+	claimsKey             = contextKey{"claims"}
 	hashedRefreshTokenKey = contextKey{"hashed_refresh_token"}
 )
 
@@ -45,11 +45,11 @@ func ContextHashedRefreshToken(ctx context.Context) (string, bool) {
 	return token, ok
 }
 
-func ContextWithAccessTokenClaims(ctx context.Context, claims *AccessTokenClaims) context.Context {
-	return context.WithValue(ctx, accessTokenClaimsKey, claims)
+func ContextWithClaims(ctx context.Context, claims *Claims) context.Context {
+	return context.WithValue(ctx, claimsKey, claims)
 }
 
-func ContextAccessTokenClaims(ctx context.Context) (*AccessTokenClaims, bool) {
-	claims, ok := ctx.Value(accessTokenClaimsKey).(*AccessTokenClaims)
+func ContextClaims(ctx context.Context) (*Claims, bool) {
+	claims, ok := ctx.Value(claimsKey).(*Claims)
 	return claims, ok
 }

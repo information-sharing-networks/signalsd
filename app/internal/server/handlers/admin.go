@@ -62,7 +62,7 @@ type ServiceAccountDetails struct {
 //	@Success		200
 //	@Failure		403	{object}	responses.ErrorResponse
 //
-//	@Router			/admin/reset [post]
+//	@Router			/api/admin/reset [post]
 func (a *AdminHandler) ResetHandler(w http.ResponseWriter, r *http.Request) {
 
 	deletedAccountsCount, err := a.queries.DeleteAccounts(r.Context())
@@ -160,7 +160,7 @@ func (a *AdminHandler) VersionHandler(w http.ResponseWriter, r *http.Request) {
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/admin/accounts/{account_id}/disable [post]
+//	@Router			/api/admin/accounts/{account_id}/disable [post]
 func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Request) {
 	accountIDString := r.PathValue("account_id")
 	logger := zerolog.Ctx(r.Context())
@@ -296,7 +296,7 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/admin/accounts/{account_id}/enable [post]
+//	@Router			/api/admin/accounts/{account_id}/enable [post]
 func (a *AdminHandler) EnableAccountHandler(w http.ResponseWriter, r *http.Request) {
 	accountIDString := r.PathValue("account_id")
 	logger := zerolog.Ctx(r.Context())
@@ -341,79 +341,101 @@ func (a *AdminHandler) EnableAccountHandler(w http.ResponseWriter, r *http.Reque
 	_, _ = w.Write([]byte(fmt.Sprintf("account %v (type %s) enabled", accountID, account.AccountType)))
 }
 
-// GetUserbyIDHandler godoc
-//
-//	@Summary	Get registered user
-//	@Description
-//	@Description	This api displays a site user and their email addreses (can only be used by owner account)
-//	@Tags			Site admin
-//
-//	@Param			id	path		string	true	"user id"	example(68fb5f5b-e3f5-4a96-8d35-cd2203a06f73)
-//	@Success		200	{object}	handlers.UserDetails
-//	@Failure		400	{object}	responses.ErrorResponse	"Invalid user ID format"
-//	@Failure		401	{object}	responses.ErrorResponse	"Authentication failed "
-//	@Failure		403	{object}	responses.ErrorResponse	"Insufficient permissions "
-//	@Failure		404	{object}	responses.ErrorResponse	"User not found"
-//
-//	@Security		BearerAccessToken
-//
-//	@Router			/admin/users/{id} [get]
-func (a *AdminHandler) GetUserHandler(w http.ResponseWriter, r *http.Request) {
-
-	userAccountIDstring := r.PathValue("id")
-	userAccountID, err := uuid.Parse(userAccountIDstring)
-	if err != nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, fmt.Sprintf("Invalid user ID: %v", err))
-		return
-	}
-
-	dbUser, err := a.queries.GetUserByID(r.Context(), userAccountID)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No user found for id %v", userAccountID))
-			return
-		}
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the user from the database %v", err))
-		return
-	}
-
-	// Convert database struct to our response struct
-	user := UserDetails{
-		AccountID: dbUser.AccountID,
-		Email:     dbUser.Email,
-		UserRole:  dbUser.UserRole,
-		CreatedAt: dbUser.CreatedAt,
-		UpdatedAt: dbUser.UpdatedAt,
-	}
-
-	responses.RespondWithJSON(w, http.StatusOK, user)
-}
-
 // GetUsersHandler godoc
 //
-//	@Summary		Get registered users
-//	@Description	This api displays all the site users and their email addreses (can only be used by owner account)
+//	@Summary		Get registered users or specific user
+//	@Description	This api displays site users and their email addresses (can only be used by owner account)
+//	@Description	No query parameters = return all users
+//	@Description	With query parameters = return specific user: ?id=uuid or ?email=address
 //	@Tags			Site admin
 //
-//	@Success		200	{array}		handlers.UserDetails
-//	@Failure		401	{object}	responses.ErrorResponse	"Authentication failed "
-//	@Failure		403	{object}	responses.ErrorResponse	"Insufficient permissions "
+//	@Param			id		query		string	false	"user account ID"	example(68fb5f5b-e3f5-4a96-8d35-cd2203a06f73)
+//	@Param			email	query		string	false	"user email address"	example(user@example.com)
+//	@Success		200		{array}		handlers.UserDetails	"All users (when no query params)"
+//	@Success		200		{object}	handlers.UserDetails	"Specific user (when query params provided)"
+//	@Failure		400		{object}	responses.ErrorResponse	"Invalid request - cannot provide both id and email parameters"
+//	@Failure		401		{object}	responses.ErrorResponse	"Authentication failed "
+//	@Failure		403		{object}	responses.ErrorResponse	"Insufficient permissions "
+//	@Failure		404		{object}	responses.ErrorResponse	"User not found"
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/admin/users [get]
+//	@Router			/api/admin/users [get]
 func (a *AdminHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
+	accountIdParam := r.URL.Query().Get("id")
+	emailParam := r.URL.Query().Get("email")
 
-	dbUsers, err := a.queries.GetUsers(r.Context())
-	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("error getting user from database: %v", err))
+	// If no query parameters, return all users
+	if accountIdParam == "" && emailParam == "" {
+		dbUsers, err := a.queries.GetUsers(r.Context())
+		if err != nil {
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("error getting users from database: %v", err))
+			return
+		}
+
+		users := make([]UserDetails, len(dbUsers))
+		for i, dbUser := range dbUsers {
+			users[i] = UserDetails{
+				AccountID: dbUser.AccountID,
+				Email:     dbUser.Email,
+				UserRole:  dbUser.UserRole,
+				CreatedAt: dbUser.CreatedAt,
+				UpdatedAt: dbUser.UpdatedAt,
+			}
+		}
+
+		responses.RespondWithJSON(w, http.StatusOK, users)
 		return
 	}
 
-	// Convert database structs to our response structs
-	users := make([]UserDetails, len(dbUsers))
-	for i, dbUser := range dbUsers {
-		users[i] = UserDetails{
+	// If query parameters provided, return specific user
+	if accountIdParam != "" && emailParam != "" {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "Cannot provide both 'id' and 'email' query parameters")
+		return
+	}
+
+	var user UserDetails
+
+	if accountIdParam != "" {
+		// Lookup by ID
+		userAccountID, err := uuid.Parse(accountIdParam)
+		if err != nil {
+			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, fmt.Sprintf("Invalid user ID format: %v", err))
+			return
+		}
+
+		dbUser, err := a.queries.GetUserByID(r.Context(), userAccountID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No user found for ID %v", userAccountID))
+				return
+			}
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the user from the database %v", err))
+			return
+		}
+
+		// Convert GetUserByIDRow to UserDetails
+		user = UserDetails{
+			AccountID: dbUser.AccountID,
+			Email:     dbUser.Email,
+			UserRole:  dbUser.UserRole,
+			CreatedAt: dbUser.CreatedAt,
+			UpdatedAt: dbUser.UpdatedAt,
+		}
+	} else {
+		// Lookup by email
+		dbUser, err := a.queries.GetUserByEmail(r.Context(), emailParam)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No user found for email %v", emailParam))
+				return
+			}
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("There was an error getting the user from the database %v", err))
+			return
+		}
+
+		// Convert User to UserDetails
+		user = UserDetails{
 			AccountID: dbUser.AccountID,
 			Email:     dbUser.Email,
 			UserRole:  dbUser.UserRole,
@@ -422,7 +444,7 @@ func (a *AdminHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	responses.RespondWithJSON(w, http.StatusOK, users)
+	responses.RespondWithJSON(w, http.StatusOK, user)
 }
 
 // GetServiceAccountHandler godoc
@@ -442,7 +464,7 @@ func (a *AdminHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/admin/service-accounts/{id} [get]
+//	@Router			/api/admin/service-accounts/{id} [get]
 func (a *AdminHandler) GetServiceAccountHandler(w http.ResponseWriter, r *http.Request) {
 	serviceAccountIDString := r.PathValue("id")
 	logger := zerolog.Ctx(r.Context())
@@ -494,7 +516,7 @@ func (a *AdminHandler) GetServiceAccountHandler(w http.ResponseWriter, r *http.R
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/admin/service-accounts [get]
+//	@Router			/api/admin/service-accounts [get]
 func (a *AdminHandler) GetServiceAccountsHandler(w http.ResponseWriter, r *http.Request) {
 	logger := zerolog.Ctx(r.Context())
 
@@ -549,7 +571,7 @@ type ResetUserPasswordResponse struct {
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/admin/users/{user_id}/reset-password [put]
+//	@Router			/api/admin/users/{user_id}/reset-password [put]
 func (a *AdminHandler) ResetUserPasswordHandler(w http.ResponseWriter, r *http.Request) {
 	logger := zerolog.Ctx(r.Context())
 
