@@ -62,7 +62,7 @@ type ServiceAccountDetails struct {
 //	@Success		200
 //	@Failure		403	{object}	responses.ErrorResponse
 //
-//	@Router			/admin/reset [post]
+//	@Router			/api/admin/reset [post]
 func (a *AdminHandler) ResetHandler(w http.ResponseWriter, r *http.Request) {
 
 	deletedAccountsCount, err := a.queries.DeleteAccounts(r.Context())
@@ -160,7 +160,7 @@ func (a *AdminHandler) VersionHandler(w http.ResponseWriter, r *http.Request) {
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/admin/accounts/{account_id}/disable [post]
+//	@Router			/api/admin/accounts/{account_id}/disable [post]
 func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Request) {
 	accountIDString := r.PathValue("account_id")
 	logger := zerolog.Ctx(r.Context())
@@ -296,7 +296,7 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/admin/accounts/{account_id}/enable [post]
+//	@Router			/api/admin/accounts/{account_id}/enable [post]
 func (a *AdminHandler) EnableAccountHandler(w http.ResponseWriter, r *http.Request) {
 	accountIDString := r.PathValue("account_id")
 	logger := zerolog.Ctx(r.Context())
@@ -357,7 +357,7 @@ func (a *AdminHandler) EnableAccountHandler(w http.ResponseWriter, r *http.Reque
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/admin/users/{id} [get]
+//	@Router			/api/admin/users/{id} [get]
 func (a *AdminHandler) GetUserHandler(w http.ResponseWriter, r *http.Request) {
 
 	userAccountIDstring := r.PathValue("id")
@@ -401,7 +401,7 @@ func (a *AdminHandler) GetUserHandler(w http.ResponseWriter, r *http.Request) {
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/admin/users [get]
+//	@Router			/api/admin/users [get]
 func (a *AdminHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 
 	dbUsers, err := a.queries.GetUsers(r.Context())
@@ -442,7 +442,7 @@ func (a *AdminHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/admin/service-accounts/{id} [get]
+//	@Router			/api/admin/service-accounts/{id} [get]
 func (a *AdminHandler) GetServiceAccountHandler(w http.ResponseWriter, r *http.Request) {
 	serviceAccountIDString := r.PathValue("id")
 	logger := zerolog.Ctx(r.Context())
@@ -494,7 +494,7 @@ func (a *AdminHandler) GetServiceAccountHandler(w http.ResponseWriter, r *http.R
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/admin/service-accounts [get]
+//	@Router			/api/admin/service-accounts [get]
 func (a *AdminHandler) GetServiceAccountsHandler(w http.ResponseWriter, r *http.Request) {
 	logger := zerolog.Ctx(r.Context())
 
@@ -549,7 +549,7 @@ type ResetUserPasswordResponse struct {
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/admin/users/{user_id}/reset-password [put]
+//	@Router			/api/admin/users/{user_id}/reset-password [put]
 func (a *AdminHandler) ResetUserPasswordHandler(w http.ResponseWriter, r *http.Request) {
 	logger := zerolog.Ctx(r.Context())
 

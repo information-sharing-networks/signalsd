@@ -447,7 +447,7 @@ func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 //	@Security		BearerAccessToken
 //	@Security		RefreshTokenCookieAuth
 //
-//	@Router			/api/isn/{isn_slug}/transfer-ownership [put]
+//	@Router			/api/admin/isn/{isn_slug}/transfer-ownership [put]
 //
 // Use with RequireRole (owner)
 func (i *IsnHandler) TransferIsnOwnershipHandler(w http.ResponseWriter, r *http.Request) {

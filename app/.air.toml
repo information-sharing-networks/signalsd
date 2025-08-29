@@ -4,9 +4,9 @@ tmp_dir = "tmp"
 [build]
   args_bin = ["--mode", "all"]
   bin = "./bin/signalsd"
-  cmd = "sqlc generate && templ generate && go build -o ./bin/signalsd ./cmd/signalsd/main.go"
+  cmd = "swag init -g ./cmd/signalsd/main.go && sqlc generate && templ generate && go build -o ./bin/signalsd ./cmd/signalsd/main.go"
   delay = 1000
-  exclude_dir = ["tmp", "internal/database" ]
+  exclude_dir = ["tmp", "internal/database", "docs"]
   exclude_file = []
   exclude_regex = [".*_templ.go"]
   exclude_unchanged = false

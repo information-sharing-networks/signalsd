@@ -24,7 +24,7 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/admin/accounts/{account_id}/admin-role": {
+        "/api/admin/accounts/{account_id}/admin-role": {
             "put": {
                 "security": [
                     {
@@ -104,7 +104,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/accounts/{account_id}/disable": {
+        "/api/admin/accounts/{account_id}/disable": {
             "post": {
                 "security": [
                     {
@@ -157,7 +157,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/accounts/{account_id}/enable": {
+        "/api/admin/accounts/{account_id}/enable": {
             "post": {
                 "security": [
                     {
@@ -210,7 +210,65 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/reset": {
+        "/api/admin/isn/{isn_slug}/transfer-ownership": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    },
+                    {
+                        "RefreshTokenCookieAuth": []
+                    }
+                ],
+                "description": "Transfer ownership of an ISN to another admin account.\nThis can be used when an admin leaves or when reorganizing responsibilities.\nOnly the site owner can transfer ISN ownership.",
+                "tags": [
+                    "ISN configuration"
+                ],
+                "summary": "Transfer ISN ownership",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ISN slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Transfer details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.TransferIsnOwnershipRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/reset": {
             "post": {
                 "description": "Delete all registered users and associated data.\nThis endpoint only works on environments configured as 'dev'",
                 "tags": [
@@ -230,7 +288,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/service-accounts": {
+        "/api/admin/service-accounts": {
             "get": {
                 "security": [
                     {
@@ -267,7 +325,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/service-accounts/{id}": {
+        "/api/admin/service-accounts/{id}": {
             "get": {
                 "security": [
                     {
@@ -323,7 +381,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/users": {
+        "/api/admin/users": {
             "get": {
                 "security": [
                     {
@@ -360,7 +418,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/users/{id}": {
+        "/api/admin/users/{id}": {
             "get": {
                 "security": [
                     {
@@ -416,7 +474,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/admin/users/{user_id}/reset-password": {
+        "/api/admin/users/{user_id}/reset-password": {
             "put": {
                 "security": [
                     {
@@ -1579,64 +1637,6 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/isn/{isn_slug}/transfer-ownership": {
-            "put": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    },
-                    {
-                        "RefreshTokenCookieAuth": []
-                    }
-                ],
-                "description": "Transfer ownership of an ISN to another admin account.\nThis can be used when an admin leaves or when reorganizing responsibilities.\nOnly the site owner can transfer ISN ownership.",
-                "tags": [
-                    "ISN configuration"
-                ],
-                "summary": "Transfer ISN ownership",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "ISN slug",
-                        "name": "isn_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Transfer details",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.TransferIsnOwnershipRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK"
-                    },
-                    "400": {
-                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }

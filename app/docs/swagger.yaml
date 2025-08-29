@@ -856,7 +856,7 @@ info:
     name: MIT
   title: Signals ISN API
 paths:
-  /admin/accounts/{account_id}/admin-role:
+  /api/admin/accounts/{account_id}/admin-role:
     delete:
       description: this endpoint can only be used by the site owner account
       parameters:
@@ -917,7 +917,7 @@ paths:
       summary: Grant admin role
       tags:
       - Site admin
-  /admin/accounts/{account_id}/disable:
+  /api/admin/accounts/{account_id}/disable:
     post:
       description: |-
         **Use Cases:**
@@ -965,7 +965,7 @@ paths:
       summary: Disable an account
       tags:
       - Site admin
-  /admin/accounts/{account_id}/enable:
+  /api/admin/accounts/{account_id}/enable:
     post:
       description: |-
         **Administrative endpoint to re-enable previously disabled accounts.**
@@ -1007,7 +1007,46 @@ paths:
       summary: Enable an account
       tags:
       - Site admin
-  /admin/reset:
+  /api/admin/isn/{isn_slug}/transfer-ownership:
+    put:
+      description: |-
+        Transfer ownership of an ISN to another admin account.
+        This can be used when an admin leaves or when reorganizing responsibilities.
+        Only the site owner can transfer ISN ownership.
+      parameters:
+      - description: ISN slug
+        in: path
+        name: isn_slug
+        required: true
+        type: string
+      - description: Transfer details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.TransferIsnOwnershipRequest'
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      - RefreshTokenCookieAuth: []
+      summary: Transfer ISN ownership
+      tags:
+      - ISN configuration
+  /api/admin/reset:
     post:
       description: |-
         Delete all registered users and associated data.
@@ -1022,7 +1061,7 @@ paths:
       summary: reset
       tags:
       - Site admin
-  /admin/service-accounts:
+  /api/admin/service-accounts:
     get:
       description: |-
         Get a list of all service accounts in the system.
@@ -1047,7 +1086,7 @@ paths:
       summary: Get all service accounts
       tags:
       - Site admin
-  /admin/service-accounts/{id}:
+  /api/admin/service-accounts/{id}:
     get:
       description: |-
         Get a specific service account by account ID.
@@ -1085,7 +1124,7 @@ paths:
       summary: Get service account
       tags:
       - Site admin
-  /admin/users:
+  /api/admin/users:
     get:
       description: This api displays all the site users and their email addreses (can
         only be used by owner account)
@@ -1109,7 +1148,7 @@ paths:
       summary: Get registered users
       tags:
       - Site admin
-  /admin/users/{id}:
+  /api/admin/users/{id}:
     get:
       description: This api displays a site user and their email addreses (can only
         be used by owner account)
@@ -1146,7 +1185,7 @@ paths:
       summary: Get registered user
       tags:
       - Site admin
-  /admin/users/{user_id}/reset-password:
+  /api/admin/users/{user_id}/reset-password:
     put:
       description: Allows admins to reset a user's password (use this endpoint if
         the user has forgotten their password)
@@ -2050,45 +2089,6 @@ paths:
       summary: Withdraw a signal
       tags:
       - Signal sharing
-  /api/isn/{isn_slug}/transfer-ownership:
-    put:
-      description: |-
-        Transfer ownership of an ISN to another admin account.
-        This can be used when an admin leaves or when reorganizing responsibilities.
-        Only the site owner can transfer ISN ownership.
-      parameters:
-      - description: ISN slug
-        in: path
-        name: isn_slug
-        required: true
-        type: string
-      - description: Transfer details
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.TransferIsnOwnershipRequest'
-      responses:
-        "200":
-          description: OK
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      - RefreshTokenCookieAuth: []
-      summary: Transfer ISN ownership
-      tags:
-      - ISN configuration
   /api/public/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search:
     get:
       description: |-

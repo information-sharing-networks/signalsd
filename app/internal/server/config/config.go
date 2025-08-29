@@ -46,8 +46,8 @@ const (
 	TokenIssuerName        = "Signalsd"
 
 	// Security & Auth constants
-	BcryptCost            = 12                  // bcrypt.DefaultCost = 10
-	AccessTokenExpiry     = 5 * time.Second     // Debug JWT access token lifetime
+	BcryptCost            = 10                  // bcrypt.DefaultCost = 10
+	AccessTokenExpiry     = 30 * time.Minute    // JWT access token lifetime
 	RefreshTokenExpiry    = 30 * 24 * time.Hour // Refresh token lifetime (30 days)
 	OneTimeSecretExpiry   = 48 * time.Hour
 	ClientSecretExpiry    = 365 * 24 * time.Hour // Client secret expiration (1 year)

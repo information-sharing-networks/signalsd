@@ -278,7 +278,7 @@ func (s *Server) registerAdminRoutes() {
 		})
 
 		// Site Admin
-		r.Route("/admin", func(r chi.Router) {
+		r.Route("/api/admin", func(r chi.Router) {
 			r.Group(func(r chi.Router) {
 
 				// route below only works in dev - take care! this endpoint deletes all the content on the database

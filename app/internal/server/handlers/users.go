@@ -259,7 +259,7 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/admin/accounts/{account_id}/admin-role [put]
+//	@Router			/api/admin/accounts/{account_id}/admin-role [put]
 //
 //	this handler must use the RequireRole (owner) middlewear
 func (u *UserHandler) GrantUserAdminRoleHandler(w http.ResponseWriter, r *http.Request) {
@@ -327,7 +327,7 @@ func (u *UserHandler) GrantUserAdminRoleHandler(w http.ResponseWriter, r *http.R
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/admin/accounts/{account_id}/admin-role [delete]
+//	@Router			/api/admin/accounts/{account_id}/admin-role [delete]
 //
 //	this handler must use the RequireRole (owner) middlewar
 func (u *UserHandler) RevokeUserAdminRoleHandler(w http.ResponseWriter, r *http.Request) {
