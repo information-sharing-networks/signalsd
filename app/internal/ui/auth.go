@@ -181,9 +181,12 @@ func (a *AuthService) CheckTokenStatus(r *http.Request) TokenStatus {
 	return TokenExpired
 }
 
-// SetAuthCookies sets the authentication-related cookies:
+// SetAuthCookies sets the authentication-related cookies.
 //
-//   - refresh token cookie (forwarded directly from signalsd API)
+// The browser needs to maintain authentication state via cookies so that any signalsd instance can authenticate the user, regardless of which instance handles each request.
+//
+// The following cookies are set:
+//   - refresh token cookie (forwarded from signalsd API)
 //   - a cookie containing the access token provided by the server,
 //   - a cookie containg the isn permissions as JSON.
 //   - a cookie containing the account information (ID, type, role) as JSON.
@@ -239,7 +242,7 @@ func (a *AuthService) SetAuthCookies(w http.ResponseWriter, loginResp *LoginResp
 		Name:     accountInfoCookieName,
 		Value:    accountInfoBase64,
 		Path:     "/",
-		HttpOnly: false, // JavaScript may need to read this for UI decisions
+		HttpOnly: true,
 		Secure:   isProd,
 		MaxAge:   loginResp.ExpiresIn + 60, // JWT expiry + 1 minute buffer
 	})
@@ -251,7 +254,6 @@ func (a *AuthService) SetAuthCookies(w http.ResponseWriter, loginResp *LoginResp
 func (a *AuthService) ClearAuthCookies(w http.ResponseWriter, environment string) {
 	isProd := environment == "prod"
 
-	// Clear access token cookie
 	http.SetCookie(w, &http.Cookie{
 		Name:     accessTokenCookieName,
 		Value:    "",
@@ -261,7 +263,6 @@ func (a *AuthService) ClearAuthCookies(w http.ResponseWriter, environment string
 		Secure:   isProd,
 	})
 
-	// Clear refresh token cookie
 	http.SetCookie(w, &http.Cookie{
 		Name:     signalsd.RefreshTokenCookieName,
 		Value:    "",
@@ -271,7 +272,6 @@ func (a *AuthService) ClearAuthCookies(w http.ResponseWriter, environment string
 		Secure:   isProd,
 	})
 
-	// Clear permissions cookie
 	http.SetCookie(w, &http.Cookie{
 		Name:     isnPermsCookieName,
 		Value:    "",
@@ -281,13 +281,12 @@ func (a *AuthService) ClearAuthCookies(w http.ResponseWriter, environment string
 		Secure:   isProd,
 	})
 
-	// Clear account info cookie
 	http.SetCookie(w, &http.Cookie{
 		Name:     accountInfoCookieName,
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
-		HttpOnly: false,
+		HttpOnly: true,
 		Secure:   isProd,
 	})
 }

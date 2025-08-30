@@ -340,15 +340,16 @@ func (s *Server) handleSearchSignals(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get access token from context (set by RequireAuth middleware)
-	accessToken, ok := ContextAccessToken(r.Context())
-	if !ok {
-		component := ErrorAlert("Internal error - access token not set, please login again")
+	// Get access token from cookie
+	accessTokenCookie, err := r.Cookie(accessTokenCookieName)
+	if err != nil {
+		component := ErrorAlert("Internal error - access token not found, please login again")
 		if err := component.Render(r.Context(), w); err != nil {
 			s.logger.Error().Err(err).Msg("Failed to render error")
 		}
 		return
 	}
+	accessToken := accessTokenCookie.Value
 
 	// Perform search using ISN visibility to determine endpoint
 	searchResp, err := s.apiClient.SearchSignals(accessToken, params, isnPerm.Visibility)
@@ -370,11 +371,10 @@ func (s *Server) handleSearchSignals(w http.ResponseWriter, r *http.Request) {
 
 // handleAdminDashboard renders the main admin dashboard page
 func (s *Server) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
-	// Get user permissions from context
-	accountInfo, ok := ContextAccountInfo(r.Context())
-
-	if !ok {
-		component := ErrorAlert("Internal error - account info not set, please login again")
+	// Get user account info from cookie
+	accountInfo := s.getAccountInfoFromCookie(r)
+	if accountInfo == nil {
+		component := ErrorAlert("Internal error - account info not found, please login again")
 		if err := component.Render(r.Context(), w); err != nil {
 			s.logger.Error().Err(err).Msg("Failed to render error")
 		}
@@ -383,7 +383,6 @@ func (s *Server) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 
 	if accountInfo.Role != "owner" && accountInfo.Role != "admin" {
 		// Redirect back to main dashboard with error message
-		// TODO: Add flash message support to show error on main dashboard
 		http.Redirect(w, r, "/dashboard?error=admin_access_denied", http.StatusSeeOther)
 		return
 	}
@@ -397,8 +396,8 @@ func (s *Server) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 
 // handleIsnAccountsAdmin renders the ISN accounts administration page
 func (s *Server) handleIsnAccountsAdmin(w http.ResponseWriter, r *http.Request) {
-	// Get user permissions from context (not cookies directly - see context.go for explanation)
-	perms, _ := ContextIsnPerms(r.Context())
+	// Get user permissions from cookie
+	perms := s.getIsnPermsFromCookie(r)
 	var isns []IsnDropdown
 
 	// Convert permissions to ISN list for dropdown (only ISNs where user has admin rights)
@@ -436,18 +435,19 @@ func (s *Server) handleAddIsnAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get access token from context
-	accessToken, ok := ContextAccessToken(r.Context())
-	if !ok {
+	// Get access token from cookie
+	accessTokenCookie, err := r.Cookie(accessTokenCookieName)
+	if err != nil {
 		component := ErrorAlert("Authentication required")
 		if err := component.Render(r.Context(), w); err != nil {
 			s.logger.Info().Err(err).Msg("Failed to render error")
 		}
 		return
 	}
+	accessToken := accessTokenCookie.Value
 
 	// Call the API to add the account to the ISN
-	err := s.apiClient.AddAccountToIsn(accessToken, isnSlug, accountEmail, permission)
+	err = s.apiClient.AddAccountToIsn(accessToken, isnSlug, accountEmail, permission)
 	if err != nil {
 		s.logger.Info().Err(err).Msg("Failed to add account to ISN")
 		component := ErrorAlert(fmt.Sprintf("Failed to add account to ISN: %v", err))
@@ -476,9 +476,9 @@ func (s *Server) redirectToLogin(w http.ResponseWriter, r *http.Request) {
 
 // getIsnPermissions validates user has access to the ISN and returns the ISN permissions
 func (s *Server) getIsnPermissions(r *http.Request, isnSlug string) (*IsnPerms, error) {
-	// Get permissions from context (not cookies directly - see context.go for explanation)
-	perms, ok := ContextIsnPerms(r.Context())
-	if !ok {
+	// Get permissions from cookie
+	perms := s.getIsnPermsFromCookie(r)
+	if len(perms) == 0 {
 		return nil, fmt.Errorf("authentication required")
 	}
 
