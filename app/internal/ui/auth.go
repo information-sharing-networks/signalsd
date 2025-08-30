@@ -104,7 +104,7 @@ func (a *AuthService) AuthenticateUser(email, password string) (*LoginResponse, 
 }
 
 // RefreshToken attempts to refresh an access token using the refresh token and returns new refresh token cookie
-func (a *AuthService) RefreshToken(currentAccessToken *http.Cookie, refreshTokenCookie *http.Cookie) (*LoginResponse, *http.Cookie, error) {
+func (a *AuthService) RefreshToken(refreshTokenCookie *http.Cookie) (*LoginResponse, *http.Cookie, error) {
 	url := fmt.Sprintf("%s/oauth/token?grant_type=refresh_token", a.apiBaseURL)
 
 	req, err := http.NewRequest("POST", url, nil)
@@ -112,8 +112,6 @@ func (a *AuthService) RefreshToken(currentAccessToken *http.Cookie, refreshToken
 		return nil, nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	// Set the current access token as bearer token
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", currentAccessToken.Value))
 	req.Header.Set("Content-Type", "application/json")
 
 	// add the refresh token cookie from the browser's request to the API request

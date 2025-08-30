@@ -56,16 +56,8 @@ func (s *Server) RequireAuth(next http.Handler) http.Handler {
 				return
 			}
 
-			// Need to get the access token cookie for refresh
-			accessTokenCookie, err := r.Cookie(accessTokenCookieName)
-			if err != nil {
-				s.logger.Err(err).Msg("Failed to get access token cookie")
-				s.redirectToLogin(w, r)
-				return
-			}
-
 			// Attempt token refresh
-			loginResp, newRefreshTokenCookie, err := s.authService.RefreshToken(accessTokenCookie, refreshTokenCookie)
+			loginResp, newRefreshTokenCookie, err := s.authService.RefreshToken(refreshTokenCookie)
 			if err != nil {
 				s.logger.Error().Err(err).Msg("Token refresh failed")
 				s.redirectToLogin(w, r)

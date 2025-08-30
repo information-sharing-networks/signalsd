@@ -69,8 +69,8 @@ import (
 //	@description	```
 //	@description
 //	@description	**Token Refresh (Web Users):**
-//	@description	- Client calls `/oauth/token?grant_type=refresh_token` with both bearer token AND HTTP-only cookie
-//	@description	- API validates both credentials and issues new access token + rotated refresh cookie
+//	@description	- Client calls `/oauth/token?grant_type=refresh_token` with HTTP-only refresh token cookie (no Authorization header required)
+//	@description	- API validates refresh token and issues new access token + rotated refresh cookie
 //	@description	- Client receives new bearer token for subsequent API calls
 //	@description
 //	@description	**Token Refresh (Service Accounts):**

@@ -819,8 +819,8 @@ info:
     ```
 
     **Token Refresh (Web Users):**
-    - Client calls `/oauth/token?grant_type=refresh_token` with both bearer token AND HTTP-only cookie
-    - API validates both credentials and issues new access token + rotated refresh cookie
+    - Client calls `/oauth/token?grant_type=refresh_token` with HTTP-only refresh token cookie (no Authorization header required)
+    - API validates refresh token and issues new access token + rotated refresh cookie
     - Client receives new bearer token for subsequent API calls
 
     **Token Refresh (Service Accounts):**
@@ -2356,7 +2356,7 @@ paths:
         Users must log in again to obtain a new refresh token after logout/revocation.
 
         **Client Examples:**
-        - **Web User Logout:** `POST /oauth/revoke` with refresh token cookie + Authorization header
+        - **Web User Logout:** `POST /oauth/revoke` with refresh token cookie
         - **Service Account:** `POST /oauth/revoke` with client_id and client_secret in request body
       responses:
         "200":
@@ -2373,9 +2373,7 @@ paths:
           description: Token not found or already revoked
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Revoke a token
+      summary: Revoke token
       tags:
       - auth
   /oauth/token:
@@ -2395,8 +2393,7 @@ paths:
         Issues new access token (in response body) and rotates refresh token (HTTP-only cookie)
 
         - Set `grant_type=refresh_token` as URL parameter
-        - Must provide current access token in Authorization header (expired tokens accepted)
-        - Must have valid refresh token cookie
+        - Must have valid refresh token cookie (no Authorization header required)
         - Access tokens expire after 30 minutes
         (subsequent requests using the token will fail with HTTP status 401 and an error_code of "access_token_expired")
         - Refresh tokens expire after 30 days
@@ -2429,9 +2426,7 @@ paths:
           description: 'Authentication failed '
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: New Access Token
+      summary: Refresh Access Token
       tags:
       - auth
   /version:

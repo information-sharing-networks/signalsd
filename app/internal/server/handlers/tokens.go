@@ -45,9 +45,9 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, p
 	}
 }
 
-// NewAccessTokenHandler godoc
+// RefreshAccessTokenHandler godoc
 //
-//	@Summary	New Access Token
+//	@Summary	Refresh Access Token
 //	@Description
 //	@Description	**Client Credentials Grant (Service Accounts):**
 //	@Description
@@ -63,8 +63,7 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, p
 //	@Description	Issues new access token (in response body) and rotates refresh token (HTTP-only cookie)
 //	@Description
 //	@Description	- Set `grant_type=refresh_token` as URL parameter
-//	@Description	- Must provide current access token in Authorization header (expired tokens accepted)
-//	@Description	- Must have valid refresh token cookie
+//	@Description	- Must have valid refresh token cookie (no Authorization header required)
 //	@Description	- Access tokens expire after 30 minutes
 //	@Description	(subsequent requests using the token will fail with HTTP status 401 and an error_code of "access_token_expired")
 //	@Description	- Refresh tokens expire after 30 days
@@ -79,16 +78,15 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, p
 //	@Failure	400			{object}	responses.ErrorResponse	"Invalid grant_type parameter "
 //	@Failure	401			{object}	responses.ErrorResponse	"Authentication failed "
 //
-//	@Security	BearerAccessToken
 //
 //	@Router		/oauth/token [post]
 //
-// NewAccessTokenHandler handles requests for both service accounts and web users.
+// RefreshAccessTokenHandler handles requests for both service accounts and web users.
 // For web users, a new refresh tokens is sent as http-only cookies whenever the client uses this endpoint.
 //
 // Use with the AuthenticateByGrantType middleware
 // this calls the appropriate authentication middleware for the grant_type (client_credentials or refresh_token)) and adds the authenticated accountID to the context
-func (a *TokenHandler) NewAccessTokenHandler(w http.ResponseWriter, r *http.Request) {
+func (a *TokenHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.Request) {
 
 	logger := zerolog.Ctx(r.Context())
 
@@ -131,7 +129,7 @@ func (a *TokenHandler) NewAccessTokenHandler(w http.ResponseWriter, r *http.Requ
 
 // RevokeTokenHandler godoc
 //
-//	@Summary		Revoke a token
+//	@Summary		Revoke token
 //	@Description	Revoke a refresh token or client secret to prevent it being used to create new access tokens (self-service)
 //	@Description
 //	@Description	**Use Cases:**
@@ -161,7 +159,7 @@ func (a *TokenHandler) NewAccessTokenHandler(w http.ResponseWriter, r *http.Requ
 //	@Description	Users must log in again to obtain a new refresh token after logout/revocation.
 //	@Description
 //	@Description	**Client Examples:**
-//	@Description	- **Web User Logout:** `POST /oauth/revoke` with refresh token cookie + Authorization header
+//	@Description	- **Web User Logout:** `POST /oauth/revoke` with refresh token cookie
 //	@Description	- **Service Account:** `POST /oauth/revoke` with client_id and client_secret in request body
 //	@Description
 //	@Tags		auth
@@ -170,8 +168,6 @@ func (a *TokenHandler) NewAccessTokenHandler(w http.ResponseWriter, r *http.Requ
 //	@Failure	400	{object}	responses.ErrorResponse	"Invalid request body "
 //	@Failure	401	{object}	responses.ErrorResponse	"Authentication failed "
 //	@Failure	404	{object}	responses.ErrorResponse	"Token not found or already revoked"
-//
-//	@Security	BearerAccessToken
 //
 //	@Router		/oauth/revoke [post]
 //

@@ -349,8 +349,8 @@ func (a *AdminHandler) EnableAccountHandler(w http.ResponseWriter, r *http.Reque
 //	@Description	With query parameters = return specific user: ?id=uuid or ?email=address
 //	@Tags			Site admin
 //
-//	@Param			id		query		string	false	"user account ID"	example(68fb5f5b-e3f5-4a96-8d35-cd2203a06f73)
-//	@Param			email	query		string	false	"user email address"	example(user@example.com)
+//	@Param			id		query		string					false	"user account ID"		example(68fb5f5b-e3f5-4a96-8d35-cd2203a06f73)
+//	@Param			email	query		string					false	"user email address"	example(user@example.com)
 //	@Success		200		{array}		handlers.UserDetails	"All users (when no query params)"
 //	@Success		200		{object}	handlers.UserDetails	"Specific user (when query params provided)"
 //	@Failure		400		{object}	responses.ErrorResponse	"Invalid request - cannot provide both id and email parameters"
