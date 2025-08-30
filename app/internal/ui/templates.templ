@@ -37,12 +37,6 @@ templ Navigation() {
 						<a href="/dashboard" class="nav-link active">
 							Dashboard
 						</a>
-						<a href="/search" class="nav-link">
-							Search Signals
-						</a>
-						<a href="/docs" class="nav-link">
-							API Docs
-						</a>
 					</div>
 				</div>
 				<div class="nav-actions">
@@ -67,9 +61,10 @@ templ LoginPage() {
 		<div class="form-container">
 			<div class="form-card">
 				<h2 class="form-title">
-					Sign in to Signal ISN 
+					Sign in to Signal ISN
 				</h2>
-				<form hx-post="/login" hx-target="#auth-error">
+				
+				<form hx-post="/login" hx-target="#login-error">
 					<div class="form-group">
 						<div class="form-group-stacked">
 							<label for="email" class="form-label-sr">Email address</label>
@@ -94,7 +89,6 @@ templ LoginPage() {
 							/>
 						</div>
 					</div>
-					<div id="auth-error"></div>
 					<div class="form-group">
 						<button type="submit" class="btn btn-primary btn-full">
 							Sign in
@@ -112,7 +106,9 @@ templ LoginPage() {
 						Create Account
 					</button>
 				</div>
+				<div id="login-error"></div>
 			</div>
+			
 		</div>
 	}
 }
@@ -124,7 +120,7 @@ templ RegisterPage() {
 				<h2 class="form-title">
 					Create Account
 				</h2>
-				<form hx-post="/register" hx-target="#auth-error">
+				<form hx-post="/register" hx-target="#register-error">
 					<div class="form-group">
 						<div class="form-group-stacked">
 							<label for="reg-email" class="form-label-sr">Email address</label>
@@ -161,13 +157,13 @@ templ RegisterPage() {
 							/>
 						</div>
 					</div>
-					<div id="auth-error"></div>
 					<div class="form-group">
 						<button type="submit" class="btn btn-primary btn-full">
 							Create Account
 						</button>
 					</div>
 				</form>
+				<div id="register-error"></div>
 				<div class="form-group text-center">
 					<p class="text-muted">Already have an account?</p>
 					<button
@@ -184,11 +180,7 @@ templ RegisterPage() {
 	}
 }
 
-templ AuthError(message string) {
-	<div class="alert alert-error">
-		{ message }
-	</div>
-}
+
 
 
 
@@ -217,7 +209,7 @@ templ RegistrationSuccess() {
 // =============================================================================
 // DASHBOARD PAGE
 // =============================================================================
-templ DashboardPage(errorMsg string) {
+templ DashboardPage() {
 	@BaseLayout("Dashboard") {
 		@Navigation()
 		<div class="page-container">
@@ -229,7 +221,9 @@ templ DashboardPage(errorMsg string) {
 					<div class="card-body">
 						<h3 class="card-title">Signal Management</h3>
 						<p class="text-muted mb-4">Search and manage signals across Information Sharing Networks.</p>
-						<a href="/search" class="btn btn-secondary">Search Signals</a>
+						<a href="/search" class="btn btn-secondary">
+							Search Signals
+						</a>
 					</div>
 				</div>
 				<div class="card">
@@ -245,14 +239,38 @@ templ DashboardPage(errorMsg string) {
 					<div class="card-body">
 						<h3 class="card-title">Information Sharing Networks</h3>
 						<p class="text-muted mb-4">Manage ISNs and configure data sharing.</p>
-						<a href="/admin" class="btn btn-secondary">Manage ISNs</a>
+						<a href="/admin" class="btn btn-secondary">
+							Manage ISNs
+						</a>
 					</div>
 				</div>
 			</div>
-			if errorMsg != "" {
-				<br/>
-				@ErrorAlert(errorMsg)
-			}
+			<div id="dashboard-error">
+			</div>
+		</div>
+	}
+}
+
+// =============================================================================
+// ACCESS DENIED PAGE
+// =============================================================================
+templ AccessDeniedPage(title, message string) {
+	@BaseLayout(title) {
+		@Navigation()
+		<div class="page-container">
+			<div class="text-center">
+				<h1 class="page-title">Access Denied</h1>
+				<div class="card max-w-md mx-auto">
+					<div class="card-body">
+						@AccessDeniedAlert(message)
+						<div class="mt-4">
+							<a href="/dashboard" class="btn btn-primary">
+								← Back to Dashboard
+							</a>
+						</div>
+					</div>
+				</div>
+			</div>
 		</div>
 	}
 }
@@ -316,7 +334,7 @@ templ VersionOptions(versions []VersionDropdown) {
 	</select>
 }
 
-templ ErrorAlert(message string) {
+templ AccessDeniedAlert(message string) {
 	<div class="alert alert-error">
 		{ message }
 	</div>
@@ -325,20 +343,6 @@ templ ErrorAlert(message string) {
 templ SuccessAlert(message string) {
 	<div class="alert alert-success">
 		{ message }
-	</div>
-}
-
-templ NoIsnAccessNotification() {
-	<div class="card mb-6">
-		<div class="card-body text-center">
-			<div class="alert alert-info mb-4">
-				<strong>Access Required</strong>
-				<p class="mt-2 mb-0">You need to be granted access to one or more Information Sharing Networks (ISNs) before you can use the search functionality.</p>
-			</div>
-			<div class="text-muted">
-				<p>Contact your administrator to request access.</p>
-			</div>
-		</div>
 	</div>
 }
 
@@ -594,16 +598,12 @@ templ IsnAccountsAdminPage(isns []IsnDropdown) {
 // =============================================================================
 // ADMIN DASHBOARD PAGE
 // =============================================================================
-templ AdminDashboardPage(errorMsg string) {
+templ AdminDashboardPage() {
 	@BaseLayout("ISN Administration") {
 		@Navigation()
 		<div class="page-container">
 			<h1 class="page-title">ISN Administration</h1>
 			<p class="text-muted mb-6">Manage Information Sharing Networks and user access.</p>
-
-			if errorMsg != "" {
-				@ErrorAlert(errorMsg)
-			}
 
 			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 				<!-- Account Management -->
@@ -673,14 +673,11 @@ templ AdminDashboardPage(errorMsg string) {
 // =============================================================================
 // SIGNAL SEARCH PAGE & RESULTS
 // =============================================================================
-templ SignalSearchPage(isns []IsnDropdown, perms map[string]IsnPerms, results []SearchSignalWithCorrelationsAndVersions, errorMsg string) {
+templ SignalSearchPage(isns []IsnDropdown, perms map[string]IsnPerms, results []SearchSignalWithCorrelationsAndVersions) {
 	@BaseLayout("Signal Search") {
 		@Navigation()
 		<div class="page-container">
 			<h1 class="page-title">Search Signals</h1>
-			if len(isns) == 0 {
-				@NoIsnAccessNotification()
-			} else {
 				<div class="card mb-6">
 					<div class="card-body">
 						<form hx-post="/ui-api/search-signals" hx-target="#search-results" class="space-y-4">
@@ -802,14 +799,11 @@ templ SignalSearchPage(isns []IsnDropdown, perms map[string]IsnPerms, results []
 				</div>
 			</div>
 			<div id="search-results">
-				if errorMsg != "" {
-					@ErrorAlert(errorMsg)
-				}
+
 				if results != nil {
 					@SearchResults(results)
 				}
 			</div>
-			}
 		</div>
 	}
 }

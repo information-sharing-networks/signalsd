@@ -80,6 +80,42 @@ func (s *Server) getAccountInfoFromCookie(r *http.Request) *AccountInfo {
 	return &accountInfo
 }
 
+// RequireAdminAccess is middleware that checks if user has admin/owner role
+func (s *Server) RequireAdminAccess(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		accountInfo := s.getAccountInfoFromCookie(r)
+		if accountInfo == nil {
+			s.logger.Error().Msg("Account info not found in RequireAdminAccess middleware")
+			s.handleAccessDenied(w, r, "Admin Dashboard", "Internal error - account info not found, please login again")
+			return
+		}
+
+		if accountInfo.Role != "owner" && accountInfo.Role != "admin" {
+			s.logger.Info().Msgf("User %s attempted to access admin area without permission", accountInfo.AccountID)
+			s.handleAccessDenied(w, r, "Admin Dashboard", "You do not have permission to access the admin dashboard")
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+// RequireIsnAccess is middleware that checks if user has access to any ISNs
+func (s *Server) RequireIsnAccess(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := r.Cookie(isnPermsCookieName)
+		if err != nil {
+			// No ISN permissions cookie = no ISN access
+			s.logger.Info().Msg("User attempted to access ISN features without ISN permissions")
+			s.handleAccessDenied(w, r, "Search Signals", "You do not have access to any ISNs - please contact your administrator")
+			return
+		}
+
+		// Cookie exists = user has ISN access, proceed to handler
+		next.ServeHTTP(w, r)
+	})
+}
+
 // getIsnPermsFromCookie reads and decodes the ISN permissions from the cookie
 func (s *Server) getIsnPermsFromCookie(r *http.Request) map[string]IsnPerms {
 	permsCookie, err := r.Cookie(isnPermsCookieName)

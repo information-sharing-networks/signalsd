@@ -83,7 +83,7 @@ import (
 //	@description	- Refresh tokens: 30 days (web users only)
 //	@description
 //	@description	### CSRF Protection
-//	@description	The /oauth API endpoints use a http-only cookie to exchange refresh tokens but also require a bearer token, preventing CSRF attacks.
+//	@description	The /oauth API endpoints use HttpOnly cookies with SameSite protection to prevent CSRF attacks.
 //	@description
 //	@description	### CORS Protection
 //	@description	By default the server will start with ALLOWED_ORIGINS=*

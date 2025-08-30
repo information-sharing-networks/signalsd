@@ -4,18 +4,28 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"time"
 )
 
-// APIClient handles communication with signalsd API
-type APIClient struct {
+// getErrorMessage extracts error message from API response or provides fallback
+func (c *Client) getErrorMessage(resp *http.Response, fallback string) string {
+	var errorResp ErrorResponse
+	if err := json.NewDecoder(resp.Body).Decode(&errorResp); err == nil && errorResp.Message != "" {
+		return errorResp.Message
+	}
+	return fallback
+}
+
+// Client handles communication with signalsd API
+type Client struct {
 	baseURL    string
 	httpClient *http.Client
 }
 
-func NewAPIClient(baseURL string) *APIClient {
-	return &APIClient{
+func NewClient(baseURL string) *Client {
+	return &Client{
 		baseURL: baseURL,
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
@@ -24,7 +34,7 @@ func NewAPIClient(baseURL string) *APIClient {
 }
 
 // SearchSignals use the signalsd API to search for signals
-func (c *APIClient) SearchSignals(accessToken string, params SignalSearchParams, visibility string) (*SignalSearchResponse, error) {
+func (c *Client) SearchSignals(accessToken string, params SignalSearchParams, visibility string) (*SignalSearchResponse, error) {
 	// Build URL based on ISN visibility (public ISNs use /api/public/, private use /api/)
 	var url string
 	if visibility == "public" {
@@ -75,16 +85,17 @@ func (c *APIClient) SearchSignals(accessToken string, params SignalSearchParams,
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		// Check for timeout to provide more specific message
+		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+			return nil, fmt.Errorf("request timed out - please check your connection and try again")
+		}
+		return nil, fmt.Errorf("network error - please check your connection and try again")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		var errorResp ErrorResponse
-		if err := json.NewDecoder(resp.Body).Decode(&errorResp); err != nil {
-			return nil, fmt.Errorf("search failed with status %d", resp.StatusCode)
-		}
-		return nil, fmt.Errorf("search failed: %s", errorResp.Message)
+		message := c.getErrorMessage(resp, "Search request failed")
+		return nil, fmt.Errorf("%s", message)
 	}
 
 	var searchResp SignalSearchResponse
@@ -96,7 +107,7 @@ func (c *APIClient) SearchSignals(accessToken string, params SignalSearchParams,
 }
 
 // RegisterUser creates a new user account using the signalsd API
-func (c *APIClient) RegisterUser(email, password string) error {
+func (c *Client) RegisterUser(email, password string) error {
 	registerReq := struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
@@ -120,22 +131,22 @@ func (c *APIClient) RegisterUser(email, password string) error {
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to make request: %w", err)
+		// Check for timeout to provide more specific message
+		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+			return fmt.Errorf("request timed out - please check your connection and try again")
+		}
+		return fmt.Errorf("network error - please check your connection and try again")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
-		var errorResp ErrorResponse
-		if err := json.NewDecoder(resp.Body).Decode(&errorResp); err != nil {
-			return fmt.Errorf("registration failed with status %d", resp.StatusCode)
-		}
-		return fmt.Errorf("registration failed: %s", errorResp.Message)
+		message := c.getErrorMessage(resp, "Registration failed")
+		return fmt.Errorf("%s", message)
 	}
 
 	return nil
 }
 
-// UserLookupResponse represents a user lookup response
 type UserLookupResponse struct {
 	AccountID string `json:"account_id"`
 	Email     string `json:"email"`
@@ -143,7 +154,7 @@ type UserLookupResponse struct {
 
 // LookupUserByEmail looks up a user by email address using the admin endpoint
 // Note: This requires admin/owner permissions
-func (c *APIClient) LookupUserByEmail(accessToken, email string) (*UserLookupResponse, error) {
+func (c *Client) LookupUserByEmail(accessToken, email string) (*UserLookupResponse, error) {
 	// Use the combined admin users endpoint with email query parameter
 	url := fmt.Sprintf("%s/api/admin/users?email=%s", c.baseURL, email)
 
@@ -156,16 +167,17 @@ func (c *APIClient) LookupUserByEmail(accessToken, email string) (*UserLookupRes
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
+		// Check for timeout to provide more specific message
+		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+			return nil, fmt.Errorf("request timed out - please check your connection and try again")
+		}
+		return nil, fmt.Errorf("network error - please check your connection and try again")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		var errorResp ErrorResponse
-		if err := json.NewDecoder(resp.Body).Decode(&errorResp); err != nil {
-			return nil, fmt.Errorf("user lookup failed with status %d", resp.StatusCode)
-		}
-		return nil, fmt.Errorf("user lookup failed: %s", errorResp.Message)
+		message := c.getErrorMessage(resp, "User lookup failed")
+		return nil, fmt.Errorf("%s", message)
 	}
 
 	// Parse the single user response
@@ -178,7 +190,7 @@ func (c *APIClient) LookupUserByEmail(accessToken, email string) (*UserLookupRes
 }
 
 // AddAccountToIsn adds an account to an ISN with the specified permission
-func (c *APIClient) AddAccountToIsn(accessToken, isnSlug, accountEmail, permission string) error {
+func (c *Client) AddAccountToIsn(accessToken, isnSlug, accountEmail, permission string) error {
 	user, err := c.LookupUserByEmail(accessToken, accountEmail)
 	if err != nil {
 		return err
@@ -205,16 +217,17 @@ func (c *APIClient) AddAccountToIsn(accessToken, isnSlug, accountEmail, permissi
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to make request: %w", err)
+		// Check for timeout to provide more specific message
+		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+			return fmt.Errorf("request timed out - please check your connection and try again")
+		}
+		return fmt.Errorf("network error - please check your connection and try again")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
-		var errorResp ErrorResponse
-		if err := json.NewDecoder(resp.Body).Decode(&errorResp); err != nil {
-			return fmt.Errorf("request failed with status %d", resp.StatusCode)
-		}
-		return fmt.Errorf("%s", errorResp.Message)
+		message := c.getErrorMessage(resp, "Failed to add account to ISN")
+		return fmt.Errorf("%s", message)
 	}
 
 	return nil

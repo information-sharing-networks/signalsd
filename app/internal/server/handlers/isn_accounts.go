@@ -126,7 +126,7 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 
 	// deny users making uncessary attempts to grant perms to themeselves
 	if userAccountID == targetAccountID {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, fmt.Sprintf("User account ID: %v cannot grant ISN permissions to its own account", userAccountID))
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "accounts cannot grant ISN permissions to themselves")
 		return
 	}
 

@@ -11,7 +11,7 @@ internal/ui/
 ├── auth.go            # Authentication service for API integration
 ├── types.go           # Shared type definitions
 ├── middleware.go      # authentication middleware
-├── api_client.go      # Client for calling signalsd API
+├── client.go.         # Client for calling signalsd API
 ├── config.go          # Configuration management (standalone mode)
 ├── templates.templ    # templ HTML templates
 └── templates_templ.go # Generated Go code from templ templates
@@ -72,7 +72,7 @@ Switch to standalone mode when you need container separation or want to replace 
            (Required for HttpOnly cookies)
 ```
 
-The standalone mode requires a reverse proxy so that the client sees a single domain/port (The refresh token authentication will without it).
+The standalone mode requires a reverse proxy so that the client sees a single domain/port (The refresh token authentication will  not work without it).
 
 ⚠️ If you run the UI in standalone mode in dev, the login will work but automatic token refresh will fail because the refresh token cookie cannot be sent cross-port. Users will be logged out after 30 minutes.
 
@@ -141,13 +141,14 @@ if developing locally, install templ and air (live reload):
 ```bash
 go install github.com/a-h/templ/cmd/templ@latest
 go install github.com/air-verse/air@latest
-
-#run the app with live reload (using docker db)
+```
+you can then rund the app locally run with live reload (the below command is using the docker signalsd database)
+```bash
 cd app
 DATABASE_URL="postgres://signalsd-dev@localhost:15432/signalsd_admin?sslmode=disable" SECRET_KEY="mysecretkey" air
 ```
 
-For docker users, air will handle live reloads when you change the templates. 
+the easiest approach is to use docker for both the app and db.  Air will handle live reloads when you change the templates - just `docker compose up` to get going. 
 
 You can manually generate the templates code with:
 ```bash
