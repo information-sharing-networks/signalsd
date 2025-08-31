@@ -238,7 +238,7 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 // GrantUserAdminRoleHandler godocs
 //
 //	@Summary		Grant admin role
-//	@Tags			Site admin
+//	@Tags			Site Admin
 //
 //	@Description	This endpoint grants the admin role to a site member
 //	@Description
@@ -247,9 +247,16 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 //	@Description	- Define the signal_types used in the ISN
 //	@Description	- read/write to their own ISNs
 //	@Description	- Grant other accounts read or write access to their ISNs
-//	@Description	- Create service accounts
 //	@Description
-//	@Description	this endpoint can only be used by the site owner account
+//	@Description	Note that admins can't change ISNs they don't own (the site owner must use the `transfer ownership` endpoint if this is requred)
+//	@Description
+//	@Description	An admin also has access to the following site admin functions:
+//	@Description	- Create service accounts
+//	@Description	- Disable/Enable accounts
+//	@Description	- View all users and their email addresses
+//	@Description	- Reset user passwords
+//	@Description
+//	@Description	**This endpoint can only be used by the site owner account**
 //
 //	@Param			account_id	path	string	true	"account id"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
@@ -261,7 +268,7 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 //
 //	@Router			/api/admin/accounts/{account_id}/admin-role [put]
 //
-//	this handler must use the RequireRole (owner) middlewear
+//	this handler must use the RequireRole (owner) middleware
 func (u *UserHandler) GrantUserAdminRoleHandler(w http.ResponseWriter, r *http.Request) {
 
 	logger := zerolog.Ctx(r.Context())
@@ -315,9 +322,9 @@ func (u *UserHandler) GrantUserAdminRoleHandler(w http.ResponseWriter, r *http.R
 // RevokeAccountAdmin godocs
 //
 //	@Summary		Revoke admin role
-//	@Tags			Site admin
+//	@Tags			Site Admin
 //
-//	@Description	this endpoint can only be used by the site owner account
+//	@Description	**This endpoint can only be used by the site owner account**
 //
 //	@Param			account_id	path	string	true	"account id"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
@@ -329,7 +336,7 @@ func (u *UserHandler) GrantUserAdminRoleHandler(w http.ResponseWriter, r *http.R
 //
 //	@Router			/api/admin/accounts/{account_id}/admin-role [delete]
 //
-//	this handler must use the RequireRole (owner) middlewar
+//	this handler must use the RequireRole (owner) middleware
 func (u *UserHandler) RevokeUserAdminRoleHandler(w http.ResponseWriter, r *http.Request) {
 	logger := zerolog.Ctx(r.Context())
 

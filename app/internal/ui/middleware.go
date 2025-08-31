@@ -10,45 +10,26 @@ import (
 
 // RequireAuth is middleware that checks authentication and attempts token refresh if needed.
 //
-// IMPORTANT: We read user data from cookies and put it in request context because:
-// 1. Cookies persist across requests (session-scoped)
-// 2. Context only exists during a single request (request-scoped)
-// 3. When tokens are refreshed mid-request, cookies get updated but context doesn't
-// 4. This ensures handlers always get the most current data after refresh
+// This middleware ensures that:
+// 1. All requests have valid authentication (redirects to login if not)
+// 2. Expired tokens are automatically refreshed when possible
+// 3. Fresh cookies are set after token refresh for subsequent requests
 //
-// All handlers should read from context, never directly from cookies.
+// Handlers can read auth data directly from cookies using helper methods.
 func (s *Server) RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		status := s.authService.CheckTokenStatus(r)
 
 		switch status {
 		case TokenValid:
-			// We read from cookies and put in context because when tokens are refreshed
-			// mid-request, cookies get updated but the current request context doesn't.
-			// This ensures handlers always get the most current data.
-			ctx := r.Context()
-
-			// Add access token to context
-			accessTokenCookie, err := r.Cookie(accessTokenCookieName)
-			if err == nil {
-				ctx = ContextWithAccessToken(ctx, accessTokenCookie.Value)
-			}
-
-			// Add account info to context if available
-			if accountInfo := s.getAccountInfoFromCookie(r); accountInfo != nil {
-				ctx = ContextWithAccountInfo(ctx, *accountInfo)
-			}
-
-			// Add ISN permissions to context
-			isnPerms := s.getIsnPermsFromCookie(r)
-			ctx = ContextWithIsnPerms(ctx, isnPerms)
-
-			next.ServeHTTP(w, r.WithContext(ctx))
+			// Authentication is valid, proceed to handler
+			next.ServeHTTP(w, r)
 			return
 		case TokenMissing, TokenInvalid:
 			s.redirectToLogin(w, r)
 			return
-		case TokenExpired: // attempt refresh
+		case TokenExpired:
+			// attempt refresh
 			refreshTokenCookie, err := r.Cookie(signalsd.RefreshTokenCookieName)
 			if err != nil {
 				s.logger.Err(err).Msg("Failed to get refresh token cookie")
@@ -56,43 +37,21 @@ func (s *Server) RequireAuth(next http.Handler) http.Handler {
 				return
 			}
 
-			// Need to get the access token cookie for refresh
-			accessTokenCookie, err := r.Cookie(accessTokenCookieName)
-			if err != nil {
-				s.logger.Err(err).Msg("Failed to get access token cookie")
-				s.redirectToLogin(w, r)
-				return
-			}
-
-			// Attempt token refresh
-			loginResp, newRefreshTokenCookie, err := s.authService.RefreshToken(accessTokenCookie, refreshTokenCookie)
+			loginResp, newRefreshTokenCookie, err := s.authService.RefreshToken(refreshTokenCookie)
 			if err != nil {
 				s.logger.Error().Err(err).Msg("Token refresh failed")
 				s.redirectToLogin(w, r)
 				return
 			}
 
-			// Set all authentication cookies using shared method (includes updated permissions)
 			if err := s.authService.SetAuthCookies(w, loginResp, newRefreshTokenCookie, s.config.Environment); err != nil {
 				s.logger.Error().Err(err).Msg("Failed to set authentication cookies after refresh")
 				s.redirectToLogin(w, r)
 				return
 			}
 
-			// After token refresh, we need to read the updated data from cookies and put in context
-			// because the refresh process updates cookies with new permissions/account info.
-			ctx := ContextWithAccessToken(r.Context(), loginResp.AccessToken)
-
-			// Add account info to context (will be available from the refreshed cookie)
-			if accountInfo := s.getAccountInfoFromCookie(r); accountInfo != nil {
-				ctx = ContextWithAccountInfo(ctx, *accountInfo)
-			}
-
-			// Add ISN permissions to context (refreshed permissions from new cookie)
-			isnPerms := s.getIsnPermsFromCookie(r)
-			ctx = ContextWithIsnPerms(ctx, isnPerms)
-
-			next.ServeHTTP(w, r.WithContext(ctx)) // Continue with refreshed token in context
+			// Continue to handler with fresh cookies set
+			next.ServeHTTP(w, r)
 		}
 	})
 }
@@ -119,6 +78,42 @@ func (s *Server) getAccountInfoFromCookie(r *http.Request) *AccountInfo {
 	}
 
 	return &accountInfo
+}
+
+// RequireAdminAccess is middleware that checks if user has admin/owner role
+func (s *Server) RequireAdminAccess(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		accountInfo := s.getAccountInfoFromCookie(r)
+		if accountInfo == nil {
+			s.logger.Error().Msg("Account info not found in RequireAdminAccess middleware")
+			s.handleAccessDenied(w, r, "Admin Dashboard", "Internal error - account info not found, please login again")
+			return
+		}
+
+		if accountInfo.Role != "owner" && accountInfo.Role != "admin" {
+			s.logger.Info().Msgf("User %s attempted to access admin area without permission", accountInfo.AccountID)
+			s.handleAccessDenied(w, r, "Admin Dashboard", "You do not have permission to access the admin dashboard")
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+// RequireIsnAccess is middleware that checks if user has access to any ISNs
+func (s *Server) RequireIsnAccess(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, err := r.Cookie(isnPermsCookieName)
+		if err != nil {
+			// No ISN permissions cookie = no ISN access
+			s.logger.Info().Msg("User attempted to access ISN features without ISN permissions")
+			s.handleAccessDenied(w, r, "Search Signals", "You do not have access to any ISNs - please contact your administrator")
+			return
+		}
+
+		// Cookie exists = user has ISN access, proceed to handler
+		next.ServeHTTP(w, r)
+	})
 }
 
 // getIsnPermsFromCookie reads and decodes the ISN permissions from the cookie

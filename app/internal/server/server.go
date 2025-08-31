@@ -185,7 +185,7 @@ func (s *Server) registerAdminRoutes() {
 				r.Use(s.authService.AuthenticateByGrantType)
 
 				// get new access tokens
-				r.Post("/token", tokens.NewAccessTokenHandler)
+				r.Post("/token", tokens.RefreshAccessTokenHandler)
 			})
 
 			r.Group(func(r chi.Router) {
@@ -205,13 +205,13 @@ func (s *Server) registerAdminRoutes() {
 			r.Route("/auth", func(r chi.Router) {
 
 				r.Group(func(r chi.Router) {
-					r.Use(s.authService.RequireValidAccessToken(false))
+					r.Use(s.authService.RequireValidAccessToken)
 
 					r.Put("/password/reset", users.UpdatePasswordHandler)
 				})
 
 				r.Group(func(r chi.Router) {
-					r.Use(s.authService.RequireValidAccessToken(false))
+					r.Use(s.authService.RequireValidAccessToken)
 					r.Use(s.authService.RequireRole("owner", "admin"))
 
 					r.Post("/register/service-accounts", serviceAccounts.RegisterServiceAccountHandler)
@@ -233,7 +233,7 @@ func (s *Server) registerAdminRoutes() {
 
 				r.Group(func(r chi.Router) {
 
-					r.Use(s.authService.RequireValidAccessToken(false))
+					r.Use(s.authService.RequireValidAccessToken)
 
 					// ISN configuration
 					r.Group(func(r chi.Router) {
@@ -288,21 +288,30 @@ func (s *Server) registerAdminRoutes() {
 				r.Post("/reset", admin.ResetHandler)
 			})
 
+			// Owner-only operations
 			r.Group(func(r chi.Router) {
 
-				r.Use(s.authService.RequireValidAccessToken(false))
-				r.Use(s.authService.RequireRole("owner", "admin"))
-
-				// User management
-				r.Get("/users", admin.GetUsersHandler)
+				r.Use(s.authService.RequireValidAccessToken)
+				r.Use(s.authService.RequireRole("owner"))
 
 				// Admin role management
 				r.Put("/accounts/{account_id}/admin-role", users.GrantUserAdminRoleHandler)
 				r.Delete("/accounts/{account_id}/admin-role", users.RevokeUserAdminRoleHandler)
 
-				// ISN ownership transfer
+				// ISN ownership transfer (owner only)
 				r.Put("/isn/{isn_slug}/transfer-ownership", isn.TransferIsnOwnershipHandler)
+			})
 
+			// Admin and owner operations
+			r.Group(func(r chi.Router) {
+
+				r.Use(s.authService.RequireValidAccessToken)
+				r.Use(s.authService.RequireRole("owner", "admin"))
+
+				// User management
+				r.Get("/users", admin.GetUsersHandler)
+
+				// Account management
 				r.Post("/accounts/{account_id}/disable", admin.DisableAccountHandler)
 				r.Post("/accounts/{account_id}/enable", admin.EnableAccountHandler)
 				r.Get("/service-accounts", admin.GetServiceAccountsHandler)
@@ -321,7 +330,7 @@ func (s *Server) registerSignalWriteRoutes() {
 	s.router.Group(func(r chi.Router) {
 		r.Use(middleware.CORS(s.corsConfigs.Protected))
 		r.Use(middleware.RequestSizeLimit(s.serverConfig.MaxSignalPayloadSize))
-		r.Use(s.authService.RequireValidAccessToken(false))
+		r.Use(s.authService.RequireValidAccessToken)
 		r.Use(s.authService.RequireIsnPermission("write"))
 
 		// signals post
@@ -348,7 +357,7 @@ func (s *Server) registerSignalReadRoutes() {
 	// Private ISN signal search - authentication required
 	s.router.Group(func(r chi.Router) {
 		r.Use(middleware.CORS(s.corsConfigs.Protected))
-		r.Use(s.authService.RequireValidAccessToken(false))
+		r.Use(s.authService.RequireValidAccessToken)
 		r.Use(s.authService.RequireIsnPermission("read", "write"))
 		r.Get("/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search", signals.SearchPrivateSignalsHandler)
 	})

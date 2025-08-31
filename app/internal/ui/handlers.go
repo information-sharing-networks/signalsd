@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -8,6 +9,15 @@ import (
 	"strings"
 )
 
+// renderError displays an error message inline to the user
+func (s *Server) renderError(w http.ResponseWriter, message string) {
+	component := AccessDeniedAlert(message)
+	if err := component.Render(context.Background(), w); err != nil {
+		s.logger.Error().Err(err).Msg("Failed to render error")
+	}
+}
+
+// handleHome handles the root path and redirects to the dashboard if authenticated, login if not
 func (s *Server) handleHome(w http.ResponseWriter, r *http.Request) {
 	status := s.authService.CheckTokenStatus(r)
 
@@ -35,44 +45,31 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleLoginPost authenticates the user and adds three cookies to the response:
-// - the server generated refresh token cookie
-// - a cookie containing the access token provided by the server,
-// - a cookie containg the isn permissions as JSON.
+// handleLoginPost authenticates the user and adds authentication cookies to the response
 func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
 	password := r.FormValue("password")
 
 	if email == "" || password == "" {
-		// Return error fragment for HTMX
-		component := AuthError("Email and password are required")
-		if err := component.Render(r.Context(), w); err != nil {
-			s.logger.Error().Err(err).Msg("Failed to render login error")
-		}
+		s.renderError(w, "Email and password are required")
 		return
 	}
-
 	// Authenticate with signalsd API
 	loginResp, refreshTokenCookie, err := s.authService.AuthenticateUser(email, password)
 	if err != nil {
 		s.logger.Error().Err(err).Msg("Authentication failed")
-		component := AuthError("Invalid email or password")
-		if err := component.Render(r.Context(), w); err != nil {
-			s.logger.Error().Err(err).Msg("Failed to render login error")
-		}
+		s.renderError(w, err.Error())
 		return
 	}
 
 	// Set all authentication cookies using shared method
 	if err := s.authService.SetAuthCookies(w, loginResp, refreshTokenCookie, s.config.Environment); err != nil {
 		s.logger.Error().Err(err).Msg("Failed to set authentication cookies")
-		component := AuthError("System error: authentication failed")
-		if err := component.Render(r.Context(), w); err != nil {
-			s.logger.Error().Err(err).Msg("Failed to render login error")
-		}
+		s.renderError(w, "System error: authentication failed")
 		return
 	}
 
+	// Login successful - redirect to dashboard
 	w.Header().Set("HX-Redirect", "/dashboard")
 	w.WriteHeader(http.StatusOK)
 }
@@ -84,19 +81,12 @@ func (s *Server) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 	confirmPassword := r.FormValue("confirm_password")
 
 	if email == "" || password == "" || confirmPassword == "" {
-		// Return error fragment for HTMX
-		component := AuthError("All fields are required")
-		if err := component.Render(r.Context(), w); err != nil {
-			s.logger.Error().Err(err).Msg("Failed to render registration error")
-		}
+		s.renderError(w, "All fields are required")
 		return
 	}
 
 	if password != confirmPassword {
-		component := AuthError("Passwords do not match")
-		if err := component.Render(r.Context(), w); err != nil {
-			s.logger.Error().Err(err).Msg("Failed to render registration error")
-		}
+		s.renderError(w, "Passwords do not match")
 		return
 	}
 
@@ -104,11 +94,7 @@ func (s *Server) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 	err := s.apiClient.RegisterUser(email, password)
 	if err != nil {
 		s.logger.Error().Err(err).Msg("Registration failed")
-
-		component := AuthError(err.Error())
-		if err := component.Render(r.Context(), w); err != nil {
-			s.logger.Error().Err(err).Msg("Failed to render registration error")
-		}
+		s.renderError(w, err.Error())
 		return
 	}
 
@@ -133,47 +119,20 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
-	var errorMsg string
-
-	// Check for error messages from redirects
-	errorParam := r.URL.Query().Get("error")
-	switch errorParam {
-	case "admin_access_denied":
-		errorMsg = "You do not have permission to access the admin dashboard"
-	}
-
-	component := DashboardPage(errorMsg)
+	component := DashboardPage()
 	if err := component.Render(r.Context(), w); err != nil {
 		s.logger.Error().Err(err).Msg("Failed to render dashboard page")
 	}
 }
 
+// handleSignalSearch renders the signal search page
+// ISN access is validated by RequireIsnAccess middleware
 func (s *Server) handleSignalSearch(w http.ResponseWriter, r *http.Request) {
-	// Initialize empty permissions and ISN list
-	var perms map[string]IsnPerms = make(map[string]IsnPerms)
-	var isns []IsnDropdown
-
-	// Try to get permissions cookie - if it doesn't exist or is invalid,
-	// we'll show the search page with no ISNs (triggering the notification)
-	permsCookie, err := r.Cookie(isnPermsCookieName)
-	if err != nil {
-		s.logger.Info().Msg("No permissions cookie found - user has no ISN access")
-	} else {
-		// Decode base64 cookie value
-		decodedPerms, err := base64.StdEncoding.DecodeString(permsCookie.Value)
-		if err != nil {
-			s.logger.Error().Err(err).Msgf("Failed to decode permissions cookie: %s", permsCookie.Value)
-		} else {
-			// Parse permissions JSON
-			if err := json.Unmarshal(decodedPerms, &perms); err != nil {
-				s.logger.Error().Err(err).Msgf("Failed to parse permissions JSON: %s", string(decodedPerms))
-				perms = make(map[string]IsnPerms) // Reset to empty map on error
-			}
-		}
-	}
+	// Get ISN permissions from cookie - middleware ensures this exists
+	perms := s.getIsnPermsFromCookie(r)
 
 	// Convert permissions to ISN list for dropdown
-	isns = make([]IsnDropdown, 0, len(perms))
+	isns := make([]IsnDropdown, 0, len(perms))
 	for isnSlug := range perms {
 		isns = append(isns, IsnDropdown{
 			Slug:    isnSlug,
@@ -181,8 +140,8 @@ func (s *Server) handleSignalSearch(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	// Render search page (will show notification if len(isns) == 0)
-	component := SignalSearchPage(isns, perms, nil, "")
+	// Render search page
+	component := SignalSearchPage(isns, perms, nil)
 	if err := component.Render(r.Context(), w); err != nil {
 		s.logger.Error().Err(err).Msg("Failed to render signal search page")
 	}
@@ -323,41 +282,31 @@ func (s *Server) handleSearchSignals(w http.ResponseWriter, r *http.Request) {
 
 	// Validate required parameters
 	if params.ISNSlug == "" || params.SignalTypeSlug == "" || params.SemVer == "" {
-		component := ErrorAlert("ISN, Signal Type, and Version are required")
-		if err := component.Render(r.Context(), w); err != nil {
-			s.logger.Error().Err(err).Msg("Failed to render error")
-		}
+		s.renderError(w, "ISN, Signal Type, and Version are required")
 		return
 	}
 
 	// Get user permissions to validate ISN access and determine visibility
 	isnPerm, err := s.getIsnPermissions(r, params.ISNSlug)
 	if err != nil {
-		component := ErrorAlert(err.Error())
-		if err := component.Render(r.Context(), w); err != nil {
-			s.logger.Error().Err(err).Msg("Failed to render error")
-		}
+		s.renderError(w, err.Error())
 		return
 	}
 
-	// Get access token from context (set by RequireAuth middleware)
-	accessToken, ok := ContextAccessToken(r.Context())
-	if !ok {
-		component := ErrorAlert("Internal error - access token not set, please login again")
-		if err := component.Render(r.Context(), w); err != nil {
-			s.logger.Error().Err(err).Msg("Failed to render error")
-		}
+	// Get access token from cookie
+	accessTokenCookie, err := r.Cookie(accessTokenCookieName)
+	if err != nil {
+		s.logger.Error().Err(err).Msg("Access token not found")
+		s.renderError(w, "Session expired - please refresh the page and try again")
 		return
 	}
+	accessToken := accessTokenCookie.Value
 
 	// Perform search using ISN visibility to determine endpoint
 	searchResp, err := s.apiClient.SearchSignals(accessToken, params, isnPerm.Visibility)
 	if err != nil {
 		s.logger.Error().Err(err).Msg("Signal search failed")
-		component := ErrorAlert(fmt.Sprintf("Search failed: %v", err))
-		if err := component.Render(r.Context(), w); err != nil {
-			s.logger.Error().Err(err).Msg("Failed to render error")
-		}
+		s.renderError(w, err.Error())
 		return
 	}
 
@@ -369,27 +318,10 @@ func (s *Server) handleSearchSignals(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleAdminDashboard renders the main admin dashboard page
+// Access control is handled by RequireAdminAccess middleware
 func (s *Server) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
-	// Get user permissions from context
-	accountInfo, ok := ContextAccountInfo(r.Context())
-
-	if !ok {
-		component := ErrorAlert("Internal error - account info not set, please login again")
-		if err := component.Render(r.Context(), w); err != nil {
-			s.logger.Error().Err(err).Msg("Failed to render error")
-		}
-		return
-	}
-
-	if accountInfo.Role != "owner" && accountInfo.Role != "admin" {
-		// Redirect back to main dashboard with error message
-		// TODO: Add flash message support to show error on main dashboard
-		http.Redirect(w, r, "/dashboard?error=admin_access_denied", http.StatusSeeOther)
-		return
-	}
-
-	// Render admin dashboard (no error message needed - access is validated above)
-	component := AdminDashboardPage("")
+	// Render admin dashboard - access is validated by middleware
+	component := AdminDashboardPage()
 	if err := component.Render(r.Context(), w); err != nil {
 		s.logger.Error().Err(err).Msg("Failed to render admin dashboard")
 	}
@@ -397,8 +329,8 @@ func (s *Server) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 
 // handleIsnAccountsAdmin renders the ISN accounts administration page
 func (s *Server) handleIsnAccountsAdmin(w http.ResponseWriter, r *http.Request) {
-	// Get user permissions from context (not cookies directly - see context.go for explanation)
-	perms, _ := ContextIsnPerms(r.Context())
+	// Get user permissions from cookie
+	perms := s.getIsnPermsFromCookie(r)
 	var isns []IsnDropdown
 
 	// Convert permissions to ISN list for dropdown (only ISNs where user has admin rights)
@@ -429,31 +361,23 @@ func (s *Server) handleAddIsnAccount(w http.ResponseWriter, r *http.Request) {
 
 	// Validate required fields
 	if isnSlug == "" || accountEmail == "" || permission == "" {
-		component := ErrorAlert("All fields are required")
-		if err := component.Render(r.Context(), w); err != nil {
-			s.logger.Error().Err(err).Msg("Failed to render error")
-		}
+		s.renderError(w, "All fields are required")
 		return
 	}
 
-	// Get access token from context
-	accessToken, ok := ContextAccessToken(r.Context())
-	if !ok {
-		component := ErrorAlert("Authentication required")
-		if err := component.Render(r.Context(), w); err != nil {
-			s.logger.Info().Err(err).Msg("Failed to render error")
-		}
+	// Get access token from cookie
+	accessTokenCookie, err := r.Cookie(accessTokenCookieName)
+	if err != nil {
+		s.renderError(w, "Authentication required")
 		return
 	}
+	accessToken := accessTokenCookie.Value
 
 	// Call the API to add the account to the ISN
-	err := s.apiClient.AddAccountToIsn(accessToken, isnSlug, accountEmail, permission)
+	err = s.apiClient.AddAccountToIsn(accessToken, isnSlug, accountEmail, permission)
 	if err != nil {
 		s.logger.Info().Err(err).Msg("Failed to add account to ISN")
-		component := ErrorAlert(fmt.Sprintf("Failed to add account to ISN: %v", err))
-		if err := component.Render(r.Context(), w); err != nil {
-			s.logger.Error().Err(err).Msg("Failed to render error")
-		}
+		s.renderError(w, err.Error())
 		return
 	}
 
@@ -476,9 +400,9 @@ func (s *Server) redirectToLogin(w http.ResponseWriter, r *http.Request) {
 
 // getIsnPermissions validates user has access to the ISN and returns the ISN permissions
 func (s *Server) getIsnPermissions(r *http.Request, isnSlug string) (*IsnPerms, error) {
-	// Get permissions from context (not cookies directly - see context.go for explanation)
-	perms, ok := ContextIsnPerms(r.Context())
-	if !ok {
+	// Get permissions from cookie
+	perms := s.getIsnPermsFromCookie(r)
+	if len(perms) == 0 {
 		return nil, fmt.Errorf("authentication required")
 	}
 
@@ -489,4 +413,19 @@ func (s *Server) getIsnPermissions(r *http.Request, isnSlug string) (*IsnPerms, 
 	}
 
 	return &isnPerm, nil
+}
+
+// handleAccessDenied handles access denied for both HTMX and direct requests
+// Always redirects to an access denied page for consistent UX
+func (s *Server) handleAccessDenied(w http.ResponseWriter, r *http.Request, pageTitle, message string) {
+	if r.Header.Get("HX-Request") == "true" {
+		// HTMX request - redirect to access denied page
+		w.Header().Set("HX-Redirect", "/access-denied?title="+pageTitle+"&message="+message)
+	} else {
+		// Direct navigation - render access denied page
+		component := AccessDeniedPage(pageTitle, message)
+		if err := component.Render(r.Context(), w); err != nil {
+			s.logger.Error().Err(err).Msg("Failed to render access denied page")
+		}
+	}
 }

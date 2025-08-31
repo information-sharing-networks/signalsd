@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 )
@@ -101,7 +100,7 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 					"client_secret": tt.clientSecret,
 				}
 
-				response := makeOAuthTokenRequest(t, baseURL, "client_credentials", payload, "", "")
+				response := makeOAuthTokenRequest(t, baseURL, "client_credentials", payload, "")
 				defer response.Body.Close()
 
 				if response.StatusCode != tt.expectedStatus {
@@ -151,18 +150,6 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 			t.Fatalf("Failed to decode login response: %v", err)
 		}
 
-		accountIDString := loginResponseBody["account_id"].(string)
-		if accountIDString == "" {
-			t.Fatal("Failed to get account_id from login response")
-		}
-		accountID, err := uuid.Parse(accountIDString)
-		if err != nil {
-			t.Fatalf("Failed to parse account_id from login response: %v", err)
-		}
-
-		// Create an expired access token for this specific user account
-		expiredAccessToken := createExpiredAccessToken(t, accountID)
-
 		accessToken := loginResponseBody["access_token"].(string)
 		if accessToken == "" {
 			t.Fatal("Failed to get access token from login response")
@@ -184,47 +171,35 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 		tests := []struct {
 			name           string
 			cookie         *http.Cookie // when nil the cookie from the last sucessful login will be used
-			accessToken    string
 			expectedStatus int
 			expectError    bool
 		}{
 			{
-				name:           "valid refresh_token and access_token",
+				name:           "valid refresh_token",
 				cookie:         originaRefreshTokenCookie,
-				accessToken:    accessToken,
 				expectedStatus: http.StatusOK,
 				expectError:    false,
 			},
 			{
 				// the previous sucessful refresh should have revoked the original refresh token
-				name:           "revoked refresh_token and valid access_token",
+				name:           "revoked refresh_token",
 				cookie:         originaRefreshTokenCookie,
-				accessToken:    accessToken,
 				expectedStatus: http.StatusUnauthorized,
 				expectError:    true,
 			},
-			//expired access tokens are allowed when refreshing tokens
 			{
-				name:           "valid refresh_token and expired access_token",
+				name:           "valid refresh_token (second refresh)",
 				cookie:         nil, // use the latest refresh token from previous successful test
-				accessToken:    expiredAccessToken,
 				expectedStatus: http.StatusOK,
 				expectError:    false,
 			},
 			{
-				name:           "valid refresh_token and invalid access_token",
-				accessToken:    "invalid-token",
-				expectedStatus: http.StatusUnauthorized,
-				expectError:    true,
-			},
-			{
-				name: "invalid refresh_token and valid access_token",
+				name: "invalid refresh_token",
 				cookie: &http.Cookie{
 					Name:  signalsd.RefreshTokenCookieName,
 					Value: "invalid-token",
 					Path:  "/",
 				},
-				accessToken:    accessToken,
 				expectedStatus: http.StatusUnauthorized,
 				expectError:    true,
 			},
@@ -237,7 +212,7 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 				if tt.cookie == nil {
 					tt.cookie = latestRefreshTokenCookie
 				}
-				response := makeOAuthTokenRequest(t, baseURL, signalsd.RefreshTokenCookieName, nil, tt.cookie.Value, tt.accessToken)
+				response := makeOAuthTokenRequest(t, baseURL, "refresh_token", nil, tt.cookie.Value)
 				defer response.Body.Close()
 
 				if response.StatusCode != tt.expectedStatus {
@@ -313,7 +288,7 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 	})
 
 	t.Run("invalid grant_type", func(t *testing.T) {
-		response := makeOAuthTokenRequest(t, baseURL, "invalid_grant", nil, "", "")
+		response := makeOAuthTokenRequest(t, baseURL, "invalid_grant", nil, "")
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusBadRequest {
@@ -332,7 +307,7 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 }
 
 // makeOAuthTokenRequest makes a POST request to /oauth/token
-func makeOAuthTokenRequest(t *testing.T, baseURL, grantType string, payload map[string]string, refreshToken string, accessToken string) *http.Response {
+func makeOAuthTokenRequest(t *testing.T, baseURL, grantType string, payload map[string]string, refreshToken string) *http.Response {
 	t.Helper()
 
 	url := fmt.Sprintf("%s/oauth/token?grant_type=%s", baseURL, grantType)
@@ -348,11 +323,6 @@ func makeOAuthTokenRequest(t *testing.T, baseURL, grantType string, payload map[
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-
-	// Add access token if provided (needed for refresh token grant)
-	if len(accessToken) > 0 && accessToken != "" {
-		req.Header.Set("Authorization", "Bearer "+accessToken)
-	}
 
 	// Add refresh token cookie if provided
 	if refreshToken != "" {
@@ -373,7 +343,7 @@ func makeOAuthTokenRequest(t *testing.T, baseURL, grantType string, payload map[
 }
 
 // makeOAuthRevokeRequest makes a POST request to /oauth/revoke
-func makeOAuthRevokeRequest(t *testing.T, baseURL string, payload map[string]string, accessToken, refreshToken string) *http.Response {
+func makeOAuthRevokeRequest(t *testing.T, baseURL string, payload map[string]string, refreshToken string) *http.Response {
 	t.Helper()
 
 	url := fmt.Sprintf("%s/oauth/revoke", baseURL)
@@ -393,11 +363,6 @@ func makeOAuthRevokeRequest(t *testing.T, baseURL string, payload map[string]str
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-
-	// Add access token if provided
-	if accessToken != "" {
-		req.Header.Set("Authorization", "Bearer "+accessToken)
-	}
 
 	// Add refresh token cookie if provided
 	if refreshToken != "" {
@@ -491,7 +456,7 @@ func TestOAuthRevokeEndpoint(t *testing.T) {
 			"client_id":     serviceAccountDetails.ClientID,
 			"client_secret": clientSecret,
 		}
-		tokenResponse := makeOAuthTokenRequest(t, baseURL, "client_credentials", tokenPayload, "", "")
+		tokenResponse := makeOAuthTokenRequest(t, baseURL, "client_credentials", tokenPayload, "")
 		defer tokenResponse.Body.Close()
 
 		if tokenResponse.StatusCode != http.StatusOK {
@@ -509,7 +474,7 @@ func TestOAuthRevokeEndpoint(t *testing.T) {
 		}
 
 		// Test revoke with valid credentials (service accounts use client credentials, not access token)
-		revokeResponse := makeOAuthRevokeRequest(t, baseURL, tokenPayload, "", "")
+		revokeResponse := makeOAuthRevokeRequest(t, baseURL, tokenPayload, "")
 		defer revokeResponse.Body.Close()
 
 		if revokeResponse.StatusCode != http.StatusOK {
@@ -517,7 +482,7 @@ func TestOAuthRevokeEndpoint(t *testing.T) {
 		}
 
 		// Verify client secret was revoked by trying to get another token
-		retryResponse := makeOAuthTokenRequest(t, baseURL, "client_credentials", tokenPayload, "", "")
+		retryResponse := makeOAuthTokenRequest(t, baseURL, "client_credentials", tokenPayload, "")
 		defer retryResponse.Body.Close()
 
 		if retryResponse.StatusCode != http.StatusUnauthorized {
@@ -543,11 +508,6 @@ func TestOAuthRevokeEndpoint(t *testing.T) {
 			t.Fatalf("Failed to decode login response: %v", err)
 		}
 
-		accessToken, ok := loginResponseBody["access_token"].(string)
-		if !ok {
-			t.Fatal("Failed to get access token from login response")
-		}
-
 		// Extract refresh token cookie
 		var refreshTokenCookie *http.Cookie
 		for _, cookie := range loginResponse.Cookies() {
@@ -561,8 +521,8 @@ func TestOAuthRevokeEndpoint(t *testing.T) {
 			t.Fatal("No refresh token cookie found in login response")
 		}
 
-		// Test revoke with valid tokens
-		revokeResponse := makeOAuthRevokeRequest(t, baseURL, nil, accessToken, refreshTokenCookie.Value)
+		// Test revoke with valid refresh token
+		revokeResponse := makeOAuthRevokeRequest(t, baseURL, nil, refreshTokenCookie.Value)
 		defer revokeResponse.Body.Close()
 
 		if revokeResponse.StatusCode != http.StatusOK {
@@ -570,7 +530,7 @@ func TestOAuthRevokeEndpoint(t *testing.T) {
 		}
 
 		// Verify refresh token was revoked by trying to use it
-		retryResponse := makeOAuthTokenRequest(t, baseURL, signalsd.RefreshTokenCookieName, nil, refreshTokenCookie.Value, "")
+		retryResponse := makeOAuthTokenRequest(t, baseURL, "refresh_token", nil, refreshTokenCookie.Value)
 		defer retryResponse.Body.Close()
 
 		if retryResponse.StatusCode != http.StatusUnauthorized {

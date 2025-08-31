@@ -21,7 +21,7 @@ type Server struct {
 	config      *Config
 	logger      *zerolog.Logger
 	authService *AuthService
-	apiClient   *APIClient
+	apiClient   *Client
 }
 
 func NewServer(cfg *Config, logger *zerolog.Logger) *Server {
@@ -30,7 +30,7 @@ func NewServer(cfg *Config, logger *zerolog.Logger) *Server {
 		config:      cfg,
 		logger:      logger,
 		authService: NewAuthService(cfg.APIBaseURL),
-		apiClient:   NewAPIClient(cfg.APIBaseURL),
+		apiClient:   NewClient(cfg.APIBaseURL),
 	}
 
 	s.setupStandaloneRoutes()
@@ -62,8 +62,6 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 
 		r.Post("/logout", s.handleLogout)
 		r.Get("/dashboard", s.handleDashboard)
-		r.Get("/search", s.handleSignalSearch)
-		r.Get("/admin", s.handleAdminDashboard)
 		r.Get("/admin/isn-accounts", s.handleIsnAccountsAdmin)
 
 		// UI API endpoints (used when rendering ui components)
@@ -71,6 +69,22 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 		r.Post("/ui-api/signal-versions", s.handleGetSignalVersions)
 		r.Post("/ui-api/search-signals", s.handleSearchSignals)
 		r.Post("/ui-api/add-isn-account", s.handleAddIsnAccount)
+	})
+
+	// ISN routes (require ISN access)
+	router.Group(func(r chi.Router) {
+		r.Use(s.RequireAuth)
+		r.Use(s.RequireIsnAccess)
+
+		r.Get("/search", s.handleSignalSearch)
+	})
+
+	// Admin routes (require admin/owner role)
+	router.Group(func(r chi.Router) {
+		r.Use(s.RequireAuth)
+		r.Use(s.RequireAdminAccess)
+
+		r.Get("/admin", s.handleAdminDashboard)
 	})
 }
 
@@ -100,12 +114,29 @@ func (s *Server) setupStandaloneRoutes() {
 
 		r.Post("/logout", s.handleLogout)
 		r.Get("/dashboard", s.handleDashboard)
-		r.Get("/search", s.handleSignalSearch)
 		r.Get("/admin/isn-accounts", s.handleIsnAccountsAdmin)
+
+		// UI API endpoints (used when rendering ui components)
 		r.Post("/ui-api/signal-types", s.handleGetSignalTypes)
 		r.Post("/ui-api/signal-versions", s.handleGetSignalVersions)
 		r.Post("/ui-api/search-signals", s.handleSearchSignals)
 		r.Post("/ui-api/add-isn-account", s.handleAddIsnAccount)
+	})
+
+	// ISN routes (require ISN access)
+	s.router.Group(func(r chi.Router) {
+		r.Use(s.RequireAuth)
+		r.Use(s.RequireIsnAccess)
+
+		r.Get("/search", s.handleSignalSearch)
+	})
+
+	// Admin routes (require admin/owner role)
+	s.router.Group(func(r chi.Router) {
+		r.Use(s.RequireAuth)
+		r.Use(s.RequireAdminAccess)
+
+		r.Get("/admin", s.handleAdminDashboard)
 	})
 }
 

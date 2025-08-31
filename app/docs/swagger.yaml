@@ -806,21 +806,21 @@ info:
     ## Authentication & Authorization
 
     ### OAuth
-    This API serves as an OAuth 2.0 Authorization Server for multiple client applications. The server supports web users and service accounts.
+    The signalsd backend service acts as an OAuth 2.0 Authorization Server and supports web users and service accounts.
 
     ### Authentication Flows
-    - **Web users**: Direct authentication via /auth/login → receive JWT access token + HTTP-only refresh cookie → use bearer tokens for API calls
+    - **Web users**: (Refresh Token Grant Type) Authentication via /auth/login → receive JWT access token + HTTP-only refresh cookie → use bearer tokens for API calls
     - **Service accounts**: Clients implement OAuth Client Credentials flow → receive JWT access token → use bearer tokens for API calls
 
     ### Token Usage
-    All protected API endpoints require valid JWT access tokens in the Authorization header:
+    All protected API endpoints require a valid JWT access token in the Authorization header:
     ```
     Authorization: Bearer <jwt-access-token>
     ```
 
     **Token Refresh (Web Users):**
-    - Client calls `/oauth/token?grant_type=refresh_token` with both bearer token AND HTTP-only cookie
-    - API validates both credentials and issues new access token + rotated refresh cookie
+    - Client calls `/oauth/token?grant_type=refresh_token` with HTTP-only refresh token cookie
+    - API validates refresh token and issues new access token + rotated refresh cookie
     - Client receives new bearer token for subsequent API calls
 
     **Token Refresh (Service Accounts):**
@@ -833,12 +833,16 @@ info:
     - Refresh tokens: 30 days (web users only)
 
     ### CSRF Protection
-    The /oauth API endpoints use a http-only cookie to exchange refresh tokens but also require a bearer token, preventing CSRF attacks.
+    The refresh token used by the /oauth API endpoints is stored in an HttpOnly cookie (to prevent access by JavaScript)
+    and marked with SameSite=Lax (to prevent it from being sent in cross-site requests, mitigating CSRF).
 
     ### CORS Protection
+
+    CORS is used to control which browser-based clients can make cross-origin requests to the API and read responses.
+
     By default the server will start with ALLOWED_ORIGINS=*
 
-    This should not be used in production - you must specify the list of client origins that are allowed to access the API in the ALLOWED_ORIGINS environment variable before starting the server.
+    In production, you should restrict ALLOWED_ORIGINS to trusted client origins rather than leaving it as *.
 
     ## Date/Time Handling:
 
@@ -848,7 +852,7 @@ info:
     - 2006-01-02T15:04:05.999999999Z (nano precision)
     - 2006-01-02 (date only, treated as start of day UTC: 2006-01-02T00:00:00Z)
 
-    Note: If the timestamp contains a timezone offset (as in +07:00), the + must be percent-encoded as %2B in the query.
+    Note: When including a timestamp with a timezone offset in a query parameter, encode the + sign as %2B (e.g. 2025-08-31T12:00:00%2B07:00). Otherwise, + may be interpreted as a space.
 
     **Response Bodies**: All date/time fields in JSON responses use RFC3339 format (ISO 8601):
     - Example: "2025-06-03T13:47:47.331787+01:00"
@@ -858,7 +862,7 @@ info:
 paths:
   /api/admin/accounts/{account_id}/admin-role:
     delete:
-      description: this endpoint can only be used by the site owner account
+      description: '**This endpoint can only be used by the site owner account**'
       parameters:
       - description: account id
         example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
@@ -881,7 +885,7 @@ paths:
       - BearerAccessToken: []
       summary: Revoke admin role
       tags:
-      - Site admin
+      - Site Admin
     put:
       description: |-
         This endpoint grants the admin role to a site member
@@ -891,9 +895,16 @@ paths:
         - Define the signal_types used in the ISN
         - read/write to their own ISNs
         - Grant other accounts read or write access to their ISNs
-        - Create service accounts
 
-        this endpoint can only be used by the site owner account
+        Note that admins can't change ISNs they don't own (the site owner must use the `transfer ownership` endpoint if this is requred)
+
+        An admin also has access to the following site admin functions:
+        - Create service accounts
+        - Disable/Enable accounts
+        - View all users and their email addresses
+        - Reset user passwords
+
+        **This endpoint can only be used by the site owner account**
       parameters:
       - description: account id
         example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
@@ -916,7 +927,7 @@ paths:
       - BearerAccessToken: []
       summary: Grant admin role
       tags:
-      - Site admin
+      - Site Admin
   /api/admin/accounts/{account_id}/disable:
     post:
       description: |-
@@ -964,7 +975,7 @@ paths:
       - BearerAccessToken: []
       summary: Disable an account
       tags:
-      - Site admin
+      - Site Admin
   /api/admin/accounts/{account_id}/enable:
     post:
       description: |-
@@ -973,7 +984,7 @@ paths:
 
         **Post-Enable Steps Required:**
         - **Service Accounts**: Must re-register via `/api/auth/register/service-accounts` (same client_id, new credentials)
-        - **Web Users**: Can immediately log in again via `/auth/login`
+        - **Web Users**: Can immediately log in again via `/api/auth/login`
 
         Only owners and admins can enable accounts.
       parameters:
@@ -1006,7 +1017,7 @@ paths:
       - BearerAccessToken: []
       summary: Enable an account
       tags:
-      - Site admin
+      - Site Admin
   /api/admin/isn/{isn_slug}/transfer-ownership:
     put:
       description: |-
@@ -1045,7 +1056,7 @@ paths:
       - RefreshTokenCookieAuth: []
       summary: Transfer ISN ownership
       tags:
-      - ISN configuration
+      - ISN Configuration
   /api/admin/reset:
     post:
       description: |-
@@ -1060,7 +1071,7 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       summary: reset
       tags:
-      - Site admin
+      - Site Admin
   /api/admin/service-accounts:
     get:
       description: |-
@@ -1085,7 +1096,7 @@ paths:
       - BearerAccessToken: []
       summary: Get all service accounts
       tags:
-      - Site admin
+      - Site Admin
   /api/admin/service-accounts/{id}:
     get:
       description: |-
@@ -1123,13 +1134,14 @@ paths:
       - BearerAccessToken: []
       summary: Get service account
       tags:
-      - Site admin
+      - Site Admin
   /api/admin/users:
     get:
       description: |-
-        This api displays site users and their email addresses (can only be used by owner account)
-        No query parameters = return all users
-        With query parameters = return specific user: ?id=uuid or ?email=address
+        This api displays site users and their email addresses (can only be used by owner and admin accounts)
+
+        - No query parameters = return all users
+        - to return a specific user supply one of the following query parameters: ?id=uuid or ?email=address
       parameters:
       - description: user account ID
         example: 68fb5f5b-e3f5-4a96-8d35-cd2203a06f73
@@ -1164,9 +1176,9 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Get registered users or specific user
+      summary: Get users
       tags:
-      - Site admin
+      - Site Admin
   /api/admin/users/{user_id}/reset-password:
     put:
       description: Allows admins to reset a user's password (use this endpoint if
@@ -1209,7 +1221,7 @@ paths:
       - BearerAccessToken: []
       summary: Reset user password
       tags:
-      - Site admin
+      - Site Admin
   /api/auth/login:
     post:
       description: |-
@@ -1310,10 +1322,10 @@ paths:
   /api/auth/register/service-accounts:
     post:
       description: |
-        Registring a new service account creates a one time link with the client credentials in it - this must be used by the client within 48 hrs.
+        Registring a new service account creates a one-time link with the client credentials in it - this must be used by the client within 48 hrs.
 
         If you want to reissue a client's credentials call this endpoint again with the same client organization and contact email.
-        A new one time setup url will be generated and the old one will be revoked.
+        A new one-time setup url will be generated and the old one will be revoked.
         Note the client_id will remain the same and any existing client secrets will be revoked.
 
         You have to be an admin or the site owner to use this endpoint
@@ -1341,7 +1353,7 @@ paths:
       - BearerServiceAccount: []
       summary: Register a new service account
       tags:
-      - Service accounts
+      - Service Accounts
   /api/auth/service-accounts/rotate-secret:
     post:
       description: |
@@ -1404,7 +1416,7 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       summary: Complete service account setup
       tags:
-      - Service accounts
+      - Service Accounts
   /api/isn:
     get:
       description: get a list of the configured ISNs
@@ -1415,9 +1427,9 @@ paths:
             items:
               $ref: '#/definitions/handlers.Isn'
             type: array
-      summary: Get the ISNs
+      summary: Get ISN configurations
       tags:
-      - ISN details
+      - ISN Configuration
   /api/isn/:
     post:
       description: |-
@@ -1432,7 +1444,7 @@ paths:
 
         Note there is a cache of public ISNs that is used by the search endpoints. This cache is not dynamically loaded, so adding public ISNs requires a restart of the service
       parameters:
-      - description: ISN details
+      - description: ISN configuration
         in: body
         name: request
         required: true
@@ -1456,7 +1468,7 @@ paths:
       - RefreshTokenCookieAuth: []
       summary: Create an ISN
       tags:
-      - ISN configuration
+      - ISN Configuration
   /api/isn/{isn_slug}:
     get:
       description: Returns details about the ISN
@@ -1482,10 +1494,10 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       summary: Get an ISN configuration
       tags:
-      - ISN details
+      - ISN Configuration
     put:
       description: |-
-        Update the ISN details
+        Update the ISN configuration
         This endpoint can only be used by the site owner or the ISN admin
       parameters:
       - description: isn slug
@@ -1494,7 +1506,7 @@ paths:
         name: isn_slug
         required: true
         type: string
-      - description: ISN details
+      - description: ISN configuration
         in: body
         name: request
         required: true
@@ -1523,12 +1535,12 @@ paths:
       - BearerAccessToken: []
       summary: Update an ISN
       tags:
-      - ISN configuration
+      - ISN Configuration
   /api/isn/{isn_slug}/accounts:
     get:
       description: |-
         Get a list of all accounts (users and service accounts) that have permissions on the specified ISN.
-        Only ISN admins and site owners can view this information.
+        Only ISN admins and site owners can view this information
       parameters:
       - description: ISN slug
         example: sample-isn--example-org
@@ -1559,12 +1571,12 @@ paths:
       - BearerAccessToken: []
       summary: Get all accounts with access to an ISN
       tags:
-      - ISN details
+      - ISN Permissions
   /api/isn/{isn_slug}/accounts/{account_id}:
     put:
       description: |-
         Grant an account read or write access to an isn.
-        This end point can only be used by the site owner or the isn admin account.
+        This end point can only be used by the site owner or the isn admin account (ISN admins can only grant permissions for ISNs they created).
       parameters:
       - description: permission details
         in: body
@@ -1626,7 +1638,7 @@ paths:
       - BearerAccessToken: []
       summary: Create a new signal batch
       tags:
-      - Signal sharing
+      - Signal Exchange
   /api/isn/{isn_slug}/signal_types:
     get:
       description: Get details for the signal types defined on the ISN
@@ -1658,7 +1670,7 @@ paths:
             type: array
       summary: Get Signal types
       tags:
-      - Signal types
+      - Signal Type Definitions
     post:
       description: |
         Signal types specify a record that can be shared over the ISN
@@ -1704,7 +1716,7 @@ paths:
       - BearerAccessToken: []
       summary: Create signal type
       tags:
-      - Signal types
+      - Signal Type Definitions
   /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}:
     delete:
       description: Only signal types that have never been referenced by signals can
@@ -1751,7 +1763,7 @@ paths:
       - BearerAccessToken: []
       summary: Delete signal type
       tags:
-      - Signal types
+      - Signal Type Definitions
     get:
       description: Returns details about the signal type
       parameters:
@@ -1792,8 +1804,8 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       summary: Get signal type
       tags:
-      - Signal types
-      - ISN details
+      - Signal Type Definitions
+      - Signal Type Definitions
     put:
       description: |-
         users can mark the signal type as *in use/not in use* and update the description or link to the readme file
@@ -1846,7 +1858,7 @@ paths:
       - BearerAccessToken: []
       summary: Update signal type
       tags:
-      - Signal types
+      - Signal Type Definitions
   /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals:
     post:
       description: |-
@@ -1948,7 +1960,7 @@ paths:
       - BearerAccessToken: []
       summary: Create signals
       tags:
-      - Signal sharing
+      - Signal Exchange
   /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search:
     get:
       description: |-
@@ -2013,7 +2025,7 @@ paths:
       - BearerAccessToken: []
       summary: Signal Search (private ISNs)
       tags:
-      - Signal sharing
+      - Signal Exchange
   /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/withdraw:
     put:
       description: |-
@@ -2070,7 +2082,7 @@ paths:
       - BearerAccessToken: []
       summary: Withdraw a signal
       tags:
-      - Signal sharing
+      - Signal Exchange
   /api/public/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search:
     get:
       description: |-
@@ -2133,7 +2145,7 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       summary: Signal Search (public ISNs)
       tags:
-      - Signal sharing
+      - Signal Exchange
   /api/webhooks:
     post:
       description: register a webhook to recieve signals batch status updates
@@ -2144,7 +2156,7 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       summary: Register webhook (TODO)
       tags:
-      - Service accounts
+      - Service Accounts
   /health/live:
     get:
       description: Check if the signalsd http service is alive and responding.
@@ -2179,7 +2191,7 @@ paths:
     delete:
       description: |-
         Revoke an account read or write access to an isn.
-        This end point can only be used by the site owner or the isn admin account.
+        This end point can only be used by the site owner or the isn admin account (ISN admins can only revoke permissions for ISNs they created)
       parameters:
       - description: isn slug
         example: sample-isn--example-org
@@ -2260,7 +2272,7 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       summary: Get batch processing status
       tags:
-      - Signal sharing
+      - Signal Exchange
   /isn/{isn_slug}/batches/search:
     get:
       description: |
@@ -2323,7 +2335,7 @@ paths:
       - BearerAccessToken: []
       summary: Search for batches
       tags:
-      - Signal sharing
+      - Signal Exchange
   /oauth/revoke:
     post:
       description: |
@@ -2344,20 +2356,12 @@ paths:
         - If the account was disabled by an admin, it must first be re-enabled via `POST /admin/accounts/{account_id}/enable`
 
         **Web Users (Logout):**
-        This endpoint expects a refresh token in an `http-only cookie` and a valid access token in the Authorization header.
+        This endpoint expects a refresh token in an `http-only cookie`.
         This revokes the user's refresh token, effectively logging them out.
 
         If the refresh token has expired or been revoked, the user must login again to get a new one.
 
-        You must also provide a previously issued `bearer access token` in the Authorization header - it does not matter if it has expired
-        (the token is not used to authenticate the request but is needed to establish the ID of the user making the request).
-
-        **Note:** Any unexpired access tokens issued for this user will continue to work until they expire.
-        Users must log in again to obtain a new refresh token after logout/revocation.
-
-        **Client Examples:**
-        - **Web User Logout:** `POST /oauth/revoke` with refresh token cookie + Authorization header
-        - **Service Account:** `POST /oauth/revoke` with client_id and client_secret in request body
+        **Note:** Any unexpired access tokens issued for the account will continue to work until they expire.
       responses:
         "200":
           description: OK
@@ -2373,9 +2377,7 @@ paths:
           description: Token not found or already revoked
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Revoke a token
+      summary: Revoke token
       tags:
       - auth
   /oauth/token:
@@ -2395,7 +2397,6 @@ paths:
         Issues new access token (in response body) and rotates refresh token (HTTP-only cookie)
 
         - Set `grant_type=refresh_token` as URL parameter
-        - Must provide current access token in Authorization header (expired tokens accepted)
         - Must have valid refresh token cookie
         - Access tokens expire after 30 minutes
         (subsequent requests using the token will fail with HTTP status 401 and an error_code of "access_token_expired")
@@ -2429,9 +2430,7 @@ paths:
           description: 'Authentication failed '
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: New Access Token
+      summary: Refresh Access Token
       tags:
       - auth
   /version:
@@ -2444,7 +2443,7 @@ paths:
             $ref: '#/definitions/version.Info'
       summary: Get API version
       tags:
-      - Site admin
+      - Site Admin
 produces:
 - application/json
 securityDefinitions:
@@ -2457,16 +2456,16 @@ swagger: "2.0"
 tags:
 - description: Authentication and authorization endpoints.
   name: auth
-- description: Site adminstration tools
-  name: Site admin
-- description: Manage the Information Sharing Networks that are used to exchange signals
-    between participating users.
-  name: ISN configuration
+- description: Site adminstration tools. These endpoints can only be used by the site
+    owner or an admin.
+  name: Site Admin
+- description: Create and manage Information Sharing Networks (ISNs) - these endpoints
+    can only be used by the site owner or an admin. Note that ISN admins can only
+    view or update details for ISNs they created.
+  name: ISN Configuration
 - description: Grant accounts read or write access to an ISN
   name: ISN Permissions
-- description: View information about the configured ISNs
-  name: ISN details
 - description: Define the format of the data being shared in an ISN
-  name: Signal types
+  name: Signal Type Definitions
 - description: Manage service account end points
-  name: Service accounts
+  name: Service Accounts

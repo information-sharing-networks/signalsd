@@ -79,7 +79,7 @@ type SignalTypeDetail struct {
 //	@Description	Signal type definitions are referred to like this: /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver} (e.g., /api/isn/sample-isn--example-org/signal_types/sample-signal--example-org/v0.0.1)
 //	@Description
 //
-//	@Tags		Signal types
+//	@Tags		Signal Type Definitions
 //
 //	@Param		request	body		handlers.CreateSignalTypeRequest	true	"signal type details"
 //
@@ -269,7 +269,7 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 //	@Param			sem_ver				path	string								true	"Sem ver"			example(0.0.1)
 //	@Param			request				body	handlers.UpdateSignalTypeRequest	true	"signal type details to be updated"
 //
-//	@Tags			Signal types
+//	@Tags			Signal Type Definitions
 //
 //	@Success		204
 //	@Failure		400	{object}	responses.ErrorResponse
@@ -392,12 +392,12 @@ func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *ht
 //
 //	@Summary		Get signal type
 //	@Description	Returns details about the signal type
-//	@Tags			Signal types
+//	@Tags			Signal Type Definitions
 //	@Param			isn_slug			path	string	true	"ISN slug"					example(sample-isn--example-org)
 //	@Param			signal_type_slug	path	string	true	"signal type slug"			example(sample-signal--example-org)
 //	@Param			sem_ver				path	string	true	"version to be recieved"	example(0.0.1)
 //
-//	@Tags			ISN details
+//	@Tags			Signal Type Definitions
 //
 //	@Success		200	{object}	handlers.SignalTypeDetail
 //	@Failure		400	{object}	responses.ErrorResponse
@@ -458,7 +458,7 @@ func (s *SignalTypeHandler) GetSignalTypeHandler(w http.ResponseWriter, r *http.
 //	@Param			isn_slug			path	string	true	"ISN slug"				example(sample-isn--example-org)
 //	@Param			signal_type_slug	path	string	true	"signal type slug"		example(sample-signal--example-org)
 //	@Param			sem_ver				path	string	true	"version to be deleted"	example(0.0.1)
-//	@Tags			Signal types
+//	@Tags			Signal Type Definitions
 //
 //	@Success		200	{array}	handlers.SignalTypeDetail
 //
@@ -511,7 +511,7 @@ func (s *SignalTypeHandler) GetSignalTypesHandler(w http.ResponseWriter, r *http
 //	@Param			signal_type_slug	path	string	true	"signal type slug"		example(sample-signal--example-org)
 //	@Param			sem_ver				path	string	true	"version to be deleted"	example(0.0.1)
 //
-//	@Tags			Signal types
+//	@Tags			Signal Type Definitions
 //
 //	@Success		204
 //	@Failure		400	{object}	responses.ErrorResponse

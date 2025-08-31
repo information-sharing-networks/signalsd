@@ -44,6 +44,26 @@ func (q *Queries) GetRefreshToken(ctx context.Context, hashedToken string) (GetR
 	return i, err
 }
 
+const GetValidRefreshTokenByHashedToken = `-- name: GetValidRefreshTokenByHashedToken :one
+SELECT user_account_id, expires_at
+FROM refresh_tokens
+WHERE hashed_token = $1
+  AND revoked_at IS NULL
+  AND expires_at > NOW()
+`
+
+type GetValidRefreshTokenByHashedTokenRow struct {
+	UserAccountID uuid.UUID `json:"user_account_id"`
+	ExpiresAt     time.Time `json:"expires_at"`
+}
+
+func (q *Queries) GetValidRefreshTokenByHashedToken(ctx context.Context, hashedToken string) (GetValidRefreshTokenByHashedTokenRow, error) {
+	row := q.db.QueryRow(ctx, GetValidRefreshTokenByHashedToken, hashedToken)
+	var i GetValidRefreshTokenByHashedTokenRow
+	err := row.Scan(&i.UserAccountID, &i.ExpiresAt)
+	return i, err
+}
+
 const GetValidRefreshTokenByUserAccountId = `-- name: GetValidRefreshTokenByUserAccountId :one
 SELECT hashed_token, expires_at
 FROM refresh_tokens
