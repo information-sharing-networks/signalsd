@@ -203,6 +203,7 @@ func (a *AuthService) SetAuthCookies(w http.ResponseWriter, loginResp *LoginResp
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   isProd,
+		SameSite: http.SameSiteLaxMode,
 		MaxAge:   loginResp.ExpiresIn + 60, // JWT expiry + 1 minute buffer
 	})
 
@@ -221,6 +222,7 @@ func (a *AuthService) SetAuthCookies(w http.ResponseWriter, loginResp *LoginResp
 			Path:     "/",
 			HttpOnly: true,
 			Secure:   isProd,
+			SameSite: http.SameSiteLaxMode,
 			MaxAge:   loginResp.ExpiresIn + 60,
 		})
 	}
@@ -244,6 +246,7 @@ func (a *AuthService) SetAuthCookies(w http.ResponseWriter, loginResp *LoginResp
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   isProd,
+		SameSite: http.SameSiteLaxMode,
 		MaxAge:   loginResp.ExpiresIn + 60, // JWT expiry + 1 minute buffer
 	})
 
@@ -261,6 +264,7 @@ func (a *AuthService) ClearAuthCookies(w http.ResponseWriter, environment string
 		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   isProd,
+		SameSite: http.SameSiteLaxMode,
 	})
 
 	http.SetCookie(w, &http.Cookie{
@@ -270,6 +274,7 @@ func (a *AuthService) ClearAuthCookies(w http.ResponseWriter, environment string
 		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   isProd,
+		SameSite: http.SameSiteLaxMode,
 	})
 
 	http.SetCookie(w, &http.Cookie{
@@ -279,6 +284,7 @@ func (a *AuthService) ClearAuthCookies(w http.ResponseWriter, environment string
 		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   isProd,
+		SameSite: http.SameSiteLaxMode,
 	})
 
 	http.SetCookie(w, &http.Cookie{
@@ -288,5 +294,6 @@ func (a *AuthService) ClearAuthCookies(w http.ResponseWriter, environment string
 		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   isProd,
+		SameSite: http.SameSiteLaxMode,
 	})
 }
