@@ -83,7 +83,7 @@ import (
 //	@description	- Refresh tokens: 30 days (web users only)
 //	@description
 //	@description	### CSRF Protection
-//  @description	The refresh token used by the /oauth API endpoints is stored in an HttpOnly cookie (to prevent access by JavaScript)
+//	@description	The refresh token used by the /oauth API endpoints is stored in an HttpOnly cookie (to prevent access by JavaScript)
 //	@description	and marked with SameSite=Lax (to prevent it from being sent in cross-site requests, mitigating CSRF).
 //	@description
 //	@description	### CORS Protection
@@ -92,7 +92,7 @@ import (
 //	@description
 //	@description	By default the server will start with ALLOWED_ORIGINS=*
 //	@description
-//  @description	In production, you should restrict ALLOWED_ORIGINS to trusted client origins rather than leaving it as *.
+//	@description	In production, you should restrict ALLOWED_ORIGINS to trusted client origins rather than leaving it as *.
 //	@description
 //	@description	## Date/Time Handling:
 //	@description

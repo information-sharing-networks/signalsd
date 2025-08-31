@@ -460,14 +460,13 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 	</div>
 	<script>
 
-		// Event delegation for pretty print buttons
+		// Store original JSON content for each signal
+		const originalJsonContent = new Map();
+
 		document.addEventListener('click', function(e) {
 		if (!e.target.classList.contains('pretty-print-btn')) {
 			return
 		}
-
-		// Store original JSON content for each signal
-		const originalJsonContent = new Map();
 
 		const signalId = e.target.getAttribute('data-signal-id');
 		const jsonElement = document.getElementById('json-' + signalId);
@@ -476,24 +475,22 @@ templ SearchResults(signals []SearchSignalWithCorrelationsAndVersions) {
 			return;
 		}
 
-		// Get or store original content
-		let originalContent = originalJsonContent.get(signalId);
-		if (!originalContent) {
-			originalContent = jsonElement.textContent.trim();
-			originalJsonContent.set(signalId, originalContent);
-		}
-
 		try {
 			const currentButtonText = e.target.textContent.trim();
 
 			if (currentButtonText === 'Pretty Print') {
+				let originalContent = originalJsonContent.get(signalId);
+				if (!originalContent) {
+					originalContent = jsonElement.textContent.trim();
+					originalJsonContent.set(signalId, originalContent);
+				}
 				// Parse and pretty print JSON
 				const parsed = JSON.parse(originalContent);
 				jsonElement.textContent = JSON.stringify(parsed, null, 2);
 				e.target.textContent = 'Compact';
 				jsonElement.classList.add('pretty-printed');
 			} else {
-				// Restore original compact JSON
+				let originalContent = originalJsonContent.get(signalId);
 				jsonElement.textContent = originalContent;
 				e.target.textContent = 'Pretty Print';
 				jsonElement.classList.remove('pretty-printed');
