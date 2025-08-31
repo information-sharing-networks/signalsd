@@ -31,9 +31,9 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "This endpoint grants the admin role to a site member\n\nAn admin can:\n- Create an ISN\n- Define the signal_types used in the ISN\n- read/write to their own ISNs\n- Grant other accounts read or write access to their ISNs\n- Create service accounts\n\nthis endpoint can only be used by the site owner account",
+                "description": "This endpoint grants the admin role to a site member\n\nAn admin can:\n- Create an ISN\n- Define the signal_types used in the ISN\n- read/write to their own ISNs\n- Grant other accounts read or write access to their ISNs\n\nNote that admins can't change ISNs they don't own (the site owner must use the ` + "`" + `transfer ownership` + "`" + ` endpoint if this is requred)\n\nAn admin also has access to the following site admin functions:\n- Create service accounts\n- Disable/Enable accounts\n- View all users and their email addresses\n- Reset user passwords\n\n**This endpoint can only be used by the site owner account**",
                 "tags": [
-                    "Site admin"
+                    "Site Admin"
                 ],
                 "summary": "Grant admin role",
                 "parameters": [
@@ -70,9 +70,9 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "this endpoint can only be used by the site owner account",
+                "description": "**This endpoint can only be used by the site owner account**",
                 "tags": [
-                    "Site admin"
+                    "Site Admin"
                 ],
                 "summary": "Revoke admin role",
                 "parameters": [
@@ -113,7 +113,7 @@ const docTemplate = `{
                 ],
                 "description": "**Use Cases:**\n- **Security Incident**: Compromised account needs immediate lockout\n- **Employee Departure**: Remove access for departed staff\n\n**Actions Performed:**\n- Sets ` + "`" + `is_active = false` + "`" + ` (account becomes unusable)\n- Revokes all client secrets/one-time secrets (service accounts)\n- Revokes all refresh tokens (web users)\n\n**Recovery:** Account must be re-enabled by admin via ` + "`" + `/admin/accounts/{id}/enable` + "`" + `\nService accounts also need re-registration via ` + "`" + `/api/auth/register/service-accounts` + "`" + `\n\n**Note:** The site owner account cannot be disabled to prevent system lockout.\nOnly owners and admins can disable accounts.",
                 "tags": [
-                    "Site admin"
+                    "Site Admin"
                 ],
                 "summary": "Disable an account",
                 "parameters": [
@@ -164,9 +164,9 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "**Administrative endpoint to re-enable previously disabled accounts.**\nSets account status to ` + "`" + `is_active = true` + "`" + ` (does not create new tokens).\n\n**Post-Enable Steps Required:**\n- **Service Accounts**: Must re-register via ` + "`" + `/api/auth/register/service-accounts` + "`" + ` (same client_id, new credentials)\n- **Web Users**: Can immediately log in again via ` + "`" + `/auth/login` + "`" + `\n\nOnly owners and admins can enable accounts.",
+                "description": "**Administrative endpoint to re-enable previously disabled accounts.**\nSets account status to ` + "`" + `is_active = true` + "`" + ` (does not create new tokens).\n\n**Post-Enable Steps Required:**\n- **Service Accounts**: Must re-register via ` + "`" + `/api/auth/register/service-accounts` + "`" + ` (same client_id, new credentials)\n- **Web Users**: Can immediately log in again via ` + "`" + `/api/auth/login` + "`" + `\n\nOnly owners and admins can enable accounts.",
                 "tags": [
-                    "Site admin"
+                    "Site Admin"
                 ],
                 "summary": "Enable an account",
                 "parameters": [
@@ -222,7 +222,7 @@ const docTemplate = `{
                 ],
                 "description": "Transfer ownership of an ISN to another admin account.\nThis can be used when an admin leaves or when reorganizing responsibilities.\nOnly the site owner can transfer ISN ownership.",
                 "tags": [
-                    "ISN configuration"
+                    "ISN Configuration"
                 ],
                 "summary": "Transfer ISN ownership",
                 "parameters": [
@@ -272,7 +272,7 @@ const docTemplate = `{
             "post": {
                 "description": "Delete all registered users and associated data.\nThis endpoint only works on environments configured as 'dev'",
                 "tags": [
-                    "Site admin"
+                    "Site Admin"
                 ],
                 "summary": "reset",
                 "responses": {
@@ -297,7 +297,7 @@ const docTemplate = `{
                 ],
                 "description": "Get a list of all service accounts in the system.\nOnly owners and admins can view service account lists.",
                 "tags": [
-                    "Site admin"
+                    "Site Admin"
                 ],
                 "summary": "Get all service accounts",
                 "responses": {
@@ -334,7 +334,7 @@ const docTemplate = `{
                 ],
                 "description": "Get a specific service account by account ID.\nOnly owners and admins can view service account details.",
                 "tags": [
-                    "Site admin"
+                    "Site Admin"
                 ],
                 "summary": "Get service account",
                 "parameters": [
@@ -388,11 +388,11 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "This api displays site users and their email addresses (can only be used by owner account)\nNo query parameters = return all users\nWith query parameters = return specific user: ?id=uuid or ?email=address",
+                "description": "This api displays site users and their email addresses (can only be used by owner and admin accounts)\n\n- No query parameters = return all users\n- to return a specific user supply one of the following query parameters: ?id=uuid or ?email=address",
                 "tags": [
-                    "Site admin"
+                    "Site Admin"
                 ],
-                "summary": "Get registered users or specific user",
+                "summary": "Get users",
                 "parameters": [
                     {
                         "type": "string",
@@ -452,7 +452,7 @@ const docTemplate = `{
                 ],
                 "description": "Allows admins to reset a user's password (use this endpoint if the user has forgotten their password)",
                 "tags": [
-                    "Site admin"
+                    "Site Admin"
                 ],
                 "summary": "Reset user password",
                 "parameters": [
@@ -640,9 +640,9 @@ const docTemplate = `{
                         "BearerServiceAccount": []
                     }
                 ],
-                "description": "Registring a new service account creates a one time link with the client credentials in it - this must be used by the client within 48 hrs.\n\nIf you want to reissue a client's credentials call this endpoint again with the same client organization and contact email.\nA new one time setup url will be generated and the old one will be revoked.\nNote the client_id will remain the same and any existing client secrets will be revoked.\n\nYou have to be an admin or the site owner to use this endpoint\n",
+                "description": "Registring a new service account creates a one-time link with the client credentials in it - this must be used by the client within 48 hrs.\n\nIf you want to reissue a client's credentials call this endpoint again with the same client organization and contact email.\nA new one-time setup url will be generated and the old one will be revoked.\nNote the client_id will remain the same and any existing client secrets will be revoked.\n\nYou have to be an admin or the site owner to use this endpoint\n",
                 "tags": [
-                    "Service accounts"
+                    "Service Accounts"
                 ],
                 "summary": "Register a new service account",
                 "parameters": [
@@ -721,7 +721,7 @@ const docTemplate = `{
             "get": {
                 "description": "Exchange one-time setup token for permanent client credentials (the one-time request url is created when a new service account is registered).\nthe endpoint renders a html page that the user can use to copy their client credentials.\nThe setup url is only valid for 48 hours.\n",
                 "tags": [
-                    "Service accounts"
+                    "Service Accounts"
                 ],
                 "summary": "Complete service account setup",
                 "parameters": [
@@ -763,9 +763,9 @@ const docTemplate = `{
             "get": {
                 "description": "get a list of the configured ISNs",
                 "tags": [
-                    "ISN details"
+                    "ISN Configuration"
                 ],
-                "summary": "Get the ISNs",
+                "summary": "Get ISN configurations",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -791,12 +791,12 @@ const docTemplate = `{
                 ],
                 "description": "Create an Information Sharing Network (ISN)\n\nvisibility = \"private\" means that signalsd on the network can only be seen by network participants.\n\nISN admins automatically get write permission for their own ISNs.\nSite owners automatically get write permission on all ISNs.\n\nThis endpoint can only be used by the site owner or an admin\n\nNote there is a cache of public ISNs that is used by the search endpoints. This cache is not dynamically loaded, so adding public ISNs requires a restart of the service",
                 "tags": [
-                    "ISN configuration"
+                    "ISN Configuration"
                 ],
                 "summary": "Create an ISN",
                 "parameters": [
                     {
-                        "description": "ISN details",
+                        "description": "ISN configuration",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -831,7 +831,7 @@ const docTemplate = `{
             "get": {
                 "description": "Returns details about the ISN",
                 "tags": [
-                    "ISN details"
+                    "ISN Configuration"
                 ],
                 "summary": "Get an ISN configuration",
                 "parameters": [
@@ -871,9 +871,9 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Update the ISN details\nThis endpoint can only be used by the site owner or the ISN admin",
+                "description": "Update the ISN configuration\nThis endpoint can only be used by the site owner or the ISN admin",
                 "tags": [
-                    "ISN configuration"
+                    "ISN Configuration"
                 ],
                 "summary": "Update an ISN",
                 "parameters": [
@@ -886,7 +886,7 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "description": "ISN details",
+                        "description": "ISN configuration",
                         "name": "request",
                         "in": "body",
                         "required": true,
@@ -933,9 +933,9 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Get a list of all accounts (users and service accounts) that have permissions on the specified ISN.\nOnly ISN admins and site owners can view this information.",
+                "description": "Get a list of all accounts (users and service accounts) that have permissions on the specified ISN.\nOnly ISN admins and site owners can view this information",
                 "tags": [
-                    "ISN details"
+                    "ISN Permissions"
                 ],
                 "summary": "Get all accounts with access to an ISN",
                 "parameters": [
@@ -986,7 +986,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Grant an account read or write access to an isn.\nThis end point can only be used by the site owner or the isn admin account.",
+                "description": "Grant an account read or write access to an isn.\nThis end point can only be used by the site owner or the isn admin account (ISN admins can only grant permissions for ISNs they created).",
                 "tags": [
                     "ISN Permissions"
                 ],
@@ -1052,7 +1052,7 @@ const docTemplate = `{
                 ],
                 "description": "This endpoint is used by service accounts to create a new batch. Batches are used to track signals sent by an account to the specified ISN.\n\nOpening a batch closes the previous batch (the client app can decide how long to keep a batch open)\n\nSignals can only be sent to open batches.\n\nAuthentication is based on the supplied access token:\nthe site owner, the isn admin and members with an isn_perm=write can create a batch for the ISN.\n\nNote this endpoint is not needed for web users (a batch is automatically created when they first write to an isn and is only closed if their permission to write to the ISN is revoked)\n",
                 "tags": [
-                    "Signal sharing"
+                    "Signal Exchange"
                 ],
                 "summary": "Create a new signal batch",
                 "responses": {
@@ -1069,7 +1069,7 @@ const docTemplate = `{
             "get": {
                 "description": "Get details for the signal types defined on the ISN",
                 "tags": [
-                    "Signal types"
+                    "Signal Type Definitions"
                 ],
                 "summary": "Get Signal types",
                 "parameters": [
@@ -1118,7 +1118,7 @@ const docTemplate = `{
                 ],
                 "description": "Signal types specify a record that can be shared over the ISN\n- Each type has a unique title and this is used to create a URL-friendly slug\n- The title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.\n- The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading\n\nSchema URL Requirements\n- Must be a liink to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)\n- To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas\n- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)\n- Subsequent POSTs to this endpoint that reference a previously submitted title/slug but point to a different schema will increment the version based on the supplied bump_type\n\nSignal type definitions are referred to like this: /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver} (e.g., /api/isn/sample-isn--example-org/signal_types/sample-signal--example-org/v0.0.1)\n",
                 "tags": [
-                    "Signal types"
+                    "Signal Type Definitions"
                 ],
                 "summary": "Create signal type",
                 "parameters": [
@@ -1164,8 +1164,8 @@ const docTemplate = `{
             "get": {
                 "description": "Returns details about the signal type",
                 "tags": [
-                    "Signal types",
-                    "ISN details"
+                    "Signal Type Definitions",
+                    "Signal Type Definitions"
                 ],
                 "summary": "Get signal type",
                 "parameters": [
@@ -1229,7 +1229,7 @@ const docTemplate = `{
                 ],
                 "description": "users can mark the signal type as *in use/not in use* and update the description or link to the readme file\nSignal types marked as 'not in use' are not returned in signal searches and can not receive new signals",
                 "tags": [
-                    "Signal types"
+                    "Signal Type Definitions"
                 ],
                 "summary": "Update signal type",
                 "parameters": [
@@ -1305,7 +1305,7 @@ const docTemplate = `{
                 ],
                 "description": "Only signal types that have never been referenced by signals can be deleted",
                 "tags": [
-                    "Signal types"
+                    "Signal Type Definitions"
                 ],
                 "summary": "Delete signal type",
                 "parameters": [
@@ -1374,7 +1374,7 @@ const docTemplate = `{
                 ],
                 "description": "Submit an array of signals for storage on the ISN\n- payloads must not mix signals of different types and are subject to the size limits defined on the site.\n- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.\n- If a local reference is received more than once from an account for the specified signal_type a new version of the signal will be stored with a incremented version number.\n- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.\n- requests are only accepted for the open signal batch for this account/ISN (service accounts need to manually create batches, web users have a batch automatically created when they first write to an ISN).\n\n**Authentication**\n\nRequires a valid access token.\nThe claims in the access token list the ISNs and signal_types that the account is permitted to use.\n\n**Error handling**\n\nif the request is a vaild format but individual signals contain errors (validation errors, incorrect correlation ids, database errors) the errors are recorded in the response but do not prevent other signals from being processed.\nIndividual failures are logged and can be tracked using the signals_batch_id returned in the response - see the batch status endpoint.\n\nErrors that relate to the entire request  - e.g invalid json, authentication, permission and server errors (400, 401, 403, 500) - are not recorded and should be handled by the client immediately.\n\n**JSON Schema Validation**\n\nSignals are validated against the JSON schema specified for the signal type unless validation is disabled on the type definition.\n\nWhen validation is disabled, basic checks are still done on the incoming data and the following issues create a 400 error and cause the entire payload to be rejected:\n- invalid json format\n- missing fields (the array of signals must be in a json object called signals, and content and local_ref must be present for each record).\n\n**Signal versions**\n\nMultiple versions are created when signals are resupplied using the same local_ref, e.g. because the client wants to correct a previously publsihed signal.\nBy default search will return the latest version of the signal.\nIf a signal has been withdrawn it will be reactivated if you resubmit it using the same local_ref.\n\n**Correlating signals**\n\nCorrelation IDs can be used to link signals together.  Signals can only be correlated within the same ISN.\nIf the supplied correlation_id is not found in the same ISN as the signal being submitted, the response will contain a 422 or 207 status code and the error_code for the failed signal will be ` + "`" + `invalid_correlation_id` + "`" + `.\n\nrequest level errors (e.g. invalid json, authentication failure etc) return a simple error_code/error_message response rather than a detailed audit log",
                 "tags": [
-                    "Signal sharing"
+                    "Signal Exchange"
                 ],
                 "summary": "Create signals",
                 "parameters": [
@@ -1467,7 +1467,7 @@ const docTemplate = `{
                 ],
                 "description": "Search for signals by date or account in private ISNs (authentication required - only accounts with read or write permissions to the ISN can access signals).\n\nNote the endpoint returns the latest version of each signal.",
                 "tags": [
-                    "Signal sharing"
+                    "Signal Exchange"
                 ],
                 "summary": "Signal Search (private ISNs)",
                 "parameters": [
@@ -1556,7 +1556,7 @@ const docTemplate = `{
                 ],
                 "description": "Withdraw a signal by local reference\n\nWithdrawn signals are hidden from search results by default but remain in the database.\nSignals can only be withdrawn by the account that created the signal.\nTo reactivate a signal resupply it with the same local_ref using the 'create signals' end point.",
                 "tags": [
-                    "Signal sharing"
+                    "Signal Exchange"
                 ],
                 "summary": "Withdraw a signal",
                 "parameters": [
@@ -1629,7 +1629,7 @@ const docTemplate = `{
             "get": {
                 "description": "Search for signals in public ISNs (no authentication required).\n\nNote the endpoint returns the latest version of each signal.",
                 "tags": [
-                    "Signal sharing"
+                    "Signal Exchange"
                 ],
                 "summary": "Signal Search (public ISNs)",
                 "parameters": [
@@ -1713,7 +1713,7 @@ const docTemplate = `{
             "post": {
                 "description": "register a webhook to recieve signals batch status updates",
                 "tags": [
-                    "Service accounts"
+                    "Service Accounts"
                 ],
                 "summary": "Register webhook (TODO)",
                 "responses": {
@@ -1779,7 +1779,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Revoke an account read or write access to an isn.\nThis end point can only be used by the site owner or the isn admin account.",
+                "description": "Revoke an account read or write access to an isn.\nThis end point can only be used by the site owner or the isn admin account (ISN admins can only revoke permissions for ISNs they created)",
                 "tags": [
                     "ISN Permissions"
                 ],
@@ -1836,7 +1836,7 @@ const docTemplate = `{
                 ],
                 "description": "Search for batches with optional filtering parameters\n\nThe search endpoint returns the full batch status for each batch.\n\nWhere a signal has failed to load as part of the batch and not subsequently been loaded, the failure is considered unresolved and listed as a failure in the batch status\n\nMember accounts can only see batches they have created. ISN Admins can see batches for ISNs they administer. The site owner can see all batches.\n\nAt least one search criteria must be provided:\n- latest=true (get the latest batch)\n- previous=true (get the previous batch)\n- created date range\n- closed date range\n",
                 "tags": [
-                    "Signal sharing"
+                    "Signal Exchange"
                 ],
                 "summary": "Search for batches",
                 "parameters": [
@@ -1906,7 +1906,7 @@ const docTemplate = `{
             "get": {
                 "description": "Returns the status of a batch, including the number of signals loaded and the number of failures for each signal type\n\nThe endpoint returns the full batch status for the batch\n\nWhere a signal has failed to load as part of the batch and not subsequently been loaded, the failure is considered unresolved and listed as a failure in the batch status\n\nNote:  Unresolved failures are signals that failed to load in this batch and have not been successfully loaded since the failure occurred.\nIf a signal is fixed but subsequently fails again in a later batch, it will be recorded as a new failure, and this new failure will appear in that batch's status.\n\nMember accounts can see the status of batches that they created.\nISN Admins can see the status of any batch created for ISNs they administer.\nThe site owner can see the status of any batch on the site.\n",
                 "tags": [
-                    "Signal sharing"
+                    "Signal Exchange"
                 ],
                 "summary": "Get batch processing status",
                 "parameters": [
@@ -1957,7 +1957,7 @@ const docTemplate = `{
         },
         "/oauth/revoke": {
             "post": {
-                "description": "Revoke a refresh token or client secret to prevent it being used to create new access tokens (self-service)\n\n**Use Cases:**\n- **Web User Logout**: User wants to log out of their session\n- **Service Account Security**: Account no longer being used/compromised secret\n\n**Service Accounts:**\nYou must supply your ` + "`" + `client ID` + "`" + ` and ` + "`" + `client secret` + "`" + ` in the request body.\nThis revokes all client secrets for the service account, effectively disabling it.\n\n**IMPORTANT - Service Account Reinstatement:**\n- This endpoint does not permanently disable the service account itself (use ` + "`" + `POST /admin/accounts/{account_id}/disable` + "`" + ` for that)\n- To restore access, an admin must call ` + "`" + `POST /api/auth/register/service-accounts` + "`" + ` with the same organization and email\n- This will generate a new setup URL and client secret while preserving the same client_id\n- If the account was disabled by an admin, it must first be re-enabled via ` + "`" + `POST /admin/accounts/{account_id}/enable` + "`" + `\n\n**Web Users (Logout):**\nThis endpoint expects a refresh token in an ` + "`" + `http-only cookie` + "`" + ` and a valid access token in the Authorization header.\nThis revokes the user's refresh token, effectively logging them out.\n\nIf the refresh token has expired or been revoked, the user must login again to get a new one.\n\nYou must also provide a previously issued ` + "`" + `bearer access token` + "`" + ` in the Authorization header - it does not matter if it has expired\n(the token is not used to authenticate the request but is needed to establish the ID of the user making the request).\n\n**Note:** Any unexpired access tokens issued for this user will continue to work until they expire.\nUsers must log in again to obtain a new refresh token after logout/revocation.\n\n**Client Examples:**\n- **Web User Logout:** ` + "`" + `POST /oauth/revoke` + "`" + ` with refresh token cookie\n- **Service Account:** ` + "`" + `POST /oauth/revoke` + "`" + ` with client_id and client_secret in request body\n",
+                "description": "Revoke a refresh token or client secret to prevent it being used to create new access tokens (self-service)\n\n**Use Cases:**\n- **Web User Logout**: User wants to log out of their session\n- **Service Account Security**: Account no longer being used/compromised secret\n\n**Service Accounts:**\nYou must supply your ` + "`" + `client ID` + "`" + ` and ` + "`" + `client secret` + "`" + ` in the request body.\nThis revokes all client secrets for the service account, effectively disabling it.\n\n**IMPORTANT - Service Account Reinstatement:**\n- This endpoint does not permanently disable the service account itself (use ` + "`" + `POST /admin/accounts/{account_id}/disable` + "`" + ` for that)\n- To restore access, an admin must call ` + "`" + `POST /api/auth/register/service-accounts` + "`" + ` with the same organization and email\n- This will generate a new setup URL and client secret while preserving the same client_id\n- If the account was disabled by an admin, it must first be re-enabled via ` + "`" + `POST /admin/accounts/{account_id}/enable` + "`" + `\n\n**Web Users (Logout):**\nThis endpoint expects a refresh token in an ` + "`" + `http-only cookie` + "`" + `.\nThis revokes the user's refresh token, effectively logging them out.\n\nIf the refresh token has expired or been revoked, the user must login again to get a new one.\n\n**Note:** Any unexpired access tokens issued for the account will continue to work until they expire.\n",
                 "tags": [
                     "auth"
                 ],
@@ -1989,7 +1989,7 @@ const docTemplate = `{
         },
         "/oauth/token": {
             "post": {
-                "description": "**Client Credentials Grant (Service Accounts):**\n\nIssues new access token (in response body)\n\n- Set ` + "`" + `grant_type=client_credentials` + "`" + ` as URL parameter\n- Provide ` + "`" + `client_id` + "`" + ` and ` + "`" + `client_secret` + "`" + ` in request body\n- Access tokens expire after 30 minutes\n(subsequent requests using the token will fail with HTTP status 401 and an error_code of \"access_token_expired\")\n\n**Refresh Token Grant (Web Users):**\n\nIssues new access token (in response body) and rotates refresh token (HTTP-only cookie)\n\n- Set ` + "`" + `grant_type=refresh_token` + "`" + ` as URL parameter\n- Must have valid refresh token cookie (no Authorization header required)\n- Access tokens expire after 30 minutes\n(subsequent requests using the token will fail with HTTP status 401 and an error_code of \"access_token_expired\")\n- Refresh tokens expire after 30 days\n- subsequent requests using the refresh token will fail with HTTP status 401 and an error_code of \"refresh_token_expired\" and users must login again to get a new one.\n",
+                "description": "**Client Credentials Grant (Service Accounts):**\n\nIssues new access token (in response body)\n\n- Set ` + "`" + `grant_type=client_credentials` + "`" + ` as URL parameter\n- Provide ` + "`" + `client_id` + "`" + ` and ` + "`" + `client_secret` + "`" + ` in request body\n- Access tokens expire after 30 minutes\n(subsequent requests using the token will fail with HTTP status 401 and an error_code of \"access_token_expired\")\n\n**Refresh Token Grant (Web Users):**\n\nIssues new access token (in response body) and rotates refresh token (HTTP-only cookie)\n\n- Set ` + "`" + `grant_type=refresh_token` + "`" + ` as URL parameter\n- Must have valid refresh token cookie\n- Access tokens expire after 30 minutes\n(subsequent requests using the token will fail with HTTP status 401 and an error_code of \"access_token_expired\")\n- Refresh tokens expire after 30 days\n- subsequent requests using the refresh token will fail with HTTP status 401 and an error_code of \"refresh_token_expired\" and users must login again to get a new one.\n",
                 "tags": [
                     "auth"
                 ],
@@ -2041,7 +2041,7 @@ const docTemplate = `{
             "get": {
                 "description": "Returns the current API version details",
                 "tags": [
-                    "Site admin"
+                    "Site Admin"
                 ],
                 "summary": "Get API version",
                 "responses": {
@@ -3155,28 +3155,24 @@ const docTemplate = `{
             "name": "auth"
         },
         {
-            "description": "Site adminstration tools",
-            "name": "Site admin"
+            "description": "Site adminstration tools. These endpoints can only be used by the site owner or an admin.",
+            "name": "Site Admin"
         },
         {
-            "description": "Manage the Information Sharing Networks that are used to exchange signals between participating users.",
-            "name": "ISN configuration"
+            "description": "Create and manage Information Sharing Networks (ISNs) - these endpoints can only be used by the site owner or an admin. Note that ISN admins can only view or update details for ISNs they created.",
+            "name": "ISN Configuration"
         },
         {
             "description": "Grant accounts read or write access to an ISN",
             "name": "ISN Permissions"
         },
         {
-            "description": "View information about the configured ISNs",
-            "name": "ISN details"
-        },
-        {
             "description": "Define the format of the data being shared in an ISN",
-            "name": "Signal types"
+            "name": "Signal Type Definitions"
         },
         {
             "description": "Manage service account end points",
-            "name": "Service accounts"
+            "name": "Service Accounts"
         }
     ]
 }`
@@ -3188,7 +3184,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "",
 	Schemes:          []string{},
 	Title:            "Signals ISN API",
-	Description:      "Signals ISN service API for managing Information Sharing Networks\n\n## Common Error Responses\nAll endpoints may return:\n- `400` Malformed request (invalid json, missing required fields, etc.)\n- `401` Unauthorized (invalid credentials)\n- `403` Forbidden (insufficient permissions)\n- `413` Request body exceeds size limit\n- `429` Rate limit exceeded\n- `500` Internal server error\n\nIndividual endpoints document their specific business logic errors.\n\n## Request Limits\nAll endpoints are protected by:\n- **Rate limiting**: Configurable requests per second (default: 100 RPS, 20 burst)\n- **Request size limits**: 64KB for admin/auth endpoints, 5MB for signal ingestion\n\nCheck the X-Max-Request-Body response header for the configured limit on signals payload.\n\nThe rate limit is set globaly and prevents abuse of the service.\nIn production there will be additional protections in place such as per-IP rate limiting provided by the load balancer/reverse proxy.\n\n## Authentication & Authorization\n\n### OAuth\nThis API serves as an OAuth 2.0 Authorization Server for multiple client applications. The server supports web users and service accounts.\n\n### Authentication Flows\n- **Web users**: Direct authentication via /auth/login → receive JWT access token + HTTP-only refresh cookie → use bearer tokens for API calls\n- **Service accounts**: Clients implement OAuth Client Credentials flow → receive JWT access token → use bearer tokens for API calls\n\n### Token Usage\nAll protected API endpoints require valid JWT access tokens in the Authorization header:\n```\nAuthorization: Bearer <jwt-access-token>\n```\n\n**Token Refresh (Web Users):**\n- Client calls `/oauth/token?grant_type=refresh_token` with HTTP-only refresh token cookie (no Authorization header required)\n- API validates refresh token and issues new access token + rotated refresh cookie\n- Client receives new bearer token for subsequent API calls\n\n**Token Refresh (Service Accounts):**\n- Client calls `/oauth/token?grant_type=client_credentials` with client ID/secret\n- API validates credentials and issues new access token\n- Client receives new bearer token for subsequent API calls\n\n**Token Lifetimes:**\n- Access tokens: 30 minutes\n- Refresh tokens: 30 days (web users only)\n\n### CSRF Protection\nThe /oauth API endpoints use HttpOnly cookies with SameSite protection to prevent CSRF attacks.\n\n### CORS Protection\nBy default the server will start with ALLOWED_ORIGINS=*\n\nThis should not be used in production - you must specify the list of client origins that are allowed to access the API in the ALLOWED_ORIGINS environment variable before starting the server.\n\n## Date/Time Handling:\n\n**URL Parameters**: The following ISO 8601 formats are accepted in URL query parameters:\n- 2006-01-02T15:04:05Z (UTC)\n- 2006-01-02T15:04:05+07:00 (with offset)\n- 2006-01-02T15:04:05.999999999Z (nano precision)\n- 2006-01-02 (date only, treated as start of day UTC: 2006-01-02T00:00:00Z)\n\nNote: If the timestamp contains a timezone offset (as in +07:00), the + must be percent-encoded as %2B in the query.\n\n**Response Bodies**: All date/time fields in JSON responses use RFC3339 format (ISO 8601):\n- Example: \"2025-06-03T13:47:47.331787+01:00\"",
+	Description:      "Signals ISN service API for managing Information Sharing Networks\n\n## Common Error Responses\nAll endpoints may return:\n- `400` Malformed request (invalid json, missing required fields, etc.)\n- `401` Unauthorized (invalid credentials)\n- `403` Forbidden (insufficient permissions)\n- `413` Request body exceeds size limit\n- `429` Rate limit exceeded\n- `500` Internal server error\n\nIndividual endpoints document their specific business logic errors.\n\n## Request Limits\nAll endpoints are protected by:\n- **Rate limiting**: Configurable requests per second (default: 100 RPS, 20 burst)\n- **Request size limits**: 64KB for admin/auth endpoints, 5MB for signal ingestion\n\nCheck the X-Max-Request-Body response header for the configured limit on signals payload.\n\nThe rate limit is set globaly and prevents abuse of the service.\nIn production there will be additional protections in place such as per-IP rate limiting provided by the load balancer/reverse proxy.\n\n## Authentication & Authorization\n\n### OAuth\nThe signalsd backend service acts as an OAuth 2.0 Authorization Server and supports web users and service accounts.\n\n### Authentication Flows\n- **Web users**: (Refresh Token Grant Type) Authentication via /auth/login → receive JWT access token + HTTP-only refresh cookie → use bearer tokens for API calls\n- **Service accounts**: Clients implement OAuth Client Credentials flow → receive JWT access token → use bearer tokens for API calls\n\n### Token Usage\nAll protected API endpoints require a valid JWT access token in the Authorization header:\n```\nAuthorization: Bearer <jwt-access-token>\n```\n\n**Token Refresh (Web Users):**\n- Client calls `/oauth/token?grant_type=refresh_token` with HTTP-only refresh token cookie\n- API validates refresh token and issues new access token + rotated refresh cookie\n- Client receives new bearer token for subsequent API calls\n\n**Token Refresh (Service Accounts):**\n- Client calls `/oauth/token?grant_type=client_credentials` with client ID/secret\n- API validates credentials and issues new access token\n- Client receives new bearer token for subsequent API calls\n\n**Token Lifetimes:**\n- Access tokens: 30 minutes\n- Refresh tokens: 30 days (web users only)\n\n### CSRF Protection\nThe refresh token used by the /oauth API endpoints is stored in an HttpOnly cookie (to prevent access by JavaScript)\nand marked with SameSite=Lax (to prevent it from being sent in cross-site requests, mitigating CSRF).\n\n### CORS Protection\n\nCORS is used to control which browser-based clients can make cross-origin requests to the API and read responses.\n\nBy default the server will start with ALLOWED_ORIGINS=*\n\nIn production, you should restrict ALLOWED_ORIGINS to trusted client origins rather than leaving it as *.\n\n## Date/Time Handling:\n\n**URL Parameters**: The following ISO 8601 formats are accepted in URL query parameters:\n- 2006-01-02T15:04:05Z (UTC)\n- 2006-01-02T15:04:05+07:00 (with offset)\n- 2006-01-02T15:04:05.999999999Z (nano precision)\n- 2006-01-02 (date only, treated as start of day UTC: 2006-01-02T00:00:00Z)\n\nNote: When including a timestamp with a timezone offset in a query parameter, encode the + sign as %2B (e.g. 2025-08-31T12:00:00%2B07:00). Otherwise, + may be interpreted as a space.\n\n**Response Bodies**: All date/time fields in JSON responses use RFC3339 format (ISO 8601):\n- Example: \"2025-06-03T13:47:47.331787+01:00\"",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

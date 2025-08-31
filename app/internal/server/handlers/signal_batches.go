@@ -88,7 +88,7 @@ type BatchSearchParams struct {
 //	@Description
 //	@Description	Note this endpoint is not needed for web users (a batch is automatically created when they first write to an isn and is only closed if their permission to write to the ISN is revoked)
 //	@Description
-//	@Tags		Signal sharing
+//	@Tags		Signal Exchange
 //
 //	@Success	201	{object}	CreateSignalsBatchResponse
 //
@@ -181,7 +181,7 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 //	@Description	ISN Admins can see the status of any batch created for ISNs they administer.
 //	@Description	The site owner can see the status of any batch on the site.
 //	@Description
-//	@Tags		Signal sharing
+//	@Tags		Signal Exchange
 //	@Param		isn_slug	path		string	true	"ISN slug"	example(sample-isn--example-org)
 //	@Param		batch_id	path		string	true	"Batch ID"	example(67890684-3b14-42cf-b785-df28ce570400)
 //	@Success	200			{object}	BatchStatusResponse
@@ -333,7 +333,7 @@ func (s *SignalsBatchHandler) getBatchStatusDetails(ctx context.Context, batchID
 // SearchBatchesHandler godocs
 //
 //	@Summary		Search for batches
-//	@Tags			Signal sharing
+//	@Tags			Signal Exchange
 //
 //	@Description	Search for batches with optional filtering parameters
 //	@Description

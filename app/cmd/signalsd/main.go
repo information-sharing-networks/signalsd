@@ -56,20 +56,20 @@ import (
 //	@description	## Authentication & Authorization
 //	@description
 //	@description	### OAuth
-//	@description	This API serves as an OAuth 2.0 Authorization Server for multiple client applications. The server supports web users and service accounts.
+//	@description	The signalsd backend service acts as an OAuth 2.0 Authorization Server and supports web users and service accounts.
 //	@description
 //	@description	### Authentication Flows
-//	@description	- **Web users**: Direct authentication via /auth/login → receive JWT access token + HTTP-only refresh cookie → use bearer tokens for API calls
+//	@description	- **Web users**: (Refresh Token Grant Type) Authentication via /auth/login → receive JWT access token + HTTP-only refresh cookie → use bearer tokens for API calls
 //	@description	- **Service accounts**: Clients implement OAuth Client Credentials flow → receive JWT access token → use bearer tokens for API calls
 //	@description
 //	@description	### Token Usage
-//	@description	All protected API endpoints require valid JWT access tokens in the Authorization header:
+//	@description	All protected API endpoints require a valid JWT access token in the Authorization header:
 //	@description	```
 //	@description	Authorization: Bearer <jwt-access-token>
 //	@description	```
 //	@description
 //	@description	**Token Refresh (Web Users):**
-//	@description	- Client calls `/oauth/token?grant_type=refresh_token` with HTTP-only refresh token cookie (no Authorization header required)
+//	@description	- Client calls `/oauth/token?grant_type=refresh_token` with HTTP-only refresh token cookie
 //	@description	- API validates refresh token and issues new access token + rotated refresh cookie
 //	@description	- Client receives new bearer token for subsequent API calls
 //	@description
@@ -83,12 +83,16 @@ import (
 //	@description	- Refresh tokens: 30 days (web users only)
 //	@description
 //	@description	### CSRF Protection
-//	@description	The /oauth API endpoints use HttpOnly cookies with SameSite protection to prevent CSRF attacks.
+//  @description	The refresh token used by the /oauth API endpoints is stored in an HttpOnly cookie (to prevent access by JavaScript)
+//	@description	and marked with SameSite=Lax (to prevent it from being sent in cross-site requests, mitigating CSRF).
 //	@description
 //	@description	### CORS Protection
+//	@description
+//	@description	CORS is used to control which browser-based clients can make cross-origin requests to the API and read responses.
+//	@description
 //	@description	By default the server will start with ALLOWED_ORIGINS=*
 //	@description
-//	@description	This should not be used in production - you must specify the list of client origins that are allowed to access the API in the ALLOWED_ORIGINS environment variable before starting the server.
+//  @description	In production, you should restrict ALLOWED_ORIGINS to trusted client origins rather than leaving it as *.
 //	@description
 //	@description	## Date/Time Handling:
 //	@description
@@ -98,7 +102,7 @@ import (
 //	@description	- 2006-01-02T15:04:05.999999999Z (nano precision)
 //	@description	- 2006-01-02 (date only, treated as start of day UTC: 2006-01-02T00:00:00Z)
 //	@description
-//	@description	Note: If the timestamp contains a timezone offset (as in +07:00), the + must be percent-encoded as %2B in the query.
+//	@description	Note: When including a timestamp with a timezone offset in a query parameter, encode the + sign as %2B (e.g. 2025-08-31T12:00:00%2B07:00). Otherwise, + may be interpreted as a space.
 //	@description
 //	@description	**Response Bodies**: All date/time fields in JSON responses use RFC3339 format (ISO 8601):
 //	@description	- Example: "2025-06-03T13:47:47.331787+01:00"
@@ -120,22 +124,19 @@ import (
 //	@tag.name			auth
 //	@tag.description	Authentication and authorization endpoints.
 
-//	@tag.name			Site admin
-//	@tag.description	Site adminstration tools
+//	@tag.name			Site Admin
+//	@tag.description	Site adminstration tools. These endpoints can only be used by the site owner or an admin.
 
-//	@tag.name			ISN configuration
-//	@tag.description	Manage the Information Sharing Networks that are used to exchange signals between participating users.
+//	@tag.name			ISN Configuration
+//	@tag.description	Create and manage Information Sharing Networks (ISNs) - these endpoints can only be used by the site owner or an admin. Note that ISN admins can only view or update details for ISNs they created.
 
 //	@tag.name			ISN Permissions
 //	@tag.description	Grant accounts read or write access to an ISN
 
-//	@tag.name			ISN details
-//	@tag.description	View information about the configured ISNs
-
-//	@tag.name			Signal types
+//	@tag.name			Signal Type Definitions
 //	@tag.description	Define the format of the data being shared in an ISN
 
-// @tag.name			Service accounts
+// @tag.name			Service Accounts
 // @tag.description	Manage service account end points
 func main() {
 	var mode string

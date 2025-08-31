@@ -306,7 +306,7 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 // CreateSignalsHandler godocs
 //
 //	@Summary		Create signals
-//	@Tags			Signal sharing
+//	@Tags			Signal Exchange
 //
 //	@Description	Submit an array of signals for storage on the ISN
 //	@Description	- payloads must not mix signals of different types and are subject to the size limits defined on the site.
@@ -660,7 +660,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 // SearchPublicSignalsHandler godocs
 //
 //	@Summary		Signal Search (public ISNs)
-//	@Tags			Signal sharing
+//	@Tags			Signal Exchange
 //
 //	@Description	Search for signals in public ISNs (no authentication required).
 //	@Description
@@ -789,7 +789,7 @@ func (s *SignalsHandler) SearchPublicSignalsHandler(w http.ResponseWriter, r *ht
 // SearchPrivateSignalsHandler godocs
 //
 //	@Summary		Signal Search (private ISNs)
-//	@Tags			Signal sharing
+//	@Tags			Signal Exchange
 //
 //	@Description	Search for signals by date or account in private ISNs (authentication required - only accounts with read or write permissions to the ISN can access signals).
 //	@Description
@@ -932,7 +932,7 @@ func (s *SignalsHandler) SearchPrivateSignalsHandler(w http.ResponseWriter, r *h
 //	@Description	Signals can only be withdrawn by the account that created the signal.
 //	@Description	To reactivate a signal resupply it with the same local_ref using the 'create signals' end point.
 //
-//	@Tags			Signal sharing
+//	@Tags			Signal Exchange
 //
 //	@Param			isn_slug			path	string							true	"ISN slug"				example(sample-isn--example-org)
 //	@Param			signal_type_slug	path	string							true	"Signal type slug"		example(signal-type-1)

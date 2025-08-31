@@ -63,7 +63,7 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, p
 //	@Description	Issues new access token (in response body) and rotates refresh token (HTTP-only cookie)
 //	@Description
 //	@Description	- Set `grant_type=refresh_token` as URL parameter
-//	@Description	- Must have valid refresh token cookie (no Authorization header required)
+//	@Description	- Must have valid refresh token cookie
 //	@Description	- Access tokens expire after 30 minutes
 //	@Description	(subsequent requests using the token will fail with HTTP status 401 and an error_code of "access_token_expired")
 //	@Description	- Refresh tokens expire after 30 days
@@ -147,20 +147,12 @@ func (a *TokenHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.
 //	@Description	- If the account was disabled by an admin, it must first be re-enabled via `POST /admin/accounts/{account_id}/enable`
 //	@Description
 //	@Description	**Web Users (Logout):**
-//	@Description	This endpoint expects a refresh token in an `http-only cookie` and a valid access token in the Authorization header.
+//	@Description	This endpoint expects a refresh token in an `http-only cookie`.
 //	@Description	This revokes the user's refresh token, effectively logging them out.
 //	@Description
 //	@Description	If the refresh token has expired or been revoked, the user must login again to get a new one.
 //	@Description
-//	@Description	You must also provide a previously issued `bearer access token` in the Authorization header - it does not matter if it has expired
-//	@Description	(the token is not used to authenticate the request but is needed to establish the ID of the user making the request).
-//	@Description
-//	@Description	**Note:** Any unexpired access tokens issued for this user will continue to work until they expire.
-//	@Description	Users must log in again to obtain a new refresh token after logout/revocation.
-//	@Description
-//	@Description	**Client Examples:**
-//	@Description	- **Web User Logout:** `POST /oauth/revoke` with refresh token cookie
-//	@Description	- **Service Account:** `POST /oauth/revoke` with client_id and client_secret in request body
+//	@Description	**Note:** Any unexpired access tokens issued for the account will continue to work until they expire.
 //	@Description
 //	@Tags		auth
 //

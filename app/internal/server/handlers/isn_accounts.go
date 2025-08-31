@@ -51,7 +51,7 @@ type IsnAccount struct {
 //	@Tags			ISN Permissions
 //
 //	@Description	Grant an account read or write access to an isn.
-//	@Description	This end point can only be used by the site owner or the isn admin account.
+//	@Description	This end point can only be used by the site owner or the isn admin account (ISN admins can only grant permissions for ISNs they created).
 //
 //	@Param			request		body	handlers.GrantIsnAccountPermissionRequest	true	"permission details"
 //	@Param			isn_slug	path	string										true	"isn slug"		example(sample-isn--example-org)
@@ -206,7 +206,7 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 //	@Tags			ISN Permissions
 //
 //	@Description	Revoke an account read or write access to an isn.
-//	@Description	This end point can only be used by the site owner or the isn admin account.
+//	@Description	This end point can only be used by the site owner or the isn admin account (ISN admins can only revoke permissions for ISNs they created)
 //
 //	@Param			isn_slug	path	string	true	"isn slug"		example(sample-isn--example-org)
 //	@Param			account_id	path	string	true	"account id"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
@@ -321,9 +321,9 @@ func (i *IsnAccountHandler) RevokeIsnAccountHandler(w http.ResponseWriter, r *ht
 // GetIsnAccountsHandler godoc
 //
 //	@Summary		Get all accounts with access to an ISN
+//	@Tags			ISN Permissions
 //	@Description	Get a list of all accounts (users and service accounts) that have permissions on the specified ISN.
-//	@Description	Only ISN admins and site owners can view this information.
-//	@Tags			ISN details
+//	@Description	Only ISN admins and site owners can view this information
 //
 //	@Param			isn_slug	path		string	true	"ISN slug"	example(sample-isn--example-org)
 //

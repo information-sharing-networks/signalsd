@@ -104,9 +104,9 @@ type IsnAndLinkedInfo struct {
 //	@Description
 //	@Description	Note there is a cache of public ISNs that is used by the search endpoints. This cache is not dynamically loaded, so adding public ISNs requires a restart of the service
 //
-//	@Tags			ISN configuration
+//	@Tags			ISN Configuration
 //
-//	@Param			request	body		handlers.CreateIsnRequest	true	"ISN details"
+//	@Param			request	body		handlers.CreateIsnRequest	true	"ISN configuration"
 //
 //	@Success		201		{object}	handlers.CreateIsnResponse
 //	@Failure		400		{object}	responses.ErrorResponse
@@ -217,13 +217,13 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 // UpdateIsnHandler godoc
 //
 //	@Summary		Update an ISN
-//	@Description	Update the ISN details
+//	@Description	Update the ISN configuration
 //	@Description	This endpoint can only be used by the site owner or the ISN admin
 //
-//	@Tags			ISN configuration
+//	@Tags			ISN Configuration
 //
 //	@Param			isn_slug	path	string						true	"isn slug"	example(sample-isn--example-org)
-//	@Param			request		body	handlers.UpdateIsnRequest	true	"ISN details"
+//	@Param			request		body	handlers.UpdateIsnRequest	true	"ISN configuration"
 //
 //	@Success		204
 //	@Failure		400	{object}	responses.ErrorResponse
@@ -309,9 +309,9 @@ func (i *IsnHandler) UpdateIsnHandler(w http.ResponseWriter, r *http.Request) {
 
 // GetIsnsHandler godoc
 //
-//	@Summary		Get the ISNs
+//	@Summary		Get ISN configurations
 //	@Description	get a list of the configured ISNs
-//	@Tags			ISN details
+//	@Tags			ISN Configuration
 //
 //	@Success		200	{array}	handlers.Isn
 //
@@ -347,7 +347,7 @@ func (s *IsnHandler) GetIsnsHandler(w http.ResponseWriter, r *http.Request) {
 //	@Description	Returns details about the ISN
 //	@Param			isn_slug	path	string	true	"isn slug"	example(sample-isn--example-org)
 //
-//	@Tags			ISN details
+//	@Tags			ISN Configuration
 //
 //	@Success		200	{object}	handlers.IsnAndLinkedInfo
 //	@Failure		400	{object}	responses.ErrorResponse
@@ -434,7 +434,7 @@ func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 //	@Description	Transfer ownership of an ISN to another admin account.
 //	@Description	This can be used when an admin leaves or when reorganizing responsibilities.
 //	@Description	Only the site owner can transfer ISN ownership.
-//	@Tags			ISN configuration
+//	@Tags			ISN Configuration
 //
 //	@Param			isn_slug	path	string									true	"ISN slug"
 //	@Param			request		body	handlers.TransferIsnOwnershipRequest	true	"Transfer details"

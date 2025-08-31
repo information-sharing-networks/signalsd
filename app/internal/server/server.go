@@ -288,6 +288,21 @@ func (s *Server) registerAdminRoutes() {
 				r.Post("/reset", admin.ResetHandler)
 			})
 
+			// Owner-only operations
+			r.Group(func(r chi.Router) {
+
+				r.Use(s.authService.RequireValidAccessToken)
+				r.Use(s.authService.RequireRole("owner"))
+
+				// Admin role management
+				r.Put("/accounts/{account_id}/admin-role", users.GrantUserAdminRoleHandler)
+				r.Delete("/accounts/{account_id}/admin-role", users.RevokeUserAdminRoleHandler)
+
+				// ISN ownership transfer (owner only)
+				r.Put("/isn/{isn_slug}/transfer-ownership", isn.TransferIsnOwnershipHandler)
+			})
+
+			// Admin and owner operations
 			r.Group(func(r chi.Router) {
 
 				r.Use(s.authService.RequireValidAccessToken)
@@ -296,13 +311,7 @@ func (s *Server) registerAdminRoutes() {
 				// User management
 				r.Get("/users", admin.GetUsersHandler)
 
-				// Admin role management
-				r.Put("/accounts/{account_id}/admin-role", users.GrantUserAdminRoleHandler)
-				r.Delete("/accounts/{account_id}/admin-role", users.RevokeUserAdminRoleHandler)
-
-				// ISN ownership transfer
-				r.Put("/isn/{isn_slug}/transfer-ownership", isn.TransferIsnOwnershipHandler)
-
+				// Account management
 				r.Post("/accounts/{account_id}/disable", admin.DisableAccountHandler)
 				r.Post("/accounts/{account_id}/enable", admin.EnableAccountHandler)
 				r.Get("/service-accounts", admin.GetServiceAccountsHandler)

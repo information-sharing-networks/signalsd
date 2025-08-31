@@ -120,15 +120,15 @@ type SetupPageData struct {
 // RegisterServiceAccountHandler godocs
 //
 //	@Summary		Register a new service account
-//	@Description	Registring a new service account creates a one time link with the client credentials in it - this must be used by the client within 48 hrs.
+//	@Description	Registring a new service account creates a one-time link with the client credentials in it - this must be used by the client within 48 hrs.
 //	@Description
 //	@Description	If you want to reissue a client's credentials call this endpoint again with the same client organization and contact email.
-//	@Description	A new one time setup url will be generated and the old one will be revoked.
+//	@Description	A new one-time setup url will be generated and the old one will be revoked.
 //	@Description	Note the client_id will remain the same and any existing client secrets will be revoked.
 //	@Description
 //	@Description	You have to be an admin or the site owner to use this endpoint
 //	@Description
-//	@Tags		Service accounts
+//	@Tags		Service Accounts
 //
 //	@Param		request	body		handlers.CreateServiceAccountRequest	true	"service account details"
 //
@@ -292,7 +292,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 //	@Description	the endpoint renders a html page that the user can use to copy their client credentials.
 //	@Description	The setup url is only valid for 48 hours.
 //	@Description
-//	@Tags		Service accounts
+//	@Tags		Service Accounts
 //
 //	@Param		setup_id	path	string	true	"One-time setup ID"	example(550e8400-e29b-41d4-a716-446655440000)
 //

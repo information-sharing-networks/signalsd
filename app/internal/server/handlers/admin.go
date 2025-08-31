@@ -57,7 +57,7 @@ type ServiceAccountDetails struct {
 //	@Summary		reset
 //	@Description	Delete all registered users and associated data.
 //	@Description	This endpoint only works on environments configured as 'dev'
-//	@Tags			Site admin
+//	@Tags			Site Admin
 //
 //	@Success		200
 //	@Failure		403	{object}	responses.ErrorResponse
@@ -121,7 +121,7 @@ func (a *AdminHandler) LivenessHandler(w http.ResponseWriter, r *http.Request) {
 //
 //	@Summary		Get API version
 //	@Description	Returns the current API version details
-//	@Tags			Site admin
+//	@Tags			Site Admin
 //
 //	@Success		200	{object}	version.Info
 //
@@ -148,7 +148,7 @@ func (a *AdminHandler) VersionHandler(w http.ResponseWriter, r *http.Request) {
 //	@Description
 //	@Description	**Note:** The site owner account cannot be disabled to prevent system lockout.
 //	@Description	Only owners and admins can disable accounts.
-//	@Tags			Site admin
+//	@Tags			Site Admin
 //
 //	@Param			account_id	path	string	true	"Account ID to disable"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
@@ -281,10 +281,10 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 //	@Description
 //	@Description	**Post-Enable Steps Required:**
 //	@Description	- **Service Accounts**: Must re-register via `/api/auth/register/service-accounts` (same client_id, new credentials)
-//	@Description	- **Web Users**: Can immediately log in again via `/auth/login`
+//	@Description	- **Web Users**: Can immediately log in again via `/api/auth/login`
 //	@Description
 //	@Description	Only owners and admins can enable accounts.
-//	@Tags			Site admin
+//	@Tags			Site Admin
 //
 //	@Param			account_id	path	string	true	"Account ID to enable"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
@@ -343,11 +343,12 @@ func (a *AdminHandler) EnableAccountHandler(w http.ResponseWriter, r *http.Reque
 
 // GetUsersHandler godoc
 //
-//	@Summary		Get registered users or specific user
-//	@Description	This api displays site users and their email addresses (can only be used by owner account)
-//	@Description	No query parameters = return all users
-//	@Description	With query parameters = return specific user: ?id=uuid or ?email=address
-//	@Tags			Site admin
+//	@Summary		Get users
+//	@Description	This api displays site users and their email addresses (can only be used by owner and admin accounts)
+//	@Description
+//	@Description	- No query parameters = return all users
+//	@Description	- to return a specific user supply one of the following query parameters: ?id=uuid or ?email=address
+//	@Tags			Site Admin
 //
 //	@Param			id		query		string					false	"user account ID"		example(68fb5f5b-e3f5-4a96-8d35-cd2203a06f73)
 //	@Param			email	query		string					false	"user email address"	example(user@example.com)
@@ -452,7 +453,7 @@ func (a *AdminHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 //	@Summary		Get service account
 //	@Description	Get a specific service account by account ID.
 //	@Description	Only owners and admins can view service account details.
-//	@Tags			Site admin
+//	@Tags			Site Admin
 //
 //	@Param			id	path		string	true	"Service Account ID"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
@@ -508,7 +509,7 @@ func (a *AdminHandler) GetServiceAccountHandler(w http.ResponseWriter, r *http.R
 //	@Summary		Get all service accounts
 //	@Description	Get a list of all service accounts in the system.
 //	@Description	Only owners and admins can view service account lists.
-//	@Tags			Site admin
+//	@Tags			Site Admin
 //
 //	@Success		200	{array}		handlers.ServiceAccountDetails
 //	@Failure		401	{object}	responses.ErrorResponse	"Authentication failed "
@@ -558,7 +559,7 @@ type ResetUserPasswordResponse struct {
 //
 //	@Summary		Reset user password
 //	@Description	Allows admins to reset a user's password (use this endpoint if the user has forgotten their password)
-//	@Tags			Site admin
+//	@Tags			Site Admin
 //
 //	@Param			user_id	path		string								true	"User Account ID"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //	@Param			request	body		handlers.ResetUserPasswordRequest	true	"New password"
