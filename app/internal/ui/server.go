@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
+	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 )
 
 const (
@@ -34,7 +35,7 @@ func NewStandaloneServer(cfg *Config, logger *slog.Logger) *Server {
 		apiClient:   NewClient(cfg.APIBaseURL),
 	}
 
-	s.setupStandaloneMiddleware()
+	s.setupMiddleware()
 	s.RegisterRoutes(s.router)
 	return s
 }
@@ -75,12 +76,14 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 		r.Post("/logout", s.handleLogout)
 		r.Get("/dashboard", s.handleDashboard)
 		r.Get("/admin/isn-accounts", s.handleIsnAccountsAdmin)
+		r.Get("/signal-types", s.handleSignalTypeManagement)
 
 		// UI API endpoints (used when rendering ui components)
 		r.Post("/ui-api/signal-types", s.handleGetSignalTypes)
 		r.Post("/ui-api/signal-versions", s.handleGetSignalVersions)
 		r.Post("/ui-api/search-signals", s.handleSearchSignals)
 		r.Post("/ui-api/add-isn-account", s.handleAddIsnAccount)
+		r.Post("/ui-api/create-signal-type", s.handleCreateSignalType)
 	})
 
 	// ISN routes (require ISN access)
@@ -100,11 +103,12 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 	})
 }
 
-// setupStandaloneMiddleware creates the routes when running the ui in standalone mode.
-func (s *Server) setupStandaloneMiddleware() {
+// setupMiddleware creates the routes when running the ui in standalone mode.
+func (s *Server) setupMiddleware() {
 	// middleware
 	s.router.Use(chimiddleware.RequestID)
 	s.router.Use(chimiddleware.RealIP)
+	s.router.Use(logger.RequestLogging(s.logger))
 	s.router.Use(chimiddleware.Recoverer)
 	s.router.Use(chimiddleware.Timeout(60 * time.Second))
 

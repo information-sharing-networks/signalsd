@@ -297,3 +297,62 @@ func (a *AuthService) ClearAuthCookies(w http.ResponseWriter, environment string
 		SameSite: http.SameSiteLaxMode,
 	})
 }
+
+// getIsnPermsFromCookie reads and decodes the ISN permissions from the cookie
+func (s *Server) getIsnPermsFromCookie(r *http.Request) (map[string]IsnPerm, error) {
+	permsCookie, err := r.Cookie(isnPermsCookieName)
+	if err != nil {
+		return make(map[string]IsnPerm), err
+	}
+
+	// Decode base64
+	decodedPerms, err := base64.StdEncoding.DecodeString(permsCookie.Value)
+	if err != nil {
+		return make(map[string]IsnPerm), err
+	}
+
+	// Unmarshal JSON
+	var isnPerms map[string]IsnPerm
+	if err := json.Unmarshal(decodedPerms, &isnPerms); err != nil {
+		return make(map[string]IsnPerm), err
+	}
+
+	return isnPerms, nil
+}
+
+func (s *Server) getAccountInfoFromCookie(r *http.Request) (*AccountInfo, error) {
+	accountInfoCookie, err := r.Cookie(accountInfoCookieName)
+	if err != nil {
+		return nil, err
+	}
+
+	// Decode base64
+	decodedAccountInfo, err := base64.StdEncoding.DecodeString(accountInfoCookie.Value)
+	if err != nil {
+		return nil, err
+	}
+	//unmarshal json to struct
+	accountInfo := &AccountInfo{}
+	if err := json.Unmarshal(decodedAccountInfo, accountInfo); err != nil {
+		return nil, err
+	}
+
+	return accountInfo, nil
+}
+
+// getIsnPermission validates user has access to the ISN and returns the ISN permission deails (read/write, availalbe signal types, visibility)
+func (s *Server) getIsnPermission(r *http.Request, isnSlug string) (*IsnPerm, error) {
+	// Get permissions from cookie
+	perms, err := s.getIsnPermsFromCookie(r)
+	if err != nil {
+		return nil, err
+	}
+
+	// Validate user has access to this ISN
+	isnPerm, exists := perms[isnSlug]
+	if !exists {
+		return nil, fmt.Errorf("no permission for this ISN")
+	}
+
+	return &isnPerm, nil
+}

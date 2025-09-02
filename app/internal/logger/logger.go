@@ -87,12 +87,14 @@ func RequestLogging(logger *slog.Logger) func(http.Handler) http.Handler {
 			// Determine request component based on path
 			var component string
 			switch {
+			case strings.HasPrefix(r.URL.Path, "/docs"):
+				component = "docs"
+			case strings.HasPrefix(r.URL.Path, "/swagger.json"):
+				component = "docs"
 			case strings.HasPrefix(r.URL.Path, "/api/"):
 				component = "api"
 			case strings.HasPrefix(r.URL.Path, "/oauth/"):
 				component = "oauth"
-			case strings.HasPrefix(r.URL.Path, "/admin/"):
-				component = "admin"
 			default:
 				component = "ui"
 			}

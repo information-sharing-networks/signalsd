@@ -5,6 +5,7 @@ import (
 	"encoding/base32"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -46,12 +47,10 @@ func GenerateSlug(input string) (string, error) {
 	return trimmed, nil
 }
 
-// ValidateGithubFileURL validates the GitHub URLs for schema and readme files submitted as part of the signal type definition
+// ValidateGithubFileURL validates the GitHub URL structure for schema and readme files submitted as part of the signal type definition
 func ValidateGithubFileURL(rawURL string, fileType string) error {
-	// Handle special skip validation URL for schemas
-	if fileType == "schema" && rawURL == "https://github.com/skip/validation/main/schema.json" {
-		return nil
-	}
+
+	rawURL = strings.TrimSpace(rawURL)
 
 	// Example: https://github.com/user/repo/blob/branch/path/to/file.json
 	pattern := `^https://github\.com/[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+/.+$`
@@ -62,6 +61,7 @@ func ValidateGithubFileURL(rawURL string, fileType string) error {
 	if !matched {
 		return fmt.Errorf("URL must be a valid GitHub file URL (e.g., https://github.com/user/repo/blob/main/file)")
 	}
+	log.Printf("filetype %v, Debug rawUrl |%v|", fileType, rawURL)
 
 	switch fileType {
 	case "schema":
@@ -79,13 +79,43 @@ func ValidateGithubFileURL(rawURL string, fileType string) error {
 	return nil
 }
 
-// FetchGithubFileContent fetches content from GitHub URLs specified in the schema and readme fields of signal types
-func FetchGithubFileContent(rawURL string) (string, error) {
-	// Handle special skip validation URL
-	if rawURL == "https://github.com/skip/validation/main/schema.json" {
-		return "{}", nil
+// CheckGithubFileExists checks if a file exists on GitHub without downloading the content
+func CheckGithubFileExists(rawURL string) error {
+	// Convert GitHub blob URLs to raw URLs
+	// Example: https://github.com/org/repo/blob/main/file.json -> https://raw.githubusercontent.com/org/repo/main/file.json
+	if strings.HasPrefix(rawURL, "https://github.com/") {
+		rawURL = strings.Replace(rawURL, "https://github.com/", "https://raw.githubusercontent.com/", 1)
+		rawURL = strings.Replace(rawURL, "/blob/", "/", 1)
 	}
 
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse // Disable redirects for SSRF protection
+		},
+	}
+
+	// #nosec G107 -- avoid false postive security linter warning - URL is validated to be GitHub-only before this function is called (see ValidateGithubFileURL)
+	req, err := http.NewRequest("HEAD", rawURL, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	res, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to check file existence: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("file not found: %d", res.StatusCode)
+	}
+
+	return nil
+}
+
+// FetchFileContentFromGithub fetches content from GitHub URL specified in the signal type schema field
+func FetchFileContentFromGithub(rawURL string) (string, error) {
 	// Convert GitHub blob URLs to raw URLs
 	// Example: https://github.com/org/repo/blob/main/file.json -> https://raw.githubusercontent.com/org/repo/main/file.json
 	if strings.HasPrefix(rawURL, "https://github.com/") {

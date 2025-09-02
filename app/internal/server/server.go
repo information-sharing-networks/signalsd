@@ -364,7 +364,7 @@ func (s *Server) registerSignalReadRoutes() {
 }
 
 // registerCommonRoutes registers routes that are always available regardless of service mode
-// These routes include health checks and version information for monitoring and debugging
+// These routes include health checks and version information
 func (s *Server) registerCommonRoutes() {
 	admin := handlers.NewAdminHandler(s.queries, s.pool, s.authService)
 

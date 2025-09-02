@@ -39,10 +39,10 @@ func (c *Client) SearchSignals(accessToken string, params SignalSearchParams, vi
 	var url string
 	if visibility == "public" {
 		url = fmt.Sprintf("%s/api/public/isn/%s/signal_types/%s/v%s/signals/search",
-			c.baseURL, params.ISNSlug, params.SignalTypeSlug, params.SemVer)
+			c.baseURL, params.IsnSlug, params.SignalTypeSlug, params.SemVer)
 	} else {
 		url = fmt.Sprintf("%s/api/isn/%s/signal_types/%s/v%s/signals/search",
-			c.baseURL, params.ISNSlug, params.SignalTypeSlug, params.SemVer)
+			c.baseURL, params.IsnSlug, params.SignalTypeSlug, params.SemVer)
 	}
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -231,4 +231,60 @@ func (c *Client) AddAccountToIsn(accessToken, isnSlug, accountEmail, permission 
 	}
 
 	return nil
+}
+
+// CreateSignalTypeRequest represents the request body for creating a signal type
+type CreateSignalTypeRequest struct {
+	SchemaURL string  `json:"schema_url"`
+	Title     string  `json:"title"`
+	BumpType  string  `json:"bump_type"`
+	ReadmeURL *string `json:"readme_url"`
+	Detail    *string `json:"detail"`
+}
+
+// CreateSignalTypeResponse represents the response from creating a signal type
+type CreateSignalTypeResponse struct {
+	Slug        string `json:"slug"`
+	SemVer      string `json:"sem_ver"`
+	ResourceURL string `json:"resource_url"`
+}
+
+// CreateSignalType creates a new signal type using the signalsd API
+func (c *Client) CreateSignalType(accessToken, isnSlug string, req CreateSignalTypeRequest) (*CreateSignalTypeResponse, error) {
+	url := fmt.Sprintf("%s/api/isn/%s/signal_types", c.baseURL, isnSlug)
+
+	jsonData, err := json.Marshal(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	httpReq, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		// Check for timeout to provide more specific message
+		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+			return nil, fmt.Errorf("request timed out - please check your connection and try again")
+		}
+		return nil, fmt.Errorf("network error - please check your connection and try again")
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		message := c.getErrorMessage(resp, "Failed to create signal type")
+		return nil, fmt.Errorf("%s", message)
+	}
+
+	var createResp CreateSignalTypeResponse
+	if err := json.NewDecoder(resp.Body).Decode(&createResp); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &createResp, nil
 }

@@ -5,12 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
+	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/schemas"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/utils"
@@ -26,11 +28,11 @@ func NewSignalTypeHandler(queries *database.Queries) *SignalTypeHandler {
 }
 
 type CreateSignalTypeRequest struct {
-	SchemaURL string  `json:"schema_url" example:"https://github.com/user/project/blob/2025.01.01/schema.json"` // JSON schema URL: must be a GitHub URL ending in .json, OR use https://github.com/skip/validation/main/schema.json to disable validation
-	Title     string  `json:"title" example:"Sample Signal @example.org"`                                       // unique title
-	BumpType  string  `json:"bump_type" example:"patch" enums:"major,minor,patch"`                              // this is used to increment semver for the signal type
-	ReadmeURL *string `json:"readme_url" example:"https://github.com/user/project/blob/2025.01.01/readme.md"`   // README file URL: must be a GitHub URL ending in .md
-	Detail    *string `json:"detail" example:"description"`                                                     // description
+	SchemaURL string `json:"schema_url" example:"https://github.com/user/project/blob/2025.01.01/schema.json"` // JSON schema URL: must be a GitHub URL ending in .json, OR use https://github.com/skip/validation/main/schema.json to disable validation
+	Title     string `json:"title" example:"Sample Signal @example.org"`                                       // unique title
+	BumpType  string `json:"bump_type" example:"patch" enums:"major,minor,patch"`                              // this is used to increment semver for the signal type
+	ReadmeURL string `json:"readme_url" example:"https://github.com/user/project/blob/2025.01.01/readme.md"`   // README file URL: must be a GitHub URL ending in .md
+	Detail    string `json:"detail" example:"description"`                                                     // description
 }
 
 type CreateSignalTypeResponse struct {
@@ -68,8 +70,12 @@ type SignalTypeDetail struct {
 //	@Description	- The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading
 //	@Description
 //	@Description	Schema URL Requirements
-//	@Description	- Must be a liink to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)
+//	@Description	- Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)
 //	@Description	- To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json
+//	@Description
+//	@Description	Readme URL requirements
+//	@Description	- Must be a link to a file ending .md on a public github repo.
+//	@Description	- Use the special URL: https://github.com/skip/readme/main/readme.md to indicate there is no readme
 //	@Description
 //	@Description	Versions
 //	@Description	- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas
@@ -149,24 +155,35 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 	if req.SchemaURL == "" ||
 		req.Title == "" ||
 		req.BumpType == "" ||
-		req.ReadmeURL == nil ||
-		req.Detail == nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "one or missing field in the body of the requet")
+		req.ReadmeURL == "" ||
+		req.Detail == "" {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must supply all the fields: schema URL, title, bump type, readme URL and detail")
 		return
 	}
 
+	req.SchemaURL = strings.TrimSpace(req.SchemaURL)
+	req.ReadmeURL = strings.TrimSpace(req.ReadmeURL)
 	if !isn.IsInUse {
 		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "this ISN is marked as 'not in use'")
 		return
 	}
 
+	// check for valid github url formats
 	if err := utils.ValidateGithubFileURL(req.SchemaURL, "schema"); err != nil {
 		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("invalid schema url: %v", err))
 		return
 	}
-	if err := utils.ValidateGithubFileURL(*req.ReadmeURL, "readme"); err != nil {
+	if err := utils.ValidateGithubFileURL(req.ReadmeURL, "readme"); err != nil {
 		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("invalid readme url: %v", err))
 		return
+	}
+
+	// Check that the readme file exists on GitHub
+	if req.ReadmeURL != signalsd.SkipReadmeURL {
+		if err := utils.CheckGithubFileExists(req.ReadmeURL); err != nil {
+			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("readme file not accessible : %v", err))
+			return
+		}
 	}
 
 	// generate slug.
@@ -209,11 +226,11 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 
 	// Fetch and compile the schema
 	var schemaContent string
-	if req.SchemaURL == "https://github.com/skip/validation/main/schema.json" {
+	if req.SchemaURL == signalsd.SkipValidationURL {
 		// for consistency store the permissive schema in the db
 		schemaContent = "{}"
 	} else {
-		schemaContent, err = utils.FetchGithubFileContent(req.SchemaURL)
+		schemaContent, err = utils.FetchFileContentFromGithub(req.SchemaURL)
 		if err != nil {
 			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("could not fetch schema from github: %v", err))
 			return
@@ -234,8 +251,8 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 		SemVer:        semVer,
 		SchemaURL:     req.SchemaURL,
 		Title:         req.Title,
-		Detail:        *req.Detail,
-		ReadmeURL:     *req.ReadmeURL,
+		Detail:        req.Detail,
+		ReadmeURL:     req.ReadmeURL,
 		SchemaContent: schemaContent,
 	})
 	if err != nil {
@@ -359,6 +376,15 @@ func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *ht
 			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("invalid readme url: %v", err))
 			return
 		}
+
+		// Check that the readme file exists on GitHub
+		if *req.ReadmeURL != signalsd.SkipReadmeURL {
+			if err := utils.CheckGithubFileExists(*req.ReadmeURL); err != nil {
+				responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("readme file not accessible: %v", err))
+				return
+			}
+		}
+
 		signalType.ReadmeURL = *req.ReadmeURL
 	}
 

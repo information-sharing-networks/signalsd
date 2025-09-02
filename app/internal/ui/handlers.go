@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -130,12 +129,15 @@ func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 // ISN access is validated by RequireIsnAccess middleware
 func (s *Server) handleSignalSearch(w http.ResponseWriter, r *http.Request) {
 	// Get ISN permissions from cookie - middleware ensures this exists
-	perms := s.getIsnPermsFromCookie(r)
+	isnPerms, err := s.getIsnPermsFromCookie(r)
+	if err != nil {
+		s.logger.Error("failed to read IsnPerms from cookie", slog.String("error", err.Error()))
+		return
+	}
 
-	s.logger.Debug("Handling signals search page")
 	// Convert permissions to ISN list for dropdown
-	isns := make([]IsnDropdown, 0, len(perms))
-	for isnSlug := range perms {
+	isns := make([]IsnDropdown, 0, len(isnPerms))
+	for isnSlug := range isnPerms {
 		isns = append(isns, IsnDropdown{
 			Slug:    isnSlug,
 			IsInUse: true,
@@ -143,12 +145,13 @@ func (s *Server) handleSignalSearch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Render search page
-	component := SignalSearchPage(isns, perms, nil)
+	component := SignalSearchPage(isns, isnPerms, nil)
 	if err := component.Render(r.Context(), w); err != nil {
 		s.logger.Error("Failed to render signal search page", slog.String("error", err.Error()))
 	}
 }
 
+// todo convert to helper
 func (s *Server) handleGetSignalTypes(w http.ResponseWriter, r *http.Request) {
 	isnSlug := r.FormValue("isn_slug")
 	if isnSlug == "" {
@@ -173,7 +176,7 @@ func (s *Server) handleGetSignalTypes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var perms map[string]IsnPerms
+	var perms map[string]IsnPerm
 	if err := json.Unmarshal(decodedPerms, &perms); err != nil {
 		s.logger.Error("Failed to parse permissions JSON in signal types handler",
 			slog.String("error", err.Error()),
@@ -239,7 +242,7 @@ func (s *Server) handleGetSignalVersions(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	var perms map[string]IsnPerms
+	var perms map[string]IsnPerm
 	if err := json.Unmarshal(decodedPerms, &perms); err != nil {
 		s.logger.Error("Failed to parse permissions JSON in versions handler",
 			slog.String("error", err.Error()),
@@ -277,7 +280,7 @@ func (s *Server) handleGetSignalVersions(w http.ResponseWriter, r *http.Request)
 func (s *Server) handleSearchSignals(w http.ResponseWriter, r *http.Request) {
 	// Parse search parameters
 	params := SignalSearchParams{
-		ISNSlug:                 r.FormValue("isn_slug"),
+		IsnSlug:                 r.FormValue("isn_slug"),
 		SignalTypeSlug:          r.FormValue("signal_type_slug"),
 		SemVer:                  r.FormValue("sem_ver"),
 		StartDate:               r.FormValue("start_date"),
@@ -291,13 +294,14 @@ func (s *Server) handleSearchSignals(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate required parameters
-	if params.ISNSlug == "" || params.SignalTypeSlug == "" || params.SemVer == "" {
+	if params.IsnSlug == "" || params.SignalTypeSlug == "" || params.SemVer == "" {
 		s.renderError(w, "ISN, Signal Type, and Version are required")
 		return
 	}
 
+	//todo make helper
 	// Get user permissions to validate ISN access and determine visibility
-	isnPerm, err := s.getIsnPermissions(r, params.ISNSlug)
+	isnPerm, err := s.getIsnPermission(r, params.IsnSlug)
 	if err != nil {
 		s.renderError(w, err.Error())
 		return
@@ -340,12 +344,16 @@ func (s *Server) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 // handleIsnAccountsAdmin renders the ISN accounts administration page
 func (s *Server) handleIsnAccountsAdmin(w http.ResponseWriter, r *http.Request) {
 	// Get user permissions from cookie
-	perms := s.getIsnPermsFromCookie(r)
-	var isns []IsnDropdown
+	isnPerms, err := s.getIsnPermsFromCookie(r)
+	if err != nil {
+		s.logger.Error("failed to read IsnPerms from cookie", slog.String("error", err.Error()))
+		return
+	}
 
 	// Convert permissions to ISN list for dropdown (only ISNs where user has admin rights)
-	isns = make([]IsnDropdown, 0, len(perms))
-	for isnSlug, perm := range perms {
+	var isns []IsnDropdown
+	isns = make([]IsnDropdown, 0, len(isnPerms))
+	for isnSlug, perm := range isnPerms {
 		// Only show ISNs where user has write permission (admins/owners)
 		if perm.Permission == "write" {
 			isns = append(isns, IsnDropdown{
@@ -408,23 +416,6 @@ func (s *Server) redirectToLogin(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// getIsnPermissions validates user has access to the ISN and returns the ISN permissions
-func (s *Server) getIsnPermissions(r *http.Request, isnSlug string) (*IsnPerms, error) {
-	// Get permissions from cookie
-	perms := s.getIsnPermsFromCookie(r)
-	if len(perms) == 0 {
-		return nil, fmt.Errorf("authentication required")
-	}
-
-	// Validate user has access to this ISN
-	isnPerm, exists := perms[isnSlug]
-	if !exists {
-		return nil, fmt.Errorf("no permission for this ISN")
-	}
-
-	return &isnPerm, nil
-}
-
 // handleAccessDenied handles access denied for both HTMX and direct requests
 // Always redirects to an access denied page for consistent UX
 func (s *Server) handleAccessDenied(w http.ResponseWriter, r *http.Request, pageTitle, message string) {
@@ -437,5 +428,100 @@ func (s *Server) handleAccessDenied(w http.ResponseWriter, r *http.Request, page
 		if err := component.Render(r.Context(), w); err != nil {
 			s.logger.Error("Failed to render access denied page", slog.String("error", err.Error()))
 		}
+	}
+}
+
+// handleSignalTypeManagement renders the signal type management page
+func (s *Server) handleSignalTypeManagement(w http.ResponseWriter, r *http.Request) {
+	// Get user permissions from cookie
+	isnPerms, err := s.getIsnPermsFromCookie(r)
+	if err != nil {
+		s.logger.Error("failed to read IsnPerms from cookie", slog.String("error", err.Error()))
+		return
+	}
+
+	// Convert permissions to ISN list for dropdown (only ISNs where user has write permission)
+	var isns []IsnDropdown
+	isns = make([]IsnDropdown, 0, len(isnPerms))
+	for isnSlug, perm := range isnPerms {
+		// Only show ISNs where user has write permission (can create signal types)
+		if perm.Permission == "write" {
+			isns = append(isns, IsnDropdown{
+				Slug:    isnSlug,
+				IsInUse: true,
+			})
+		}
+	}
+
+	// Render signal type management page
+	component := SignalTypeManagementPage(isns)
+	if err := component.Render(r.Context(), w); err != nil {
+		s.logger.Error("Failed to render signal type management page", slog.String("error", err.Error()))
+	}
+}
+
+// handleCreateSignalType handles the form submission to create a new signal type
+func (s *Server) handleCreateSignalType(w http.ResponseWriter, r *http.Request) {
+	// Parse form data
+	isnSlug := r.FormValue("isn_slug")
+	title := r.FormValue("title")
+	schemaURL := r.FormValue("schema_url")
+	bumpType := r.FormValue("bump_type")
+	readmeURL := r.FormValue("readme_url")
+	detail := r.FormValue("detail")
+
+	// Validate user has admin or owner permission
+	isnPerm, err := s.getIsnPermission(r, isnSlug)
+	if err != nil {
+		s.renderError(w, err.Error())
+		return
+	}
+
+	if isnPerm.Permission != "write" {
+		s.renderError(w, "You need write permission to create signal types for this ISN")
+		return
+	}
+
+	// Validate required fields
+	if isnSlug == "" || title == "" || schemaURL == "" || bumpType == "" {
+		s.renderError(w, "ISN, Title, Schema URL, and Bump Type are required")
+		return
+	}
+
+	// Get access token from cookie
+	accessTokenCookie, err := r.Cookie(accessTokenCookieName)
+	if err != nil {
+		s.renderError(w, "Authentication required")
+		return
+	}
+	accessToken := accessTokenCookie.Value
+
+	// Prepare request
+	createReq := CreateSignalTypeRequest{
+		SchemaURL: schemaURL,
+		Title:     title,
+		BumpType:  bumpType,
+	}
+
+	// Add optional fields if provided
+	if readmeURL != "" {
+		createReq.ReadmeURL = &readmeURL
+	}
+	if detail != "" {
+		createReq.Detail = &detail
+	}
+
+	// Call the API to create the signal type
+	response, err := s.apiClient.CreateSignalType(accessToken, isnSlug, createReq)
+	if err != nil {
+		s.logger.Info("Failed to create signal type", slog.String("error", err.Error()))
+		s.renderError(w, err.Error())
+		return
+	}
+
+	// Success response
+	component := SignalTypeCreationSuccess(*response)
+	if err := component.Render(r.Context(), w); err != nil {
+		s.logger.Error("Failed to render success message", slog.String("error", err.Error()))
 	}
 }

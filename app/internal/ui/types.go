@@ -10,13 +10,13 @@ import (
 
 // LoginResponse represents the response from the authentication API
 type LoginResponse struct {
-	AccessToken string              `json:"access_token"`
-	TokenType   string              `json:"token_type"`
-	ExpiresIn   int                 `json:"expires_in"`
-	AccountID   string              `json:"account_id"`
-	AccountType string              `json:"account_type"`
-	Role        string              `json:"role"`
-	Perms       map[string]IsnPerms `json:"isn_perms,omitempty"`
+	AccessToken string             `json:"access_token"`
+	TokenType   string             `json:"token_type"`
+	ExpiresIn   int                `json:"expires_in"`
+	AccountID   string             `json:"account_id"`
+	AccountType string             `json:"account_type"`
+	Role        string             `json:"role"`
+	Perms       map[string]IsnPerm `json:"isn_perms,omitempty"`
 }
 
 // AccountInfo represents the user's account information stored in cookies
@@ -26,8 +26,8 @@ type AccountInfo struct {
 	Role        string `json:"role"`
 }
 
-// IsnPerms represents permissions for an ISN
-type IsnPerms struct {
+// IsnPerm represents permissions for an ISN
+type IsnPerm struct {
 	Permission      string   `json:"permission"`
 	SignalBatchID   string   `json:"signal_batch_id"`
 	SignalTypePaths []string `json:"signal_types"`
@@ -68,7 +68,7 @@ type VersionDropdown struct {
 
 // SignalSearchParams represents search parameters for signals
 type SignalSearchParams struct {
-	ISNSlug                 string
+	IsnSlug                 string
 	SignalTypeSlug          string
 	SemVer                  string
 	StartDate               string
