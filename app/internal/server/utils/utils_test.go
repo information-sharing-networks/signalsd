@@ -2,6 +2,8 @@ package utils
 
 import (
 	"testing"
+
+	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 )
 
 func TestValidateGithubFileURL(t *testing.T) {
@@ -26,7 +28,7 @@ func TestValidateGithubFileURL(t *testing.T) {
 		},
 		{
 			name:     "skip validation URL",
-			url:      "https://github.com/skip/validation/main/schema.json",
+			url:      signalsd.SkipValidationURL,
 			fileType: "schema",
 			wantErr:  false,
 		},
@@ -75,13 +77,35 @@ func TestValidateGithubFileURL(t *testing.T) {
 	}
 }
 
-func TestFetchGithubFileContent_SkipValidation(t *testing.T) {
-	// Test the skip validation URL returns empty JSON
-	content, err := FetchGithubFileContent("https://github.com/skip/validation/main/schema.json")
-	if err != nil {
-		t.Errorf("FetchGithubFileContent() error = %v, want nil", err)
+func TestCheckGithubFileExists(t *testing.T) {
+	tests := []struct {
+		name    string
+		url     string
+		wantErr bool
+	}{
+		{
+			name:    "valid github blob URL",
+			url:     "https://github.com/information-sharing-networks/signalsd/blob/main/README.md",
+			wantErr: false,
+		},
+		{
+			name:    "non-existent file",
+			url:     "https://github.com/information-sharing-networks/signalsd/blob/main/non-existent-file.md",
+			wantErr: true,
+		},
+		{
+			name:    "invalid URL format",
+			url:     "not-a-url",
+			wantErr: true,
+		},
 	}
-	if content != "{}" {
-		t.Errorf("FetchGithubFileContent() content = %v, want {}", content)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := CheckGithubFileExists(tt.url)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("CheckGithubFileExists() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }

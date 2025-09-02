@@ -1679,8 +1679,12 @@ paths:
         - The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading
 
         Schema URL Requirements
-        - Must be a liink to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)
+        - Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)
         - To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json
+
+        Readme URL requirements
+        - Must be a link to a file ending .md on a public github repo.
+        - Use the special URL: https://github.com/skip/readme/main/readme.md to indicate there is no readme
 
         Versions
         - A signal type can have multiple versions - these share the same title/slug but have different JSON schemas

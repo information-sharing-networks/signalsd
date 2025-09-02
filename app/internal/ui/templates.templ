@@ -37,6 +37,7 @@ templ Navigation() {
 						<a href="/dashboard" class="nav-link active">
 							Dashboard
 						</a>
+						
 					</div>
 				</div>
 				<div class="nav-actions">
@@ -626,9 +627,10 @@ templ AdminDashboardPage() {
 				<div class="card">
 					<div class="card-body">
 						<h3 class="card-title">Signal Types</h3>
-						<p class="text-muted mb-4">Manage signal type definitions and schemas.</p>
-						<button class="btn btn-secondary" disabled>Manage Signal Types</button>
-						<p class="text-xs text-muted mt-2">Coming soon</p>
+
+						<p class="text-muted mb-4">Configure the signal types used in an ISN.</p>
+						<a href="/signal-types" class="btn btn-primary">Manage Signal Types</a>
+
 					</div>
 				</div>
 
@@ -670,7 +672,7 @@ templ AdminDashboardPage() {
 // =============================================================================
 // SIGNAL SEARCH PAGE & RESULTS
 // =============================================================================
-templ SignalSearchPage(isns []IsnDropdown, perms map[string]IsnPerms, results []SearchSignalWithCorrelationsAndVersions) {
+templ SignalSearchPage(isns []IsnDropdown, perms map[string]IsnPerm, results []SearchSignalWithCorrelationsAndVersions) {
 	@BaseLayout("Signal Search") {
 		@Navigation()
 		<div class="page-container">
@@ -803,4 +805,142 @@ templ SignalSearchPage(isns []IsnDropdown, perms map[string]IsnPerms, results []
 			</div>
 		</div>
 	}
+}
+
+// =============================================================================
+// SIGNAL TYPE MANAGEMENT
+// =============================================================================
+
+// SignalTypeManagementPage renders the signal type management page
+templ SignalTypeManagementPage(isns []IsnDropdown) {
+	@BaseLayout("Signal Type Management") {
+		@Navigation()
+		<div class="page-container">
+			<h1 class="page-title">Signal Type Management</h1>
+			<div class="card mb-6">
+				<div class="card-header">
+					<h3 class="card-title">Create New Signal Type</h3>
+				</div>
+				<div class="card-body">
+					<form hx-post="/ui-api/create-signal-type" hx-target="#signal-type-result" class="space-y-4">
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+							<div class="form-group">
+								<label for="isn_slug" class="form-label">ISN</label>
+								<select
+									id="isn_slug"
+									name="isn_slug"
+									required
+									class="form-select"
+								>
+									<option value="">Select an ISN</option>
+									for _, isn := range isns {
+										<option value={ isn.Slug }>{ isn.Slug }</option>
+									}
+								</select>
+							</div>
+							<div class="form-group">
+								<label for="bump_type" class="form-label">Version Bump Type</label>
+								<select
+									id="bump_type"
+									name="bump_type"
+									required
+									class="form-select"
+								>
+									<option value="">Select bump type</option>
+									<option value="patch">Patch (0.0.1)</option>
+									<option value="minor">Minor (0.1.0)</option>
+									<option value="major">Major (1.0.0)</option>
+								</select>
+							</div>
+						</div>
+						<div class="form-group">
+							<label for="title" class="form-label">Title</label>
+							<input
+								id="title"
+								name="title"
+								type="text"
+								required
+								class="form-input"
+								placeholder="e.g., Sample Signal @example.org"
+							/>
+							<p class="text-muted text-sm mt-1">Unique title for the signal type. This will be used to create a URL-friendly slug.</p>
+						</div>
+						<div class="form-group">
+							<label for="schema_url" class="form-label">Schema URL</label>
+							<input
+								id="schema_url"
+								name="schema_url"
+								type="url"
+								required
+								class="form-input"
+								placeholder="https://github.com/user/project/blob/2025.01.01/schema.json"
+							/>
+							<p class="text-muted text-sm mt-1">
+								Must be a valid JSON schema available on Github
+								<code class="text-xs bg-gray-100 px-1 py-0.5 rounded">https://github.com/skip/validation/main/schema.json</code>
+								to disable validation.
+							</p>
+						</div>
+						<div class="form-group">
+							<label for="readme_url" class="form-label">README URL</label>
+							<input
+								id="readme_url"
+								name="readme_url"
+								type="url"
+								class="form-input"
+								placeholder="https://github.com/user/project/blob/2025.01.01/readme.md"
+							/>
+							<p class="text-muted text-sm mt-1">Must be a GitHub URL ending in .md. Use
+								<code class="text-xs bg-gray-100 px-1 py-0.5 rounded">https://github.com/skip/readme/main/readme.md</code>
+								to indicate there is no readme
+							</p>
+
+						</div>
+						<div class="form-group">
+							<label for="detail" class="form-label">Description</label>
+							<textarea
+								id="detail"
+								name="detail"
+								rows="3"
+								class="form-input"
+								placeholder="Description of the signal type"
+							></textarea>
+							<p class="text-muted text-sm mt-1">Optional. Provide a detailed description of this signal type.</p>
+						</div>
+						<div class="form-group">
+							<button type="submit" class="btn btn-primary">
+								Create Signal Type
+							</button>
+						</div>
+					</form>
+				</div>
+			</div>
+			<div id="signal-type-result"></div>
+		</div>
+	}
+}
+
+// SignalTypeCreationSuccess renders a success message after signal type creation
+templ SignalTypeCreationSuccess(response CreateSignalTypeResponse) {
+	<div class="card">
+		<div class="card-body">
+			@SuccessAlert("Signal type created successfully!")
+			<div class="mt-4 space-y-2">
+				<p><strong>Slug:</strong> <code class="text-sm bg-gray-100 px-2 py-1 rounded">{ response.Slug }</code></p>
+				<p><strong>Version:</strong> <code class="text-sm bg-gray-100 px-2 py-1 rounded">{ response.SemVer }</code></p>
+				<p><strong>Resource URL:</strong></p>
+				<code class="text-xs bg-gray-100 px-2 py-1 rounded block break-all">{ response.ResourceURL }</code>
+			</div>
+			<div class="mt-4">
+				<button
+					hx-get="/signal-types"
+					hx-target="body"
+					hx-swap="outerHTML"
+					class="btn btn-primary"
+				>
+					Create Another Signal Type
+				</button>
+			</div>
+		</div>
+	</div>
 }

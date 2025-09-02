@@ -587,7 +587,6 @@ func TestSignalSubmission(t *testing.T) {
 				var countMismatch bool
 				countMismatch = validateResponseCounts(t, auditTrail, tt.expectedStored, tt.expectedFailed, tt.name)
 
-				// If there were count mismatches, show detailed response for debugging
 				if countMismatch {
 					t.Logf("=== Response Details for %s (Count Validation Failed) ===", tt.name)
 					t.Logf("Status: %d %s", response.StatusCode, response.Status)
