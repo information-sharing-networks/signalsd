@@ -6,7 +6,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -248,7 +247,6 @@ func startInProcessServer(t *testing.T, ctx context.Context, testDB *pgxpool.Poo
 	if err != nil {
 		t.Fatalf("Failed to load configuration: %v", err)
 	}
-	appLogger := logger.InitLogger(slog.LevelDebug, environment)
 
 	cfg.ServiceMode = "all"
 
@@ -264,6 +262,8 @@ func startInProcessServer(t *testing.T, ctx context.Context, testDB *pgxpool.Poo
 	if err := publicIsnCache.Load(ctx, queries); err != nil {
 		t.Logf("Warning: Failed to load public ISN cache: %v", err)
 	}
+
+	appLogger := logger.InitLogger(logger.ParseLogLevel(cfg.LogLevel), "debug")
 
 	serverInstance := server.NewServer(
 		testDB,

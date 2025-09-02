@@ -85,7 +85,7 @@ services:
         echo 'Creating swagger documentation...' &&
         swag init -g ./cmd/signalsd/main.go &&
         echo 'Running database migrations...' &&
-        goose -dir sql/schema postgres \"$$DATABASE_URL\" -env=none up &&
+        goose -dir sql/schema postgres $$DATABASE_URL -env=none up &&
         echo 'Starting signalsd service (live reload)...' &&
         air 
       "

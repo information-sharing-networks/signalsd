@@ -185,7 +185,7 @@ func run(mode string) error {
 
 	appLogger := logger.InitLogger(logger.ParseLogLevel(cfg.LogLevel), cfg.Environment)
 
-	appLogger.Info("Configuration loaded (debug)",
+	appLogger.Info("Configuration loaded",
 		slog.String("ENVIRONMENT", cfg.Environment),
 		slog.String("HOST", cfg.Host),
 		slog.Int("PORT", cfg.Port),
