@@ -8,7 +8,6 @@ import (
 
 	"github.com/jub0bs/cors"
 	"github.com/kelseyhightower/envconfig"
-	"github.com/rs/zerolog"
 )
 
 // Environment variables are automatically mapped using envconfig.
@@ -17,7 +16,7 @@ type ServerConfig struct {
 	Host                 string        `envconfig:"HOST" default:"0.0.0.0"`
 	Port                 int           `envconfig:"PORT" default:"8080"`
 	SecretKey            string        `envconfig:"SECRET_KEY" required:"true"`
-	LogLevel             zerolog.Level `envconfig:"LOG_LEVEL" default:"debug"`
+	LogLevel             string        `envconfig:"LOG_LEVEL" default:"debug"`
 	DatabaseURL          string        `envconfig:"DATABASE_URL" required:"true"`
 	ReadTimeout          time.Duration `envconfig:"READ_TIMEOUT" default:"15s"`
 	WriteTimeout         time.Duration `envconfig:"WRITE_TIMEOUT" default:"15s"`
@@ -103,11 +102,10 @@ var ValidServiceModes = map[string]bool{ // service modes for CLI
 	"signals":       true, // both read and write
 	"signals-read":  true, // read-only signal operations
 	"signals-write": true, // write-only signal operations
-	"ui":            true, // web UI only
 }
 
 // NewServerConfig loads environment variables using envconfig and returns a ServerConfig struct and CORSConfigs
-func NewServerConfig(logger *zerolog.Logger) (*ServerConfig, *CORSConfigs, error) {
+func NewServerConfig() (*ServerConfig, *CORSConfigs, error) {
 	var cfg ServerConfig
 
 	// load environment variables with defaults
@@ -124,24 +122,6 @@ func NewServerConfig(logger *zerolog.Logger) (*ServerConfig, *CORSConfigs, error
 	if err != nil {
 		return nil, nil, fmt.Errorf("CORS configuration failed: %w", err)
 	}
-
-	logger.Info().
-		Str("ENVIRONMENT", cfg.Environment).
-		Str("HOST", cfg.Host).
-		Int("PORT", cfg.Port).
-		Str("LOG_LEVEL", cfg.LogLevel.String()).
-		Str("READ_TIMEOUT", cfg.ReadTimeout.String()).
-		Str("WRITE_TIMEOUT", cfg.WriteTimeout.String()).
-		Str("IDLE_TIMEOUT", cfg.IdleTimeout.String()).
-		Int64("MAX_SIGNAL_PAYLOAD_SIZE", cfg.MaxSignalPayloadSize).
-		Int32("RATE_LIMIT_RPS", cfg.RateLimitRPS).
-		Int32("RATE_LIMIT_BURST", cfg.RateLimitBurst).
-		Int32("DB_MAX_CONNECTIONS", cfg.DBMaxConnections).
-		Int32("DB_MIN_CONNECTIONS", cfg.DBMinConnections).
-		Str("DB_MAX_CONN_LIFETIME", cfg.DBMaxConnLifetime.String()).
-		Str("DB_MAX_CONN_IDLE_TIME", cfg.DBMaxConnIdleTime.String()).
-		Str("DB_CONNECT_TIMEOUT", cfg.DBConnectTimeout.String()).
-		Msg("Configuration loaded")
 
 	return &cfg, corsConfigs, nil
 }

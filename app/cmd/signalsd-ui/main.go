@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -31,21 +33,23 @@ func main() {
 	}
 }
 
+// run the UI service in standalone mode
 func run() error {
-	serverLogger := logger.InitServerLogger()
-
 	// Load UI configuration
-	cfg, err := ui.NewConfig(serverLogger)
+	cfg, err := ui.NewConfig()
 	if err != nil {
-		serverLogger.Fatal().Err(err).Msg("Failed to load UI configuration")
+		log.Printf("Failed to load UI configuration %v", err.Error())
+		os.Exit(1)
 	}
 
-	serverLogger.Info().Msgf("Starting UI server (version: %s)", version.Get().Version)
+	appLogger := logger.InitLogger(logger.ParseLogLevel(cfg.LogLevel), cfg.Environment)
 
-	serverLogger.Info().Msgf("using signalsd API at: %s", cfg.APIBaseURL)
+	appLogger.Info("Starting UI server", slog.String("version", version.Get().Version))
+
+	appLogger.Info("using signalsd API", slog.String("api_url", cfg.APIBaseURL))
 
 	// Create UI server
-	server := ui.NewServer(cfg, serverLogger)
+	server := ui.NewStandaloneServer(cfg, appLogger)
 
 	// Set up graceful shutdown handling
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -53,10 +57,10 @@ func run() error {
 
 	// Run the server
 	if err := server.Start(ctx); err != nil {
-		serverLogger.Error().Msgf("UI server error: %v", err)
+		appLogger.Error("UI server error", slog.String("error", err.Error()))
 		return err
 	}
 
-	serverLogger.Info().Msg("UI server shutdown complete")
+	appLogger.Info("UI server shutdown complete")
 	return nil
 }

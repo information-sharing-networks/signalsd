@@ -2,11 +2,12 @@ package responses
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
-	"github.com/rs/zerolog"
+	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 )
 
 type ErrorResponse struct {
@@ -17,24 +18,27 @@ type ErrorResponse struct {
 }
 
 func RespondWithError(w http.ResponseWriter, r *http.Request, statusCode int, errorCode apperrors.ErrorCode, message string) {
-	requestLogger := zerolog.Ctx(r.Context())
+	requestLogger := logger.ContextLogger(r.Context())
 	requestID := middleware.GetReqID(r.Context())
-	var logEvent *zerolog.Event
 
+	// Log the error with appropriate level
 	switch {
 	case statusCode >= 500:
-		logEvent = requestLogger.Error()
+		requestLogger.Error("Request failed",
+			slog.Int("status", statusCode),
+			slog.String("error_code", string(errorCode)),
+			slog.String("error_message", message))
 	case statusCode >= 400:
-		logEvent = requestLogger.Warn()
+		requestLogger.Warn("Request failed",
+			slog.Int("status", statusCode),
+			slog.String("error_code", string(errorCode)),
+			slog.String("error_message", message))
 	default:
-		logEvent = requestLogger.Info()
+		requestLogger.Info("Request failed",
+			slog.Int("status", statusCode),
+			slog.String("error_code", string(errorCode)),
+			slog.String("error_message", message))
 	}
-
-	logEvent.
-		Int("status", statusCode).
-		Any("error_code", errorCode).
-		Str("error_message", message).
-		Msg("Request failed")
 
 	errResponse := ErrorResponse{
 		StatusCode: statusCode,
@@ -45,9 +49,8 @@ func RespondWithError(w http.ResponseWriter, r *http.Request, statusCode int, er
 
 	dat, err := json.Marshal(errResponse)
 	if err != nil {
-		requestLogger.Error().
-			Err(err).
-			Msg("error marshaling error response")
+		requestLogger.Error("error marshaling error response",
+			slog.String("error", err.Error()))
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte(`{"error_code":"internal_error","message":"Internal Server Error"}`))
 		return

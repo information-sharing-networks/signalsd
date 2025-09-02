@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -11,10 +12,10 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
+	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/utils"
 	"github.com/jackc/pgx/v5"
-	"github.com/rs/zerolog"
 )
 
 type SignalsBatchHandler struct {
@@ -98,7 +99,7 @@ type BatchSearchParams struct {
 //
 // CreateSignalsBatchHandler must be used with the RequireValidAccessToken and RequireIsnPermission middleware functions
 func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r *http.Request) {
-	logger := zerolog.Ctx(r.Context())
+	reqLogger := logger.ContextLogger(r.Context())
 
 	// these checks have been done already in the middleware so - if there is an error here - it is a bug.
 	_, ok := auth.ContextClaims(r.Context())
@@ -157,7 +158,9 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 		returnedRow.ID,
 	)
 
-	logger.Info().Msgf("New signal batch %v created by %v ", account.ID, returnedRow.ID)
+	reqLogger.Info("New signal batch created",
+		slog.String("account_id", account.ID.String()),
+		slog.String("batch_id", returnedRow.ID.String()))
 	responses.RespondWithJSON(w, http.StatusOK, CreateSignalsBatchResponse{
 		ResourceURL:    resourceURL,
 		AccountID:      account.ID,

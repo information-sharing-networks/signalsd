@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
-	"github.com/rs/zerolog"
 )
 
 // UI server config - used when the ui is run in standalone mode
@@ -13,7 +12,7 @@ type Config struct {
 	Environment  string        `envconfig:"ENVIRONMENT" default:"dev"`
 	Host         string        `envconfig:"HOST" default:"0.0.0.0"`
 	Port         int           `envconfig:"PORT" default:"3000"`
-	LogLevel     zerolog.Level `envconfig:"LOG_LEVEL" default:"debug"`
+	LogLevel     string        `envconfig:"LOG_LEVEL" default:"debug"`
 	ReadTimeout  time.Duration `envconfig:"READ_TIMEOUT" default:"15s"`
 	WriteTimeout time.Duration `envconfig:"WRITE_TIMEOUT" default:"15s"`
 	IdleTimeout  time.Duration `envconfig:"IDLE_TIMEOUT" default:"60s"`
@@ -32,7 +31,7 @@ const accessTokenCookieName = "access_token"
 const isnPermsCookieName = "isn_perms"
 const accountInfoCookieName = "account_info"
 
-func NewConfig(logger *zerolog.Logger) (*Config, error) {
+func NewConfig() (*Config, error) {
 	var cfg Config
 
 	if err := envconfig.Process("", &cfg); err != nil {

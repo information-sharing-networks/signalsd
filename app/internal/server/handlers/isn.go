@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -12,12 +13,12 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
+	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/utils"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/rs/zerolog"
 )
 
 type IsnHandler struct {
@@ -452,7 +453,7 @@ func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 // Use with RequireRole (owner)
 func (i *IsnHandler) TransferIsnOwnershipHandler(w http.ResponseWriter, r *http.Request) {
 	var req TransferIsnOwnershipRequest
-	logger := zerolog.Ctx(r.Context())
+	reqLogger := logger.ContextLogger(r.Context())
 
 	isnSlug := r.PathValue("isn_slug")
 
@@ -529,6 +530,9 @@ func (i *IsnHandler) TransferIsnOwnershipHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	logger.Info().Msgf("ISN %v ownership transferred from %v to %v ", isn.Slug, isn.UserAccountID, newAdminAccountID)
+	reqLogger.Info("ISN ownership transferred",
+		slog.String("isn_slug", isn.Slug),
+		slog.String("from_user_id", isn.UserAccountID.String()),
+		slog.String("to_user_id", newAdminAccountID.String()))
 	responses.RespondWithStatusCodeOnly(w, http.StatusOK)
 }

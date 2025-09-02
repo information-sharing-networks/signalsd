@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 )
@@ -13,7 +14,7 @@ import (
 func (s *Server) renderError(w http.ResponseWriter, message string) {
 	component := AccessDeniedAlert(message)
 	if err := component.Render(context.Background(), w); err != nil {
-		s.logger.Error().Err(err).Msg("Failed to render error")
+		s.logger.Error("Failed to render error", slog.String("error", err.Error()))
 	}
 }
 
@@ -33,7 +34,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	// Render login page
 	component := LoginPage()
 	if err := component.Render(r.Context(), w); err != nil {
-		s.logger.Error().Err(err).Msg("Failed to render login page")
+		s.logger.Error("Failed to render login page", slog.String("error", err.Error()))
 	}
 }
 
@@ -41,7 +42,7 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	// Render registration page
 	component := RegisterPage()
 	if err := component.Render(r.Context(), w); err != nil {
-		s.logger.Error().Err(err).Msg("Failed to render registration page")
+		s.logger.Error("Failed to render registration page", slog.String("error", err.Error()))
 	}
 }
 
@@ -57,14 +58,14 @@ func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	// Authenticate with signalsd API
 	loginResp, refreshTokenCookie, err := s.authService.AuthenticateUser(email, password)
 	if err != nil {
-		s.logger.Error().Err(err).Msg("Authentication failed")
+		s.logger.Error("Authentication failed", slog.String("error", err.Error()))
 		s.renderError(w, err.Error())
 		return
 	}
 
 	// Set all authentication cookies using shared method
 	if err := s.authService.SetAuthCookies(w, loginResp, refreshTokenCookie, s.config.Environment); err != nil {
-		s.logger.Error().Err(err).Msg("Failed to set authentication cookies")
+		s.logger.Error("Failed to set authentication cookies", slog.String("error", err.Error()))
 		s.renderError(w, "System error: authentication failed")
 		return
 	}
@@ -93,7 +94,7 @@ func (s *Server) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 	// Register user with signalsd API
 	err := s.apiClient.RegisterUser(email, password)
 	if err != nil {
-		s.logger.Error().Err(err).Msg("Registration failed")
+		s.logger.Error("Registration failed", slog.String("error", err.Error()))
 		s.renderError(w, err.Error())
 		return
 	}
@@ -102,7 +103,7 @@ func (s *Server) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("HX-Trigger-After-Settle", "registrationSuccess")
 	component := RegistrationSuccess()
 	if err := component.Render(r.Context(), w); err != nil {
-		s.logger.Error().Err(err).Msg("Failed to render registration success")
+		s.logger.Error("Failed to render registration success", slog.String("error", err.Error()))
 	}
 }
 
@@ -121,7 +122,7 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
 	component := DashboardPage()
 	if err := component.Render(r.Context(), w); err != nil {
-		s.logger.Error().Err(err).Msg("Failed to render dashboard page")
+		s.logger.Error("Failed to render dashboard page", slog.String("error", err.Error()))
 	}
 }
 
@@ -131,6 +132,7 @@ func (s *Server) handleSignalSearch(w http.ResponseWriter, r *http.Request) {
 	// Get ISN permissions from cookie - middleware ensures this exists
 	perms := s.getIsnPermsFromCookie(r)
 
+	s.logger.Debug("Handling signals search page")
 	// Convert permissions to ISN list for dropdown
 	isns := make([]IsnDropdown, 0, len(perms))
 	for isnSlug := range perms {
@@ -143,7 +145,7 @@ func (s *Server) handleSignalSearch(w http.ResponseWriter, r *http.Request) {
 	// Render search page
 	component := SignalSearchPage(isns, perms, nil)
 	if err := component.Render(r.Context(), w); err != nil {
-		s.logger.Error().Err(err).Msg("Failed to render signal search page")
+		s.logger.Error("Failed to render signal search page", slog.String("error", err.Error()))
 	}
 }
 
@@ -164,14 +166,18 @@ func (s *Server) handleGetSignalTypes(w http.ResponseWriter, r *http.Request) {
 	// Decode base64 cookie value
 	decodedPerms, err := base64.StdEncoding.DecodeString(permsCookie.Value)
 	if err != nil {
-		s.logger.Error().Err(err).Msgf("Failed to decode permissions cookie in signal types handler: %s", permsCookie.Value)
+		s.logger.Error("Failed to decode permissions cookie in signal types handler",
+			slog.String("error", err.Error()),
+			slog.String("cookie_value", permsCookie.Value))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	var perms map[string]IsnPerms
 	if err := json.Unmarshal(decodedPerms, &perms); err != nil {
-		s.logger.Error().Err(err).Msgf("Failed to parse permissions JSON in signal types handler: %s", string(decodedPerms))
+		s.logger.Error("Failed to parse permissions JSON in signal types handler",
+			slog.String("error", err.Error()),
+			slog.String("json_data", string(decodedPerms)))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -204,7 +210,7 @@ func (s *Server) handleGetSignalTypes(w http.ResponseWriter, r *http.Request) {
 	// Render signal types dropdown options
 	component := SignalTypeOptions(signalTypes)
 	if err := component.Render(r.Context(), w); err != nil {
-		s.logger.Error().Err(err).Msg("Failed to render signal type options")
+		s.logger.Error("Failed to render signal type options", slog.String("error", err.Error()))
 	}
 }
 
@@ -226,14 +232,18 @@ func (s *Server) handleGetSignalVersions(w http.ResponseWriter, r *http.Request)
 	// Decode base64 cookie value
 	decodedPerms, err := base64.StdEncoding.DecodeString(permsCookie.Value)
 	if err != nil {
-		s.logger.Error().Err(err).Msgf("Failed to decode permissions cookie in versions handler: %s", permsCookie.Value)
+		s.logger.Error("Failed to decode permissions cookie in versions handler",
+			slog.String("error", err.Error()),
+			slog.String("cookie_value", permsCookie.Value))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	var perms map[string]IsnPerms
 	if err := json.Unmarshal(decodedPerms, &perms); err != nil {
-		s.logger.Error().Err(err).Msgf("Failed to parse permissions JSON in versions handler: %s", string(decodedPerms))
+		s.logger.Error("Failed to parse permissions JSON in versions handler",
+			slog.String("error", err.Error()),
+			slog.String("json_data", string(decodedPerms)))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -260,7 +270,7 @@ func (s *Server) handleGetSignalVersions(w http.ResponseWriter, r *http.Request)
 	// Render version dropdown options
 	component := VersionOptions(versions)
 	if err := component.Render(r.Context(), w); err != nil {
-		s.logger.Error().Err(err).Msg("Failed to render version options")
+		s.logger.Error("Failed to render version options", slog.String("error", err.Error()))
 	}
 }
 
@@ -296,7 +306,7 @@ func (s *Server) handleSearchSignals(w http.ResponseWriter, r *http.Request) {
 	// Get access token from cookie
 	accessTokenCookie, err := r.Cookie(accessTokenCookieName)
 	if err != nil {
-		s.logger.Error().Err(err).Msg("Access token not found")
+		s.logger.Error("Access token not found", slog.String("error", err.Error()))
 		s.renderError(w, "Session expired - please refresh the page and try again")
 		return
 	}
@@ -305,7 +315,7 @@ func (s *Server) handleSearchSignals(w http.ResponseWriter, r *http.Request) {
 	// Perform search using ISN visibility to determine endpoint
 	searchResp, err := s.apiClient.SearchSignals(accessToken, params, isnPerm.Visibility)
 	if err != nil {
-		s.logger.Error().Err(err).Msg("Signal search failed")
+		s.logger.Error("Signal search failed", slog.String("error", err.Error()))
 		s.renderError(w, err.Error())
 		return
 	}
@@ -313,7 +323,7 @@ func (s *Server) handleSearchSignals(w http.ResponseWriter, r *http.Request) {
 	// Render search results
 	component := SearchResults(*searchResp)
 	if err := component.Render(r.Context(), w); err != nil {
-		s.logger.Error().Err(err).Msg("Failed to render search results")
+		s.logger.Error("Failed to render search results", slog.String("error", err.Error()))
 	}
 }
 
@@ -323,7 +333,7 @@ func (s *Server) handleAdminDashboard(w http.ResponseWriter, r *http.Request) {
 	// Render admin dashboard - access is validated by middleware
 	component := AdminDashboardPage()
 	if err := component.Render(r.Context(), w); err != nil {
-		s.logger.Error().Err(err).Msg("Failed to render admin dashboard")
+		s.logger.Error("Failed to render admin dashboard", slog.String("error", err.Error()))
 	}
 }
 
@@ -348,7 +358,7 @@ func (s *Server) handleIsnAccountsAdmin(w http.ResponseWriter, r *http.Request) 
 	// Render admin page
 	component := IsnAccountsAdminPage(isns)
 	if err := component.Render(r.Context(), w); err != nil {
-		s.logger.Error().Err(err).Msg("Failed to render ISN accounts admin page")
+		s.logger.Error("Failed to render ISN accounts admin page", slog.String("error", err.Error()))
 	}
 }
 
@@ -376,7 +386,7 @@ func (s *Server) handleAddIsnAccount(w http.ResponseWriter, r *http.Request) {
 	// Call the API to add the account to the ISN
 	err = s.apiClient.AddAccountToIsn(accessToken, isnSlug, accountEmail, permission)
 	if err != nil {
-		s.logger.Info().Err(err).Msg("Failed to add account to ISN")
+		s.logger.Info("Failed to add account to ISN", slog.String("error", err.Error()))
 		s.renderError(w, err.Error())
 		return
 	}
@@ -384,7 +394,7 @@ func (s *Server) handleAddIsnAccount(w http.ResponseWriter, r *http.Request) {
 	// Success response
 	component := SuccessAlert("Account successfully added to ISN")
 	if err := component.Render(r.Context(), w); err != nil {
-		s.logger.Error().Err(err).Msg("Failed to render success message")
+		s.logger.Error("Failed to render success message", slog.String("error", err.Error()))
 	}
 }
 
@@ -425,7 +435,7 @@ func (s *Server) handleAccessDenied(w http.ResponseWriter, r *http.Request, page
 		// Direct navigation - render access denied page
 		component := AccessDeniedPage(pageTitle, message)
 		if err := component.Render(r.Context(), w); err != nil {
-			s.logger.Error().Err(err).Msg("Failed to render access denied page")
+			s.logger.Error("Failed to render access denied page", slog.String("error", err.Error()))
 		}
 	}
 }

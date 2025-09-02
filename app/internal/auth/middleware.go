@@ -4,15 +4,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
+	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
 	"github.com/jackc/pgx/v5"
-	"github.com/rs/zerolog"
 )
 
 type ServiceAccountTokenRequest struct {
@@ -29,7 +30,7 @@ type ServiceAccountTokenRequest struct {
 func (a *AuthService) RequireValidAccessToken(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		logger := zerolog.Ctx(r.Context())
+		reqLogger := logger.ContextLogger(r.Context())
 
 		accessToken, err := a.GetAccessTokenFromHeader(r.Header)
 		if err != nil {
@@ -61,7 +62,7 @@ func (a *AuthService) RequireValidAccessToken(next http.Handler) http.Handler {
 			return
 		}
 
-		logger.Info().Msgf("account %v access_token validated", accountID)
+		reqLogger.Info("account access_token validated", slog.String("account_id", accountID.String()))
 
 		// add user and claims to context
 		ctx := ContextWithAccountID(r.Context(), accountID)
@@ -123,7 +124,7 @@ func (a *AuthService) AuthenticateByCredentalType(next http.Handler) http.Handle
 func (a *AuthService) RequireValidRefreshToken(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		logger := zerolog.Ctx(r.Context())
+		reqLogger := logger.ContextLogger(r.Context())
 
 		// extract the refresh token from the cookie
 		cookie, err := r.Cookie(signalsd.RefreshTokenCookieName)
@@ -152,7 +153,7 @@ func (a *AuthService) RequireValidRefreshToken(next http.Handler) http.Handler {
 
 		userAccountID := refreshTokenRow.UserAccountID
 
-		logger.Info().Msgf("user %v refresh_token validated", userAccountID)
+		reqLogger.Info("user refresh_token validated", slog.String("user_account_id", userAccountID.String()))
 
 		// add userId, accountType and hashedRefreshToken to context
 		ctx := ContextWithAccountID(r.Context(), userAccountID)
@@ -170,7 +171,7 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		var req ServiceAccountTokenRequest
-		logger := zerolog.Ctx(r.Context())
+		reqLogger := logger.ContextLogger(r.Context())
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
@@ -197,7 +198,7 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 		}
 
 		if !account.IsActive {
-			logger.Warn().Msgf("attempt to authenticate with disabled service account: %v", serviceAccount.AccountID)
+			reqLogger.Warn("attempt to authenticate with disabled service account", slog.String("service_account_id", serviceAccount.AccountID.String()))
 			responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "account is disabled")
 			return
 		}
@@ -211,7 +212,7 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 			return
 		}
 
-		logger.Info().Msgf("Client credentials confirmed for service account ID %v", serviceAccount.AccountID)
+		reqLogger.Info("Client credentials confirmed for service account", slog.String("service_account_id", serviceAccount.AccountID.String()))
 		ctx := ContextWithAccountID(r.Context(), serviceAccount.AccountID)
 		ctx = ContextWithAccountType(ctx, "service_account")
 		next.ServeHTTP(w, r.WithContext(ctx))
@@ -223,7 +224,7 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 func (a *AuthService) RequireRole(allowedRoles ...string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			logger := zerolog.Ctx(r.Context())
+			reqLogger := logger.ContextLogger(r.Context())
 			claims, ok := ContextClaims(r.Context())
 			if !ok {
 				responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
@@ -232,7 +233,7 @@ func (a *AuthService) RequireRole(allowedRoles ...string) func(http.Handler) htt
 
 			for _, role := range allowedRoles {
 				if claims.Role == role {
-					logger.Info().Msgf("Role confirmed: %v", role)
+					reqLogger.Info("Role confirmed", slog.String("role", role))
 					next.ServeHTTP(w, r)
 					return
 				}
@@ -249,7 +250,7 @@ func (a *AuthService) RequireIsnPermission(allowedPermissions ...string) func(ht
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-			logger := zerolog.Ctx(r.Context())
+			reqLogger := logger.ContextLogger(r.Context())
 
 			claims, ok := ContextClaims(r.Context())
 			if !ok {
@@ -265,7 +266,7 @@ func (a *AuthService) RequireIsnPermission(allowedPermissions ...string) func(ht
 
 			for _, permission := range allowedPermissions {
 				if claims.IsnPerms[isnSlug].Permission == permission {
-					logger.Info().Msgf("Permission confirmed: %v", permission)
+					reqLogger.Info("Permission confirmed", slog.String("permission", permission), slog.String("isn_slug", isnSlug))
 					next.ServeHTTP(w, r)
 					return
 				}
@@ -279,13 +280,13 @@ func (a *AuthService) RequireIsnPermission(allowedPermissions ...string) func(ht
 func (a *AuthService) RequireDevEnv(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		logger := zerolog.Ctx(r.Context())
+		reqLogger := logger.ContextLogger(r.Context())
 
 		if a.environment != "dev" {
 			responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "this api can only be used in the dev environment")
 			return
 		}
-		logger.Info().Msg("Dev environment confirmed")
+		reqLogger.Info("Dev environment confirmed")
 		next.ServeHTTP(w, r)
 	})
 }

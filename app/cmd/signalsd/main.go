@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/url"
 	"os"
 	"os/signal"
@@ -17,9 +18,7 @@ import (
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/isns"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/schemas"
-	"github.com/information-sharing-networks/signalsd/app/internal/ui"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/version"
@@ -148,22 +147,20 @@ func main() {
 		Example: `
   signalsd --mode all           # Single service with all endpoints + UI
   signalsd --mode api           # API endpoints only (no UI)
-  signalsd --mode ui            # Standalone UI server (requires separate API)
   signalsd --mode admin         # Admin endpoints only
   signalsd --mode signals       # Signal exchange service (read + write)
   signalsd --mode signals-read  # Signal read operations only
-  signalsd --mode signals-write # Signal write operations only
-  signalsd --mode ui            # Web UI service only`,
+  signalsd --mode signals-write # Signal write operations only`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if !signalsd.ValidServiceModes[mode] {
-				return fmt.Errorf("invalid service mode '%s'. Valid modes: all, api, admin, signals, signals-read, signals-write, ui", mode)
+				return fmt.Errorf("invalid service mode '%s'. Valid modes: all, api, admin, signals, signals-read, signals-write", mode)
 			}
 
 			return run(mode)
 		},
 	}
 
-	cmd.Flags().StringVarP(&mode, "mode", "m", "", "Service mode (required): all, api, admin, signals, signals-read, signals-write, or ui")
+	cmd.Flags().StringVarP(&mode, "mode", "m", "", "Service mode (required): all, api, admin, signals, signals-read, signals-write")
 	if err := cmd.MarkFlagRequired("mode"); err != nil {
 		log.Fatalf("Failed to mark mode flag as required: %v", err)
 	}
@@ -177,31 +174,44 @@ func main() {
 }
 
 func run(mode string) error {
-	// command line logger
-	serverLogger := logger.InitServerLogger()
 
-	// Special case: UI-only mode runs standalone UI server
-	if mode == "ui" {
-		return runStandaloneUI(serverLogger)
-	}
-
-	// get site config from environment variables
-	cfg, corsConfigs, err := signalsd.NewServerConfig(serverLogger)
+	// get site config
+	cfg, corsConfigs, err := signalsd.NewServerConfig()
 	if err != nil {
-		serverLogger.Fatal().Err(err).Msg("Failed to load configuration")
+		// exit with error
+		log.Printf("failed to load configuration: %v", err.Error())
+		os.Exit(1)
 	}
+
+	appLogger := logger.InitLogger(logger.ParseLogLevel(cfg.LogLevel), cfg.Environment)
+
+	appLogger.Info("Configuration loaded (debug)",
+		slog.String("ENVIRONMENT", cfg.Environment),
+		slog.String("HOST", cfg.Host),
+		slog.Int("PORT", cfg.Port),
+		slog.String("LOG_LEVEL", cfg.LogLevel),
+		slog.Duration("READ_TIMEOUT", cfg.ReadTimeout),
+		slog.Duration("WRITE_TIMEOUT", cfg.WriteTimeout),
+		slog.Duration("IDLE_TIMEOUT", cfg.IdleTimeout),
+		slog.Int64("MAX_SIGNAL_PAYLOAD_SIZE", cfg.MaxSignalPayloadSize),
+		slog.Int("RATE_LIMIT_RPS", int(cfg.RateLimitRPS)),
+		slog.Int("RATE_LIMIT_BURST", int(cfg.RateLimitBurst)),
+		slog.Int("DB_MAX_CONNECTIONS", int(cfg.DBMaxConnections)),
+		slog.Int("DB_MIN_CONNECTIONS", int(cfg.DBMinConnections)),
+		slog.Duration("DB_MAX_CONN_LIFETIME", cfg.DBMaxConnLifetime),
+		slog.Duration("DB_MAX_CONN_IDLE_TIME", cfg.DBMaxConnIdleTime),
+		slog.Duration("DB_CONNECT_TIMEOUT", cfg.DBConnectTimeout),
+	)
 
 	// cross-origin resource sharing rules for browser based access to the API (based on the ALLOWED_ORIGINS env config) - the cors middleware will ensure that only the listed partner sites can access the protected endpoints.
-	serverLogger.Info().Msgf("CORS allowed origins: %v", cfg.AllowedOrigins)
+	appLogger.Info("CORS allowed origins", slog.Any("origins", cfg.AllowedOrigins))
 
 	if cfg.Environment == "prod" && (len(cfg.AllowedOrigins) == 0 || (len(cfg.AllowedOrigins) == 1 && strings.TrimSpace(cfg.AllowedOrigins[0]) == "*")) {
-		serverLogger.Warn().Msg("production env is configured to allow all origins for CORS. Use the ALLOWED_ORIGINS env variable to restrict access to specific origins")
+		appLogger.Warn("production env is configured to allow all origins for CORS. Use the ALLOWED_ORIGINS env variable to restrict access to specific origins")
 	}
 
 	// the --mode command line param determines which endpoints should be served: all, admin, signals, signals-read, signals-write, or ui
 	cfg.ServiceMode = mode
-
-	httpLogger := logger.InitHttpLogger(cfg.LogLevel, cfg.Environment)
 
 	// set up the pgx database connection pool
 	dbCtx, dbCancel := context.WithTimeout(context.Background(), signalsd.DatabasePingTimeout)
@@ -209,7 +219,8 @@ func run(mode string) error {
 
 	poolConfig, err := pgxpool.ParseConfig(cfg.DatabaseURL)
 	if err != nil {
-		serverLogger.Fatal().Err(err).Msg("Failed to parse database URL")
+		appLogger.Error("Failed to parse database URL", slog.String("error", err.Error()))
+		os.Exit(1)
 	}
 
 	poolConfig.MaxConns = cfg.DBMaxConnections
@@ -220,16 +231,18 @@ func run(mode string) error {
 
 	pool, err := pgxpool.NewWithConfig(dbCtx, poolConfig)
 	if err != nil {
-		serverLogger.Fatal().Err(err).Msg("Unable to create connection pool")
+		appLogger.Error("Unable to create connection pool", slog.String("error", err.Error()))
+		os.Exit(1)
 	}
 
 	if err = pool.Ping(dbCtx); err != nil {
-		serverLogger.Fatal().Err(err).Msg("Error pinging database via pool")
+		appLogger.Error("Error pinging database via pool", slog.String("error", err.Error()))
+		os.Exit(1)
 	}
 
 	safeURL, _ := removePasswordFromConnectionString(cfg.DatabaseURL)
 
-	serverLogger.Info().Msgf("connected to PostgreSQL at %v", safeURL)
+	appLogger.Info("connected to PostgreSQL", slog.String("url", safeURL))
 
 	// get the sqlc generated database queries
 	queries := database.New(pool)
@@ -237,38 +250,40 @@ func run(mode string) error {
 	// set up the signal schema cache - these schemas are stored on the database and used to validate the incoming signals (they are cached to avoid database roundtrips when validating signals)
 	schemaCache := schemas.NewSchemaCache()
 	if err := schemaCache.Load(dbCtx, queries); err != nil {
-		serverLogger.Fatal().Msgf("Failed to load schema cache: %v", err)
+		appLogger.Error("Failed to load schema cache", slog.String("error", err.Error()))
+		os.Exit(1)
 	}
 
 	if schemaCache.Len() > 0 {
-		serverLogger.Info().Msgf("Loaded %d signal schemas into cache", schemaCache.Len())
+		appLogger.Info("Loaded signal schemas into cache", slog.Int("count", schemaCache.Len()))
 	} else {
-		serverLogger.Info().Msgf("No signal schemas defined for this site")
+		appLogger.Info("No signal schemas defined for this site")
 	}
 
 	// set up the public ISN cache - this is used by the public signal search endpoint (this endpoint can be used by unauthenticated users)
 	publicIsnCache := isns.NewPublicIsnCache()
 	if err := publicIsnCache.Load(dbCtx, queries); err != nil {
-		serverLogger.Fatal().Msgf("Failed to load public ISN cache: %v", err)
+		appLogger.Error("Failed to load public ISN cache", slog.String("error", err.Error()))
+		os.Exit(1)
 	}
 
 	if publicIsnCache.Len() > 0 {
-		serverLogger.Info().Msgf("Loaded %d public ISNs into cache", publicIsnCache.Len())
+		appLogger.Info("Loaded public ISNs into cache", slog.Int("count", publicIsnCache.Len()))
 	} else {
-		serverLogger.Info().Msgf("No public ISNs defined for this site")
+		appLogger.Info("No public ISNs defined for this site")
 	}
 
 	// set up the site level rate limiter (disable if RPS <= 0) - note there are payload size limits in addition to rate limiting and these are set when the routes are created in the server package
 	if cfg.RateLimitRPS <= 0 {
-		serverLogger.Warn().Msg("rate limiting disabled")
+		appLogger.Warn("rate limiting disabled")
 	}
 
 	// set up the authentication service (this provides functions for managing logins, tokens and auth middleware)
 	authService := auth.NewAuthService(cfg.SecretKey, cfg.Environment, queries)
 
 	// run the http server
-	serverLogger.Info().Msgf("service mode: %s", cfg.ServiceMode)
-	serverLogger.Info().Msgf("Starting server (version: %s)", version.Get().Version)
+	appLogger.Info("service mode", slog.String("mode", cfg.ServiceMode))
+	appLogger.Info("Starting server", slog.String("version", version.Get().Version))
 
 	server := server.NewServer(
 		pool,
@@ -276,8 +291,7 @@ func run(mode string) error {
 		authService,
 		cfg,
 		corsConfigs,
-		serverLogger,
-		httpLogger,
+		appLogger,
 		schemaCache,
 		publicIsnCache,
 	)
@@ -290,40 +304,11 @@ func run(mode string) error {
 
 	// Run the server
 	if err := server.Start(ctx); err != nil {
-		serverLogger.Error().Msgf("Server error: %v", err)
+		appLogger.Error("Server error", slog.String("error", err.Error()))
 		return err
 	}
 
-	serverLogger.Info().Msg("server shutdown complete")
-	return nil
-}
-
-// runStandaloneUI runs the UI server without database or API infrastructure
-func runStandaloneUI(serverLogger *zerolog.Logger) error {
-	serverLogger.Info().Msg("Starting standalone UI server")
-
-	// Load UI configuration
-	cfg, err := ui.NewConfig(serverLogger)
-	if err != nil {
-		serverLogger.Fatal().Err(err).Msg("Failed to load UI configuration")
-	}
-
-	serverLogger.Info().Msgf("Using signalsd API at: %s", cfg.APIBaseURL)
-
-	// Create UI server
-	server := ui.NewServer(cfg, serverLogger)
-
-	// Set up graceful shutdown handling
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	// Run the server
-	if err := server.Start(ctx); err != nil {
-		serverLogger.Error().Msgf("UI server error: %v", err)
-		return err
-	}
-
-	serverLogger.Info().Msg("UI server shutdown complete")
+	appLogger.Info("server shutdown complete")
 	return nil
 }
 

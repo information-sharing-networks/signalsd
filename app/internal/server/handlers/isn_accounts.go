@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -11,10 +12,10 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
+	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
 	"github.com/jackc/pgx/v5"
-	"github.com/rs/zerolog"
 )
 
 type IsnAccountHandler struct {
@@ -73,7 +74,7 @@ type IsnAccount struct {
 //
 //	this handler must use the RequireRole (owner,admin) middleware
 func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *http.Request) {
-	logger := zerolog.Ctx(r.Context())
+	reqLogger := logger.ContextLogger(r.Context())
 	req := GrantIsnAccountPermissionRequest{}
 
 	// get user account id for user making request
@@ -195,7 +196,11 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not update/create an isn_account record for user account %v when adding them to isn %v : %v", targetAccountID, isnSlug, err))
 		return
 	}
-	logger.Info().Msgf("userAccount %v granted new permission %v to account %v on isn %v", userAccountID, req.Permission, targetAccount.ID, isnSlug)
+	reqLogger.Info("userAccount granted new permission",
+		slog.String("granting_user_id", userAccountID.String()),
+		slog.String("permission", req.Permission),
+		slog.String("target_account_id", targetAccount.ID.String()),
+		slog.String("isn_slug", isnSlug))
 
 	responses.RespondWithStatusCodeOnly(w, http.StatusCreated)
 }
@@ -223,7 +228,7 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 //	this handler must use the RequireRole (owner,admin) middlewar
 func (i *IsnAccountHandler) RevokeIsnAccountHandler(w http.ResponseWriter, r *http.Request) {
 
-	logger := zerolog.Ctx(r.Context())
+	reqLogger := logger.ContextLogger(r.Context())
 
 	// get user account id for user making request
 	userAccountID, ok := auth.ContextAccountID(r.Context())
@@ -313,7 +318,10 @@ func (i *IsnAccountHandler) RevokeIsnAccountHandler(w http.ResponseWriter, r *ht
 		return
 	}
 
-	logger.Info().Msgf("userAccount %v revoked permission on %v to account %v", userAccountID, isnSlug, targetAccount.ID)
+	reqLogger.Info("userAccount revoked permission",
+		slog.String("revoking_user_id", userAccountID.String()),
+		slog.String("isn_slug", isnSlug),
+		slog.String("target_account_id", targetAccount.ID.String()))
 
 	responses.RespondWithStatusCodeOnly(w, http.StatusCreated)
 }
@@ -336,7 +344,7 @@ func (i *IsnAccountHandler) RevokeIsnAccountHandler(w http.ResponseWriter, r *ht
 //
 //	@Router			/api/isn/{isn_slug}/accounts [get]
 func (i *IsnAccountHandler) GetIsnAccountsHandler(w http.ResponseWriter, r *http.Request) {
-	logger := zerolog.Ctx(r.Context())
+	reqLogger := logger.ContextLogger(r.Context())
 
 	// get user account id for user making request
 	userAccountID, ok := auth.ContextAccountID(r.Context())
@@ -376,7 +384,9 @@ func (i *IsnAccountHandler) GetIsnAccountsHandler(w http.ResponseWriter, r *http
 	// Get all accounts with access to this ISN
 	dbAccounts, err := i.queries.GetAccountsByIsnID(r.Context(), isn.ID)
 	if err != nil {
-		logger.Error().Err(err).Msgf("database error retrieving accounts for ISN: %v", isnSlug)
+		reqLogger.Error("database error retrieving accounts for ISN",
+			slog.String("error", err.Error()),
+			slog.String("isn_slug", isnSlug))
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
 		return
 	}
@@ -400,6 +410,8 @@ func (i *IsnAccountHandler) GetIsnAccountsHandler(w http.ResponseWriter, r *http
 		}
 	}
 
-	logger.Info().Msgf("retrieved %d accounts for ISN: %v", len(accounts), isnSlug)
+	reqLogger.Info("retrieved accounts for ISN",
+		slog.Int("count", len(accounts)),
+		slog.String("isn_slug", isnSlug))
 	responses.RespondWithJSON(w, http.StatusOK, accounts)
 }

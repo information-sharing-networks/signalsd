@@ -4,17 +4,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/google/uuid"
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
+	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/rs/zerolog"
 )
 
 type UserHandler struct {
@@ -106,8 +107,8 @@ func (u *UserHandler) RegisterUserHandler(w http.ResponseWriter, r *http.Request
 	defer func() {
 		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 			// Log the error but don't try to respond since the request may have already timed out
-			logger := zerolog.Ctx(r.Context())
-			logger.Error().Err(err).Msg("failed to rollback transaction")
+			reqLogger := logger.ContextLogger(r.Context())
+			reqLogger.Error("failed to rollback transaction", slog.String("error", err.Error()))
 		}
 	}()
 
@@ -271,7 +272,7 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 //	this handler must use the RequireRole (owner) middleware
 func (u *UserHandler) GrantUserAdminRoleHandler(w http.ResponseWriter, r *http.Request) {
 
-	logger := zerolog.Ctx(r.Context())
+	reqLogger := logger.ContextLogger(r.Context())
 
 	// get user account id for user making request
 	userAccountID, ok := auth.ContextAccountID(r.Context())
@@ -315,7 +316,7 @@ func (u *UserHandler) GrantUserAdminRoleHandler(w http.ResponseWriter, r *http.R
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not get account %v from database: %v", targetAccountID, err))
 		return
 	}
-	logger.Info().Msgf("%v updated to be an admin", targetAccountID)
+	reqLogger.Info("user updated to be an admin", slog.String("target_account_id", targetAccountID.String()))
 	responses.RespondWithStatusCodeOnly(w, http.StatusCreated)
 }
 
@@ -338,7 +339,7 @@ func (u *UserHandler) GrantUserAdminRoleHandler(w http.ResponseWriter, r *http.R
 //
 //	this handler must use the RequireRole (owner) middleware
 func (u *UserHandler) RevokeUserAdminRoleHandler(w http.ResponseWriter, r *http.Request) {
-	logger := zerolog.Ctx(r.Context())
+	reqLogger := logger.ContextLogger(r.Context())
 
 	// get user account id for user making request
 	userAccountID, ok := auth.ContextAccountID(r.Context())
@@ -382,6 +383,6 @@ func (u *UserHandler) RevokeUserAdminRoleHandler(w http.ResponseWriter, r *http.
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not get account %v from database: %v", targetAccountID, err))
 		return
 	}
-	logger.Info().Msgf("%v: admin role revoked", targetAccountID)
+	reqLogger.Info("admin role revoked", slog.String("target_account_id", targetAccountID.String()))
 	responses.RespondWithStatusCodeOnly(w, http.StatusCreated)
 }
