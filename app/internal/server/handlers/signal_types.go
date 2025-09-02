@@ -378,9 +378,11 @@ func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *ht
 		}
 
 		// Check that the readme file exists on GitHub
-		if err := utils.CheckGithubFileExists(*req.ReadmeURL); err != nil {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("readme file not accessible: %v", err))
-			return
+		if *req.ReadmeURL != signalsd.SkipReadmeURL {
+			if err := utils.CheckGithubFileExists(*req.ReadmeURL); err != nil {
+				responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("readme file not accessible: %v", err))
+				return
+			}
 		}
 
 		signalType.ReadmeURL = *req.ReadmeURL

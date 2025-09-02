@@ -95,6 +95,7 @@ func CheckGithubFileExists(rawURL string) error {
 		},
 	}
 
+	// #nosec G107 -- avoid false postive security linter warning - URL is validated to be GitHub-only before this function is called (see ValidateGithubFileURL)
 	req, err := http.NewRequest("HEAD", rawURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
