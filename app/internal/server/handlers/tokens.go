@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -14,7 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/rs/zerolog"
+	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 )
 
 type ServiceAccountTokenRequest struct {
@@ -88,7 +89,7 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, p
 // this calls the appropriate authentication middleware for the grant_type (client_credentials or refresh_token)) and adds the authenticated accountID to the context
 func (a *TokenHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.Request) {
 
-	logger := zerolog.Ctx(r.Context())
+	reqLogger := logger.ContextLogger(r.Context())
 
 	// RequireValidRefreshToken / RequireClientCredentials middleware adds the userAccountId or serverAccountAccountID to the context
 	accountID, ok := auth.ContextAccountID(r.Context())
@@ -122,7 +123,7 @@ func (a *TokenHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.
 
 		http.SetCookie(w, newCookie)
 	}
-	logger.Info().Msgf("account %v refreshed an access token", accountID)
+	reqLogger.Info("account refreshed an access token", slog.String("account_id", accountID.String()))
 
 	responses.RespondWithJSON(w, http.StatusOK, accessTokenResponse)
 }
@@ -232,8 +233,8 @@ func (a *TokenHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	logger := zerolog.Ctx(r.Context())
-	logger.Info().Msgf("refresh token revoked by userAccountID %v", userAccountId)
+	reqLogger := logger.ContextLogger(r.Context())
+	reqLogger.Info("refresh token revoked by userAccountID", slog.String("user_account_id", userAccountId.String()))
 	responses.RespondWithStatusCodeOnly(w, http.StatusOK)
 
 }
@@ -262,7 +263,7 @@ func (a *TokenHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.
 //
 //	@Router		/api/auth/service-accounts/rotate-secret [post]
 func (a *TokenHandler) RotateServiceAccountSecretHandler(w http.ResponseWriter, r *http.Request) {
-	logger := zerolog.Ctx(r.Context())
+	reqLogger := logger.ContextLogger(r.Context())
 
 	// Get service account ID from context (set by RequireClientCredentials middleware)
 	serviceAccountID, ok := auth.ContextAccountID(r.Context())
@@ -274,7 +275,9 @@ func (a *TokenHandler) RotateServiceAccountSecretHandler(w http.ResponseWriter, 
 	// Get service account details to return client_id
 	serviceAccount, err := a.queries.GetServiceAccountByAccountID(r.Context(), serviceAccountID)
 	if err != nil {
-		logger.Error().Err(err).Msgf("failed to get service account: %v", serviceAccountID)
+		reqLogger.Error("failed to get service account",
+			slog.String("error", err.Error()),
+			slog.String("service_account_id", serviceAccountID.String()))
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "failed to get service account details")
 		return
 	}
@@ -282,7 +285,7 @@ func (a *TokenHandler) RotateServiceAccountSecretHandler(w http.ResponseWriter, 
 	// Generate new client secret
 	newPlaintextSecret, err := a.authService.GenerateSecureToken(32)
 	if err != nil {
-		logger.Error().Err(err).Msg("failed to generate secure token")
+		reqLogger.Error("failed to generate secure token", slog.String("error", err.Error()))
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "failed to generate secure token")
 		return
 	}
@@ -291,14 +294,14 @@ func (a *TokenHandler) RotateServiceAccountSecretHandler(w http.ResponseWriter, 
 
 	tx, err := a.pool.BeginTx(r.Context(), pgx.TxOptions{})
 	if err != nil {
-		logger.Error().Err(err).Msg("failed to begin transaction")
+		reqLogger.Error("failed to begin transaction", slog.String("error", err.Error()))
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "failed to begin transaction")
 		return
 	}
 
 	defer func() {
 		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
-			logger.Error().Err(err).Msg("failed to rollback transaction")
+			reqLogger.Error("failed to rollback transaction", slog.String("error", err.Error()))
 		}
 	}()
 
@@ -306,7 +309,9 @@ func (a *TokenHandler) RotateServiceAccountSecretHandler(w http.ResponseWriter, 
 
 	_, err = txQueries.ScheduleRevokeAllClientSecretsForAccount(r.Context(), serviceAccountID)
 	if err != nil {
-		logger.Error().Err(err).Msgf("failed to schedule revocation of old secrets for account: %v", serviceAccountID)
+		reqLogger.Error("failed to schedule revocation of old secrets for account",
+			slog.String("error", err.Error()),
+			slog.String("service_account_id", serviceAccountID.String()))
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "failed to schedule revocation of old secrets")
 		return
 	}
@@ -317,18 +322,21 @@ func (a *TokenHandler) RotateServiceAccountSecretHandler(w http.ResponseWriter, 
 		ExpiresAt:               expiresAt,
 	})
 	if err != nil {
-		logger.Error().Err(err).Msgf("failed to create new secret for account: %v", serviceAccountID)
+		reqLogger.Error("failed to create new secret for account",
+			slog.String("error", err.Error()),
+			slog.String("service_account_id", serviceAccountID.String()))
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "failed to create new secret")
 		return
 	}
 
 	if err := tx.Commit(r.Context()); err != nil {
-		logger.Error().Err(err).Msg("failed to commit transaction")
+		reqLogger.Error("failed to commit transaction", slog.String("error", err.Error()))
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "failed to commit transaction")
 		return
 	}
 
-	logger.Info().Msgf("service account %v rotated client secret (old secret valid for 5 more minutes)", serviceAccount.ClientID)
+	reqLogger.Info("service account rotated client secret (old secret valid for 5 more minutes)",
+		slog.String("client_id", serviceAccount.ClientID))
 
 	response := ServiceAccountRotateResponse{
 		ClientID:     serviceAccount.ClientID,

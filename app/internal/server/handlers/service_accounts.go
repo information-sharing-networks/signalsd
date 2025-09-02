@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -12,12 +13,12 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
+	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/utils"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/rs/zerolog"
 )
 
 // template for service account setup confirmation
@@ -141,7 +142,7 @@ type SetupPageData struct {
 //	@Router		/api/auth/register/service-accounts [post]
 func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWriter, r *http.Request) {
 	var req CreateServiceAccountRequest
-	logger := zerolog.Ctx(r.Context())
+	reqLogger := logger.ContextLogger(r.Context())
 
 	defer r.Body.Close()
 
@@ -180,7 +181,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 		clientID = serviceAccount.ClientID
 		serviceAccountID = serviceAccount.AccountID
 
-		logger.Info().Msgf("service account %v already exists - revoking exitng client secrets", clientID)
+		reqLogger.Info("service account already exists - revoking existing client secrets", slog.String("client_id", clientID))
 
 		_, err := s.queries.RevokeAllClientSecretsForAccount(r.Context(), serviceAccount.AccountID)
 		if err != nil {
@@ -215,7 +216,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 	txQueries := s.queries.WithTx(tx)
 
 	if !clientAlreadyExists {
-		logger.Info().Msgf("creating new service account %v", clientID)
+		reqLogger.Info("creating new service account", slog.String("client_id", clientID))
 
 		// create serviceAccount
 		serviceAccount, err := txQueries.CreateServiceAccountAccount(r.Context())
@@ -271,7 +272,9 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 		oneTimeSecretID.String(),
 	)
 
-	logger.Info().Msgf("service account %v created - setup url: %v", clientID, setupURL)
+	reqLogger.Info("service account created",
+		slog.String("client_id", clientID),
+		slog.String("setup_url", setupURL))
 
 	// Return the setup information
 	response := CreateServiceAccountResponse{
@@ -307,12 +310,12 @@ func (s *ServiceAccountHandler) SetupServiceAccountHandler(w http.ResponseWriter
 	// Extract token from URL path
 	oneTimeSecretIDString := r.PathValue("setup_id")
 
-	logger := zerolog.Ctx(r.Context())
+	reqLogger := logger.ContextLogger(r.Context())
 
 	// Parse token as UUID
 	oneTimeSecretID, err := uuid.Parse(oneTimeSecretIDString)
 	if err != nil {
-		logger.Warn().Msg("invalid setup ID format")
+		reqLogger.Warn("invalid setup ID format")
 		s.renderErrorPage(w, "Invalid Setup ID", "The setup ID you provided is not valid. Please check the URL and try again.")
 		return
 	}
@@ -320,14 +323,14 @@ func (s *ServiceAccountHandler) SetupServiceAccountHandler(w http.ResponseWriter
 	// Start transaction
 	tx, err := s.pool.BeginTx(r.Context(), pgx.TxOptions{})
 	if err != nil {
-		logger.Error().Err(err).Msg("failed to begin transaction")
+		reqLogger.Error("failed to begin transaction", slog.String("error", err.Error()))
 		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
 		return
 	}
 
 	defer func() {
 		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
-			logger.Error().Err(err).Msg("failed to rollback transaction")
+			reqLogger.Error("failed to rollback transaction", slog.String("error", err.Error()))
 			s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
 			return
 		}
@@ -339,25 +342,25 @@ func (s *ServiceAccountHandler) SetupServiceAccountHandler(w http.ResponseWriter
 	oneTimeSecret, err := txQueries.GetOneTimeClientSecret(r.Context(), oneTimeSecretID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			logger.Warn().Msgf("setup ID %v not found or already used", oneTimeSecretID)
+			reqLogger.Warn("setup ID not found or already used", slog.String("setup_id", oneTimeSecretID.String()))
 			s.renderErrorPage(w, "set up ID not found ", "The setup ID you provided has already been used or is no longer valid")
 			return
 		}
-		logger.Error().Err(err).Msg("database error")
+		reqLogger.Error("database error", slog.String("error", err.Error()))
 		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
 		return
 	}
 
 	// Check if token has expired
 	if time.Now().After(oneTimeSecret.ExpiresAt) {
-		logger.Warn().Msgf("setup ID %v has expired", oneTimeSecretID)
+		reqLogger.Warn("setup ID has expired", slog.String("setup_id", oneTimeSecretID.String()))
 		s.renderErrorPage(w, "set up ID not found or already used", "The setup ID you provided has already been used or is no longer valid")
 		return
 	}
 
 	serviceAccount, err := txQueries.GetServiceAccountByAccountID(r.Context(), oneTimeSecret.ServiceAccountAccountID)
 	if err != nil {
-		logger.Error().Err(err).Msg("database error - could not retrieve service account")
+		reqLogger.Error("database error - could not retrieve service account", slog.String("error", err.Error()))
 		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
 		return
 	}
@@ -365,7 +368,7 @@ func (s *ServiceAccountHandler) SetupServiceAccountHandler(w http.ResponseWriter
 	// Revoke any existing client secrets for this service account
 	_, err = txQueries.RevokeAllClientSecretsForAccount(r.Context(), oneTimeSecret.ServiceAccountAccountID)
 	if err != nil {
-		logger.Error().Err(err).Msg("database error - could not revoke existing secrets")
+		reqLogger.Error("database error - could not revoke existing secrets", slog.String("error", err.Error()))
 		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
 		return
 	}
@@ -380,7 +383,7 @@ func (s *ServiceAccountHandler) SetupServiceAccountHandler(w http.ResponseWriter
 		ExpiresAt:               expiresAt,
 	})
 	if err != nil {
-		logger.Error().Err(err).Msg("database error - could not create client secret")
+		reqLogger.Error("database error - could not create client secret", slog.String("error", err.Error()))
 		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
 		return
 	}
@@ -388,20 +391,20 @@ func (s *ServiceAccountHandler) SetupServiceAccountHandler(w http.ResponseWriter
 	// Delete the one-time secret
 	_, err = txQueries.DeleteOneTimeClientSecret(r.Context(), oneTimeSecretID)
 	if err != nil {
-		logger.Error().Err(err).Msg("database error - could not delete one-time client secret")
+		reqLogger.Error("database error - could not delete one-time client secret", slog.String("error", err.Error()))
 		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
 		return
 	}
 
 	if err := tx.Commit(r.Context()); err != nil {
-		logger.Error().Err(err).Msg("database error - failed to commit transaction")
+		reqLogger.Error("database error - failed to commit transaction", slog.String("error", err.Error()))
 		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
 		return
 	}
 
 	template, err := template.New("setup").Parse(setupPageTemplate)
 	if err != nil {
-		logger.Error().Err(err).Msg("template parsing error")
+		reqLogger.Error("template parsing error", slog.String("error", err.Error()))
 		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
 		return
 	}
@@ -417,7 +420,7 @@ func (s *ServiceAccountHandler) SetupServiceAccountHandler(w http.ResponseWriter
 	w.WriteHeader(http.StatusCreated)
 
 	if err := template.Execute(w, data); err != nil {
-		logger.Error().Err(err).Msg("template execution error")
+		reqLogger.Error("template execution error", slog.String("error", err.Error()))
 		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
 		return
 	}

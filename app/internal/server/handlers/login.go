@@ -3,13 +3,14 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
+	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
-	"github.com/rs/zerolog"
 )
 
 type LoginHandler struct {
@@ -56,7 +57,7 @@ type LoginRequest struct {
 //	@Router			/api/auth/login [post]
 func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
-	logger := zerolog.Ctx(r.Context())
+	reqLogger := logger.ContextLogger(r.Context())
 
 	defer r.Body.Close()
 
@@ -95,7 +96,7 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !account.IsActive {
-		logger.Warn().Msgf("attempt to login with disabled user account: %v", user.AccountID)
+		reqLogger.Warn("attempt to login with disabled user account", slog.String("user_account_id", user.AccountID.String()))
 		responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "account is disabled")
 		return
 	}
@@ -121,6 +122,6 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	http.SetCookie(w, newCookie)
 
-	logger.Info().Msgf("user %s logged in", user.AccountID)
+	reqLogger.Info("user logged in", slog.String("user_account_id", user.AccountID.String()))
 	responses.RespondWithJSON(w, http.StatusOK, accessTokenResponse)
 }

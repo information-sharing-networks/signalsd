@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -14,13 +15,13 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
+	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/isns"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/schemas"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/utils"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/rs/zerolog"
 )
 
 type SignalsHandler struct {
@@ -487,6 +488,8 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 		}
 	}
 
+	reqLogger := logger.ContextLogger(r.Context())
+
 	// Process each valid signal in its own transaction
 	for _, signal := range validSignals {
 		// Start a new transaction for this signal
@@ -520,8 +523,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 
 			if err != nil {
 				if rollbackErr := tx.Rollback(r.Context()); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-					logger := zerolog.Ctx(r.Context())
-					logger.Error().Err(rollbackErr).Msg("failed to rollback transaction")
+					reqLogger.Error("failed to rollback transaction", slog.String("error", rollbackErr.Error()))
 				}
 				createSignalsResponse.Results.FailedSignals = append(createSignalsResponse.Results.FailedSignals, FailedSignal{
 					LocalRef:     signal.LocalRef,
@@ -533,8 +535,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 
 			if !isValid {
 				if rollbackErr := tx.Rollback(r.Context()); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-					logger := zerolog.Ctx(r.Context())
-					logger.Error().Err(rollbackErr).Msg("failed to rollback transaction")
+					reqLogger.Error("failed to rollback transaction", slog.String("error", rollbackErr.Error()))
 				}
 				createSignalsResponse.Results.FailedSignals = append(createSignalsResponse.Results.FailedSignals, FailedSignal{
 					LocalRef:     signal.LocalRef,
@@ -559,8 +560,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 			// Rollback this transaction
 			if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 				// Log the error but don't try to respond since the request may have already timed out
-				logger := zerolog.Ctx(r.Context())
-				logger.Error().Err(err).Msg("failed to rollback transaction")
+				reqLogger.Error("failed to rollback transaction", slog.String("error", err.Error()))
 				continue
 			}
 
@@ -587,8 +587,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 			// Rollback this transaction
 			if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 				// Log the error but don't try to respond since the request may have already timed out
-				logger := zerolog.Ctx(r.Context())
-				logger.Error().Err(err).Msg("failed to rollback transaction")
+				reqLogger.Error("failed to rollback transaction", slog.String("error", err.Error()))
 			}
 
 			createSignalsResponse.Results.FailedSignals = append(createSignalsResponse.Results.FailedSignals, FailedSignal{
@@ -635,8 +634,9 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 			})
 			if err != nil {
 				// Log the error but don't fail the operation
-				logger := zerolog.Ctx(r.Context())
-				logger.Error().Msgf("failed to log signal processing failure for local_ref %s: %v", failed.LocalRef, err)
+				reqLogger.Error("failed to log signal processing failure",
+					slog.String("local_ref", failed.LocalRef),
+					slog.String("error", err.Error()))
 			}
 		}
 	}
@@ -1026,8 +1026,12 @@ func (s *SignalsHandler) WithdrawSignalHandler(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	logger := zerolog.Ctx(r.Context())
-	logger.Info().Msgf("Signal %v (local ref: %v) withdrawn by %v", signal.ID, signal.LocalRef, accountID)
+	reqLogger := logger.ContextLogger(r.Context())
+
+	reqLogger.Info("Signal withdrawn",
+		slog.String("signal_id", signal.ID.String()),
+		slog.String("local_ref", signal.LocalRef),
+		slog.String("withdrawn_by", accountID.String()))
 
 	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
 }

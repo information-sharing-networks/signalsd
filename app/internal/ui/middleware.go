@@ -3,6 +3,7 @@ package ui
 import (
 	"encoding/base64"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
@@ -32,20 +33,20 @@ func (s *Server) RequireAuth(next http.Handler) http.Handler {
 			// attempt refresh
 			refreshTokenCookie, err := r.Cookie(signalsd.RefreshTokenCookieName)
 			if err != nil {
-				s.logger.Err(err).Msg("Failed to get refresh token cookie")
+				s.logger.Error("Failed to get refresh token cookie", slog.String("error", err.Error()))
 				s.redirectToLogin(w, r)
 				return
 			}
 
 			loginResp, newRefreshTokenCookie, err := s.authService.RefreshToken(refreshTokenCookie)
 			if err != nil {
-				s.logger.Error().Err(err).Msg("Token refresh failed")
+				s.logger.Error("Token refresh failed", slog.String("error", err.Error()))
 				s.redirectToLogin(w, r)
 				return
 			}
 
 			if err := s.authService.SetAuthCookies(w, loginResp, newRefreshTokenCookie, s.config.Environment); err != nil {
-				s.logger.Error().Err(err).Msg("Failed to set authentication cookies after refresh")
+				s.logger.Error("Failed to set authentication cookies after refresh", slog.String("error", err.Error()))
 				s.redirectToLogin(w, r)
 				return
 			}
@@ -66,14 +67,14 @@ func (s *Server) getAccountInfoFromCookie(r *http.Request) *AccountInfo {
 	// Decode base64
 	decodedAccountInfo, err := base64.StdEncoding.DecodeString(accountInfoCookie.Value)
 	if err != nil {
-		s.logger.Error().Err(err).Msg("Failed to decode account info cookie")
+		s.logger.Error("Failed to decode account info cookie", slog.String("error", err.Error()))
 		return nil
 	}
 
 	// Unmarshal JSON
 	var accountInfo AccountInfo
 	if err := json.Unmarshal(decodedAccountInfo, &accountInfo); err != nil {
-		s.logger.Error().Err(err).Msg("Failed to unmarshal account info")
+		s.logger.Error("Failed to unmarshal account info", slog.String("error", err.Error()))
 		return nil
 	}
 
@@ -85,13 +86,14 @@ func (s *Server) RequireAdminAccess(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		accountInfo := s.getAccountInfoFromCookie(r)
 		if accountInfo == nil {
-			s.logger.Error().Msg("Account info not found in RequireAdminAccess middleware")
+			s.logger.Error("Account info not found in RequireAdminAccess middleware")
 			s.handleAccessDenied(w, r, "Admin Dashboard", "Internal error - account info not found, please login again")
 			return
 		}
 
 		if accountInfo.Role != "owner" && accountInfo.Role != "admin" {
-			s.logger.Info().Msgf("User %s attempted to access admin area without permission", accountInfo.AccountID)
+			s.logger.Info("User attempted to access admin area without permission",
+				slog.String("account_id", accountInfo.AccountID))
 			s.handleAccessDenied(w, r, "Admin Dashboard", "You do not have permission to access the admin dashboard")
 			return
 		}
@@ -106,7 +108,7 @@ func (s *Server) RequireIsnAccess(next http.Handler) http.Handler {
 		_, err := r.Cookie(isnPermsCookieName)
 		if err != nil {
 			// No ISN permissions cookie = no ISN access
-			s.logger.Info().Msg("User attempted to access ISN features without ISN permissions")
+			s.logger.Info("User attempted to access ISN features without ISN permissions")
 			s.handleAccessDenied(w, r, "Search Signals", "You do not have access to any ISNs - please contact your administrator")
 			return
 		}
@@ -126,14 +128,14 @@ func (s *Server) getIsnPermsFromCookie(r *http.Request) map[string]IsnPerms {
 	// Decode base64
 	decodedPerms, err := base64.StdEncoding.DecodeString(permsCookie.Value)
 	if err != nil {
-		s.logger.Error().Err(err).Msg("Failed to decode ISN permissions cookie")
+		s.logger.Error("Failed to decode ISN permissions cookie", slog.String("error", err.Error()))
 		return make(map[string]IsnPerms)
 	}
 
 	// Unmarshal JSON
 	var perms map[string]IsnPerms
 	if err := json.Unmarshal(decodedPerms, &perms); err != nil {
-		s.logger.Error().Err(err).Msg("Failed to unmarshal ISN permissions")
+		s.logger.Error("Failed to unmarshal ISN permissions", slog.String("error", err.Error()))
 		return make(map[string]IsnPerms)
 	}
 

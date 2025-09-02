@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -17,7 +18,6 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/server/schemas"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/rs/zerolog"
 )
 
 type Server struct {
@@ -26,8 +26,7 @@ type Server struct {
 	authService    *auth.AuthService
 	serverConfig   *signalsd.ServerConfig
 	corsConfigs    *signalsd.CORSConfigs
-	serverLogger   *zerolog.Logger
-	httpLogger     *zerolog.Logger
+	logger         *slog.Logger
 	router         *chi.Mux
 	schemaCache    *schemas.SchemaCache
 	publicIsnCache *isns.PublicIsnCache
@@ -39,8 +38,7 @@ func NewServer(
 	authService *auth.AuthService,
 	cfg *signalsd.ServerConfig,
 	corsConfigs *signalsd.CORSConfigs,
-	serverLogger *zerolog.Logger,
-	httpLogger *zerolog.Logger,
+	logger *slog.Logger,
 	schemaCache *schemas.SchemaCache,
 	publicIsnCache *isns.PublicIsnCache,
 ) *Server {
@@ -50,8 +48,7 @@ func NewServer(
 		authService:    authService,
 		serverConfig:   cfg,
 		corsConfigs:    corsConfigs,
-		serverLogger:   serverLogger,
-		httpLogger:     httpLogger,
+		logger:         logger,
 		router:         chi.NewRouter(),
 		schemaCache:    schemaCache,
 		publicIsnCache: publicIsnCache,
@@ -66,8 +63,7 @@ func NewServer(
 		server.registerSignalReadRoutes()
 		server.registerSignalWriteRoutes()
 		server.registerApiDocoRoutes()
-		server.registerUIRoutes()
-
+		server.setupUIServer()
 	case "api":
 		server.registerAdminRoutes()
 		server.registerSignalReadRoutes()
@@ -102,7 +98,9 @@ func (s *Server) Start(ctx context.Context) error {
 
 	// Start HTTP server
 	go func() {
-		s.serverLogger.Info().Msgf("%s service listening on %s", s.serverConfig.Environment, serverAddr)
+		s.logger.Info("service listening",
+			slog.String("environment", s.serverConfig.Environment),
+			slog.String("address", serverAddr))
 
 		err := httpServer.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
@@ -115,30 +113,31 @@ func (s *Server) Start(ctx context.Context) error {
 	case err := <-serverErrors:
 		return err
 	case <-ctx.Done():
-		s.serverLogger.Info().Msg("shutdown signal received")
+		s.logger.Info("shutdown signal received")
 	}
 
 	// Graceful shutdown with timeout
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), signalsd.ServerShutdownTimeout)
 	defer shutdownCancel()
 
-	s.serverLogger.Info().Msg("shutting down HTTP server")
+	s.logger.Info("shutting down HTTP server")
 
 	err := httpServer.Shutdown(shutdownCtx)
 	if err != nil {
-		s.serverLogger.Warn().Msgf("HTTP server shutdown error: %v", err)
+		s.logger.Warn("HTTP server shutdown error",
+			slog.String("error", err.Error()))
 		return fmt.Errorf("HTTP server shutdown failed: %w", err)
 	}
 
-	s.serverLogger.Info().Msg("HTTP server shutdown complete")
+	s.logger.Info("HTTP server shutdown complete")
 	return nil
 }
 
 // DatabaseShutdown gracefully shutsdown the database
 func (s *Server) DatabaseShutdown() {
-	s.serverLogger.Info().Msg("closing database connections")
+	s.logger.Info("closing database connections")
 	s.pool.Close()
-	s.serverLogger.Info().Msg("database connections closed")
+	s.logger.Info("database connections closed")
 }
 
 // setupMiddleware sets up the middleware that applies to all server requests
@@ -146,7 +145,7 @@ func (s *Server) DatabaseShutdown() {
 func (s *Server) setupMiddleware() {
 	s.router.Use(chimiddleware.Recoverer)
 	s.router.Use(chimiddleware.RequestID)
-	s.router.Use(logger.RequestLogging(s.httpLogger))
+	s.router.Use(logger.RequestLogging(s.logger))
 	s.router.Use(chimiddleware.StripSlashes)
 	s.router.Use(middleware.SecurityHeaders(s.serverConfig.Environment))
 	s.router.Use(middleware.RateLimit(s.serverConfig.RateLimitRPS, s.serverConfig.RateLimitBurst))
@@ -421,23 +420,23 @@ func (s *Server) registerApiDocoRoutes() {
 	})
 }
 
-// registerUIRoutes registers web UI routes directly on the main router
-func (s *Server) registerUIRoutes() {
-	// Create UI configuration pointing to localhost API
+// setupUIServer configures the UI server and registers web UI routes directly on the signalsd router
+func (s *Server) setupUIServer() {
+	// Create UI configuration based on signalsd configuration
 	uiConfig := &ui.Config{
 		Environment:  s.serverConfig.Environment,
 		Host:         s.serverConfig.Host,
 		Port:         s.serverConfig.Port, // Same port as API
-		LogLevel:     s.serverLogger.GetLevel(),
+		LogLevel:     s.serverConfig.LogLevel,
 		ReadTimeout:  s.serverConfig.ReadTimeout,
 		WriteTimeout: s.serverConfig.WriteTimeout,
 		IdleTimeout:  s.serverConfig.IdleTimeout,
 		APIBaseURL:   fmt.Sprintf("http://localhost:%d", s.serverConfig.Port), // use the API port
 	}
 
-	// Create UI server and register its routes on our main router
-	uiServer := ui.NewServer(uiConfig, s.serverLogger)
+	// Create UI server and register its routes on the signalsd router
+	uiServer := ui.NewIntegratedServer(s.router, uiConfig, s.logger)
 	uiServer.RegisterRoutes(s.router)
 
-	s.serverLogger.Info().Msg("UI routes registered")
+	s.logger.Info("UI routes registered")
 }

@@ -6,7 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -18,7 +18,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
-	"github.com/rs/zerolog"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
@@ -73,27 +72,6 @@ func getTestDatabaseURL() string {
 		return ciTestDatabaseURL
 	}
 	return localTestDatabaseURL
-}
-
-// createHttpLogger creates a logger that only logs errors - used to suppress request logs during tests
-// Set ENABLE_SERVER_LOGS=true environment variable to enable full HTTP request/response logging for debugging
-func createHttpLogger() *zerolog.Logger {
-	if os.Getenv("ENABLE_SERVER_LOGS") == "true" {
-		logger := zerolog.New(zerolog.ConsoleWriter{Out: os.Stderr}).
-			Level(zerolog.DebugLevel).
-			With().
-			Timestamp().
-			Logger()
-		return &logger
-	}
-
-	// Default: only log errors to reduce test noise
-	logger := zerolog.New(io.Discard).
-		Level(zerolog.ErrorLevel).
-		With().
-		Timestamp().
-		Logger()
-	return &logger
 }
 
 // setupTestDatabase sets up a test database environment:
@@ -266,16 +244,13 @@ func startInProcessServer(t *testing.T, ctx context.Context, testDB *pgxpool.Poo
 		}
 	}()
 
-	serverLogger := logger.InitServerLogger()
-
-	cfg, corsConfigs, err := signalsd.NewServerConfig(serverLogger)
+	cfg, corsConfigs, err := signalsd.NewServerConfig()
 	if err != nil {
 		t.Fatalf("Failed to load configuration: %v", err)
 	}
+	appLogger := logger.InitLogger(slog.LevelDebug, environment)
 
 	cfg.ServiceMode = "all"
-
-	httpLogger := createHttpLogger()
 
 	queries := database.New(testDB)
 	authService := auth.NewAuthService(cfg.SecretKey, environment, queries)
@@ -296,8 +271,7 @@ func startInProcessServer(t *testing.T, ctx context.Context, testDB *pgxpool.Poo
 		authService,
 		cfg,
 		corsConfigs,
-		serverLogger,
-		httpLogger,
+		appLogger,
 		schemaCache,
 		publicIsnCache,
 	)
