@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -57,18 +56,26 @@ type LoginRequest struct {
 //	@Router			/api/auth/login [post]
 func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
-	reqLogger := logger.ContextLogger(r.Context())
 
 	defer r.Body.Close()
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
 		return
 	}
 
 	exists, err := l.queries.ExistsUserWithEmail(r.Context(), req.Email)
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("email", req.Email),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 	if !exists {
@@ -78,7 +85,12 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	user, err := l.queries.GetUserByEmail(r.Context(), req.Email)
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("email", req.Email),
+		)
+
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
@@ -91,12 +103,20 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	// check if the user account is active
 	account, err := l.queries.GetAccountByID(r.Context(), user.AccountID)
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("account_id", user.AccountID.String()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
 	if !account.IsActive {
-		reqLogger.Warn("attempt to login with disabled user account", slog.String("user_account_id", user.AccountID.String()))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("user_account_id", user.AccountID.String()),
+		)
+
 		responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "account is disabled")
 		return
 	}
@@ -106,14 +126,24 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	accessTokenResponse, err := l.authService.CreateAccessToken(ctx)
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenInvalid, fmt.Sprintf("error creating access token: %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("account_id", user.AccountID.String()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenInvalid, "error creating access token")
 		return
 	}
 
 	// new refresh token
 	refreshToken, err := l.authService.RotateRefreshToken(ctx)
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenInvalid, fmt.Sprintf("error creating refresh token: %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("account_id", user.AccountID.String()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenInvalid, "error creating refresh token")
 		return
 	}
 
@@ -122,6 +152,9 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	http.SetCookie(w, newCookie)
 
-	reqLogger.Info("user logged in", slog.String("user_account_id", user.AccountID.String()))
+	logger.ContextWithLogAttrs(r.Context(),
+		slog.String("user_account_id", user.AccountID.String()),
+	)
+
 	responses.RespondWithJSON(w, http.StatusOK, accessTokenResponse)
 }

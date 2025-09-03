@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 
@@ -9,6 +10,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
+	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
 )
 
@@ -46,6 +48,21 @@ func RequestSizeLimit(maxBytes int64) func(http.Handler) http.Handler {
 
 			// Check Content-Length header first (if present)
 			if r.ContentLength > maxBytes {
+				reqLogger := logger.ContextMiddlewareLogger(r.Context())
+
+				// Log request size limit violation immediately
+				reqLogger.Warn("Request size limit exceeded",
+					slog.String("component", "RequestSizeLimit"),
+					slog.Int64("content_length", r.ContentLength),
+					slog.Int64("max_bytes", maxBytes),
+				)
+
+				// Add context for final request log
+				logger.ContextWithLogAttrs(r.Context(),
+					slog.Int64("content_length", r.ContentLength),
+					slog.Int64("max_bytes", maxBytes),
+				)
+
 				errorMsg := fmt.Sprintf("Request body exceeds maximum size of %d bytes", maxBytes)
 				responses.RespondWithError(w, r, 413, // Request Entity Too Large
 					apperrors.ErrCodeRequestTooLarge, errorMsg)
@@ -74,6 +91,19 @@ func RateLimit(requestsPerSecond int32, burst int32) func(http.Handler) http.Han
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if !limiter.Allow() {
+				reqLogger := logger.ContextMiddlewareLogger(r.Context())
+
+				// Log rate limit violation immediately
+				reqLogger.Warn("Rate limit exceeded",
+					slog.String("component", "RateLimit"),
+					slog.String("remote_addr", r.RemoteAddr),
+				)
+
+				// Add context for final request log
+				logger.ContextWithLogAttrs(r.Context(),
+					slog.String("remote_addr", r.RemoteAddr),
+				)
+
 				responses.RespondWithError(w, r, http.StatusTooManyRequests,
 					apperrors.ErrCodeRateLimitExceeded, "Rate limit exceeded")
 				return

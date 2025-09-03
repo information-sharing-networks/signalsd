@@ -33,6 +33,15 @@ const (
 	TokenValid
 )
 
+var tokenStatusNames = []string{"TokenMissing", "TokenInvalid", "TokenExpired", "TokenValid"}
+
+func (t TokenStatus) String() string {
+	if t < 0 || int(t) >= len(tokenStatusNames) {
+		return fmt.Sprintf("TokenStatus(%d)", int(t))
+	}
+	return tokenStatusNames[t]
+}
+
 func NewAuthService(apiBaseURL string) *AuthService {
 	return &AuthService{
 		apiBaseURL: apiBaseURL,

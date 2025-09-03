@@ -391,7 +391,12 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 	// check that the user is requesting a valid signal type/sem_ver for this isn
 	found := slices.Contains(claims.IsnPerms[isnSlug].SignalTypePaths, signalTypePath)
 	if !found {
-		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("signal type %v is not available on ISN %v", signalTypePath, isnSlug))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("signal_type", signalTypePath),
+			slog.String("isn_slug", isnSlug),
+		)
+
+		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "signal type not available on this ISN")
 		return
 	}
 
@@ -401,7 +406,11 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 	decoder := json.NewDecoder(r.Body)
 	err := decoder.Decode(&createSignalsRequest)
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("invalid JSON format: %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
 		return
 	}
 
@@ -419,11 +428,20 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 	// check each signal in the payload has required fields
 	for i, signal := range createSignalsRequest.Signals {
 		if signal.LocalRef == "" {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("signal at index %d is missing required field 'local_ref'", i))
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.Int("signal_index", i),
+			)
+
+			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "signal is missing required field 'local_ref'")
 			return
 		}
 		if len(signal.Content) == 0 {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("signal at index %d is missing required field 'content'", i))
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.Int("signal_index", i),
+				slog.String("local_ref", signal.LocalRef),
+			)
+
+			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "signal is missing required field 'content'")
 			return
 		}
 	}
@@ -449,7 +467,13 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 				AccountID: accountID,
 			})
 			if err != nil {
-				responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to get or create signal batch: %v", err))
+				logger.ContextWithLogAttrs(r.Context(),
+					slog.String("error", err.Error()),
+					slog.String("isn_slug", isnSlug),
+					slog.String("account_id", accountID.String()),
+				)
+
+				responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 				return
 			}
 		}
@@ -480,15 +504,13 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 			createSignalsResponse.Results.FailedSignals = append(createSignalsResponse.Results.FailedSignals, FailedSignal{
 				LocalRef:     signal.LocalRef,
 				ErrorCode:    string(apperrors.ErrCodeMalformedBody),
-				ErrorMessage: fmt.Sprintf("validation failed: %v", err),
+				ErrorMessage: "validation failed",
 			})
 		} else {
 			// Add to valid signals for processing
 			validSignals = append(validSignals, signal)
 		}
 	}
-
-	reqLogger := logger.ContextLogger(r.Context())
 
 	// Process each valid signal in its own transaction
 	for _, signal := range validSignals {
@@ -499,7 +521,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 			createSignalsResponse.Results.FailedSignals = append(createSignalsResponse.Results.FailedSignals, FailedSignal{
 				LocalRef:     signal.LocalRef,
 				ErrorCode:    string(apperrors.ErrCodeMalformedBody),
-				ErrorMessage: fmt.Sprintf("failed to begin transaction: %v", err),
+				ErrorMessage: "failed to begin transaction",
 			})
 			continue
 		}
@@ -523,7 +545,10 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 
 			if err != nil {
 				if rollbackErr := tx.Rollback(r.Context()); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-					reqLogger.Error("failed to rollback transaction", slog.String("error", rollbackErr.Error()))
+					logger.ContextWithLogAttrs(r.Context(),
+						slog.String("error", rollbackErr.Error()),
+					)
+
 				}
 				createSignalsResponse.Results.FailedSignals = append(createSignalsResponse.Results.FailedSignals, FailedSignal{
 					LocalRef:     signal.LocalRef,
@@ -535,7 +560,10 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 
 			if !isValid {
 				if rollbackErr := tx.Rollback(r.Context()); rollbackErr != nil && !errors.Is(rollbackErr, pgx.ErrTxClosed) {
-					reqLogger.Error("failed to rollback transaction", slog.String("error", rollbackErr.Error()))
+					logger.ContextWithLogAttrs(r.Context(),
+						slog.String("error", rollbackErr.Error()),
+					)
+
 				}
 				createSignalsResponse.Results.FailedSignals = append(createSignalsResponse.Results.FailedSignals, FailedSignal{
 					LocalRef:     signal.LocalRef,
@@ -560,7 +588,10 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 			// Rollback this transaction
 			if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 				// Log the error but don't try to respond since the request may have already timed out
-				reqLogger.Error("failed to rollback transaction", slog.String("error", err.Error()))
+				logger.ContextWithLogAttrs(r.Context(),
+					slog.String("error", err.Error()),
+				)
+
 				continue
 			}
 
@@ -587,7 +618,10 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 			// Rollback this transaction
 			if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 				// Log the error but don't try to respond since the request may have already timed out
-				reqLogger.Error("failed to rollback transaction", slog.String("error", err.Error()))
+				logger.ContextWithLogAttrs(r.Context(),
+					slog.String("error", err.Error()),
+				)
+
 			}
 
 			createSignalsResponse.Results.FailedSignals = append(createSignalsResponse.Results.FailedSignals, FailedSignal{
@@ -603,7 +637,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 			createSignalsResponse.Results.FailedSignals = append(createSignalsResponse.Results.FailedSignals, FailedSignal{
 				LocalRef:     signal.LocalRef,
 				ErrorCode:    string(apperrors.ErrCodeDatabaseError),
-				ErrorMessage: fmt.Sprintf("failed to commit transaction: %v", err),
+				ErrorMessage: "failed to commit transaction",
 			})
 			continue
 		}
@@ -634,9 +668,11 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 			})
 			if err != nil {
 				// Log the error but don't fail the operation
-				reqLogger.Error("failed to log signal processing failure",
+				logger.ContextWithLogAttrs(r.Context(),
 					slog.String("local_ref", failed.LocalRef),
-					slog.String("error", err.Error()))
+					slog.String("error", err.Error()),
+				)
+
 			}
 		}
 	}
@@ -685,7 +721,11 @@ func (s *SignalsHandler) SearchPublicSignalsHandler(w http.ResponseWriter, r *ht
 	// Parse all search parameters
 	searchParams, err := parseSearchParams(r)
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "invalid search parameters")
 		return
 	}
 
@@ -693,13 +733,22 @@ func (s *SignalsHandler) SearchPublicSignalsHandler(w http.ResponseWriter, r *ht
 
 	// Validate this is a public ISN
 	if !s.publicIsnCache.HasSignalType(searchParams.isnSlug, signalTypePath) {
-		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("invalid public ISN or signal type: %v is not available on this ISN", signalTypePath))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("signal_type", signalTypePath),
+			slog.String("isn_slug", searchParams.isnSlug),
+		)
+
+		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "signal type not available on this ISN")
 		return
 	}
 
 	// Validate search parameters
 	if err := validateSearchParams(searchParams); err != nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "invalid search parameters")
 		return
 	}
 
@@ -715,7 +764,12 @@ func (s *SignalsHandler) SearchPublicSignalsHandler(w http.ResponseWriter, r *ht
 		IncludeWithdrawn: &searchParams.includeWithdrawn,
 	})
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to select signals from database: %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("isn_slug", searchParams.isnSlug),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
@@ -738,7 +792,11 @@ func (s *SignalsHandler) SearchPublicSignalsHandler(w http.ResponseWriter, r *ht
 		// create a map of signal_id to their correlated signals
 		correlatedSignalBySignalID, err = s.getCorrelatedSignals(r.Context(), signalIDs, searchParams)
 		if err != nil {
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to get correlated signals: %v", err))
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("error", err.Error()),
+			)
+
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 			return
 		}
 	}
@@ -746,7 +804,11 @@ func (s *SignalsHandler) SearchPublicSignalsHandler(w http.ResponseWriter, r *ht
 	if searchParams.includePreviousSignalVersions {
 		previousVersionsBySignalID, err = s.getPreviousSignalVersions(r.Context(), signalIDs)
 		if err != nil {
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to get signal versions: %v", err))
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("error", err.Error()),
+			)
+
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 			return
 		}
 	}
@@ -815,7 +877,11 @@ func (s *SignalsHandler) SearchPrivateSignalsHandler(w http.ResponseWriter, r *h
 	// Parse all search parameters
 	searchParams, err := parseSearchParams(r)
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "invalid search parameters")
 		return
 	}
 
@@ -830,13 +896,22 @@ func (s *SignalsHandler) SearchPrivateSignalsHandler(w http.ResponseWriter, r *h
 
 	// Check if user has access to this signal type
 	if !slices.Contains(claims.IsnPerms[searchParams.isnSlug].SignalTypePaths, signalTypePath) {
-		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("signal type %v not found on ISN %v", signalTypePath, searchParams.isnSlug))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("signal_type", signalTypePath),
+			slog.String("isn_slug", searchParams.isnSlug),
+		)
+
+		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "signal type not found on ISN")
 		return
 	}
 
 	// Validate search parameters
 	if err := validateSearchParams(searchParams); err != nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "invalid search parameters")
 		return
 	}
 
@@ -852,7 +927,12 @@ func (s *SignalsHandler) SearchPrivateSignalsHandler(w http.ResponseWriter, r *h
 		IncludeWithdrawn: &searchParams.includeWithdrawn,
 	})
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to select signals from database: %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("isn_slug", searchParams.isnSlug),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
@@ -875,7 +955,11 @@ func (s *SignalsHandler) SearchPrivateSignalsHandler(w http.ResponseWriter, r *h
 		// create a map of signal_id to their correlated signals
 		correlatedSignalBySignalID, err = s.getCorrelatedSignals(r.Context(), signalIDs, searchParams)
 		if err != nil {
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to get correlated signals: %v", err))
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("error", err.Error()),
+			)
+
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 			return
 		}
 	}
@@ -883,7 +967,11 @@ func (s *SignalsHandler) SearchPrivateSignalsHandler(w http.ResponseWriter, r *h
 	if searchParams.includePreviousSignalVersions {
 		previousVersionsBySignalID, err = s.getPreviousSignalVersions(r.Context(), signalIDs)
 		if err != nil {
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to get signal versions: %v", err))
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("error", err.Error()),
+			)
+
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 			return
 		}
 	}
@@ -949,6 +1037,7 @@ func (s *SignalsHandler) SearchPrivateSignalsHandler(w http.ResponseWriter, r *h
 //
 //	@Router			/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/withdraw [put]
 func (s *SignalsHandler) WithdrawSignalHandler(w http.ResponseWriter, r *http.Request) {
+
 	isnSlug := r.PathValue("isn_slug")
 	signalTypeSlug := r.PathValue("signal_type_slug")
 	semVer := r.PathValue("sem_ver")
@@ -969,7 +1058,12 @@ func (s *SignalsHandler) WithdrawSignalHandler(w http.ResponseWriter, r *http.Re
 	// check that the user is requesting a valid signal type/sem_ver for this isn
 	found := slices.Contains(claims.IsnPerms[isnSlug].SignalTypePaths, signalTypePath)
 	if !found {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("signal type %v is not available on ISN %v", signalTypePath, isnSlug))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("signal_type", signalTypePath),
+			slog.String("isn_slug", isnSlug),
+		)
+
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeResourceNotFound, "signal type not available on this ISN")
 		return
 	}
 
@@ -977,7 +1071,11 @@ func (s *SignalsHandler) WithdrawSignalHandler(w http.ResponseWriter, r *http.Re
 	var req WithdrawSignalRequest
 	defer r.Body.Close()
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
 		return
 	}
 
@@ -998,7 +1096,12 @@ func (s *SignalsHandler) WithdrawSignalHandler(w http.ResponseWriter, r *http.Re
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "signal not found")
 			return
 		}
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("local_ref", *req.LocalRef),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
@@ -1017,7 +1120,12 @@ func (s *SignalsHandler) WithdrawSignalHandler(w http.ResponseWriter, r *http.Re
 	})
 
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to withdraw signal: %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("local_ref", *req.LocalRef),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
@@ -1026,12 +1134,11 @@ func (s *SignalsHandler) WithdrawSignalHandler(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	reqLogger := logger.ContextLogger(r.Context())
-
-	reqLogger.Info("Signal withdrawn",
+	logger.ContextWithLogAttrs(r.Context(),
 		slog.String("signal_id", signal.ID.String()),
 		slog.String("local_ref", signal.LocalRef),
-		slog.String("withdrawn_by", accountID.String()))
+		slog.String("withdrawn_by", accountID.String()),
+	)
 
 	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
 }

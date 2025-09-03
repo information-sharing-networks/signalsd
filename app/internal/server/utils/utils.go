@@ -5,7 +5,6 @@ import (
 	"encoding/base32"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -61,7 +60,6 @@ func ValidateGithubFileURL(rawURL string, fileType string) error {
 	if !matched {
 		return fmt.Errorf("URL must be a valid GitHub file URL (e.g., https://github.com/user/repo/blob/main/file)")
 	}
-	log.Printf("filetype %v, Debug rawUrl |%v|", fileType, rawURL)
 
 	switch fileType {
 	case "schema":

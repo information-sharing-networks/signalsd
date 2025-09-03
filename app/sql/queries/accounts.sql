@@ -9,6 +9,7 @@ VALUES ( gen_random_uuid(), NOW(), NOW(), 'service_account', true)
 RETURNING *;
 
 -- return the account and user_role (user_role is not applicable to service_accounts - which are always treated as members - so just return 'member' in these cases)
+-- returns both active and inactive accounts
 -- name: GetAccountByID :one
 SELECT
     a.id ,

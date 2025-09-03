@@ -99,7 +99,6 @@ type BatchSearchParams struct {
 //
 // CreateSignalsBatchHandler must be used with the RequireValidAccessToken and RequireIsnPermission middleware functions
 func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r *http.Request) {
-	reqLogger := logger.ContextLogger(r.Context())
 
 	// these checks have been done already in the middleware so - if there is an error here - it is a bug.
 	_, ok := auth.ContextClaims(r.Context())
@@ -115,7 +114,12 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 	}
 	account, err := s.queries.GetAccountByID(r.Context(), accountID)
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, fmt.Sprintf("could not get account %v from datababase: %v ", accountID, err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("account_id", accountID.String()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "database error")
 		return
 	}
 
@@ -128,7 +132,12 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 	isnSlug := r.PathValue("isn_slug")
 	isn, err := s.queries.GetIsnBySlug(r.Context(), isnSlug)
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not get ISN %v from database: %v", isnSlug, err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("isn_slug", isnSlug),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
@@ -137,7 +146,12 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 		AccountID: accountID,
 	})
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not close open batch for user %v : %v", accountID, err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("account_id", accountID.String()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
@@ -146,7 +160,12 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 		AccountID: account.ID,
 	})
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not insert signal_batch: %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("account_id", accountID.String()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
@@ -158,9 +177,11 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 		returnedRow.ID,
 	)
 
-	reqLogger.Info("New signal batch created",
+	logger.ContextWithLogAttrs(r.Context(),
 		slog.String("account_id", account.ID.String()),
-		slog.String("batch_id", returnedRow.ID.String()))
+		slog.String("batch_id", returnedRow.ID.String()),
+	)
+
 	responses.RespondWithJSON(w, http.StatusOK, CreateSignalsBatchResponse{
 		ResourceURL:    resourceURL,
 		AccountID:      account.ID,
@@ -195,6 +216,7 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 //
 // todo handle the fact that the list of failed local_refs might be very large if errors go undetected for a long time
 func (s *SignalsBatchHandler) GetSignalBatchStatusHandler(w http.ResponseWriter, r *http.Request) {
+
 	// Extract path parameters
 	batchIDString := r.PathValue("batch_id")
 
@@ -211,7 +233,12 @@ func (s *SignalsBatchHandler) GetSignalBatchStatusHandler(w http.ResponseWriter,
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "batch not found")
 			return
 		}
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("batch_id", batchIDString),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
@@ -228,7 +255,12 @@ func (s *SignalsBatchHandler) GetSignalBatchStatusHandler(w http.ResponseWriter,
 	// Get the ISN to check if user is an ISN admin
 	isn, err := s.queries.GetIsnBySlug(r.Context(), r.PathValue("isn_slug"))
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("isn_slug", r.PathValue("isn_slug")),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
@@ -245,7 +277,12 @@ func (s *SignalsBatchHandler) GetSignalBatchStatusHandler(w http.ResponseWriter,
 	// Get batch status details using shared helper function
 	response, err := s.getBatchStatusDetails(r.Context(), batchID)
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to get batch status: %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("batch_id", batchID.String()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
@@ -367,13 +404,19 @@ func (s *SignalsBatchHandler) getBatchStatusDetails(ctx context.Context, batchID
 //
 //	@Router		/isn/{isn_slug}/batches/search [get]
 func (s *SignalsBatchHandler) SearchBatchesHandler(w http.ResponseWriter, r *http.Request) {
+
 	// Extract path parameters
 	isnSlug := r.PathValue("isn_slug")
 
 	// check isn exists
 	isn, err := s.queries.GetIsnBySlug(r.Context(), isnSlug)
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("isn_slug", isnSlug),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
@@ -500,7 +543,12 @@ func (s *SignalsBatchHandler) SearchBatchesHandler(w http.ResponseWriter, r *htt
 		Previous:            searchParams.Previous,
 	})
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to search batches: %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("isn_slug", isnSlug),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
@@ -510,7 +558,12 @@ func (s *SignalsBatchHandler) SearchBatchesHandler(w http.ResponseWriter, r *htt
 	for _, batch := range batches {
 		statusResponse, err := s.getBatchStatusDetails(r.Context(), batch.BatchID)
 		if err != nil {
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to get status for batch %s: %v", batch.BatchID, err))
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("error", err.Error()),
+				slog.String("batch_id", batch.BatchID.String()),
+			)
+
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 			return
 		}
 

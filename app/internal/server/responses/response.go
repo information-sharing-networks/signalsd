@@ -7,7 +7,6 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
-	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 )
 
 type ErrorResponse struct {
@@ -18,27 +17,7 @@ type ErrorResponse struct {
 }
 
 func RespondWithError(w http.ResponseWriter, r *http.Request, statusCode int, errorCode apperrors.ErrorCode, message string) {
-	requestLogger := logger.ContextLogger(r.Context())
 	requestID := middleware.GetReqID(r.Context())
-
-	// Log the error with appropriate level
-	switch {
-	case statusCode >= 500:
-		requestLogger.Error("Request failed",
-			slog.Int("status", statusCode),
-			slog.String("error_code", string(errorCode)),
-			slog.String("error_message", message))
-	case statusCode >= 400:
-		requestLogger.Warn("Request failed",
-			slog.Int("status", statusCode),
-			slog.String("error_code", string(errorCode)),
-			slog.String("error_message", message))
-	default:
-		requestLogger.Info("Request failed",
-			slog.Int("status", statusCode),
-			slog.String("error_code", string(errorCode)),
-			slog.String("error_message", message))
-	}
 
 	errResponse := ErrorResponse{
 		StatusCode: statusCode,
@@ -49,8 +28,8 @@ func RespondWithError(w http.ResponseWriter, r *http.Request, statusCode int, er
 
 	dat, err := json.Marshal(errResponse)
 	if err != nil {
-		requestLogger.Error("error marshaling error response",
-			slog.String("error", err.Error()))
+		// Log marshal error directly since this is a critical system error
+		slog.Error("error marshaling error response", slog.String("error", err.Error()), slog.String("request_id", requestID))
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte(`{"error_code":"internal_error","message":"Internal Server Error"}`))
 		return
