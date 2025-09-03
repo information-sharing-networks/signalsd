@@ -96,6 +96,7 @@ type GetAccountByIDRow struct {
 }
 
 // return the account and user_role (user_role is not applicable to service_accounts - which are always treated as members - so just return 'member' in these cases)
+// returns both active and inactive accounts
 func (q *Queries) GetAccountByID(ctx context.Context, id uuid.UUID) (GetAccountByIDRow, error) {
 	row := q.db.QueryRow(ctx, GetAccountByID, id)
 	var i GetAccountByIDRow

@@ -142,12 +142,15 @@ type SetupPageData struct {
 //	@Router		/api/auth/register/service-accounts [post]
 func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWriter, r *http.Request) {
 	var req CreateServiceAccountRequest
-	reqLogger := logger.ContextLogger(r.Context())
 
 	defer r.Body.Close()
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
 		return
 	}
 
@@ -165,14 +168,23 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 		ClientContactEmail: req.ClientContactEmail,
 	})
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("organization", req.ClientOrganization),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
 		// new service account - create client_id
 		clientID, err = utils.GenerateClientID(req.ClientOrganization)
 		if err != nil {
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("could not generate client id: %v", err))
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("error", err.Error()),
+			)
+
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "internal server error")
 			return
 		}
 	} else {
@@ -181,11 +193,18 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 		clientID = serviceAccount.ClientID
 		serviceAccountID = serviceAccount.AccountID
 
-		reqLogger.Info("service account already exists - revoking existing client secrets", slog.String("client_id", clientID))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("client_id", clientID),
+		)
 
 		_, err := s.queries.RevokeAllClientSecretsForAccount(r.Context(), serviceAccount.AccountID)
 		if err != nil {
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("error revoking client secrets: %v", err))
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("error", err.Error()),
+				slog.String("service_account_id", serviceAccountID.String()),
+			)
+
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 			return
 		}
 
@@ -194,7 +213,12 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 			ClientOrganization: req.ClientOrganization,
 		})
 		if err != nil {
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("error deleting one time client secrets: %v", err))
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("error", err.Error()),
+				slog.String("service_account_id", serviceAccountID.String()),
+			)
+
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 			return
 		}
 	}
@@ -202,26 +226,38 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 	// transaction
 	tx, err := s.pool.BeginTx(r.Context(), pgx.TxOptions{})
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to begin transaction: %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
 	defer func() {
 		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to rollback transaction: %v", err))
-			return
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("error", err.Error()),
+			)
+
 		}
 	}()
 
 	txQueries := s.queries.WithTx(tx)
 
 	if !clientAlreadyExists {
-		reqLogger.Info("creating new service account", slog.String("client_id", clientID))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("client_id", clientID),
+		)
 
 		// create serviceAccount
 		serviceAccount, err := txQueries.CreateServiceAccountAccount(r.Context())
 		if err != nil {
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not insert account record: %v", err))
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("error", err.Error()),
+			)
+
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 			return
 		}
 
@@ -235,7 +271,12 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 			ClientOrganization: req.ClientOrganization,
 		})
 		if err != nil {
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not insert service account record: %v", err))
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("error", err.Error()),
+				slog.String("client_id", clientID),
+			)
+
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 			return
 		}
 	}
@@ -243,7 +284,11 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 	// Generate the actual client secret (this gets stored temporarily)
 	clientSecret, err := s.authService.GenerateSecureToken(32)
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, fmt.Sprintf("could not generate client secret: %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "internal server error")
 		return
 	}
 
@@ -256,12 +301,21 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 		ExpiresAt:               expiresAt,
 	})
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not insert one time client secret record: %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("service_account_id", serviceAccountID.String()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
 	if err := tx.Commit(r.Context()); err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to commit transaction: %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
@@ -272,9 +326,10 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 		oneTimeSecretID.String(),
 	)
 
-	reqLogger.Info("service account created",
+	logger.ContextWithLogAttrs(r.Context(),
 		slog.String("client_id", clientID),
-		slog.String("setup_url", setupURL))
+		slog.String("setup_url", setupURL),
+	)
 
 	// Return the setup information
 	response := CreateServiceAccountResponse{
@@ -310,12 +365,11 @@ func (s *ServiceAccountHandler) SetupServiceAccountHandler(w http.ResponseWriter
 	// Extract token from URL path
 	oneTimeSecretIDString := r.PathValue("setup_id")
 
-	reqLogger := logger.ContextLogger(r.Context())
-
 	// Parse token as UUID
 	oneTimeSecretID, err := uuid.Parse(oneTimeSecretIDString)
 	if err != nil {
-		reqLogger.Warn("invalid setup ID format")
+		logger.ContextWithLogAttrs(r.Context())
+
 		s.renderErrorPage(w, "Invalid Setup ID", "The setup ID you provided is not valid. Please check the URL and try again.")
 		return
 	}
@@ -323,14 +377,20 @@ func (s *ServiceAccountHandler) SetupServiceAccountHandler(w http.ResponseWriter
 	// Start transaction
 	tx, err := s.pool.BeginTx(r.Context(), pgx.TxOptions{})
 	if err != nil {
-		reqLogger.Error("failed to begin transaction", slog.String("error", err.Error()))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
 		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
 		return
 	}
 
 	defer func() {
 		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
-			reqLogger.Error("failed to rollback transaction", slog.String("error", err.Error()))
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("error", err.Error()),
+			)
+
 			s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
 			return
 		}
@@ -342,25 +402,37 @@ func (s *ServiceAccountHandler) SetupServiceAccountHandler(w http.ResponseWriter
 	oneTimeSecret, err := txQueries.GetOneTimeClientSecret(r.Context(), oneTimeSecretID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			reqLogger.Warn("setup ID not found or already used", slog.String("setup_id", oneTimeSecretID.String()))
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("setup_id", oneTimeSecretID.String()),
+			)
+
 			s.renderErrorPage(w, "set up ID not found ", "The setup ID you provided has already been used or is no longer valid")
 			return
 		}
-		reqLogger.Error("database error", slog.String("error", err.Error()))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
 		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
 		return
 	}
 
 	// Check if token has expired
 	if time.Now().After(oneTimeSecret.ExpiresAt) {
-		reqLogger.Warn("setup ID has expired", slog.String("setup_id", oneTimeSecretID.String()))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("setup_id", oneTimeSecretID.String()),
+		)
+
 		s.renderErrorPage(w, "set up ID not found or already used", "The setup ID you provided has already been used or is no longer valid")
 		return
 	}
 
 	serviceAccount, err := txQueries.GetServiceAccountByAccountID(r.Context(), oneTimeSecret.ServiceAccountAccountID)
 	if err != nil {
-		reqLogger.Error("database error - could not retrieve service account", slog.String("error", err.Error()))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
 		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
 		return
 	}
@@ -368,7 +440,10 @@ func (s *ServiceAccountHandler) SetupServiceAccountHandler(w http.ResponseWriter
 	// Revoke any existing client secrets for this service account
 	_, err = txQueries.RevokeAllClientSecretsForAccount(r.Context(), oneTimeSecret.ServiceAccountAccountID)
 	if err != nil {
-		reqLogger.Error("database error - could not revoke existing secrets", slog.String("error", err.Error()))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
 		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
 		return
 	}
@@ -383,7 +458,10 @@ func (s *ServiceAccountHandler) SetupServiceAccountHandler(w http.ResponseWriter
 		ExpiresAt:               expiresAt,
 	})
 	if err != nil {
-		reqLogger.Error("database error - could not create client secret", slog.String("error", err.Error()))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
 		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
 		return
 	}
@@ -391,20 +469,29 @@ func (s *ServiceAccountHandler) SetupServiceAccountHandler(w http.ResponseWriter
 	// Delete the one-time secret
 	_, err = txQueries.DeleteOneTimeClientSecret(r.Context(), oneTimeSecretID)
 	if err != nil {
-		reqLogger.Error("database error - could not delete one-time client secret", slog.String("error", err.Error()))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
 		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
 		return
 	}
 
 	if err := tx.Commit(r.Context()); err != nil {
-		reqLogger.Error("database error - failed to commit transaction", slog.String("error", err.Error()))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
 		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
 		return
 	}
 
 	template, err := template.New("setup").Parse(setupPageTemplate)
 	if err != nil {
-		reqLogger.Error("template parsing error", slog.String("error", err.Error()))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
 		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
 		return
 	}
@@ -420,7 +507,10 @@ func (s *ServiceAccountHandler) SetupServiceAccountHandler(w http.ResponseWriter
 	w.WriteHeader(http.StatusCreated)
 
 	if err := template.Execute(w, data); err != nil {
-		reqLogger.Error("template execution error", slog.String("error", err.Error()))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
 		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
 		return
 	}

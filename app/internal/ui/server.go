@@ -75,7 +75,10 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 
 		r.Post("/logout", s.handleLogout)
 		r.Get("/dashboard", s.handleDashboard)
-		r.Get("/admin/isn-accounts", s.handleIsnAccountsAdmin)
+		r.Group(func(r chi.Router) {
+			r.Use(s.RequireAdminAccess)
+			r.Get("/admin/isn-accounts", s.handleIsnAccountsAdmin)
+		})
 		r.Get("/signal-types", s.handleSignalTypeManagement)
 
 		// UI API endpoints (used when rendering ui components)

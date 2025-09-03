@@ -74,11 +74,11 @@ type IsnAccount struct {
 //
 //	this handler must use the RequireRole (owner,admin) middleware
 func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *http.Request) {
-	reqLogger := logger.ContextLogger(r.Context())
+
 	req := GrantIsnAccountPermissionRequest{}
 
-	// get user account id for user making request
-	userAccountID, ok := auth.ContextAccountID(r.Context())
+	// get account id for the account making request
+	accountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
 		return
@@ -93,7 +93,13 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
 			return
 		}
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("isn_slug", isnSlug),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 	// check if user is either the ISN owner or a site owner
@@ -103,7 +109,7 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 		return
 	}
 
-	isIsnOwner := isn.UserAccountID == userAccountID
+	isIsnOwner := isn.UserAccountID == accountID
 	isSiteOwner := claims.Role == "owner"
 
 	if !isIsnOwner && !isSiteOwner {
@@ -115,18 +121,33 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 	targetAccountIDString := r.PathValue("account_id")
 	targetAccountID, err := uuid.Parse(targetAccountIDString)
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, fmt.Sprintf("Invalid account ID: %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("account_id", targetAccountIDString),
+		)
+
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "invalid account ID format")
 		return
 	}
 
 	targetAccount, err := i.queries.GetAccountByID(r.Context(), targetAccountID)
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not get account %v from database: %v", targetAccountID, err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("target_account_id", targetAccountID.String()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
 	// deny users making uncessary attempts to grant perms to themeselves
-	if userAccountID == targetAccountID {
+	if accountID == targetAccountID {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("operation", "grant_isn_account"),
+			slog.String("account_id", accountID.String()),
+			slog.String("error", "accounts cannot grant ISN permissions to themselves"),
+		)
 		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "accounts cannot grant ISN permissions to themselves")
 		return
 	}
@@ -138,7 +159,7 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 	decoder.DisallowUnknownFields()
 	err = decoder.Decode(&req)
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("could not decode request body: %v", err))
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
 		return
 	}
 
@@ -153,7 +174,13 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 		IsnID:     isn.ID,
 	})
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not read isn_accounts for %v: %v", targetAccountID, err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("target_account_id", targetAccountID.String()),
+			slog.String("isn_slug", isnSlug),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
@@ -163,6 +190,13 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 	if !errors.Is(err, pgx.ErrNoRows) {
 		// user has permission on this isn already
 		if req.Permission == isnAccount.Permission {
+
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("operation", "grant_isn_account"),
+				slog.String("account_id", accountID.String()),
+				slog.String("error", fmt.Sprintf("account already has %v permission on isn %v", req.Permission, isnSlug)),
+			)
+
 			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeResourceAlreadyExists, fmt.Sprintf("account already has %v permission on isn %v", req.Permission, isnSlug))
 			return
 		}
@@ -174,7 +208,13 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 			AccountID: targetAccountID,
 		})
 		if err != nil {
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error closing sigal_batches %v", err))
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("error", err.Error()),
+				slog.String("target_account_id", targetAccountID.String()),
+				slog.String("isn_slug", isnSlug),
+			)
+
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 			return
 		}
 	}
@@ -193,14 +233,21 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 		})
 	}
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not update/create an isn_account record for user account %v when adding them to isn %v : %v", targetAccountID, isnSlug, err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("target_account_id", targetAccountID.String()),
+			slog.String("isn_slug", isnSlug),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
-	reqLogger.Info("userAccount granted new permission",
-		slog.String("granting_user_id", userAccountID.String()),
+	logger.ContextWithLogAttrs(r.Context(),
+		slog.String("account_id", accountID.String()),
 		slog.String("permission", req.Permission),
 		slog.String("target_account_id", targetAccount.ID.String()),
-		slog.String("isn_slug", isnSlug))
+		slog.String("isn_slug", isnSlug),
+	)
 
 	responses.RespondWithStatusCodeOnly(w, http.StatusCreated)
 }
@@ -228,10 +275,8 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 //	this handler must use the RequireRole (owner,admin) middlewar
 func (i *IsnAccountHandler) RevokeIsnAccountHandler(w http.ResponseWriter, r *http.Request) {
 
-	reqLogger := logger.ContextLogger(r.Context())
-
 	// get user account id for user making request
-	userAccountID, ok := auth.ContextAccountID(r.Context())
+	accountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
 		return
@@ -246,7 +291,12 @@ func (i *IsnAccountHandler) RevokeIsnAccountHandler(w http.ResponseWriter, r *ht
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
 			return
 		}
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("isn_slug", isnSlug),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 	// check if user is either the ISN owner or a site owner
@@ -256,7 +306,7 @@ func (i *IsnAccountHandler) RevokeIsnAccountHandler(w http.ResponseWriter, r *ht
 		return
 	}
 
-	isIsnOwner := isn.UserAccountID == userAccountID
+	isIsnOwner := isn.UserAccountID == accountID
 	isSiteOwner := claims.Role == "owner"
 
 	if !isIsnOwner && !isSiteOwner {
@@ -268,19 +318,29 @@ func (i *IsnAccountHandler) RevokeIsnAccountHandler(w http.ResponseWriter, r *ht
 	targetAccountIDString := r.PathValue("account_id")
 	targetAccountID, err := uuid.Parse(targetAccountIDString)
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, fmt.Sprintf("Invalid account ID: %v", err))
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "invalid account ID format")
 		return
 	}
 
 	targetAccount, err := i.queries.GetAccountByID(r.Context(), targetAccountID)
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not get account %v from database: %v", targetAccountID, err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("target_account_id", targetAccountID.String()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
 	// deny users making uncessary attempts to revoke perms to themeselves
-	if userAccountID == targetAccountID {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, fmt.Sprintf("User account ID: %v cannot revoke ISN permissions for its own account", userAccountID))
+	if accountID == targetAccountID {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", "accounts cannot revoke ISN permissions for themselves"),
+			slog.String("user_account_id", accountID.String()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "accounts cannot revoke ISN permissions for themselves")
 		return
 	}
 
@@ -291,10 +351,22 @@ func (i *IsnAccountHandler) RevokeIsnAccountHandler(w http.ResponseWriter, r *ht
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, fmt.Sprintf("account %v does not have any permission to use ISN %v already - no action needed", userAccountID, isnSlug))
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("error", "account does not have permission on this ISN"),
+				slog.String("target_account_id", targetAccountID.String()),
+				slog.String("isn_slug", isnSlug),
+			)
+
+			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "account does not have permission on this ISN")
 			return
 		}
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("could not read isn_accounts for %v: %v", targetAccountID, err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("target_account_id", targetAccountID.String()),
+			slog.String("isn_slug", isnSlug),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
@@ -304,7 +376,13 @@ func (i *IsnAccountHandler) RevokeIsnAccountHandler(w http.ResponseWriter, r *ht
 		AccountID: targetAccountID,
 	})
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error closing sigal_batches %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("target_account_id", targetAccountID.String()),
+			slog.String("isn_slug", isnSlug),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
@@ -314,12 +392,18 @@ func (i *IsnAccountHandler) RevokeIsnAccountHandler(w http.ResponseWriter, r *ht
 		AccountID: targetAccountID,
 	})
 	if err != nil || rowsDeleted == 0 {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error removing isn_account record: %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("target_account_id", targetAccountID.String()),
+			slog.String("isn_slug", isnSlug),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
-	reqLogger.Info("userAccount revoked permission",
-		slog.String("revoking_user_id", userAccountID.String()),
+	logger.ContextWithLogAttrs(r.Context(),
+		slog.String("revoking_account_id", accountID.String()),
 		slog.String("isn_slug", isnSlug),
 		slog.String("target_account_id", targetAccount.ID.String()))
 
@@ -344,7 +428,6 @@ func (i *IsnAccountHandler) RevokeIsnAccountHandler(w http.ResponseWriter, r *ht
 //
 //	@Router			/api/isn/{isn_slug}/accounts [get]
 func (i *IsnAccountHandler) GetIsnAccountsHandler(w http.ResponseWriter, r *http.Request) {
-	reqLogger := logger.ContextLogger(r.Context())
 
 	// get user account id for user making request
 	userAccountID, ok := auth.ContextAccountID(r.Context())
@@ -362,7 +445,12 @@ func (i *IsnAccountHandler) GetIsnAccountsHandler(w http.ResponseWriter, r *http
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
 			return
 		}
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("isn_slug", isnSlug),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
@@ -384,10 +472,12 @@ func (i *IsnAccountHandler) GetIsnAccountsHandler(w http.ResponseWriter, r *http
 	// Get all accounts with access to this ISN
 	dbAccounts, err := i.queries.GetAccountsByIsnID(r.Context(), isn.ID)
 	if err != nil {
-		reqLogger.Error("database error retrieving accounts for ISN",
+		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
-			slog.String("isn_slug", isnSlug))
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, fmt.Sprintf("database error: %v", err))
+			slog.String("isn_slug", isnSlug),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
@@ -410,7 +500,7 @@ func (i *IsnAccountHandler) GetIsnAccountsHandler(w http.ResponseWriter, r *http
 		}
 	}
 
-	reqLogger.Info("retrieved accounts for ISN",
+	logger.ContextWithLogAttrs(r.Context(),
 		slog.Int("count", len(accounts)),
 		slog.String("isn_slug", isnSlug))
 	responses.RespondWithJSON(w, http.StatusOK, accounts)
