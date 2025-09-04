@@ -27,6 +27,9 @@ type ServiceAccountTokenRequest struct {
 // with the exception of expiry errors which get a specific error code.
 //
 // If the access token is valid the requestor's accountID, accountType and jwt claims are added to the Context.
+//
+// note this middleware adds the account id, role and account type as log attributes to the context and these fields will automatically be included
+// in the final request log for all requests that require an access token.
 func (a *AuthService) RequireValidAccessToken(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		reqLogger := logger.ContextMiddlewareLogger(r.Context())
@@ -52,6 +55,7 @@ func (a *AuthService) RequireValidAccessToken(next http.Handler) http.Handler {
 			if errors.Is(err, jwt.ErrTokenExpired) {
 				logger.ContextWithLogAttrs(r.Context(),
 					slog.String("account_id", claims.AccountID.String()),
+					slog.String("error", err.Error()),
 				)
 
 				responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAccessTokenExpired, "access token expired, please use the /oauth/token endpoint to renew it")
@@ -73,6 +77,7 @@ func (a *AuthService) RequireValidAccessToken(next http.Handler) http.Handler {
 		if err != nil {
 			logger.ContextWithLogAttrs(r.Context(),
 				slog.String("account_id", claims.AccountID.String()),
+				slog.String("error", err.Error()),
 			)
 
 			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "unauthorized - error processing access token")
@@ -85,9 +90,11 @@ func (a *AuthService) RequireValidAccessToken(next http.Handler) http.Handler {
 			slog.String("account_type", claims.AccountType),
 		)
 
-		// Add account_id to final request log context
+		// Add account_id, role and account_type to final request log context
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("account_id", accountID.String()),
+			slog.String("account_type", claims.AccountType),
+			slog.String("role", claims.Role),
 		)
 
 		// add user and claims to context
@@ -118,6 +125,7 @@ func (a *AuthService) AuthenticateByGrantType(next http.Handler) http.Handler {
 		default:
 			logger.ContextWithLogAttrs(r.Context(),
 				slog.String("grant_type", grantType),
+				slog.String("error", "invalid grant_type parameter"),
 			)
 
 			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "invalid grant_type parameter")
@@ -194,12 +202,12 @@ func (a *AuthService) RequireValidRefreshToken(next http.Handler) http.Handler {
 		// Log successful refresh token validation immediately
 		reqLogger.Debug("Refresh token validation successful",
 			slog.String("component", "RequireValidRefreshToken"),
-			slog.String("user_account_id", userAccountID.String()),
+			slog.String("account_id", userAccountID.String()),
 		)
 
 		// Add user_account_id to final request log context
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("user_account_id", userAccountID.String()),
+			slog.String("account_id", userAccountID.String()),
 		)
 
 		// add userId, accountType and hashedRefreshToken to context
@@ -214,6 +222,7 @@ func (a *AuthService) RequireValidRefreshToken(next http.Handler) http.Handler {
 // RequireValidClientCredentials checks the client crentials used to authenticate service accounts
 //
 // no bearer token required - authenticaton is done using the client credentials.
+// this middleware adds the client_id to the log attributes in context so they are included in the request log for any requests authenticated with client credentials
 func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -264,7 +273,7 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 		if !account.IsActive {
 			logger.ContextWithLogAttrs(r.Context(),
 				slog.String("client_id", req.ClientID),
-				slog.String("service_account_id", serviceAccount.AccountID.String()),
+				slog.String("account_id", serviceAccount.AccountID.String()),
 			)
 
 			responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "account is disabled")
@@ -287,17 +296,17 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 
 		reqLogger := logger.ContextMiddlewareLogger(r.Context())
 
-		// Log successful client credentials validation immediately
+		// Log successful client credentials validation
 		reqLogger.Debug("Client credentials validation successful",
 			slog.String("component", "RequireValidClientCredentials"),
 			slog.String("client_id", req.ClientID),
-			slog.String("service_account_id", serviceAccount.AccountID.String()),
+			slog.String("account_id", serviceAccount.AccountID.String()),
 		)
 
 		// Add context for final request log
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("client_id", req.ClientID),
-			slog.String("service_account_id", serviceAccount.AccountID.String()),
+			slog.String("account_id", serviceAccount.AccountID.String()),
 		)
 
 		ctx := ContextWithAccountID(r.Context(), serviceAccount.AccountID)
@@ -335,7 +344,6 @@ func (a *AuthService) RequireRole(allowedRoles ...string) func(http.Handler) htt
 
 			// let the logger middleware handle log message
 			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("account_id", claims.AccountID.String()),
 				slog.Any("expected_roles", allowedRoles),
 				slog.String("got_role", claims.Role),
 			)
@@ -377,7 +385,6 @@ func (a *AuthService) RequireIsnPermission(allowedPermissions ...string) func(ht
 
 					// Add context for final request log
 					logger.ContextWithLogAttrs(r.Context(),
-						slog.String("account_id", claims.AccountID.String()),
 						slog.String("permission", permission),
 						slog.String("isn_slug", isnSlug),
 					)
@@ -389,7 +396,6 @@ func (a *AuthService) RequireIsnPermission(allowedPermissions ...string) func(ht
 
 			// Add context for final request log
 			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("account_id", claims.AccountID.String()),
 				slog.String("isn", isnSlug),
 				slog.Any("expected_perms", allowedPermissions),
 			)
@@ -410,7 +416,6 @@ func (a *AuthService) RequireDevEnv(next http.Handler) http.Handler {
 			responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "this api can only be used in the dev environment")
 			return
 		}
-		logger.ContextWithLogAttrs(r.Context())
 
 		next.ServeHTTP(w, r)
 	})

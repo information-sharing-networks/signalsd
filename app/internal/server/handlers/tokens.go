@@ -106,7 +106,6 @@ func (a *TokenHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
-			slog.String("account_id", accountID.String()),
 		)
 
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenInvalid, "error creating access token")
@@ -119,20 +118,24 @@ func (a *TokenHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.
 		if err != nil {
 			logger.ContextWithLogAttrs(r.Context(),
 				slog.String("error", err.Error()),
-				slog.String("account_id", accountID.String()),
 			)
 
 			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenInvalid, "error creating refresh token")
 			return
 		}
 
+		reqLogger := logger.ContextMiddlewareLogger(r.Context())
+
+		reqLogger.Debug("Created new access token",
+			slog.String("component", "RefreshAccessTokenHandler"),
+			slog.String("account_id", accountID.String()),
+			slog.String("account_type", accountType),
+		)
+
 		newCookie := a.authService.NewRefreshTokenCookie(a.environment, newRefreshToken)
 
 		http.SetCookie(w, newCookie)
 	}
-	logger.ContextWithLogAttrs(r.Context(),
-		slog.String("account_id", accountID.String()),
-	)
 
 	responses.RespondWithJSON(w, http.StatusOK, accessTokenResponse)
 }
@@ -204,7 +207,6 @@ func (a *TokenHandler) RevokeClientSecretHandler(w http.ResponseWriter, r *http.
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
-			slog.String("account_id", serverAccountID.String()),
 		)
 
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
@@ -234,32 +236,41 @@ func (a *TokenHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
+	reqLogger := logger.ContextMiddlewareLogger(r.Context())
+
 	rowsAffected, err := a.queries.RevokeRefreshToken(r.Context(), hashedRefreshToken)
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
-			slog.String("user_account_id", userAccountId.String()),
 		)
 
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 	if rowsAffected == 0 {
+		reqLogger.Debug("Error revoking refresh token",
+			slog.String("component", "RevokeRefreshTokenHandler"),
+			slog.String("account_id", userAccountId.String()),
+			slog.String("error", "refresh token not found"),
+		)
+
 		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeTokenInvalid, "refresh token not found")
 		return
 	}
 	if rowsAffected != 1 {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.Int64("rows_affected", rowsAffected),
+			slog.Int64("error_rows_affected", rowsAffected),
 		)
 
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
-	logger.ContextWithLogAttrs(r.Context(),
-		slog.String("user_account_id", userAccountId.String()),
-	)
 
+	// add log attributes for final request log
+	logger.ContextWithLogAttrs(r.Context(),
+		slog.String("component", "RevokeRefreshTokenHandler"),
+		slog.String("account_id", userAccountId.String()),
+	)
 	responses.RespondWithStatusCodeOnly(w, http.StatusOK)
 
 }
@@ -301,7 +312,6 @@ func (a *TokenHandler) RotateServiceAccountSecretHandler(w http.ResponseWriter, 
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
-			slog.String("service_account_id", serviceAccountID.String()),
 		)
 
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "failed to get service account details")
@@ -346,7 +356,6 @@ func (a *TokenHandler) RotateServiceAccountSecretHandler(w http.ResponseWriter, 
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
-			slog.String("service_account_id", serviceAccountID.String()),
 		)
 
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "failed to schedule revocation of old secrets")
@@ -361,7 +370,6 @@ func (a *TokenHandler) RotateServiceAccountSecretHandler(w http.ResponseWriter, 
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
-			slog.String("service_account_id", serviceAccountID.String()),
 		)
 
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "failed to create new secret")

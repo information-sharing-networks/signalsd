@@ -470,7 +470,6 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 				logger.ContextWithLogAttrs(r.Context(),
 					slog.String("error", err.Error()),
 					slog.String("isn_slug", isnSlug),
-					slog.String("account_id", accountID.String()),
 				)
 
 				responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")

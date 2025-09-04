@@ -47,7 +47,7 @@ This repo contains the second version (work in progress) - it develops the ISN a
 There are three components:
 - an [API](https://signalsd.btddemo.org/docs) used to configure ISNs, register participants and deploy the data sharing infrastructure
 - an associated [framework agreement](https://github.com/information-sharing-networks/Framework) that establishes the responsibilities of the participants in an ISN
-- a demonstration UI
+- a demonstration [UI](app/internal/ui/README.md)
 
 ## Credits
 Many thanks to [Ross McDonald](https://github.com/rossajmcd) who came up with the concept and created the initial reference implementation.
@@ -145,7 +145,7 @@ docker exec -it signalsd-app /bin/bash
 
 The service starts on [http://localhost:8080](http://localhost:8080) by default.
 
-The API documentation is hosted as part of the service or you can refer to the [latest released docs](https://signals.btddemo.org/docs)
+The API documentation is hosted as part of the service or you can refer to the [docs](https://signals.btddemo.org/docs) for the current release.
 
 ### Development Tools
 

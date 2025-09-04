@@ -201,7 +201,7 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("account_id", accountID.String()),
+				slog.String("error", "account not found"),
 			)
 
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "account not found")
@@ -209,7 +209,6 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 		}
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
-			slog.String("account_id", accountID.String()),
 		)
 
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
@@ -219,7 +218,7 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 	// Prevent disabling the site owner account
 	if account.AccountRole == "owner" {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("account_id", accountID.String()),
+			slog.String("error", "cannot disable the site owner account"),
 		)
 
 		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "cannot disable the site owner account")
@@ -231,7 +230,6 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
-			slog.String("account_id", accountID.String()),
 		)
 
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
@@ -240,7 +238,7 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 
 	if rowsAffected == 0 {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("account_id", accountID.String()),
+			slog.String("error_code", "account not found or already disabled"),
 		)
 
 		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "account not found or already disabled")
@@ -255,7 +253,6 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 		if err != nil {
 			logger.ContextWithLogAttrs(r.Context(),
 				slog.String("error", err.Error()),
-				slog.String("account_id", accountID.String()),
 			)
 
 			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
@@ -267,7 +264,6 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 		if err != nil {
 			logger.ContextWithLogAttrs(r.Context(),
 				slog.String("error", err.Error()),
-				slog.String("account_id", accountID.String()),
 			)
 
 			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
@@ -281,7 +277,6 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 		if err != nil {
 			logger.ContextWithLogAttrs(r.Context(),
 				slog.String("error", err.Error()),
-				slog.String("account_id", accountID.String()),
 			)
 
 			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
@@ -294,7 +289,6 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 		if err != nil {
 			logger.ContextWithLogAttrs(r.Context(),
 				slog.String("error", err.Error()),
-				slog.String("account_id", accountID.String()),
 			)
 
 			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
@@ -312,11 +306,6 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
-
-	logger.ContextWithLogAttrs(r.Context(),
-		slog.String("account_id", accountID.String()),
-		slog.String("account_type", account.AccountType),
-	)
 
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(fmt.Sprintf("account %v (type %s) disabled", accountID, account.AccountType)))
@@ -364,7 +353,7 @@ func (a *AdminHandler) EnableAccountHandler(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("account_id", accountID.String()),
+				slog.String("error", "account not found"),
 			)
 
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "account not found")
@@ -372,7 +361,6 @@ func (a *AdminHandler) EnableAccountHandler(w http.ResponseWriter, r *http.Reque
 		}
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
-			slog.String("account_id", accountID.String()),
 		)
 
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
@@ -384,7 +372,6 @@ func (a *AdminHandler) EnableAccountHandler(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
-			slog.String("account_id", accountID.String()),
 		)
 
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
@@ -393,17 +380,12 @@ func (a *AdminHandler) EnableAccountHandler(w http.ResponseWriter, r *http.Reque
 
 	if rowsAffected == 0 {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("account_id", accountID.String()),
+			slog.String("error", "account not found or already enabled"),
 		)
 
 		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "account not found or already enabled")
 		return
 	}
-
-	logger.ContextWithLogAttrs(r.Context(),
-		slog.String("account_id", accountID.String()),
-		slog.String("account_type", account.AccountType),
-	)
 
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(fmt.Sprintf("account %v (type %s) enabled", accountID, account.AccountType)))
@@ -474,11 +456,6 @@ func (a *AdminHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 		// Lookup by ID
 		userAccountID, err := uuid.Parse(accountIdParam)
 		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
-				slog.String("account_id", accountIdParam),
-			)
-
 			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "invalid user ID format")
 			return
 		}
@@ -491,7 +468,6 @@ func (a *AdminHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 			}
 			logger.ContextWithLogAttrs(r.Context(),
 				slog.String("error", err.Error()),
-				slog.String("user_account_id", userAccountID.String()),
 			)
 
 			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
@@ -571,16 +547,11 @@ func (a *AdminHandler) GetServiceAccountHandler(w http.ResponseWriter, r *http.R
 	dbServiceAccount, err := a.queries.GetServiceAccountByAccountID(r.Context(), serviceAccountID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("service_account_id", serviceAccountID.String()),
-			)
-
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "service account not found")
 			return
 		}
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
-			slog.String("service_account_id", serviceAccountID.String()),
 		)
 
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
@@ -596,10 +567,6 @@ func (a *AdminHandler) GetServiceAccountHandler(w http.ResponseWriter, r *http.R
 		ClientContactEmail: dbServiceAccount.ClientContactEmail,
 		ClientOrganization: dbServiceAccount.ClientOrganization,
 	}
-
-	logger.ContextWithLogAttrs(r.Context(),
-		slog.String("service_account_id", serviceAccountID.String()),
-	)
 
 	responses.RespondWithJSON(w, http.StatusOK, serviceAccount)
 }

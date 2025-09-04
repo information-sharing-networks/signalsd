@@ -170,7 +170,6 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
-			slog.String("organization", req.ClientOrganization),
 		)
 
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
@@ -193,15 +192,12 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 		clientID = serviceAccount.ClientID
 		serviceAccountID = serviceAccount.AccountID
 
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("client_id", clientID),
-		)
-
 		_, err := s.queries.RevokeAllClientSecretsForAccount(r.Context(), serviceAccount.AccountID)
 		if err != nil {
 			logger.ContextWithLogAttrs(r.Context(),
 				slog.String("error", err.Error()),
-				slog.String("service_account_id", serviceAccountID.String()),
+				slog.String("client_id", clientID),
+				slog.String("account_id", serviceAccountID.String()),
 			)
 
 			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
@@ -215,13 +211,20 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 		if err != nil {
 			logger.ContextWithLogAttrs(r.Context(),
 				slog.String("error", err.Error()),
-				slog.String("service_account_id", serviceAccountID.String()),
+				slog.String("client_id", clientID),
+				slog.String("account_id", serviceAccountID.String()),
 			)
 
 			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 			return
 		}
 	}
+
+	// add client and account ids to final request log context
+	logger.ContextWithLogAttrs(r.Context(),
+		slog.String("client_id", clientID),
+		slog.String("account_id", serviceAccountID.String()),
+	)
 
 	// transaction
 	tx, err := s.pool.BeginTx(r.Context(), pgx.TxOptions{})
@@ -273,7 +276,6 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 		if err != nil {
 			logger.ContextWithLogAttrs(r.Context(),
 				slog.String("error", err.Error()),
-				slog.String("client_id", clientID),
 			)
 
 			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
@@ -303,7 +305,6 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
-			slog.String("service_account_id", serviceAccountID.String()),
 		)
 
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
@@ -326,8 +327,8 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 		oneTimeSecretID.String(),
 	)
 
+	// add setup url to final request log context
 	logger.ContextWithLogAttrs(r.Context(),
-		slog.String("client_id", clientID),
 		slog.String("setup_url", setupURL),
 	)
 
@@ -368,7 +369,6 @@ func (s *ServiceAccountHandler) SetupServiceAccountHandler(w http.ResponseWriter
 	// Parse token as UUID
 	oneTimeSecretID, err := uuid.Parse(oneTimeSecretIDString)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context())
 
 		s.renderErrorPage(w, "Invalid Setup ID", "The setup ID you provided is not valid. Please check the URL and try again.")
 		return
@@ -403,7 +403,7 @@ func (s *ServiceAccountHandler) SetupServiceAccountHandler(w http.ResponseWriter
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("setup_id", oneTimeSecretID.String()),
+				slog.String("error", "setup id has already been used or is no longer valid"),
 			)
 
 			s.renderErrorPage(w, "set up ID not found ", "The setup ID you provided has already been used or is no longer valid")
@@ -420,7 +420,7 @@ func (s *ServiceAccountHandler) SetupServiceAccountHandler(w http.ResponseWriter
 	// Check if token has expired
 	if time.Now().After(oneTimeSecret.ExpiresAt) {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("setup_id", oneTimeSecretID.String()),
+			slog.String("error:", "setup id has expired"),
 		)
 
 		s.renderErrorPage(w, "set up ID not found or already used", "The setup ID you provided has already been used or is no longer valid")
@@ -502,6 +502,11 @@ func (s *ServiceAccountHandler) SetupServiceAccountHandler(w http.ResponseWriter
 		ClientSecret: oneTimeSecret.PlaintextSecret,
 		ExpiresAt:    expiresAt,
 	}
+
+	logger.ContextWithLogAttrs(r.Context(),
+		slog.String("client_id", serviceAccount.ClientID),
+		slog.String("account_id", serviceAccount.AccountID.String()),
+	)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusCreated)
