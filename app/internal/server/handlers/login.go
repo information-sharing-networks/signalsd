@@ -109,7 +109,7 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// add the account_id to the final request log context
+	// add the account_id to the request log context
 	logger.ContextWithLogAttrs(r.Context(),
 		slog.String("account_id", user.AccountID.String()),
 	)

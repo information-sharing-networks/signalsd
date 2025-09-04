@@ -125,7 +125,7 @@ WHERE st.isn_id = $1
 AND is_in_use = true
 `
 
-// only return signal_types for the ISN that are flagged "in use"
+// only returns active signal_types (is_in_use = true)
 func (q *Queries) GetInUseSignalTypesByIsnID(ctx context.Context, isnID uuid.UUID) ([]SignalType, error) {
 	rows, err := q.db.Query(ctx, GetInUseSignalTypesByIsnID, isnID)
 	if err != nil {

@@ -65,8 +65,8 @@ WHERE st2.slug = $1
      FROM signal_types st3
      WHERE st3.slug = $1);
 
--- only return signal_types for the ISN that are flagged "in use"
 -- name: GetInUseSignalTypesByIsnID :many
+-- only returns active signal_types (is_in_use = true)
 SELECT st.*
 FROM signal_types st
 WHERE st.isn_id = $1

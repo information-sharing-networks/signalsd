@@ -442,6 +442,7 @@ type GetSignalsByCorrelationIDsRow struct {
 }
 
 // Get all signals that correlate to the provided signal IDs (for embedding correlated signals)
+// Signals for inactive isns or signal types (is_in_use = false) are not returned
 func (q *Queries) GetSignalsByCorrelationIDs(ctx context.Context, arg GetSignalsByCorrelationIDsParams) ([]GetSignalsByCorrelationIDsRow, error) {
 	rows, err := q.db.Query(ctx, GetSignalsByCorrelationIDs, arg.CorrelationIds, arg.IncludeWithdrawn)
 	if err != nil {
@@ -549,6 +550,7 @@ type GetSignalsWithOptionalFiltersRow struct {
 }
 
 // you must supply the isn_slug,signal_type_slug & sem_ver params - other filters are optional
+// signals for inactive isns or signal_types are not returned (is_in_use = false)
 func (q *Queries) GetSignalsWithOptionalFilters(ctx context.Context, arg GetSignalsWithOptionalFiltersParams) ([]GetSignalsWithOptionalFiltersRow, error) {
 	rows, err := q.db.Query(ctx, GetSignalsWithOptionalFilters,
 		arg.IsnSlug,

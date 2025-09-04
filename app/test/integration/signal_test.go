@@ -824,10 +824,10 @@ func TestIsInUseStatus(t *testing.T) {
 	memberAccount := createTestAccount(t, ctx, testEnv.queries, "member", "user", "member@isinuse.com")
 
 	ownerISN := createTestISN(t, ctx, testEnv.queries, "owner-isinuse-isn", "Owner ISN", ownerAccount.ID, "private")
-	adminISN := createTestISN(t, ctx, testEnv.queries, "admin-isinuse-isn", "Admin ISN", adminAccount.ID, "private")
+	adminISN := createTestISN(t, ctx, testEnv.queries, "admin-isnotinuse-isn", "Admin ISN", adminAccount.ID, "private")
 
 	ownerSignalType := createTestSignalType(t, ctx, testEnv.queries, ownerISN.ID, "owner isinuse ISN signal", "1.0.0")
-	adminSignalType := createTestSignalType(t, ctx, testEnv.queries, adminISN.ID, "admin isinuse ISN signal", "1.0.0")
+	adminSignalType := createTestSignalType(t, ctx, testEnv.queries, adminISN.ID, "admin isnotinuse ISN signal", "1.0.0")
 	disabledSignalType := createTestSignalType(t, ctx, testEnv.queries, ownerISN.ID, "owner isinuse ISN signal (inactive)", "1.0.0")
 
 	grantPermission(t, ctx, testEnv.queries, ownerISN.ID, adminAccount.ID, "write")

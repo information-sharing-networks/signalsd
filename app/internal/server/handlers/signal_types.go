@@ -147,6 +147,11 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 	}
 	// check the isn is in use
 	if !isn.IsInUse {
+		// add to request log
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("isn_slug", isnSlug),
+			slog.Bool("is_in_use", isn.IsInUse),
+		)
 		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "this ISN is marked as 'not in use'")
 		return
 	}
@@ -175,6 +180,10 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 	req.SchemaURL = strings.TrimSpace(req.SchemaURL)
 	req.ReadmeURL = strings.TrimSpace(req.ReadmeURL)
 	if !isn.IsInUse {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("isn_slug", isnSlug),
+			slog.Bool("is_in_use", isn.IsInUse),
+		)
 		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "this ISN is marked as 'not in use'")
 		return
 	}
@@ -422,6 +431,10 @@ func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *ht
 	}
 	// check the isn is in use
 	if !isn.IsInUse {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("isn_slug", isnSlug),
+			slog.Bool("is_in_use", isn.IsInUse),
+		)
 		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "this ISN is marked as 'not in use'")
 		return
 	}

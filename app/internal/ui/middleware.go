@@ -106,8 +106,6 @@ func (s *Server) RequireAdminAccess(next http.Handler) http.Handler {
 		// Log successful admin access check
 		reqLogger.Debug("Admin access check successful",
 			slog.String("component", "RequireAdminAccess"),
-			slog.String("account_id", accountInfo.AccountID),
-			slog.String("role", accountInfo.Role),
 		)
 
 		next.ServeHTTP(w, r)

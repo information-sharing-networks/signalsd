@@ -150,6 +150,7 @@ WHERE account_id = $1
 
 -- name: GetSignalsWithOptionalFilters :many
 -- you must supply the isn_slug,signal_type_slug & sem_ver params - other filters are optional
+-- signals for inactive isns or signal_types are not returned (is_in_use = false)
 SELECT
  a.id AS account_id,
     a.account_type,
@@ -235,6 +236,7 @@ WHERE s.account_id = $1
 
 -- name: GetSignalsByCorrelationIDs :many
 -- Get all signals that correlate to the provided signal IDs (for embedding correlated signals)
+-- Signals for inactive isns or signal types (is_in_use = false) are not returned
 SELECT
     a.id AS account_id,
     a.account_type,

@@ -123,11 +123,6 @@ func (a *AuthService) AuthenticateByGrantType(next http.Handler) http.Handler {
 		case "refresh_token":
 			a.RequireValidRefreshToken(next).ServeHTTP(w, r)
 		default:
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("grant_type", grantType),
-				slog.String("error", "invalid grant_type parameter"),
-			)
-
 			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "invalid grant_type parameter")
 			return
 		}
@@ -385,7 +380,7 @@ func (a *AuthService) RequireIsnPermission(allowedPermissions ...string) func(ht
 
 					// Add context for final request log
 					logger.ContextWithLogAttrs(r.Context(),
-						slog.String("permission", permission),
+						slog.String("isn_permission", permission),
 						slog.String("isn_slug", isnSlug),
 					)
 
@@ -396,8 +391,8 @@ func (a *AuthService) RequireIsnPermission(allowedPermissions ...string) func(ht
 
 			// Add context for final request log
 			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("isn", isnSlug),
-				slog.Any("expected_perms", allowedPermissions),
+				slog.String("forbidden_isn_slug", isnSlug),
+				slog.String("error", "account does not have the necessary access permission for this isn"),
 			)
 
 			responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you do not have the necessary access permission for this isn")
