@@ -133,7 +133,7 @@ func RequestLogging(logger *slog.Logger) func(http.Handler) http.Handler {
 			case strings.HasPrefix(r.URL.Path, "/oauth/"):
 				component = "oauth"
 			default:
-				component = "ui"
+				component = "ui-api"
 			}
 
 			// Create request-scoped logger with common fields
@@ -156,7 +156,6 @@ func RequestLogging(logger *slog.Logger) func(http.Handler) http.Handler {
 			// Wrap response writer to capture status
 			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 
-			// pass on updated writer and request
 			next.ServeHTTP(ww, req)
 
 			duration := time.Since(start)
