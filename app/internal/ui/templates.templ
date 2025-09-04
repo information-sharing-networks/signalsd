@@ -64,7 +64,10 @@ templ LoginPage() {
 				<h2 class="form-title">
 					Sign in to Signal ISN
 				</h2>
-				
+
+				<!-- Error message area - positioned prominently above the form -->
+				<div id="login-error"></div>
+
 				<form hx-post="/login" hx-target="#login-error">
 					<div class="form-group">
 						<div class="form-group-stacked">
@@ -107,9 +110,8 @@ templ LoginPage() {
 						Create Account
 					</button>
 				</div>
-				<div id="login-error"></div>
 			</div>
-			
+
 		</div>
 	}
 }

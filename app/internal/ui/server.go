@@ -111,7 +111,7 @@ func (s *Server) setupMiddleware() {
 	// middleware
 	s.router.Use(chimiddleware.RequestID)
 	s.router.Use(chimiddleware.RealIP)
-	s.router.Use(logger.RequestLogging(s.logger))
+	s.router.Use(logger.RequestLogging(s.logger)) // use the signalsd request logger
 	s.router.Use(chimiddleware.Recoverer)
 	s.router.Use(chimiddleware.Timeout(60 * time.Second))
 
