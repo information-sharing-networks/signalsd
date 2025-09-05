@@ -4,14 +4,17 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
+
+	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 )
 
 // renderError displays an error message inline to the user
-func (s *Server) renderError(w http.ResponseWriter, message string) {
-	component := AccessDeniedAlert(message)
+func (s *Server) renderError(w http.ResponseWriter, error error) {
+	component := AccessDeniedAlert(error.Error())
 	if err := component.Render(context.Background(), w); err != nil {
 		s.logger.Error("Failed to render error", slog.String("error", err.Error()))
 	}
@@ -37,41 +40,49 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// handleLoginPost authenticates the user and adds authentication cookies to the response
+func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
+	email := r.FormValue("email")
+	password := r.FormValue("password")
+
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	// Authenticate with signalsd API using the client
+	loginResp, refreshTokenCookie, err := s.apiClient.Login(email, password)
+	if err != nil {
+		reqLogger.Error("Authentication failed", slog.String("error", err.Error()))
+		uiError := UIError{
+			Type:    ErrorTypeLogin,
+			Message: userErrorMessages[ErrorTypeLogin],
+		}
+		s.renderError(w, uiError)
+		return
+	}
+
+	// Set all authentication cookies using shared method
+	if err := s.authService.SetAuthCookies(w, loginResp, refreshTokenCookie, s.config.Environment); err != nil {
+		reqLogger.Error("Failed to set authentication cookies", slog.String("error", err.Error()))
+		uiErr := CategorizeError(http.StatusInternalServerError, err)
+		s.renderError(w, uiErr)
+		return
+	}
+
+	// Login successful - add account attribute to context
+	_ = logger.ContextWithLogAttrs(r.Context(),
+		slog.String("account_id", loginResp.AccountID),
+	)
+
+	// redirect to dashboard
+	w.Header().Set("HX-Redirect", "/dashboard")
+	w.WriteHeader(http.StatusOK)
+}
+
 func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	// Render registration page
 	component := RegisterPage()
 	if err := component.Render(r.Context(), w); err != nil {
 		s.logger.Error("Failed to render registration page", slog.String("error", err.Error()))
 	}
-}
-
-// handleLoginPost authenticates the user and adds authentication cookies to the response
-func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
-	email := r.FormValue("email")
-	password := r.FormValue("password")
-
-	if email == "" || password == "" {
-		s.renderError(w, "Email and password are required")
-		return
-	}
-	// Authenticate with signalsd API
-	loginResp, refreshTokenCookie, err := s.authService.AuthenticateUser(email, password)
-	if err != nil {
-		s.logger.Error("Authentication failed", slog.String("error", err.Error()))
-		s.renderError(w, err.Error())
-		return
-	}
-
-	// Set all authentication cookies using shared method
-	if err := s.authService.SetAuthCookies(w, loginResp, refreshTokenCookie, s.config.Environment); err != nil {
-		s.logger.Error("Failed to set authentication cookies", slog.String("error", err.Error()))
-		s.renderError(w, "System error: authentication failed")
-		return
-	}
-
-	// Login successful - redirect to dashboard
-	w.Header().Set("HX-Redirect", "/dashboard")
-	w.WriteHeader(http.StatusOK)
 }
 
 // handleRegisterPost processes user registration
@@ -81,12 +92,14 @@ func (s *Server) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 	confirmPassword := r.FormValue("confirm_password")
 
 	if email == "" || password == "" || confirmPassword == "" {
-		s.renderError(w, "All fields are required")
+		uiErr := CategorizeError(http.StatusBadRequest, nil)
+		s.renderError(w, uiErr)
 		return
 	}
 
 	if password != confirmPassword {
-		s.renderError(w, "Passwords do not match")
+		uiErr := CategorizeError(http.StatusBadRequest, nil)
+		s.renderError(w, uiErr)
 		return
 	}
 
@@ -94,7 +107,8 @@ func (s *Server) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 	err := s.apiClient.RegisterUser(email, password)
 	if err != nil {
 		s.logger.Error("Registration failed", slog.String("error", err.Error()))
-		s.renderError(w, err.Error())
+		uiErr := CategorizeError(0, err) // Let CategorizeError determine the status code
+		s.renderError(w, uiErr)
 		return
 	}
 
@@ -295,7 +309,7 @@ func (s *Server) handleSearchSignals(w http.ResponseWriter, r *http.Request) {
 
 	// Validate required parameters
 	if params.IsnSlug == "" || params.SignalTypeSlug == "" || params.SemVer == "" {
-		s.renderError(w, "ISN, Signal Type, and Version are required")
+		s.renderError(w, fmt.Errorf("ISN, Signal Type, and Version are required"))
 		return
 	}
 
@@ -303,7 +317,7 @@ func (s *Server) handleSearchSignals(w http.ResponseWriter, r *http.Request) {
 	// Get user permissions to validate ISN access and determine visibility
 	isnPerm, err := s.getIsnPermission(r, params.IsnSlug)
 	if err != nil {
-		s.renderError(w, err.Error())
+		s.renderError(w, err)
 		return
 	}
 
@@ -311,7 +325,7 @@ func (s *Server) handleSearchSignals(w http.ResponseWriter, r *http.Request) {
 	accessTokenCookie, err := r.Cookie(accessTokenCookieName)
 	if err != nil {
 		s.logger.Error("Access token not found", slog.String("error", err.Error()))
-		s.renderError(w, "Session expired - please refresh the page and try again")
+		s.renderError(w, fmt.Errorf("Session expired - please refresh the page and try again"))
 		return
 	}
 	accessToken := accessTokenCookie.Value
@@ -320,7 +334,7 @@ func (s *Server) handleSearchSignals(w http.ResponseWriter, r *http.Request) {
 	searchResp, err := s.apiClient.SearchSignals(accessToken, params, isnPerm.Visibility)
 	if err != nil {
 		s.logger.Error("Signal search failed", slog.String("error", err.Error()))
-		s.renderError(w, err.Error())
+		s.renderError(w, err)
 		return
 	}
 
@@ -379,14 +393,14 @@ func (s *Server) handleAddIsnAccount(w http.ResponseWriter, r *http.Request) {
 
 	// Validate required fields
 	if isnSlug == "" || accountEmail == "" || permission == "" {
-		s.renderError(w, "All fields are required")
+		s.renderError(w, fmt.Errorf("all fields are required"))
 		return
 	}
 
 	// Get access token from cookie
 	accessTokenCookie, err := r.Cookie(accessTokenCookieName)
 	if err != nil {
-		s.renderError(w, "Authentication required")
+		s.renderError(w, fmt.Errorf("authentication required"))
 		return
 	}
 	accessToken := accessTokenCookie.Value
@@ -394,8 +408,7 @@ func (s *Server) handleAddIsnAccount(w http.ResponseWriter, r *http.Request) {
 	// Call the API to add the account to the ISN
 	err = s.apiClient.AddAccountToIsn(accessToken, isnSlug, accountEmail, permission)
 	if err != nil {
-		//s.logger.Info("Failed to add account to ISN", slog.String("error", err.Error()))
-		s.renderError(w, err.Error())
+		s.renderError(w, err)
 		return
 	}
 
@@ -473,25 +486,25 @@ func (s *Server) handleCreateSignalType(w http.ResponseWriter, r *http.Request) 
 	// Validate user has admin or owner permission
 	isnPerm, err := s.getIsnPermission(r, isnSlug)
 	if err != nil {
-		s.renderError(w, err.Error())
+		s.renderError(w, err)
 		return
 	}
 
 	if isnPerm.Permission != "write" {
-		s.renderError(w, "You need write permission to create signal types for this ISN")
+		s.renderError(w, fmt.Errorf("You need write permission to create signal types for this ISN"))
 		return
 	}
 
 	// Validate required fields
 	if isnSlug == "" || title == "" || schemaURL == "" || bumpType == "" {
-		s.renderError(w, "ISN, Title, Schema URL, and Bump Type are required")
+		s.renderError(w, fmt.Errorf("ISN, Title, Schema URL, and Bump Type are required"))
 		return
 	}
 
 	// Get access token from cookie
 	accessTokenCookie, err := r.Cookie(accessTokenCookieName)
 	if err != nil {
-		s.renderError(w, "Authentication required")
+		s.renderError(w, fmt.Errorf("Authentication required"))
 		return
 	}
 	accessToken := accessTokenCookie.Value
@@ -515,7 +528,7 @@ func (s *Server) handleCreateSignalType(w http.ResponseWriter, r *http.Request) 
 	response, err := s.apiClient.CreateSignalType(accessToken, isnSlug, createReq)
 	if err != nil {
 		s.logger.Info("Failed to create signal type", slog.String("error", err.Error()))
-		s.renderError(w, err.Error())
+		s.renderError(w, err)
 		return
 	}
 

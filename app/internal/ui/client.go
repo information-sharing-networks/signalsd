@@ -33,6 +33,59 @@ func NewClient(baseURL string) *Client {
 	}
 }
 
+// Login authenticates a user with the signalsd API
+func (c *Client) Login(email, password string) (*LoginResponse, *http.Cookie, error) {
+	loginReq := LoginRequest{
+		Email:    email,
+		Password: password,
+	}
+
+	jsonData, err := json.Marshal(loginReq)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to marshal login request: %w", err)
+	}
+
+	url := fmt.Sprintf("%s/api/auth/login", c.baseURL)
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, nil, err // Return raw error for categorization
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		// Return error with status code for proper categorization
+		message := c.getErrorMessage(resp, "Authentication failed")
+		return nil, nil, &HTTPError{StatusCode: resp.StatusCode, Message: message}
+	}
+
+	var loginResp LoginResponse
+	if err := json.NewDecoder(resp.Body).Decode(&loginResp); err != nil {
+		return nil, nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	// Extract the refresh token cookie from the API response
+	var refreshTokenCookie *http.Cookie
+	for _, cookie := range resp.Cookies() {
+		if cookie.Name == "refresh_token" { // signalsd.RefreshTokenCookieName
+			refreshTokenCookie = cookie
+			break
+		}
+	}
+
+	if refreshTokenCookie == nil {
+		return nil, nil, fmt.Errorf("refresh token cookie not found in API response")
+	}
+
+	return &loginResp, refreshTokenCookie, nil
+}
+
 // SearchSignals use the signalsd API to search for signals
 func (c *Client) SearchSignals(accessToken string, params SignalSearchParams, visibility string) (*SignalSearchResponse, error) {
 	// Build URL based on ISN visibility (public ISNs use /api/public/, private use /api/)

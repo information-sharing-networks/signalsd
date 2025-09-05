@@ -11,6 +11,7 @@ import (
 type UIErrorType string
 
 const (
+	ErrorTypeLogin          UIErrorType = "login"
 	ErrorTypeValidation     UIErrorType = "validation"
 	ErrorTypeAuthentication UIErrorType = "authentication"
 	ErrorTypeNetwork        UIErrorType = "network"
@@ -19,19 +20,19 @@ const (
 )
 
 type UIError struct {
-	Type             UIErrorType
-	ClientStatusCode int
-	UserMessage      string
+	Type    UIErrorType
+	Message string
 }
 
 // Error implements the error interface
 func (e UIError) Error() string {
-	return e.UserMessage
+	return e.Message
 }
 
 // user-friendly error messages
 var userErrorMessages = map[UIErrorType]string{
-	ErrorTypeValidation:     "Please check your input and try again.",
+	ErrorTypeLogin:          "Login failed. Please check your email and password and try again.",
+	ErrorTypeValidation:     "Please correct the errors and try again.",
 	ErrorTypeAuthentication: "Login failed. Please check your email and password.",
 	ErrorTypeNetwork:        "Unable to connect. Please try again in a few moments.",
 	ErrorTypeSystem:         "A system error occurred. Please try again later.",
@@ -55,7 +56,7 @@ func isNetworkError(err error) bool {
 	// Check for DNS errors
 	var dnsErr *net.DNSError
 	if errors.As(err, &dnsErr) {
-		return true // DNS lookup failures
+		return true
 	}
 
 	// Check for URL errors (which often wrap network errors)
@@ -76,16 +77,31 @@ func isNetworkError(err error) bool {
 	return false
 }
 
-// categorizeError todo
-func categorizeError(statusCode int, err error) UIError {
+// HTTPError represents an HTTP error with status code (defined here to avoid import cycles)
+type HTTPError struct {
+	StatusCode int
+	Message    string
+}
+
+func (e *HTTPError) Error() string {
+	return e.Message
+}
+
+// CategorizeError converts errors into user-friendly UIError instances
+func CategorizeError(statusCode int, err error) UIError {
 	// Handle network/connection errors
 	if err != nil {
 		if isNetworkError(err) {
 			return UIError{
-				Type:             ErrorTypeNetwork,
-				ClientStatusCode: http.StatusServiceUnavailable,
-				UserMessage:      userErrorMessages[ErrorTypeNetwork],
+				Type:    ErrorTypeNetwork,
+				Message: userErrorMessages[ErrorTypeNetwork],
 			}
+		}
+
+		// Handle HTTPError (extract status code from error)
+		var httpErr *HTTPError
+		if errors.As(err, &httpErr) {
+			statusCode = httpErr.StatusCode
 		}
 	}
 
@@ -93,34 +109,29 @@ func categorizeError(statusCode int, err error) UIError {
 	switch statusCode {
 	case http.StatusUnauthorized: // 401
 		return UIError{
-			Type:             ErrorTypeAuthentication,
-			ClientStatusCode: statusCode,
-			UserMessage:      userErrorMessages[ErrorTypeAuthentication],
+			Type:    ErrorTypeAuthentication,
+			Message: userErrorMessages[ErrorTypeAuthentication],
 		}
 	case http.StatusForbidden: // 403
 		return UIError{
-			Type:             ErrorTypePermission,
-			ClientStatusCode: statusCode,
-			UserMessage:      userErrorMessages[ErrorTypePermission],
+			Type:    ErrorTypePermission,
+			Message: userErrorMessages[ErrorTypePermission],
 		}
 	case http.StatusBadRequest: // 400
 		return UIError{
-			Type:             ErrorTypeValidation,
-			ClientStatusCode: statusCode,
-			UserMessage:      userErrorMessages[ErrorTypeValidation],
+			Type:    ErrorTypeValidation,
+			Message: userErrorMessages[ErrorTypeValidation],
 		}
 	case http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout: // 5xx
 		return UIError{
-			Type:             ErrorTypeSystem,
-			ClientStatusCode: statusCode,
-			UserMessage:      userErrorMessages[ErrorTypeSystem],
+			Type:    ErrorTypeSystem,
+			Message: userErrorMessages[ErrorTypeSystem],
 		}
 	default:
 		// For unknown status codes or client-side errors, default to system error
 		return UIError{
-			Type:             ErrorTypeSystem,
-			ClientStatusCode: http.StatusInternalServerError,
-			UserMessage:      userErrorMessages[ErrorTypeSystem],
+			Type:    ErrorTypeSystem,
+			Message: userErrorMessages[ErrorTypeSystem],
 		}
 	}
 }
