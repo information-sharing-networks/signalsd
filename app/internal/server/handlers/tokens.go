@@ -124,7 +124,7 @@ func (a *TokenHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.
 			return
 		}
 
-		reqLogger := logger.ContextMiddlewareLogger(r.Context())
+		reqLogger := logger.ContextRequestLogger(r.Context())
 
 		reqLogger.Debug("Created new access token",
 			slog.String("component", "RefreshAccessTokenHandler"),
@@ -236,7 +236,7 @@ func (a *TokenHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	reqLogger := logger.ContextMiddlewareLogger(r.Context())
+	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	rowsAffected, err := a.queries.RevokeRefreshToken(r.Context(), hashedRefreshToken)
 	if err != nil {
