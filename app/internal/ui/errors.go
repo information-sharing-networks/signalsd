@@ -11,7 +11,6 @@ import (
 type UIErrorType string
 
 const (
-	ErrorTypeLogin          UIErrorType = "login"
 	ErrorTypeValidation     UIErrorType = "validation"
 	ErrorTypeAuthentication UIErrorType = "authentication"
 	ErrorTypeNetwork        UIErrorType = "network"
@@ -31,9 +30,8 @@ func (e UIError) Error() string {
 
 // user-friendly error messages
 var userErrorMessages = map[UIErrorType]string{
-	ErrorTypeLogin:          "Login failed. Please check your email and password and try again.",
 	ErrorTypeValidation:     "Please correct the errors and try again.",
-	ErrorTypeAuthentication: "Login failed. Please check your email and password.",
+	ErrorTypeAuthentication: "Login failed. Please check your email and password and try again.",
 	ErrorTypeNetwork:        "Unable to connect. Please try again in a few moments.",
 	ErrorTypeSystem:         "A system error occurred. Please try again later.",
 	ErrorTypePermission:     "You don't have permission to perform this action.",

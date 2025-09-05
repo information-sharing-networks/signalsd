@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -51,19 +50,14 @@ func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	loginResp, refreshTokenCookie, err := s.apiClient.Login(email, password)
 	if err != nil {
 		reqLogger.Error("Authentication failed", slog.String("error", err.Error()))
-		uiError := UIError{
-			Type:    ErrorTypeLogin,
-			Message: userErrorMessages[ErrorTypeLogin],
-		}
-		s.renderError(w, uiError)
+		s.renderError(w, CategorizeError(0, err))
 		return
 	}
 
 	// Set all authentication cookies using shared method
 	if err := s.authService.SetAuthCookies(w, loginResp, refreshTokenCookie, s.config.Environment); err != nil {
 		reqLogger.Error("Failed to set authentication cookies", slog.String("error", err.Error()))
-		uiErr := CategorizeError(http.StatusInternalServerError, err)
-		s.renderError(w, uiErr)
+		s.renderError(w, CategorizeError(http.StatusInternalServerError, err))
 		return
 	}
 
@@ -90,25 +84,23 @@ func (s *Server) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
 	password := r.FormValue("password")
 	confirmPassword := r.FormValue("confirm_password")
+	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	if email == "" || password == "" || confirmPassword == "" {
-		uiErr := CategorizeError(http.StatusBadRequest, nil)
-		s.renderError(w, uiErr)
+		s.renderError(w, CategorizeError(http.StatusBadRequest, nil))
 		return
 	}
 
 	if password != confirmPassword {
-		uiErr := CategorizeError(http.StatusBadRequest, nil)
-		s.renderError(w, uiErr)
+		s.renderError(w, CategorizeError(http.StatusBadRequest, nil))
 		return
 	}
 
 	// Register user with signalsd API
 	err := s.apiClient.RegisterUser(email, password)
 	if err != nil {
-		s.logger.Error("Registration failed", slog.String("error", err.Error()))
-		uiErr := CategorizeError(0, err) // Let CategorizeError determine the status code
-		s.renderError(w, uiErr)
+		reqLogger.Error("Registration failed", slog.String("error", err.Error()))
+		s.renderError(w, CategorizeError(0, err))
 		return
 	}
 
@@ -292,6 +284,8 @@ func (s *Server) handleGetSignalVersions(w http.ResponseWriter, r *http.Request)
 }
 
 func (s *Server) handleSearchSignals(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
 	// Parse search parameters
 	params := SignalSearchParams{
 		IsnSlug:                 r.FormValue("isn_slug"),
@@ -309,7 +303,7 @@ func (s *Server) handleSearchSignals(w http.ResponseWriter, r *http.Request) {
 
 	// Validate required parameters
 	if params.IsnSlug == "" || params.SignalTypeSlug == "" || params.SemVer == "" {
-		s.renderError(w, fmt.Errorf("ISN, Signal Type, and Version are required"))
+		s.renderError(w, CategorizeError(http.StatusBadRequest, nil))
 		return
 	}
 
@@ -317,15 +311,15 @@ func (s *Server) handleSearchSignals(w http.ResponseWriter, r *http.Request) {
 	// Get user permissions to validate ISN access and determine visibility
 	isnPerm, err := s.getIsnPermission(r, params.IsnSlug)
 	if err != nil {
-		s.renderError(w, err)
+		s.renderError(w, CategorizeError(0, err))
 		return
 	}
 
 	// Get access token from cookie
 	accessTokenCookie, err := r.Cookie(accessTokenCookieName)
 	if err != nil {
-		s.logger.Error("Access token not found", slog.String("error", err.Error()))
-		s.renderError(w, fmt.Errorf("Session expired - please refresh the page and try again"))
+		reqLogger.Error("Access token not found", slog.String("error", err.Error()))
+		s.renderError(w, CategorizeError(http.StatusUnauthorized, err))
 		return
 	}
 	accessToken := accessTokenCookie.Value
@@ -333,8 +327,8 @@ func (s *Server) handleSearchSignals(w http.ResponseWriter, r *http.Request) {
 	// Perform search using ISN visibility to determine endpoint
 	searchResp, err := s.apiClient.SearchSignals(accessToken, params, isnPerm.Visibility)
 	if err != nil {
-		s.logger.Error("Signal search failed", slog.String("error", err.Error()))
-		s.renderError(w, err)
+		reqLogger.Error("Signal search failed", slog.String("error", err.Error()))
+		s.renderError(w, CategorizeError(0, err))
 		return
 	}
 
@@ -386,6 +380,8 @@ func (s *Server) handleIsnAccountsAdmin(w http.ResponseWriter, r *http.Request) 
 
 // handleAddIsnAccount handles the form submission to add an account to an ISN
 func (s *Server) handleAddIsnAccount(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
 	// Parse form data
 	isnSlug := r.FormValue("isn_slug")
 	accountEmail := r.FormValue("account_email")
@@ -393,14 +389,14 @@ func (s *Server) handleAddIsnAccount(w http.ResponseWriter, r *http.Request) {
 
 	// Validate required fields
 	if isnSlug == "" || accountEmail == "" || permission == "" {
-		s.renderError(w, fmt.Errorf("all fields are required"))
+		s.renderError(w, CategorizeError(http.StatusBadRequest, nil))
 		return
 	}
 
 	// Get access token from cookie
 	accessTokenCookie, err := r.Cookie(accessTokenCookieName)
 	if err != nil {
-		s.renderError(w, fmt.Errorf("authentication required"))
+		s.renderError(w, CategorizeError(http.StatusUnauthorized, err))
 		return
 	}
 	accessToken := accessTokenCookie.Value
@@ -408,7 +404,8 @@ func (s *Server) handleAddIsnAccount(w http.ResponseWriter, r *http.Request) {
 	// Call the API to add the account to the ISN
 	err = s.apiClient.AddAccountToIsn(accessToken, isnSlug, accountEmail, permission)
 	if err != nil {
-		s.renderError(w, err)
+		reqLogger.Error("Failed to add account to ISN", slog.String("error", err.Error()))
+		s.renderError(w, CategorizeError(0, err))
 		return
 	}
 
@@ -475,6 +472,8 @@ func (s *Server) handleSignalTypeManagement(w http.ResponseWriter, r *http.Reque
 
 // handleCreateSignalType handles the form submission to create a new signal type
 func (s *Server) handleCreateSignalType(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
 	// Parse form data
 	isnSlug := r.FormValue("isn_slug")
 	title := r.FormValue("title")
@@ -486,25 +485,25 @@ func (s *Server) handleCreateSignalType(w http.ResponseWriter, r *http.Request) 
 	// Validate user has admin or owner permission
 	isnPerm, err := s.getIsnPermission(r, isnSlug)
 	if err != nil {
-		s.renderError(w, err)
+		s.renderError(w, CategorizeError(0, err))
 		return
 	}
 
 	if isnPerm.Permission != "write" {
-		s.renderError(w, fmt.Errorf("You need write permission to create signal types for this ISN"))
+		s.renderError(w, CategorizeError(http.StatusForbidden, nil))
 		return
 	}
 
 	// Validate required fields
 	if isnSlug == "" || title == "" || schemaURL == "" || bumpType == "" {
-		s.renderError(w, fmt.Errorf("ISN, Title, Schema URL, and Bump Type are required"))
+		s.renderError(w, CategorizeError(http.StatusBadRequest, nil))
 		return
 	}
 
 	// Get access token from cookie
 	accessTokenCookie, err := r.Cookie(accessTokenCookieName)
 	if err != nil {
-		s.renderError(w, fmt.Errorf("Authentication required"))
+		s.renderError(w, CategorizeError(http.StatusUnauthorized, err))
 		return
 	}
 	accessToken := accessTokenCookie.Value
@@ -527,8 +526,8 @@ func (s *Server) handleCreateSignalType(w http.ResponseWriter, r *http.Request) 
 	// Call the API to create the signal type
 	response, err := s.apiClient.CreateSignalType(accessToken, isnSlug, createReq)
 	if err != nil {
-		s.logger.Info("Failed to create signal type", slog.String("error", err.Error()))
-		s.renderError(w, err)
+		reqLogger.Error("Failed to create signal type", slog.String("error", err.Error()))
+		s.renderError(w, CategorizeError(0, err))
 		return
 	}
 
