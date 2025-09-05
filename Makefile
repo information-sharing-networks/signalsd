@@ -1,7 +1,7 @@
 # Docker-based Makefile for signalsd
 # Uses tools installed in Docker containers instead of local installations
 
-.PHONY: help psql check generate docs swag-fmt sqlc fmt vet lint security test clean docker-up docker-down templ
+.PHONY: help psql check generate docs swag-fmt sqlc fmt vet lint security test clean docker-up docker-down templ go-api go-ui
 
 # Docker compose service name
 APP_SERVICE = app
@@ -28,12 +28,14 @@ help:
 	@echo "  make security        - Run gosec security analysis"
 	@echo "  make test            - Run tests"
 	@echo "  make migrate         - Run database migrations (up)"
-	@echo "  make docker-up       - Start Docker containers"
-	@echo "  make docker-down     - Stop Docker containers"
 	@echo "  make restart         - restart the docker app"
-	@echo "  make logs       	  - follow docker logs"
+	@echo "  make logs            - follow docker logs"
 	@echo "  make psql            - run psql agaist the dev database"
 	@echo "  make clean           - Clean build artifacts"
+	@echo "  make docker-up       - Start Docker containers"
+	@echo "  make docker-down     - Stop Docker containers"
+	@echo "  make go-api          - Start signalsd backend locally (expects docker db to be running)"
+	@echo "  make go-ui           - Start ui in standalone (expects signalsd to be running on 8080)"
 
 # Docker management
 docker-up:
@@ -131,3 +133,13 @@ check-containers:
 psql:
 	@echo "🔄 Running psql on dev database container"
 	docker compose exec -it db psql -U $(DB_ACCOUNT) -d $(DB_NAME)
+
+# Run api locally using docker db
+go-api:
+	@echo "🔄 Running local api + docker db"
+	cd app && DATABASE_URL="postgres://signalsd-dev@localhost:15432/signalsd_admin?sslmode=disable" SECRET_KEY="secretkey" go run cmd/signalsd/main.go --mode api
+
+# Run ui in standalone mode
+go-ui:
+	@echo "🔄 Running standalone ui"
+	cd app && API_BASE_URL=localhost:8080 go run cmd/signalsd-ui/main.go
