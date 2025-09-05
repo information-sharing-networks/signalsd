@@ -77,7 +77,7 @@ func isNetworkError(err error) bool {
 }
 
 // categorizeError todo
-func categorizeError(statusCode int, apiErrorCode string, err error) UIError {
+func categorizeError(statusCode int, err error) UIError {
 	// Handle network/connection errors
 	if err != nil {
 		if isNetworkError(err) {
@@ -104,13 +104,6 @@ func categorizeError(statusCode int, apiErrorCode string, err error) UIError {
 			UserMessage:      userErrorMessages[ErrorTypePermission],
 		}
 	case http.StatusBadRequest: // 400
-		if apiErrorCode == "resource_not_found" || apiErrorCode == "authentication_failure" {
-			return UIError{
-				Type:             ErrorTypeAuthentication,
-				ClientStatusCode: http.StatusUnauthorized, // Normalize to 401 for UI
-				UserMessage:      userErrorMessages[ErrorTypeAuthentication],
-			}
-		}
 		return UIError{
 			Type:             ErrorTypeValidation,
 			ClientStatusCode: statusCode,
