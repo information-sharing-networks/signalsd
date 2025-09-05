@@ -15,6 +15,7 @@ definitions:
     - invalid_url_param
     - malformed_body
     - not_implemented
+    - network_error
     - password_too_short
     - refresh_token_invalid
     - request_too_large
@@ -38,6 +39,7 @@ definitions:
     - ErrCodeInvalidURLParam
     - ErrCodeMalformedBody
     - ErrCodeNotImplemented
+    - ErrCodeNetworkError
     - ErrCodePasswordTooShort
     - ErrCodeRefreshTokenInvalid
     - ErrCodeRequestTooLarge

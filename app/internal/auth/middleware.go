@@ -32,7 +32,7 @@ type ServiceAccountTokenRequest struct {
 // in the final request log for all requests that require an access token.
 func (a *AuthService) RequireValidAccessToken(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		reqLogger := logger.ContextMiddlewareLogger(r.Context())
+		reqLogger := logger.ContextRequestLogger(r.Context())
 
 		accessToken, err := a.GetAccessTokenFromHeader(r.Header)
 		if err != nil {
@@ -192,7 +192,7 @@ func (a *AuthService) RequireValidRefreshToken(next http.Handler) http.Handler {
 
 		userAccountID := refreshTokenRow.UserAccountID
 
-		reqLogger := logger.ContextMiddlewareLogger(r.Context())
+		reqLogger := logger.ContextRequestLogger(r.Context())
 
 		// Log successful refresh token validation immediately
 		reqLogger.Debug("Refresh token validation successful",
@@ -289,7 +289,7 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 			return
 		}
 
-		reqLogger := logger.ContextMiddlewareLogger(r.Context())
+		reqLogger := logger.ContextRequestLogger(r.Context())
 
 		// Log successful client credentials validation
 		reqLogger.Debug("Client credentials validation successful",
@@ -316,7 +316,7 @@ func (a *AuthService) RequireRole(allowedRoles ...string) func(http.Handler) htt
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-			reqLogger := logger.ContextMiddlewareLogger(r.Context())
+			reqLogger := logger.ContextRequestLogger(r.Context())
 
 			claims, ok := ContextClaims(r.Context())
 			if !ok {
@@ -366,7 +366,7 @@ func (a *AuthService) RequireIsnPermission(allowedPermissions ...string) func(ht
 				return
 			}
 
-			reqLogger := logger.ContextMiddlewareLogger(r.Context())
+			reqLogger := logger.ContextRequestLogger(r.Context())
 
 			for _, permission := range allowedPermissions {
 				if claims.IsnPerms[isnSlug].Permission == permission {

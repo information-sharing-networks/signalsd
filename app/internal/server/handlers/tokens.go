@@ -84,11 +84,10 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, p
 // RefreshAccessTokenHandler handles requests for both service accounts and web users.
 // For web users, a new refresh tokens is sent as http-only cookies whenever the client uses this endpoint.
 //
-// Use with the AuthenticateByGrantType middleware
-// this calls the appropriate authentication middleware for the grant_type (client_credentials or refresh_token)) and adds the authenticated accountID to the context
+// Must be called with the AuthenticateByGrantType middleware.
+// This calls the appropriate authentication middleware for the grant_type (client_credentials or refresh_token)) and adds the authenticated accountID to the context
 func (a *TokenHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.Request) {
 
-	// RequireValidRefreshToken / RequireClientCredentials middleware adds the userAccountId or serverAccountAccountID to the context
 	accountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
@@ -124,7 +123,7 @@ func (a *TokenHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.
 			return
 		}
 
-		reqLogger := logger.ContextMiddlewareLogger(r.Context())
+		reqLogger := logger.ContextRequestLogger(r.Context())
 
 		reqLogger.Debug("Created new access token",
 			slog.String("component", "RefreshAccessTokenHandler"),
@@ -236,7 +235,7 @@ func (a *TokenHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	reqLogger := logger.ContextMiddlewareLogger(r.Context())
+	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	rowsAffected, err := a.queries.RevokeRefreshToken(r.Context(), hashedRefreshToken)
 	if err != nil {

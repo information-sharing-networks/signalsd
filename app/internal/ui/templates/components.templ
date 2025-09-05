@@ -1,0 +1,75 @@
+
+package templates
+import (
+    "strings"
+    "github.com/information-sharing-networks/signalsd/app/internal/ui/types"
+)
+
+
+// =============================================================================
+// REUSABLE FORM COMPONENTS
+// =============================================================================
+templ SignalTypeOptions(signalTypes []types.SignalTypeDropdown) {
+	<select
+		id="signal_type_slug"
+		name="signal_type_slug"
+		required
+		hx-post="/ui-api/signal-versions"
+		hx-target="#sem_ver"
+		hx-swap="outerHTML"
+		hx-trigger="change"
+		hx-include="#isn_slug, this"
+		class="form-select"
+	>
+		<option value="">Select Signal Type...</option>
+		for _, signalType := range signalTypes {
+			<option value={ signalType.Slug }>{ strings.ReplaceAll(signalType.Slug, "-", " ") }</option>
+		}
+	</select>
+}
+
+templ VersionOptions(versions []types.VersionDropdown) {
+	<select
+		id="sem_ver"
+		name="sem_ver"
+		required
+		class="form-select"
+	>
+		<option value="">Select Version...</option>
+		for _, version := range versions {
+			<option value={ version.Version }>{ version.Version }</option>
+		}
+	</select>
+}
+
+templ ErrorAlert(message string) {
+	<div class="alert alert-error">
+		{ message }
+	</div>
+}
+
+templ SuccessAlert(message string) {
+	<div class="alert alert-success">
+		{ message }
+	</div>
+}
+
+templ SignalMetadataItem(label, value string) {
+	<div class="signal-metadata-item">
+		<span class="signal-metadata-label">{ label }:</span>
+		<div class="signal-metadata-value">{ value }</div>
+	</div>
+}
+
+templ SignalMetadataSimple(label, value string) {
+	<div class="signal-metadata-item">
+		<span class="signal-metadata-label">{ label }:</span> { value }
+	</div>
+}
+
+templ CheckboxField(name, value, label string) {
+	<label class="checkbox-field">
+		<input type="checkbox" name={ name } value={ value } class="checkbox-input"/>
+		<span class="text-sm">{ label }</span>
+	</label>
+}

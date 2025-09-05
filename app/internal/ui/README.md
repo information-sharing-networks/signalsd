@@ -6,15 +6,15 @@ A simple web user interface for managing Information Sharing Networks (ISNs) bui
 
 ```
 internal/ui/
-├── server.go          # HTTP server setup and routing
-├── handlers.go        # HTTP request handlers
-├── auth.go            # Authentication service for API integration
-├── types.go           # Shared type definitions
-├── middleware.go      # authentication middleware
-├── client.go.         # Client for calling signalsd API
-├── config.go          # Configuration management (standalone mode)
-├── templates.templ    # templ HTML templates
-└── templates_templ.go # Generated Go code from templ templates
+├── server/server.go            # HTTP server setup and routing
+├── handlers/handlers.go        # HTTP request handlers
+├── auth/auth.go                # Authentication service for API integration
+├── auth/middleware.go          # authentication middleware
+├── types/types.go              # Shared type definitions
+├── client/client.go            # Client for calling signalsd API
+├── config/config.go            # Configuration management (standalone mode)
+├── template/templates.templ    # templ HTML templates
+└── template/templates_templ.go # Generated Go code from templ templates
 ```
 
 
@@ -32,23 +32,36 @@ The standard integrated mode (`-mode all`) is the simplist, everything runs on t
 └─────────────────────────────────────┘
          Same Domain (localhost:8080)
 ```
-running the integrated service:
+the integrated UI runs by default and is available on the same port as the API (default: 8080). 
 
 ```bash
-# Generate templ templates
-make templ-generate
-
 # start databasae
 docker compose up db
 
 # start app with docker
 docker compose up app
-
-#... or run signalsd locally with integrated UI (the below command uses the signalsd docker db)
-SECRET_KEY=your-secret DATABASE_URL="postgres://signalsd-dev:@localhost:15432/signalsd_admin?sslmode=disable" signalsd --mode all
-
-The integrated UI runs on the same port as the API (default: 8080).
 ```
+
+Login using `http://localhost:8080/login`
+
+The app runs with a live reload server (air) so you can develop the UI locally and see changes immediately. 
+
+if you want to run the app locally (not in docker) you can use the below.  Note there is no live reload when running locally so you will need to regenerate the templates and stop and start the ui server after making changes.
+
+
+```bash
+
+# start the api 
+make go-api # note expects the docker database to be running
+
+# or specify your own local database
+SECRET_KEY=your-secret DATABASE_URL="postgres://signalsd-dev:@localhost:5432/signalsd_admin?sslmode=disable" signalsd --mode ui
+
+# start the ui
+make go-ui
+
+```
+
 Switch to standalone mode when you need container separation or want to replace the UI
 
 ### Standalone UI 
@@ -81,10 +94,12 @@ The standalone mode requires a reverse proxy so that the client sees a single do
 **Step 1**: Deploy containers separately
 ```bash
 # API container
+ go build -o signalsd cmd/signalsd/main.go 
 signalsd --mode api
 
 # UI container
-signalsd --mode ui
+cd app &&  go build -o signalsd-ui cmd/signalsd-ui/main.go 
+signalsd-ui
 ```
 
 **Step 2**: Configure reverse proxy (nginx example)
@@ -112,7 +127,7 @@ server {
 ## Configuration
 
 ### Integrated Mode (Default)
-When running as integrated UI (`--mode all` or `--mode ui`), the UI uses signalsd's configuration. No separate configuration needed.
+When running as integrated UI (`signalsd --mode all`), the UI uses signalsd's configuration. No separate configuration needed.
 
 ### Standalone Mode (Development/Custom Deployments)
 
@@ -128,6 +143,12 @@ When running as a separate service, the UI has its own configuration:
 - `IDLE_TIMEOUT`: HTTP idle timeout (default: 60s)
 
 **No database or secret configuration required** - the UI calls the signalsd API for all data operations.
+
+## Integrated mode
+the integrated UI is built into the signalsd binary and can be run with `signalsd --mode all` or `signalsd --mode ui`.  No additional configuration is required.  
+
+Note the UI was created as an example of how a third party UI could be built on top of the signalsd API.  It does not integrated directly with the signalsd http server - all communication is via the public API.
+
 
 # Development
 

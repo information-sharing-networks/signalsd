@@ -1,0 +1,89 @@
+package templates
+
+import (
+    "strings"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
+)
+
+// =============================================================================
+// ISN ACCOUNTS ADMIN PAGE
+// =============================================================================
+templ IsnAccountsAdminPage(isns []types.IsnDropdown) {
+	@BaseLayout("ISN Account Management") {
+		@Navigation()
+		<div class="page-container">
+			<h1 class="page-title">ISN Account Management</h1>
+			<p class="text-muted mb-6">Add accounts to Information Sharing Networks.</p>
+
+			if len(isns) == 0 {
+				<div class="card">
+					<div class="card-body text-center">
+						<div class="alert alert-info">
+							<strong>No ISNs Available</strong>
+							<p class="mt-2 mb-0">You need admin access to at least one ISN to manage accounts.</p>
+						</div>
+					</div>
+				</div>
+			} else {
+				<div class="card mb-6">
+					<div class="card-header">
+						<h3 class="card-title">Add Account to ISN</h3>
+					</div>
+					<div class="card-body">
+						<form hx-post="/ui-api/add-isn-account" hx-target="#admin-result" class="space-y-4">
+							<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+								<div class="form-group">
+									<label for="isn_slug" class="form-label">ISN</label>
+									<select
+										id="isn_slug"
+										name="isn_slug"
+										required
+										class="form-select"
+									>
+										<option value="">Select ISN...</option>
+										for _, isn := range isns {
+											<option value={ isn.Slug }>{ strings.ReplaceAll(isn.Slug, "-", " ") }</option>
+										}
+									</select>
+								</div>
+								<div class="form-group">
+									<label for="account_email" class="form-label">Account Email</label>
+									<input
+										type="email"
+										id="account_email"
+										name="account_email"
+										required
+										placeholder="user@example.com"
+										class="form-input"
+									/>
+								</div>
+							</div>
+							<div class="form-group">
+								<label for="permission" class="form-label">Permission Level</label>
+								<select
+									id="permission"
+									name="permission"
+									required
+									class="form-select"
+								>
+									<option value="">Select Permission...</option>
+									<option value="read">Read - Can view signals</option>
+									<option value="write">Write - Can create and view signals</option>
+								</select>
+							</div>
+							<div class="form-group">
+								<button type="submit" class="btn btn-primary">
+									Add Account to ISN
+								</button>
+							</div>
+						</form>
+					</div>
+				</div>
+
+				<div id="admin-result">
+					<!-- Results will appear here -->
+				</div>
+			}
+		</div>
+	}
+}

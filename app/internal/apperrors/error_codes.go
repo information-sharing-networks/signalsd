@@ -1,5 +1,6 @@
 package apperrors
 
+// ErrorCode represents a specific error condition - used in either the backend API or client
 type ErrorCode string
 
 const (
@@ -15,6 +16,7 @@ const (
 	ErrCodeInvalidURLParam            ErrorCode = "invalid_url_param"
 	ErrCodeMalformedBody              ErrorCode = "malformed_body"
 	ErrCodeNotImplemented             ErrorCode = "not_implemented"
+	ErrCodeNetworkError               ErrorCode = "network_error"
 	ErrCodePasswordTooShort           ErrorCode = "password_too_short"
 	ErrCodeRefreshTokenInvalid        ErrorCode = "refresh_token_invalid"
 	ErrCodeRequestTooLarge            ErrorCode = "request_too_large"

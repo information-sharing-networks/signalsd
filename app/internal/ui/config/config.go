@@ -1,4 +1,4 @@
-package ui
+package config
 
 import (
 	"fmt"
@@ -27,9 +27,9 @@ var validEnvs = map[string]bool{
 	"staging": true,
 }
 
-const accessTokenCookieName = "access_token"
-const isnPermsCookieName = "isn_perms"
-const accountInfoCookieName = "account_info"
+const AccessTokenCookieName = "access_token"
+const IsnPermsCookieName = "isn_perms"
+const AccountInfoCookieName = "account_info"
 
 func NewConfig() (*Config, error) {
 	var cfg Config

@@ -173,7 +173,7 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 		req.BumpType == "" ||
 		req.ReadmeURL == "" ||
 		req.Detail == "" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must supply all the fields: schema URL, title, bump type, readme URL and detail")
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must supply all the fields: schema URL, title, version, readme URL and detail")
 		return
 	}
 

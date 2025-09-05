@@ -16,7 +16,8 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/server/isns"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/middleware"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/schemas"
-	"github.com/information-sharing-networks/signalsd/app/internal/ui"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/config"
+	uiserver "github.com/information-sharing-networks/signalsd/app/internal/ui/server"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -423,7 +424,7 @@ func (s *Server) registerApiDocoRoutes() {
 // setupUIServer configures the UI server and registers web UI routes directly on the signalsd router
 func (s *Server) setupUIServer() {
 	// Create UI configuration based on signalsd configuration
-	uiConfig := &ui.Config{
+	uiConfig := &config.Config{
 		Environment:  s.serverConfig.Environment,
 		Host:         s.serverConfig.Host,
 		Port:         s.serverConfig.Port, // Same port as API
@@ -435,7 +436,7 @@ func (s *Server) setupUIServer() {
 	}
 
 	// Create UI server and register its routes on the signalsd router
-	uiServer := ui.NewIntegratedServer(s.router, uiConfig, s.logger)
+	uiServer := uiserver.NewIntegratedServer(s.router, uiConfig, s.logger)
 	uiServer.RegisterRoutes(s.router)
 
 	s.logger.Info("UI routes registered")

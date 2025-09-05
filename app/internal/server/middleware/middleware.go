@@ -48,7 +48,7 @@ func RequestSizeLimit(maxBytes int64) func(http.Handler) http.Handler {
 
 			// Check Content-Length header first (if present)
 			if r.ContentLength > maxBytes {
-				reqLogger := logger.ContextMiddlewareLogger(r.Context())
+				reqLogger := logger.ContextRequestLogger(r.Context())
 
 				// Log request size limit violation immediately
 				reqLogger.Warn("Request size limit exceeded",
@@ -91,7 +91,7 @@ func RateLimit(requestsPerSecond int32, burst int32) func(http.Handler) http.Han
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if !limiter.Allow() {
-				reqLogger := logger.ContextMiddlewareLogger(r.Context())
+				reqLogger := logger.ContextRequestLogger(r.Context())
 
 				// Log rate limit violation immediately
 				reqLogger.Warn("Rate limit exceeded",

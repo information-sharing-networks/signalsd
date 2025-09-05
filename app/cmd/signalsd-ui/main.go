@@ -10,7 +10,8 @@ import (
 	"syscall"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
-	"github.com/information-sharing-networks/signalsd/app/internal/ui"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/config"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/server"
 	"github.com/information-sharing-networks/signalsd/app/internal/version"
 	"github.com/spf13/cobra"
 )
@@ -36,7 +37,7 @@ func main() {
 // run the UI service in standalone mode
 func run() error {
 	// Load UI configuration
-	cfg, err := ui.NewConfig()
+	cfg, err := config.NewConfig()
 	if err != nil {
 		log.Printf("Failed to load UI configuration %v", err.Error())
 		os.Exit(1)
@@ -49,7 +50,7 @@ func run() error {
 	appLogger.Info("using signalsd API", slog.String("api_url", cfg.APIBaseURL))
 
 	// Create UI server
-	server := ui.NewStandaloneServer(cfg, appLogger)
+	server := server.NewStandaloneServer(cfg, appLogger)
 
 	// Set up graceful shutdown handling
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

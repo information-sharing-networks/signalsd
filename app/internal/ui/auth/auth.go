@@ -1,21 +1,34 @@
-package ui
+package auth
 
 import (
-	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/config"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
+// AuthService provides authentication and authorization services for the UI
 type AuthService struct {
-	apiBaseURL string
-	httpClient *http.Client
+	apiBaseURL  string
+	httpClient  *http.Client
+	environment string
+}
+
+// NewAuthService creates a new UI authentication service
+func NewAuthService(apiBaseURL string, environment string) *AuthService {
+	return &AuthService{
+		apiBaseURL: apiBaseURL,
+		httpClient: &http.Client{
+			Timeout: 10 * time.Second,
+		},
+		environment: environment,
+	}
 }
 
 type LoginRequest struct {
@@ -23,7 +36,7 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 
-// TokenStatus represents the status of an access token
+// TokenStatus represents the status of an access token used in a UI request
 type TokenStatus int
 
 const (
@@ -42,78 +55,9 @@ func (t TokenStatus) String() string {
 	return tokenStatusNames[t]
 }
 
-func NewAuthService(apiBaseURL string) *AuthService {
-	return &AuthService{
-		apiBaseURL: apiBaseURL,
-		httpClient: &http.Client{
-			Timeout: 10 * time.Second,
-		},
-	}
-}
-
-// AuthenticateUser authenticates a user with the signalsd API and returns response with refresh token cookie
-func (a *AuthService) AuthenticateUser(email, password string) (*LoginResponse, *http.Cookie, error) {
-	loginReq := LoginRequest{
-		Email:    email,
-		Password: password,
-	}
-
-	jsonData, err := json.Marshal(loginReq)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to marshal login request: %w", err)
-	}
-
-	url := fmt.Sprintf("%s/api/auth/login", a.apiBaseURL)
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := a.httpClient.Do(req)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to make request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	bodyBytes, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		var errorResp ErrorResponse
-		if err := json.Unmarshal(bodyBytes, &errorResp); err != nil {
-			return nil, nil, fmt.Errorf("authentication failed with status %d", resp.StatusCode)
-		}
-		return nil, nil, fmt.Errorf("authentication failed: %s", errorResp.Message)
-	}
-
-	var loginResp LoginResponse
-	if err := json.Unmarshal(bodyBytes, &loginResp); err != nil {
-		return nil, nil, fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	// Extract the refresh token cookie from the API response
-	cookies := resp.Cookies()
-	var refreshTokenCookie *http.Cookie
-	for _, cookie := range cookies {
-		if cookie.Name == signalsd.RefreshTokenCookieName {
-			refreshTokenCookie = cookie
-			break
-		}
-	}
-
-	if refreshTokenCookie == nil {
-		return nil, nil, fmt.Errorf("refresh token cookie not found in API response")
-	}
-
-	return &loginResp, refreshTokenCookie, nil
-}
-
-// RefreshToken attempts to refresh an access token using the refresh token and returns new refresh token cookie
-func (a *AuthService) RefreshToken(refreshTokenCookie *http.Cookie) (*LoginResponse, *http.Cookie, error) {
+// RefreshToken is a UI-specific method that uses the signalsd backend API to refresh an access token using the supplied refresh token.
+// Returns a new refresh token cookie and access token.
+func (a *AuthService) RefreshToken(refreshTokenCookie *http.Cookie) (*types.AccesTokenDetails, *http.Cookie, error) {
 	url := fmt.Sprintf("%s/oauth/token?grant_type=refresh_token", a.apiBaseURL)
 
 	req, err := http.NewRequest("POST", url, nil)
@@ -133,15 +77,15 @@ func (a *AuthService) RefreshToken(refreshTokenCookie *http.Cookie) (*LoginRespo
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		var errorResp ErrorResponse
+		var errorResp types.ErrorResponse
 		if err := json.NewDecoder(resp.Body).Decode(&errorResp); err != nil {
 			return nil, nil, fmt.Errorf("token refresh failed with status %d", resp.StatusCode)
 		}
 		return nil, nil, fmt.Errorf("token refresh failed: %s", errorResp.Message)
 	}
 
-	var loginResp LoginResponse
-	if err := json.NewDecoder(resp.Body).Decode(&loginResp); err != nil {
+	var refreshResp types.AccesTokenDetails
+	if err := json.NewDecoder(resp.Body).Decode(&refreshResp); err != nil {
 		return nil, nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
@@ -159,12 +103,12 @@ func (a *AuthService) RefreshToken(refreshTokenCookie *http.Cookie) (*LoginRespo
 		return nil, nil, fmt.Errorf("new refresh token cookie not found in API response")
 	}
 
-	return &loginResp, newRefreshTokenCookie, nil
+	return &refreshResp, newRefreshTokenCookie, nil
 }
 
 // CheckTokenStatus checks the status of an access token from the request cookies
 func (a *AuthService) CheckTokenStatus(r *http.Request) TokenStatus {
-	accessTokenCookie, err := r.Cookie(accessTokenCookieName)
+	accessTokenCookie, err := r.Cookie(config.AccessTokenCookieName)
 	if err != nil {
 		return TokenMissing
 	}
@@ -190,7 +134,7 @@ func (a *AuthService) CheckTokenStatus(r *http.Request) TokenStatus {
 	return TokenExpired
 }
 
-// SetAuthCookies sets the authentication-related cookies.
+// SetAuthCookies sets the authentication-related cookies in the UI HTTP response after authentication
 //
 // The browser needs to maintain authentication state via cookies so that any signalsd instance can authenticate the user, regardless of which instance handles each request.
 //
@@ -199,7 +143,7 @@ func (a *AuthService) CheckTokenStatus(r *http.Request) TokenStatus {
 //   - a cookie containing the access token provided by the server,
 //   - a cookie containg the isn permissions as JSON.
 //   - a cookie containing the account information (ID, type, role) as JSON.
-func (a *AuthService) SetAuthCookies(w http.ResponseWriter, loginResp *LoginResponse, refreshTokenCookie *http.Cookie, environment string) error {
+func (a *AuthService) SetAuthCookies(w http.ResponseWriter, accessTokenDetails *types.AccesTokenDetails, refreshTokenCookie *http.Cookie, environment string) error {
 	isProd := environment == "prod"
 
 	// Set refresh token cookie (from API response)
@@ -207,18 +151,18 @@ func (a *AuthService) SetAuthCookies(w http.ResponseWriter, loginResp *LoginResp
 
 	// Set access token cookie
 	http.SetCookie(w, &http.Cookie{
-		Name:     accessTokenCookieName,
-		Value:    loginResp.AccessToken,
+		Name:     config.AccessTokenCookieName,
+		Value:    accessTokenDetails.AccessToken,
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   isProd,
 		SameSite: http.SameSiteLaxMode,
-		MaxAge:   loginResp.ExpiresIn + 60, // JWT expiry + 1 minute buffer
+		MaxAge:   accessTokenDetails.ExpiresIn,
 	})
 
 	// Set permissions cookie if permissions exist
-	if len(loginResp.Perms) > 0 {
-		permsJSON, err := json.Marshal(loginResp.Perms)
+	if len(accessTokenDetails.Perms) > 0 {
+		permsJSON, err := json.Marshal(accessTokenDetails.Perms)
 		if err != nil {
 			return fmt.Errorf("failed to marshal permissions: %w", err)
 		}
@@ -226,21 +170,21 @@ func (a *AuthService) SetAuthCookies(w http.ResponseWriter, loginResp *LoginResp
 		// Base64 encode to avoid cookie encoding issues
 		encodedPerms := base64.StdEncoding.EncodeToString(permsJSON)
 		http.SetCookie(w, &http.Cookie{
-			Name:     isnPermsCookieName,
+			Name:     config.IsnPermsCookieName,
 			Value:    encodedPerms,
 			Path:     "/",
 			HttpOnly: true,
 			Secure:   isProd,
 			SameSite: http.SameSiteLaxMode,
-			MaxAge:   loginResp.ExpiresIn + 60,
+			MaxAge:   accessTokenDetails.ExpiresIn,
 		})
 	}
 
 	// Set account information cookie (base64 encoded JSON)
-	accountInfo := AccountInfo{
-		AccountID:   loginResp.AccountID,
-		AccountType: loginResp.AccountType,
-		Role:        loginResp.Role,
+	accountInfo := types.AccountInfo{
+		AccountID:   accessTokenDetails.AccountID,
+		AccountType: accessTokenDetails.AccountType,
+		Role:        accessTokenDetails.Role,
 	}
 
 	accountInfoJSON, err := json.Marshal(accountInfo)
@@ -250,13 +194,13 @@ func (a *AuthService) SetAuthCookies(w http.ResponseWriter, loginResp *LoginResp
 
 	accountInfoBase64 := base64.StdEncoding.EncodeToString(accountInfoJSON)
 	http.SetCookie(w, &http.Cookie{
-		Name:     accountInfoCookieName,
+		Name:     config.AccountInfoCookieName,
 		Value:    accountInfoBase64,
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   isProd,
 		SameSite: http.SameSiteLaxMode,
-		MaxAge:   loginResp.ExpiresIn + 60, // JWT expiry + 1 minute buffer
+		MaxAge:   accessTokenDetails.ExpiresIn,
 	})
 
 	return nil
@@ -267,7 +211,7 @@ func (a *AuthService) ClearAuthCookies(w http.ResponseWriter, environment string
 	isProd := environment == "prod"
 
 	http.SetCookie(w, &http.Cookie{
-		Name:     accessTokenCookieName,
+		Name:     config.AccessTokenCookieName,
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
@@ -287,7 +231,7 @@ func (a *AuthService) ClearAuthCookies(w http.ResponseWriter, environment string
 	})
 
 	http.SetCookie(w, &http.Cookie{
-		Name:     isnPermsCookieName,
+		Name:     config.IsnPermsCookieName,
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
@@ -297,7 +241,7 @@ func (a *AuthService) ClearAuthCookies(w http.ResponseWriter, environment string
 	})
 
 	http.SetCookie(w, &http.Cookie{
-		Name:     accountInfoCookieName,
+		Name:     config.AccountInfoCookieName,
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
@@ -307,30 +251,30 @@ func (a *AuthService) ClearAuthCookies(w http.ResponseWriter, environment string
 	})
 }
 
-// getIsnPermsFromCookie reads and decodes the ISN permissions from the cookie
-func (s *Server) getIsnPermsFromCookie(r *http.Request) (map[string]IsnPerm, error) {
-	permsCookie, err := r.Cookie(isnPermsCookieName)
+// GetIsnPermsFromCookie reads and decodes the ISN permissions from the cookie
+func (a *AuthService) GetIsnPermsFromCookie(r *http.Request) (map[string]types.IsnPerm, error) {
+	permsCookie, err := r.Cookie(config.IsnPermsCookieName)
 	if err != nil {
-		return make(map[string]IsnPerm), err
+		return make(map[string]types.IsnPerm), err
 	}
 
 	// Decode base64
 	decodedPerms, err := base64.StdEncoding.DecodeString(permsCookie.Value)
 	if err != nil {
-		return make(map[string]IsnPerm), err
+		return make(map[string]types.IsnPerm), err
 	}
 
 	// Unmarshal JSON
-	var isnPerms map[string]IsnPerm
+	var isnPerms map[string]types.IsnPerm
 	if err := json.Unmarshal(decodedPerms, &isnPerms); err != nil {
-		return make(map[string]IsnPerm), err
+		return make(map[string]types.IsnPerm), err
 	}
 
 	return isnPerms, nil
 }
 
-func (s *Server) getAccountInfoFromCookie(r *http.Request) (*AccountInfo, error) {
-	accountInfoCookie, err := r.Cookie(accountInfoCookieName)
+func (a *AuthService) GetAccountInfoFromCookie(r *http.Request) (*types.AccountInfo, error) {
+	accountInfoCookie, err := r.Cookie(config.AccountInfoCookieName)
 	if err != nil {
 		return nil, err
 	}
@@ -341,7 +285,7 @@ func (s *Server) getAccountInfoFromCookie(r *http.Request) (*AccountInfo, error)
 		return nil, err
 	}
 	//unmarshal json to struct
-	accountInfo := &AccountInfo{}
+	accountInfo := &types.AccountInfo{}
 	if err := json.Unmarshal(decodedAccountInfo, accountInfo); err != nil {
 		return nil, err
 	}
@@ -349,10 +293,10 @@ func (s *Server) getAccountInfoFromCookie(r *http.Request) (*AccountInfo, error)
 	return accountInfo, nil
 }
 
-// getIsnPermission validates user has access to the ISN and returns the ISN permission deails (read/write, availalbe signal types, visibility)
-func (s *Server) getIsnPermission(r *http.Request, isnSlug string) (*IsnPerm, error) {
+// CheckIsnPermission validates user has access to the ISN and returns the ISN permission deails (read/write, availalbe signal types, visibility)
+func (a *AuthService) CheckIsnPermission(r *http.Request, isnSlug string) (*types.IsnPerm, error) {
 	// Get permissions from cookie
-	perms, err := s.getIsnPermsFromCookie(r)
+	perms, err := a.GetIsnPermsFromCookie(r)
 	if err != nil {
 		return nil, err
 	}

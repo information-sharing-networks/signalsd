@@ -1,0 +1,52 @@
+package templates
+
+
+// =============================================================================
+// BASE LAYOUT & STRUCTURE
+// =============================================================================
+templ BaseLayout(title string) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>{ title } - Signalsd</title>
+			<script src="https://unpkg.com/htmx.org@2.0.4"></script>
+			<link href="/static/css/app.css" rel="stylesheet"/>
+		</head>
+		<body>
+			{ children... }
+		</body>
+	</html>
+}
+
+// =============================================================================
+// NAVIGATION 
+// =============================================================================
+templ Navigation() {
+	<nav class="navigation">
+		<div class="nav-container">
+			<div class="nav-content">
+				<div class="nav-brand">
+					<h1 class="nav-title">Signals</h1>
+					<div class="nav-links">
+						<a href="/dashboard" class="nav-link active">
+							Dashboard
+						</a>
+						
+					</div>
+				</div>
+				<div class="nav-actions">
+					<button
+						hx-post="/logout"
+						hx-confirm="Are you sure you want to logout?"
+						class="nav-link"
+					>
+						Logout
+					</button>
+				</div>
+			</div>
+		</div>
+	</nav>
+}
+
