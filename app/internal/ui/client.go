@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"net"
 	"net/http"
 	"time"
 )
@@ -138,11 +137,7 @@ func (c *Client) SearchSignals(accessToken string, params SignalSearchParams, vi
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		// Check for timeout to provide more specific message
-		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-			return nil, fmt.Errorf("request timed out - please check your connection and try again")
-		}
-		return nil, fmt.Errorf("network error - please check your connection and try again")
+		return nil, err
 	}
 	defer resp.Body.Close()
 
@@ -184,11 +179,7 @@ func (c *Client) RegisterUser(email, password string) error {
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		// Check for timeout to provide more specific message
-		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-			return fmt.Errorf("request timed out - please check your connection and try again")
-		}
-		return fmt.Errorf("network error - please check your connection and try again")
+		return err
 	}
 	defer resp.Body.Close()
 
@@ -220,11 +211,7 @@ func (c *Client) LookupUserByEmail(accessToken, email string) (*UserLookupRespon
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		// Check for timeout to provide more specific message
-		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-			return nil, fmt.Errorf("request timed out - please check your connection and try again")
-		}
-		return nil, fmt.Errorf("network error - please check your connection and try again")
+		return nil, err
 	}
 	defer resp.Body.Close()
 
@@ -270,11 +257,7 @@ func (c *Client) AddAccountToIsn(accessToken, isnSlug, accountEmail, permission 
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		// Check for timeout to provide more specific message
-		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-			return fmt.Errorf("request timed out - please check your connection and try again")
-		}
-		return fmt.Errorf("network error - please check your connection and try again")
+		return err
 	}
 	defer resp.Body.Close()
 
@@ -321,11 +304,7 @@ func (c *Client) CreateSignalType(accessToken, isnSlug string, req CreateSignalT
 
 	resp, err := c.httpClient.Do(httpReq)
 	if err != nil {
-		// Check for timeout to provide more specific message
-		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-			return nil, fmt.Errorf("request timed out - please check your connection and try again")
-		}
-		return nil, fmt.Errorf("network error - please check your connection and try again")
+		return nil, err
 	}
 	defer resp.Body.Close()
 

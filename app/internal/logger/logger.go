@@ -1,3 +1,18 @@
+// Package logger provides structured logging for signalsd with three distinct logging patterns:
+//
+//  1. **Application-level logging**: Use the logger returned by InitLogger() for server startup,
+//     shutdown, configuration, and other non-HTTP operations.
+//     Example: appLogger.Info("Starting server", slog.String("version", version))
+//
+//  2. **HTTP request completion logging**: Automatic logging via RequestLogging middleware.
+//     This logs when HTTP requests complete with status, duration, etc. No manual calls needed.
+//
+//  3. **Request-scoped adhoc logging**: Use ContextRequestLogger(r.Context()) for events
+//     that occur during request processing. These logs include the request ID for tracing.
+//     Example: reqLogger.Error("Database query failed", slog.String("error", err.Error()))
+//
+// All request-scoped logs (patterns 2 and 3) automatically include request IDs for tracing.
+// This pattern works in both standalone UI mode and integrated signalsd mode.
 package logger
 
 import (

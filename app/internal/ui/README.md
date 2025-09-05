@@ -129,6 +129,26 @@ When running as a separate service, the UI has its own configuration:
 
 **No database or secret configuration required** - the UI calls the signalsd API for all data operations.
 
+## Logging
+
+The UI follows signalsd's three-tier logging pattern:
+
+1. **Server-level logging** (`s.logger`): Used for server startup, shutdown, and configuration. Not request-scoped.
+
+2. **HTTP request completion logging**: Automatic via middleware. Logs when requests complete with status, duration, request ID.
+
+3. **Request-scoped logging** (`logger.ContextRequestLogger(r.Context())`): Used in handlers for events during request processing. Includes request ID for tracing.
+
+```go
+// In handlers, always use request-scoped logging:
+func (s *Server) handleExample(w http.ResponseWriter, r *http.Request) {
+    reqLogger := logger.ContextRequestLogger(r.Context())
+    reqLogger.Error("Something went wrong", slog.String("error", err.Error()))
+}
+```
+
+This pattern works in both standalone and integrated modes, providing consistent request tracing.
+
 # Development
 
 ## Prerequisites
