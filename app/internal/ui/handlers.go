@@ -417,7 +417,8 @@ func (s *Server) handleAddIsnAccount(w http.ResponseWriter, r *http.Request) {
 	err = s.apiClient.AddAccountToIsn(accessToken, isnSlug, accountEmail, permission)
 	if err != nil {
 		reqLogger.Error("Failed to add account to ISN", slog.String("error", err.Error()))
-		s.renderError(w, r, CategorizeError(0, err))
+
+		s.renderError(w, r, err)
 		return
 	}
 

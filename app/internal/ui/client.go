@@ -211,6 +211,7 @@ func (c *Client) LookupUserByEmail(accessToken, email string) (*UserLookupRespon
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
+		fmt.Printf("debug!!!!!!!!!! %v", err)
 		return nil, err
 	}
 	defer resp.Body.Close()
@@ -263,7 +264,9 @@ func (c *Client) AddAccountToIsn(accessToken, isnSlug, accountEmail, permission 
 
 	if resp.StatusCode != http.StatusCreated {
 		message := c.getErrorMessage(resp, "Failed to add account to ISN")
-		return fmt.Errorf("%s", message)
+		UIError := CategorizeError(resp.StatusCode, fmt.Errorf("%s", message))
+		fmt.Printf("Debug !!! %s %v status code UIerror.Type |%v| UIError.Message |%v|\n", message, resp.StatusCode, UIError.Type, UIError.Message)
+		return UIError
 	}
 
 	return nil

@@ -115,10 +115,10 @@ func CategorizeError(statusCode int, err error) UIError {
 			Type:    ErrorTypePermission,
 			Message: userErrorMessages[ErrorTypePermission],
 		}
-	case http.StatusBadRequest: // 400
+	case http.StatusBadRequest: // 400 - prefer the error message from the server for bad request errors as these should explain the problem in plain English
 		return UIError{
 			Type:    ErrorTypeValidation,
-			Message: userErrorMessages[ErrorTypeValidation],
+			Message: err.Error(),
 		}
 	case http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout: // 5xx
 		return UIError{
