@@ -3,6 +3,7 @@ package ui
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -12,7 +13,7 @@ import (
 
 // renderError displays an error message inline to the user
 func (s *Server) renderError(w http.ResponseWriter, r *http.Request, error error) {
-	component := AccessDeniedAlert(error.Error())
+	component := ErrorAlert(error.Error())
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger := logger.ContextRequestLogger(r.Context())
 		reqLogger.Error("Failed to render error", slog.String("error", err.Error()))
@@ -51,14 +52,14 @@ func (s *Server) handleLoginPost(w http.ResponseWriter, r *http.Request) {
 	loginResp, refreshTokenCookie, err := s.apiClient.Login(email, password)
 	if err != nil {
 		reqLogger.Error("Authentication failed", slog.String("error", err.Error()))
-		s.renderError(w, r, CategorizeError(0, err))
+		s.renderError(w, r, err)
 		return
 	}
 
 	// Set all authentication cookies using shared method
 	if err := s.authService.SetAuthCookies(w, loginResp, refreshTokenCookie, s.config.Environment); err != nil {
 		reqLogger.Error("Failed to set authentication cookies", slog.String("error", err.Error()))
-		s.renderError(w, r, CategorizeError(http.StatusInternalServerError, err))
+		s.renderError(w, r, NewUIError(http.StatusInternalServerError, err))
 		return
 	}
 
@@ -89,12 +90,12 @@ func (s *Server) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	if email == "" || password == "" || confirmPassword == "" {
-		s.renderError(w, r, CategorizeError(http.StatusBadRequest, nil))
+		s.renderError(w, r, NewUIError(http.StatusBadRequest, nil))
 		return
 	}
 
 	if password != confirmPassword {
-		s.renderError(w, r, CategorizeError(http.StatusBadRequest, nil))
+		s.renderError(w, r, NewUIError(http.StatusBadRequest, nil))
 		return
 	}
 
@@ -102,7 +103,7 @@ func (s *Server) handleRegisterPost(w http.ResponseWriter, r *http.Request) {
 	err := s.apiClient.RegisterUser(email, password)
 	if err != nil {
 		reqLogger.Error("Registration failed", slog.String("error", err.Error()))
-		s.renderError(w, r, CategorizeError(0, err))
+		s.renderError(w, r, err)
 		return
 	}
 
@@ -312,7 +313,7 @@ func (s *Server) handleSearchSignals(w http.ResponseWriter, r *http.Request) {
 
 	// Validate required parameters
 	if params.IsnSlug == "" || params.SignalTypeSlug == "" || params.SemVer == "" {
-		s.renderError(w, r, CategorizeError(http.StatusBadRequest, nil))
+		s.renderError(w, r, NewUIError(http.StatusBadRequest, nil))
 		return
 	}
 
@@ -320,7 +321,7 @@ func (s *Server) handleSearchSignals(w http.ResponseWriter, r *http.Request) {
 	// Get user permissions to validate ISN access and determine visibility
 	isnPerm, err := s.getIsnPermission(r, params.IsnSlug)
 	if err != nil {
-		s.renderError(w, r, CategorizeError(0, err))
+		s.renderError(w, r, NewUIError(0, err))
 		return
 	}
 
@@ -328,7 +329,7 @@ func (s *Server) handleSearchSignals(w http.ResponseWriter, r *http.Request) {
 	accessTokenCookie, err := r.Cookie(accessTokenCookieName)
 	if err != nil {
 		reqLogger.Error("Access token not found", slog.String("error", err.Error()))
-		s.renderError(w, r, CategorizeError(http.StatusUnauthorized, err))
+		s.renderError(w, r, NewUIError(http.StatusUnauthorized, err))
 		return
 	}
 	accessToken := accessTokenCookie.Value
@@ -337,7 +338,7 @@ func (s *Server) handleSearchSignals(w http.ResponseWriter, r *http.Request) {
 	searchResp, err := s.apiClient.SearchSignals(accessToken, params, isnPerm.Visibility)
 	if err != nil {
 		reqLogger.Error("Signal search failed", slog.String("error", err.Error()))
-		s.renderError(w, r, CategorizeError(0, err))
+		s.renderError(w, r, err)
 		return
 	}
 
@@ -401,14 +402,15 @@ func (s *Server) handleAddIsnAccount(w http.ResponseWriter, r *http.Request) {
 
 	// Validate required fields
 	if isnSlug == "" || accountEmail == "" || permission == "" {
-		s.renderError(w, r, CategorizeError(http.StatusBadRequest, nil))
+		s.renderError(w, r, errors.New("please fill in all fields"))
 		return
 	}
 
 	// Get access token from cookie
 	accessTokenCookie, err := r.Cookie(accessTokenCookieName)
 	if err != nil {
-		s.renderError(w, r, CategorizeError(http.StatusUnauthorized, err))
+		reqLogger.Error("Failed to read access token cookie", slog.String("component", "ui.handleAddIsnAccount"), slog.String("error", err.Error()))
+		s.renderError(w, r, NewUIError(http.StatusUnauthorized, err))
 		return
 	}
 	accessToken := accessTokenCookie.Value
@@ -416,7 +418,7 @@ func (s *Server) handleAddIsnAccount(w http.ResponseWriter, r *http.Request) {
 	// Call the API to add the account to the ISN
 	err = s.apiClient.AddAccountToIsn(accessToken, isnSlug, accountEmail, permission)
 	if err != nil {
-		reqLogger.Error("Failed to add account to ISN", slog.String("error", err.Error()))
+		reqLogger.Error("Failed to add account to ISN", slog.String("component", "ui.handleAddIsnAccount"), slog.String("error", err.Error()))
 
 		s.renderError(w, r, err)
 		return
@@ -501,25 +503,25 @@ func (s *Server) handleCreateSignalType(w http.ResponseWriter, r *http.Request) 
 	// Validate user has admin or owner permission
 	isnPerm, err := s.getIsnPermission(r, isnSlug)
 	if err != nil {
-		s.renderError(w, r, CategorizeError(0, err))
+		s.renderError(w, r, NewUIError(0, err))
 		return
 	}
 
 	if isnPerm.Permission != "write" {
-		s.renderError(w, r, CategorizeError(http.StatusForbidden, nil))
+		s.renderError(w, r, NewUIError(http.StatusForbidden, nil))
 		return
 	}
 
 	// Validate required fields
 	if isnSlug == "" || title == "" || schemaURL == "" || bumpType == "" {
-		s.renderError(w, r, CategorizeError(http.StatusBadRequest, nil))
+		s.renderError(w, r, NewUIError(http.StatusBadRequest, nil))
 		return
 	}
 
 	// Get access token from cookie
 	accessTokenCookie, err := r.Cookie(accessTokenCookieName)
 	if err != nil {
-		s.renderError(w, r, CategorizeError(http.StatusUnauthorized, err))
+		s.renderError(w, r, NewUIError(http.StatusUnauthorized, err))
 		return
 	}
 	accessToken := accessTokenCookie.Value
@@ -543,7 +545,7 @@ func (s *Server) handleCreateSignalType(w http.ResponseWriter, r *http.Request) 
 	response, err := s.apiClient.CreateSignalType(accessToken, isnSlug, createReq)
 	if err != nil {
 		reqLogger.Error("Failed to create signal type", slog.String("error", err.Error()))
-		s.renderError(w, r, CategorizeError(0, err))
+		s.renderError(w, r, err)
 		return
 	}
 

@@ -8,15 +8,6 @@ import (
 	"time"
 )
 
-// getErrorMessage extracts error message from API response or provides fallback
-func (c *Client) getErrorMessage(resp *http.Response, fallback string) string {
-	var errorResp ErrorResponse
-	if err := json.NewDecoder(resp.Body).Decode(&errorResp); err == nil && errorResp.Message != "" {
-		return errorResp.Message
-	}
-	return fallback
-}
-
 // Client handles communication with signalsd API
 type Client struct {
 	baseURL    string
@@ -59,9 +50,9 @@ func (c *Client) Login(email, password string) (*LoginResponse, *http.Cookie, er
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		// Return error with status code for proper categorization
-		message := c.getErrorMessage(resp, "Authentication failed")
-		return nil, nil, &HTTPError{StatusCode: resp.StatusCode, Message: message}
+		// Return UIError for proper categorization and user-friendly messages
+		uiErr := CategorizeErrorFromResponse(resp, "Authentication failed")
+		return nil, nil, uiErr
 	}
 
 	var loginResp LoginResponse
@@ -142,8 +133,7 @@ func (c *Client) SearchSignals(accessToken string, params SignalSearchParams, vi
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		message := c.getErrorMessage(resp, "Search request failed")
-		return nil, fmt.Errorf("%s", message)
+		return nil, CategorizeErrorFromResponse(resp, "Search request failed")
 	}
 
 	var searchResp SignalSearchResponse
@@ -184,8 +174,7 @@ func (c *Client) RegisterUser(email, password string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
-		message := c.getErrorMessage(resp, "Registration failed")
-		return fmt.Errorf("%s", message)
+		return CategorizeErrorFromResponse(resp, "Registration failed")
 	}
 
 	return nil
@@ -217,8 +206,7 @@ func (c *Client) LookupUserByEmail(accessToken, email string) (*UserLookupRespon
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		message := c.getErrorMessage(resp, "User lookup failed")
-		return nil, fmt.Errorf("%s", message)
+		return nil, CategorizeErrorFromResponse(resp, "User lookup failed")
 	}
 
 	// Parse the single user response
@@ -263,10 +251,7 @@ func (c *Client) AddAccountToIsn(accessToken, isnSlug, accountEmail, permission 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
-		message := c.getErrorMessage(resp, "Failed to add account to ISN")
-		UIError := CategorizeError(resp.StatusCode, fmt.Errorf("%s", message))
-		fmt.Printf("Debug !!! %s %v status code UIerror.Type |%v| UIError.Message |%v|\n", message, resp.StatusCode, UIError.Type, UIError.Message)
-		return UIError
+		return CategorizeErrorFromResponse(resp, "Failed to add account to ISN")
 	}
 
 	return nil
@@ -312,8 +297,7 @@ func (c *Client) CreateSignalType(accessToken, isnSlug string, req CreateSignalT
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated {
-		message := c.getErrorMessage(resp, "Failed to create signal type")
-		return nil, fmt.Errorf("%s", message)
+		return nil, CategorizeErrorFromResponse(resp, "Failed to create signal type")
 	}
 
 	var createResp CreateSignalTypeResponse

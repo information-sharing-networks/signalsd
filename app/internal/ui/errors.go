@@ -1,7 +1,9 @@
 package ui
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/url"
@@ -42,13 +44,13 @@ func isNetworkError(err error) bool {
 	// Unwrap the error to get to the root cause
 	var netErr net.Error
 	if errors.As(err, &netErr) {
-		return true // Any net.Error (timeout, temporary, etc.)
+		return true
 	}
 
 	// Check for specific network error types
 	var opErr *net.OpError
 	if errors.As(err, &opErr) {
-		return true // Network operation errors (connection refused, etc.)
+		return true
 	}
 
 	// Check for DNS errors
@@ -60,7 +62,6 @@ func isNetworkError(err error) bool {
 	// Check for URL errors (which often wrap network errors)
 	var urlErr *url.Error
 	if errors.As(err, &urlErr) {
-		// Recursively check the wrapped error
 		return isNetworkError(urlErr.Err)
 	}
 
@@ -75,18 +76,8 @@ func isNetworkError(err error) bool {
 	return false
 }
 
-// HTTPError represents an HTTP error with status code (defined here to avoid import cycles)
-type HTTPError struct {
-	StatusCode int
-	Message    string
-}
-
-func (e *HTTPError) Error() string {
-	return e.Message
-}
-
-// CategorizeError converts errors into user-friendly UIError instances
-func CategorizeError(statusCode int, err error) UIError {
+// NewUIError converts errors into user-friendly UIError instances
+func NewUIError(statusCode int, err error) UIError {
 	// Handle network/connection errors
 	if err != nil {
 		if isNetworkError(err) {
@@ -96,11 +87,6 @@ func CategorizeError(statusCode int, err error) UIError {
 			}
 		}
 
-		// Handle HTTPError (extract status code from error)
-		var httpErr *HTTPError
-		if errors.As(err, &httpErr) {
-			statusCode = httpErr.StatusCode
-		}
 	}
 
 	// Handle errors based on HTTP status code (most reliable indicator)
@@ -132,4 +118,31 @@ func CategorizeError(statusCode int, err error) UIError {
 			Message: userErrorMessages[ErrorTypeSystem],
 		}
 	}
+}
+
+// CategorizeErrorFromResponse creates a UIError from a signalsd http errorResponse
+func CategorizeErrorFromResponse(resp *http.Response, fallbackMessage string) UIError {
+	var message string
+
+	// Try to extract detailed error message from response
+	if resp != nil && resp.Body != nil {
+		var errorResp ErrorResponse
+		if err := json.NewDecoder(resp.Body).Decode(&errorResp); err == nil {
+			if errorResp.Message != "" {
+				message = errorResp.Message
+			}
+		}
+	}
+
+	// Fall back to generic message if no specific message found
+	if message == "" {
+		message = fallbackMessage
+	}
+
+	statusCode := 0
+	if resp != nil {
+		statusCode = resp.StatusCode
+	}
+
+	return NewUIError(statusCode, fmt.Errorf("%s", message))
 }
