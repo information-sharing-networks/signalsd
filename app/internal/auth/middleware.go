@@ -85,7 +85,7 @@ func (a *AuthService) RequireValidAccessToken(next http.Handler) http.Handler {
 		}
 
 		reqLogger.Debug("Access token validation successful",
-			slog.String("component", "RequireValidAccessToken"),
+			slog.String("component", "signalsd.RequireValidAccessToken"),
 			slog.String("account_id", accountID.String()),
 			slog.String("account_type", claims.AccountType),
 		)
@@ -196,7 +196,7 @@ func (a *AuthService) RequireValidRefreshToken(next http.Handler) http.Handler {
 
 		// Log successful refresh token validation immediately
 		reqLogger.Debug("Refresh token validation successful",
-			slog.String("component", "RequireValidRefreshToken"),
+			slog.String("component", "signalsd.RequireValidRefreshToken"),
 			slog.String("account_id", userAccountID.String()),
 		)
 
@@ -293,7 +293,7 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 
 		// Log successful client credentials validation
 		reqLogger.Debug("Client credentials validation successful",
-			slog.String("component", "RequireValidClientCredentials"),
+			slog.String("component", "signalsd.RequireValidClientCredentials"),
 			slog.String("client_id", req.ClientID),
 			slog.String("account_id", serviceAccount.AccountID.String()),
 		)
@@ -326,7 +326,7 @@ func (a *AuthService) RequireRole(allowedRoles ...string) func(http.Handler) htt
 			for _, role := range allowedRoles {
 				if claims.Role == role {
 					reqLogger.Debug("Role authorization successful",
-						slog.String("component", "RequireAuth"),
+						slog.String("component", "signalsd.RequireAuth"),
 						slog.String("account_id", claims.AccountID.String()),
 						slog.Any("allowed_roles", allowedRoles),
 						slog.String("role", role),
@@ -372,7 +372,7 @@ func (a *AuthService) RequireIsnPermission(allowedPermissions ...string) func(ht
 				if claims.IsnPerms[isnSlug].Permission == permission {
 					// Log successful ISN permission check immediately
 					reqLogger.Debug("ISN permission check successful",
-						slog.String("component", "RequireIsnPermission"),
+						slog.String("component", "signalsd.RequireIsnPermission"),
 						slog.String("account_id", claims.AccountID.String()),
 						slog.String("permission", permission),
 						slog.String("isn_slug", isnSlug),
