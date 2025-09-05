@@ -142,4 +142,4 @@ go-api:
 # Run ui in standalone mode
 go-ui:
 	@echo "🔄 Running standalone ui"
-	cd app && API_BASE_URL=localhost:8080 go run cmd/signalsd-ui/main.go
+	cd app && API_BASE_URL=http://localhost:8080 go run cmd/signalsd-ui/main.go
