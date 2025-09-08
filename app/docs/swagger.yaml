@@ -83,6 +83,10 @@ definitions:
     type: object
   auth.IsnPerms:
     properties:
+      isn_admin:
+        description: true if the account is the owner of the isn or the site owner
+        example: false
+        type: boolean
       permission:
         enum:
         - read

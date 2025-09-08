@@ -63,7 +63,7 @@ func IsnAccountsAdminPage(isns []types.IsnDropdown) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			} else {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div class=\"card mb-6\"><div class=\"card-header\"><h3 class=\"card-title\">Add Account to ISN</h3></div><div class=\"card-body\"><form hx-post=\"/ui-api/add-isn-account\" hx-target=\"#admin-result\" class=\"space-y-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\"><label for=\"isn_slug\" class=\"form-label\">ISN</label> <select id=\"isn_slug\" name=\"isn_slug\" required class=\"form-select\"><option value=\"\">Select ISN...</option> ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div class=\"card mb-6\"><div class=\"card-header\"><h3 class=\"card-title\">Change ISN permissions for a web user</h3></div><div class=\"card-body\"><form hx-post=\"/ui-api/add-isn-account\" hx-target=\"#admin-result\" class=\"space-y-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\"><label for=\"isn_slug\" class=\"form-label\">ISN</label> <select id=\"isn_slug\" name=\"isn_slug\" required class=\"form-select\"><option value=\"\">Select ISN...</option> ")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -99,7 +99,7 @@ func IsnAccountsAdminPage(isns []types.IsnDropdown) templ.Component {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</select></div><div class=\"form-group\"><label for=\"account_email\" class=\"form-label\">Account Email</label> <input type=\"email\" id=\"account_email\" name=\"account_email\" required placeholder=\"user@example.com\" class=\"form-input\"></div></div><div class=\"form-group\"><label for=\"permission\" class=\"form-label\">Permission Level</label> <select id=\"permission\" name=\"permission\" required class=\"form-select\"><option value=\"\">Select Permission...</option> <option value=\"read\">Read - Can view signals</option> <option value=\"write\">Write - Can create and view signals</option></select></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Add Account to ISN</button></div></form></div></div><div id=\"admin-result\"><!-- Results will appear here --></div>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</select></div><div class=\"form-group\"><label for=\"account_email\" class=\"form-label\">Account Email</label> <input type=\"email\" id=\"account_email\" name=\"account_email\" required placeholder=\"user@example.com\" class=\"form-input\"></div></div><div class=\"form-group\"><label for=\"permission\" class=\"form-label\">Permission Level</label> <select id=\"permission\" name=\"permission\" required class=\"form-select\"><option value=\"\">Select Permission...</option> <option value=\"none\">None - No access to the ISN</option> <option value=\"read\">Read - Can view signals</option> <option value=\"write\">Write - Can create and view signals</option></select></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Add Account to ISN</button></div></form></div></div><div id=\"admin-result\"><!-- Results will appear here --></div>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

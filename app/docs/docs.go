@@ -2154,6 +2154,11 @@ const docTemplate = `{
         "auth.IsnPerms": {
             "type": "object",
             "properties": {
+                "isn_admin": {
+                    "description": "true if the account is the owner of the isn or the site owner",
+                    "type": "boolean",
+                    "example": false
+                },
                 "permission": {
                     "type": "string",
                     "enum": [

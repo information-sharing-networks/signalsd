@@ -66,12 +66,12 @@ func (h *HandlerService) HandleIsnAccountsAdmin(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Convert permissions to ISN list for dropdown (only ISNs where user has admin rights)
+	// Convert permissions to ISN list for dropdown (only ISNs where user has write permission)
 	var isns []types.IsnDropdown
 	isns = make([]types.IsnDropdown, 0, len(isnPerms))
 	for isnSlug, perm := range isnPerms {
 		// Only show ISNs where user has write permission (admins/owners)
-		if perm.Permission == "write" {
+		if perm.IsnAdmin {
 			isns = append(isns, types.IsnDropdown{
 				Slug:    isnSlug,
 				IsInUse: true,

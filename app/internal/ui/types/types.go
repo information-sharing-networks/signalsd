@@ -34,6 +34,7 @@ type IsnPerm struct {
 	SignalBatchID   string   `json:"signal_batch_id"`
 	SignalTypePaths []string `json:"signal_types"`
 	Visibility      string   `json:"visibility"` // "public" or "private"
+	IsnAdmin        bool     `json:"isn_admin"`  // true if the account is the owner of the isn or the site owner
 }
 
 // =============================================================================
