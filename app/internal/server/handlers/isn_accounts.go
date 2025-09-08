@@ -351,7 +351,7 @@ func (i *IsnAccountHandler) RevokeIsnAccountHandler(w http.ResponseWriter, r *ht
 				slog.String("isn_slug", isnSlug),
 			)
 
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "account does not have permission on this ISN")
+			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "can't revoke access - account does not have permission on this ISN")
 			return
 		}
 		logger.ContextWithLogAttrs(r.Context(),
@@ -401,7 +401,7 @@ func (i *IsnAccountHandler) RevokeIsnAccountHandler(w http.ResponseWriter, r *ht
 		slog.String("isn_slug", isnSlug),
 		slog.String("target_account_id", targetAccount.ID.String()))
 
-	responses.RespondWithStatusCodeOnly(w, http.StatusCreated)
+	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
 }
 
 // GetIsnAccountsHandler godoc

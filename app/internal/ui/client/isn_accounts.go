@@ -7,8 +7,8 @@ import (
 	"net/http"
 )
 
-// AddAccountToIsn adds an account to an ISN with the specified permission
-func (c *Client) AddAccountToIsn(accessToken, isnSlug, accountEmail, permission string) error {
+// IsnAccountAccess adds an account to an ISN with the specified permission
+func (c *Client) IsnAccountAccess(accessToken, isnSlug, accountEmail, permission string) error {
 
 	user, err := c.LookupUserByEmail(accessToken, accountEmail)
 	if err != nil {
@@ -17,6 +17,29 @@ func (c *Client) AddAccountToIsn(accessToken, isnSlug, accountEmail, permission 
 
 	url := fmt.Sprintf("%s/api/isn/%s/accounts/%s", c.baseURL, isnSlug, user.AccountID)
 
+	// Revoke access
+	if permission == "none" {
+		req, err := http.NewRequest("DELETE", url, nil)
+		if err != nil {
+			return NewClientInternalError(err, "revoke isn account access")
+		}
+
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+
+		res, err := c.httpClient.Do(req)
+		if err != nil {
+			return NewClientConnectionError(err)
+		}
+		defer res.Body.Close()
+		fmt.Printf("debug!!!!!!!! res.StatusCode: %d\n", res.StatusCode)
+		if res.StatusCode != http.StatusNoContent {
+			return NewClientApiError(res)
+		}
+
+		return nil
+	}
+
+	// Grant Access
 	requestBody := map[string]string{
 		"permission": permission,
 	}

@@ -11,8 +11,8 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
-// HandleAddIsnAccount handles the form submission to add an account to an ISN
-func (h *HandlerService) HandleAddIsnAccount(w http.ResponseWriter, r *http.Request) {
+// HandleIsnAccountAccess handles the form submission to add an account to an ISN
+func (h *HandlerService) HandleIsnAccountAccess(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Parse form data
@@ -36,7 +36,7 @@ func (h *HandlerService) HandleAddIsnAccount(w http.ResponseWriter, r *http.Requ
 	accessToken := accessTokenCookie.Value
 
 	// Call the API to add the account to the ISN
-	err = h.ApiClient.AddAccountToIsn(accessToken, isnSlug, accountEmail, permission)
+	err = h.ApiClient.IsnAccountAccess(accessToken, isnSlug, accountEmail, permission)
 	if err != nil {
 		reqLogger.Error("Failed to add account to ISN", slog.String("component", "templates.handleAddIsnAccount"), slog.String("error", err.Error()))
 
@@ -49,7 +49,14 @@ func (h *HandlerService) HandleAddIsnAccount(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Success response
-	component := templates.SuccessAlert("Account successfully added to ISN")
+	msg := ""
+	if permission == "none" {
+		msg = "Account successfully removed from ISN"
+	} else {
+		msg = "Account successfully added to ISN"
+	}
+
+	component := templates.SuccessAlert(msg)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
 	}

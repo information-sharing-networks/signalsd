@@ -94,7 +94,7 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 		r.Post("/ui-api/signal-types", handlerService.HandleGetSignalTypes)
 		r.Post("/ui-api/signal-versions", handlerService.HandleGetSignalVersions)
 		r.Post("/ui-api/search-signals", handlerService.HandleSearchSignals)
-		r.Post("/ui-api/add-isn-account", handlerService.HandleAddIsnAccount)
+		r.Post("/ui-api/isn-account-access", handlerService.HandleIsnAccountAccess)
 		r.Post("/ui-api/create-signal-type", handlerService.HandleCreateSignalType)
 	})
 

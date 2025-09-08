@@ -13,7 +13,7 @@ templ IsnAccountsAdminPage(isns []types.IsnDropdown) {
 		@Navigation()
 		<div class="page-container">
 			<h1 class="page-title">ISN Account Management</h1>
-			<p class="text-muted mb-6">Add accounts to Information Sharing Networks.</p>
+			<p class="text-muted mb-6">Grant or remove access to Information Sharing Networks.</p>
 
 			if len(isns) == 0 {
 				<div class="card">
@@ -30,7 +30,7 @@ templ IsnAccountsAdminPage(isns []types.IsnDropdown) {
 						<h3 class="card-title">Change ISN permissions for a web user</h3>
 					</div>
 					<div class="card-body">
-						<form hx-post="/ui-api/add-isn-account" hx-target="#admin-result" class="space-y-4">
+						<form hx-post="/ui-api/isn-account-access" hx-target="#admin-result" class="space-y-4">
 							<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 								<div class="form-group">
 									<label for="isn_slug" class="form-label">ISN</label>
@@ -74,7 +74,7 @@ templ IsnAccountsAdminPage(isns []types.IsnDropdown) {
 							</div>
 							<div class="form-group">
 								<button type="submit" class="btn btn-primary">
-									Add Account to ISN
+									Update Account
 								</button>
 							</div>
 						</form>
