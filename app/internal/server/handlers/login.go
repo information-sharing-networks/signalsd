@@ -48,9 +48,9 @@ type LoginRequest struct {
 //	@Param			request	body		handlers.LoginRequest	true	"email and password"
 //
 //	@Success		200		{object}	auth.AccessTokenResponse
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		401	{object}	responses.ErrorResponse
-//	@Failure		500	{object}	responses.ErrorResponse
+//	@Failure		400		{object}	responses.ErrorResponse
+//	@Failure		401		{object}	responses.ErrorResponse
+//	@Failure		500		{object}	responses.ErrorResponse
 //
 //	@Router			/api/auth/login [post]
 func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
