@@ -73,6 +73,7 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 	router.Post("/login", handlerService.HandleLoginPost)
 	router.Get("/register", handlerService.HandleRegister)
 	router.Post("/register", handlerService.HandleRegisterPost)
+	router.Get("/access-denied", handlerService.HandleAccessDenied)
 
 	// redirects to dashboard if authenticated, login if not
 	router.Get("/", handlerService.HandleHome)

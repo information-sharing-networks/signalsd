@@ -160,18 +160,12 @@ func (h *HandlerService) HandleGetSignalVersions(w http.ResponseWriter, r *http.
 	}
 }
 
-// HandleAccessDenied handles access denied for both HTMX and direct requests
-// Always redirects to an access denied page for consistent UX
-func (h *HandlerService) HandleAccessDenied(w http.ResponseWriter, r *http.Request, pageTitle, message string) {
-	if r.Header.Get("HX-Request") == "true" {
-		// HTMX request - redirect to access denied page
-		w.Header().Set("HX-Redirect", "/access-denied?title="+pageTitle+"&message="+message)
-	} else {
-		// Direct navigation - render access denied page
-		component := templates.AccessDeniedPage(pageTitle, message)
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger := logger.ContextRequestLogger(r.Context())
-			reqLogger.Error("Failed to render access denied page", slog.String("error", err.Error()))
-		}
+// HandleAccessDenied handles the /access-denied route
+func (h *HandlerService) HandleAccessDenied(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	component := templates.AccessDeniedPage("Access Denied", "You do not have permission to use this feature")
+	if err := component.Render(r.Context(), w); err != nil {
+		reqLogger.Error("Failed to render access denied page", slog.String("error", err.Error()))
 	}
 }

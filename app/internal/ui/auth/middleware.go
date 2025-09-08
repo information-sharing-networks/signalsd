@@ -91,7 +91,7 @@ func (a *AuthService) RequireAdminAccess(next http.Handler) http.Handler {
 				slog.String("component", "ui.RequireAdminAccess"),
 				slog.String("error", err.Error()),
 			)
-			//debug todo handlers.HandleAccessDenied(w, r, "Admin Dashboard", "Internal error - account info not found, please login again")
+			redirectToAccessDenied(w, r)
 			return
 		}
 
@@ -101,7 +101,7 @@ func (a *AuthService) RequireAdminAccess(next http.Handler) http.Handler {
 				slog.String("account_id", accountInfo.AccountID),
 				slog.String("role", accountInfo.Role),
 			)
-			//debug todo handlers.HandleAccessDenied(w, r, "Admin Dashboard", "You do not have permission to access the admin dashboard")
+			redirectToAccessDenied(w, r)
 			return
 		}
 
@@ -125,7 +125,7 @@ func (a *AuthService) RequireIsnAccess(next http.Handler) http.Handler {
 			reqLogger.Debug("User attempted to access ISN features without ISN permissions",
 				slog.String("component", "ui.RequireIsnAccess"),
 			)
-			//debug todo handlers.HandleAccessDenied(w, r, "Search Signals", "You do not have access to any ISNs - please contact your administrator")
+			redirectToAccessDenied(w, r)
 			return
 		}
 
@@ -146,5 +146,15 @@ func redirectToLogin(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	} else {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
+	}
+}
+
+// redirectToAccessDenied redirects to access denied page for both HTMX and direct requests
+func redirectToAccessDenied(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/access-denied")
+		w.WriteHeader(http.StatusOK)
+	} else {
+		http.Redirect(w, r, "/access-denied", http.StatusSeeOther)
 	}
 }
