@@ -55,7 +55,13 @@ func NewClientApiError(res *http.Response) *ClientError {
 			LogMessage:  "signaslsd error response body is nil",
 		}
 	}
-	json.NewDecoder(res.Body).Decode(&serverErr)
+	if err := json.NewDecoder(res.Body).Decode(&serverErr); err != nil {
+		return &ClientError{
+			StatusCode:  0,
+			UserMessage: "An error occurred. Please try again.",
+			LogMessage:  fmt.Sprintf("error decoding signalsd error response: %v", err),
+		}
+	}
 
 	var userMsg string
 	switch res.StatusCode {
