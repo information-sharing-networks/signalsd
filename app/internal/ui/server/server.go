@@ -1,4 +1,4 @@
-package ui
+package server
 
 import (
 	"context"
@@ -10,6 +10,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/config"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/handlers"
 )
 
 const (
@@ -19,20 +23,18 @@ const (
 
 type Server struct {
 	router      *chi.Mux
-	config      *Config
+	config      *config.Config
 	logger      *slog.Logger
-	authService *AuthService
-	apiClient   *Client
+	authService *auth.AuthService
 }
 
 // NewStandaloneServer creates a new UI server that can run independently of the API
-func NewStandaloneServer(cfg *Config, logger *slog.Logger) *Server {
+func NewStandaloneServer(cfg *config.Config, logger *slog.Logger) *Server {
 	s := &Server{
 		router:      chi.NewRouter(),
 		config:      cfg,
 		logger:      logger,
-		authService: NewAuthService(cfg.APIBaseURL),
-		apiClient:   NewClient(cfg.APIBaseURL),
+		authService: auth.NewAuthService(cfg.APIBaseURL, cfg.Environment),
 	}
 
 	s.setupMiddleware()
@@ -42,13 +44,13 @@ func NewStandaloneServer(cfg *Config, logger *slog.Logger) *Server {
 
 // NewIntegratedServer creates a new UI server that runs as part of the API server
 // The UI routes are registered on the signalsd router (passed as a parameter)
-func NewIntegratedServer(router *chi.Mux, cfg *Config, logger *slog.Logger) *Server {
+func NewIntegratedServer(router *chi.Mux, cfg *config.Config, logger *slog.Logger) *Server {
+
 	s := &Server{
 		router:      router,
 		config:      cfg,
 		logger:      logger,
-		authService: NewAuthService(cfg.APIBaseURL),
-		apiClient:   NewClient(cfg.APIBaseURL),
+		authService: auth.NewAuthService(cfg.APIBaseURL, cfg.Environment),
 	}
 
 	s.RegisterRoutes(s.router)
@@ -57,52 +59,59 @@ func NewIntegratedServer(router *chi.Mux, cfg *Config, logger *slog.Logger) *Ser
 
 // RegisterRoutes registers UI routes on the signalsd router - use when running the integrated ui.
 func (s *Server) RegisterRoutes(router *chi.Mux) {
+
+	handlerService := &handlers.HandlerService{
+		AuthService: auth.NewAuthService(s.config.APIBaseURL, s.config.Environment),
+		ApiClient:   client.NewClient(s.config.APIBaseURL),
+		Environment: s.config.Environment,
+	}
 	// Static assets (no auth required) - only UI's own CSS
 	router.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("./web/static/"))))
 
 	// Public routes (no auth required)
-	router.Get("/login", s.handleLogin)
-	router.Post("/login", s.handleLoginPost)
-	router.Get("/register", s.handleRegister)
-	router.Post("/register", s.handleRegisterPost)
+	router.Get("/login", handlerService.HandleLogin)
+	router.Post("/login", handlerService.HandleLoginPost)
+	router.Get("/register", handlerService.HandleRegister)
+	router.Post("/register", handlerService.HandleRegisterPost)
+	router.Get("/access-denied", handlerService.HandleAccessDenied)
 
 	// redirects to dashboard if authenticated, login if not
-	router.Get("/", s.handleHome)
+	router.Get("/", handlerService.HandleHome)
 
 	// Protected routes (require authentication)
 	router.Group(func(r chi.Router) {
-		r.Use(s.RequireAuth)
+		r.Use(s.authService.RequireAuth)
 
-		r.Post("/logout", s.handleLogout)
-		r.Get("/dashboard", s.handleDashboard)
+		r.Post("/logout", handlerService.HandleLogout)
+		r.Get("/dashboard", handlerService.HandleDashboard)
 		r.Group(func(r chi.Router) {
-			r.Use(s.RequireAdminAccess)
-			r.Get("/admin/isn-accounts", s.handleIsnAccountsAdmin)
+			r.Use(s.authService.RequireAdminAccess)
+			r.Get("/admin/isn-accounts", handlerService.HandleIsnAccountsAdmin)
 		})
-		r.Get("/signal-types", s.handleSignalTypeManagement)
+		r.Get("/signal-types", handlerService.HandleSignalTypeManagement)
 
 		// UI API endpoints (used when rendering ui components)
-		r.Post("/ui-api/signal-types", s.handleGetSignalTypes)
-		r.Post("/ui-api/signal-versions", s.handleGetSignalVersions)
-		r.Post("/ui-api/search-signals", s.handleSearchSignals)
-		r.Post("/ui-api/add-isn-account", s.handleAddIsnAccount)
-		r.Post("/ui-api/create-signal-type", s.handleCreateSignalType)
+		r.Post("/ui-api/signal-types", handlerService.HandleGetSignalTypes)
+		r.Post("/ui-api/signal-versions", handlerService.HandleGetSignalVersions)
+		r.Post("/ui-api/search-signals", handlerService.HandleSearchSignals)
+		r.Post("/ui-api/add-isn-account", handlerService.HandleAddIsnAccount)
+		r.Post("/ui-api/create-signal-type", handlerService.HandleCreateSignalType)
 	})
 
 	// ISN routes (require ISN access)
 	router.Group(func(r chi.Router) {
-		r.Use(s.RequireAuth)
-		r.Use(s.RequireIsnAccess)
+		r.Use(s.authService.RequireAuth)
+		r.Use(s.authService.RequireIsnAccess)
 
-		r.Get("/search", s.handleSignalSearch)
+		r.Get("/search", handlerService.HandleSignalSearch)
 	})
 
 	// Admin routes (require admin/owner role)
 	router.Group(func(r chi.Router) {
-		r.Use(s.RequireAuth)
-		r.Use(s.RequireAdminAccess)
+		r.Use(s.authService.RequireAuth)
+		r.Use(s.authService.RequireAdminAccess)
 
-		r.Get("/admin", s.handleAdminDashboard)
+		r.Get("/admin", handlerService.HandleAdminDashboard)
 	})
 }
 
@@ -111,7 +120,7 @@ func (s *Server) setupMiddleware() {
 	// middleware
 	s.router.Use(chimiddleware.RequestID)
 	s.router.Use(chimiddleware.RealIP)
-	s.router.Use(logger.RequestLogging(s.logger))
+	s.router.Use(logger.RequestLogging(s.logger)) // use the signalsd request logger
 	s.router.Use(chimiddleware.Recoverer)
 	s.router.Use(chimiddleware.Timeout(60 * time.Second))
 

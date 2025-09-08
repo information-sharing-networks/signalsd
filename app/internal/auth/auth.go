@@ -104,14 +104,14 @@ func (a *AuthService) CheckTokenHash(hash string, token string) bool {
 //   - account ID
 //   - account type (user or service_account)
 //   - account role (owner, admin, member)
-//   - A list of all the isns the account has access to and the permission granted (read or write)
+//   - A list of all the isns the account has access to and the permission granted (read or write) - note inactive isns/signal_types are not included
 //   - the list of available signal_types in the isn
 //
 // The function returns the token inside a AccessTokenResponse that can be returned to the client.
 //
 // if this function generates an error, it is unexpected and the calling handler should produce a 500 status code
 //
-//	this function is only used when logging in or refreshing an access token.
+//	this function is only used when the user logs-in or when an account refreshes an access token.
 //	Since the calling functions authenticate using secrets that (should) only be known by the client, the claims in the token can be trusted by the handler without rechecking the database
 //
 // Caveat:

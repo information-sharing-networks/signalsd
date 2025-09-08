@@ -76,7 +76,7 @@ FROM isn i
 WHERE is_in_use = true
 `
 
-// only returns ISNs where is_in_use = true
+// only returns active ISNs (is_in_use = true)
 func (q *Queries) GetInUseIsns(ctx context.Context) ([]Isn, error) {
 	rows, err := q.db.Query(ctx, GetInUseIsns)
 	if err != nil {
@@ -125,6 +125,7 @@ type GetInUsePublicIsnSignalTypesRow struct {
 	SemVer         string `json:"sem_ver"`
 }
 
+// only returns active ISNs and signal types (is_in_use = true)
 func (q *Queries) GetInUsePublicIsnSignalTypes(ctx context.Context) ([]GetInUsePublicIsnSignalTypesRow, error) {
 	rows, err := q.db.Query(ctx, GetInUsePublicIsnSignalTypes)
 	if err != nil {
@@ -254,6 +255,7 @@ const GetPublicIsnSlugs = `-- name: GetPublicIsnSlugs :many
 SELECT slug FROM isn WHERE visibility = 'public' AND is_in_use = true
 `
 
+// only returns active ISNs (is_in_use = true)
 func (q *Queries) GetPublicIsnSlugs(ctx context.Context) ([]string, error) {
 	rows, err := q.db.Query(ctx, GetPublicIsnSlugs)
 	if err != nil {

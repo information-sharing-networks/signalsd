@@ -116,7 +116,6 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
-			slog.String("account_id", accountID.String()),
 		)
 
 		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "database error")
@@ -148,7 +147,6 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
-			slog.String("account_id", accountID.String()),
 		)
 
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
@@ -162,7 +160,6 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
-			slog.String("account_id", accountID.String()),
 		)
 
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
@@ -178,7 +175,6 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 	)
 
 	logger.ContextWithLogAttrs(r.Context(),
-		slog.String("account_id", account.ID.String()),
 		slog.String("batch_id", returnedRow.ID.String()),
 	)
 

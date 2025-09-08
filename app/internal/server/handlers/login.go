@@ -48,10 +48,9 @@ type LoginRequest struct {
 //	@Param			request	body		handlers.LoginRequest	true	"email and password"
 //
 //	@Success		200		{object}	auth.AccessTokenResponse
-//	@Example		value { "access_token": "abc...", "token_type": "Bearer", "expires_in": 1800, "role": "member", "isn_perms": { "isn-slug-1": "write", "isn-slug-2": "read" } }
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		401	{object}	responses.ErrorResponse
-//	@Failure		500	{object}	responses.ErrorResponse
+//	@Failure		400		{object}	responses.ErrorResponse
+//	@Failure		401		{object}	responses.ErrorResponse
+//	@Failure		500		{object}	responses.ErrorResponse
 //
 //	@Router			/api/auth/login [post]
 func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
@@ -72,7 +71,6 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
-			slog.String("email", req.Email),
 		)
 
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
@@ -87,7 +85,6 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
-			slog.String("email", req.Email),
 		)
 
 		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeDatabaseError, "database error")
@@ -105,16 +102,20 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
-			slog.String("account_id", user.AccountID.String()),
 		)
 
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
+	// add the account_id to the request log context
+	logger.ContextWithLogAttrs(r.Context(),
+		slog.String("account_id", user.AccountID.String()),
+	)
+
 	if !account.IsActive {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("user_account_id", user.AccountID.String()),
+			slog.String("error", "account is disabled"),
 		)
 
 		responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "account is disabled")
@@ -128,7 +129,6 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
-			slog.String("account_id", user.AccountID.String()),
 		)
 
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenInvalid, "error creating access token")
@@ -140,7 +140,6 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
-			slog.String("account_id", user.AccountID.String()),
 		)
 
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenInvalid, "error creating refresh token")
@@ -151,10 +150,6 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	newCookie := l.authService.NewRefreshTokenCookie(l.environment, refreshToken)
 
 	http.SetCookie(w, newCookie)
-
-	logger.ContextWithLogAttrs(r.Context(),
-		slog.String("user_account_id", user.AccountID.String()),
-	)
 
 	responses.RespondWithJSON(w, http.StatusOK, accessTokenResponse)
 }

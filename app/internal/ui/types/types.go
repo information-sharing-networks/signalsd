@@ -1,15 +1,17 @@
-package ui
+package types
 
 import (
 	"encoding/json"
+
+	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 )
 
 // =============================================================================
 // AUTHENTICATION & AUTHORIZATION TYPES
 // =============================================================================
 
-// LoginResponse represents the response from the authentication API
-type LoginResponse struct {
+// AccesTokenDetails represents the response from the signalsd login and refresh token APIs
+type AccesTokenDetails struct {
 	AccessToken string             `json:"access_token"`
 	TokenType   string             `json:"token_type"`
 	ExpiresIn   int                `json:"expires_in"`
@@ -40,8 +42,8 @@ type IsnPerm struct {
 
 // ErrorResponse represents an error response from the API
 type ErrorResponse struct {
-	ErrorCode string `json:"error_code"`
-	Message   string `json:"message"`
+	ErrorCode apperrors.ErrorCode `json:"error_code"`
+	Message   string              `json:"message"`
 }
 
 // =============================================================================

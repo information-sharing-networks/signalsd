@@ -1,4 +1,4 @@
-package ui
+package auth
 
 import (
 	"log/slog"
@@ -6,6 +6,7 @@ import (
 
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/config"
 )
 
 // RequireAuth is middleware that checks authentication and attempts token refresh if needed.
@@ -16,60 +17,61 @@ import (
 // 3. Fresh cookies are set after token refresh for subsequent requests
 //
 // Handlers can read auth data directly from cookies using helper methods.
-func (s *Server) RequireAuth(next http.Handler) http.Handler {
+func (a *AuthService) RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		reqLogger := logger.ContextMiddlewareLogger(r.Context())
-		tokenStatus := s.authService.CheckTokenStatus(r)
+		reqLogger := logger.ContextRequestLogger(r.Context())
+		tokenStatus := a.CheckTokenStatus(r)
 
 		switch tokenStatus {
 		case TokenValid:
 			// Log successful authentication check
 			reqLogger.Debug("Authentication check successful",
-				slog.String("component", "RequireAuth"),
+				slog.String("component", "ui.RequireAuth"),
 			)
 			// Authentication is valid, proceed to handler
 			next.ServeHTTP(w, r)
 			return
 		case TokenMissing, TokenInvalid:
 			reqLogger.Debug("Authentication failed - redirecting to login",
-				slog.String("component", "RequireAuth"),
+				slog.String("component", "ui.RequireAuth"),
 				slog.String("status", tokenStatus.String()),
 			)
-			s.redirectToLogin(w, r)
+			redirectToLogin(w, r)
 			return
 		case TokenExpired:
 			// attempt refresh
 			refreshTokenCookie, err := r.Cookie(signalsd.RefreshTokenCookieName)
 			if err != nil {
 				reqLogger.Error("Failed to get refresh token cookie",
-					slog.String("component", "RequireAuth"),
+					slog.String("component", "ui.RequireAuth"),
 					slog.String("error", err.Error()),
 				)
-				s.redirectToLogin(w, r)
+				redirectToLogin(w, r)
 				return
 			}
 
-			loginResp, newRefreshTokenCookie, err := s.authService.RefreshToken(refreshTokenCookie)
+			// attempt a token refresh
+			loginResp, newRefreshTokenCookie, err := a.RefreshToken(refreshTokenCookie)
 			if err != nil {
 				reqLogger.Error("Token refresh failed",
-					slog.String("component", "RequireAuth"),
+					slog.String("component", "ui.RequireAuth"),
 					slog.String("error", err.Error()),
 				)
-				s.redirectToLogin(w, r)
+				redirectToLogin(w, r)
 				return
 			}
 
-			if err := s.authService.SetAuthCookies(w, loginResp, newRefreshTokenCookie, s.config.Environment); err != nil {
+			if err := a.SetAuthCookies(w, loginResp, newRefreshTokenCookie, a.environment); err != nil {
 				reqLogger.Error("Failed to set authentication cookies after refresh",
-					slog.String("component", "RequireAuth"),
+					slog.String("component", "ui.RequireAuth"),
 					slog.String("error", err.Error()),
 				)
-				s.redirectToLogin(w, r)
+				redirectToLogin(w, r)
 				return
 			}
 
 			reqLogger.Debug("Token refresh successful",
-				slog.String("component", "RequireAuth"),
+				slog.String("component", "ui.RequireAuth"),
 			)
 
 			// Continue to handler with fresh cookies set
@@ -79,35 +81,33 @@ func (s *Server) RequireAuth(next http.Handler) http.Handler {
 }
 
 // RequireAdminAccess is middleware that checks if user has admin/owner role
-func (s *Server) RequireAdminAccess(next http.Handler) http.Handler {
+func (a *AuthService) RequireAdminAccess(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		reqLogger := logger.ContextMiddlewareLogger(r.Context())
+		reqLogger := logger.ContextRequestLogger(r.Context())
 
-		accountInfo, err := s.getAccountInfoFromCookie(r)
+		accountInfo, err := a.GetAccountInfoFromCookie(r)
 		if err != nil {
 			reqLogger.Error("Could not get accountInfo from Cookie",
-				slog.String("component", "RequireAdminAccess"),
+				slog.String("component", "ui.RequireAdminAccess"),
 				slog.String("error", err.Error()),
 			)
-			s.handleAccessDenied(w, r, "Admin Dashboard", "Internal error - account info not found, please login again")
+			redirectToAccessDenied(w, r)
 			return
 		}
 
 		if accountInfo.Role != "owner" && accountInfo.Role != "admin" {
 			reqLogger.Debug("User attempted to access admin area without permission",
-				slog.String("component", "RequireAdminAccess"),
+				slog.String("component", "ui.RequireAdminAccess"),
 				slog.String("account_id", accountInfo.AccountID),
 				slog.String("role", accountInfo.Role),
 			)
-			s.handleAccessDenied(w, r, "Admin Dashboard", "You do not have permission to access the admin dashboard")
+			redirectToAccessDenied(w, r)
 			return
 		}
 
 		// Log successful admin access check
 		reqLogger.Debug("Admin access check successful",
-			slog.String("component", "RequireAdminAccess"),
-			slog.String("account_id", accountInfo.AccountID),
-			slog.String("role", accountInfo.Role),
+			slog.String("component", "ui.RequireAdminAccess"),
 		)
 
 		next.ServeHTTP(w, r)
@@ -115,26 +115,46 @@ func (s *Server) RequireAdminAccess(next http.Handler) http.Handler {
 }
 
 // RequireIsnAccess is middleware that checks if user has access to any ISNs
-func (s *Server) RequireIsnAccess(next http.Handler) http.Handler {
+func (a *AuthService) RequireIsnAccess(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		reqLogger := logger.ContextMiddlewareLogger(r.Context())
+		reqLogger := logger.ContextRequestLogger(r.Context())
 
-		_, err := r.Cookie(isnPermsCookieName)
+		_, err := r.Cookie(config.IsnPermsCookieName)
 		if err != nil {
 			// No ISN permissions cookie = no ISN access
 			reqLogger.Debug("User attempted to access ISN features without ISN permissions",
-				slog.String("component", "RequireIsnAccess"),
+				slog.String("component", "ui.RequireIsnAccess"),
 			)
-			s.handleAccessDenied(w, r, "Search Signals", "You do not have access to any ISNs - please contact your administrator")
+			redirectToAccessDenied(w, r)
 			return
 		}
 
 		// Log successful ISN access check
 		reqLogger.Debug("ISN access check successful",
-			slog.String("component", "RequireIsnAccess"),
+			slog.String("component", "ui.RequireIsnAccess"),
 		)
 
 		// Cookie exists = user has ISN access, proceed to handler
 		next.ServeHTTP(w, r)
 	})
+}
+
+// Helper method for redirecting to login
+func redirectToLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/login")
+		w.WriteHeader(http.StatusOK)
+	} else {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+	}
+}
+
+// redirectToAccessDenied redirects to access denied page for both HTMX and direct requests
+func redirectToAccessDenied(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/access-denied")
+		w.WriteHeader(http.StatusOK)
+	} else {
+		http.Redirect(w, r, "/access-denied", http.StatusSeeOther)
+	}
 }

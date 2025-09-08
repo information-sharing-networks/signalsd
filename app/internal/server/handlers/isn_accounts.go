@@ -121,11 +121,6 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 	targetAccountIDString := r.PathValue("account_id")
 	targetAccountID, err := uuid.Parse(targetAccountIDString)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-			slog.String("account_id", targetAccountIDString),
-		)
-
 		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "invalid account ID format")
 		return
 	}
@@ -145,7 +140,6 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 	if accountID == targetAccountID {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("operation", "grant_isn_account"),
-			slog.String("account_id", accountID.String()),
 			slog.String("error", "accounts cannot grant ISN permissions to themselves"),
 		)
 		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "accounts cannot grant ISN permissions to themselves")
@@ -193,7 +187,6 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 
 			logger.ContextWithLogAttrs(r.Context(),
 				slog.String("operation", "grant_isn_account"),
-				slog.String("account_id", accountID.String()),
 				slog.String("error", fmt.Sprintf("account already has %v permission on isn %v", req.Permission, isnSlug)),
 			)
 
@@ -243,7 +236,6 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 		return
 	}
 	logger.ContextWithLogAttrs(r.Context(),
-		slog.String("account_id", accountID.String()),
 		slog.String("permission", req.Permission),
 		slog.String("target_account_id", targetAccount.ID.String()),
 		slog.String("isn_slug", isnSlug),
@@ -278,6 +270,9 @@ func (i *IsnAccountHandler) RevokeIsnAccountHandler(w http.ResponseWriter, r *ht
 	// get user account id for user making request
 	accountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", "did not receive userAccountID from middleware"),
+		)
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
 		return
 	}
@@ -337,7 +332,6 @@ func (i *IsnAccountHandler) RevokeIsnAccountHandler(w http.ResponseWriter, r *ht
 	if accountID == targetAccountID {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", "accounts cannot revoke ISN permissions for themselves"),
-			slog.String("user_account_id", accountID.String()),
 		)
 
 		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "accounts cannot revoke ISN permissions for themselves")
