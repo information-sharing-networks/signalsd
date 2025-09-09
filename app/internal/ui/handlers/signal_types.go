@@ -8,11 +8,12 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
-	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
-// SignalTypeManagementHandler renders the signal type management page
-func (h *HandlerService) SignalTypeManagementHandler(w http.ResponseWriter, r *http.Request) {
+// CreateSignalTypePage renders the signal type management page.
+//
+// Use with RequireAdminOrOwnerRole and RequireIsnAdmin middleware
+func (h *HandlerService) CreateSignalTypePage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Get user permissions from cookie
@@ -22,56 +23,28 @@ func (h *HandlerService) SignalTypeManagementHandler(w http.ResponseWriter, r *h
 		return
 	}
 
-	// Convert permissions to ISN list for dropdown (only ISNs where user has write permission)
-	var isns []types.IsnDropdown
-	isns = make([]types.IsnDropdown, 0, len(isnPerms))
-	for isnSlug, perm := range isnPerms {
-		// Only show ISNs where user has write permission (can create signal types)
-		if perm.Permission == "write" {
-			isns = append(isns, types.IsnDropdown{
-				Slug:    isnSlug,
-				IsInUse: true,
-			})
-		}
-	}
+	// populate the isn dropdown list with ISNs where the user is an admin
+	isns := h.getIsnOptions(isnPerms, true, false)
 
 	// Render signal type management page
-	component := templates.SignalTypeManagementPage(isns)
+	component := templates.CreateSignalTypePage(isns)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render signal type management page", slog.String("error", err.Error()))
 	}
 }
 
-// CreateSignalTypeHandler handles the form submission to create a new signal type
-func (h *HandlerService) CreateSignalTypeHandler(w http.ResponseWriter, r *http.Request) {
+// CreateSignalType handles the form submission to create a new signal type
+// Use with RequireAdminOrOwnerRole and RequireIsnAdmin middleware
+func (h *HandlerService) CreateSignalType(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Parse form data
-	isnSlug := r.FormValue("isn_slug")
+	isnSlug := r.FormValue("isn-slug")
 	title := r.FormValue("title")
-	schemaURL := r.FormValue("schema_url")
-	bumpType := r.FormValue("bump_type")
-	readmeURL := r.FormValue("readme_url")
+	schemaURL := r.FormValue("schema-url")
+	bumpType := r.FormValue("bump-type")
+	readmeURL := r.FormValue("readme-url")
 	detail := r.FormValue("detail")
-
-	// todo check this - should be done in the middleware
-	// Validate user has admin or owner permission
-	isnPerm, err := h.AuthService.CheckIsnPermission(r, isnSlug)
-	if err != nil {
-		component := templates.ErrorAlert("You don't have permission to access this ISN.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
-		return
-	}
-
-	if isnPerm.Permission != "write" {
-		component := templates.ErrorAlert("You don't have permission to create signal types in this ISN.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
-		return
-	}
 
 	// Validate required fields
 	if isnSlug == "" || title == "" || schemaURL == "" || bumpType == "" {

@@ -173,7 +173,8 @@ func (a *AuthService) RequireIsnAccess(next http.Handler) http.Handler {
 	})
 }
 
-// Helper method for redirecting to login
+// redirectToLogin is a helper for redirecting to login from a middleware function
+// works for both HTMX and direct requests
 func redirectToLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("HX-Request") == "true" {
 		w.Header().Set("HX-Redirect", "/login")
@@ -183,7 +184,7 @@ func redirectToLogin(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// redirectToAccessDenied redirects to access denied page for both HTMX and direct requests
+// redirectToAccessDenied redirects to access denied page
 func redirectToAccessDenied(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("HX-Request") == "true" {
 		w.Header().Set("HX-Redirect", "/access-denied")

@@ -1,0 +1,25 @@
+package types
+
+// =============================================================================
+// DROPDOWN OPTIONS
+// =============================================================================
+// These types are used for UI dropdown components in templates and handlers
+
+type IsnOption struct {
+	Slug       string `json:"slug"`
+	IsInUse    bool   `json:"is_in_use"`
+	Visibility string `json:"visibility"`
+}
+
+type SignalTypeOption struct {
+	Slug string `json:"slug"`
+}
+
+type VersionOption struct {
+	Version string `json:"version"`
+}
+
+type ServiceAccountOption struct {
+	ClientOrganization string `json:"client_organization"`
+	ClientContactEmail string `json:"client_contact_email"`
+}

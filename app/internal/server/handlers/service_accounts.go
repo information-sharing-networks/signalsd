@@ -44,7 +44,7 @@ const setupPageTemplate = `<!DOCTYPE html>
 </head>
 <body>
     <div class="container">
-        <div class="success">✓ Signalds Service Account Setup Complete</div>
+        <div class="success">✓ Signalsd service account setup complete</div>
 
         <div class="credential">
             <div class="label">Client ID</div>
@@ -112,6 +112,19 @@ type CreateServiceAccountResponse struct {
 	ExpiresIn int       `json:"expires_in" example:"172800"`
 }
 
+type ReissueServiceAccountCredentialsRequest struct {
+	ClientOrganization string `json:"client_organization" example:"example org"`
+	ClientContactEmail string `json:"client_contact_email" example:"example@example.com"`
+}
+
+type ReissueServiceAccountCredentialsResponse struct {
+	ClientID  string    `json:"client_id" example:"sa_example-org_k7j2m9x1"`
+	AccountID uuid.UUID `json:"account_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	SetupURL  string    `json:"setup_url" example:"https://api.example.com/api/auth/service-accounts/setup/550e8400-e29b-41d4-a716-446655440000"`
+	ExpiresAt time.Time `json:"expires_at" example:"2024-12-25T10:30:00Z"`
+	ExpiresIn int       `json:"expires_in" example:"172800"`
+}
+
 type SetupPageData struct {
 	ClientID     string
 	ClientSecret string
@@ -120,12 +133,13 @@ type SetupPageData struct {
 
 // RegisterServiceAccountHandler godocs
 //
-//	@Summary		Register a new service account
+//	@Summary		Register service account
 //	@Description	Registring a new service account creates a one-time link with the client credentials in it - this must be used by the client within 48 hrs.
 //	@Description
-//	@Description	If you want to reissue a client's credentials call this endpoint again with the same client organization and contact email.
-//	@Description	A new one-time setup url will be generated and the old one will be revoked.
-//	@Description	Note the client_id will remain the same and any existing client secrets will be revoked.
+//	@Description	Note that where an organization needs more than one service account they must supply unique contact emails for each account.
+//	@Description
+//	@Description
+//	@Description	To reissue credentials for an existing service account, use the **Reissue Service Account Credentials** endpoint.
 //	@Description
 //	@Description	You have to be an admin or the site owner to use this endpoint
 //	@Description
@@ -133,13 +147,14 @@ type SetupPageData struct {
 //
 //	@Param		request	body		handlers.CreateServiceAccountRequest	true	"service account details"
 //
-//	@Success	200		{object}	handlers.CreateServiceAccountResponse
+//	@Success	201		{object}	handlers.CreateServiceAccountResponse
 //	@Failure	400		{object}	responses.ErrorResponse
 //	@Failure	401		{object}	responses.ErrorResponse
+//	@Failure	409		{object}	responses.ErrorResponse
 //
 //	@Security	BearerServiceAccount
 //
-//	@Router		/api/auth/register/service-accounts [post]
+//	@Router		/api/auth/service-accounts/register [post]
 func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWriter, r *http.Request) {
 	var req CreateServiceAccountRequest
 
@@ -159,15 +174,12 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 		return
 	}
 
-	clientAlreadyExists := false
-	clientID := ""
-	serviceAccountID := uuid.UUID{}
-
-	serviceAccount, err := s.queries.GetServiceAccountWithOrganizationAndEmail(r.Context(), database.GetServiceAccountWithOrganizationAndEmailParams{
+	// Check if service account already exists
+	exists, err := s.queries.ExistsServiceAccountWithOrganizationAndEmail(r.Context(), database.ExistsServiceAccountWithOrganizationAndEmailParams{
 		ClientOrganization: req.ClientOrganization,
 		ClientContactEmail: req.ClientContactEmail,
 	})
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
 		)
@@ -175,56 +187,21 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
-	if errors.Is(err, pgx.ErrNoRows) {
-		// new service account - create client_id
-		clientID, err = utils.GenerateClientID(req.ClientOrganization)
-		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
-			)
-
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "internal server error")
-			return
-		}
-	} else {
-		// service account exists: reset the one time password, revoke any client secrets and reissue a one time url
-		clientAlreadyExists = true
-		clientID = serviceAccount.ClientID
-		serviceAccountID = serviceAccount.AccountID
-
-		_, err := s.queries.RevokeAllClientSecretsForAccount(r.Context(), serviceAccount.AccountID)
-		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
-				slog.String("client_id", clientID),
-				slog.String("account_id", serviceAccountID.String()),
-			)
-
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-			return
-		}
-
-		_, err = s.queries.DeleteOneTimeClientSecretsByOrgAndEmail(r.Context(), database.DeleteOneTimeClientSecretsByOrgAndEmailParams{
-			ClientContactEmail: req.ClientContactEmail,
-			ClientOrganization: req.ClientOrganization,
-		})
-		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
-				slog.String("client_id", clientID),
-				slog.String("account_id", serviceAccountID.String()),
-			)
-
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-			return
-		}
+	if exists {
+		responses.RespondWithError(w, r, http.StatusConflict, apperrors.ErrCodeResourceAlreadyExists, "service account already exists for this organization and email combination")
+		return
 	}
 
-	// add client and account ids to final request log context
-	logger.ContextWithLogAttrs(r.Context(),
-		slog.String("client_id", clientID),
-		slog.String("account_id", serviceAccountID.String()),
-	)
+	// Create new service account - generate client_id
+	clientID, err := utils.GenerateClientID(req.ClientOrganization)
+	if err != nil {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "internal server error")
+		return
+	}
 
 	// transaction
 	tx, err := s.pool.BeginTx(r.Context(), pgx.TxOptions{})
@@ -248,39 +225,37 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 
 	txQueries := s.queries.WithTx(tx)
 
-	if !clientAlreadyExists {
+	logger.ContextWithLogAttrs(r.Context(),
+		slog.String("client_id", clientID),
+	)
+
+	// create serviceAccount
+	serviceAccount, err := txQueries.CreateServiceAccountAccount(r.Context())
+	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("client_id", clientID),
+			slog.String("error", err.Error()),
 		)
 
-		// create serviceAccount
-		serviceAccount, err := txQueries.CreateServiceAccountAccount(r.Context())
-		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
-			)
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+		return
+	}
 
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-			return
-		}
+	serviceAccountID := serviceAccount.ID
 
-		serviceAccountID = serviceAccount.ID
+	// create service account
+	_, err = txQueries.CreateServiceAccount(r.Context(), database.CreateServiceAccountParams{
+		AccountID:          serviceAccount.ID,
+		ClientID:           clientID,
+		ClientContactEmail: req.ClientContactEmail,
+		ClientOrganization: req.ClientOrganization,
+	})
+	if err != nil {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
 
-		// create service account
-		_, err = txQueries.CreateServiceAccount(r.Context(), database.CreateServiceAccountParams{
-			AccountID:          serviceAccount.ID,
-			ClientID:           clientID,
-			ClientContactEmail: req.ClientContactEmail,
-			ClientOrganization: req.ClientOrganization,
-		})
-		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
-			)
-
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-			return
-		}
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+		return
 	}
 
 	// Generate the actual client secret (this gets stored temporarily)
@@ -327,9 +302,10 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 		oneTimeSecretID.String(),
 	)
 
-	// add setup url to final request log context
+	// add setup url and account id to final request log context
 	logger.ContextWithLogAttrs(r.Context(),
 		slog.String("setup_url", setupURL),
+		slog.String("account_id", serviceAccountID.String()),
 	)
 
 	// Return the setup information
@@ -342,6 +318,183 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 	}
 
 	responses.RespondWithJSON(w, http.StatusCreated, response)
+}
+
+// ReissueServiceAccountCredentialsHandler godocs
+//
+//	@Summary		Reissue service account credentials
+//	@Description	Reissue credentials for an existing service account.
+//	@Description	This creates a new one-time link with fresh client credentials - this must be used by the client within 48 hrs.
+//	@Description
+//	@Description	This endpoint revokes all existing client secrets and one-time setup URLs for the service account, then generates new credentials.
+//	@Description
+//	@Description	The client_id will remain the same, but a new client_secret will be generated.
+//	@Description
+//	@Description	You have to be an admin or the site owner to use this endpoint
+//	@Description
+//	@Tags		Service Accounts
+//
+//	@Param		request	body		handlers.ReissueServiceAccountCredentialsRequest	true	"service account details"
+//
+//	@Success	200		{object}	handlers.ReissueServiceAccountCredentialsResponse
+//	@Failure	400		{object}	responses.ErrorResponse
+//	@Failure	401		{object}	responses.ErrorResponse
+//	@Failure	404		{object}	responses.ErrorResponse
+//
+//	@Security	BearerServiceAccount
+//
+//	@Router		/api/auth/service-accounts/reissue-credentials [post]
+func (s *ServiceAccountHandler) ReissueServiceAccountCredentialsHandler(w http.ResponseWriter, r *http.Request) {
+	var req ReissueServiceAccountCredentialsRequest
+
+	defer r.Body.Close()
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
+		return
+	}
+
+	if req.ClientContactEmail == "" || req.ClientOrganization == "" {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "client_organization and client_contact_email are required")
+		return
+	}
+
+	// Check if service account exists
+	serviceAccount, err := s.queries.GetServiceAccountWithOrganizationAndEmail(r.Context(), database.GetServiceAccountWithOrganizationAndEmailParams{
+		ClientOrganization: req.ClientOrganization,
+		ClientContactEmail: req.ClientContactEmail,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "service account not found for this organization and email combination")
+			return
+		}
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+		return
+	}
+
+	clientID := serviceAccount.ClientID
+	serviceAccountID := serviceAccount.AccountID
+
+	// Revoke existing client secrets and one-time secrets
+	_, err = s.queries.RevokeAllClientSecretsForAccount(r.Context(), serviceAccount.AccountID)
+	if err != nil {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("client_id", clientID),
+			slog.String("account_id", serviceAccountID.String()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+		return
+	}
+
+	_, err = s.queries.DeleteOneTimeClientSecretsByOrgAndEmail(r.Context(), database.DeleteOneTimeClientSecretsByOrgAndEmailParams{
+		ClientContactEmail: req.ClientContactEmail,
+		ClientOrganization: req.ClientOrganization,
+	})
+	if err != nil {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("client_id", clientID),
+			slog.String("account_id", serviceAccountID.String()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+		return
+	}
+
+	// transaction
+	tx, err := s.pool.BeginTx(r.Context(), pgx.TxOptions{})
+	if err != nil {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+		return
+	}
+
+	defer func() {
+		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("error", err.Error()),
+			)
+
+		}
+	}()
+
+	txQueries := s.queries.WithTx(tx)
+
+	// Generate the actual client secret (this gets stored temporarily)
+	clientSecret, err := s.authService.GenerateSecureToken(32)
+	if err != nil {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "internal server error")
+		return
+	}
+
+	// Create one-time secret record
+	expiresAt := time.Now().Add(signalsd.OneTimeSecretExpiry)
+	oneTimeSecretID, err := txQueries.CreateOneTimeClientSecret(r.Context(), database.CreateOneTimeClientSecretParams{
+		ID:                      uuid.New(),
+		ServiceAccountAccountID: serviceAccountID,
+		PlaintextSecret:         clientSecret,
+		ExpiresAt:               expiresAt,
+	})
+	if err != nil {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+		return
+	}
+
+	if err := tx.Commit(r.Context()); err != nil {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+		return
+	}
+
+	// Generate the one-time setup URL
+	setupURL := fmt.Sprintf("%s://%s/api/auth/service-accounts/setup/%s",
+		utils.GetScheme(r),
+		r.Host,
+		oneTimeSecretID.String(),
+	)
+
+	// add setup url and account id to final request log context
+	logger.ContextWithLogAttrs(r.Context(),
+		slog.String("setup_url", setupURL),
+		slog.String("client_id", clientID),
+		slog.String("account_id", serviceAccountID.String()),
+	)
+
+	// Return the setup information
+	response := ReissueServiceAccountCredentialsResponse{
+		ClientID:  clientID,
+		AccountID: serviceAccountID,
+		SetupURL:  setupURL,
+		ExpiresAt: expiresAt,
+		ExpiresIn: int(signalsd.OneTimeSecretExpiry.Seconds()),
+	}
+
+	responses.RespondWithJSON(w, http.StatusOK, response)
 }
 
 // SetupServiceAccountHandler godoc

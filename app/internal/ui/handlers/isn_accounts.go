@@ -9,17 +9,37 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
-	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
-// UpdateIsnAccountHandler handles the form submission to add an account to an ISN
-func (h *HandlerService) UpdateIsnAccountHandler(w http.ResponseWriter, r *http.Request) {
+// UpdateIsnAccountPage renders the ISN accounts administration page
+func (h *HandlerService) UpdateIsnAccountPage(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	// Get user permissions from cookie
+	isnPerms, err := h.AuthService.GetIsnPermsFromCookie(r)
+	if err != nil {
+		reqLogger.Error("failed to read IsnPerms from cookie", slog.String("error", err.Error()))
+		return
+	}
+
+	// Convert permissions to ISN list for dropdown (only ISNs where user has admin rights)
+	isns := h.getIsnOptions(isnPerms, true, false)
+
+	// Render admin page
+	component := templates.IsnAccountManagementPage(isns)
+	if err := component.Render(r.Context(), w); err != nil {
+		reqLogger.Error("Failed to render ISN accounts admin page", slog.String("error", err.Error()))
+	}
+}
+
+// UpdateIsnAccount handles the form submission to add an account to an ISN
+func (h *HandlerService) UpdateIsnAccount(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Parse form data
-	isnSlug := r.FormValue("isn_slug")
-	accountType := r.FormValue("account_type")
-	accountIdentifier := r.FormValue("account_identifier")
+	isnSlug := r.FormValue("isn-slug")
+	accountType := r.FormValue("account-type")
+	accountIdentifier := r.FormValue("account-identifier")
 	permission := r.FormValue("permission")
 
 	// Validate required fields
@@ -55,7 +75,7 @@ func (h *HandlerService) UpdateIsnAccountHandler(w http.ResponseWriter, r *http.
 	accessToken := accessTokenCookie.Value
 
 	// Call the API to add the account to the ISN
-	err = h.ApiClient.UpdateIsnAccountAccess(accessToken, isnSlug, accountType, accountIdentifier, permission)
+	err = h.ApiClient.UpdateIsnAccount(accessToken, isnSlug, accountType, accountIdentifier, permission)
 	if err != nil {
 		reqLogger.Error("Failed to add account to ISN", slog.String("component", "templates.handleAddIsnAccount"), slog.String("error", err.Error()))
 
@@ -87,40 +107,9 @@ func (h *HandlerService) UpdateIsnAccountHandler(w http.ResponseWriter, r *http.
 	}
 }
 
-// IsnAccountManagementHandler renders the ISN accounts administration page
-func (h *HandlerService) IsnAccountManagementHandler(w http.ResponseWriter, r *http.Request) {
-	reqLogger := logger.ContextRequestLogger(r.Context())
-
-	// Get user permissions from cookie
-	isnPerms, err := h.AuthService.GetIsnPermsFromCookie(r)
-	if err != nil {
-		reqLogger.Error("failed to read IsnPerms from cookie", slog.String("error", err.Error()))
-		return
-	}
-
-	// Convert permissions to ISN list for dropdown (only ISNs where user has write permission)
-	var isns []types.IsnDropdown
-	isns = make([]types.IsnDropdown, 0, len(isnPerms))
-	for isnSlug, perm := range isnPerms {
-		// Only show ISNs where user has write permission (admins/owners)
-		if perm.IsnAdmin {
-			isns = append(isns, types.IsnDropdown{
-				Slug:    isnSlug,
-				IsInUse: true,
-			})
-		}
-	}
-
-	// Render admin page
-	component := templates.IsnAccountManagementPage(isns)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render ISN accounts admin page", slog.String("error", err.Error()))
-	}
-}
-
-// AccountIdentifierFieldHandler renders the appropriate input field based on account type
-func (h *HandlerService) AccountIdentifierFieldHandler(w http.ResponseWriter, r *http.Request) {
-	accountType := r.FormValue("account_type")
+// RenderAccountIdentifierField renders the appropriate input field based on account type
+func (h *HandlerService) RenderAccountIdentifierField(w http.ResponseWriter, r *http.Request) {
+	accountType := r.FormValue("account-type")
 
 	component := templates.AccountIdentifierField(accountType)
 	if err := component.Render(r.Context(), w); err != nil {

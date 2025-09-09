@@ -691,7 +691,6 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 	responses.RespondWithJSON(w, httpStatus, createSignalsResponse)
 }
 
-// todo sync with private
 // SearchPublicSignalsHandler godocs
 //
 //	@Summary		Signal Search (public ISNs)

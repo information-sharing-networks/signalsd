@@ -149,7 +149,7 @@ func (a *AdminHandler) VersionHandler(w http.ResponseWriter, r *http.Request) {
 //	@Description	- Revokes all refresh tokens (web users)
 //	@Description
 //	@Description	**Recovery:** Account must be re-enabled by admin via `/admin/accounts/{id}/enable`
-//	@Description	Service accounts also need re-registration via `/api/auth/register/service-accounts`
+//	@Description	Service accounts will also need a new client secret via `/api/auth/service-accounts/reissue-credentials`
 //	@Description
 //	@Description	**Note:** The site owner account cannot be disabled to prevent system lockout.
 //	@Description	Only owners and admins can disable accounts.
@@ -318,7 +318,7 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 //	@Description	Sets account status to `is_active = true` (does not create new tokens).
 //	@Description
 //	@Description	**Post-Enable Steps Required:**
-//	@Description	- **Service Accounts**: Must re-register via `/api/auth/register/service-accounts` (same client_id, new credentials)
+//	@Description	- **Service Accounts**: will need a new client secret via `/api/auth/service-accounts/reissue_credentials`
 //	@Description	- **Web Users**: Can immediately log in again via `/api/auth/login`
 //	@Description
 //	@Description	Only owners and admins can enable accounts.
@@ -520,17 +520,23 @@ func (a *AdminHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 //	@Summary		Get service accounts
 //	@Description	Only owners and admins can view service account lists.
 //	@Description
-//	@Description	- No query parameters = return all service accounts
-//	@Description	- to return a specific service account supply one of the following query parameter: `?id=uuid` or `?client_id=id`
+//	@Description	To return a specific service account supply one of the following query parameter combinations:
+//	@Description	-	id (account ID)
+//	@Description	-	client_id
+//	@Description	-	client_email & client_organization
+//	@Descriotion
+//	@Description	No query parameters = return all service accounts
 //	@Description
 //	@Tags		Site Admin
 //
-//	@Param		id			query		string	false	"Service Account ID"		example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
-//	@Param		client_id	query		string	false	"Service Account Client ID"	example(sa_exampleorg_k7j2m9x1)
+//	@Param		id					query		string	false	"Service Account ID"													example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
+//	@Param		client_id			query		string	false	"Service Account Client ID"												example(sa_exampleorg_k7j2m9x1)
+//	@Param		client_email		query		string	false	"Service Account Contact Email (must be used with client_organization)"	example(contact@example.com)
+//	@Param		client_organization	query		string	false	"Service Account Organization (must be used with client_email)"			example(Example Org)
 //
-//	@Success	200			{array}		handlers.ServiceAccountDetails
-//	@Failure	401			{object}	responses.ErrorResponse	"Authentication failed"
-//	@Failure	403			{object}	responses.ErrorResponse	"Insufficient permissions"
+//	@Success	200					{array}		handlers.ServiceAccountDetails
+//	@Failure	401					{object}	responses.ErrorResponse	"Authentication failed"
+//	@Failure	403					{object}	responses.ErrorResponse	"Insufficient permissions"
 //
 //	@Security	BearerAccessToken
 //
@@ -538,11 +544,12 @@ func (a *AdminHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 func (a *AdminHandler) GetServiceAccountsHandler(w http.ResponseWriter, r *http.Request) {
 
 	accountIDString := r.URL.Query().Get("id")
-
 	clientID := r.URL.Query().Get("client_id")
+	clientEmail := r.URL.Query().Get("client_email")
+	clientOrganization := r.URL.Query().Get("client_organization")
 
 	// if no query parameters provided, return all service accounts
-	if accountIDString == "" && clientID == "" {
+	if accountIDString == "" && clientID == "" && clientEmail == "" && clientOrganization == "" {
 		// Get all service accounts
 		dbServiceAccounts, err := a.queries.GetServiceAccounts(r.Context())
 		if err != nil {
@@ -575,8 +582,26 @@ func (a *AdminHandler) GetServiceAccountsHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if accountIDString != "" && clientID != "" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "Cannot provide both 'id' and 'client_id' query parameters")
+	// Validate query parameter combinations
+	paramCount := 0
+	if accountIDString != "" {
+		paramCount++
+	}
+	if clientID != "" {
+		paramCount++
+	}
+	if clientEmail != "" || clientOrganization != "" {
+		paramCount++
+	}
+
+	if paramCount > 1 {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "Cannot provide multiple query parameter combinations. Use only one of: 'id', 'client_id', or 'client_email & client_organization'")
+		return
+	}
+
+	// Validate that email and organization are used together
+	if (clientEmail != "" && clientOrganization == "") || (clientEmail == "" && clientOrganization != "") {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "Both 'client_email' and 'client_organization' parameters are required when querying by email/organization")
 		return
 	}
 
@@ -614,6 +639,38 @@ func (a *AdminHandler) GetServiceAccountsHandler(w http.ResponseWriter, r *http.
 		responses.RespondWithJSON(w, http.StatusOK, serviceAccountDetails)
 		return
 	}
+
+	// query by email and organization
+	if clientEmail != "" && clientOrganization != "" {
+		dbServiceAccount, err := a.queries.GetServiceAccountWithOrganizationAndEmail(r.Context(), database.GetServiceAccountWithOrganizationAndEmailParams{
+			ClientOrganization: clientOrganization,
+			ClientContactEmail: clientEmail,
+		})
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "service account not found")
+				return
+			}
+
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("error", err.Error()),
+			)
+
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+			return
+		}
+		serviceAccountDetails := ServiceAccountDetails{
+			AccountID:          dbServiceAccount.AccountID,
+			CreatedAt:          dbServiceAccount.CreatedAt,
+			UpdatedAt:          dbServiceAccount.UpdatedAt,
+			ClientID:           dbServiceAccount.ClientID,
+			ClientContactEmail: dbServiceAccount.ClientContactEmail,
+			ClientOrganization: dbServiceAccount.ClientOrganization,
+		}
+		responses.RespondWithJSON(w, http.StatusOK, serviceAccountDetails)
+		return
+	}
+
 	// query by clientId
 	dbServiceAccount, err := a.queries.GetServiceAccountByClientID(r.Context(), clientID)
 	if err != nil {

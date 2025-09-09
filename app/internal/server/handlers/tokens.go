@@ -154,7 +154,7 @@ func (a *TokenHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.
 //	@Description
 //	@Description	**IMPORTANT - Service Account Reinstatement:**
 //	@Description	- This endpoint does not permanently disable the service account itself (use `POST /admin/accounts/{account_id}/disable` for that)
-//	@Description	- To restore access, an admin must call `POST /api/auth/register/service-accounts` with the same organization and email
+//	@Description	- To restore access, an admin must call `/api/auth/service-accounts/reissue_credentials` with the same organization and email
 //	@Description	- This will generate a new setup URL and client secret while preserving the same client_id
 //	@Description	- If the account was disabled by an admin, it must first be re-enabled via `POST /admin/accounts/{account_id}/enable`
 //	@Description
@@ -192,7 +192,7 @@ func (a *TokenHandler) RevokeTokenHandler(w http.ResponseWriter, r *http.Request
 }
 
 // RevokeClientSecretHandler revokes ALL client secrets for a service account - called by the wrapper handler for /oauth/revoke (RevokeTokenHandler)
-// This effectively disables the service account until an admin re-registers it via POST /api/auth/register/service-accounts
+// This effectively disables the service account until an admin re-registers it via POST /api/auth/service-accounts/register
 func (a *TokenHandler) RevokeClientSecretHandler(w http.ResponseWriter, r *http.Request) {
 
 	serverAccountID, ok := auth.ContextAccountID(r.Context())

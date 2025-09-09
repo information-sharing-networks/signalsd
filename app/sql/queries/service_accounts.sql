@@ -28,8 +28,8 @@ WHERE id = $1;
 DELETE from one_time_client_secrets 
 WHERE service_account_account_id = (SELECT account_id 
                                     FROM service_accounts 
-                                    WHERE client_organization = $1 
-                                    AND client_contact_email = $2)
+                                    WHERE LOWER(client_organization) = LOWER(sqlc.arg(client_organization))
+                                    AND LOWER(client_contact_email) = LOWER(sqlc.arg(client_contact_email)))
 AND expires_at > NOW();
 
 -- name: GetValidClientSecretByServiceAccountAccountId :one
@@ -61,17 +61,18 @@ UPDATE client_secrets SET (updated_at, revoked_at) = (NOW() + INTERVAL '5 minute
 WHERE service_account_account_id = $1
 AND revoked_at IS NULL;
 
--- name: ExistsServiceAccountWithEmailAndOrganization :one
-SELECT EXISTS (
-    SELECT 1 FROM service_accounts
-    WHERE client_contact_email = $1
-    AND client_organization = $2
-) AS exists;
+
+-- name: ExistsServiceAccountWithOrganizationAndEmail :one
+SELECT exists
+  (SELECT 1 FROM service_accounts
+    WHERE LOWER(client_organization) = LOWER(sqlc.arg(client_organization))
+    AND LOWER(client_contact_email) = LOWER(sqlc.arg(client_contact_email))) as exists;
+
 
 -- name: GetServiceAccountWithOrganizationAndEmail :one
 SELECT * FROM service_accounts
-    WHERE client_organization = $1
-    AND client_contact_email = $2;
+    WHERE LOWER(client_organization) = LOWER(sqlc.arg(client_organization))
+    AND LOWER(client_contact_email) = LOWER(sqlc.arg(client_contact_email));
 
 -- name: GetOneTimeClientSecret :one
 SELECT created_at, service_account_account_id, plaintext_secret, expires_at

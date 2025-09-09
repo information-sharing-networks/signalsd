@@ -4,24 +4,21 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
-// SignalTypeManagementPage renders the signal type management page
-templ SignalTypeManagementPage(isns []types.IsnDropdown) {
-	@BaseLayout("Signal Type Management") {
+// CreateSignalTypePage renders the signal type management page
+templ CreateSignalTypePage(isns []types.IsnOption) {
+	@BaseLayout("Create New Signal Type") {
 		@Navigation()
 		<div class="page-container">
-			<h1 class="page-title">Signal Type Management</h1>
+			<h1 class="page-title">Create New Signal Type</h1>
 			<div class="card mb-6">
-				<div class="card-header">
-					<h3 class="card-title">Create New Signal Type</h3>
-				</div>
 				<div class="card-body">
 					<form hx-post="/ui-api/create-signal-type" hx-target="#signal-type-result" class="space-y-4">
 						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 							<div class="form-group">
-								<label for="isn_slug" class="form-label">ISN</label>
+								<label for="isn-slug" class="form-label">ISN</label>
 								<select
-									id="isn_slug"
-									name="isn_slug"
+									id="isn-slug"
+									name="isn-slug"
 									required
 									class="form-select"
 								>
@@ -32,10 +29,10 @@ templ SignalTypeManagementPage(isns []types.IsnDropdown) {
 								</select>
 							</div>
 							<div class="form-group">
-								<label for="bump_type" class="form-label">Version</label>
+								<label for="bump-type" class="form-label">Version</label>
 								<select
-									id="bump_type"
-									name="bump_type"
+									id="bump-type"
+									name="bump-type"
 									required
 									class="form-select"
 								>
@@ -59,10 +56,10 @@ templ SignalTypeManagementPage(isns []types.IsnDropdown) {
 							<p class="text-muted text-sm mt-1">Unique title for the signal type. This will be used to create a URL-friendly slug.</p>
 						</div>
 						<div class="form-group">
-							<label for="schema_url" class="form-label">Schema URL</label>
+							<label for="schema-url" class="form-label">Schema URL</label>
 							<input
-								id="schema_url"
-								name="schema_url"
+								id="schema-url"
+								name="schema-url"
 								type="url"
 								required
 								class="form-input"
@@ -75,10 +72,10 @@ templ SignalTypeManagementPage(isns []types.IsnDropdown) {
 							</p>
 						</div>
 						<div class="form-group">
-							<label for="readme_url" class="form-label">README URL</label>
+							<label for="readme-url" class="form-label">README URL</label>
 							<input
-								id="readme_url"
-								name="readme_url"
+								id="readme-url"
+								name="readme-url"
 								type="url"
 								class="form-input"
 								placeholder="https://github.com/user/project/blob/2025.01.01/readme.md"

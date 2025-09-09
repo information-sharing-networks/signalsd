@@ -28,7 +28,7 @@ type Server struct {
 	authService *auth.AuthService
 }
 
-// NewStandaloneServer creates a new UI server that can run independently of the API
+// NewStandaloneServer creates a UI server that can run independently of the API
 func NewStandaloneServer(cfg *config.Config, logger *slog.Logger) *Server {
 	s := &Server{
 		router:      chi.NewRouter(),
@@ -58,6 +58,7 @@ func NewIntegratedServer(router *chi.Mux, cfg *config.Config, logger *slog.Logge
 }
 
 // RegisterRoutes registers UI routes on the signalsd router - use when running the integrated ui.
+// note: dynamic HMTX handlers are registered with routes starting /ui-api
 func (s *Server) RegisterRoutes(router *chi.Mux) {
 
 	handlerService := &handlers.HandlerService{
@@ -65,42 +66,44 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 		ApiClient:   client.NewClient(s.config.APIBaseURL),
 		Environment: s.config.Environment,
 	}
-	// Static assets (no auth required) - only UI's own CSS
-	router.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("./web/static/"))))
-
 	// Public routes (no auth required)
-	router.Get("/login", handlerService.LoginHandler)
-	router.Post("/login", handlerService.LoginPostHandler)
-	router.Get("/register", handlerService.RegisterLogin)
-	router.Post("/register", handlerService.RegisterPostHandler)
+	router.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("./web/static/"))))
+	router.Get("/login", handlerService.LoginPage)
+	router.Post("/login", handlerService.Login)
+	router.Get("/register", handlerService.RegisterPage)
+	router.Post("/register", handlerService.Register)
 
 	// redirects to dashboard if authenticated, login if not
-	router.Get("/", handlerService.HomeHandler)
+	router.Get("/", handlerService.HomePage)
 
-	// Protected routes (require authentication)
+	// Protected routes
 	router.Group(func(r chi.Router) {
 		r.Use(s.authService.RequireAuth)
 
 		// entry point after login
-		r.Get("/dashboard", handlerService.DashboardHandler)
+		r.Get("/dashboard", handlerService.DashboardPage)
 
 		// auth
-		r.Post("/logout", handlerService.LogoutHandler)
-		r.Get("/access-denied", handlerService.AccessDeniedHandler)
-		r.Get("/need-isn-admin", handlerService.NeedIsnAdminHandler)
+		r.Post("/logout", handlerService.Logout)
+		r.Get("/access-denied", handlerService.AccessDeniedPage)
+		r.Get("/need-isn-admin", handlerService.NeedIsnAdminPage)
+
+		//alerts
+		r.Get("/ui-api/clear-alerts", handlerService.ClearAlerts)
 
 		// render drop down options
-		r.Post("/ui-api/signal-type-options", handlerService.SignalTypeOptionsHandler)
-		r.Post("/ui-api/signal-type-version-options", handlerService.SignalTypeVersionOptionsHandler)
+		r.Post("/ui-api/signal-type-options", handlerService.RenderSignalTypeOptions)
+		r.Post("/ui-api/signal-type-version-options", handlerService.RenderSignalTypeVersionOptions)
+		r.Get("/ui-api/service-account-options", handlerService.RenderServiceAccountOptions)
 
 		// render individual fields
-		r.Post("/ui-api/account-identifier-field", handlerService.AccountIdentifierFieldHandler)
+		r.Post("/ui-api/account-identifier-field", handlerService.RenderAccountIdentifierField)
 
-		// authenticated user forms
-		r.Get("/search", handlerService.SignalSearchHandler)
+		// authenticated user pages
+		r.Get("/search", handlerService.SearchSignalsPage)
 
 		// execute backend api calls and render the results
-		r.Post("/ui-api/search-signals", handlerService.SearchSignalsHandler)
+		r.Post("/ui-api/search-signals", handlerService.SearchSignals)
 	})
 
 	// ISN Admin routes (require admin/owner role)
@@ -109,22 +112,27 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 		r.Use(s.authService.RequireAdminOrOwnerRole)
 
 		//dashboard
-		r.Get("/admin", handlerService.IsnAdminDashboardHandler)
+		r.Get("/admin", handlerService.IsnAdminDashboardPage)
 
-		//isn creation form
-		r.Get("/admin/isns", handlerService.IsnManagementHandler)
-		r.Post("/ui-api/create-isn", handlerService.CreateIsnHandler)
+		//isn creation
+		r.Get("/admin/isns", handlerService.CreateIsnPage)
+		r.Post("/ui-api/create-isn", handlerService.CreateIsn)
 
-		// isn management forms - only relevant to admins that have created one or more ISN
+		// service accounts
+		r.Get("/admin/service-accounts", handlerService.ManageServiceAccountsPage)
+		r.Post("/ui-api/create-service-account", handlerService.CreateServiceAccount)
+		r.Post("/ui-api/reissue-service-account", handlerService.ReissueServiceAccount)
+		r.Get("/ui-api/reissue-button-state", handlerService.ReissueButtonState)
+
+		// isn management forms
 		r.Group(func(r chi.Router) {
-			r.Use(s.authService.RequireIsnAdmin)
+			r.Use(s.authService.RequireIsnAdmin) //  the below features are only relevant to admins that have created one or more ISN
 
-			r.Get("/admin/signal-types", handlerService.SignalTypeManagementHandler)
-			r.Get("/admin/isn-accounts", handlerService.IsnAccountManagementHandler)
+			r.Get("/admin/signal-types", handlerService.CreateSignalTypePage)
+			r.Post("/ui-api/create-signal-type", handlerService.CreateSignalType)
 
-			// execute backend api calls and render the results
-			r.Post("/ui-api/create-signal-type", handlerService.CreateSignalTypeHandler)
-			r.Post("/ui-api/update-isn-account-access", handlerService.UpdateIsnAccountHandler)
+			r.Get("/admin/isn-accounts", handlerService.UpdateIsnAccountPage)
+			r.Post("/ui-api/update-isn-account", handlerService.UpdateIsnAccount)
 		})
 	})
 }
@@ -152,7 +160,7 @@ func (s *Server) Start(ctx context.Context) error {
 		IdleTimeout:  s.config.IdleTimeout,
 	}
 
-	// Start server in a goroutine
+	// Start server
 	serverErr := make(chan error, 1)
 	go func() {
 		s.logger.Info("UI server listening", slog.String("address", addr))

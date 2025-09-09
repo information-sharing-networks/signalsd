@@ -467,6 +467,33 @@ definitions:
       version_number:
         type: integer
     type: object
+  handlers.ReissueServiceAccountCredentialsRequest:
+    properties:
+      client_contact_email:
+        example: example@example.com
+        type: string
+      client_organization:
+        example: example org
+        type: string
+    type: object
+  handlers.ReissueServiceAccountCredentialsResponse:
+    properties:
+      account_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      client_id:
+        example: sa_example-org_k7j2m9x1
+        type: string
+      expires_at:
+        example: "2024-12-25T10:30:00Z"
+        type: string
+      expires_in:
+        example: 172800
+        type: integer
+      setup_url:
+        example: https://api.example.com/api/auth/service-accounts/setup/550e8400-e29b-41d4-a716-446655440000
+        type: string
+    type: object
   handlers.ResetUserPasswordRequest:
     properties:
       new_password:
@@ -947,7 +974,7 @@ paths:
         - Revokes all refresh tokens (web users)
 
         **Recovery:** Account must be re-enabled by admin via `/admin/accounts/{id}/enable`
-        Service accounts also need re-registration via `/api/auth/register/service-accounts`
+        Service accounts will also need a new client secret via `/api/auth/service-accounts/reissue-credentials`
 
         **Note:** The site owner account cannot be disabled to prevent system lockout.
         Only owners and admins can disable accounts.
@@ -989,7 +1016,7 @@ paths:
         Sets account status to `is_active = true` (does not create new tokens).
 
         **Post-Enable Steps Required:**
-        - **Service Accounts**: Must re-register via `/api/auth/register/service-accounts` (same client_id, new credentials)
+        - **Service Accounts**: will need a new client secret via `/api/auth/service-accounts/reissue_credentials`
         - **Web Users**: Can immediately log in again via `/api/auth/login`
 
         Only owners and admins can enable accounts.
@@ -1080,11 +1107,10 @@ paths:
       - Site Admin
   /api/admin/service-accounts:
     get:
-      description: |
-        Only owners and admins can view service account lists.
-
-        - No query parameters = return all service accounts
-        - to return a specific service account supply one of the following query parameter: `?id=uuid` or `?client_id=id`
+      description: "Only owners and admins can view service account lists.\n\nTo return
+        a specific service account supply one of the following query parameter combinations:\n-\tid
+        (account ID)\n-\tclient_id\n-\tclient_email & client_organization\nNo query
+        parameters = return all service accounts\n"
       parameters:
       - description: Service Account ID
         example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
@@ -1095,6 +1121,16 @@ paths:
         example: sa_exampleorg_k7j2m9x1
         in: query
         name: client_id
+        type: string
+      - description: Service Account Contact Email (must be used with client_organization)
+        example: contact@example.com
+        in: query
+        name: client_email
+        type: string
+      - description: Service Account Organization (must be used with client_email)
+        example: Example Org
+        in: query
+        name: client_organization
         type: string
       responses:
         "200":
@@ -1300,14 +1336,15 @@ paths:
       summary: Register user
       tags:
       - auth
-  /api/auth/register/service-accounts:
+  /api/auth/service-accounts/register:
     post:
       description: |
         Registring a new service account creates a one-time link with the client credentials in it - this must be used by the client within 48 hrs.
 
-        If you want to reissue a client's credentials call this endpoint again with the same client organization and contact email.
-        A new one-time setup url will be generated and the old one will be revoked.
-        Note the client_id will remain the same and any existing client secrets will be revoked.
+        Note that where an organization needs more than one service account they must supply unique contact emails for each account.
+
+
+        To reissue credentials for an existing service account, use the **Reissue Service Account Credentials** endpoint.
 
         You have to be an admin or the site owner to use this endpoint
       parameters:
@@ -1318,8 +1355,8 @@ paths:
         schema:
           $ref: '#/definitions/handlers.CreateServiceAccountRequest'
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Created
           schema:
             $ref: '#/definitions/handlers.CreateServiceAccountResponse'
         "400":
@@ -1330,9 +1367,53 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerServiceAccount: []
-      summary: Register a new service account
+      summary: Register service account
+      tags:
+      - Service Accounts
+  /api/auth/service-accounts/reissue-credentials:
+    post:
+      description: |
+        Reissue credentials for an existing service account.
+        This creates a new one-time link with fresh client credentials - this must be used by the client within 48 hrs.
+
+        This endpoint revokes all existing client secrets and one-time setup URLs for the service account, then generates new credentials.
+
+        The client_id will remain the same, but a new client_secret will be generated.
+
+        You have to be an admin or the site owner to use this endpoint
+      parameters:
+      - description: service account details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.ReissueServiceAccountCredentialsRequest'
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.ReissueServiceAccountCredentialsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerServiceAccount: []
+      summary: Reissue service account credentials
       tags:
       - Service Accounts
   /api/auth/service-accounts/rotate-secret:
@@ -2336,7 +2417,7 @@ paths:
 
         **IMPORTANT - Service Account Reinstatement:**
         - This endpoint does not permanently disable the service account itself (use `POST /admin/accounts/{account_id}/disable` for that)
-        - To restore access, an admin must call `POST /api/auth/register/service-accounts` with the same organization and email
+        - To restore access, an admin must call `/api/auth/service-accounts/reissue_credentials` with the same organization and email
         - This will generate a new setup URL and client secret while preserving the same client_id
         - If the account was disabled by an admin, it must first be re-enabled via `POST /admin/accounts/{account_id}/enable`
 

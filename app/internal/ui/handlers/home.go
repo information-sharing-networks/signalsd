@@ -10,8 +10,8 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
 )
 
-// HomeHandler handles the root path and redirects to the dashboard if authenticated, login if not
-func (h *HandlerService) HomeHandler(w http.ResponseWriter, r *http.Request) {
+// HomePage handles the root path and redirects to the dashboard if authenticated, login if not
+func (h *HandlerService) HomePage(w http.ResponseWriter, r *http.Request) {
 	status := h.AuthService.CheckTokenStatus(r)
 
 	switch status {
@@ -22,7 +22,7 @@ func (h *HandlerService) HomeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *HandlerService) LoginHandler(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerService) LoginPage(w http.ResponseWriter, r *http.Request) {
 	// Render login page
 	component := templates.LoginPage()
 	if err := component.Render(r.Context(), w); err != nil {
@@ -41,8 +41,8 @@ func (h *HandlerService) RedirectToLogin(w http.ResponseWriter, r *http.Request)
 	}
 }
 
-// LoginPostHandler authenticates the user and adds authentication cookies to the response
-func (h *HandlerService) LoginPostHandler(w http.ResponseWriter, r *http.Request) {
+// Login authenticates the user and adds authentication cookies to the response
+func (h *HandlerService) Login(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
 	password := r.FormValue("password")
 
@@ -88,7 +88,7 @@ func (h *HandlerService) LoginPostHandler(w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *HandlerService) RegisterLogin(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerService) RegisterPage(w http.ResponseWriter, r *http.Request) {
 	// Render registration page
 	component := templates.RegisterPage()
 	if err := component.Render(r.Context(), w); err != nil {
@@ -97,11 +97,11 @@ func (h *HandlerService) RegisterLogin(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// RegisterPostHandler processes user registration
-func (h *HandlerService) RegisterPostHandler(w http.ResponseWriter, r *http.Request) {
+// Register processes user registration
+func (h *HandlerService) Register(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
 	password := r.FormValue("password")
-	confirmPassword := r.FormValue("confirm_password")
+	confirmPassword := r.FormValue("confirm-password")
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	if email == "" || password == "" || confirmPassword == "" {
@@ -147,7 +147,7 @@ func (h *HandlerService) RegisterPostHandler(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-func (h *HandlerService) LogoutHandler(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerService) Logout(w http.ResponseWriter, r *http.Request) {
 	h.AuthService.ClearAuthCookies(w, h.Environment)
 
 	// Redirect to login page
