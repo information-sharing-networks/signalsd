@@ -50,7 +50,6 @@ func (h *HandlerService) CreateIsnHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	//todo make helper
 	// Call the API to create the ISN
 	accessToken := accessTokenCookie.Value
 	createReq := client.CreateIsnRequest{

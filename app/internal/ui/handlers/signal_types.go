@@ -8,10 +8,11 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
-	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
-// SignalTypeManagementHandler renders the signal type management page
+// SignalTypeManagementHandler renders the signal type management page.
+//
+// Use with RequireAdminOrOwnerRole and RequireIsnAdmin middleware
 func (h *HandlerService) SignalTypeManagementHandler(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
@@ -22,18 +23,8 @@ func (h *HandlerService) SignalTypeManagementHandler(w http.ResponseWriter, r *h
 		return
 	}
 
-	// Convert permissions to ISN list for dropdown (only ISNs where user has write permission)
-	var isns []types.IsnDropdown
-	isns = make([]types.IsnDropdown, 0, len(isnPerms))
-	for isnSlug, perm := range isnPerms {
-		// Only show ISNs where user has write permission (can create signal types)
-		if perm.Permission == "write" {
-			isns = append(isns, types.IsnDropdown{
-				Slug:    isnSlug,
-				IsInUse: true,
-			})
-		}
-	}
+	// populate the isn dropdown list with ISNs where the user is an admin
+	isns := h.getIsnDropDownList(isnPerms, true, false)
 
 	// Render signal type management page
 	component := templates.SignalTypeManagementPage(isns)
@@ -43,6 +34,7 @@ func (h *HandlerService) SignalTypeManagementHandler(w http.ResponseWriter, r *h
 }
 
 // CreateSignalTypeHandler handles the form submission to create a new signal type
+// Use with RequireAdminOrOwnerRole and RequireIsnAdmin middleware
 func (h *HandlerService) CreateSignalTypeHandler(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
@@ -54,7 +46,6 @@ func (h *HandlerService) CreateSignalTypeHandler(w http.ResponseWriter, r *http.
 	readmeURL := r.FormValue("readme_url")
 	detail := r.FormValue("detail")
 
-	// todo check this - should be done in the middleware
 	// Validate user has admin or owner permission
 	isnPerm, err := h.AuthService.CheckIsnPermission(r, isnSlug)
 	if err != nil {

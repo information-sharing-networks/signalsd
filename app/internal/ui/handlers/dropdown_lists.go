@@ -21,6 +21,28 @@ type HandlerService struct {
 	Environment string
 }
 
+// getIsnDropDown is a helper that returns a list of ISNs for the dropdown list. The list is used as a parater on several pages,
+// Optionally the selected value can be use to trigger a cascading update of the signal type dropdown list (see SignalTypeOptionsHandler)
+//
+// If filterByIsnAdmin is true, only ISNs where the user is an admin are returned.
+// If filterByWritePerm is true, only ISNs where the user has write permission are returned.
+func (h *HandlerService) getIsnDropDownList(isnPerms map[string]types.IsnPerm, filterByIsnAdmin bool, filterByWritePerm bool) []types.IsnDropdown {
+	isns := make([]types.IsnDropdown, 0, len(isnPerms))
+	for isnSlug, perm := range isnPerms {
+		if filterByIsnAdmin && !perm.IsnAdmin {
+			continue
+		}
+		if filterByWritePerm && perm.Permission != "write" {
+			continue
+		}
+		isns = append(isns, types.IsnDropdown{
+			Slug:    isnSlug,
+			IsInUse: true,
+		})
+	}
+	return isns
+}
+
 // SignalTypeOptionsHandler gets the signal types for the selected ISN and returns the dropdown options
 func (h *HandlerService) SignalTypeOptionsHandler(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())

@@ -24,13 +24,7 @@ func (h *HandlerService) SignalSearchHandler(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Convert permissions to ISN list for dropdown
-	isns := make([]types.IsnDropdown, 0, len(isnPerms))
-	for isnSlug := range isnPerms {
-		isns = append(isns, types.IsnDropdown{
-			Slug:    isnSlug,
-			IsInUse: true,
-		})
-	}
+	isns := h.getIsnDropDownList(isnPerms, false, false)
 
 	// Render search page
 	component := templates.SignalSearchPage(isns, isnPerms, nil)

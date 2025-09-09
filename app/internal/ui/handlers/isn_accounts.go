@@ -9,7 +9,6 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
-	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
 // UpdateIsnAccountHandler handles the form submission to add an account to an ISN
@@ -98,18 +97,8 @@ func (h *HandlerService) IsnAccountManagementHandler(w http.ResponseWriter, r *h
 		return
 	}
 
-	// Convert permissions to ISN list for dropdown (only ISNs where user has write permission)
-	var isns []types.IsnDropdown
-	isns = make([]types.IsnDropdown, 0, len(isnPerms))
-	for isnSlug, perm := range isnPerms {
-		// Only show ISNs where user has write permission (admins/owners)
-		if perm.IsnAdmin {
-			isns = append(isns, types.IsnDropdown{
-				Slug:    isnSlug,
-				IsInUse: true,
-			})
-		}
-	}
+	// Convert permissions to ISN list for dropdown (only ISNs where user has admin rights)
+	isns := h.getIsnDropDownList(isnPerms, true, false)
 
 	// Render admin page
 	component := templates.IsnAccountManagementPage(isns)
