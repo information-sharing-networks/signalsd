@@ -49,6 +49,7 @@ type IsnPerms struct {
 	SignalBatchID   *uuid.UUID `json:"signal_batch_id,omitempty" example:"967affe9-5628-4fdd-921f-020051344a12"`
 	SignalTypePaths []string   `json:"signal_types,omitempty" example:"signal-type-1/v0.0.1,signal-type-2/v1.0.0"` // list of available signal types for the isn
 	Visibility      string     `json:"visibility" enums:"public,private" example:"private"`                        // ISN visibility setting
+	IsnAdmin        bool       `json:"isn_admin" example:"false"`                                                  // true if the account is the owner of the isn or the site owner
 }
 
 type Claims struct {
@@ -194,18 +195,19 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 	// set up isnPerms map for claims
 	switch account.AccountRole {
 	case "owner":
-		// owner can write to all ISNs
+		// owner has write and admin access to all ISNs
 		for _, siteIsn := range inUseIsns {
 			isnPerms[siteIsn.Slug] = IsnPerms{
 				Permission:      "write",
 				SignalBatchID:   latestSignalBatchIDs[siteIsn.Slug],
 				SignalTypePaths: isnSignalTypePaths[siteIsn.Slug],
 				Visibility:      isnVisibility[siteIsn.Slug],
+				IsnAdmin:        true,
 			}
 		}
 
 	case "admin":
-		// Admin can write to any ISN they created
+		// Admin can write to any ISN they created but can only admin sites they created
 		for _, siteIsn := range inUseIsns {
 			if account.ID == siteIsn.UserAccountID {
 				isnPerms[siteIsn.Slug] = IsnPerms{
@@ -213,6 +215,7 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 					SignalBatchID:   latestSignalBatchIDs[siteIsn.Slug],
 					SignalTypePaths: isnSignalTypePaths[siteIsn.Slug],
 					Visibility:      isnVisibility[siteIsn.Slug],
+					IsnAdmin:        true,
 				}
 			}
 		}
@@ -224,6 +227,7 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 				SignalBatchID:   latestSignalBatchIDs[accessibleIsn.IsnSlug],
 				SignalTypePaths: isnSignalTypePaths[accessibleIsn.IsnSlug],
 				Visibility:      isnVisibility[accessibleIsn.IsnSlug],
+				IsnAdmin:        false,
 			}
 		}
 	case "member":
@@ -234,6 +238,7 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 				SignalBatchID:   latestSignalBatchIDs[accessibleIsn.IsnSlug],
 				SignalTypePaths: isnSignalTypePaths[accessibleIsn.IsnSlug],
 				Visibility:      isnVisibility[accessibleIsn.IsnSlug],
+				IsnAdmin:        false,
 			}
 		}
 	default:

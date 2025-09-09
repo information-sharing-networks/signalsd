@@ -13,10 +13,7 @@ import (
 	"strings"
 )
 
-// =============================================================================
-// ISN ACCOUNTS ADMIN PAGE
-// =============================================================================
-func IsnAccountsAdminPage(isns []types.IsnDropdown) templ.Component {
+func IsnAccountManagementPage(isns []types.IsnDropdown) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -53,64 +50,100 @@ func IsnAccountsAdminPage(isns []types.IsnDropdown) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">ISN Account Management</h1><p class=\"text-muted mb-6\">Add accounts to Information Sharing Networks.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">ISN Account Management</h1><p class=\"text-muted mb-6\">Grant or revoke access to Information Sharing Networks.</p><div class=\"card mb-6\"><div class=\"card-header\"><h3 class=\"card-title\">Change ISN permissions for an account</h3></div><div class=\"card-body\"><form hx-post=\"/ui-api/update-isn-account-access\" hx-target=\"#update-access-result\" class=\"space-y-4\"><div class=\"grid grid-cols-1 md:grid-cols-3 gap-4\"><div class=\"form-group\"><label for=\"isn_slug\" class=\"form-label\">ISN</label> <select id=\"isn_slug\" name=\"isn_slug\" required class=\"form-select\"><option value=\"\">Select ISN...</option> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			if len(isns) == 0 {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"card\"><div class=\"card-body text-center\"><div class=\"alert alert-info\"><strong>No ISNs Available</strong><p class=\"mt-2 mb-0\">You need admin access to at least one ISN to manage accounts.</p></div></div></div>")
+			for _, isn := range isns {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<option value=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-			} else {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div class=\"card mb-6\"><div class=\"card-header\"><h3 class=\"card-title\">Add Account to ISN</h3></div><div class=\"card-body\"><form hx-post=\"/ui-api/add-isn-account\" hx-target=\"#admin-result\" class=\"space-y-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\"><label for=\"isn_slug\" class=\"form-label\">ISN</label> <select id=\"isn_slug\" name=\"isn_slug\" required class=\"form-select\"><option value=\"\">Select ISN...</option> ")
+				var templ_7745c5c3_Var3 string
+				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(isn.Slug)
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/isn_accounts.templ`, Line: 32, Col: 34}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				for _, isn := range isns {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<option value=\"")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					var templ_7745c5c3_Var3 string
-					templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(isn.Slug)
-					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/isn_accounts.templ`, Line: 45, Col: 35}
-					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\">")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					var templ_7745c5c3_Var4 string
-					templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(strings.ReplaceAll(isn.Slug, "-", " "))
-					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/isn_accounts.templ`, Line: 45, Col: 78}
-					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</option>")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</select></div><div class=\"form-group\"><label for=\"account_email\" class=\"form-label\">Account Email</label> <input type=\"email\" id=\"account_email\" name=\"account_email\" required placeholder=\"user@example.com\" class=\"form-input\"></div></div><div class=\"form-group\"><label for=\"permission\" class=\"form-label\">Permission Level</label> <select id=\"permission\" name=\"permission\" required class=\"form-select\"><option value=\"\">Select Permission...</option> <option value=\"read\">Read - Can view signals</option> <option value=\"write\">Write - Can create and view signals</option></select></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Add Account to ISN</button></div></form></div></div><div id=\"admin-result\"><!-- Results will appear here --></div>")
+				var templ_7745c5c3_Var4 string
+				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(strings.ReplaceAll(isn.Slug, "-", " "))
+				if templ_7745c5c3_Err != nil {
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/isn_accounts.templ`, Line: 32, Col: 77}
+				}
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</option>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</select></div><div class=\"form-group\"><label for=\"account_type\" class=\"form-label\">Account Type</label> <select id=\"account_type\" name=\"account_type\" required class=\"form-select\" hx-trigger=\"change\" hx-target=\"#account-identifier-field\" hx-swap=\"outerHTML\" hx-post=\"/ui-api/account-identifier-field\"><option value=\"\">Select Type...</option> <option value=\"user\">Web User</option> <option value=\"service_account\">Service Account</option></select></div><div class=\"form-group\" id=\"account-identifier-field\"><label for=\"account_identifier\" class=\"form-label\">Account Identifier</label> <input type=\"text\" id=\"account_identifier\" name=\"account_identifier\" required placeholder=\"Select account type first\" class=\"form-input\" disabled></div></div><div class=\"form-group\"><label for=\"permission\" class=\"form-label\">Permission Level</label> <select id=\"permission\" name=\"permission\" required class=\"form-select\"><option value=\"\">Select Permission...</option> <option value=\"none\">None - Revoke access to the ISN</option> <option value=\"read\">Read - Can view signals</option> <option value=\"write\">Write - Can create and view signals</option></select></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Update Account</button></div></form></div></div><div id=\"update-access-result\"><!-- Results will appear here --></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			return nil
 		})
 		templ_7745c5c3_Err = BaseLayout("ISN Account Management").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
+// AccountIdentifierField renders the appropriate input field based on account type
+func AccountIdentifierField(accountType string) templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var5 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var5 == nil {
+			templ_7745c5c3_Var5 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<div class=\"form-group\" id=\"account-identifier-field\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		switch accountType {
+		case "user":
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<label for=\"account_identifier\" class=\"form-label\">Account Email</label> <input type=\"email\" id=\"account_identifier\" name=\"account_identifier\" required placeholder=\"user@example.com\" class=\"form-input\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		case "service_account":
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<label for=\"account_identifier\" class=\"form-label\">Client ID</label> <input type=\"text\" id=\"account_identifier\" name=\"account_identifier\" required placeholder=\"sa_example-org_abc123\" class=\"form-input\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		default:
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<label for=\"account_identifier\" class=\"form-label\">Account Identifier</label> <input type=\"text\" id=\"account_identifier\" name=\"account_identifier\" required placeholder=\"Select account type first\" class=\"form-input\" disabled>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

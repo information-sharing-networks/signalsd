@@ -21,17 +21,8 @@ type HandlerService struct {
 	Environment string
 }
 
-// RenderError displays an error message inline to the user
-func (h *HandlerService) RenderError(w http.ResponseWriter, r *http.Request, msg string) {
-	component := templates.ErrorAlert(msg)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger := logger.ContextRequestLogger(r.Context())
-		reqLogger.Error("Failed to render error", slog.String("error", err.Error()))
-	}
-}
-
-// HandleGetSignalTypes handles the form submission to get signal types for the selected ISN
-func (h *HandlerService) HandleGetSignalTypes(w http.ResponseWriter, r *http.Request) {
+// SignalTypeOptionsHandler gets the signal types for the selected ISN and returns the dropdown options
+func (h *HandlerService) SignalTypeOptionsHandler(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	isnSlug := r.FormValue("isn_slug")
@@ -98,7 +89,8 @@ func (h *HandlerService) HandleGetSignalTypes(w http.ResponseWriter, r *http.Req
 	}
 }
 
-func (h *HandlerService) HandleGetSignalVersions(w http.ResponseWriter, r *http.Request) {
+// SignalTypeVersionOptionsHandler gets the versions for the selected signal type and returns the dropdown options
+func (h *HandlerService) SignalTypeVersionOptionsHandler(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	isnSlug := r.FormValue("isn_slug")
@@ -154,18 +146,8 @@ func (h *HandlerService) HandleGetSignalVersions(w http.ResponseWriter, r *http.
 	}
 
 	// Render version dropdown options
-	component := templates.VersionOptions(versions)
+	component := templates.SignalTypeVersionOptions(versions)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render version options", slog.String("error", err.Error()))
-	}
-}
-
-// HandleAccessDenied handles the /access-denied route
-func (h *HandlerService) HandleAccessDenied(w http.ResponseWriter, r *http.Request) {
-	reqLogger := logger.ContextRequestLogger(r.Context())
-
-	component := templates.AccessDeniedPage("Access Denied", "You do not have permission to use this feature")
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render access denied page", slog.String("error", err.Error()))
 	}
 }

@@ -6,15 +6,13 @@ import (
 )
 
 
-// =============================================================================
-// REUSABLE FORM COMPONENTS
-// =============================================================================
+// the list of available signal types for the selected ISN
 templ SignalTypeOptions(signalTypes []types.SignalTypeDropdown) {
 	<select
 		id="signal_type_slug"
 		name="signal_type_slug"
 		required
-		hx-post="/ui-api/signal-versions"
+		hx-post="/ui-api/signal-type-version-options"
 		hx-target="#sem_ver"
 		hx-swap="outerHTML"
 		hx-trigger="change"
@@ -28,7 +26,8 @@ templ SignalTypeOptions(signalTypes []types.SignalTypeDropdown) {
 	</select>
 }
 
-templ VersionOptions(versions []types.VersionDropdown) {
+// the list of available versions for the selected signal type
+templ SignalTypeVersionOptions(versions []types.VersionDropdown) {
 	<select
 		id="sem_ver"
 		name="sem_ver"

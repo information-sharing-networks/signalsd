@@ -10,8 +10,8 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
 )
 
-// HandleHome handles the root path and redirects to the dashboard if authenticated, login if not
-func (h *HandlerService) HandleHome(w http.ResponseWriter, r *http.Request) {
+// HomeHandler handles the root path and redirects to the dashboard if authenticated, login if not
+func (h *HandlerService) HomeHandler(w http.ResponseWriter, r *http.Request) {
 	status := h.AuthService.CheckTokenStatus(r)
 
 	switch status {
@@ -22,7 +22,7 @@ func (h *HandlerService) HandleHome(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *HandlerService) HandleLogin(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerService) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	// Render login page
 	component := templates.LoginPage()
 	if err := component.Render(r.Context(), w); err != nil {
@@ -41,8 +41,8 @@ func (h *HandlerService) RedirectToLogin(w http.ResponseWriter, r *http.Request)
 	}
 }
 
-// HandleLoginPost authenticates the user and adds authentication cookies to the response
-func (h *HandlerService) HandleLoginPost(w http.ResponseWriter, r *http.Request) {
+// LoginPostHandler authenticates the user and adds authentication cookies to the response
+func (h *HandlerService) LoginPostHandler(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
 	password := r.FormValue("password")
 
@@ -53,10 +53,16 @@ func (h *HandlerService) HandleLoginPost(w http.ResponseWriter, r *http.Request)
 	if clientError != nil {
 		reqLogger.Error("Authentication failed", slog.String("error", clientError.Error()))
 
+		var msg string
 		if ce, ok := clientError.(*client.ClientError); ok {
-			h.RenderError(w, r, ce.UserError())
+			msg = ce.UserError()
 		} else {
-			h.RenderError(w, r, "An error occurred. Please try again.")
+			msg = "An error occurred. Please try again."
+		}
+
+		component := templates.ErrorAlert(msg)
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
 		}
 		return
 	}
@@ -64,7 +70,11 @@ func (h *HandlerService) HandleLoginPost(w http.ResponseWriter, r *http.Request)
 	// Set all authentication cookies using shared method
 	if err := h.AuthService.SetAuthCookies(w, accessTokenDetails, refreshTokenCookie, h.Environment); err != nil {
 		reqLogger.Error("Failed to set authentication cookies", slog.String("error", err.Error()))
-		h.RenderError(w, r, "An error occurred. Please try again.")
+
+		component := templates.ErrorAlert("An error occurred. Please try again.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
 		return
 	}
 
@@ -78,7 +88,7 @@ func (h *HandlerService) HandleLoginPost(w http.ResponseWriter, r *http.Request)
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *HandlerService) HandleRegister(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerService) RegisterLogin(w http.ResponseWriter, r *http.Request) {
 	// Render registration page
 	component := templates.RegisterPage()
 	if err := component.Render(r.Context(), w); err != nil {
@@ -87,20 +97,26 @@ func (h *HandlerService) HandleRegister(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-// HandleRegisterPost processes user registration
-func (h *HandlerService) HandleRegisterPost(w http.ResponseWriter, r *http.Request) {
+// RegisterPostHandler processes user registration
+func (h *HandlerService) RegisterPostHandler(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
 	password := r.FormValue("password")
 	confirmPassword := r.FormValue("confirm_password")
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	if email == "" || password == "" || confirmPassword == "" {
-		h.RenderError(w, r, "Please fill in all fields.")
+		component := templates.ErrorAlert("Please fill in all fields.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
 		return
 	}
 
 	if password != confirmPassword {
-		h.RenderError(w, r, "Passwords do not match.")
+		component := templates.ErrorAlert("Passwords do not match.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
 		return
 	}
 
@@ -109,10 +125,16 @@ func (h *HandlerService) HandleRegisterPost(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		reqLogger.Error("Registration failed", slog.String("error", err.Error()))
 
+		var msg string
 		if ce, ok := err.(*client.ClientError); ok {
-			h.RenderError(w, r, ce.UserError())
+			msg = ce.UserError()
 		} else {
-			h.RenderError(w, r, "An error occurred. Please try again.")
+			msg = "An error occurred. Please try again."
+		}
+
+		component := templates.ErrorAlert(msg)
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
 		}
 		return
 	}
@@ -125,7 +147,7 @@ func (h *HandlerService) HandleRegisterPost(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-func (h *HandlerService) HandleLogout(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerService) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	h.AuthService.ClearAuthCookies(w, h.Environment)
 
 	// Redirect to login page

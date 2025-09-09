@@ -308,14 +308,11 @@ func (s *Server) registerAdminRoutes() {
 				r.Use(s.authService.RequireValidAccessToken)
 				r.Use(s.authService.RequireRole("owner", "admin"))
 
-				// User management
-				r.Get("/users", admin.GetUsersHandler)
-
 				// Account management
 				r.Post("/accounts/{account_id}/disable", admin.DisableAccountHandler)
 				r.Post("/accounts/{account_id}/enable", admin.EnableAccountHandler)
+				r.Get("/users", admin.GetUsersHandler)
 				r.Get("/service-accounts", admin.GetServiceAccountsHandler)
-				r.Get("/service-accounts/{id}", admin.GetServiceAccountHandler)
 				r.Put("/users/{user_id}/reset-password", admin.ResetUserPasswordHandler)
 			})
 		})

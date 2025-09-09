@@ -286,11 +286,27 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Get a list of all service accounts in the system.\nOnly owners and admins can view service account lists.",
+                "description": "Only owners and admins can view service account lists.\n\n- No query parameters = return all service accounts\n- to return a specific service account supply one of the following query parameter: `?id=uuid` or `?client_id=id`\n",
                 "tags": [
                     "Site Admin"
                 ],
-                "summary": "Get all service accounts",
+                "summary": "Get service accounts",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
+                        "description": "Service Account ID",
+                        "name": "id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "sa_exampleorg_k7j2m9x1",
+                        "description": "Service Account Client ID",
+                        "name": "client_id",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -302,69 +318,13 @@
                         }
                     },
                     "401": {
-                        "description": "Authentication failed ",
+                        "description": "Authentication failed",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "Insufficient permissions ",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/admin/service-accounts/{id}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "Get a specific service account by account ID.\nOnly owners and admins can view service account details.",
-                "tags": [
-                    "Site Admin"
-                ],
-                "summary": "Get service account",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
-                        "description": "Service Account ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ServiceAccountDetails"
-                        }
-                    },
-                    "400": {
-                        "description": "Invalid service account ID format",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Authentication failed ",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Insufficient permissions ",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Service account not found",
+                        "description": "Insufficient permissions",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -379,7 +339,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "This api displays site users and their email addresses (can only be used by owner and admin accounts)\n\n- No query parameters = return all users\n- to return a specific user supply one of the following query parameters: ?id=uuid or ?email=address",
+                "description": "This api displays site users and their email addresses (can only be used by owner and admin accounts)\n\n- No query parameters = return all users\n- to return a specific user supply one of the following query parameters: `?id=uuid` or `?email=address`",
                 "tags": [
                     "Site Admin"
                 ],
@@ -414,13 +374,13 @@
                         }
                     },
                     "401": {
-                        "description": "Authentication failed ",
+                        "description": "Authentication failed",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "Insufficient permissions ",
+                        "description": "Insufficient permissions",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -2145,6 +2105,11 @@
         "auth.IsnPerms": {
             "type": "object",
             "properties": {
+                "isn_admin": {
+                    "description": "true if the account is the owner of the isn or the site owner",
+                    "type": "boolean",
+                    "example": false
+                },
                 "permission": {
                     "type": "string",
                     "enum": [
@@ -2593,7 +2558,7 @@
                 },
                 "client_id": {
                     "type": "string",
-                    "example": "client-123"
+                    "example": "sa_exampleorg_k7j2m9x1"
                 },
                 "client_organization": {
                     "type": "string",
@@ -2818,7 +2783,7 @@
                 },
                 "client_id": {
                     "type": "string",
-                    "example": "client-123"
+                    "example": "sa_exampleorg_k7j2m9x1"
                 },
                 "client_organization": {
                     "type": "string",

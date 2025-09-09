@@ -11,8 +11,8 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
-// HandleSignalTypeManagement renders the signal type management page
-func (h *HandlerService) HandleSignalTypeManagement(w http.ResponseWriter, r *http.Request) {
+// SignalTypeManagementHandler renders the signal type management page
+func (h *HandlerService) SignalTypeManagementHandler(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Get user permissions from cookie
@@ -42,8 +42,8 @@ func (h *HandlerService) HandleSignalTypeManagement(w http.ResponseWriter, r *ht
 	}
 }
 
-// HandleCreateSignalType handles the form submission to create a new signal type
-func (h *HandlerService) HandleCreateSignalType(w http.ResponseWriter, r *http.Request) {
+// CreateSignalTypeHandler handles the form submission to create a new signal type
+func (h *HandlerService) CreateSignalTypeHandler(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Parse form data
@@ -54,28 +54,41 @@ func (h *HandlerService) HandleCreateSignalType(w http.ResponseWriter, r *http.R
 	readmeURL := r.FormValue("readme_url")
 	detail := r.FormValue("detail")
 
+	// todo check this - should be done in the middleware
 	// Validate user has admin or owner permission
 	isnPerm, err := h.AuthService.CheckIsnPermission(r, isnSlug)
 	if err != nil {
-		h.RenderError(w, r, "You don't have permission to access this ISN.")
+		component := templates.ErrorAlert("You don't have permission to access this ISN.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
 		return
 	}
 
 	if isnPerm.Permission != "write" {
-		h.RenderError(w, r, "You don't have permission to create signal types in this ISN.")
+		component := templates.ErrorAlert("You don't have permission to create signal types in this ISN.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
 		return
 	}
 
 	// Validate required fields
 	if isnSlug == "" || title == "" || schemaURL == "" || bumpType == "" {
-		h.RenderError(w, r, "Please fill in all required fields.")
+		component := templates.ErrorAlert("Please fill in all required fields.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
 		return
 	}
 
 	// Get access token from cookie
 	accessTokenCookie, err := r.Cookie(config.AccessTokenCookieName)
 	if err != nil {
-		h.RenderError(w, r, "Authentication required. Please log in again.")
+		component := templates.ErrorAlert("Authentication required. Please log in again.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
 		return
 	}
 	accessToken := accessTokenCookie.Value
@@ -100,10 +113,16 @@ func (h *HandlerService) HandleCreateSignalType(w http.ResponseWriter, r *http.R
 	if err != nil {
 		reqLogger.Error("Failed to create signal type", slog.String("error", err.Error()))
 
+		var msg string
 		if ce, ok := err.(*client.ClientError); ok {
-			h.RenderError(w, r, ce.UserError())
+			msg = ce.UserError()
 		} else {
-			h.RenderError(w, r, "An error occurred. Please try again.")
+			msg = "An error occurred. Please try again."
+		}
+
+		component := templates.ErrorAlert(msg)
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
 		}
 		return
 	}

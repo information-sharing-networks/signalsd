@@ -83,6 +83,10 @@ definitions:
     type: object
   auth.IsnPerms:
     properties:
+      isn_admin:
+        description: true if the account is the owner of the isn or the site owner
+        example: false
+        type: boolean
       permission:
         enum:
         - read
@@ -401,7 +405,7 @@ definitions:
         example: user
         type: string
       client_id:
-        example: client-123
+        example: sa_exampleorg_k7j2m9x1
         type: string
       client_organization:
         example: Example Organization
@@ -554,7 +558,7 @@ definitions:
         example: contact@example.com
         type: string
       client_id:
-        example: client-123
+        example: sa_exampleorg_k7j2m9x1
         type: string
       client_organization:
         example: Example Organization
@@ -1076,9 +1080,22 @@ paths:
       - Site Admin
   /api/admin/service-accounts:
     get:
-      description: |-
-        Get a list of all service accounts in the system.
+      description: |
         Only owners and admins can view service account lists.
+
+        - No query parameters = return all service accounts
+        - to return a specific service account supply one of the following query parameter: `?id=uuid` or `?client_id=id`
+      parameters:
+      - description: Service Account ID
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+        in: query
+        name: id
+        type: string
+      - description: Service Account Client ID
+        example: sa_exampleorg_k7j2m9x1
+        in: query
+        name: client_id
+        type: string
       responses:
         "200":
           description: OK
@@ -1087,54 +1104,16 @@ paths:
               $ref: '#/definitions/handlers.ServiceAccountDetails'
             type: array
         "401":
-          description: 'Authentication failed '
+          description: Authentication failed
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
-          description: 'Insufficient permissions '
+          description: Insufficient permissions
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Get all service accounts
-      tags:
-      - Site Admin
-  /api/admin/service-accounts/{id}:
-    get:
-      description: |-
-        Get a specific service account by account ID.
-        Only owners and admins can view service account details.
-      parameters:
-      - description: Service Account ID
-        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
-        in: path
-        name: id
-        required: true
-        type: string
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.ServiceAccountDetails'
-        "400":
-          description: Invalid service account ID format
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "401":
-          description: 'Authentication failed '
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "403":
-          description: 'Insufficient permissions '
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "404":
-          description: Service account not found
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Get service account
+      summary: Get service accounts
       tags:
       - Site Admin
   /api/admin/users:
@@ -1143,7 +1122,7 @@ paths:
         This api displays site users and their email addresses (can only be used by owner and admin accounts)
 
         - No query parameters = return all users
-        - to return a specific user supply one of the following query parameters: ?id=uuid or ?email=address
+        - to return a specific user supply one of the following query parameters: `?id=uuid` or `?email=address`
       parameters:
       - description: user account ID
         example: 68fb5f5b-e3f5-4a96-8d35-cd2203a06f73
@@ -1165,11 +1144,11 @@ paths:
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: 'Authentication failed '
+          description: Authentication failed
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
-          description: 'Insufficient permissions '
+          description: Insufficient permissions
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":

@@ -22,7 +22,7 @@ templ SignalSearchPage(isns []types.IsnDropdown, perms map[string]types.IsnPerm,
 										id="isn_slug"
 										name="isn_slug"
 										required
-										hx-post="/ui-api/signal-types"
+										hx-post="/ui-api/signal-type-options"
 										hx-target="#signal_type_slug"
 										hx-swap="outerHTML"
 										hx-trigger="change"
@@ -45,7 +45,7 @@ templ SignalSearchPage(isns []types.IsnDropdown, perms map[string]types.IsnPerm,
 									id="signal_type_slug"
 									name="signal_type_slug"
 									required
-									hx-post="/ui-api/signal-versions"
+									hx-post="/ui-api/signal-type-version-options"
 									hx-target="#sem_ver"
 									hx-swap="outerHTML"
 									hx-trigger="change"

@@ -7,16 +7,53 @@ import (
 	"net/http"
 )
 
-// AddAccountToIsn adds an account to an ISN with the specified permission
-func (c *Client) AddAccountToIsn(accessToken, isnSlug, accountEmail, permission string) error {
+// UpdateIsnAccountAccess grants or revokes an permissions to access an ISN
+// accountType should be "user" or "service_account"
+func (c *Client) UpdateIsnAccountAccess(accessToken, isnSlug, accountType, accountIdentifier, permission string) error {
+	var accountID string
 
-	user, err := c.LookupUserByEmail(accessToken, accountEmail)
-	if err != nil {
-		return err
+	// Lookup account based on type
+	switch accountType {
+	case "user":
+		user, err := c.LookupUserByEmail(accessToken, accountIdentifier)
+		if err != nil {
+			return err
+		}
+		accountID = user.AccountID
+	case "service_account":
+		serviceAccount, err := c.LookupServiceAccountByClientID(accessToken, accountIdentifier)
+		if err != nil {
+			return err
+		}
+		accountID = serviceAccount.AccountID
+	default:
+		return NewClientInternalError(fmt.Errorf("invalid account type: %s", accountType), "validating account type")
 	}
 
-	url := fmt.Sprintf("%s/api/isn/%s/accounts/%s", c.baseURL, isnSlug, user.AccountID)
+	url := fmt.Sprintf("%s/api/isn/%s/accounts/%s", c.baseURL, isnSlug, accountID)
 
+	// Revoke access
+	if permission == "none" {
+		req, err := http.NewRequest("DELETE", url, nil)
+		if err != nil {
+			return NewClientInternalError(err, "revoke isn account access")
+		}
+
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+
+		res, err := c.httpClient.Do(req)
+		if err != nil {
+			return NewClientConnectionError(err)
+		}
+		defer res.Body.Close()
+		if res.StatusCode != http.StatusNoContent {
+			return NewClientApiError(res)
+		}
+
+		return nil
+	}
+
+	// Grant Access
 	requestBody := map[string]string{
 		"permission": permission,
 	}

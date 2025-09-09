@@ -170,7 +170,7 @@ func SignalTypeCreationSuccess(response client.CreateSignalTypeResponse) templ.C
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</code></div><div class=\"mt-4\"><button hx-get=\"/signal-types\" hx-target=\"body\" hx-swap=\"outerHTML\" class=\"btn btn-primary\">Create Another Signal Type</button></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</code></div><div class=\"mt-4\"><button hx-get=\"/admin/signal-types\" hx-target=\"body\" hx-swap=\"outerHTML\" class=\"btn btn-primary\">Create Another Signal Type</button></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

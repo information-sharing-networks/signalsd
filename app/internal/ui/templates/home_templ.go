@@ -141,9 +141,7 @@ func RegistrationSuccess() templ.Component {
 	})
 }
 
-// =============================================================================
-// SEARCH RESULTS
-// =============================================================================
+// Search Results renders the search results
 func SearchResults(signals []types.SearchSignalWithCorrelationsAndVersions) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -172,7 +170,7 @@ func SearchResults(signals []types.SearchSignalWithCorrelationsAndVersions) temp
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", len(signals)))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 169, Col: 75}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 167, Col: 75}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
@@ -205,7 +203,7 @@ func SearchResults(signals []types.SearchSignalWithCorrelationsAndVersions) temp
 					var templ_7745c5c3_Var8 string
 					templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(signal.LocalRef)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 184, Col: 52}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 182, Col: 52}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 					if templ_7745c5c3_Err != nil {
@@ -223,7 +221,7 @@ func SearchResults(signals []types.SearchSignalWithCorrelationsAndVersions) temp
 					var templ_7745c5c3_Var9 string
 					templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(signal.SignalID[:8])
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 186, Col: 63}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 184, Col: 63}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 					if templ_7745c5c3_Err != nil {
@@ -282,7 +280,7 @@ func SearchResults(signals []types.SearchSignalWithCorrelationsAndVersions) temp
 					var templ_7745c5c3_Var10 string
 					templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(signal.CorrelatedToSignalID)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 207, Col: 94}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 205, Col: 94}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 					if templ_7745c5c3_Err != nil {
@@ -300,7 +298,7 @@ func SearchResults(signals []types.SearchSignalWithCorrelationsAndVersions) temp
 				var templ_7745c5c3_Var11 string
 				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(signal.SignalID)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 219, Col: 41}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 217, Col: 41}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 				if templ_7745c5c3_Err != nil {
@@ -313,7 +311,7 @@ func SearchResults(signals []types.SearchSignalWithCorrelationsAndVersions) temp
 				var templ_7745c5c3_Var12 string
 				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("json-%s", signal.SignalID))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 226, Col: 57}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 224, Col: 57}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 				if templ_7745c5c3_Err != nil {
@@ -326,7 +324,7 @@ func SearchResults(signals []types.SearchSignalWithCorrelationsAndVersions) temp
 				var templ_7745c5c3_Var13 string
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(string(signal.Content))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 226, Col: 105}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 224, Col: 105}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 				if templ_7745c5c3_Err != nil {
@@ -344,7 +342,7 @@ func SearchResults(signals []types.SearchSignalWithCorrelationsAndVersions) temp
 					var templ_7745c5c3_Var14 string
 					templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", len(signal.CorrelatedSignals)))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 232, Col: 163}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 230, Col: 163}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 					if templ_7745c5c3_Err != nil {
@@ -362,7 +360,7 @@ func SearchResults(signals []types.SearchSignalWithCorrelationsAndVersions) temp
 						var templ_7745c5c3_Var15 string
 						templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(correlated.SignalID[:8])
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 236, Col: 60}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 234, Col: 60}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 						if templ_7745c5c3_Err != nil {
@@ -380,7 +378,7 @@ func SearchResults(signals []types.SearchSignalWithCorrelationsAndVersions) temp
 							var templ_7745c5c3_Var16 string
 							templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(correlated.LocalRef)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 238, Col: 69}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 236, Col: 69}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 							if templ_7745c5c3_Err != nil {
@@ -398,7 +396,7 @@ func SearchResults(signals []types.SearchSignalWithCorrelationsAndVersions) temp
 						var templ_7745c5c3_Var17 string
 						templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", correlated.VersionNumber))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 240, Col: 108}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 238, Col: 108}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 						if templ_7745c5c3_Err != nil {
@@ -422,7 +420,7 @@ func SearchResults(signals []types.SearchSignalWithCorrelationsAndVersions) temp
 					var templ_7745c5c3_Var18 string
 					templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", len(signal.PreviousSignalVersions)))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 248, Col: 167}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 246, Col: 167}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 					if templ_7745c5c3_Err != nil {
@@ -440,7 +438,7 @@ func SearchResults(signals []types.SearchSignalWithCorrelationsAndVersions) temp
 						var templ_7745c5c3_Var19 string
 						templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(fmt.Sprintf("%d", version.VersionNumber))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 252, Col: 93}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 250, Col: 93}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 						if templ_7745c5c3_Err != nil {
@@ -453,7 +451,7 @@ func SearchResults(signals []types.SearchSignalWithCorrelationsAndVersions) temp
 						var templ_7745c5c3_Var20 string
 						templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(version.CreatedAt)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 253, Col: 81}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 251, Col: 81}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 						if templ_7745c5c3_Err != nil {
@@ -486,7 +484,7 @@ func SearchResults(signals []types.SearchSignalWithCorrelationsAndVersions) temp
 						var templ_7745c5c3_Var21 string
 						templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(signal.AccountID)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 265, Col: 108}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 263, Col: 108}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 						if templ_7745c5c3_Err != nil {
@@ -505,7 +503,7 @@ func SearchResults(signals []types.SearchSignalWithCorrelationsAndVersions) temp
 						var templ_7745c5c3_Var22 string
 						templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(signal.AccountType)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 268, Col: 88}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 266, Col: 88}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 						if templ_7745c5c3_Err != nil {
