@@ -69,7 +69,7 @@ func NewClientApiError(res *http.Response) *ClientError {
 		userMsg = "Login failed. Please check your email and password and try again."
 	case http.StatusForbidden:
 		userMsg = "You don't have permission to access this resource."
-	case http.StatusBadRequest:
+	case http.StatusBadRequest, http.StatusConflict:
 		// Use server message for validation errors if available
 		if serverErr.Message != "" {
 			userMsg = serverErr.Message

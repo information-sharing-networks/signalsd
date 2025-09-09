@@ -11,9 +11,9 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
-// HandleSignalSearch renders the signal search page
+// SignalSearchHandler renders the signal search page
 // ISN access is validated by RequireIsnAccess middleware
-func (h *HandlerService) HandleSignalSearch(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerService) SignalSearchHandler(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Get ISN permissions from cookie - middleware ensures this exists
@@ -39,7 +39,7 @@ func (h *HandlerService) HandleSignalSearch(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-func (h *HandlerService) HandleSearchSignals(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerService) SearchSignalsHandler(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Parse search parameters
@@ -59,7 +59,10 @@ func (h *HandlerService) HandleSearchSignals(w http.ResponseWriter, r *http.Requ
 
 	// Validate required parameters
 	if params.IsnSlug == "" || params.SignalTypeSlug == "" || params.SemVer == "" {
-		h.RenderError(w, r, "Please select ISN, signal type, and version.")
+		component := templates.ErrorAlert("Please select ISN, signal type, and version.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
 		return
 	}
 
@@ -67,7 +70,10 @@ func (h *HandlerService) HandleSearchSignals(w http.ResponseWriter, r *http.Requ
 	// Get user permissions to validate ISN access and determine visibility
 	isnPerm, err := h.AuthService.CheckIsnPermission(r, params.IsnSlug)
 	if err != nil {
-		h.RenderError(w, r, "You don't have permission to access this ISN.")
+		component := templates.ErrorAlert("You don't have permission to access this ISN.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
 		return
 	}
 
@@ -75,7 +81,11 @@ func (h *HandlerService) HandleSearchSignals(w http.ResponseWriter, r *http.Requ
 	accessTokenCookie, err := r.Cookie(config.AccessTokenCookieName)
 	if err != nil {
 		reqLogger.Error("Access token not found", slog.String("error", err.Error()))
-		h.RenderError(w, r, "Authentication required. Please log in again.")
+
+		component := templates.ErrorAlert("Authentication required. Please log in again.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
 		return
 	}
 	accessToken := accessTokenCookie.Value
@@ -85,10 +95,16 @@ func (h *HandlerService) HandleSearchSignals(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		reqLogger.Error("Signal search failed", slog.String("error", err.Error()))
 
+		var msg string
 		if ce, ok := err.(*client.ClientError); ok {
-			h.RenderError(w, r, ce.UserError())
+			msg = ce.UserError()
 		} else {
-			h.RenderError(w, r, "An error occurred. Please try again.")
+			msg = "An error occurred. Please try again."
+		}
+
+		component := templates.ErrorAlert(msg)
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
 		}
 		return
 	}

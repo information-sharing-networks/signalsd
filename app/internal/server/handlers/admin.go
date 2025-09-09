@@ -48,7 +48,7 @@ type ServiceAccountDetails struct {
 	AccountID          uuid.UUID `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
 	CreatedAt          time.Time `json:"created_at" example:"2025-06-03T13:47:47.331787+01:00"`
 	UpdatedAt          time.Time `json:"updated_at" example:"2025-06-03T13:47:47.331787+01:00"`
-	ClientID           string    `json:"client_id" example:"client-123"`
+	ClientID           string    `json:"client_id" example:"sa_exampleorg_k7j2m9x1"`
 	ClientContactEmail string    `json:"client_contact_email" example:"contact@example.com"`
 	ClientOrganization string    `json:"client_organization" example:"Example Organization"`
 }
@@ -397,7 +397,7 @@ func (a *AdminHandler) EnableAccountHandler(w http.ResponseWriter, r *http.Reque
 //	@Description	This api displays site users and their email addresses (can only be used by owner and admin accounts)
 //	@Description
 //	@Description	- No query parameters = return all users
-//	@Description	- to return a specific user supply one of the following query parameters: ?id=uuid or ?email=address
+//	@Description	- to return a specific user supply one of the following query parameters: `?id=uuid` or `?email=address`
 //	@Tags			Site Admin
 //
 //	@Param			id		query		string					false	"user account ID"		example(68fb5f5b-e3f5-4a96-8d35-cd2203a06f73)
@@ -405,8 +405,8 @@ func (a *AdminHandler) EnableAccountHandler(w http.ResponseWriter, r *http.Reque
 //	@Success		200		{array}		handlers.UserDetails	"All users (when no query params)"
 //	@Success		200		{object}	handlers.UserDetails	"Specific user (when query params provided)"
 //	@Failure		400		{object}	responses.ErrorResponse	"Invalid request - cannot provide both id and email parameters"
-//	@Failure		401		{object}	responses.ErrorResponse	"Authentication failed "
-//	@Failure		403		{object}	responses.ErrorResponse	"Insufficient permissions "
+//	@Failure		401		{object}	responses.ErrorResponse	"Authentication failed"
+//	@Failure		403		{object}	responses.ErrorResponse	"Insufficient permissions"
 //	@Failure		404		{object}	responses.ErrorResponse	"User not found"
 //
 //	@Security		BearerAccessToken
@@ -444,7 +444,7 @@ func (a *AdminHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If query parameters provided, return specific user
+	// If query parameters provided
 	if accountIdParam != "" && emailParam != "" {
 		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "Cannot provide both 'id' and 'email' query parameters")
 		return
@@ -482,126 +482,128 @@ func (a *AdminHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 			CreatedAt: dbUser.CreatedAt,
 			UpdatedAt: dbUser.UpdatedAt,
 		}
-	} else {
-		// Lookup by email
-		dbUser, err := a.queries.GetUserByEmail(r.Context(), emailParam)
+
+		responses.RespondWithJSON(w, http.StatusOK, user)
+		return
+	}
+
+	// Lookup by email
+	dbUser, err := a.queries.GetUserByEmail(r.Context(), emailParam)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No user found for email %v", emailParam))
+			return
+		}
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("email", emailParam),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+		return
+	}
+
+	// Convert User to UserDetails
+	user = UserDetails{
+		AccountID: dbUser.AccountID,
+		Email:     dbUser.Email,
+		UserRole:  dbUser.UserRole,
+		CreatedAt: dbUser.CreatedAt,
+		UpdatedAt: dbUser.UpdatedAt,
+	}
+
+	responses.RespondWithJSON(w, http.StatusOK, user)
+}
+
+// GetServiceAccountsHandler godoc
+//
+//	@Summary		Get service accounts
+//	@Description	Only owners and admins can view service account lists.
+//	@Description
+//	@Description	- No query parameters = return all service accounts
+//	@Description	- to return a specific service account supply one of the following query parameter: `?id=uuid` or `?client_id=id`
+//	@Description
+//	@Tags		Site Admin
+//
+//	@Param		id			query		string	false	"Service Account ID"		example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
+//	@Param		client_id	query		string	false	"Service Account Client ID"	example(sa_exampleorg_k7j2m9x1)
+//
+//	@Success	200			{array}		handlers.ServiceAccountDetails
+//	@Failure	401			{object}	responses.ErrorResponse	"Authentication failed"
+//	@Failure	403			{object}	responses.ErrorResponse	"Insufficient permissions"
+//
+//	@Security	BearerAccessToken
+//
+//	@Router		/api/admin/service-accounts [get]
+func (a *AdminHandler) GetServiceAccountsHandler(w http.ResponseWriter, r *http.Request) {
+
+	accountIDString := r.URL.Query().Get("id")
+
+	clientID := r.URL.Query().Get("client_id")
+
+	// if no query parameters provided, return all service accounts
+	if accountIDString == "" && clientID == "" {
+		// Get all service accounts
+		dbServiceAccounts, err := a.queries.GetServiceAccounts(r.Context())
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No user found for email %v", emailParam))
-				return
-			}
 			logger.ContextWithLogAttrs(r.Context(),
 				slog.String("error", err.Error()),
-				slog.String("email", emailParam),
 			)
 
 			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 			return
 		}
 
-		// Convert User to UserDetails
-		user = UserDetails{
-			AccountID: dbUser.AccountID,
-			Email:     dbUser.Email,
-			UserRole:  dbUser.UserRole,
-			CreatedAt: dbUser.CreatedAt,
-			UpdatedAt: dbUser.UpdatedAt,
+		// Convert database structs to our response structs
+		serviceAccounts := make([]ServiceAccountDetails, len(dbServiceAccounts))
+		for i, dbServiceAccount := range dbServiceAccounts {
+			serviceAccounts[i] = ServiceAccountDetails{
+				AccountID:          dbServiceAccount.AccountID,
+				CreatedAt:          dbServiceAccount.CreatedAt,
+				UpdatedAt:          dbServiceAccount.UpdatedAt,
+				ClientID:           dbServiceAccount.ClientID,
+				ClientContactEmail: dbServiceAccount.ClientContactEmail,
+				ClientOrganization: dbServiceAccount.ClientOrganization,
+			}
 		}
-	}
 
-	responses.RespondWithJSON(w, http.StatusOK, user)
-}
-
-// GetServiceAccountHandler godoc
-//
-//	@Summary		Get service account
-//	@Description	Get a specific service account by account ID.
-//	@Description	Only owners and admins can view service account details.
-//	@Tags			Site Admin
-//
-//	@Param			id	path		string	true	"Service Account ID"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
-//
-//	@Success		200	{object}	handlers.ServiceAccountDetails
-//	@Failure		400	{object}	responses.ErrorResponse	"Invalid service account ID format"
-//	@Failure		401	{object}	responses.ErrorResponse	"Authentication failed "
-//	@Failure		403	{object}	responses.ErrorResponse	"Insufficient permissions "
-//	@Failure		404	{object}	responses.ErrorResponse	"Service account not found"
-//
-//	@Security		BearerAccessToken
-//
-//	@Router			/api/admin/service-accounts/{id} [get]
-func (a *AdminHandler) GetServiceAccountHandler(w http.ResponseWriter, r *http.Request) {
-	serviceAccountIDString := r.PathValue("id")
-
-	serviceAccountID, err := uuid.Parse(serviceAccountIDString)
-	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("service_account_id_string", serviceAccountIDString),
+			slog.Int("count", len(serviceAccounts)),
 		)
 
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "invalid service account ID format")
+		responses.RespondWithJSON(w, http.StatusOK, serviceAccounts)
 		return
 	}
 
-	// Get service account by account ID
-	dbServiceAccount, err := a.queries.GetServiceAccountByAccountID(r.Context(), serviceAccountID)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "service account not found")
+	if accountIDString != "" && clientID != "" {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "Cannot provide both 'id' and 'client_id' query parameters")
+		return
+	}
+
+	// query by account id
+	if accountIDString != "" {
+
+		accountID, err := uuid.Parse(accountIDString)
+		if err != nil {
+			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "Invalid account ID format")
 			return
 		}
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
-	}
+		dbServiceAccount, err := a.queries.GetServiceAccountByAccountID(r.Context(), accountID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "service account not found")
+				return
+			}
 
-	// Convert database struct to our response struct
-	serviceAccount := ServiceAccountDetails{
-		AccountID:          dbServiceAccount.AccountID,
-		CreatedAt:          dbServiceAccount.CreatedAt,
-		UpdatedAt:          dbServiceAccount.UpdatedAt,
-		ClientID:           dbServiceAccount.ClientID,
-		ClientContactEmail: dbServiceAccount.ClientContactEmail,
-		ClientOrganization: dbServiceAccount.ClientOrganization,
-	}
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("error", err.Error()),
+			)
 
-	responses.RespondWithJSON(w, http.StatusOK, serviceAccount)
-}
-
-// GetServiceAccountsHandler godoc
-//
-//	@Summary		Get all service accounts
-//	@Description	Get a list of all service accounts in the system.
-//	@Description	Only owners and admins can view service account lists.
-//	@Tags			Site Admin
-//
-//	@Success		200	{array}		handlers.ServiceAccountDetails
-//	@Failure		401	{object}	responses.ErrorResponse	"Authentication failed "
-//	@Failure		403	{object}	responses.ErrorResponse	"Insufficient permissions "
-//
-//	@Security		BearerAccessToken
-//
-//	@Router			/api/admin/service-accounts [get]
-func (a *AdminHandler) GetServiceAccountsHandler(w http.ResponseWriter, r *http.Request) {
-
-	// Get all service accounts
-	dbServiceAccounts, err := a.queries.GetServiceAccounts(r.Context())
-	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
-	}
-
-	// Convert database structs to our response structs
-	serviceAccounts := make([]ServiceAccountDetails, len(dbServiceAccounts))
-	for i, dbServiceAccount := range dbServiceAccounts {
-		serviceAccounts[i] = ServiceAccountDetails{
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+			return
+		}
+		serviceAccountDetails := ServiceAccountDetails{
 			AccountID:          dbServiceAccount.AccountID,
 			CreatedAt:          dbServiceAccount.CreatedAt,
 			UpdatedAt:          dbServiceAccount.UpdatedAt,
@@ -609,13 +611,33 @@ func (a *AdminHandler) GetServiceAccountsHandler(w http.ResponseWriter, r *http.
 			ClientContactEmail: dbServiceAccount.ClientContactEmail,
 			ClientOrganization: dbServiceAccount.ClientOrganization,
 		}
+		responses.RespondWithJSON(w, http.StatusOK, serviceAccountDetails)
+		return
 	}
+	// query by clientId
+	dbServiceAccount, err := a.queries.GetServiceAccountByClientID(r.Context(), clientID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "service account not found")
+			return
+		}
 
-	logger.ContextWithLogAttrs(r.Context(),
-		slog.Int("count", len(serviceAccounts)),
-	)
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
 
-	responses.RespondWithJSON(w, http.StatusOK, serviceAccounts)
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+		return
+	}
+	serviceAccountDetails := ServiceAccountDetails{
+		AccountID:          dbServiceAccount.AccountID,
+		CreatedAt:          dbServiceAccount.CreatedAt,
+		UpdatedAt:          dbServiceAccount.UpdatedAt,
+		ClientID:           dbServiceAccount.ClientID,
+		ClientContactEmail: dbServiceAccount.ClientContactEmail,
+		ClientOrganization: dbServiceAccount.ClientOrganization,
+	}
+	responses.RespondWithJSON(w, http.StatusOK, serviceAccountDetails)
 }
 
 // Simple password reset types

@@ -42,7 +42,7 @@ type IsnAccount struct {
 	IsActive           bool      `json:"is_active" example:"true"`
 	Email              string    `json:"email" example:"user@example.com"`
 	AccountRole        string    `json:"account_role" example:"admin" enums:"owner,admin,member"`
-	ClientID           *string   `json:"client_id,omitempty" example:"client-123"`
+	ClientID           *string   `json:"client_id,omitempty" example:"sa_exampleorg_k7j2m9x1"`
 	ClientOrganization *string   `json:"client_organization,omitempty" example:"Example Organization"`
 }
 

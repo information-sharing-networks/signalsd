@@ -7,15 +7,30 @@ import (
 	"net/http"
 )
 
-// IsnAccountAccess adds an account to an ISN with the specified permission
-func (c *Client) IsnAccountAccess(accessToken, isnSlug, accountEmail, permission string) error {
+// UpdateIsnAccountAccess grants or revokes an permissions to access an ISN
+// accountType should be "user" or "service_account"
+func (c *Client) UpdateIsnAccountAccess(accessToken, isnSlug, accountType, accountIdentifier, permission string) error {
+	var accountID string
 
-	user, err := c.LookupUserByEmail(accessToken, accountEmail)
-	if err != nil {
-		return err
+	// Lookup account based on type
+	switch accountType {
+	case "user":
+		user, err := c.LookupUserByEmail(accessToken, accountIdentifier)
+		if err != nil {
+			return err
+		}
+		accountID = user.AccountID
+	case "service_account":
+		serviceAccount, err := c.LookupServiceAccountByClientID(accessToken, accountIdentifier)
+		if err != nil {
+			return err
+		}
+		accountID = serviceAccount.AccountID
+	default:
+		return NewClientInternalError(fmt.Errorf("invalid account type: %s", accountType), "validating account type")
 	}
 
-	url := fmt.Sprintf("%s/api/isn/%s/accounts/%s", c.baseURL, isnSlug, user.AccountID)
+	url := fmt.Sprintf("%s/api/isn/%s/accounts/%s", c.baseURL, isnSlug, accountID)
 
 	// Revoke access
 	if permission == "none" {
@@ -31,7 +46,6 @@ func (c *Client) IsnAccountAccess(accessToken, isnSlug, accountEmail, permission
 			return NewClientConnectionError(err)
 		}
 		defer res.Body.Close()
-		fmt.Printf("debug!!!!!!!! res.StatusCode: %d\n", res.StatusCode)
 		if res.StatusCode != http.StatusNoContent {
 			return NewClientApiError(res)
 		}

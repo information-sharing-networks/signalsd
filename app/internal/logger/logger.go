@@ -64,7 +64,9 @@ func ContextLogAttrs(ctx context.Context) []slog.Attr {
 
 // ContextRequestLogger retrieves the request-scoped logger from context.
 //
-// the logger is can be used to create intermediary log messages before the request finsihes.
+// the logger can be used to create intermediary log messages before the request finsihes.
+//
+// To add attributes to the final request log, use ContextWithLogAttrs instead.
 func ContextRequestLogger(ctx context.Context) *slog.Logger {
 	if logger, ok := ctx.Value(RequestLoggerKey).(*slog.Logger); ok {
 		return logger

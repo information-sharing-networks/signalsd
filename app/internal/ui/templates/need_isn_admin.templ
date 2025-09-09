@@ -1,0 +1,25 @@
+package templates
+
+// =============================================================================
+// ACCESS DENIED PAGE 
+// =============================================================================
+templ NeedIsnAdminPage(title, message string) {
+	@BaseLayout(title) {
+		@Navigation()
+		<div class="page-container">
+			<div class="text-center">
+				<h1 class="page-title">Access Denied</h1>
+				<div class="card max-w-md mx-auto">
+					<div class="card-body">
+						@ErrorAlert(message)
+						<div class="mt-4">
+							<a href="/dashboard" class="btn btn-primary">
+								← Back to Dashboard
+							</a>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	}
+}

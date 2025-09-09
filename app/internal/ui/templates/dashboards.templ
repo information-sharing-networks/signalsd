@@ -55,6 +55,16 @@ templ AdminDashboardPage() {
 			<p class="text-muted mb-6">Manage Information Sharing Networks and user access.</p>
 
 			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+				<!-- ISN Configuration -->
+				<div class="card">
+					<div class="card-body">
+						<h3 class="card-title">ISN Configuration</h3>
+						<p class="text-muted mb-4">Create new Information Sharing Networks.</p>
+						<a href="/admin/isns" class="btn btn-primary">Manage ISNs</a>
+					</div>
+				</div>
+
 				<!-- Account Management -->
 				<div class="card">
 					<div class="card-body">
@@ -64,24 +74,12 @@ templ AdminDashboardPage() {
 					</div>
 				</div>
 
-				<!-- ISN Configuration -->
-				<div class="card">
-					<div class="card-body">
-						<h3 class="card-title">ISN Configuration</h3>
-						<p class="text-muted mb-4">Create and configure Information Sharing Networks.</p>
-						<button class="btn btn-secondary" disabled>Create ISN</button>
-						<p class="text-xs text-muted mt-2">Coming soon</p>
-					</div>
-				</div>
-
 				<!-- Signal Types -->
 				<div class="card">
 					<div class="card-body">
 						<h3 class="card-title">Signal Types</h3>
-
 						<p class="text-muted mb-4">Configure the signal types used in an ISN.</p>
-						<a href="/signal-types" class="btn btn-primary">Manage Signal Types</a>
-
+						<a href="/admin/signal-types" class="btn btn-primary">Manage Signal Types</a>
 					</div>
 				</div>
 

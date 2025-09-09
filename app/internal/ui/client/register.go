@@ -86,3 +86,50 @@ func (c *Client) LookupUserByEmail(accessToken, email string) (*UserLookupRespon
 
 	return &user, nil
 }
+
+type ServiceAccountLookupResponse struct {
+	AccountID string `json:"account_id"`
+	ClientID  string `json:"client_id"`
+}
+
+// LookupServiceAccountByClientID looks up a service account by client ID using the admin endpoint
+// Note: This requires admin/owner permissions
+func (c *Client) LookupServiceAccountByClientID(accessToken, clientID string) (*ServiceAccountLookupResponse, error) {
+	// Use the admin service accounts endpoint to get all service accounts, then filter by client_id
+	// This is similar to how the user lookup works but for service accounts
+	url := fmt.Sprintf("%s/api/admin/service-accounts?client_id=%s", c.baseURL, clientID)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, NewClientInternalError(err, "creating service account lookup request")
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+
+	res, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, NewClientConnectionError(err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		if res.StatusCode == http.StatusNotFound {
+			return nil, &ClientError{
+				StatusCode:  http.StatusNotFound,
+				UserMessage: "Client ID not found.",
+				LogMessage:  fmt.Sprintf("service account lookup failed: client_id %s not found", clientID),
+			}
+		}
+		return nil, NewClientApiError(res)
+	}
+
+	// Parse the service accounts list response
+	var serviceAccount ServiceAccountLookupResponse
+
+	if err := json.NewDecoder(res.Body).Decode(&serviceAccount); err != nil {
+		return nil, NewClientInternalError(err, "decoding service accounts response")
+	}
+
+	return &serviceAccount, nil
+
+}

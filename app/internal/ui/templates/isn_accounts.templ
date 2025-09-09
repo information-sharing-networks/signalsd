@@ -5,86 +5,129 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
-// =============================================================================
-// ISN ACCOUNTS ADMIN PAGE
-// =============================================================================
-templ IsnAccountsAdminPage(isns []types.IsnDropdown) {
+templ IsnAccountManagementPage(isns []types.IsnDropdown) {
 	@BaseLayout("ISN Account Management") {
 		@Navigation()
 		<div class="page-container">
 			<h1 class="page-title">ISN Account Management</h1>
-			<p class="text-muted mb-6">Grant or remove access to Information Sharing Networks.</p>
+			<p class="text-muted mb-6">Grant or revoke access to Information Sharing Networks.</p>
 
-			if len(isns) == 0 {
-				<div class="card">
-					<div class="card-body text-center">
-						<div class="alert alert-info">
-							<strong>No ISNs Available</strong>
-							<p class="mt-2 mb-0">You need admin access to at least one ISN to manage accounts.</p>
-						</div>
-					</div>
+			<div class="card mb-6">
+				<div class="card-header">
+					<h3 class="card-title">Change ISN permissions for an account</h3>
 				</div>
-			} else {
-				<div class="card mb-6">
-					<div class="card-header">
-						<h3 class="card-title">Change ISN permissions for a web user</h3>
-					</div>
-					<div class="card-body">
-						<form hx-post="/ui-api/isn-account-access" hx-target="#admin-result" class="space-y-4">
-							<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-								<div class="form-group">
-									<label for="isn_slug" class="form-label">ISN</label>
-									<select
-										id="isn_slug"
-										name="isn_slug"
-										required
-										class="form-select"
-									>
-										<option value="">Select ISN...</option>
-										for _, isn := range isns {
-											<option value={ isn.Slug }>{ strings.ReplaceAll(isn.Slug, "-", " ") }</option>
-										}
-									</select>
-								</div>
-								<div class="form-group">
-									<label for="account_email" class="form-label">Account Email</label>
-									<input
-										type="email"
-										id="account_email"
-										name="account_email"
-										required
-										placeholder="user@example.com"
-										class="form-input"
-									/>
-								</div>
-							</div>
+				<div class="card-body">
+					<form hx-post="/ui-api/update-isn-account-access" hx-target="#update-access-result" class="space-y-4">
+						<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 							<div class="form-group">
-								<label for="permission" class="form-label">Permission Level</label>
+								<label for="isn_slug" class="form-label">ISN</label>
 								<select
-									id="permission"
-									name="permission"
+									id="isn_slug"
+									name="isn_slug"
 									required
 									class="form-select"
 								>
-									<option value="">Select Permission...</option>
-									<option value="none">None - No access to the ISN</option>
-									<option value="read">Read - Can view signals</option>
-									<option value="write">Write - Can create and view signals</option>
+									<option value="">Select ISN...</option>
+									for _, isn := range isns {
+										<option value={ isn.Slug }>{ strings.ReplaceAll(isn.Slug, "-", " ") }</option>
+									}
 								</select>
 							</div>
 							<div class="form-group">
-								<button type="submit" class="btn btn-primary">
-									Update Account
-								</button>
+								<label for="account_type" class="form-label">Account Type</label>
+								<select
+									id="account_type"
+									name="account_type"
+									required
+									class="form-select"
+									hx-trigger="change"
+									hx-target="#account-identifier-field"
+									hx-swap="outerHTML"
+									hx-post="/ui-api/account-identifier-field"
+								>
+									<option value="">Select Type...</option>
+									<option value="user">Web User</option>
+									<option value="service_account">Service Account</option>
+								</select>
 							</div>
-						</form>
-					</div>
+							<div class="form-group" id="account-identifier-field">
+								<label for="account_identifier" class="form-label">Account Identifier</label>
+								<input
+									type="text"
+									id="account_identifier"
+									name="account_identifier"
+									required
+									placeholder="Select account type first"
+									class="form-input"
+									disabled
+								/>
+							</div>
+						</div>
+						<div class="form-group">
+							<label for="permission" class="form-label">Permission Level</label>
+							<select
+								id="permission"
+								name="permission"
+								required
+								class="form-select"
+							>
+								<option value="">Select Permission...</option>
+								<option value="none">None - Revoke access to the ISN</option>
+								<option value="read">Read - Can view signals</option>
+								<option value="write">Write - Can create and view signals</option>
+							</select>
+						</div>
+						<div class="form-group">
+							<button type="submit" class="btn btn-primary">
+								Update Account
+							</button>
+						</div>
+					</form>
 				</div>
+			</div>
 
-				<div id="admin-result">
-					<!-- Results will appear here -->
-				</div>
-			}
+			<div id="update-access-result">
+				<!-- Results will appear here -->
+			</div>
 		</div>
 	}
+}
+
+// AccountIdentifierField renders the appropriate input field based on account type
+templ AccountIdentifierField(accountType string) {
+	<div class="form-group" id="account-identifier-field">
+		switch accountType {
+		case "user":
+			<label for="account_identifier" class="form-label">Account Email</label>
+			<input
+				type="email"
+				id="account_identifier"
+				name="account_identifier"
+				required
+				placeholder="user@example.com"
+				class="form-input"
+			/>
+		case "service_account":
+			<label for="account_identifier" class="form-label">Client ID</label>
+			<input
+				type="text"
+				id="account_identifier"
+				name="account_identifier"
+				required
+				placeholder="sa_example-org_abc123"
+				class="form-input"
+			/>
+		default:
+			<label for="account_identifier" class="form-label">Account Identifier</label>
+			<input
+				type="text"
+				id="account_identifier"
+				name="account_identifier"
+				required
+				placeholder="Select account type first"
+				class="form-input"
+				disabled
+			/>
+		}
+	</div>
 }

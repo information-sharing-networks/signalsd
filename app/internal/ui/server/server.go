@@ -69,49 +69,63 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 	router.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("./web/static/"))))
 
 	// Public routes (no auth required)
-	router.Get("/login", handlerService.HandleLogin)
-	router.Post("/login", handlerService.HandleLoginPost)
-	router.Get("/register", handlerService.HandleRegister)
-	router.Post("/register", handlerService.HandleRegisterPost)
-	router.Get("/access-denied", handlerService.HandleAccessDenied)
+	router.Get("/login", handlerService.LoginHandler)
+	router.Post("/login", handlerService.LoginPostHandler)
+	router.Get("/register", handlerService.RegisterLogin)
+	router.Post("/register", handlerService.RegisterPostHandler)
 
 	// redirects to dashboard if authenticated, login if not
-	router.Get("/", handlerService.HandleHome)
+	router.Get("/", handlerService.HomeHandler)
 
 	// Protected routes (require authentication)
 	router.Group(func(r chi.Router) {
 		r.Use(s.authService.RequireAuth)
 
-		r.Post("/logout", handlerService.HandleLogout)
-		r.Get("/dashboard", handlerService.HandleDashboard)
+		// entry point after login
+		r.Get("/dashboard", handlerService.DashboardHandler)
+
+		// auth
+		r.Post("/logout", handlerService.LogoutHandler)
+		r.Get("/access-denied", handlerService.AccessDeniedHandler)
+		r.Get("/need-isn-admin", handlerService.NeedIsnAdminHandler)
+
+		// render drop down options
+		r.Post("/ui-api/signal-type-options", handlerService.SignalTypeOptionsHandler)
+		r.Post("/ui-api/signal-type-version-options", handlerService.SignalTypeVersionOptionsHandler)
+
+		// render individual fields
+		r.Post("/ui-api/account-identifier-field", handlerService.AccountIdentifierFieldHandler)
+
+		// authenticated user forms
+		r.Get("/search", handlerService.SignalSearchHandler)
+
+		// execute backend api calls and render the results
+		r.Post("/ui-api/search-signals", handlerService.SearchSignalsHandler)
+	})
+
+	// ISN Admin routes (require admin/owner role)
+	router.Group(func(r chi.Router) {
+		r.Use(s.authService.RequireAuth)
+		r.Use(s.authService.RequireAdminOrOwnerRole)
+
+		//dashboard
+		r.Get("/admin", handlerService.IsnAdminDashboardHandler)
+
+		//isn creation form
+		r.Get("/admin/isns", handlerService.IsnManagementHandler)
+		r.Post("/ui-api/create-isn", handlerService.CreateIsnHandler)
+
+		// isn management forms - only relevant to admins that have created one or more ISN
 		r.Group(func(r chi.Router) {
-			r.Use(s.authService.RequireAdminAccess)
-			r.Get("/admin/isn-accounts", handlerService.HandleIsnAccountsAdmin)
+			r.Use(s.authService.RequireIsnAdmin)
+
+			r.Get("/admin/signal-types", handlerService.SignalTypeManagementHandler)
+			r.Get("/admin/isn-accounts", handlerService.IsnAccountManagementHandler)
+
+			// execute backend api calls and render the results
+			r.Post("/ui-api/create-signal-type", handlerService.CreateSignalTypeHandler)
+			r.Post("/ui-api/update-isn-account-access", handlerService.UpdateIsnAccountHandler)
 		})
-		r.Get("/signal-types", handlerService.HandleSignalTypeManagement)
-
-		// UI API endpoints (used when rendering ui components)
-		r.Post("/ui-api/signal-types", handlerService.HandleGetSignalTypes)
-		r.Post("/ui-api/signal-versions", handlerService.HandleGetSignalVersions)
-		r.Post("/ui-api/search-signals", handlerService.HandleSearchSignals)
-		r.Post("/ui-api/isn-account-access", handlerService.HandleIsnAccountAccess)
-		r.Post("/ui-api/create-signal-type", handlerService.HandleCreateSignalType)
-	})
-
-	// ISN routes (require ISN access)
-	router.Group(func(r chi.Router) {
-		r.Use(s.authService.RequireAuth)
-		r.Use(s.authService.RequireIsnAccess)
-
-		r.Get("/search", handlerService.HandleSignalSearch)
-	})
-
-	// Admin routes (require admin/owner role)
-	router.Group(func(r chi.Router) {
-		r.Use(s.authService.RequireAuth)
-		r.Use(s.authService.RequireAdminAccess)
-
-		r.Get("/admin", handlerService.HandleAdminDashboard)
 	})
 }
 

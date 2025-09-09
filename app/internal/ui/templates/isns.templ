@@ -1,0 +1,79 @@
+package templates
+
+import (
+    "github.com/information-sharing-networks/signalsd/app/internal/ui/client"
+)
+// CreateISNPage renders the create ISN page
+templ CreateIsnPage() {
+	@BaseLayout("Create ISN") {
+		@Navigation()
+		<div class="page-container">
+			<h1 class="page-title">Create ISN</h1>
+			<div class="card mb-6">     
+				<div class="card-body"> 
+					<form hx-post="/ui-api/create-isn" hx-target="#isn-result" class="space-y-4">
+						<div class="form-group">
+							<label for="title" class="form-label">Title</label>
+							<input
+								id="title"
+								name="title"
+								type="text"
+								required
+								class="form-input"
+								placeholder="e.g., Sample ISN @example.org"
+							/>
+							<p class="text-muted text-sm mt-1">Unique title for the ISN. This will be used to create a URL-friendly slug.</p>
+						</div>
+						<div class="form-group">
+							<label for="detail" class="form-label">Description</label>
+							<textarea
+								id="detail"
+								name="detail"
+								rows="3"
+								class="form-input"
+								placeholder="Description of the ISN"
+							></textarea>
+							<p class="text-muted text-sm mt-1">Provide a detailed description of this ISN.</p>
+						</div>
+						<div class="form-group">
+							<label for="visibility" class="form-label">Visibility</label>
+							<select
+								id="visibility"
+								name="visibility"
+								required
+								class="form-select"
+							>
+								<option value="">Select Visibility...</option>
+								<option value="public">Public - Anyone can view signals</option>
+								<option value="private">Private - Only network participants can view signals</option>
+							</select>
+						</div>
+						<div class="form-group">
+							<button type="submit" class="btn btn-primary">
+								Create ISN
+							</button>
+						</div>
+					</form>
+				</div>
+			</div>
+			<div id="isn-result"></div>
+		</div>
+	}
+}
+
+
+// SignalTypeCreationSuccess renders a success message after signal type creation
+templ IsnCreationSuccess(response client.CreateIsnResponse) {
+	<div class="card">
+		<div class="card-body">
+			@SuccessAlert("ISN created successfully!")
+			<div class="mt-4 space-y-2">
+				<p><strong>Slug:</strong> <code class="text-sm bg-gray-100 px-2 py-1 rounded">{ response.Slug }</code></p>
+				<p><strong>Resource URL:</strong>
+					<code class="text-xs bg-gray-100 px-2 py-1 rounded block break-all">{ response.ResourceURL }</code>
+				</p>
+			</div>
+		</div>
+	</div>
+}
+    

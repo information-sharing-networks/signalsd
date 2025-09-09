@@ -51,7 +51,7 @@ func (a *AuthService) RequireAuth(next http.Handler) http.Handler {
 			}
 
 			// attempt a token refresh
-			loginResp, newRefreshTokenCookie, err := a.RefreshToken(refreshTokenCookie)
+			accessTokenDetails, newRefreshTokenCookie, err := a.RefreshToken(refreshTokenCookie)
 			if err != nil {
 				reqLogger.Error("Token refresh failed",
 					slog.String("component", "ui.RequireAuth"),
@@ -61,7 +61,7 @@ func (a *AuthService) RequireAuth(next http.Handler) http.Handler {
 				return
 			}
 
-			if err := a.SetAuthCookies(w, loginResp, newRefreshTokenCookie, a.environment); err != nil {
+			if err := a.SetAuthCookies(w, accessTokenDetails, newRefreshTokenCookie, a.environment); err != nil {
 				reqLogger.Error("Failed to set authentication cookies after refresh",
 					slog.String("component", "ui.RequireAuth"),
 					slog.String("error", err.Error()),
@@ -80,8 +80,8 @@ func (a *AuthService) RequireAuth(next http.Handler) http.Handler {
 	})
 }
 
-// RequireAdminAccess is middleware that checks if user has admin/owner role
-func (a *AuthService) RequireAdminAccess(next http.Handler) http.Handler {
+// RequireAdminOrOwnerRole is middleware that checks if user has admin/owner role
+func (a *AuthService) RequireAdminOrOwnerRole(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		reqLogger := logger.ContextRequestLogger(r.Context())
 
@@ -96,7 +96,7 @@ func (a *AuthService) RequireAdminAccess(next http.Handler) http.Handler {
 		}
 
 		if accountInfo.Role != "owner" && accountInfo.Role != "admin" {
-			reqLogger.Debug("User attempted to access admin area without permission",
+			reqLogger.Debug("Access denied - account attempted to access admin feature",
 				slog.String("component", "ui.RequireAdminAccess"),
 				slog.String("account_id", accountInfo.AccountID),
 				slog.String("role", accountInfo.Role),
@@ -114,27 +114,61 @@ func (a *AuthService) RequireAdminAccess(next http.Handler) http.Handler {
 	})
 }
 
-// RequireIsnAccess is middleware that checks if user has access to any ISNs
+// RequireIsnAdmin is middleware that checks if user is the admin for one or more ISNs.
+// redirects to the 'access denied' page if not.
+func (a *AuthService) RequireIsnAdmin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		reqLogger := logger.ContextRequestLogger(r.Context())
+
+		isnPerms, err := a.GetIsnPermsFromCookie(r)
+		if err != nil {
+			reqLogger.Debug("access denied - user does not have access to any ISNs",
+				slog.String("component", "ui.RequireIsnAccess"),
+			)
+			redirectToNeedIsnAdmin(w, r)
+			return
+		}
+		for perm := range isnPerms {
+			if isnPerms[perm].IsnAdmin {
+				reqLogger.Debug("ISN admin check successful",
+					slog.String("component", "ui.RequireIsnAdmin"),
+				)
+				next.ServeHTTP(w, r)
+				return
+			}
+		}
+
+		reqLogger.Debug("access denied - user does not have admin role for any ISNs",
+			slog.String("component", "ui.RequireIsnAdmin"),
+		)
+		redirectToNeedIsnAdmin(w, r)
+
+	})
+}
+
+// RequireIsnAccess is middleware that checks if user has access to one or more ISNs.
+// Use this middlware to prevent accounts from accessing pages that are only relevant to ISN members
 func (a *AuthService) RequireIsnAccess(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		reqLogger := logger.ContextRequestLogger(r.Context())
 
+		// the UI middleware extracts the ISN permissions from the access token claims and stores them in a cookie.
+		// The middleware only sets this cookie if the account has access to one or more ISNs
 		_, err := r.Cookie(config.IsnPermsCookieName)
 		if err != nil {
-			// No ISN permissions cookie = no ISN access
-			reqLogger.Debug("User attempted to access ISN features without ISN permissions",
+			reqLogger.Debug("access denied - user does not have access to any ISNs",
 				slog.String("component", "ui.RequireIsnAccess"),
 			)
 			redirectToAccessDenied(w, r)
 			return
 		}
 
-		// Log successful ISN access check
 		reqLogger.Debug("ISN access check successful",
 			slog.String("component", "ui.RequireIsnAccess"),
 		)
 
-		// Cookie exists = user has ISN access, proceed to handler
+		// Cookie exists = user has access to one or more ISNs, proceed to handler
 		next.ServeHTTP(w, r)
 	})
 }
@@ -156,5 +190,15 @@ func redirectToAccessDenied(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	} else {
 		http.Redirect(w, r, "/access-denied", http.StatusSeeOther)
+	}
+}
+
+// redirectToNeedIsnAdmin redirects to access denied page for both HTMX and direct requests
+func redirectToNeedIsnAdmin(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/need-isn-admin")
+		w.WriteHeader(http.StatusOK)
+	} else {
+		http.Redirect(w, r, "/need-isn-admin", http.StatusSeeOther)
 	}
 }
