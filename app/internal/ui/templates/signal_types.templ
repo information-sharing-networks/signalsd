@@ -4,16 +4,13 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
-// SignalTypeManagementPage renders the signal type management page
-templ SignalTypeManagementPage(isns []types.IsnDropdown) {
-	@BaseLayout("Signal Type Management") {
+// CreateSignalTypePage renders the signal type management page
+templ CreateSignalTypePage(isns []types.IsnDropdown) {
+	@BaseLayout("Create New Signal Type") {
 		@Navigation()
 		<div class="page-container">
-			<h1 class="page-title">Signal Type Management</h1>
+			<h1 class="page-title">Create New Signal Type</h1>
 			<div class="card mb-6">
-				<div class="card-header">
-					<h3 class="card-title">Create New Signal Type</h3>
-				</div>
 				<div class="card-body">
 					<form hx-post="/ui-api/create-signal-type" hx-target="#signal-type-result" class="space-y-4">
 						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">

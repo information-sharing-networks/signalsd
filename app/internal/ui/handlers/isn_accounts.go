@@ -11,8 +11,8 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
 )
 
-// UpdateIsnAccountHandler handles the form submission to add an account to an ISN
-func (h *HandlerService) UpdateIsnAccountHandler(w http.ResponseWriter, r *http.Request) {
+// UpdateIsnAccount handles the form submission to add an account to an ISN
+func (h *HandlerService) UpdateIsnAccount(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Parse form data
@@ -86,8 +86,8 @@ func (h *HandlerService) UpdateIsnAccountHandler(w http.ResponseWriter, r *http.
 	}
 }
 
-// IsnAccountManagementHandler renders the ISN accounts administration page
-func (h *HandlerService) IsnAccountManagementHandler(w http.ResponseWriter, r *http.Request) {
+// UpdateIsnAccountPage renders the ISN accounts administration page
+func (h *HandlerService) UpdateIsnAccountPage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Get user permissions from cookie

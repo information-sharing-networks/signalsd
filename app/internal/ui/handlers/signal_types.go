@@ -10,10 +10,10 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
 )
 
-// SignalTypeManagementHandler renders the signal type management page.
+// CreateSignalTypePage renders the signal type management page.
 //
 // Use with RequireAdminOrOwnerRole and RequireIsnAdmin middleware
-func (h *HandlerService) SignalTypeManagementHandler(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerService) CreateSignalTypePage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Get user permissions from cookie
@@ -27,15 +27,15 @@ func (h *HandlerService) SignalTypeManagementHandler(w http.ResponseWriter, r *h
 	isns := h.getIsnDropDownList(isnPerms, true, false)
 
 	// Render signal type management page
-	component := templates.SignalTypeManagementPage(isns)
+	component := templates.CreateSignalTypePage(isns)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render signal type management page", slog.String("error", err.Error()))
 	}
 }
 
-// CreateSignalTypeHandler handles the form submission to create a new signal type
+// CreateSignalType handles the form submission to create a new signal type
 // Use with RequireAdminOrOwnerRole and RequireIsnAdmin middleware
-func (h *HandlerService) CreateSignalTypeHandler(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerService) CreateSignalType(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Parse form data

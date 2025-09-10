@@ -10,8 +10,8 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
 )
 
-// HomeHandler handles the root path and redirects to the dashboard if authenticated, login if not
-func (h *HandlerService) HomeHandler(w http.ResponseWriter, r *http.Request) {
+// HomePageHandler handles the root path and redirects to the dashboard if authenticated, login if not
+func (h *HandlerService) HomePageHandler(w http.ResponseWriter, r *http.Request) {
 	status := h.AuthService.CheckTokenStatus(r)
 
 	switch status {

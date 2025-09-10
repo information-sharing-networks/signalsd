@@ -75,19 +75,19 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 	router.Post("/register", handlerService.RegisterPostHandler)
 
 	// redirects to dashboard if authenticated, login if not
-	router.Get("/", handlerService.HomeHandler)
+	router.Get("/", handlerService.HomePageHandler)
 
 	// Protected routes (require authentication)
 	router.Group(func(r chi.Router) {
 		r.Use(s.authService.RequireAuth)
 
 		// entry point after login
-		r.Get("/dashboard", handlerService.DashboardHandler)
+		r.Get("/dashboard", handlerService.DashboardPage)
 
 		// auth
 		r.Post("/logout", handlerService.LogoutHandler)
-		r.Get("/access-denied", handlerService.AccessDeniedHandler)
-		r.Get("/need-isn-admin", handlerService.NeedIsnAdminHandler)
+		r.Get("/access-denied", handlerService.AccessDeniedPage)
+		r.Get("/need-isn-admin", handlerService.NeedIsnAdminPage)
 
 		// render drop down options
 		r.Post("/ui-api/signal-type-options", handlerService.SignalTypeOptionsHandler)
@@ -97,10 +97,10 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 		r.Post("/ui-api/account-identifier-field", handlerService.AccountIdentifierFieldHandler)
 
 		// authenticated user forms
-		r.Get("/search", handlerService.SignalSearchHandler)
+		r.Get("/search", handlerService.SearchSignalsPage)
 
 		// execute backend api calls and render the results
-		r.Post("/ui-api/search-signals", handlerService.SearchSignalsHandler)
+		r.Post("/ui-api/search-signals", handlerService.SearchSignals)
 	})
 
 	// ISN Admin routes (require admin/owner role)
@@ -109,22 +109,22 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 		r.Use(s.authService.RequireAdminOrOwnerRole)
 
 		//dashboard
-		r.Get("/admin", handlerService.IsnAdminDashboardHandler)
+		r.Get("/admin", handlerService.IsnAdminDashboardPage)
 
 		//isn creation form
-		r.Get("/admin/isns", handlerService.IsnManagementHandler)
-		r.Post("/ui-api/create-isn", handlerService.CreateIsnHandler)
+		r.Get("/admin/isns", handlerService.CreateIsnPage)
+		r.Post("/ui-api/create-isn", handlerService.CreateIsn)
 
 		// isn management forms - only relevant to admins that have created one or more ISN
 		r.Group(func(r chi.Router) {
 			r.Use(s.authService.RequireIsnAdmin)
 
-			r.Get("/admin/signal-types", handlerService.SignalTypeManagementHandler)
-			r.Get("/admin/isn-accounts", handlerService.IsnAccountManagementHandler)
+			r.Get("/admin/signal-types", handlerService.CreateSignalTypePage)
+			r.Get("/admin/isn-accounts", handlerService.UpdateIsnAccountPage)
 
 			// execute backend api calls and render the results
-			r.Post("/ui-api/create-signal-type", handlerService.CreateSignalTypeHandler)
-			r.Post("/ui-api/update-isn-account-access", handlerService.UpdateIsnAccountHandler)
+			r.Post("/ui-api/create-signal-type", handlerService.CreateSignalType)
+			r.Post("/ui-api/update-isn-account-access", handlerService.UpdateIsnAccount)
 		})
 	})
 }

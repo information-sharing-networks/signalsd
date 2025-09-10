@@ -10,8 +10,8 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
 )
 
-// IsnManagementHandler renders the ISN management page
-func (h *HandlerService) IsnManagementHandler(w http.ResponseWriter, r *http.Request) {
+// CreateIsnPage renders the Create ISN page
+func (h *HandlerService) CreateIsnPage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// currently a single function is supported - create ISN
@@ -21,9 +21,9 @@ func (h *HandlerService) IsnManagementHandler(w http.ResponseWriter, r *http.Req
 	}
 }
 
-// CreateIsnHandler handles the form submission to create a new ISN
+// CreateIsn handles the form submission to create a new ISN
 // use with RequireAdminOrOwnerRole middleware
-func (h *HandlerService) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerService) CreateIsn(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Parse form data

@@ -11,9 +11,9 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
-// SignalSearchHandler renders the signal search page
+// SearchSignalsPage renders the signal search page
 // ISN access is validated by RequireIsnAccess middleware
-func (h *HandlerService) SignalSearchHandler(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerService) SearchSignalsPage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Get ISN permissions from cookie - middleware ensures this exists
@@ -33,7 +33,7 @@ func (h *HandlerService) SignalSearchHandler(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-func (h *HandlerService) SearchSignalsHandler(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerService) SearchSignals(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Parse search parameters
@@ -60,7 +60,6 @@ func (h *HandlerService) SearchSignalsHandler(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	//todo make helper
 	// Get user permissions to validate ISN access and determine visibility
 	isnPerm, err := h.AuthService.CheckIsnPermission(r, params.IsnSlug)
 	if err != nil {
