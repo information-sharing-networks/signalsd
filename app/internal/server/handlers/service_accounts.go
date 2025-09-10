@@ -44,7 +44,7 @@ const setupPageTemplate = `<!DOCTYPE html>
 </head>
 <body>
     <div class="container">
-        <div class="success">✓ Signalds Service Account Setup Complete</div>
+        <div class="success">✓ Signalsd service account setup complete</div>
 
         <div class="credential">
             <div class="label">Client ID</div>
