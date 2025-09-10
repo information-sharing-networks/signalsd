@@ -28,7 +28,7 @@ type Server struct {
 	authService *auth.AuthService
 }
 
-// NewStandaloneServer creates a new UI server that can run independently of the API
+// NewStandaloneServer creates a UI server that can run independently of the API
 func NewStandaloneServer(cfg *config.Config, logger *slog.Logger) *Server {
 	s := &Server{
 		router:      chi.NewRouter(),
@@ -150,7 +150,7 @@ func (s *Server) Start(ctx context.Context) error {
 		IdleTimeout:  s.config.IdleTimeout,
 	}
 
-	// Start server in a goroutine
+	// Start server
 	serverErr := make(chan error, 1)
 	go func() {
 		s.logger.Info("UI server listening", slog.String("address", addr))
