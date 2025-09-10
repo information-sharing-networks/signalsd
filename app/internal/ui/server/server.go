@@ -114,6 +114,10 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 		r.Get("/admin/isns", handlerService.CreateIsnPage)
 		r.Post("/ui-api/create-isn", handlerService.CreateIsn)
 
+		// service accounts
+		r.Get("/admin/service-accounts", handlerService.CreateServiceAccountPage)
+		r.Post("/ui-api/create-service-account", handlerService.CreateServiceAccount)
+
 		// isn management forms
 		r.Group(func(r chi.Router) {
 			r.Use(s.authService.RequireIsnAdmin) //  the below features are only relevant to admins that have created one or more ISN

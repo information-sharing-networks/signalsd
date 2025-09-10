@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -10,31 +11,28 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
 )
 
-// CreateIsnPage renders the Create ISN page
-func (h *HandlerService) CreateIsnPage(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerService) CreateServiceAccountPage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
-	component := templates.CreateIsnPage()
+	component := templates.CreateServiceAccount()
+
 	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render create ISN page", slog.String("error", err.Error()))
+		reqLogger.Error("Failed to render CreateServiceAccount template", slog.String("error", err.Error()))
 	}
+
 }
 
-// CreateIsn handles the form submission to create a new ISN
-// use with RequireAdminOrOwnerRole middleware
-func (h *HandlerService) CreateIsn(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerService) CreateServiceAccount(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
-	// Parse form data
-	title := r.FormValue("title")
-	detail := r.FormValue("detail")
-	visibility := r.FormValue("visibility")
+	fmt.Printf("Debug !!! in create service acct handler")
+	email := r.FormValue("email")
+	organization := r.FormValue("organization")
 
-	// Validate required fields
-	if title == "" || detail == "" || visibility == "" {
-		component := templates.ErrorAlert("Please fill in all fields.")
+	if email == "" || organization == "" {
+		component := templates.ErrorAlert("you must supply values for both email and organization")
 		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+			reqLogger.Error("Failed to render ErrorAlert", slog.String("error", err.Error()))
 		}
 		return
 	}
@@ -49,18 +47,16 @@ func (h *HandlerService) CreateIsn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Call the API to create the ISN
 	accessToken := accessTokenCookie.Value
-	req := client.CreateIsnRequest{
-		Title:      title,
-		Detail:     detail,
-		IsInUse:    true,
-		Visibility: visibility,
+
+	req := client.CreateServiceAccountRequest{
+		ClientOrganization: organization,
+		ClientContactEmail: email,
 	}
 
-	res, err := h.ApiClient.CreateIsn(accessToken, req)
+	res, err := h.ApiClient.CreateServiceAccount(accessToken, req)
 	if err != nil {
-		reqLogger.Error("Failed to create ISN", slog.String("error", err.Error()))
+		reqLogger.Error("Failed to create service account", slog.String("error", err.Error()))
 
 		var msg string
 		if ce, ok := err.(*client.ClientError); ok {
@@ -77,7 +73,7 @@ func (h *HandlerService) CreateIsn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Success response
-	component := templates.IsnCreationSuccess(*res)
+	component := templates.ServiceAccountCreationSuccess(*res)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
 	}

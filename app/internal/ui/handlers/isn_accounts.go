@@ -11,6 +11,27 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
 )
 
+// UpdateIsnAccountPage renders the ISN accounts administration page
+func (h *HandlerService) UpdateIsnAccountPage(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	// Get user permissions from cookie
+	isnPerms, err := h.AuthService.GetIsnPermsFromCookie(r)
+	if err != nil {
+		reqLogger.Error("failed to read IsnPerms from cookie", slog.String("error", err.Error()))
+		return
+	}
+
+	// Convert permissions to ISN list for dropdown (only ISNs where user has admin rights)
+	isns := h.getIsnDropDownList(isnPerms, true, false)
+
+	// Render admin page
+	component := templates.IsnAccountManagementPage(isns)
+	if err := component.Render(r.Context(), w); err != nil {
+		reqLogger.Error("Failed to render ISN accounts admin page", slog.String("error", err.Error()))
+	}
+}
+
 // UpdateIsnAccount handles the form submission to add an account to an ISN
 func (h *HandlerService) UpdateIsnAccount(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
@@ -54,7 +75,7 @@ func (h *HandlerService) UpdateIsnAccount(w http.ResponseWriter, r *http.Request
 	accessToken := accessTokenCookie.Value
 
 	// Call the API to add the account to the ISN
-	err = h.ApiClient.UpdateIsnAccountAccess(accessToken, isnSlug, accountType, accountIdentifier, permission)
+	err = h.ApiClient.UpdateIsnAccount(accessToken, isnSlug, accountType, accountIdentifier, permission)
 	if err != nil {
 		reqLogger.Error("Failed to add account to ISN", slog.String("component", "templates.handleAddIsnAccount"), slog.String("error", err.Error()))
 
@@ -83,27 +104,6 @@ func (h *HandlerService) UpdateIsnAccount(w http.ResponseWriter, r *http.Request
 	component := templates.SuccessAlert(msg)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
-	}
-}
-
-// UpdateIsnAccountPage renders the ISN accounts administration page
-func (h *HandlerService) UpdateIsnAccountPage(w http.ResponseWriter, r *http.Request) {
-	reqLogger := logger.ContextRequestLogger(r.Context())
-
-	// Get user permissions from cookie
-	isnPerms, err := h.AuthService.GetIsnPermsFromCookie(r)
-	if err != nil {
-		reqLogger.Error("failed to read IsnPerms from cookie", slog.String("error", err.Error()))
-		return
-	}
-
-	// Convert permissions to ISN list for dropdown (only ISNs where user has admin rights)
-	isns := h.getIsnDropDownList(isnPerms, true, false)
-
-	// Render admin page
-	component := templates.IsnAccountManagementPage(isns)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render ISN accounts admin page", slog.String("error", err.Error()))
 	}
 }
 

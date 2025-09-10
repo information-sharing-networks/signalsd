@@ -7,9 +7,9 @@ import (
 	"net/http"
 )
 
-// UpdateIsnAccountAccess grants or revokes an permissions to access an ISN
+// UpdateIsnAccount grants or revokes an permissions to access an ISN
 // accountType should be "user" or "service_account"
-func (c *Client) UpdateIsnAccountAccess(accessToken, isnSlug, accountType, accountIdentifier, permission string) error {
+func (c *Client) UpdateIsnAccount(accessToken, isnSlug, accountType, accountIdentifier, permission string) error {
 	var accountID string
 
 	// Lookup account based on type
