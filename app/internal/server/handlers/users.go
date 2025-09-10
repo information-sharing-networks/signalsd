@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
@@ -156,13 +157,13 @@ func (u *UserHandler) RegisterUserHandler(w http.ResponseWriter, r *http.Request
 		_, err = txQueries.CreateOwnerUser(r.Context(), database.CreateOwnerUserParams{
 			AccountID:      account.ID,
 			HashedPassword: hashedPassword,
-			Email:          req.Email,
+			Email:          strings.ToLower(req.Email),
 		})
 	} else {
 		_, err = txQueries.CreateUser(r.Context(), database.CreateUserParams{
 			AccountID:      account.ID,
 			HashedPassword: hashedPassword,
-			Email:          req.Email,
+			Email:          strings.ToLower(req.Email),
 		})
 	}
 	if err != nil {

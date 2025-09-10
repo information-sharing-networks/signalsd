@@ -13,7 +13,7 @@ UPDATE users SET (updated_at, hashed_password) = (NOW(), $2)
 WHERE account_id = $1;
 
 -- name: GetUserByEmail :one
-SELECT * FROM users WHERE email = $1;
+SELECT * FROM users WHERE LOWER(email) = LOWER(sqlc.arg(email));
 
 -- name: GetUsers :many
 SELECT u.account_id, u.email, u.user_role, u.created_at , u.updated_at FROM users u;
@@ -42,9 +42,9 @@ SET
 WHERE 
     account_id = $1;
 
--- name: ExistsUserWithEmail :one 
-SELECT EXISTS (
-    SELECT 1 FROM users WHERE email = $1
+-- name: ExistsUserWithEmail :one
+SELECT exists (
+    SELECT 1 FROM users WHERE LOWER(email) = LOWER(sqlc.arg(email))
 ) AS exists;
 
 -- name: IsFirstUser :one
