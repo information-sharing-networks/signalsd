@@ -295,7 +295,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Only owners and admins can view service account lists.\n\n- No query parameters = return all service accounts\n- to return a specific service account supply one of the following query parameter: ` + "`" + `?id=uuid` + "`" + ` or ` + "`" + `?client_id=id` + "`" + `\n",
+                "description": "Only owners and admins can view service account lists.\n\nTo return a specific service account supply one of the following query parameter combinations:\n-\tid (account ID)\n-\tclient_id\n-\tclient_email \u0026 client_organization\nNo query parameters = return all service accounts\n",
                 "tags": [
                     "Site Admin"
                 ],
@@ -600,11 +600,11 @@ const docTemplate = `{
                         "BearerServiceAccount": []
                     }
                 ],
-                "description": "Registring a new service account creates a one-time link with the client credentials in it - this must be used by the client within 48 hrs.\n\nIf you want to reissue a client's credentials call this endpoint again with the same client organization and contact email.\nA new one-time setup url will be generated and the old one will be revoked.\nNote the client_id will remain the same and any existing client secrets will be revoked.\n\nYou have to be an admin or the site owner to use this endpoint\n",
+                "description": "Registring a new service account creates a one-time link with the client credentials in it - this must be used by the client within 48 hrs.\n\nNote that where an Organization needs more than one service account they must supply unique contact emails for each account.\n\nIf you want to reissue a client's credentials call this endpoint again with the same client organization and contact email.\nA new one-time setup url will be generated and the old one will be revoked. The client_id will remain the same.\n\nUse the **Get Service Account** endpoint to check if a service account has already been registered for an email/organisation combination.\n\nYou have to be an admin or the site owner to use this endpoint\n",
                 "tags": [
                     "Service Accounts"
                 ],
-                "summary": "Register a new service account",
+                "summary": "Register service account",
                 "parameters": [
                     {
                         "description": "service account details",

@@ -520,8 +520,12 @@ func (a *AdminHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 //	@Summary		Get service accounts
 //	@Description	Only owners and admins can view service account lists.
 //	@Description
-//	@Description	- No query parameters = return all service accounts
-//	@Description	- to return a specific service account supply one of the following query parameter: `?id=uuid` or `?client_id=id`
+//	@Description	To return a specific service account supply one of the following query parameter combinations:
+//	@Description	-	id (account ID)
+//	@Description	-	client_id
+//	@Description	-	client_email & client_organization
+//	@Descriotion
+//	@Description	No query parameters = return all service accounts
 //	@Description
 //	@Tags		Site Admin
 //

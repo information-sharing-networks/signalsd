@@ -75,4 +75,10 @@ func (h *HandlerService) CreateServiceAccount(w http.ResponseWriter, r *http.Req
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
 	}
+
+	//todo
+	component = templates.WarningAlert("warning! debug")
+	if err := component.Render(r.Context(), w); err != nil {
+		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
+	}
 }

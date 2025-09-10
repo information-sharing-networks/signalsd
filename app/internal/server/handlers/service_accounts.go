@@ -120,12 +120,15 @@ type SetupPageData struct {
 
 // RegisterServiceAccountHandler godocs
 //
-//	@Summary		Register a new service account
+//	@Summary		Register service account
 //	@Description	Registring a new service account creates a one-time link with the client credentials in it - this must be used by the client within 48 hrs.
 //	@Description
+//	@Description	Note that where an Organization needs more than one service account they must supply unique contact emails for each account.
+//	@Description
 //	@Description	If you want to reissue a client's credentials call this endpoint again with the same client organization and contact email.
-//	@Description	A new one-time setup url will be generated and the old one will be revoked.
-//	@Description	Note the client_id will remain the same and any existing client secrets will be revoked.
+//	@Description	A new one-time setup url will be generated and the old one will be revoked. The client_id will remain the same.
+//	@Description
+//	@Description	Use the **Get Service Account** endpoint to check if a service account has already been registered for an email/organisation combination.
 //	@Description
 //	@Description	You have to be an admin or the site owner to use this endpoint
 //	@Description
