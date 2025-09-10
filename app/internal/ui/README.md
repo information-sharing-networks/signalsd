@@ -7,25 +7,25 @@ A simple web user interface for managing Information Sharing Networks (ISNs) bui
 ```
 internal/ui/
 ├── server/server.go            # HTTP server setup and routing
-├── handlers/handlers.go        # HTTP request handlers - render pages and calls the UI api
+├── handlers/                   # HTTP request handlers - render pages and calls the UI api
 ├── client/client.go            # Client for calling signalsd backend API
 ├── auth/auth.go                # Authentication service for API integration
 ├── auth/middleware.go          # authentication middleware
 ├── types/types.go              # Shared type definitions
 ├── config/config.go            # Configuration management (standalone mode)
-├── template/templates.templ    # templ HTML templates
-└── template/templates_templ.go # Generated Go code from templ templates
+├── templates/*.templ           # templ HTML templates
+└── templates/*.go              # Generated Go code from templ templates 
 ```
 The steps to add a new interactive page to the UI are:
 1. Create Client methods to call the relevant signalsd API endpoints
 2. Add a new page template (`.templ` file) for the new feature
-3. Add a new handler function in `handlers/handlers.go` to render the page
-4. Add new ui-api handler functions in `handlers/handlers.go` to handle any interactions required in the page (use HTMX to make partial page updates)
-4. Add routes for the page and ui-api calls in `server/server.go`, using the appropriate authentication middleware
+3. Add a new handler function in the appropriate handlers/*.go file to render the page
+4. Add new ui-api handler functions in the appropriate handlers/*.go file to handle any interactions required in the page (use HTMX to make partial page updates)
+5. Add routes for the page and ui-api calls in `server/server.go`, using the appropriate authentication middleware
 
 ###  Integrated UI (Default)
 
-The default integrated mode (`signalsd --mode all`) is the simplist way to run the ui, everything runs on the same domain/port:
+The default integrated mode (`signalsd --mode all`) is the simplest way to run the ui, everything runs on the same domain/port:
 
 ```
 ┌─────────────────────────────────────┐
@@ -40,7 +40,7 @@ The default integrated mode (`signalsd --mode all`) is the simplist way to run t
 The integrated UI is built into the signalsd binary and available on the same port as the API (default: 8080).  The integrated UI runs automatically when using docker:
 
 ```bash
-# start databasae
+# start database
 docker compose up db
 
 # start app (including integrated ui)
@@ -87,7 +87,7 @@ Switch to standalone mode when you need container separation or want to replace 
            (Required for HttpOnly cookies)
 ```
 
-The standalone mode requires a reverse proxy so that the client sees a single domain/port (The refresh token authentication will  not work without it).
+The standalone mode requires a reverse proxy so that the client sees a single domain/port (The refresh token authentication will not work without it due to cross-origin cookie restrictions).
 
 ⚠️ If you run the UI in standalone mode in dev, the login will work but automatic token refresh will fail because the refresh token cookie cannot be sent cross-port. Users will be logged out after 30 minutes.
 
@@ -151,9 +151,9 @@ When running as a separate service, the UI has its own configuration:
 **No database or secret configuration required** - the UI calls the signalsd API for all data operations.
 
 ## Integrated mode
-the integrated UI is built into the signalsd binary and can be run with `signalsd --mode all` or `signalsd --mode ui`.  No additional configuration is required.  
+the integrated UI is built into the signalsd binary and can be run with `signalsd --mode all`.  No additional configuration is required.
 
-Note the UI was created as an example of how a third party UI could be built on top of the signalsd API.  It does not integrated directly with the signalsd http server - all communication is via the public API.
+Note the UI was created as an example of how a third party UI could be built on top of the signalsd API.  It does not integrate directly with the signalsd http server - all communication is via the public API.
 
 # Auth
 All authentication and authorization is handled by the signalsd API.  
@@ -162,7 +162,7 @@ Authorization is via the server supplied JWT access tokens.  The UI decodes the 
 1. determine the user's role and permissions so that it can improve the UX (e.g., hiding pages that the user does not have access to)
 2. to establish the expiry time so that it can refresh the token before it expires. 
 
-the UI does not need to know the SECRET_KEY used to sign the tokens. 
+The UI does not need create tokens and does not need to know the SECRET_KEY used by the server.
 
 # Development
 
@@ -177,7 +177,7 @@ if developing locally, install templ and air (live reload):
 go install github.com/a-h/templ/cmd/templ@latest
 go install github.com/air-verse/air@latest
 ```
-you can then rund the app locally run with live reload (the below command is using the docker signalsd database)
+you can then run the app locally with live reload (the below command is using the docker signalsd database)
 ```bash
 cd app
 DATABASE_URL="postgres://signalsd-dev@localhost:15432/signalsd_admin?sslmode=disable" SECRET_KEY="mysecretkey" air
