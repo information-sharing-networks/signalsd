@@ -36,16 +36,19 @@ func (c *Client) CreateServiceAccount(accessToken string, req CreateServiceAccou
 		return nil, NewClientInternalError(err, "creating service account request")
 	}
 
-	httpReq.Header.Set("Authorization", accessToken)
+	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 	httpReq.Header.Set("Content-type", "application/json")
 
+	fmt.Printf("Debug !!! about to present request to api, accessToken %v", accessToken)
 	res, err := c.httpClient.Do(httpReq)
 	if err != nil {
+		fmt.Printf("Debug !! got connection error")
 		return nil, NewClientConnectionError(err)
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusCreated {
+		fmt.Printf("Debug !! got wrong status code %v", res.StatusCode)
 		return nil, NewClientApiError(res)
 	}
 

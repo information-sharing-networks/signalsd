@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -25,7 +24,6 @@ func (h *HandlerService) CreateServiceAccountPage(w http.ResponseWriter, r *http
 func (h *HandlerService) CreateServiceAccount(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
-	fmt.Printf("Debug !!! in create service acct handler")
 	email := r.FormValue("email")
 	organization := r.FormValue("organization")
 
