@@ -17,7 +17,7 @@ templ IsnAccountManagementPage(isns []types.IsnDropdown) {
 					<h3 class="card-title">Change ISN permissions for an account</h3>
 				</div>
 				<div class="card-body">
-					<form hx-post="/ui-api/update-isn-account-access" hx-target="#update-access-result" class="space-y-4">
+					<form hx-post="/ui-api/update-isn-account" hx-target="#update-access-result" class="space-y-4">
 						<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 							<div class="form-group">
 								<label for="isn_slug" class="form-label">ISN</label>

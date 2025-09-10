@@ -43,8 +43,8 @@ func (h *HandlerService) getIsnDropDownList(isnPerms map[string]types.IsnPerm, f
 	return isns
 }
 
-// SignalTypeOptionsHandler gets the signal types for the selected ISN and returns the dropdown options
-func (h *HandlerService) SignalTypeOptionsHandler(w http.ResponseWriter, r *http.Request) {
+// RenderSignalTypeOptions gets the signal types for the selected ISN and renders the dropdown options
+func (h *HandlerService) RenderSignalTypeOptions(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	isnSlug := r.FormValue("isn_slug")
@@ -111,8 +111,8 @@ func (h *HandlerService) SignalTypeOptionsHandler(w http.ResponseWriter, r *http
 	}
 }
 
-// SignalTypeVersionOptionsHandler gets the versions for the selected signal type and returns the dropdown options
-func (h *HandlerService) SignalTypeVersionOptionsHandler(w http.ResponseWriter, r *http.Request) {
+// RenderSignalTypeVersionOptions gets the versions for the selected signal type and returns the dropdown options
+func (h *HandlerService) RenderSignalTypeVersionOptions(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	isnSlug := r.FormValue("isn_slug")

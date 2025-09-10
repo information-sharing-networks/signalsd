@@ -107,8 +107,8 @@ func (h *HandlerService) UpdateIsnAccountPage(w http.ResponseWriter, r *http.Req
 	}
 }
 
-// AccountIdentifierFieldHandler renders the appropriate input field based on account type
-func (h *HandlerService) AccountIdentifierFieldHandler(w http.ResponseWriter, r *http.Request) {
+// RenderAccountIdentifierField renders the appropriate input field based on account type
+func (h *HandlerService) RenderAccountIdentifierField(w http.ResponseWriter, r *http.Request) {
 	accountType := r.FormValue("account_type")
 
 	component := templates.AccountIdentifierField(accountType)

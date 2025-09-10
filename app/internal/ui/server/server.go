@@ -58,6 +58,7 @@ func NewIntegratedServer(router *chi.Mux, cfg *config.Config, logger *slog.Logge
 }
 
 // RegisterRoutes registers UI routes on the signalsd router - use when running the integrated ui.
+// note: dynamic HMTX handlers are registered with routes starting /ui-api
 func (s *Server) RegisterRoutes(router *chi.Mux) {
 
 	handlerService := &handlers.HandlerService{
@@ -65,19 +66,17 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 		ApiClient:   client.NewClient(s.config.APIBaseURL),
 		Environment: s.config.Environment,
 	}
-	// Static assets (no auth required) - only UI's own CSS
-	router.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("./web/static/"))))
-
 	// Public routes (no auth required)
-	router.Get("/login", handlerService.LoginHandler)
-	router.Post("/login", handlerService.LoginPostHandler)
-	router.Get("/register", handlerService.RegisterLogin)
-	router.Post("/register", handlerService.RegisterPostHandler)
+	router.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("./web/static/"))))
+	router.Get("/login", handlerService.LoginPage)
+	router.Post("/login", handlerService.Login)
+	router.Get("/register", handlerService.RegisterPage)
+	router.Post("/register", handlerService.Register)
 
 	// redirects to dashboard if authenticated, login if not
-	router.Get("/", handlerService.HomePageHandler)
+	router.Get("/", handlerService.HomePage)
 
-	// Protected routes (require authentication)
+	// Protected routes
 	router.Group(func(r chi.Router) {
 		r.Use(s.authService.RequireAuth)
 
@@ -85,18 +84,18 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 		r.Get("/dashboard", handlerService.DashboardPage)
 
 		// auth
-		r.Post("/logout", handlerService.LogoutHandler)
+		r.Post("/logout", handlerService.Logout)
 		r.Get("/access-denied", handlerService.AccessDeniedPage)
 		r.Get("/need-isn-admin", handlerService.NeedIsnAdminPage)
 
 		// render drop down options
-		r.Post("/ui-api/signal-type-options", handlerService.SignalTypeOptionsHandler)
-		r.Post("/ui-api/signal-type-version-options", handlerService.SignalTypeVersionOptionsHandler)
+		r.Post("/ui-api/signal-type-options", handlerService.RenderSignalTypeOptions)
+		r.Post("/ui-api/signal-type-version-options", handlerService.RenderSignalTypeVersionOptions)
 
 		// render individual fields
-		r.Post("/ui-api/account-identifier-field", handlerService.AccountIdentifierFieldHandler)
+		r.Post("/ui-api/account-identifier-field", handlerService.RenderAccountIdentifierField)
 
-		// authenticated user forms
+		// authenticated user pages
 		r.Get("/search", handlerService.SearchSignalsPage)
 
 		// execute backend api calls and render the results
@@ -111,20 +110,19 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 		//dashboard
 		r.Get("/admin", handlerService.IsnAdminDashboardPage)
 
-		//isn creation form
+		//isn creation
 		r.Get("/admin/isns", handlerService.CreateIsnPage)
 		r.Post("/ui-api/create-isn", handlerService.CreateIsn)
 
-		// isn management forms - only relevant to admins that have created one or more ISN
+		// isn management forms
 		r.Group(func(r chi.Router) {
-			r.Use(s.authService.RequireIsnAdmin)
+			r.Use(s.authService.RequireIsnAdmin) //  the below features are only relevant to admins that have created one or more ISN
 
 			r.Get("/admin/signal-types", handlerService.CreateSignalTypePage)
-			r.Get("/admin/isn-accounts", handlerService.UpdateIsnAccountPage)
-
-			// execute backend api calls and render the results
 			r.Post("/ui-api/create-signal-type", handlerService.CreateSignalType)
-			r.Post("/ui-api/update-isn-account-access", handlerService.UpdateIsnAccount)
+
+			r.Get("/admin/isn-accounts", handlerService.UpdateIsnAccountPage)
+			r.Post("/ui-api/update-isn-account", handlerService.UpdateIsnAccount)
 		})
 	})
 }

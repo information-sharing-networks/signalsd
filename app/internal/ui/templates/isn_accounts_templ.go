@@ -50,7 +50,7 @@ func IsnAccountManagementPage(isns []types.IsnDropdown) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">ISN Account Management</h1><p class=\"text-muted mb-6\">Grant or revoke access to Information Sharing Networks.</p><div class=\"card mb-6\"><div class=\"card-header\"><h3 class=\"card-title\">Change ISN permissions for an account</h3></div><div class=\"card-body\"><form hx-post=\"/ui-api/update-isn-account-access\" hx-target=\"#update-access-result\" class=\"space-y-4\"><div class=\"grid grid-cols-1 md:grid-cols-3 gap-4\"><div class=\"form-group\"><label for=\"isn_slug\" class=\"form-label\">ISN</label> <select id=\"isn_slug\" name=\"isn_slug\" required class=\"form-select\"><option value=\"\">Select ISN...</option> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">ISN Account Management</h1><p class=\"text-muted mb-6\">Grant or revoke access to Information Sharing Networks.</p><div class=\"card mb-6\"><div class=\"card-header\"><h3 class=\"card-title\">Change ISN permissions for an account</h3></div><div class=\"card-body\"><form hx-post=\"/ui-api/update-isn-account\" hx-target=\"#update-access-result\" class=\"space-y-4\"><div class=\"grid grid-cols-1 md:grid-cols-3 gap-4\"><div class=\"form-group\"><label for=\"isn_slug\" class=\"form-label\">ISN</label> <select id=\"isn_slug\" name=\"isn_slug\" required class=\"form-select\"><option value=\"\">Select ISN...</option> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
