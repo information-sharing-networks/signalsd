@@ -34,8 +34,9 @@ help:
 	@echo "  make clean           - Clean build artifacts"
 	@echo "  make docker-up       - Start Docker containers"
 	@echo "  make docker-down     - Stop Docker containers"
+	@echo "  make go-all          - Start signalsd backend and integrated ui locally (expects docker db to be running)"
 	@echo "  make go-api          - Start signalsd backend locally (expects docker db to be running)"
-	@echo "  make go-ui           - Start ui in standalone (expects signalsd to be running on 8080)"
+	@echo "  make go-ui           - Start ui in standalone mode (expects signalsd to be running on 8080)"
 
 # Docker management
 docker-up:
@@ -143,3 +144,8 @@ go-api:
 go-ui:
 	@echo "🔄 Running standalone ui"
 	cd app && API_BASE_URL=http://localhost:8080 go run cmd/signalsd-ui/main.go
+
+# Run api and integrated ui locally using docker db
+go-all:
+	@echo "🔄 Running local api + docker db"
+	cd app && DATABASE_URL="postgres://signalsd-dev@localhost:15432/signalsd_admin?sslmode=disable" SECRET_KEY="secretkey" go run cmd/signalsd/main.go --mode all
