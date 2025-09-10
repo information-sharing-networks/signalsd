@@ -150,10 +150,6 @@ When running as a separate service, the UI has its own configuration:
 
 **No database or secret configuration required** - the UI calls the signalsd API for all data operations.
 
-## Integrated mode
-the integrated UI is built into the signalsd binary and can be run with `signalsd --mode all`.  No additional configuration is required.
-
-Note the UI was created as an example of how a third party UI could be built on top of the signalsd API.  It does not integrate directly with the signalsd http server - all communication is via the public API.
 
 # Auth
 All authentication and authorization is handled by the signalsd API.  
