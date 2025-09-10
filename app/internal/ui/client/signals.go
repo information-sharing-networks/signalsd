@@ -4,12 +4,63 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-
-	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
+// =============================================================================
+// SIGNAL SEARCH TYPES
+// =============================================================================
+
+// SignalSearchParams represents search parameters for signals
+type SignalSearchParams struct {
+	IsnSlug                 string
+	SignalTypeSlug          string
+	SemVer                  string
+	StartDate               string
+	EndDate                 string
+	AccountID               string
+	SignalID                string
+	LocalRef                string
+	IncludeWithdrawn        bool
+	IncludeCorrelated       bool
+	IncludePreviousVersions bool
+}
+
+// SearchSignal represents a signal in search results
+type SearchSignal struct {
+	AccountID            string          `json:"account_id"`
+	AccountType          string          `json:"account_type"`
+	Email                string          `json:"email,omitempty"`
+	SignalID             string          `json:"signal_id"`
+	LocalRef             string          `json:"local_ref"`
+	SignalCreatedAt      string          `json:"signal_created_at"`
+	SignalVersionID      string          `json:"signal_version_id"`
+	VersionNumber        int32           `json:"version_number"`
+	VersionCreatedAt     string          `json:"version_created_at"`
+	CorrelatedToSignalID string          `json:"correlated_to_signal_id"`
+	IsWithdrawn          bool            `json:"is_withdrawn"`
+	Content              json.RawMessage `json:"content"`
+}
+
+// PreviousSignalVersion represents a previous version of a signal
+type PreviousSignalVersion struct {
+	SignalVersionID string          `json:"signal_version_id"`
+	CreatedAt       string          `json:"created_at"`
+	VersionNumber   int32           `json:"version_number"`
+	Content         json.RawMessage `json:"content"`
+}
+
+// SearchSignalWithCorrelationsAndVersions represents a signal with optional correlations and versions
+type SearchSignalWithCorrelationsAndVersions struct {
+	SearchSignal
+	CorrelatedSignals      []SearchSignal          `json:"correlated_signals,omitempty"`
+	PreviousSignalVersions []PreviousSignalVersion `json:"previous_signal_versions,omitempty"`
+}
+
+// SignalSearchResponse represents the response from signal search (direct array)
+type SignalSearchResponse []SearchSignalWithCorrelationsAndVersions
+
 // SearchSignals use the signalsd API to search for signals
-func (c *Client) SearchSignals(accessToken string, params types.SignalSearchParams, visibility string) (*types.SignalSearchResponse, error) {
+func (c *Client) SearchSignals(accessToken string, params SignalSearchParams, visibility string) (*SignalSearchResponse, error) {
 	// Build URL based on ISN visibility (public ISNs use /api/public/, private use /api/)
 	var url string
 	if visibility == "public" {
@@ -68,7 +119,7 @@ func (c *Client) SearchSignals(accessToken string, params types.SignalSearchPara
 		return nil, NewClientApiError(res)
 	}
 
-	var searchResp types.SignalSearchResponse
+	var searchResp SignalSearchResponse
 	if err := json.NewDecoder(res.Body).Decode(&searchResp); err != nil {
 		return nil, NewClientInternalError(err, "decoding search response")
 	}

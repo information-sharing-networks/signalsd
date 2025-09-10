@@ -8,7 +8,6 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
-	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
 // SearchSignalsPage renders the signal search page
@@ -37,7 +36,7 @@ func (h *HandlerService) SearchSignals(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Parse search parameters
-	params := types.SignalSearchParams{
+	params := client.SignalSearchParams{
 		IsnSlug:                 r.FormValue("isn_slug"),
 		SignalTypeSlug:          r.FormValue("signal_type_slug"),
 		SemVer:                  r.FormValue("sem_ver"),
