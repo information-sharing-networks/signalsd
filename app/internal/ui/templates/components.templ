@@ -7,7 +7,7 @@ import (
 
 
 // the list of available signal types for the selected ISN
-templ SignalTypeOptions(signalTypes []types.SignalTypeDropdown) {
+templ SignalTypeOptions(signalTypes []types.SignalTypeOption) {
 	<select
 		id="signal_type_slug"
 		name="signal_type_slug"
@@ -27,7 +27,7 @@ templ SignalTypeOptions(signalTypes []types.SignalTypeDropdown) {
 }
 
 // the list of available versions for the selected signal type
-templ SignalTypeVersionOptions(versions []types.VersionDropdown) {
+templ SignalTypeVersionOptions(versions []types.VersionOption) {
 	<select
 		id="sem_ver"
 		name="sem_ver"

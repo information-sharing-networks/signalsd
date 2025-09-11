@@ -96,10 +96,10 @@ func (h *HandlerService) RenderSignalTypeOptions(w http.ResponseWriter, r *http.
 		}
 	}
 
-	// Convert to slice of SignalTypeDropdown
-	signalTypes := make([]types.SignalTypeDropdown, 0, len(signalTypeMap))
+	// Convert to slice of SignalTypeOption
+	signalTypes := make([]types.SignalTypeOption, 0, len(signalTypeMap))
 	for signalType := range signalTypeMap {
-		signalTypes = append(signalTypes, types.SignalTypeDropdown{
+		signalTypes = append(signalTypes, types.SignalTypeOption{
 			Slug: signalType,
 		})
 	}
@@ -156,12 +156,12 @@ func (h *HandlerService) RenderSignalTypeVersionOptions(w http.ResponseWriter, r
 	}
 
 	// Find versions for the specific signal type
-	versions := make([]types.VersionDropdown, 0)
+	versions := make([]types.VersionOption, 0)
 	for _, path := range isnPerm.SignalTypePaths {
 		// Path format: "signal-type-slug/v1.0.0"
 		parts := strings.Split(path, "/v")
 		if len(parts) == 2 && parts[0] == signalTypeSlug {
-			versions = append(versions, types.VersionDropdown{
+			versions = append(versions, types.VersionOption{
 				Version: parts[1],
 			})
 		}

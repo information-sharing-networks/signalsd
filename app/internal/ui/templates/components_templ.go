@@ -15,7 +15,7 @@ import (
 )
 
 // the list of available signal types for the selected ISN
-func SignalTypeOptions(signalTypes []types.SignalTypeDropdown) templ.Component {
+func SignalTypeOptions(signalTypes []types.SignalTypeOption) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -81,7 +81,7 @@ func SignalTypeOptions(signalTypes []types.SignalTypeDropdown) templ.Component {
 }
 
 // the list of available versions for the selected signal type
-func SignalTypeVersionOptions(versions []types.VersionDropdown) templ.Component {
+func SignalTypeVersionOptions(versions []types.VersionOption) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {

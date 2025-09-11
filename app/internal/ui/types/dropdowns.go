@@ -11,11 +11,11 @@ type IsnOption struct {
 	Visibility string `json:"visibility"`
 }
 
-type SignalTypeDropdown struct {
+type SignalTypeOption struct {
 	Slug string `json:"slug"`
 }
 
-type VersionDropdown struct {
+type VersionOption struct {
 	Version string `json:"version"`
 }
 
