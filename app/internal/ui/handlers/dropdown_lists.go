@@ -21,13 +21,13 @@ type HandlerService struct {
 	Environment string
 }
 
-// getIsnDropDown is a helper that returns a list of ISNs for the dropdown list. The list is used as a parater on several pages,
+// getIsnOptions is a helper that returns a list of ISNs for the dropdown list. The list is used as a parater on several pages,
 // Optionally the selected value can be use to trigger a cascading update of the signal type dropdown list (see SignalTypeOptionsHandler)
 //
 // If filterByIsnAdmin is true, only ISNs where the user is an admin are returned.
 // If filterByWritePerm is true, only ISNs where the user has write permission are returned.
-func (h *HandlerService) getIsnDropDownList(isnPerms map[string]types.IsnPerm, filterByIsnAdmin bool, filterByWritePerm bool) []types.IsnDropdown {
-	isns := make([]types.IsnDropdown, 0, len(isnPerms))
+func (h *HandlerService) getIsnOptions(isnPerms map[string]types.IsnPerm, filterByIsnAdmin bool, filterByWritePerm bool) []types.IsnOption {
+	isns := make([]types.IsnOption, 0, len(isnPerms))
 	for isnSlug, perm := range isnPerms {
 		if filterByIsnAdmin && !perm.IsnAdmin {
 			continue
@@ -35,7 +35,7 @@ func (h *HandlerService) getIsnDropDownList(isnPerms map[string]types.IsnPerm, f
 		if filterByWritePerm && perm.Permission != "write" {
 			continue
 		}
-		isns = append(isns, types.IsnDropdown{
+		isns = append(isns, types.IsnOption{
 			Slug:    isnSlug,
 			IsInUse: true,
 		})
@@ -172,4 +172,44 @@ func (h *HandlerService) RenderSignalTypeVersionOptions(w http.ResponseWriter, r
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render version options", slog.String("error", err.Error()))
 	}
+}
+
+func (h *HandlerService) RenderServiceAccountOptions(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	// Get access token from cookie
+	accessTokenCookie, err := r.Cookie(config.AccessTokenCookieName)
+	if err != nil {
+		component := templates.ErrorAlert("Authentication required. Please log in again.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	accessToken := accessTokenCookie.Value
+
+	// Get service accounts from API
+	serviceAccounts, err := h.ApiClient.GetServiceAccounts(accessToken)
+	if err != nil {
+		reqLogger.Error("Failed to get service accounts", slog.String("error", err.Error()))
+		return
+	}
+
+	// Convert to slice of ServiceAccountDropdown
+	serviceAccountOptions := make([]types.ServiceAccountOption, 0, len(serviceAccounts))
+	for _, account := range serviceAccounts {
+		serviceAccountOptions = append(serviceAccountOptions, types.ServiceAccountOption{
+			ClientOrganization: account.ClientOrganization,
+			ClientContactEmail: account.ClientContactEmail,
+		})
+	}
+
+	/* todo
+	// Render service account dropdown options
+	component := templates.ServiceAccountOptions(serviceAccountOptions)
+	if err := component.Render(r.Context(), w); err != nil {
+		reqLogger.Error("Failed to render service account options", slog.String("error", err.Error()))
+	}
+	*/
 }

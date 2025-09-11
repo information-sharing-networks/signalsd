@@ -23,7 +23,7 @@ func (h *HandlerService) UpdateIsnAccountPage(w http.ResponseWriter, r *http.Req
 	}
 
 	// Convert permissions to ISN list for dropdown (only ISNs where user has admin rights)
-	isns := h.getIsnDropDownList(isnPerms, true, false)
+	isns := h.getIsnOptions(isnPerms, true, false)
 
 	// Render admin page
 	component := templates.IsnAccountManagementPage(isns)

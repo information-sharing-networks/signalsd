@@ -5,7 +5,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
-templ IsnAccountManagementPage(isns []types.IsnDropdown) {
+templ IsnAccountManagementPage(isns []types.IsnOption) {
 	@BaseLayout("ISN Account Management") {
 		@Navigation()
 		<div class="page-container">

@@ -9,7 +9,7 @@ import (
 // =============================================================================
 // SIGNAL SEARCH PAGE & RESULTS
 // =============================================================================
-templ SignalSearchPage(isns []types.IsnDropdown, perms map[string]types.IsnPerm, results []client.SearchSignalWithCorrelationsAndVersions) {
+templ SignalSearchPage(isns []types.IsnOption, perms map[string]types.IsnPerm, results []client.SearchSignalWithCorrelationsAndVersions) {
 	@BaseLayout("Signal Search") {
 		@Navigation()
 		<div class="page-container">

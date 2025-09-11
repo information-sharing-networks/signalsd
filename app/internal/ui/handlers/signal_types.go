@@ -24,7 +24,7 @@ func (h *HandlerService) CreateSignalTypePage(w http.ResponseWriter, r *http.Req
 	}
 
 	// populate the isn dropdown list with ISNs where the user is an admin
-	isns := h.getIsnDropDownList(isnPerms, true, false)
+	isns := h.getIsnOptions(isnPerms, true, false)
 
 	// Render signal type management page
 	component := templates.CreateSignalTypePage(isns)
