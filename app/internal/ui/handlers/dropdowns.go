@@ -205,11 +205,9 @@ func (h *HandlerService) RenderServiceAccountOptions(w http.ResponseWriter, r *h
 		})
 	}
 
-	/* todo
 	// Render service account dropdown options
 	component := templates.ServiceAccountOptions(serviceAccountOptions)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render service account options", slog.String("error", err.Error()))
 	}
-	*/
 }

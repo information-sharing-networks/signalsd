@@ -50,7 +50,7 @@ func CreateServiceAccount() templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Create New Servce Account</h1><div class=\"card mb-6\"><div class=\"card-body\"><form hx-post=\"/ui-api/create-service-account\" hx-target=\"#service-account-result\" class=\"space-y-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\"><label for=\"email\" class=\"form-label\">contact email</label> <input id=\"email\" name=\"email\" type=\"email\" class=\"form-input\" placeholder=\"contact email for the service account\"></div></div><div class=\"form-group\"><label for=\"organization\" class=\"form-label\">client organisation</label> <input id=\"organization\" name=\"organization\" type=\"text\" required class=\"form-input\" placeholder=\"Client organization name\"></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Create service account</button></div></form></div></div><div id=\"service-account-result\"></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Create New Servce Account</h1><div class=\"card mb-6\"><div class=\"card\"><div class=\"card-body\"><h3 class=\"card-title\">Debug ServiceAccounts</h3><a hx-post=\"/ui-api/service-account-options\" hx-target=\"#service-account-result\" class=\"btn btn-secondary\">Search Signals</a></div></div><div class=\"card mb-6\"><div class=\"card-body\"><h3 class=\"card-title\">Reissue service account credentials</h3><div hx-get=\"/ui-api/service-account-options\" hx-target=\"#service-account-result2\" class=\"btn btn-secondary\"></div><div id=\"service-account-result2\"></div></div></div><div class=\"card mb-6\"><div class=\"card-body\"><div id=\"service-account-result\"></div></div></div><div class=\"card-body\"><form hx-post=\"/ui-api/create-service-account\" hx-target=\"#service-account-result\" class=\"space-y-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\"><label for=\"email\" class=\"form-label\">contact email</label> <input id=\"email\" name=\"email\" type=\"email\" class=\"form-input\" placeholder=\"contact email for the service account\"></div></div><div class=\"form-group\"><label for=\"organization\" class=\"form-label\">client organisation</label> <input id=\"organization\" name=\"organization\" type=\"text\" required class=\"form-input\" placeholder=\"Client organization name\"></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Create service account</button></div></form></div></div><div id=\"service-account-result\"></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -100,7 +100,7 @@ func ServiceAccountCreationSuccess(response client.CreateServiceAccountResponse)
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(response.ClientID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 59, Col: 106}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 79, Col: 106}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -113,7 +113,7 @@ func ServiceAccountCreationSuccess(response client.CreateServiceAccountResponse)
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(response.AccountID.String())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 60, Col: 117}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 80, Col: 117}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
@@ -126,7 +126,7 @@ func ServiceAccountCreationSuccess(response client.CreateServiceAccountResponse)
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(response.SetupURL)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 62, Col: 92}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 82, Col: 92}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {

@@ -91,6 +91,7 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 		// render drop down options
 		r.Post("/ui-api/signal-type-options", handlerService.RenderSignalTypeOptions)
 		r.Post("/ui-api/signal-type-version-options", handlerService.RenderSignalTypeVersionOptions)
+		r.Post("/ui-api/service-account-options", handlerService.RenderServiceAccountOptions)
 
 		// render individual fields
 		r.Post("/ui-api/account-identifier-field", handlerService.RenderAccountIdentifierField)

@@ -26,6 +26,20 @@ templ SignalTypeOptions(signalTypes []types.SignalTypeOption) {
 	</select>
 }
 
+templ ServiceAccountOptions(serviceAccounts []types.ServiceAccountOption) {
+	<select
+		id="service_account"
+		name="service_account"
+		required
+		class="form-select"
+	>
+		<option value="">Select Service Account...</option>
+		for _, account := range serviceAccounts {
+			<option value={ account.ClientOrganization }>{ account.ClientOrganization } ({ account.ClientContactEmail })</option>
+		}
+	</select>
+}
+
 // the list of available versions for the selected signal type
 templ SignalTypeVersionOptions(versions []types.VersionOption) {
 	<select
