@@ -27,8 +27,18 @@ These tests verify the authentication and authorization system by running databa
 - ✅ Disabled account handling
 
 
-### 2. OAuth Endpoints (`oauth_test.go`)
+### 2. User Registration (`register_test.go`)
+Tests user and service account registration via HTTP requests.
 
+- ✅ User registration flow
+- ✅ Duplicate email handling
+- ✅ Password validation and hashing
+- ✅ Error response validation
+- ✅ Service account registration flow
+- ✅ Duplicate email/org handling
+- ✅ Error response validation
+
+### 3. OAuth (`oauth_test.go`)
 Tests OAuth token generation and revocation via HTTP requests.
 
 - ✅ Client credentials grant (service accounts)
@@ -37,7 +47,7 @@ Tests OAuth token generation and revocation via HTTP requests.
 - ✅ Cookie handling and rotation
 - ✅ Error response validation
 
-### 3. Signal Endpoints (`signal_test.go`)
+### 4. Signal Endpoints (`signal_test.go`)
 
 Tests signal creation, search, and security controls via HTTP requests.
 
@@ -51,7 +61,7 @@ Tests signal creation, search, and security controls via HTTP requests.
 - ✅ Cross-ISN data leakage prevention
 
 
-### 4. Batch Management (`batch_test.go`)
+### 5. Batch Management (`batch_test.go`)
 
 - ✅ Batch creation and automatic closure
 - ✅ Service account submission requirements
@@ -59,9 +69,9 @@ Tests signal creation, search, and security controls via HTTP requests.
 
 **TODO**
 - Rate limiting integration tests (unit tests exist)
-- ISN admin endpoints (auth is tested, but not HTTP handling)
+- ISN admin endpoints (auth is tested but HTTP handling not yet implemented)
 
-### 5. CORS (`cors_test.go`)
+### 6. CORS (`cors_test.go`)
 
 - ✅ Origin validation and enforcement
 - ✅ Public vs protected endpoint policies
