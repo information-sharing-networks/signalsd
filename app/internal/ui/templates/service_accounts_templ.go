@@ -12,8 +12,8 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 )
 
-// CreateServiceAccount renders the create service account page
-func CreateServiceAccount() templ.Component {
+// ManageServiceAccounts renders the create service account page
+func ManageServiceAccounts() templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -50,7 +50,15 @@ func CreateServiceAccount() templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Manage Service Accounts</h1><!-- Reissue Service Account Credentials Section --><div class=\"card mb-6\"><div class=\"card-body\"><h3 class=\"card-title\">Reissue Service Account Credentials</h3><p class=\"text-muted mb-4\">Select an existing service account to reissue its credentials. This will revoke all existing client secrets and generate new ones.</p><div class=\"form-group\"><label for=\"service-account-dropdown\" class=\"form-label\">Service Account</label> <select id=\"service-account-dropdown\" hx-get=\"/ui-api/service-account-options\" hx-trigger=\"load\" hx-swap=\"outerHTML\"><!-- Service account dropdown will be loaded here --></select></div><div class=\"form-group mt-4\"><button id=\"reissue-btn\" hx-post=\"/ui-api/reissue-service-account\" hx-target=\"#reissue-result\" hx-include=\"#service-account-dropdown\" class=\"btn btn-warning\" disabled>Reissue Credentials</button></div><div id=\"reissue-result\" class=\"mt-4\"></div></div></div><!-- Create New Service Account Section --><div class=\"card mb-6\"><div class=\"card-body\"><h3 class=\"card-title\">Create New Service Account</h3><form hx-post=\"/ui-api/create-service-account\" hx-target=\"#create-result\" class=\"space-y-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\"><label for=\"email\" class=\"form-label\">Contact Email</label> <input id=\"email\" name=\"email\" type=\"email\" class=\"form-input\" placeholder=\"Contact email for the service account\"></div></div><div class=\"form-group\"><label for=\"organization\" class=\"form-label\">Client Organization</label> <input id=\"organization\" name=\"organization\" type=\"text\" required class=\"form-input\" placeholder=\"Client organization name\"></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Create Service Account</button></div></form><div id=\"create-result\" class=\"mt-4\"></div></div></div></div><script>\n\t\t\t// Enable/disable reissue button based on dropdown selection\n\t\t\tdocument.addEventListener('htmx:afterSettle', function(e) {\n\t\t\t\tif (e.target.id === 'service-account-dropdown') {\n\t\t\t\t\tconst dropdown = document.getElementById('service-account-dropdown');\n\t\t\t\t\tconst reissueBtn = document.getElementById('reissue-btn');\n\n\t\t\t\t\tif (dropdown && reissueBtn) {\n\t\t\t\t\t\tdropdown.addEventListener('change', function() {\n\t\t\t\t\t\t\treissueBtn.disabled = !this.value;\n\t\t\t\t\t\t});\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t});\n\t\t</script>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Manage Service Accounts</h1><!-- Reissue Service Account Credentials Section --><div class=\"card mb-6\"><div class=\"card-body\"><h3 class=\"card-title\">Reissue Service Account Credentials</h3>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = WarningAlert("Warning: Reissuing credentials will revoke all existing client secrets for the service account and generate new ones.").Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<p class=\"text-muted mb-4\">Select an existing service account to reissue its credentials.</p><div class=\"form-group\"><label for=\"service-account-dropdown\" class=\"form-label\">Service Account</label> <select id=\"service-account-dropdown\" hx-get=\"/ui-api/service-account-options\" hx-trigger=\"load\" hx-swap=\"outerHTML\"><!-- Service account dropdown will be loaded here --></select></div><div class=\"form-group mt-4\"><button id=\"reissue-btn\" hx-post=\"/ui-api/reissue-service-account\" hx-target=\"#reissue-result\" hx-include=\"#service-account-dropdown\" class=\"btn btn-warning\" disabled>Reissue Credentials</button></div><div id=\"reissue-result\" class=\"mt-4\"></div></div></div><!-- Create New Service Account Section --><div class=\"card mb-6\"><div class=\"card-body\"><h3 class=\"card-title\">Create New Service Account</h3><form hx-post=\"/ui-api/create-service-account\" hx-target=\"#create-result\" class=\"space-y-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\"><label for=\"email\" class=\"form-label\">Contact Email</label> <input id=\"email\" name=\"email\" type=\"email\" class=\"form-input\" placeholder=\"Contact email for the service account\"></div></div><div class=\"form-group\"><label for=\"organization\" class=\"form-label\">Client Organization</label> <input id=\"organization\" name=\"organization\" type=\"text\" required class=\"form-input\" placeholder=\"Client organization name\"></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Create Service Account</button></div></form><div id=\"create-result\" class=\"mt-4\"></div></div></div></div><script>\n\t\t\t// Enable/disable reissue button based on dropdown selection\n\t\t\tdocument.addEventListener('htmx:afterSettle', function(e) {\n\t\t\t\tif (e.target.id === 'service-account-dropdown') {\n\t\t\t\t\tconst dropdown = document.getElementById('service-account-dropdown');\n\t\t\t\t\tconst reissueBtn = document.getElementById('reissue-btn');\n\n\t\t\t\t\tif (dropdown && reissueBtn) {\n\t\t\t\t\t\tdropdown.addEventListener('change', function() {\n\t\t\t\t\t\t\treissueBtn.disabled = !this.value;\n\t\t\t\t\t\t});\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t});\n\t\t</script>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -85,7 +93,7 @@ func ServiceAccountCreationSuccess(response client.CreateServiceAccountResponse)
 			templ_7745c5c3_Var3 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"card\"><div class=\"card-body\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div class=\"card\"><div class=\"card-body\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -93,7 +101,7 @@ func ServiceAccountCreationSuccess(response client.CreateServiceAccountResponse)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div class=\"mt-4 space-y-2\"><p><strong>Client ID:</strong> <code class=\"text-sm bg-gray-100 px-2 py-1 rounded\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"mt-4 space-y-2\"><p><strong>Client ID:</strong> <code class=\"text-sm bg-gray-100 px-2 py-1 rounded\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -106,7 +114,7 @@ func ServiceAccountCreationSuccess(response client.CreateServiceAccountResponse)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</code></p><p><strong>Account ID:</strong> <code class=\"text-sm bg-gray-100 px-2 py-1 rounded\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</code></p><p><strong>Account ID:</strong> <code class=\"text-sm bg-gray-100 px-2 py-1 rounded\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -119,7 +127,7 @@ func ServiceAccountCreationSuccess(response client.CreateServiceAccountResponse)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</code></p><p><strong>Setup URL:</strong> <code class=\"text-xs bg-gray-100 px-2 py-1 rounded block break-all\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</code></p><p><strong>Setup URL:</strong> <code class=\"text-xs bg-gray-100 px-2 py-1 rounded block break-all\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -132,7 +140,7 @@ func ServiceAccountCreationSuccess(response client.CreateServiceAccountResponse)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</code></p></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</code></p></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -161,7 +169,7 @@ func ServiceAccountReissueSuccess(response client.ReissueServiceAccountResponse)
 			templ_7745c5c3_Var7 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<div class=\"card\"><div class=\"card-body\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<div class=\"card\"><div class=\"card-body\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -169,7 +177,7 @@ func ServiceAccountReissueSuccess(response client.ReissueServiceAccountResponse)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<div class=\"mt-4 space-y-2\"><p><strong>Client ID:</strong> <code class=\"text-sm bg-gray-100 px-2 py-1 rounded\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<div class=\"mt-4 space-y-2\"><p><strong>Client ID:</strong> <code class=\"text-sm bg-gray-100 px-2 py-1 rounded\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -182,7 +190,7 @@ func ServiceAccountReissueSuccess(response client.ReissueServiceAccountResponse)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</code></p><p><strong>New Setup URL:</strong> <code class=\"text-sm bg-gray-100 px-2 py-1 rounded block break-all\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</code></p><p><strong>New Setup URL:</strong> <code class=\"text-sm bg-gray-100 px-2 py-1 rounded block break-all\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -195,7 +203,7 @@ func ServiceAccountReissueSuccess(response client.ReissueServiceAccountResponse)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</code></p><p class=\"text-sm text-gray-600 mt-2\"><strong>Note:</strong> All previous client secrets have been revoked. The owner of this account can use the link above to retrieve their new client secret (the link can only be used once and expires in 48 hours).</p></div></div></div><script>\n\t\t// Disable the reissue button after successful reissue\n\t\tconst reissueBtn = document.getElementById('reissue-btn');\n\t\tif (reissueBtn) {\n\t\t\treissueBtn.disabled = true;\n\t\t\treissueBtn.classList.add('opacity-50', 'cursor-not-allowed');\n\t\t\treissueBtn.textContent = 'Credentials Reissued';\n\t\t}\n\t</script>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</code></p><p class=\"text-sm text-gray-600 mt-2\"><strong>Note:</strong> All previous client secrets have been revoked. The owner of this account can use the link above to retrieve their new client secret (the link can only be used once and expires in 48 hours).</p></div></div></div><script>\n\t\t// Disable the reissue button after successful reissue\n\t\tconst reissueBtn = document.getElementById('reissue-btn');\n\t\tif (reissueBtn) {\n\t\t\treissueBtn.disabled = true;\n\t\t\treissueBtn.classList.add('opacity-50', 'cursor-not-allowed');\n\t\t\treissueBtn.textContent = 'Credentials Reissued';\n\t\t}\n\t</script>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

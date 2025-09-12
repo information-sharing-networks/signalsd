@@ -11,10 +11,10 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
 )
 
-func (h *HandlerService) CreateServiceAccountPage(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerService) ManageServiceAccountsPage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
-	component := templates.CreateServiceAccount()
+	component := templates.ManageServiceAccounts()
 
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render CreateServiceAccount template", slog.String("error", err.Error()))

@@ -116,7 +116,7 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 		r.Post("/ui-api/create-isn", handlerService.CreateIsn)
 
 		// service accounts
-		r.Get("/admin/service-accounts", handlerService.CreateServiceAccountPage)
+		r.Get("/admin/service-accounts", handlerService.ManageServiceAccountsPage)
 		r.Post("/ui-api/create-service-account", handlerService.CreateServiceAccount)
 		r.Post("/ui-api/reissue-service-account", handlerService.ReissueServiceAccount)
 
