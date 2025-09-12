@@ -101,7 +101,7 @@ func ServiceAccountOptions(serviceAccounts []types.ServiceAccountOption) templ.C
 			templ_7745c5c3_Var4 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<select id=\"service-account-dropdown\" name=\"service-account-dropdown\" required class=\"form-select\"><option value=\"\">Select Service Account...</option> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<select id=\"service-account-dropdown\" name=\"service-account-dropdown\" required class=\"form-select\" hx-on:change=\"htmx.trigger('#reissue-result', 'clear-alerts')\"><option value=\"\">Select Service Account...</option> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -113,7 +113,7 @@ func ServiceAccountOptions(serviceAccounts []types.ServiceAccountOption) templ.C
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(account.ClientOrganization + "|" + account.ClientContactEmail)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 38, Col: 80}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 39, Col: 80}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -126,7 +126,7 @@ func ServiceAccountOptions(serviceAccounts []types.ServiceAccountOption) templ.C
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(account.ClientOrganization)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 38, Col: 111}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 39, Col: 111}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -139,7 +139,7 @@ func ServiceAccountOptions(serviceAccounts []types.ServiceAccountOption) templ.C
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(account.ClientContactEmail)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 38, Col: 143}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 39, Col: 143}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -192,7 +192,7 @@ func SignalTypeVersionOptions(versions []types.VersionOption) templ.Component {
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(version.Version)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 53, Col: 34}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 54, Col: 34}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
@@ -205,7 +205,7 @@ func SignalTypeVersionOptions(versions []types.VersionOption) templ.Component {
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(version.Version)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 53, Col: 54}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 54, Col: 54}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -252,7 +252,7 @@ func WarningAlert(message string) templ.Component {
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(message)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 61, Col: 11}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 62, Col: 11}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
@@ -294,7 +294,7 @@ func ErrorAlert(message string) templ.Component {
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(message)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 67, Col: 11}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 68, Col: 11}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 		if templ_7745c5c3_Err != nil {
@@ -336,7 +336,7 @@ func SuccessAlert(message string) templ.Component {
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(message)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 73, Col: 11}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 74, Col: 11}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
@@ -378,7 +378,7 @@ func SignalMetadataItem(label, value string) templ.Component {
 		var templ_7745c5c3_Var18 string
 		templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 79, Col: 45}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 80, Col: 45}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 		if templ_7745c5c3_Err != nil {
@@ -391,7 +391,7 @@ func SignalMetadataItem(label, value string) templ.Component {
 		var templ_7745c5c3_Var19 string
 		templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(value)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 80, Col: 44}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 81, Col: 44}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 		if templ_7745c5c3_Err != nil {
@@ -433,7 +433,7 @@ func SignalMetadataSimple(label, value string) templ.Component {
 		var templ_7745c5c3_Var21 string
 		templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 86, Col: 45}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 87, Col: 45}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 		if templ_7745c5c3_Err != nil {
@@ -446,7 +446,7 @@ func SignalMetadataSimple(label, value string) templ.Component {
 		var templ_7745c5c3_Var22 string
 		templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(value)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 86, Col: 63}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 87, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 		if templ_7745c5c3_Err != nil {
@@ -488,7 +488,7 @@ func CheckboxField(name, value, label string) templ.Component {
 		var templ_7745c5c3_Var24 string
 		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 92, Col: 36}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 93, Col: 36}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
 		if templ_7745c5c3_Err != nil {
@@ -501,7 +501,7 @@ func CheckboxField(name, value, label string) templ.Component {
 		var templ_7745c5c3_Var25 string
 		templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(value)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 92, Col: 52}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 93, Col: 52}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 		if templ_7745c5c3_Err != nil {
@@ -514,7 +514,7 @@ func CheckboxField(name, value, label string) templ.Component {
 		var templ_7745c5c3_Var26 string
 		templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(label)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 93, Col: 31}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 94, Col: 31}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 		if templ_7745c5c3_Err != nil {

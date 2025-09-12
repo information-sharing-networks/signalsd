@@ -58,7 +58,7 @@ func ManageServiceAccounts() templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<p class=\"text-muted mb-4\">Select an existing service account to reissue its credentials.</p><div class=\"form-group\"><label for=\"service-account-dropdown\" class=\"form-label\">Service Account</label> <select id=\"service-account-dropdown\" hx-get=\"/ui-api/service-account-options\" hx-trigger=\"load\" hx-swap=\"outerHTML\"><!-- Service account dropdown will be loaded here --></select></div><div class=\"form-group mt-4\"><button id=\"reissue-btn\" hx-post=\"/ui-api/reissue-service-account\" hx-target=\"#reissue-result\" hx-include=\"#service-account-dropdown\" class=\"btn btn-warning\" disabled>Reissue Credentials</button></div><div id=\"reissue-result\" class=\"mt-4\"></div></div></div><!-- Create New Service Account Section --><div class=\"card mb-6\"><div class=\"card-body\"><h3 class=\"card-title\">Create New Service Account</h3><form hx-post=\"/ui-api/create-service-account\" hx-target=\"#create-result\" class=\"space-y-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\"><label for=\"email\" class=\"form-label\">Contact Email</label> <input id=\"email\" name=\"email\" type=\"email\" class=\"form-input\" placeholder=\"Contact email for the service account\"></div></div><div class=\"form-group\"><label for=\"organization\" class=\"form-label\">Client Organization</label> <input id=\"organization\" name=\"organization\" type=\"text\" required class=\"form-input\" placeholder=\"Client organization name\"></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Create Service Account</button></div></form><div id=\"create-result\" class=\"mt-4\"></div></div></div></div><script>\n\t\t\t// Enable/disable reissue button based on dropdown selection\n\t\t\tdocument.addEventListener('htmx:afterSettle', function(e) {\n\t\t\t\tif (e.target.id === 'service-account-dropdown') {\n\t\t\t\t\tconst dropdown = document.getElementById('service-account-dropdown');\n\t\t\t\t\tconst reissueBtn = document.getElementById('reissue-btn');\n\n\t\t\t\t\tif (dropdown && reissueBtn) {\n\t\t\t\t\t\tdropdown.addEventListener('change', function() {\n\t\t\t\t\t\t\treissueBtn.disabled = !this.value;\n\t\t\t\t\t\t});\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t});\n\t\t</script>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<p class=\"text-muted mb-4\">Select an existing service account to reissue its credentials.</p><div class=\"form-group\"><label for=\"service-account-dropdown\" class=\"form-label\">Service Account</label> <select id=\"service-account-dropdown\" hx-get=\"/ui-api/service-account-options\" hx-trigger=\"load\" hx-swap=\"outerHTML\" hx-on:change=\"htmx.trigger('#reissue-result', 'clear-alerts')\"><!-- Service account dropdown will be loaded here --></select></div><div class=\"form-group mt-4\"><button id=\"reissue-btn\" hx-post=\"/ui-api/reissue-service-account\" hx-target=\"#reissue-result\" hx-include=\"#service-account-dropdown\" class=\"btn btn-warning\" disabled>Reissue Credentials</button></div><div id=\"reissue-result\" class=\"mt-4\"></div></div></div><!-- Create New Service Account Section --><div class=\"card mb-6\"><div class=\"card-body\"><h3 class=\"card-title\">Create New Service Account</h3><form hx-post=\"/ui-api/create-service-account\" hx-target=\"#create-result\" class=\"space-y-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\"><label for=\"email\" class=\"form-label\">Contact Email</label> <input id=\"email\" name=\"email\" type=\"email\" class=\"form-input\" placeholder=\"Contact email for the service account\"></div></div><div class=\"form-group\"><label for=\"organization\" class=\"form-label\">Client Organization</label> <input id=\"organization\" name=\"organization\" type=\"text\" required class=\"form-input\" placeholder=\"Client organization name\"></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Create Service Account</button></div></form><div id=\"create-result\" class=\"mt-4\"></div></div></div></div><script>\n\t\t\t// Enable/disable reissue button based on dropdown selection\n\t\t\tdocument.addEventListener('htmx:afterSettle', function(e) {\n\t\t\t\tif (e.target.id === 'service-account-dropdown') {\n\t\t\t\t\tconst dropdown = document.getElementById('service-account-dropdown');\n\t\t\t\t\tconst reissueBtn = document.getElementById('reissue-btn');\n\n\t\t\t\t\tif (dropdown && reissueBtn) {\n\t\t\t\t\t\tdropdown.addEventListener('change', function() {\n\t\t\t\t\t\t\treissueBtn.disabled = !this.value;\n\t\t\t\t\t\t});\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t});\n\n\t\t\t// Clear alerts when dropdown selection changes\n\t\t\tdocument.addEventListener('clear-alerts', function(e) {\n\t\t\t\tif (e.target.id === 'reissue-result') {\n\t\t\t\t\te.target.innerHTML = '';\n\t\t\t\t}\n\t\t\t});\n\t\t</script>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -108,7 +108,7 @@ func ServiceAccountCreationSuccess(response client.CreateServiceAccountResponse)
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(response.ClientID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 109, Col: 106}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 122, Col: 106}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -121,7 +121,7 @@ func ServiceAccountCreationSuccess(response client.CreateServiceAccountResponse)
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(response.AccountID.String())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 110, Col: 117}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 123, Col: 117}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
@@ -134,7 +134,7 @@ func ServiceAccountCreationSuccess(response client.CreateServiceAccountResponse)
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(response.SetupURL)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 112, Col: 92}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 125, Col: 92}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -184,7 +184,7 @@ func ServiceAccountReissueSuccess(response client.ReissueServiceAccountResponse)
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(response.ClientID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 124, Col: 106}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 137, Col: 106}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
@@ -197,7 +197,7 @@ func ServiceAccountReissueSuccess(response client.ReissueServiceAccountResponse)
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(response.SetupURL)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 126, Col: 92}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 139, Col: 92}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {

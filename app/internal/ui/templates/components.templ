@@ -32,6 +32,7 @@ templ ServiceAccountOptions(serviceAccounts []types.ServiceAccountOption) {
 		name="service-account-dropdown"
 		required
 		class="form-select"
+		hx-on:change="htmx.trigger('#reissue-result', 'clear-alerts')"
 	>
 		<option value="">Select Service Account...</option>
 		for _, account := range serviceAccounts {
