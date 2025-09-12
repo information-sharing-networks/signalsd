@@ -36,7 +36,7 @@ func SignalTypeOptions(signalTypes []types.SignalTypeOption) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<select id=\"signal_type_slug\" name=\"signal_type_slug\" required hx-post=\"/ui-api/signal-type-version-options\" hx-target=\"#sem_ver\" hx-swap=\"outerHTML\" hx-trigger=\"change\" hx-include=\"#isn_slug, this\" class=\"form-select\"><option value=\"\">Select Signal Type...</option> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<select id=\"signal-type-slug\" name=\"signal-type-slug\" required hx-post=\"/ui-api/signal-type-version-options\" hx-target=\"#sem-ver\" hx-swap=\"outerHTML\" hx-trigger=\"change\" hx-include=\"#isn-slug, this\" class=\"form-select\"><option value=\"\">Select Signal Type...</option> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -101,7 +101,7 @@ func ServiceAccountOptions(serviceAccounts []types.ServiceAccountOption) templ.C
 			templ_7745c5c3_Var4 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<select id=\"service_account\" name=\"service_account\" required class=\"form-select\"><option value=\"\">Select Service Account...</option> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<select id=\"service-account-dropdown\" name=\"service-account-dropdown\" required class=\"form-select\"><option value=\"\">Select Service Account...</option> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -111,9 +111,9 @@ func ServiceAccountOptions(serviceAccounts []types.ServiceAccountOption) templ.C
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var5 string
-			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(account.ClientOrganization)
+			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(account.ClientOrganization + "|" + account.ClientContactEmail)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 38, Col: 45}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 38, Col: 80}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -126,7 +126,7 @@ func ServiceAccountOptions(serviceAccounts []types.ServiceAccountOption) templ.C
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(account.ClientOrganization)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 38, Col: 76}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 38, Col: 111}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -139,7 +139,7 @@ func ServiceAccountOptions(serviceAccounts []types.ServiceAccountOption) templ.C
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(account.ClientContactEmail)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 38, Col: 108}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/components.templ`, Line: 38, Col: 143}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -180,7 +180,7 @@ func SignalTypeVersionOptions(versions []types.VersionOption) templ.Component {
 			templ_7745c5c3_Var8 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<select id=\"sem_ver\" name=\"sem_ver\" required class=\"form-select\"><option value=\"\">Select Version...</option> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<select id=\"sem-ver\" name=\"sem-ver\" required class=\"form-select\"><option value=\"\">Select Version...</option> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

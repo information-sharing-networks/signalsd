@@ -51,7 +51,7 @@ func CreateSignalTypePage(isns []types.IsnOption) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Create New Signal Type</h1><div class=\"card mb-6\"><div class=\"card-body\"><form hx-post=\"/ui-api/create-signal-type\" hx-target=\"#signal-type-result\" class=\"space-y-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\"><label for=\"isn_slug\" class=\"form-label\">ISN</label> <select id=\"isn_slug\" name=\"isn_slug\" required class=\"form-select\"><option value=\"\">Select an ISN</option> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Create New Signal Type</h1><div class=\"card mb-6\"><div class=\"card-body\"><form hx-post=\"/ui-api/create-signal-type\" hx-target=\"#signal-type-result\" class=\"space-y-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\"><label for=\"isn-slug\" class=\"form-label\">ISN</label> <select id=\"isn-slug\" name=\"isn-slug\" required class=\"form-select\"><option value=\"\">Select an ISN</option> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

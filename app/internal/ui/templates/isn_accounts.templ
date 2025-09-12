@@ -20,10 +20,10 @@ templ IsnAccountManagementPage(isns []types.IsnOption) {
 					<form hx-post="/ui-api/update-isn-account" hx-target="#update-access-result" class="space-y-4">
 						<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 							<div class="form-group">
-								<label for="isn_slug" class="form-label">ISN</label>
+								<label for="isn-slug" class="form-label">ISN</label>
 								<select
-									id="isn_slug"
-									name="isn_slug"
+									id="isn-slug"
+									name="isn-slug"
 									required
 									class="form-select"
 								>
@@ -47,7 +47,7 @@ templ IsnAccountManagementPage(isns []types.IsnOption) {
 								>
 									<option value="">Select Type...</option>
 									<option value="user">Web User</option>
-									<option value="service_account">Service Account</option>
+									<option value="service-account">Service Account</option>
 								</select>
 							</div>
 							<div class="form-group" id="account-identifier-field">
@@ -107,7 +107,7 @@ templ AccountIdentifierField(accountType string) {
 				placeholder="user@example.com"
 				class="form-input"
 			/>
-		case "service_account":
+		case "service-account":
 			<label for="account_identifier" class="form-label">Client ID</label>
 			<input
 				type="text"

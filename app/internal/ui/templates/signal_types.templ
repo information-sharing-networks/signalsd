@@ -15,10 +15,10 @@ templ CreateSignalTypePage(isns []types.IsnOption) {
 					<form hx-post="/ui-api/create-signal-type" hx-target="#signal-type-result" class="space-y-4">
 						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 							<div class="form-group">
-								<label for="isn_slug" class="form-label">ISN</label>
+								<label for="isn-slug" class="form-label">ISN</label>
 								<select
-									id="isn_slug"
-									name="isn_slug"
+									id="isn-slug"
+									name="isn-slug"
 									required
 									class="form-select"
 								>

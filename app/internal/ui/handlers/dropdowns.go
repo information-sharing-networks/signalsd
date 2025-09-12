@@ -190,19 +190,14 @@ func (h *HandlerService) RenderServiceAccountOptions(w http.ResponseWriter, r *h
 	accessToken := accessTokenCookie.Value
 
 	// Get service accounts from API
-	serviceAccounts, err := h.ApiClient.GetServiceAccounts(accessToken)
+	serviceAccountOptions, err := h.ApiClient.GetServiceAccounts(accessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get service accounts", slog.String("error", err.Error()))
+		component := templates.ErrorAlert("Failed to load service accounts. Please try again.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
 		return
-	}
-
-	// Convert to slice of ServiceAccountDropdown
-	serviceAccountOptions := make([]types.ServiceAccountOption, 0, len(serviceAccounts))
-	for _, account := range serviceAccounts {
-		serviceAccountOptions = append(serviceAccountOptions, types.ServiceAccountOption{
-			ClientOrganization: account.ClientOrganization,
-			ClientContactEmail: account.ClientContactEmail,
-		})
 	}
 
 	// Render service account dropdown options

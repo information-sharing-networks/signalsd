@@ -91,7 +91,7 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 		// render drop down options
 		r.Post("/ui-api/signal-type-options", handlerService.RenderSignalTypeOptions)
 		r.Post("/ui-api/signal-type-version-options", handlerService.RenderSignalTypeVersionOptions)
-		r.Post("/ui-api/service-account-options", handlerService.RenderServiceAccountOptions)
+		r.Get("/ui-api/service-account-options", handlerService.RenderServiceAccountOptions)
 
 		// render individual fields
 		r.Post("/ui-api/account-identifier-field", handlerService.RenderAccountIdentifierField)
@@ -118,6 +118,7 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 		// service accounts
 		r.Get("/admin/service-accounts", handlerService.CreateServiceAccountPage)
 		r.Post("/ui-api/create-service-account", handlerService.CreateServiceAccount)
+		r.Post("/ui-api/reissue-service-account", handlerService.ReissueServiceAccount)
 
 		// isn management forms
 		r.Group(func(r chi.Router) {

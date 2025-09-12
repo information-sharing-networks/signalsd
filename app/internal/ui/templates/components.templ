@@ -9,14 +9,14 @@ import (
 // the list of available signal types for the selected ISN
 templ SignalTypeOptions(signalTypes []types.SignalTypeOption) {
 	<select
-		id="signal_type_slug"
-		name="signal_type_slug"
+		id="signal-type-slug"
+		name="signal-type-slug"
 		required
 		hx-post="/ui-api/signal-type-version-options"
-		hx-target="#sem_ver"
+		hx-target="#sem-ver"
 		hx-swap="outerHTML"
 		hx-trigger="change"
-		hx-include="#isn_slug, this"
+		hx-include="#isn-slug, this"
 		class="form-select"
 	>
 		<option value="">Select Signal Type...</option>
@@ -28,14 +28,14 @@ templ SignalTypeOptions(signalTypes []types.SignalTypeOption) {
 
 templ ServiceAccountOptions(serviceAccounts []types.ServiceAccountOption) {
 	<select
-		id="service_account"
-		name="service_account"
+		id="service-account-dropdown"
+		name="service-account-dropdown"
 		required
 		class="form-select"
 	>
 		<option value="">Select Service Account...</option>
 		for _, account := range serviceAccounts {
-			<option value={ account.ClientOrganization }>{ account.ClientOrganization } ({ account.ClientContactEmail })</option>
+			<option value={ account.ClientOrganization + "|" + account.ClientContactEmail }>{ account.ClientOrganization } ({ account.ClientContactEmail })</option>
 		}
 	</select>
 }
@@ -43,8 +43,8 @@ templ ServiceAccountOptions(serviceAccounts []types.ServiceAccountOption) {
 // the list of available versions for the selected signal type
 templ SignalTypeVersionOptions(versions []types.VersionOption) {
 	<select
-		id="sem_ver"
-		name="sem_ver"
+		id="sem-ver"
+		name="sem-ver"
 		required
 		class="form-select"
 	>
