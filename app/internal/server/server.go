@@ -214,7 +214,8 @@ func (s *Server) registerAdminRoutes() {
 					r.Use(s.authService.RequireValidAccessToken)
 					r.Use(s.authService.RequireRole("owner", "admin"))
 
-					r.Post("/register/service-accounts", serviceAccounts.RegisterServiceAccountHandler)
+					r.Post("/service-accounts/register", serviceAccounts.RegisterServiceAccountHandler)
+					r.Post("/service-accounts/reissue-credentials", serviceAccounts.ReissueServiceAccountCredentialsHandler)
 				})
 
 				r.Group(func(r chi.Router) {

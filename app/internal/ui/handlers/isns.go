@@ -10,20 +10,19 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
 )
 
-// IsnManagementHandler renders the ISN management page
-func (h *HandlerService) IsnManagementHandler(w http.ResponseWriter, r *http.Request) {
+// CreateIsnPage renders the Create ISN page
+func (h *HandlerService) CreateIsnPage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
-	// currently a single function is supported - create ISN
 	component := templates.CreateIsnPage()
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render create ISN page", slog.String("error", err.Error()))
 	}
 }
 
-// CreateIsnHandler handles the form submission to create a new ISN
+// CreateIsn handles the form submission to create a new ISN
 // use with RequireAdminOrOwnerRole middleware
-func (h *HandlerService) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerService) CreateIsn(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Parse form data
@@ -50,17 +49,16 @@ func (h *HandlerService) CreateIsnHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	//todo make helper
 	// Call the API to create the ISN
 	accessToken := accessTokenCookie.Value
-	createReq := client.CreateIsnRequest{
+	req := client.CreateIsnRequest{
 		Title:      title,
 		Detail:     detail,
 		IsInUse:    true,
 		Visibility: visibility,
 	}
 
-	response, err := h.ApiClient.CreateIsn(accessToken, createReq)
+	res, err := h.ApiClient.CreateIsn(accessToken, req)
 	if err != nil {
 		reqLogger.Error("Failed to create ISN", slog.String("error", err.Error()))
 
@@ -79,7 +77,7 @@ func (h *HandlerService) CreateIsnHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	// Success response
-	component := templates.IsnCreationSuccess(*response)
+	component := templates.IsnCreationSuccess(*res)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
 	}

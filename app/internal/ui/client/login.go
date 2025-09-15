@@ -12,7 +12,7 @@ import (
 )
 
 // Login authenticates a user with the signalsd API
-func (c *Client) Login(email, password string) (*types.AccesTokenDetails, *http.Cookie, error) {
+func (c *Client) Login(email, password string) (*types.AccessTokenDetails, *http.Cookie, error) {
 	loginReq := auth.LoginRequest{
 		Email:    email,
 		Password: password,
@@ -41,7 +41,7 @@ func (c *Client) Login(email, password string) (*types.AccesTokenDetails, *http.
 		return nil, nil, NewClientApiError(res)
 	}
 
-	var accessTokenDetails types.AccesTokenDetails
+	var accessTokenDetails types.AccessTokenDetails
 	if err := json.NewDecoder(res.Body).Decode(&accessTokenDetails); err != nil {
 		return nil, nil, NewClientInternalError(err, "decoding access token response")
 	}

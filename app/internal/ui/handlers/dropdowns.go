@@ -21,11 +21,33 @@ type HandlerService struct {
 	Environment string
 }
 
-// SignalTypeOptionsHandler gets the signal types for the selected ISN and returns the dropdown options
-func (h *HandlerService) SignalTypeOptionsHandler(w http.ResponseWriter, r *http.Request) {
+// getIsnOptions is a helper that returns a list of ISNs for the dropdown list. The list is used as a parater on several pages,
+// Optionally the selected value can be use to trigger a cascading update of the signal type dropdown list (see SignalTypeOptionsHandler)
+//
+// If filterByIsnAdmin is true, only ISNs where the user is an admin are returned.
+// If filterByWritePerm is true, only ISNs where the user has write permission are returned.
+func (h *HandlerService) getIsnOptions(isnPerms map[string]types.IsnPerm, filterByIsnAdmin bool, filterByWritePerm bool) []types.IsnOption {
+	isns := make([]types.IsnOption, 0, len(isnPerms))
+	for isnSlug, perm := range isnPerms {
+		if filterByIsnAdmin && !perm.IsnAdmin {
+			continue
+		}
+		if filterByWritePerm && perm.Permission != "write" {
+			continue
+		}
+		isns = append(isns, types.IsnOption{
+			Slug:    isnSlug,
+			IsInUse: true,
+		})
+	}
+	return isns
+}
+
+// RenderSignalTypeOptions gets the signal types for the selected ISN and renders the dropdown options
+func (h *HandlerService) RenderSignalTypeOptions(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
-	isnSlug := r.FormValue("isn_slug")
+	isnSlug := r.FormValue("isn-slug")
 	if isnSlug == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -74,10 +96,10 @@ func (h *HandlerService) SignalTypeOptionsHandler(w http.ResponseWriter, r *http
 		}
 	}
 
-	// Convert to slice of SignalTypeDropdown
-	signalTypes := make([]types.SignalTypeDropdown, 0, len(signalTypeMap))
+	// Convert to slice of SignalTypeOption
+	signalTypes := make([]types.SignalTypeOption, 0, len(signalTypeMap))
 	for signalType := range signalTypeMap {
-		signalTypes = append(signalTypes, types.SignalTypeDropdown{
+		signalTypes = append(signalTypes, types.SignalTypeOption{
 			Slug: signalType,
 		})
 	}
@@ -89,12 +111,12 @@ func (h *HandlerService) SignalTypeOptionsHandler(w http.ResponseWriter, r *http
 	}
 }
 
-// SignalTypeVersionOptionsHandler gets the versions for the selected signal type and returns the dropdown options
-func (h *HandlerService) SignalTypeVersionOptionsHandler(w http.ResponseWriter, r *http.Request) {
+// RenderSignalTypeVersionOptions gets the versions for the selected signal type and returns the dropdown options
+func (h *HandlerService) RenderSignalTypeVersionOptions(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
-	isnSlug := r.FormValue("isn_slug")
-	signalTypeSlug := r.FormValue("signal_type_slug")
+	isnSlug := r.FormValue("isn-slug")
+	signalTypeSlug := r.FormValue("signal-type-slug")
 	if isnSlug == "" || signalTypeSlug == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -134,12 +156,12 @@ func (h *HandlerService) SignalTypeVersionOptionsHandler(w http.ResponseWriter, 
 	}
 
 	// Find versions for the specific signal type
-	versions := make([]types.VersionDropdown, 0)
+	versions := make([]types.VersionOption, 0)
 	for _, path := range isnPerm.SignalTypePaths {
 		// Path format: "signal-type-slug/v1.0.0"
 		parts := strings.Split(path, "/v")
 		if len(parts) == 2 && parts[0] == signalTypeSlug {
-			versions = append(versions, types.VersionDropdown{
+			versions = append(versions, types.VersionOption{
 				Version: parts[1],
 			})
 		}
@@ -149,5 +171,38 @@ func (h *HandlerService) SignalTypeVersionOptionsHandler(w http.ResponseWriter, 
 	component := templates.SignalTypeVersionOptions(versions)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render version options", slog.String("error", err.Error()))
+	}
+}
+
+func (h *HandlerService) RenderServiceAccountOptions(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	// Get access token from cookie
+	accessTokenCookie, err := r.Cookie(config.AccessTokenCookieName)
+	if err != nil {
+		component := templates.ErrorAlert("Authentication required. Please log in again.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	accessToken := accessTokenCookie.Value
+
+	// Get service accounts from API
+	serviceAccountOptions, err := h.ApiClient.GetServiceAccounts(accessToken)
+	if err != nil {
+		reqLogger.Error("Failed to get service accounts", slog.String("error", err.Error()))
+		component := templates.ErrorAlert("Failed to load service accounts. Please try again.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	// Render service account dropdown options
+	component := templates.ServiceAccountOptions(serviceAccountOptions)
+	if err := component.Render(r.Context(), w); err != nil {
+		reqLogger.Error("Failed to render service account options", slog.String("error", err.Error()))
 	}
 }

@@ -102,7 +102,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "**Use Cases:**\n- **Security Incident**: Compromised account needs immediate lockout\n- **Employee Departure**: Remove access for departed staff\n\n**Actions Performed:**\n- Sets `is_active = false` (account becomes unusable)\n- Revokes all client secrets/one-time secrets (service accounts)\n- Revokes all refresh tokens (web users)\n\n**Recovery:** Account must be re-enabled by admin via `/admin/accounts/{id}/enable`\nService accounts also need re-registration via `/api/auth/register/service-accounts`\n\n**Note:** The site owner account cannot be disabled to prevent system lockout.\nOnly owners and admins can disable accounts.",
+                "description": "**Use Cases:**\n- **Security Incident**: Compromised account needs immediate lockout\n- **Employee Departure**: Remove access for departed staff\n\n**Actions Performed:**\n- Sets `is_active = false` (account becomes unusable)\n- Revokes all client secrets/one-time secrets (service accounts)\n- Revokes all refresh tokens (web users)\n\n**Recovery:** Account must be re-enabled by admin via `/admin/accounts/{id}/enable`\nService accounts will also need a new client secret via `/api/auth/service-accounts/reissue-credentials`\n\n**Note:** The site owner account cannot be disabled to prevent system lockout.\nOnly owners and admins can disable accounts.",
                 "tags": [
                     "Site Admin"
                 ],
@@ -155,7 +155,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "**Administrative endpoint to re-enable previously disabled accounts.**\nSets account status to `is_active = true` (does not create new tokens).\n\n**Post-Enable Steps Required:**\n- **Service Accounts**: Must re-register via `/api/auth/register/service-accounts` (same client_id, new credentials)\n- **Web Users**: Can immediately log in again via `/api/auth/login`\n\nOnly owners and admins can enable accounts.",
+                "description": "**Administrative endpoint to re-enable previously disabled accounts.**\nSets account status to `is_active = true` (does not create new tokens).\n\n**Post-Enable Steps Required:**\n- **Service Accounts**: will need a new client secret via `/api/auth/service-accounts/reissue_credentials`\n- **Web Users**: Can immediately log in again via `/api/auth/login`\n\nOnly owners and admins can enable accounts.",
                 "tags": [
                     "Site Admin"
                 ],
@@ -286,7 +286,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Only owners and admins can view service account lists.\n\n- No query parameters = return all service accounts\n- to return a specific service account supply one of the following query parameter: `?id=uuid` or `?client_id=id`\n",
+                "description": "Only owners and admins can view service account lists.\n\nTo return a specific service account supply one of the following query parameter combinations:\n-\tid (account ID)\n-\tclient_id\n-\tclient_email \u0026 client_organization\nNo query parameters = return all service accounts\n",
                 "tags": [
                     "Site Admin"
                 ],
@@ -304,6 +304,20 @@
                         "example": "sa_exampleorg_k7j2m9x1",
                         "description": "Service Account Client ID",
                         "name": "client_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "contact@example.com",
+                        "description": "Service Account Contact Email (must be used with client_organization)",
+                        "name": "client_email",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "Example Org",
+                        "description": "Service Account Organization (must be used with client_email)",
+                        "name": "client_organization",
                         "in": "query"
                     }
                 ],
@@ -584,18 +598,18 @@
                 }
             }
         },
-        "/api/auth/register/service-accounts": {
+        "/api/auth/service-accounts/register": {
             "post": {
                 "security": [
                     {
                         "BearerServiceAccount": []
                     }
                 ],
-                "description": "Registring a new service account creates a one-time link with the client credentials in it - this must be used by the client within 48 hrs.\n\nIf you want to reissue a client's credentials call this endpoint again with the same client organization and contact email.\nA new one-time setup url will be generated and the old one will be revoked.\nNote the client_id will remain the same and any existing client secrets will be revoked.\n\nYou have to be an admin or the site owner to use this endpoint\n",
+                "description": "Registring a new service account creates a one-time link with the client credentials in it - this must be used by the client within 48 hrs.\n\nNote that where an organization needs more than one service account they must supply unique contact emails for each account.\n\n\nTo reissue credentials for an existing service account, use the **Reissue Service Account Credentials** endpoint.\n\nYou have to be an admin or the site owner to use this endpoint\n",
                 "tags": [
                     "Service Accounts"
                 ],
-                "summary": "Register a new service account",
+                "summary": "Register service account",
                 "parameters": [
                     {
                         "description": "service account details",
@@ -608,8 +622,8 @@
                     }
                 ],
                 "responses": {
-                    "200": {
-                        "description": "OK",
+                    "201": {
+                        "description": "Created",
                         "schema": {
                             "$ref": "#/definitions/handlers.CreateServiceAccountResponse"
                         }
@@ -622,6 +636,63 @@
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/service-accounts/reissue-credentials": {
+            "post": {
+                "security": [
+                    {
+                        "BearerServiceAccount": []
+                    }
+                ],
+                "description": "Reissue credentials for an existing service account.\nThis creates a new one-time link with fresh client credentials - this must be used by the client within 48 hrs.\n\nThis endpoint revokes all existing client secrets and one-time setup URLs for the service account, then generates new credentials.\n\nThe client_id will remain the same, but a new client_secret will be generated.\n\nYou have to be an admin or the site owner to use this endpoint\n",
+                "tags": [
+                    "Service Accounts"
+                ],
+                "summary": "Reissue service account credentials",
+                "parameters": [
+                    {
+                        "description": "service account details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ReissueServiceAccountCredentialsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.ReissueServiceAccountCredentialsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1908,7 +1979,7 @@
         },
         "/oauth/revoke": {
             "post": {
-                "description": "Revoke a refresh token or client secret to prevent it being used to create new access tokens (self-service)\n\n**Use Cases:**\n- **Web User Logout**: User wants to log out of their session\n- **Service Account Security**: Account no longer being used/compromised secret\n\n**Service Accounts:**\nYou must supply your `client ID` and `client secret` in the request body.\nThis revokes all client secrets for the service account, effectively disabling it.\n\n**IMPORTANT - Service Account Reinstatement:**\n- This endpoint does not permanently disable the service account itself (use `POST /admin/accounts/{account_id}/disable` for that)\n- To restore access, an admin must call `POST /api/auth/register/service-accounts` with the same organization and email\n- This will generate a new setup URL and client secret while preserving the same client_id\n- If the account was disabled by an admin, it must first be re-enabled via `POST /admin/accounts/{account_id}/enable`\n\n**Web Users (Logout):**\nThis endpoint expects a refresh token in an `http-only cookie`.\nThis revokes the user's refresh token, effectively logging them out.\n\nIf the refresh token has expired or been revoked, the user must login again to get a new one.\n\n**Note:** Any unexpired access tokens issued for the account will continue to work until they expire.\n",
+                "description": "Revoke a refresh token or client secret to prevent it being used to create new access tokens (self-service)\n\n**Use Cases:**\n- **Web User Logout**: User wants to log out of their session\n- **Service Account Security**: Account no longer being used/compromised secret\n\n**Service Accounts:**\nYou must supply your `client ID` and `client secret` in the request body.\nThis revokes all client secrets for the service account, effectively disabling it.\n\n**IMPORTANT - Service Account Reinstatement:**\n- This endpoint does not permanently disable the service account itself (use `POST /admin/accounts/{account_id}/disable` for that)\n- To restore access, an admin must call `/api/auth/service-accounts/reissue_credentials` with the same organization and email\n- This will generate a new setup URL and client secret while preserving the same client_id\n- If the account was disabled by an admin, it must first be re-enabled via `POST /admin/accounts/{account_id}/enable`\n\n**Web Users (Logout):**\nThis endpoint expects a refresh token in an `http-only cookie`.\nThis revokes the user's refresh token, effectively logging them out.\n\nIf the refresh token has expired or been revoked, the user must login again to get a new one.\n\n**Note:** Any unexpired access tokens issued for the account will continue to work until they expire.\n",
                 "tags": [
                     "auth"
                 ],
@@ -2643,6 +2714,44 @@
                 },
                 "version_number": {
                     "type": "integer"
+                }
+            }
+        },
+        "handlers.ReissueServiceAccountCredentialsRequest": {
+            "type": "object",
+            "properties": {
+                "client_contact_email": {
+                    "type": "string",
+                    "example": "example@example.com"
+                },
+                "client_organization": {
+                    "type": "string",
+                    "example": "example org"
+                }
+            }
+        },
+        "handlers.ReissueServiceAccountCredentialsResponse": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "client_id": {
+                    "type": "string",
+                    "example": "sa_example-org_k7j2m9x1"
+                },
+                "expires_at": {
+                    "type": "string",
+                    "example": "2024-12-25T10:30:00Z"
+                },
+                "expires_in": {
+                    "type": "integer",
+                    "example": 172800
+                },
+                "setup_url": {
+                    "type": "string",
+                    "example": "https://api.example.com/api/auth/service-accounts/setup/550e8400-e29b-41d4-a716-446655440000"
                 }
             }
         },

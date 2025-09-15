@@ -328,6 +328,16 @@ func (i *IsnAccountHandler) RevokeIsnAccountHandler(w http.ResponseWriter, r *ht
 		return
 	}
 
+	if targetAccount.AccountRole == "owner" {
+		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "the site owner account permissions cannot be updated")
+		return
+	}
+
+	if targetAccount.AccountType != "user" {
+		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "this end point should not be used for service accounts")
+		return
+	}
+
 	// deny users making uncessary attempts to revoke perms to themeselves
 	if accountID == targetAccountID {
 		logger.ContextWithLogAttrs(r.Context(),

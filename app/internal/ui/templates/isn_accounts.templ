@@ -5,7 +5,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
-templ IsnAccountManagementPage(isns []types.IsnDropdown) {
+templ IsnAccountManagementPage(isns []types.IsnOption) {
 	@BaseLayout("ISN Account Management") {
 		@Navigation()
 		<div class="page-container">
@@ -17,13 +17,13 @@ templ IsnAccountManagementPage(isns []types.IsnDropdown) {
 					<h3 class="card-title">Change ISN permissions for an account</h3>
 				</div>
 				<div class="card-body">
-					<form hx-post="/ui-api/update-isn-account-access" hx-target="#update-access-result" class="space-y-4">
+					<form hx-post="/ui-api/update-isn-account" hx-target="#update-access-result" class="space-y-4">
 						<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 							<div class="form-group">
-								<label for="isn_slug" class="form-label">ISN</label>
+								<label for="isn-slug" class="form-label">ISN</label>
 								<select
-									id="isn_slug"
-									name="isn_slug"
+									id="isn-slug"
+									name="isn-slug"
 									required
 									class="form-select"
 								>
@@ -34,10 +34,10 @@ templ IsnAccountManagementPage(isns []types.IsnDropdown) {
 								</select>
 							</div>
 							<div class="form-group">
-								<label for="account_type" class="form-label">Account Type</label>
+								<label for="account-type" class="form-label">Account Type</label>
 								<select
-									id="account_type"
-									name="account_type"
+									id="account-type"
+									name="account-type"
 									required
 									class="form-select"
 									hx-trigger="change"
@@ -47,15 +47,15 @@ templ IsnAccountManagementPage(isns []types.IsnDropdown) {
 								>
 									<option value="">Select Type...</option>
 									<option value="user">Web User</option>
-									<option value="service_account">Service Account</option>
+									<option value="service-account">Service Account</option>
 								</select>
 							</div>
 							<div class="form-group" id="account-identifier-field">
-								<label for="account_identifier" class="form-label">Account Identifier</label>
+								<label for="account-identifier" class="form-label">Account Identifier</label>
 								<input
 									type="text"
-									id="account_identifier"
-									name="account_identifier"
+									id="account-identifier"
+									name="account-identifier"
 									required
 									placeholder="Select account type first"
 									class="form-input"
@@ -98,31 +98,31 @@ templ AccountIdentifierField(accountType string) {
 	<div class="form-group" id="account-identifier-field">
 		switch accountType {
 		case "user":
-			<label for="account_identifier" class="form-label">Account Email</label>
+			<label for="account-identifier" class="form-label">Account Email</label>
 			<input
 				type="email"
-				id="account_identifier"
-				name="account_identifier"
+				id="account-identifier"
+				name="account-identifier"
 				required
 				placeholder="user@example.com"
 				class="form-input"
 			/>
-		case "service_account":
-			<label for="account_identifier" class="form-label">Client ID</label>
+		case "service-account":
+			<label for="account-identifier" class="form-label">Client ID</label>
 			<input
 				type="text"
-				id="account_identifier"
-				name="account_identifier"
+				id="account-identifier"
+				name="account-identifier"
 				required
 				placeholder="sa_example-org_abc123"
 				class="form-input"
 			/>
 		default:
-			<label for="account_identifier" class="form-label">Account Identifier</label>
+			<label for="account-identifier" class="form-label">Account Identifier</label>
 			<input
 				type="text"
-				id="account_identifier"
-				name="account_identifier"
+				id="account-identifier"
+				name="account-identifier"
 				required
 				placeholder="Select account type first"
 				class="form-input"

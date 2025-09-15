@@ -1,9 +1,5 @@
 package templates
 
-import (
-    "fmt"
-	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
-)
 
 // =============================================================================
 // LOGIN & REGISTRATION
@@ -105,7 +101,7 @@ templ RegisterPage() {
 							<label for="reg-confirm-password" class="form-label-sr">Confirm Password</label>
 							<input
 								id="reg-confirm-password"
-								name="confirm_password"
+								name="confirm-password"
 								type="password"
 								required
 								class="form-input form-input-stacked"
@@ -159,167 +155,4 @@ templ RegistrationSuccess() {
 		}, 5000);
 	</script>
 }
-
-// Search Results renders the search results
-templ SearchResults(signals []types.SearchSignalWithCorrelationsAndVersions) {
-	<div class="card">
-		<div class="card-header">
-			<h3 class="card-title">Search Results ({ fmt.Sprintf("%d", len(signals)) } signals found)</h3>
-		</div>
-		if len(signals) == 0 {
-			<div class="card-body text-center text-muted">
-				No signals found matching your search criteria.
-			</div>
-		} else {
-			<div class="card-body space-y-6">
-				for _, signal := range signals {
-					<div class="signal-card">
-						<!-- Signal Header -->
-						<div class="signal-header">
-							<div style="flex: 1;">
-								<div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
-									if signal.LocalRef != "" {
-										<h4 class="signal-title">{ signal.LocalRef }</h4>
-									} else {
-										<h4 class="signal-title">Signal { signal.SignalID[:8] }...</h4>
-									}
-									if signal.IsWithdrawn {
-										<span class="signal-badge signal-badge-withdrawn">
-											Withdrawn
-										</span>
-									}
-								</div>
-								<div class="signal-metadata">
-									@SignalMetadataItem("Signal ID", signal.SignalID)
-									@SignalMetadataItem("Version ID", signal.SignalVersionID)
-									@SignalMetadataSimple("Version", fmt.Sprintf("%d", signal.VersionNumber))
-									@SignalMetadataSimple("Created", signal.SignalCreatedAt)
-									@SignalMetadataSimple("Updated", signal.VersionCreatedAt)
-									if signal.Email != "" {
-										@SignalMetadataSimple("Created by", signal.Email)
-									}
-								</div>
-								if signal.CorrelatedToSignalID != "" {
-									<div class="correlation-info">
-										<span class="text-sm" style="color: #1e40af;">
-											<span style="font-weight: 500;">Correlated to:</span> { signal.CorrelatedToSignalID }
-										</span>
-									</div>
-								}
-							</div>
-						</div>
-						<!-- Signal Content -->
-						<div style="margin-top: 1rem;">
-							<div class="json-header">
-								<h5 class="text-sm" style="font-weight: 500; color: #111827;">Signal Content</h5>
-								<button
-									type="button"
-									data-signal-id={ signal.SignalID }
-									class="pretty-print-btn btn btn-secondary text-xs"
-								>
-									Pretty Print
-								</button>
-							</div>
-							<div class="json-container">
-								<pre id={ fmt.Sprintf("json-%s", signal.SignalID) } class="json-content">{ string(signal.Content) }</pre>
-							</div>
-						</div>
-						<!-- Additional Information -->
-						if len(signal.CorrelatedSignals) > 0 {
-							<div class="correlated-signals">
-								<h5 class="text-sm" style="font-weight: 500; color: #111827; margin-bottom: 0.5rem;">Correlated Signals ({ fmt.Sprintf("%d", len(signal.CorrelatedSignals)) })</h5>
-								<div class="space-y-1">
-									for _, correlated := range signal.CorrelatedSignals {
-										<div class="text-sm" style="color: #374151;">
-											<span class="font-mono">{ correlated.SignalID[:8] }...</span>
-											if correlated.LocalRef != "" {
-												<span style="margin-left: 0.5rem;">({ correlated.LocalRef })</span>
-											}
-											<span style="margin-left: 0.5rem; color: #6b7280;">v{ fmt.Sprintf("%d", correlated.VersionNumber) }</span>
-										</div>
-									}
-								</div>
-							</div>
-						}
-						if len(signal.PreviousSignalVersions) > 0 {
-							<div class="previous-versions">
-								<h5 class="text-sm" style="font-weight: 500; color: #111827; margin-bottom: 0.5rem;">Previous Versions ({ fmt.Sprintf("%d", len(signal.PreviousSignalVersions)) })</h5>
-								<div class="space-y-1">
-									for _, version := range signal.PreviousSignalVersions {
-										<div class="text-sm" style="color: #374151;">
-											<span style="font-weight: 500;">Version { fmt.Sprintf("%d", version.VersionNumber) }</span>
-											<span style="margin-left: 0.5rem; color: #6b7280;">{ version.CreatedAt }</span>
-										</div>
-									}
-								</div>
-							</div>
-						}
-						<!-- Additional Technical Info -->
-						if signal.AccountID != "" || signal.AccountType != "" {
-							<div class="technical-details">
-								<h6 class="text-xs" style="font-weight: 500; color: #6b7280; margin-bottom: 0.5rem;">Additional Information</h6>
-								<div class="signal-metadata text-xs" style="color: #6b7280;">
-									if signal.AccountID != "" {
-										<div><span style="font-weight: 500;">Account ID:</span> <span class="font-mono">{ signal.AccountID }</span></div>
-									}
-									if signal.AccountType != "" {
-										<div><span style="font-weight: 500;">Account Type:</span> { signal.AccountType }</div>
-									}
-								</div>
-							</div>
-						}
-					</div>
-				}
-			</div>
-		}
-	</div>
-	<script>
-
-		// Store original JSON content for each signal
-		const originalJsonContent = new Map();
-
-		document.addEventListener('click', function(e) {
-		if (!e.target.classList.contains('pretty-print-btn')) {
-			return
-		}
-
-		const signalId = e.target.getAttribute('data-signal-id');
-		const jsonElement = document.getElementById('json-' + signalId);
-
-		if (!jsonElement) {
-			return;
-		}
-
-		try {
-			const currentButtonText = e.target.textContent.trim();
-
-			if (currentButtonText === 'Pretty Print') {
-				let originalContent = originalJsonContent.get(signalId);
-				if (!originalContent) {
-					originalContent = jsonElement.textContent.trim();
-					originalJsonContent.set(signalId, originalContent);
-				}
-				// Parse and pretty print JSON
-				const parsed = JSON.parse(originalContent);
-				jsonElement.textContent = JSON.stringify(parsed, null, 2);
-				e.target.textContent = 'Compact';
-				jsonElement.classList.add('pretty-printed');
-			} else {
-				let originalContent = originalJsonContent.get(signalId);
-				jsonElement.textContent = originalContent;
-				e.target.textContent = 'Pretty Print';
-				jsonElement.classList.remove('pretty-printed');
-			}
-		} catch (error) {
-			// Show error message briefly
-			const originalText = e.target.textContent;
-			e.target.textContent = 'Invalid JSON';
-			e.target.classList.add('text-red-600');
-			setTimeout(function() {
-				e.target.textContent = originalText;
-				e.target.classList.remove('text-red-600');
-			}, 2000);
-			}
-		});
-		</script>
-	}
+	

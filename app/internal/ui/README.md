@@ -7,20 +7,25 @@ A simple web user interface for managing Information Sharing Networks (ISNs) bui
 ```
 internal/ui/
 ├── server/server.go            # HTTP server setup and routing
-├── handlers/handlers.go        # HTTP request handlers
+├── handlers/                   # HTTP request handlers - render pages and calls the UI api
+├── client/client.go            # Client for calling signalsd backend API
 ├── auth/auth.go                # Authentication service for API integration
 ├── auth/middleware.go          # authentication middleware
 ├── types/types.go              # Shared type definitions
-├── client/client.go            # Client for calling signalsd API
 ├── config/config.go            # Configuration management (standalone mode)
-├── template/templates.templ    # templ HTML templates
-└── template/templates_templ.go # Generated Go code from templ templates
+├── templates/*.templ           # templ HTML templates
+└── templates/*.go              # Generated Go code from templ templates 
 ```
-
+The steps to add a new interactive page to the UI are:
+1. Create Client methods to call the relevant signalsd API endpoints
+2. Add a new page template (`.templ` file) for the new feature
+3. Add a new handler function in the appropriate handlers/*.go file to render the page
+4. Add new ui-api handler functions in the appropriate handlers/*.go file to handle any interactions required in the page (use HTMX to make partial page updates)
+5. Add routes for the page and ui-api calls in `server/server.go`, using the appropriate authentication middleware
 
 ###  Integrated UI (Default)
 
-The standard integrated mode (`-mode all`) is the simplist, everything runs on the same domain/port:
+The default integrated mode (`signalsd --mode all`) is the simplest way to run the ui, everything runs on the same domain/port:
 
 ```
 ┌─────────────────────────────────────┐
@@ -32,33 +37,30 @@ The standard integrated mode (`-mode all`) is the simplist, everything runs on t
 └─────────────────────────────────────┘
          Same Domain (localhost:8080)
 ```
-the integrated UI runs by default and is available on the same port as the API (default: 8080). 
+The integrated UI is built into the signalsd binary and available on the same port as the API (default: 8080).  The integrated UI runs automatically when using docker:
 
 ```bash
-# start databasae
+# start database
 docker compose up db
 
-# start app with docker
+# start app (including integrated ui)
 docker compose up app
 ```
 
 Login using `http://localhost:8080/login`
 
-The app runs with a live reload server (air) so you can develop the UI locally and see changes immediately. 
+When using docker, the app runs with a live reload server (air) so you can develop the UI locally and see changes immediately. 
 
-if you want to run the app locally (not in docker) you can use the below.  Note there is no live reload when running locally so you will need to regenerate the templates and stop and start the ui server after making changes.
+if you want to run the app locally (not in docker) you can use the below.  Note there is no live reload so you will need to regenerate the templates and stop and start the app after making changes.
 
 
 ```bash
 
-# start the api 
-make go-api # note expects the docker database to be running
+# start the app locally
+make go-all # note expects the docker database to be running
 
 # or specify your own local database
-SECRET_KEY=your-secret DATABASE_URL="postgres://signalsd-dev:@localhost:5432/signalsd_admin?sslmode=disable" signalsd --mode ui
-
-# start the ui
-make go-ui
+SECRET_KEY=your-secret DATABASE_URL="postgres://signalsd-dev:@localhost:5432/signalsd_admin?sslmode=disable" signalsd --mode all
 
 ```
 
@@ -85,11 +87,15 @@ Switch to standalone mode when you need container separation or want to replace 
            (Required for HttpOnly cookies)
 ```
 
-The standalone mode requires a reverse proxy so that the client sees a single domain/port (The refresh token authentication will  not work without it).
+The standalone mode requires a reverse proxy so that the client sees a single domain/port (The refresh token authentication will not work without it due to cross-origin cookie restrictions).
 
 ⚠️ If you run the UI in standalone mode in dev, the login will work but automatic token refresh will fail because the refresh token cookie cannot be sent cross-port. Users will be logged out after 30 minutes.
 
 ***Production Setup***
+
+**Prod and staging deployment** these environments currently run the integrated ui/signalsd service.
+
+To deploy a standalone UI you will need to build and deploy two containers:
 
 **Step 1**: Deploy containers separately
 ```bash
@@ -144,11 +150,15 @@ When running as a separate service, the UI has its own configuration:
 
 **No database or secret configuration required** - the UI calls the signalsd API for all data operations.
 
-## Integrated mode
-the integrated UI is built into the signalsd binary and can be run with `signalsd --mode all` or `signalsd --mode ui`.  No additional configuration is required.  
 
-Note the UI was created as an example of how a third party UI could be built on top of the signalsd API.  It does not integrated directly with the signalsd http server - all communication is via the public API.
+# Auth
+All authentication and authorization is handled by the signalsd API.  
 
+Authorization is via the server supplied JWT access tokens.  The UI decodes the tokens to:
+1. determine the user's role and permissions so that it can improve the UX (e.g., hiding pages that the user does not have access to)
+2. to establish the expiry time so that it can refresh the token before it expires. 
+
+The UI does not need create tokens and does not need to know the SECRET_KEY used by the server.
 
 # Development
 
@@ -163,7 +173,7 @@ if developing locally, install templ and air (live reload):
 go install github.com/a-h/templ/cmd/templ@latest
 go install github.com/air-verse/air@latest
 ```
-you can then rund the app locally run with live reload (the below command is using the docker signalsd database)
+you can then run the app locally with live reload (the below command is using the docker signalsd database)
 ```bash
 cd app
 DATABASE_URL="postgres://signalsd-dev@localhost:15432/signalsd_admin?sslmode=disable" SECRET_KEY="mysecretkey" air

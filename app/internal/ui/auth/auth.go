@@ -57,7 +57,7 @@ func (t TokenStatus) String() string {
 
 // RefreshToken is a UI-specific method that uses the signalsd backend API to refresh an access token using the supplied refresh token.
 // Returns a new refresh token cookie and access token.
-func (a *AuthService) RefreshToken(refreshTokenCookie *http.Cookie) (*types.AccesTokenDetails, *http.Cookie, error) {
+func (a *AuthService) RefreshToken(refreshTokenCookie *http.Cookie) (*types.AccessTokenDetails, *http.Cookie, error) {
 	url := fmt.Sprintf("%s/oauth/token?grant_type=refresh_token", a.apiBaseURL)
 
 	req, err := http.NewRequest("POST", url, nil)
@@ -84,7 +84,7 @@ func (a *AuthService) RefreshToken(refreshTokenCookie *http.Cookie) (*types.Acce
 		return nil, nil, fmt.Errorf("token refresh failed: %s", errorResp.Message)
 	}
 
-	var refreshResp types.AccesTokenDetails
+	var refreshResp types.AccessTokenDetails
 	if err := json.NewDecoder(resp.Body).Decode(&refreshResp); err != nil {
 		return nil, nil, fmt.Errorf("failed to decode response: %w", err)
 	}
@@ -143,7 +143,7 @@ func (a *AuthService) CheckTokenStatus(r *http.Request) TokenStatus {
 //   - a cookie containing the access token provided by the server,
 //   - a cookie containg the isn permissions as JSON.
 //   - a cookie containing the account information (ID, type, role) as JSON.
-func (a *AuthService) SetAuthCookies(w http.ResponseWriter, accessTokenDetails *types.AccesTokenDetails, refreshTokenCookie *http.Cookie, environment string) error {
+func (a *AuthService) SetAuthCookies(w http.ResponseWriter, accessTokenDetails *types.AccessTokenDetails, refreshTokenCookie *http.Cookie, environment string) error {
 	isProd := environment == "prod"
 
 	// Set refresh token cookie (from API response)

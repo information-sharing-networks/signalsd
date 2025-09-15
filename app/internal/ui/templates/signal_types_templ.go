@@ -13,8 +13,8 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
-// SignalTypeManagementPage renders the signal type management page
-func SignalTypeManagementPage(isns []types.IsnDropdown) templ.Component {
+// CreateSignalTypePage renders the signal type management page
+func CreateSignalTypePage(isns []types.IsnOption) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -51,7 +51,7 @@ func SignalTypeManagementPage(isns []types.IsnDropdown) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Signal Type Management</h1><div class=\"card mb-6\"><div class=\"card-header\"><h3 class=\"card-title\">Create New Signal Type</h3></div><div class=\"card-body\"><form hx-post=\"/ui-api/create-signal-type\" hx-target=\"#signal-type-result\" class=\"space-y-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\"><label for=\"isn_slug\" class=\"form-label\">ISN</label> <select id=\"isn_slug\" name=\"isn_slug\" required class=\"form-select\"><option value=\"\">Select an ISN</option> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Create New Signal Type</h1><div class=\"card mb-6\"><div class=\"card-body\"><form hx-post=\"/ui-api/create-signal-type\" hx-target=\"#signal-type-result\" class=\"space-y-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\"><label for=\"isn-slug\" class=\"form-label\">ISN</label> <select id=\"isn-slug\" name=\"isn-slug\" required class=\"form-select\"><option value=\"\">Select an ISN</option> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -63,7 +63,7 @@ func SignalTypeManagementPage(isns []types.IsnDropdown) templ.Component {
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(isn.Slug)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/signal_types.templ`, Line: 30, Col: 34}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/signal_types.templ`, Line: 27, Col: 34}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -76,7 +76,7 @@ func SignalTypeManagementPage(isns []types.IsnDropdown) templ.Component {
 				var templ_7745c5c3_Var4 string
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(isn.Slug)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/signal_types.templ`, Line: 30, Col: 47}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/signal_types.templ`, Line: 27, Col: 47}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 				if templ_7745c5c3_Err != nil {
@@ -87,13 +87,13 @@ func SignalTypeManagementPage(isns []types.IsnDropdown) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</select></div><div class=\"form-group\"><label for=\"bump_type\" class=\"form-label\">Version</label> <select id=\"bump_type\" name=\"bump_type\" required class=\"form-select\"><option value=\"\">Select version</option> <option value=\"patch\">Patch (0.0.1)</option> <option value=\"minor\">Minor (0.1.0)</option> <option value=\"major\">Major (1.0.0)</option></select></div></div><div class=\"form-group\"><label for=\"title\" class=\"form-label\">Title</label> <input id=\"title\" name=\"title\" type=\"text\" required class=\"form-input\" placeholder=\"e.g., Sample Signal @example.org\"><p class=\"text-muted text-sm mt-1\">Unique title for the signal type. This will be used to create a URL-friendly slug.</p></div><div class=\"form-group\"><label for=\"schema_url\" class=\"form-label\">Schema URL</label> <input id=\"schema_url\" name=\"schema_url\" type=\"url\" required class=\"form-input\" placeholder=\"https://github.com/user/project/blob/2025.01.01/schema.json\"><p class=\"text-muted text-sm mt-1\">Must be a valid JSON schema available on Github <code class=\"text-xs bg-gray-100 px-1 py-0.5 rounded\">https://github.com/skip/validation/main/schema.json</code> to disable validation.</p></div><div class=\"form-group\"><label for=\"readme_url\" class=\"form-label\">README URL</label> <input id=\"readme_url\" name=\"readme_url\" type=\"url\" class=\"form-input\" placeholder=\"https://github.com/user/project/blob/2025.01.01/readme.md\"><p class=\"text-muted text-sm mt-1\">Must be a GitHub URL ending in .md. Use <code class=\"text-xs bg-gray-100 px-1 py-0.5 rounded\">https://github.com/skip/readme/main/readme.md</code> to indicate there is no readme</p></div><div class=\"form-group\"><label for=\"detail\" class=\"form-label\">Description</label> <textarea id=\"detail\" name=\"detail\" rows=\"3\" class=\"form-input\" placeholder=\"Description of the signal type\"></textarea><p class=\"text-muted text-sm mt-1\">Provide a detailed description of this signal type.</p></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Create Signal Type</button></div></form></div></div><div id=\"signal-type-result\"></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</select></div><div class=\"form-group\"><label for=\"bump-type\" class=\"form-label\">Version</label> <select id=\"bump-type\" name=\"bump-type\" required class=\"form-select\"><option value=\"\">Select version</option> <option value=\"patch\">Patch (0.0.1)</option> <option value=\"minor\">Minor (0.1.0)</option> <option value=\"major\">Major (1.0.0)</option></select></div></div><div class=\"form-group\"><label for=\"title\" class=\"form-label\">Title</label> <input id=\"title\" name=\"title\" type=\"text\" required class=\"form-input\" placeholder=\"e.g., Sample Signal @example.org\"><p class=\"text-muted text-sm mt-1\">Unique title for the signal type. This will be used to create a URL-friendly slug.</p></div><div class=\"form-group\"><label for=\"schema-url\" class=\"form-label\">Schema URL</label> <input id=\"schema-url\" name=\"schema-url\" type=\"url\" required class=\"form-input\" placeholder=\"https://github.com/user/project/blob/2025.01.01/schema.json\"><p class=\"text-muted text-sm mt-1\">Must be a valid JSON schema available on Github <code class=\"text-xs bg-gray-100 px-1 py-0.5 rounded\">https://github.com/skip/validation/main/schema.json</code> to disable validation.</p></div><div class=\"form-group\"><label for=\"readme-url\" class=\"form-label\">README URL</label> <input id=\"readme-url\" name=\"readme-url\" type=\"url\" class=\"form-input\" placeholder=\"https://github.com/user/project/blob/2025.01.01/readme.md\"><p class=\"text-muted text-sm mt-1\">Must be a GitHub URL ending in .md. Use <code class=\"text-xs bg-gray-100 px-1 py-0.5 rounded\">https://github.com/skip/readme/main/readme.md</code> to indicate there is no readme</p></div><div class=\"form-group\"><label for=\"detail\" class=\"form-label\">Description</label> <textarea id=\"detail\" name=\"detail\" rows=\"3\" class=\"form-input\" placeholder=\"Description of the signal type\"></textarea><p class=\"text-muted text-sm mt-1\">Provide a detailed description of this signal type.</p></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Create Signal Type</button></div></form></div></div><div id=\"signal-type-result\"></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = BaseLayout("Signal Type Management").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = BaseLayout("Create New Signal Type").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -138,7 +138,7 @@ func SignalTypeCreationSuccess(response client.CreateSignalTypeResponse) templ.C
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(response.Slug)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/signal_types.templ`, Line: 122, Col: 97}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/signal_types.templ`, Line: 119, Col: 97}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -151,7 +151,7 @@ func SignalTypeCreationSuccess(response client.CreateSignalTypeResponse) templ.C
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(response.SemVer)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/signal_types.templ`, Line: 123, Col: 102}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/signal_types.templ`, Line: 120, Col: 102}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
@@ -164,7 +164,7 @@ func SignalTypeCreationSuccess(response client.CreateSignalTypeResponse) templ.C
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(response.ResourceURL)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/signal_types.templ`, Line: 125, Col: 94}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/signal_types.templ`, Line: 122, Col: 94}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {

@@ -8,7 +8,10 @@ package templates
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-func NeedIsnAdminPage(title, message string) templ.Component {
+// =============================================================================
+// MAIN DASHBOARD PAGE
+// =============================================================================
+func DashboardPage() templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -45,21 +48,13 @@ func NeedIsnAdminPage(title, message string) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><div class=\"text-center\"><h1 class=\"page-title\">Access Denied</h1><div class=\"card max-w-md mx-auto\"><div class=\"card-body\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = ErrorAlert(message).Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"mt-4\"><a href=\"/dashboard\" class=\"btn btn-primary\">← Back to Dashboard</a></div></div></div></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Dashboard</h1><p class=\"text-muted mb-6\">Welcome to the Signalsd management interface.</p><div class=\"grid grid-cols-1 md:grid-cols-3 gap-6 mb-8\"><div class=\"card\"><div class=\"card-body\"><h3 class=\"card-title\">Signal Management</h3><p class=\"text-muted mb-4\">Search and manage signals across Information Sharing Networks.</p><a href=\"/search\" class=\"btn btn-secondary\">Search Signals</a></div></div><div class=\"card\"><div class=\"card-body\"><h3 class=\"card-title\">API Documentation</h3><p class=\"text-muted mb-4\">View the complete API reference and interactive documentation.</p><a href=\"/docs\" target=\"_blank\" class=\"btn btn-secondary\">View Docs ↗</a></div></div><div class=\"card\"><div class=\"card-body\"><h3 class=\"card-title\">Information Sharing Networks</h3><p class=\"text-muted mb-4\">Manage ISNs and configure data sharing.</p><a href=\"/admin\" class=\"btn btn-secondary\">Manage ISNs</a></div></div></div><div id=\"dashboard-error\"></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = BaseLayout(title).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = BaseLayout("Dashboard").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
