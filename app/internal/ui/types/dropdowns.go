@@ -23,3 +23,8 @@ type ServiceAccountOption struct {
 	ClientOrganization string `json:"client_organization"`
 	ClientContactEmail string `json:"client_contact_email"`
 }
+
+type UserOption struct {
+	Email    string `json:"email"`
+	UserRole string `json:"user_role"`
+}

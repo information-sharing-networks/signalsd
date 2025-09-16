@@ -14,9 +14,7 @@ import (
 func (h *HandlerService) ManageServiceAccountsPage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
-	component := templates.ManageServiceAccounts()
-
-	if err := component.Render(r.Context(), w); err != nil {
+	if err := templates.ManageServiceAccounts().Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render CreateServiceAccount template", slog.String("error", err.Error()))
 	}
 
@@ -162,13 +160,5 @@ func (h *HandlerService) ReissueButtonState(w http.ResponseWriter, r *http.Reque
 	component := templates.ReissueButton(isEnabled)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render reissue button", slog.String("error", err.Error()))
-	}
-}
-
-func (h *HandlerService) ClearAlerts(w http.ResponseWriter, r *http.Request) {
-	component := templates.ClearAlerts()
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger := logger.ContextRequestLogger(r.Context())
-		reqLogger.Error("Failed to render ClearAlerts", slog.String("error", err.Error()))
 	}
 }

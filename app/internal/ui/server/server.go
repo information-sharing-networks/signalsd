@@ -86,24 +86,29 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 		// auth
 		r.Post("/logout", handlerService.Logout)
 		r.Get("/access-denied", handlerService.AccessDeniedPage)
-		r.Get("/need-isn-admin", handlerService.NeedIsnAdminPage)
+		r.Get("/need-isn-admin", handlerService.AccessDeniedNeedIsnAdminPage)
+		r.Get("/need-isn-access", handlerService.AccessDeniedNeedIsnAccessPage)
 
 		//alerts
 		r.Get("/ui-api/clear-alerts", handlerService.ClearAlerts)
 
-		// render drop down options
+		// render dropdown list options
 		r.Post("/ui-api/signal-type-options", handlerService.RenderSignalTypeOptions)
 		r.Post("/ui-api/signal-type-version-options", handlerService.RenderSignalTypeVersionOptions)
 		r.Get("/ui-api/service-account-options", handlerService.RenderServiceAccountOptions)
+		r.Get("/ui-api/user-options", handlerService.RenderUserOptions)
 
 		// render individual fields
 		r.Post("/ui-api/account-identifier-field", handlerService.RenderAccountIdentifierField)
 
-		// authenticated user pages
-		r.Get("/search", handlerService.SearchSignalsPage)
+		r.Group(func(r chi.Router) {
+			r.Use(s.authService.RequireIsnAccess)
 
-		// execute backend api calls and render the results
-		r.Post("/ui-api/search-signals", handlerService.SearchSignals)
+			// search signals
+			r.Get("/search", handlerService.SearchSignalsPage)
+			r.Post("/ui-api/search-signals", handlerService.SearchSignals)
+		})
+
 	})
 
 	// ISN Admin routes (require admin/owner role)
@@ -114,6 +119,9 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 		//dashboard
 		r.Get("/admin", handlerService.IsnAdminDashboardPage)
 
+		// user management
+		r.Get("/admin/users", handlerService.ManageUsersPage)
+
 		//isn creation
 		r.Get("/admin/isns", handlerService.CreateIsnPage)
 		r.Post("/ui-api/create-isn", handlerService.CreateIsn)
@@ -122,7 +130,11 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 		r.Get("/admin/service-accounts", handlerService.ManageServiceAccountsPage)
 		r.Post("/ui-api/create-service-account", handlerService.CreateServiceAccount)
 		r.Post("/ui-api/reissue-service-account", handlerService.ReissueServiceAccount)
-		r.Get("/ui-api/reissue-button-state", handlerService.ReissueButtonState)
+		r.Get("/ui-api/reissue-btn-state", handlerService.ReissueButtonState)
+
+		// user accounts
+		r.Post("/ui-api/generate-password-reset-link", handlerService.GeneratePasswordResetLink)
+		r.Get("/ui-api/generate-password-reset-btn-state", handlerService.GeneratePasswordResetButtonState)
 
 		// isn management forms
 		r.Group(func(r chi.Router) {

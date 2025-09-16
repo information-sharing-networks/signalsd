@@ -12,7 +12,6 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 )
 
-// ManageServiceAccounts renders the create service account page
 func ManageServiceAccounts() templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -58,7 +57,7 @@ func ManageServiceAccounts() templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<p class=\"text-muted mb-4\">Select an existing service account to reissue its credentials.</p><div class=\"form-group\"><label for=\"service-account-dropdown\" class=\"form-label\">Service Account</label> <select id=\"service-account-dropdown\" hx-get=\"/ui-api/service-account-options\" hx-trigger=\"load\" hx-swap=\"outerHTML\"><!-- Service account dropdown will be loaded here --></select></div><div id=\"reissue-button-container\" class=\"form-group mt-4\"><button id=\"reissue-btn\" hx-post=\"/ui-api/reissue-service-account\" hx-target=\"#reissue-result\" hx-include=\"#service-account-dropdown\" class=\"btn\" disabled>Reissue Credentials</button></div><!-- Update button state when dropdown changes --><div hx-get=\"/ui-api/reissue-button-state\" hx-trigger=\"change from:#service-account-dropdown\" hx-target=\"#reissue-button-container\" hx-swap=\"innerHTML\" style=\"display: none;\"></div><div id=\"reissue-result\" class=\"mt-4\"></div></div></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<p class=\"text-muted mb-4\">Select an existing service account to reissue its credentials.</p><div class=\"form-group\"><label for=\"service-account-dropdown\" class=\"form-label\">Service Account</label> <select id=\"service-account-dropdown\" hx-get=\"/ui-api/service-account-options\" hx-trigger=\"load\" hx-swap=\"outerHTML\"><!-- Service account dropdown will be loaded here --></select></div><div id=\"reissue-btn-container\" class=\"form-group mt-4\"><button id=\"reissue-btn\" hx-post=\"/ui-api/reissue-service-account\" hx-target=\"#reissue-result\" hx-include=\"#service-account-dropdown\" class=\"btn\" disabled>Reissue Credentials</button></div><!-- Update button state when dropdown changes --><div hx-get=\"/ui-api/reissue-btn-state\" hx-trigger=\"change from:#service-account-dropdown\" hx-target=\"#reissue-btn-container\" hx-swap=\"innerHTML\" style=\"display: none;\"></div><div id=\"reissue-result\" class=\"mt-4\"></div></div></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -108,7 +107,7 @@ func ServiceAccountCreationSuccess(response client.CreateServiceAccountResponse)
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(response.ClientID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 107, Col: 106}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 106, Col: 106}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -121,7 +120,7 @@ func ServiceAccountCreationSuccess(response client.CreateServiceAccountResponse)
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(response.AccountID.String())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 108, Col: 117}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 107, Col: 117}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
@@ -134,7 +133,7 @@ func ServiceAccountCreationSuccess(response client.CreateServiceAccountResponse)
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(response.SetupURL)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 110, Col: 92}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 109, Col: 92}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -173,7 +172,7 @@ func ServiceAccountReissueSuccess(response client.ReissueServiceAccountResponse)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = SuccessAlert("Service Account credentials reissued successfully!").Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = SuccessAlert("Service Account credentials reissued").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -184,7 +183,7 @@ func ServiceAccountReissueSuccess(response client.ReissueServiceAccountResponse)
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(response.ClientID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 122, Col: 106}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 121, Col: 106}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
@@ -197,13 +196,13 @@ func ServiceAccountReissueSuccess(response client.ReissueServiceAccountResponse)
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(response.SetupURL)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 124, Col: 92}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 123, Col: 92}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</code></p><p class=\"text-sm text-gray-600 mt-2\"><strong>Note:</strong> All previous client secrets have been revoked. The owner of this account can use the link above to retrieve their new client secret (the link can only be used once and expires in 48 hours).</p></div></div></div><!-- Update button to disabled state using htmx out-of-band swap --><div hx-swap-oob=\"true\" id=\"reissue-button-container\"><button id=\"reissue-btn\" class=\"btn opacity-50 cursor-not-allowed\" disabled>Credentials Reissued</button></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</code></p><p class=\"text-sm text-gray-600 mt-2\"><strong>Note:</strong> All previous client secrets have been revoked. The owner of this account can use the link above to retrieve their new client secret (the link can only be used once and expires in 48 hours).</p></div></div></div><!-- Update button to disabled state --><div hx-swap-oob=\"true\" id=\"reissue-btn-container\"><button id=\"reissue-btn\" class=\"btn opacity-50 cursor-not-allowed\" disabled>Credentials Reissued</button></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -211,7 +210,7 @@ func ServiceAccountReissueSuccess(response client.ReissueServiceAccountResponse)
 	})
 }
 
-// Simple reissue button template
+// reissue button template
 func ReissueButton(isEnabled bool) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context

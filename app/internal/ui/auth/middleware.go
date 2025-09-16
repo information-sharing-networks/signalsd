@@ -91,7 +91,7 @@ func (a *AuthService) RequireAdminOrOwnerRole(next http.Handler) http.Handler {
 				slog.String("component", "ui.RequireAdminAccess"),
 				slog.String("error", err.Error()),
 			)
-			redirectToAccessDenied(w, r)
+			redirectToAccessDeniedPage(w, r)
 			return
 		}
 
@@ -101,7 +101,7 @@ func (a *AuthService) RequireAdminOrOwnerRole(next http.Handler) http.Handler {
 				slog.String("account_id", accountInfo.AccountID),
 				slog.String("role", accountInfo.Role),
 			)
-			redirectToAccessDenied(w, r)
+			redirectToAccessDeniedPage(w, r)
 			return
 		}
 
@@ -126,7 +126,7 @@ func (a *AuthService) RequireIsnAdmin(next http.Handler) http.Handler {
 			reqLogger.Debug("access denied - user does not have access to any ISNs",
 				slog.String("component", "ui.RequireIsnAccess"),
 			)
-			redirectToNeedIsnAdmin(w, r)
+			redirectToNeedIsnAdminPage(w, r)
 			return
 		}
 		for perm := range isnPerms {
@@ -142,7 +142,7 @@ func (a *AuthService) RequireIsnAdmin(next http.Handler) http.Handler {
 		reqLogger.Debug("access denied - user does not have admin role for any ISNs",
 			slog.String("component", "ui.RequireIsnAdmin"),
 		)
-		redirectToNeedIsnAdmin(w, r)
+		redirectToNeedIsnAdminPage(w, r)
 
 	})
 }
@@ -160,7 +160,7 @@ func (a *AuthService) RequireIsnAccess(next http.Handler) http.Handler {
 			reqLogger.Debug("access denied - user does not have access to any ISNs",
 				slog.String("component", "ui.RequireIsnAccess"),
 			)
-			redirectToAccessDenied(w, r)
+			redirectToNeedIsnAccessPage(w, r)
 			return
 		}
 
@@ -184,8 +184,8 @@ func redirectToLogin(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// redirectToAccessDenied redirects to access denied page
-func redirectToAccessDenied(w http.ResponseWriter, r *http.Request) {
+// redirectToAccessDeniedPage redirects to access denied page
+func redirectToAccessDeniedPage(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("HX-Request") == "true" {
 		w.Header().Set("HX-Redirect", "/access-denied")
 		w.WriteHeader(http.StatusOK)
@@ -194,12 +194,22 @@ func redirectToAccessDenied(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// redirectToNeedIsnAdmin redirects to access denied page for both HTMX and direct requests
-func redirectToNeedIsnAdmin(w http.ResponseWriter, r *http.Request) {
+// redirectToNeedIsnAdminPage redirects to access denied page for both HTMX and direct requests
+func redirectToNeedIsnAdminPage(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("HX-Request") == "true" {
 		w.Header().Set("HX-Redirect", "/need-isn-admin")
 		w.WriteHeader(http.StatusOK)
 	} else {
 		http.Redirect(w, r, "/need-isn-admin", http.StatusSeeOther)
+	}
+}
+
+// redirectToNeedIsnAccessPage redirects to page explaining the user needs to be granted access to one or more isns
+func redirectToNeedIsnAccessPage(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/need-isn-access")
+		w.WriteHeader(http.StatusOK)
+	} else {
+		http.Redirect(w, r, "/need-isn-access", http.StatusSeeOther)
 	}
 }

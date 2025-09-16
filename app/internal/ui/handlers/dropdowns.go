@@ -174,6 +174,38 @@ func (h *HandlerService) RenderSignalTypeVersionOptions(w http.ResponseWriter, r
 	}
 }
 
+func (h *HandlerService) RenderUserOptions(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	// Get access token from cookie
+	accessTokenCookie, err := r.Cookie(config.AccessTokenCookieName)
+	if err != nil {
+		component := templates.ErrorAlert("Authentication required. Please log in again.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	accessToken := accessTokenCookie.Value
+	// Get users from API
+	users, err := h.ApiClient.GetUserOptionsList(accessToken)
+	if err != nil {
+		reqLogger.Error("Failed to get users", slog.String("error", err.Error()))
+		component := templates.ErrorAlert("Failed to load users. Please try again.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	// Render user dropdown options
+	component := templates.UserOptions(users)
+	if err := component.Render(r.Context(), w); err != nil {
+		reqLogger.Error("Failed to render web user options", slog.String("error", err.Error()))
+	}
+}
+
 func (h *HandlerService) RenderServiceAccountOptions(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
@@ -190,7 +222,7 @@ func (h *HandlerService) RenderServiceAccountOptions(w http.ResponseWriter, r *h
 	accessToken := accessTokenCookie.Value
 
 	// Get service accounts from API
-	serviceAccountOptions, err := h.ApiClient.GetServiceAccounts(accessToken)
+	serviceAccountOptions, err := h.ApiClient.GetServiceAccountOptionsList(accessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get service accounts", slog.String("error", err.Error()))
 		component := templates.ErrorAlert("Failed to load service accounts. Please try again.")

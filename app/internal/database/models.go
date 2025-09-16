@@ -67,6 +67,14 @@ type OneTimeClientSecret struct {
 	ExpiresAt               time.Time `json:"expires_at"`
 }
 
+type PasswordResetToken struct {
+	ID               uuid.UUID `json:"id"`
+	CreatedAt        time.Time `json:"created_at"`
+	UserAccountID    uuid.UUID `json:"user_account_id"`
+	ExpiresAt        time.Time `json:"expires_at"`
+	CreatedByAdminID uuid.UUID `json:"created_by_admin_id"`
+}
+
 type RefreshToken struct {
 	HashedToken   string     `json:"hashed_token"`
 	UserAccountID uuid.UUID  `json:"user_account_id"`

@@ -350,6 +350,24 @@ definitions:
       local_ref:
         type: string
     type: object
+  handlers.GeneratePasswordResetLinkResponse:
+    properties:
+      account_id:
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      expires_at:
+        example: "2024-12-25T10:30:00Z"
+        type: string
+      expires_in:
+        example: 1800
+        type: integer
+      reset_url:
+        example: https://api.example.com/api/auth/password-reset/0ce71234-34d5-4fb5-beb8-ad50d8b40c7d
+        type: string
+      user_email:
+        example: user@example.com
+        type: string
+    type: object
   handlers.GrantIsnAccountPermissionRequest:
     properties:
       permission:
@@ -456,6 +474,12 @@ definitions:
         example: lkIB53@6O^Y
         type: string
     type: object
+  handlers.PasswordResetRequest:
+    properties:
+      new-password:
+        example: ue6U>&X3j570
+        type: string
+    type: object
   handlers.PreviousSignalVersion:
     properties:
       content:
@@ -492,17 +516,6 @@ definitions:
         type: integer
       setup_url:
         example: https://api.example.com/api/auth/service-accounts/setup/550e8400-e29b-41d4-a716-446655440000
-        type: string
-    type: object
-  handlers.ResetUserPasswordRequest:
-    properties:
-      new_password:
-        description: Admin provides the new password
-        type: string
-    type: object
-  handlers.ResetUserPasswordResponse:
-    properties:
-      message:
         type: string
     type: object
   handlers.SearchSignal:
@@ -729,7 +742,7 @@ definitions:
       current_password:
         example: lkIB53@6O^Y
         type: string
-      new_password:
+      new-password:
         example: ue6U>&X3j570
         type: string
     type: object
@@ -1196,10 +1209,11 @@ paths:
       summary: Get users
       tags:
       - Site Admin
-  /api/admin/users/{user_id}/reset-password:
-    put:
-      description: Allows admins to reset a user's password (use this endpoint if
-        the user has forgotten their password)
+  /api/admin/users/{user_id}/generate-password-reset-link:
+    post:
+      description: |-
+        Allows admins to generate a one-time password reset link for a user (use this endpoint when a user has forgotten their password)
+        The generated link expires in 30 minutes and can only be used once.
       parameters:
       - description: User Account ID
         example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
@@ -1207,17 +1221,11 @@ paths:
         name: user_id
         required: true
         type: string
-      - description: New password
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.ResetUserPasswordRequest'
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/handlers.ResetUserPasswordResponse'
+            $ref: '#/definitions/handlers.GeneratePasswordResetLinkResponse'
         "400":
           description: Bad Request
           schema:
@@ -1236,7 +1244,7 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Reset user password
+      summary: Generate password reset link
       tags:
       - Site Admin
   /api/auth/login:
@@ -1276,6 +1284,71 @@ paths:
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       summary: Login
+      tags:
+      - auth
+  /api/auth/password-reset/{token_id}:
+    get:
+      description: |-
+        Renders a password reset form for users with a valid reset token
+        The reset token is validated and if valid, displays a form for the user to enter a new password
+      parameters:
+      - description: Password reset token ID
+        example: 550e8400-e29b-41d4-a716-446655440000
+        in: path
+        name: token_id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "410":
+          description: Gone
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      summary: Display password reset form
+      tags:
+      - auth
+    post:
+      description: |-
+        Processes a password reset request with a valid reset token
+        Validates the token, updates the user's password, and consumes the token
+      parameters:
+      - description: Password reset token ID
+        example: 550e8400-e29b-41d4-a716-446655440000
+        in: path
+        name: token_id
+        required: true
+        type: string
+      - description: New password
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.PasswordResetRequest'
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "410":
+          description: Gone
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      summary: Process password reset
       tags:
       - auth
   /api/auth/password/reset:
@@ -1372,7 +1445,7 @@ paths:
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
-      - BearerServiceAccount: []
+      - BearerAccessToken: []
       summary: Register service account
       tags:
       - Service Accounts
@@ -1412,7 +1485,7 @@ paths:
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
-      - BearerServiceAccount: []
+      - BearerAccessToken: []
       summary: Reissue service account credentials
       tags:
       - Service Accounts

@@ -27,14 +27,15 @@ templ SignalTypeOptions(signalTypes []types.SignalTypeOption) {
 }
 
 templ ServiceAccountOptions(serviceAccounts []types.ServiceAccountOption) {
+	// todo toggle button should be a param
 	<select
 		id="service-account-dropdown"
 		name="service-account-dropdown"
 		required
 		class="form-select"
-		hx-get="/ui-api/reissue-button-state"
+		hx-get="/ui-api/reissue-btn-state"
 		hx-trigger="change"
-		hx-target="#reissue-button-container"
+		hx-target="#reissue-btn-container"
 		hx-swap="innerHTML"
 		hx-include="this"
 	>
@@ -52,6 +53,32 @@ templ ServiceAccountOptions(serviceAccounts []types.ServiceAccountOption) {
 	</div>
 }
 
+
+templ UserOptions(users []types.UserOption) {
+	<select
+		id="user-dropdown"
+		name="user-dropdown"
+		required
+		class="form-select"
+		hx-get="/ui-api/generate-password-reset-btn-state"
+		hx-trigger="change"
+		hx-target="#generate-password-reset-btn-container"
+		hx-swap="innerHTML"
+		hx-include="this"
+	>
+		<option value="">Select User ...</option>
+		for _, user := range users {
+			<option value={ user.Email + "|" + user.UserRole }>{ user.Email } ({ user.UserRole })</option>
+		}
+	</select>
+	<!--todo Clear alerts when dropdown selection changes -->
+	<div hx-get="/ui-api/clear-alerts"
+		hx-trigger="change from:#user-dropdown"
+		hx-target="#generate-password-reset-result"
+		hx-swap="innerHTML"
+		style="display: none;">
+	</div>
+}
 // the list of available versions for the selected signal type
 templ SignalTypeVersionOptions(versions []types.VersionOption) {
 	<select

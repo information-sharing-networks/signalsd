@@ -1,10 +1,10 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html/template"
 	"log/slog"
 	"net/http"
 	"time"
@@ -16,74 +16,12 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
+	errorTemplates "github.com/information-sharing-networks/signalsd/app/internal/server/templates/errors"
+	serviceAccountTemplates "github.com/information-sharing-networks/signalsd/app/internal/server/templates/service_accounts"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/utils"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
-
-// template for service account setup confirmation
-const setupPageTemplate = `<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Service Account Setup</title>
-    <style>
-        body { font-family: system-ui, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
-        .container { background: #f8f9fa; border-radius: 8px; padding: 30px; }
-        .success { color: #28a745; font-size: 24px; margin-bottom: 20px; }
-        .credential { background: white; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; margin: 15px 0; }
-        .label { font-weight: bold; color: #495057; margin-bottom: 5px; }
-        .value { font-family: monospace; background: #f8f9fa; padding: 8px; border-radius: 3px; word-break: break-all; }
-        .warning { background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; padding: 15px; margin: 20px 0; }
-        .warning-title { font-weight: bold; color: #856404; }
-        .expiry { text-align: center; margin: 20px 0; padding: 15px; background: #d1ecf1; border-radius: 4px; }
-        .copy-btn { background: #007bff; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; margin-left: 10px; }
-        .copy-btn:hover { background: #0056b3; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="success">✓ Signalsd service account setup complete</div>
-
-        <div class="credential">
-            <div class="label">Client ID</div>
-            <div class="value">{{.ClientID}} <button class="copy-btn" onclick="copy('{{.ClientID}}', this)">Copy</button></div>
-        </div>
-
-        <div class="credential">
-            <div class="label">Client Secret</div>
-            <div class="value">{{.ClientSecret}} <button class="copy-btn" onclick="copy('{{.ClientSecret}}', this)">Copy</button></div>
-        </div>
-
-        <div class="warning">
-            <div class="warning-title">⚠️ Important</div>
-            This is the only time you'll see the client secret.
-            These credentials expire on {{.ExpiresAt.Format "January 2, 2006"}}.
-        </div>
-
-        <h3>Next Steps:</h3>
-		<p>Store the client ID and secret securely. You will need them to authenticate with the API.</p>
-        <p>access tokens are issued by calling the /oauth/token endpoint with your client_id and client_secret in the request body</p>
-        <p>When using the API include the access token as: <code>Authorization: Bearer &lt;token&gt;</code></li>
-    </div>
-
-	<script>
-		function copy(text, btn) {
-			navigator.clipboard.writeText(text).then(() => {
-				btn.textContent = '✓ Copied!';
-				btn.style.background = '#28a745';
-				btn.disabled = true;
-				setTimeout(() => {
-					btn.textContent = 'Copy';
-					btn.style.background = '#007bff';
-					btn.disabled = false;
-				}, 1500);
-			});
-		}
-	</script>
-</body>
-</html>`
 
 type ServiceAccountHandler struct {
 	queries     *database.Queries
@@ -152,7 +90,7 @@ type SetupPageData struct {
 //	@Failure	401		{object}	responses.ErrorResponse
 //	@Failure	409		{object}	responses.ErrorResponse
 //
-//	@Security	BearerServiceAccount
+//	@Security	BearerAccessToken
 //
 //	@Router		/api/auth/service-accounts/register [post]
 func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWriter, r *http.Request) {
@@ -269,7 +207,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 		return
 	}
 
-	// Create one-time secret record
+	// Create one-time secret record (used to complete the set up the service account)
 	expiresAt := time.Now().Add(signalsd.OneTimeSecretExpiry)
 	oneTimeSecretID, err := txQueries.CreateOneTimeClientSecret(r.Context(), database.CreateOneTimeClientSecretParams{
 		ID:                      uuid.New(),
@@ -341,7 +279,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 //	@Failure	401		{object}	responses.ErrorResponse
 //	@Failure	404		{object}	responses.ErrorResponse
 //
-//	@Security	BearerServiceAccount
+//	@Security	BearerAccessToken
 //
 //	@Router		/api/auth/service-accounts/reissue-credentials [post]
 func (s *ServiceAccountHandler) ReissueServiceAccountCredentialsHandler(w http.ResponseWriter, r *http.Request) {
@@ -639,18 +577,8 @@ func (s *ServiceAccountHandler) SetupServiceAccountHandler(w http.ResponseWriter
 		return
 	}
 
-	template, err := template.New("setup").Parse(setupPageTemplate)
-	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
-		return
-	}
-
-	// Prepare html response
-	data := SetupPageData{
+	// Prepare template data
+	data := serviceAccountTemplates.SetupPageData{
 		ClientID:     serviceAccount.ClientID,
 		ClientSecret: oneTimeSecret.PlaintextSecret,
 		ExpiresAt:    expiresAt,
@@ -661,10 +589,11 @@ func (s *ServiceAccountHandler) SetupServiceAccountHandler(w http.ResponseWriter
 		slog.String("account_id", serviceAccount.AccountID.String()),
 	)
 
+	// Render service account setup page using templ
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusCreated)
 
-	if err := template.Execute(w, data); err != nil {
+	if err := serviceAccountTemplates.SetupPage(data).Render(r.Context(), w); err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
 		)
@@ -675,31 +604,15 @@ func (s *ServiceAccountHandler) SetupServiceAccountHandler(w http.ResponseWriter
 }
 
 func (s *ServiceAccountHandler) renderErrorPage(w http.ResponseWriter, title, message string) {
-	errorHTML := `<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>` + title + `</title>
-    <style>
-        body { font-family: system-ui, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
-        .container { background: #f8f9fa; border-radius: 8px; padding: 30px; text-align: center; }
-        .error { color: #dc3545; font-size: 24px; margin-bottom: 20px; }
-        .message { color: #495057; margin-bottom: 30px; line-height: 1.5; }
-        .back-link { color: #007bff; text-decoration: none; }
-        .back-link:hover { text-decoration: underline; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="error">⚠️ ` + title + `</div>
-        <div class="message">` + message + `</div>
-        <a href="javascript:history.back()" class="back-link">← Go Back</a>
-    </div>
-</body>
-</html>`
+	data := errorTemplates.ErrorPageData{
+		Title:   title,
+		Message: message,
+	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusBadRequest)
-	_, _ = w.Write([]byte(errorHTML))
+
+	if err := errorTemplates.ErrorPage(data).Render(context.Background(), w); err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}
 }
