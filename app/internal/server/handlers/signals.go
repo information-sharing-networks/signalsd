@@ -503,7 +503,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 			createSignalsResponse.Results.FailedSignals = append(createSignalsResponse.Results.FailedSignals, FailedSignal{
 				LocalRef:     signal.LocalRef,
 				ErrorCode:    string(apperrors.ErrCodeMalformedBody),
-				ErrorMessage: "validation failed",
+				ErrorMessage: fmt.Sprintf("validation failed: %v", err),
 			})
 		} else {
 			// Add to valid signals for processing
