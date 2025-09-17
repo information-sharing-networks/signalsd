@@ -1,3 +1,4 @@
+// the ui handlers package handle the ui-api routes
 package handlers
 
 import (

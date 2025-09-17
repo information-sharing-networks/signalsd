@@ -227,6 +227,8 @@ func (s *Server) registerAdminRoutes() {
 				r.Post("/register", users.RegisterUserHandler)
 				r.Post("/login", login.LoginHandler)
 				r.Get("/service-accounts/setup/{setup_id}", serviceAccounts.SetupServiceAccountHandler)
+				r.Get("/password-reset/{token_id}", users.PasswordResetPageHandler)
+				r.Post("/password-reset/{token_id}", users.PasswordResetHandler)
 			})
 
 			// isn admin endpoints
@@ -314,7 +316,7 @@ func (s *Server) registerAdminRoutes() {
 				r.Post("/accounts/{account_id}/enable", admin.EnableAccountHandler)
 				r.Get("/users", admin.GetUsersHandler)
 				r.Get("/service-accounts", admin.GetServiceAccountsHandler)
-				r.Put("/users/{user_id}/reset-password", admin.ResetUserPasswordHandler)
+				r.Post("/users/{user_id}/generate-password-reset-link", admin.GeneratePasswordResetLinkHandler)
 			})
 		})
 	})

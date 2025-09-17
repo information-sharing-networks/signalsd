@@ -417,18 +417,18 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/admin/users/{user_id}/reset-password": {
-            "put": {
+        "/api/admin/users/{user_id}/generate-password-reset-link": {
+            "post": {
                 "security": [
                     {
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Allows admins to reset a user's password (use this endpoint if the user has forgotten their password)",
+                "description": "Allows admins to generate a one-time password reset link for a user (use this endpoint when a user has forgotten their password)\nThe generated link expires in 30 minutes and can only be used once.",
                 "tags": [
                     "Site Admin"
                 ],
-                "summary": "Reset user password",
+                "summary": "Generate password reset link",
                 "parameters": [
                     {
                         "type": "string",
@@ -437,22 +437,13 @@ const docTemplate = `{
                         "name": "user_id",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "description": "New password",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ResetUserPasswordRequest"
-                        }
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/handlers.ResetUserPasswordResponse"
+                            "$ref": "#/definitions/handlers.GeneratePasswordResetLinkResponse"
                         }
                     },
                     "400": {
@@ -521,6 +512,97 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/auth/password-reset/{token_id}": {
+            "get": {
+                "description": "Renders a password reset form for users with a valid reset token\nThe reset token is validated and if valid, displays a form for the user to enter a new password",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Display password reset form",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "description": "Password reset token ID",
+                        "name": "token_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "410": {
+                        "description": "Gone",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Processes a password reset request with a valid reset token\nValidates the token, updates the user's password, and consumes the token",
+                "tags": [
+                    "auth"
+                ],
+                "summary": "Process password reset",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "description": "Password reset token ID",
+                        "name": "token_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "New password",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.PasswordResetRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "410": {
+                        "description": "Gone",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -611,7 +693,7 @@ const docTemplate = `{
             "post": {
                 "security": [
                     {
-                        "BearerServiceAccount": []
+                        "BearerAccessToken": []
                     }
                 ],
                 "description": "Registring a new service account creates a one-time link with the client credentials in it - this must be used by the client within 48 hrs.\n\nNote that where an organization needs more than one service account they must supply unique contact emails for each account.\n\n\nTo reissue credentials for an existing service account, use the **Reissue Service Account Credentials** endpoint.\n\nYou have to be an admin or the site owner to use this endpoint\n",
@@ -662,7 +744,7 @@ const docTemplate = `{
             "post": {
                 "security": [
                     {
-                        "BearerServiceAccount": []
+                        "BearerAccessToken": []
                     }
                 ],
                 "description": "Reissue credentials for an existing service account.\nThis creates a new one-time link with fresh client credentials - this must be used by the client within 48 hrs.\n\nThis endpoint revokes all existing client secrets and one-time setup URLs for the service account, then generates new credentials.\n\nThe client_id will remain the same, but a new client_secret will be generated.\n\nYou have to be an admin or the site owner to use this endpoint\n",
@@ -2562,6 +2644,31 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.GeneratePasswordResetLinkResponse": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "type": "string",
+                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "expires_at": {
+                    "type": "string",
+                    "example": "2024-12-25T10:30:00Z"
+                },
+                "expires_in": {
+                    "type": "integer",
+                    "example": 1800
+                },
+                "reset_url": {
+                    "type": "string",
+                    "example": "https://api.example.com/api/auth/password-reset/0ce71234-34d5-4fb5-beb8-ad50d8b40c7d"
+                },
+                "user_email": {
+                    "type": "string",
+                    "example": "user@example.com"
+                }
+            }
+        },
         "handlers.GrantIsnAccountPermissionRequest": {
             "type": "object",
             "properties": {
@@ -2709,6 +2816,15 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.PasswordResetRequest": {
+            "type": "object",
+            "properties": {
+                "new-password": {
+                    "type": "string",
+                    "example": "ue6U\u003e\u0026X3j570"
+                }
+            }
+        },
         "handlers.PreviousSignalVersion": {
             "type": "object",
             "properties": {
@@ -2761,23 +2877,6 @@ const docTemplate = `{
                 "setup_url": {
                     "type": "string",
                     "example": "https://api.example.com/api/auth/service-accounts/setup/550e8400-e29b-41d4-a716-446655440000"
-                }
-            }
-        },
-        "handlers.ResetUserPasswordRequest": {
-            "type": "object",
-            "properties": {
-                "new_password": {
-                    "description": "Admin provides the new password",
-                    "type": "string"
-                }
-            }
-        },
-        "handlers.ResetUserPasswordResponse": {
-            "type": "object",
-            "properties": {
-                "message": {
-                    "type": "string"
                 }
             }
         },
@@ -3100,7 +3199,7 @@ const docTemplate = `{
                     "type": "string",
                     "example": "lkIB53@6O^Y"
                 },
-                "new_password": {
+                "new-password": {
                     "type": "string",
                     "example": "ue6U\u003e\u0026X3j570"
                 }

@@ -1,12 +1,14 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
@@ -15,6 +17,8 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
+	authTemplates "github.com/information-sharing-networks/signalsd/app/internal/server/templates/auth"
+	errorTemplates "github.com/information-sharing-networks/signalsd/app/internal/server/templates/errors"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -40,7 +44,7 @@ type CreateUserRequest struct {
 
 type UpdatePasswordRequest struct {
 	CurrentPassword string `json:"current_password" example:"lkIB53@6O^Y"`
-	NewPassword     string `json:"new_password" example:"ue6U>&X3j570"`
+	NewPassword     string `json:"new-password" example:"ue6U>&X3j570"`
 }
 
 // RegisterUserHandler godoc
@@ -479,4 +483,274 @@ func (u *UserHandler) RevokeUserAdminRoleHandler(w http.ResponseWriter, r *http.
 	)
 
 	responses.RespondWithStatusCodeOnly(w, http.StatusCreated)
+}
+
+// Password reset types
+type PasswordResetRequest struct {
+	NewPassword string `json:"new-password" example:"ue6U>&X3j570"`
+}
+
+type PasswordResetPageData struct {
+	TokenID   string
+	UserEmail string
+	ExpiresAt time.Time
+	ExpiresIn time.Duration
+}
+
+// PasswordResetPageHandler godoc
+//
+//	@Summary		Display password reset form
+//	@Description	Renders a password reset form for users with a valid reset token
+//	@Description	The reset token is validated and if valid, displays a form for the user to enter a new password
+//	@Tags			auth
+//
+//	@Param			token_id	path	string	true	"Password reset token ID"	example(550e8400-e29b-41d4-a716-446655440000)
+//
+//	@Success		200
+//	@Failure		400	{object}	responses.ErrorResponse
+//	@Failure		404	{object}	responses.ErrorResponse
+//	@Failure		410	{object}	responses.ErrorResponse
+//
+//	@Router			/api/auth/password-reset/{token_id} [get]
+func (u *UserHandler) PasswordResetPageHandler(w http.ResponseWriter, r *http.Request) {
+	// Extract token from URL path
+	tokenIDString := r.PathValue("token_id")
+
+	// Parse token as UUID
+	tokenID, err := uuid.Parse(tokenIDString)
+	if err != nil {
+		u.renderErrorPage(w, "Invalid Reset Token", "The password reset token you provided is not valid. Please check the URL and try again.")
+		return
+	}
+
+	// Retrieve and validate password reset token
+	resetToken, err := u.queries.GetPasswordResetToken(r.Context(), tokenID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("error", "password reset token has already been used or is no longer valid"),
+			)
+
+			u.renderErrorPage(w, "Reset Token Not Found", "The password reset token you provided has already been used or is no longer valid")
+			return
+		}
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		u.renderErrorPage(w, "Internal Server Error", "Please try again later.")
+		return
+	}
+
+	// Check if token has expired
+	if time.Now().After(resetToken.ExpiresAt) {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", "password reset token has expired"),
+		)
+
+		u.renderErrorPage(w, "Reset Token Expired", "The password reset token you provided has expired. Please contact your administrator for a new reset link.")
+		return
+	}
+
+	// Get user information
+	user, err := u.queries.GetUserByID(r.Context(), resetToken.UserAccountID)
+	if err != nil {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		u.renderErrorPage(w, "Internal Server Error", "Please try again later.")
+		return
+	}
+
+	// Prepare template data
+	data := authTemplates.PasswordResetPageData{
+		UserEmail: user.Email,
+		ExpiresAt: resetToken.ExpiresAt,
+		ExpiresIn: time.Until(resetToken.ExpiresAt),
+	}
+
+	logger.ContextWithLogAttrs(r.Context(),
+		slog.String("user_email", user.Email),
+		slog.String("user_id", resetToken.UserAccountID.String()),
+	)
+
+	// Render password reset form using templ
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := authTemplates.PasswordResetPage(data).Render(r.Context(), w); err != nil {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		u.renderErrorPage(w, "Internal Server Error", "Please try again later.")
+		return
+	}
+}
+
+// PasswordResetHandler godoc
+//
+//	@Summary		Process password reset
+//	@Description	Processes a password reset request with a valid reset token
+//	@Description	Validates the token, updates the user's password, and consumes the token
+//	@Tags			auth
+//
+//	@Param			token_id	path	string							true	"Password reset token ID"	example(550e8400-e29b-41d4-a716-446655440000)
+//	@Param			request		body	handlers.PasswordResetRequest	true	"New password"
+//
+//	@Success		200
+//	@Failure		400	{object}	responses.ErrorResponse
+//	@Failure		404	{object}	responses.ErrorResponse
+//	@Failure		410	{object}	responses.ErrorResponse
+//
+//	@Router			/api/auth/password-reset/{token_id} [post]
+func (u *UserHandler) PasswordResetHandler(w http.ResponseWriter, r *http.Request) {
+	// Extract token from URL path
+	tokenIDString := r.PathValue("token_id")
+
+	// Parse token as UUID
+	tokenID, err := uuid.Parse(tokenIDString)
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "invalid token format")
+		return
+	}
+
+	// Parse request body
+	var req PasswordResetRequest
+	defer r.Body.Close()
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
+		return
+	}
+
+	// Validate the new password
+	if req.NewPassword == "" {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "new-password is required")
+		return
+	}
+
+	if len(req.NewPassword) < signalsd.MinimumPasswordLength {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodePasswordTooShort, fmt.Sprintf("password must be at least %d characters", signalsd.MinimumPasswordLength))
+		return
+	}
+
+	// Start transaction (following service account pattern)
+	tx, err := u.pool.BeginTx(r.Context(), pgx.TxOptions{})
+	if err != nil {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+		return
+	}
+
+	defer func() {
+		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("error", err.Error()),
+			)
+		}
+	}()
+
+	txQueries := u.queries.WithTx(tx)
+
+	// Retrieve and validate password reset token
+	resetToken, err := txQueries.GetPasswordResetToken(r.Context(), tokenID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "password reset token not found or already used")
+			return
+		}
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+		return
+	}
+
+	// Check if token has expired
+	if time.Now().After(resetToken.ExpiresAt) {
+		responses.RespondWithError(w, r, http.StatusGone, apperrors.ErrCodeResourceExpired, "password reset token has expired")
+		return
+	}
+
+	// Hash the new password
+	hashedPassword, err := u.authService.HashPassword(req.NewPassword)
+	if err != nil {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "internal server error")
+		return
+	}
+
+	// Update the password in the database
+	rowsAffected, err := txQueries.UpdatePassword(r.Context(), database.UpdatePasswordParams{
+		AccountID:      resetToken.UserAccountID,
+		HashedPassword: hashedPassword,
+	})
+	if err != nil {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("user_id", resetToken.UserAccountID.String()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+		return
+	}
+
+	if rowsAffected != 1 {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "password update affected unexpected number of rows")
+		return
+	}
+
+	// Delete the password reset token
+	_, err = txQueries.DeletePasswordResetToken(r.Context(), tokenID)
+	if err != nil {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+		return
+	}
+
+	// Commit the transaction
+	if err := tx.Commit(r.Context()); err != nil {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+		return
+	}
+
+	logger.ContextWithLogAttrs(r.Context(),
+		slog.String("user_id", resetToken.UserAccountID.String()),
+		slog.String("admin_account_id", resetToken.CreatedByAdminID.String()),
+	)
+
+	responses.RespondWithStatusCodeOnly(w, http.StatusOK)
+}
+
+// renderErrorPage renders a simple HTML error page using templ
+func (u *UserHandler) renderErrorPage(w http.ResponseWriter, title, message string) {
+	data := errorTemplates.ErrorPageData{
+		Title:   title,
+		Message: message,
+	}
+
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusBadRequest)
+
+	if err := errorTemplates.ErrorPage(data).Render(context.Background(), w); err != nil {
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	}
 }

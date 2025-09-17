@@ -1,0 +1,100 @@
+package templates
+
+
+import (
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
+)
+
+// TODO - the generate password reset link feature currently allows admins to reset any account - including the owner.  
+// Probs better to have an owner-only page to reset admins, and limit this page to resets on members only
+templ ManageUsersPage() {
+	@BaseLayout("Manager web users") {
+		@Navigation()
+		<div class="page-container">
+			<h1 class="page-title">Manage Users</h1>
+
+			<!-- Generate password reset link section -->
+			<div class="card mb-6">
+				<div class="card-body">
+					<h3 class="card-title">Generate password reset link for a user</h3>
+    		        <p class="text-muted mb-4">Select an existing user account to generate a password reset link.</p>
+					<div class="form-group">
+						<label for="user-dropdown" class="form-label">User </label>
+						<select
+							id="user-dropdown"
+							hx-get="/ui-api/user-options"
+							hx-trigger="load"
+							hx-swap="outerHTML"
+						>
+							<!--web user dropdown will be loaded here -->
+						</select>
+					</div>
+
+					<div id="generate-password-reset-btn-container" class="form-group mt-4">
+                        <button
+                            id="generate-password-reset-btn"
+                            hx-post="/ui-api/generate-password-reset-link"
+                            hx-target="#generate-password-reset-result"
+                            hx-include="#user-dropdown"
+                            class="btn "
+                            disabled>
+                                Generate Reset Link
+                        </button>
+					</div>
+
+					<!-- Update button state when dropdown changes -->
+					<div hx-get="/ui-api/generate-password-reset-btn-state"
+						hx-trigger="change from:#user-dropdown"
+						hx-target="#generate-password-reset-btn-container"
+						hx-swap="innerHTML"
+						style="display: none;">
+					</div>
+
+					<div id="generate-password-reset-result" class="mt-4"></div>
+				</div>
+			</div>
+
+		</div>
+        <!-- todo disable user account -->
+	}
+}
+
+templ GeneratePasswordResetLinkSuccess(response client.GeneratePasswordResetLinkResponse) {
+	<div class="card">
+		<div class="card-body">
+			@SuccessAlert("Password reset link generated")
+			<div class="mt-4 space-y-2">
+				<p><strong>User Email:</strong> { response.UserEmail }</p>
+				<p><strong>New Reset Password URL:</strong>
+					<code class="text-sm bg-gray-100 px-2 py-1 rounded block break-all">{ response.ResetURL }</code>
+				</p>
+				<p class="text-sm text-gray-600 mt-2">
+					<strong>Note:</strong> The user can use the link above to reset their password (the link can only be used once and expires in 30 minutes).
+				</p>
+			</div>
+		</div>
+	</div>
+	<!-- Update button to disabled state -->
+	<div hx-swap-oob="true" id="generate-password-reset-btn-container">
+		<button
+			id="generate-password-reset-btn"
+			class="btn opacity-50 cursor-not-allowed"
+			disabled
+		>
+			Reset Link Generated
+		</button>
+	</div>
+}
+
+templ GeneratePasswordResetButton(isEnabled bool) {
+	<button
+		id="generate-password-reset-btn"
+		hx-post="/ui-api/generate-password-reset-link"
+		hx-target="#generate-password-reset-result"
+		hx-include="#user-dropdown"
+		class="btn "
+		disabled?={ !isEnabled }
+	>
+		Generate Reset Link
+	</button>
+}

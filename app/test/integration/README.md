@@ -27,16 +27,14 @@ These tests verify the authentication and authorization system by running databa
 - ✅ Disabled account handling
 
 
-### 2. User Registration (`register_test.go`)
-Tests user and service account registration via HTTP requests.
+### 2. User & Service Account Registration (`register_login_reset_test.go`)
+Tests for user and service account registration via HTTP requests.
 
-- ✅ User registration flow
-- ✅ Duplicate email handling
-- ✅ Password validation and hashing
-- ✅ Error response validation
-- ✅ Service account registration flow
-- ✅ Duplicate email/org handling
-- ✅ Error response validation
+- ✅ User registration 
+- ✅ Login 
+- ✅ Password reset (admin generated link)
+- ✅ Service account registration
+- ✅ Service acccount credential reissue
 
 ### 3. OAuth (`oauth_test.go`)
 Tests OAuth token generation and revocation via HTTP requests.

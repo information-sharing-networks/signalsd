@@ -45,10 +45,11 @@ const (
 	TokenIssuerName        = "Signalsd"
 
 	// Security & Auth constants
-	BcryptCost            = 10                  // bcrypt.DefaultCost = 10
-	AccessTokenExpiry     = 30 * time.Minute    // JWT access token lifetime
-	RefreshTokenExpiry    = 30 * 24 * time.Hour // Refresh token lifetime (30 days)
-	OneTimeSecretExpiry   = 48 * time.Hour
+	BcryptCost            = 10                   // bcrypt.DefaultCost = 10
+	AccessTokenExpiry     = 30 * time.Minute     // JWT access token lifetime
+	RefreshTokenExpiry    = 30 * 24 * time.Hour  // Refresh token lifetime (30 days)
+	OneTimeSecretExpiry   = 48 * time.Hour       // Service account setup tokens
+	PasswordResetExpiry   = 30 * time.Minute     // Password reset tokens
 	ClientSecretExpiry    = 365 * 24 * time.Hour // Client secret expiration (1 year)
 	MinimumPasswordLength = 11
 

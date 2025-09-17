@@ -2,6 +2,12 @@
 
 package integration
 
+//e2e tests for
+// Register new service account
+// Service account reissue credentials
+// User registration
+// User login
+// User password reset (admin generated link)
 import (
 	"bytes"
 	"context"
@@ -14,6 +20,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
+	"github.com/information-sharing-networks/signalsd/app/internal/database"
+	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
+	"github.com/information-sharing-networks/signalsd/app/internal/server/handlers"
 )
 
 type serviceAccountDetails struct {
@@ -1015,6 +1024,226 @@ func TestUserRegistration(t *testing.T) {
 					t.Errorf("Expected error_code 'malformed_body', got %s", errorCode)
 				}
 			}
+		})
+	})
+}
+
+func TestPasswordResetFlow(t *testing.T) {
+	ctx := context.Background()
+	testDB := setupTestDatabase(t, ctx)
+	queries := database.New(testDB)
+	authService := auth.NewAuthService(secretKey, "test", queries)
+
+	// Create test accounts
+	adminAccount := createTestAccount(t, ctx, queries, "admin", "user", "admin@example.com")
+	userAccount := createTestAccount(t, ctx, queries, "member", "user", "user@example.com")
+
+	// Start test server
+	testURL := getTestDatabaseURL()
+	baseURL, stopServer := startInProcessServer(t, ctx, testDB, testURL)
+	defer stopServer()
+
+	t.Run("non admin cannot generate reset link", func(t *testing.T) {
+		userToken := getAccessToken(t, authService, userAccount.ID)
+
+		url := fmt.Sprintf("%s/api/admin/users/%s/generate-password-reset-link", baseURL, userAccount.ID)
+		req, err := http.NewRequest("POST", url, nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+userToken)
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("Failed to make request: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusForbidden {
+			t.Fatalf("Expected status 403, got %d", resp.StatusCode)
+		}
+	})
+
+	// 1. Admin generates password reset link
+	t.Run("Admin generates password reset link", func(t *testing.T) {
+		// Get admin access token
+		adminToken := getAccessToken(t, authService, adminAccount.ID)
+
+		// Generate password reset link
+		url := fmt.Sprintf("%s/api/admin/users/%s/generate-password-reset-link", baseURL, userAccount.ID)
+		req, err := http.NewRequest("POST", url, nil)
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+adminToken)
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("Failed to make request: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+		}
+
+		var resetResponse handlers.GeneratePasswordResetLinkResponse
+		if err := json.NewDecoder(resp.Body).Decode(&resetResponse); err != nil {
+			t.Fatalf("Failed to decode response: %v", err)
+		}
+
+		// Verify response structure
+		if resetResponse.UserEmail != "user@example.com" {
+			t.Errorf("Expected user email 'user@example.com', got '%s'", resetResponse.UserEmail)
+		}
+		if resetResponse.AccountID != userAccount.ID {
+			t.Errorf("Expected account ID %s, got %s", userAccount.ID, resetResponse.AccountID)
+		}
+		if !strings.Contains(resetResponse.ResetURL, "/api/auth/password-reset/") {
+			t.Errorf("Expected reset URL to contain '/api/auth/password-reset/', got '%s'", resetResponse.ResetURL)
+		}
+		if resetResponse.ExpiresIn != int(signalsd.PasswordResetExpiry.Seconds()) {
+			t.Errorf("Expected expires_in %d, got %d", int(signalsd.PasswordResetExpiry.Seconds()), resetResponse.ExpiresIn)
+		}
+
+		// Extract token ID from URL for next steps
+		urlParts := strings.Split(resetResponse.ResetURL, "/")
+		tokenID := urlParts[len(urlParts)-1]
+
+		// 2: User visits reset link (GET) - should render HTML form
+		t.Run("User visits reset link", func(t *testing.T) {
+			resetURL := fmt.Sprintf("%s/api/auth/password-reset/%s", baseURL, tokenID)
+			resp, err := http.Get(resetURL)
+			if err != nil {
+				t.Fatalf("Failed to get reset form: %v", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+			}
+
+			// Verify content type is HTML
+			contentType := resp.Header.Get("Content-Type")
+			if !strings.Contains(contentType, "text/html") {
+				t.Errorf("Expected HTML content type, got '%s'", contentType)
+			}
+
+			// Read response body to verify it contains form elements
+			buf := new(bytes.Buffer)
+			buf.ReadFrom(resp.Body)
+			body := buf.String()
+
+			// Verify HTML form is present
+			if !strings.Contains(body, "Reset Your Password") {
+				t.Error("Expected HTML to contain 'Reset Your Password' title")
+			}
+			if !strings.Contains(body, "user@example.com") {
+				t.Error("Expected HTML to contain user email")
+			}
+			if !strings.Contains(body, `type="password"`) {
+				t.Error("Expected HTML to contain password input field")
+			}
+		})
+
+		// 3: User submits new password
+		t.Run("User submits new password", func(t *testing.T) {
+			newPassword := "new-secure-password-123"
+			resetRequest := handlers.PasswordResetRequest{
+				NewPassword: newPassword,
+			}
+
+			requestBody, err := json.Marshal(resetRequest)
+			if err != nil {
+				t.Fatalf("Failed to marshal request: %v", err)
+			}
+
+			resetURL := fmt.Sprintf("%s/api/auth/password-reset/%s", baseURL, tokenID)
+			req, err := http.NewRequest("POST", resetURL, bytes.NewBuffer(requestBody))
+			if err != nil {
+				t.Fatalf("Failed to create request: %v", err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("Failed to submit password reset: %v", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+			}
+
+			// 4: Verify user can login with new password
+			t.Run("User can login with new password", func(t *testing.T) {
+				loginRequest := map[string]string{
+					"email":    "user@example.com",
+					"password": newPassword,
+				}
+
+				requestBody, err := json.Marshal(loginRequest)
+				if err != nil {
+					t.Fatalf("Failed to marshal login request: %v", err)
+				}
+
+				loginURL := fmt.Sprintf("%s/api/auth/login", baseURL)
+				req, err := http.NewRequest("POST", loginURL, bytes.NewBuffer(requestBody))
+				if err != nil {
+					t.Fatalf("Failed to create login request: %v", err)
+				}
+				req.Header.Set("Content-Type", "application/json")
+
+				resp, err := http.DefaultClient.Do(req)
+				if err != nil {
+					t.Fatalf("Failed to login: %v", err)
+				}
+				defer resp.Body.Close()
+
+				if resp.StatusCode != http.StatusOK {
+					t.Fatalf("Expected login success with status 200, got %d", resp.StatusCode)
+				}
+
+				var loginResponse auth.AccessTokenResponse
+				if err := json.NewDecoder(resp.Body).Decode(&loginResponse); err != nil {
+					t.Fatalf("Failed to decode login response: %v", err)
+				}
+
+				// Verify we got a valid access token
+				if loginResponse.AccessToken == "" {
+					t.Error("Expected access token in login response")
+				}
+			})
+
+			// Step 5: Verify reset token cannot be reused
+			t.Run("Reset token cannot be reused", func(t *testing.T) {
+				anotherResetRequest := handlers.PasswordResetRequest{
+					NewPassword: "another-password-456",
+				}
+
+				requestBody, err := json.Marshal(anotherResetRequest)
+				if err != nil {
+					t.Fatalf("Failed to marshal request: %v", err)
+				}
+
+				resetURL := fmt.Sprintf("%s/api/auth/password-reset/%s", baseURL, tokenID)
+				req, err := http.NewRequest("POST", resetURL, bytes.NewBuffer(requestBody))
+				if err != nil {
+					t.Fatalf("Failed to create request: %v", err)
+				}
+				req.Header.Set("Content-Type", "application/json")
+
+				resp, err := http.DefaultClient.Do(req)
+				if err != nil {
+					t.Fatalf("Failed to attempt password reset: %v", err)
+				}
+				defer resp.Body.Close()
+
+				// Should return 404 since token was consumed
+				if resp.StatusCode != http.StatusNotFound {
+					t.Fatalf("Expected status 404 for consumed token, got %d", resp.StatusCode)
+				}
+			})
 		})
 	})
 }

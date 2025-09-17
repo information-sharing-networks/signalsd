@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -16,6 +15,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
+	"github.com/information-sharing-networks/signalsd/app/internal/server/utils"
 	"github.com/information-sharing-networks/signalsd/app/internal/version"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -697,25 +697,25 @@ func (a *AdminHandler) GetServiceAccountsHandler(w http.ResponseWriter, r *http.
 	responses.RespondWithJSON(w, http.StatusOK, serviceAccountDetails)
 }
 
-// Simple password reset types
-type ResetUserPasswordRequest struct {
-	NewPassword string `json:"new_password"` // Admin provides the new password
+// Password reset link generation types
+type GeneratePasswordResetLinkResponse struct {
+	UserEmail string    `json:"user_email" example:"user@example.com"`
+	AccountID uuid.UUID `json:"account_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	ResetURL  string    `json:"reset_url" example:"https://api.example.com/api/auth/password-reset/0ce71234-34d5-4fb5-beb8-ad50d8b40c7d"`
+	ExpiresAt time.Time `json:"expires_at" example:"2024-12-25T10:30:00Z"`
+	ExpiresIn int       `json:"expires_in" example:"1800"`
 }
 
-type ResetUserPasswordResponse struct {
-	Message string `json:"message"`
-}
-
-// ResetUserPasswordHandler godoc
+// GeneratePasswordResetLinkHandler godoc
 //
-//	@Summary		Reset user password
-//	@Description	Allows admins to reset a user's password (use this endpoint if the user has forgotten their password)
+//	@Summary		Generate password reset link
+//	@Description	Allows admins to generate a one-time password reset link for a user (use this endpoint when a user has forgotten their password)
+//	@Description	The generated link expires in 30 minutes and can only be used once.
 //	@Tags			Site Admin
 //
-//	@Param			user_id	path		string								true	"User Account ID"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
-//	@Param			request	body		handlers.ResetUserPasswordRequest	true	"New password"
+//	@Param			user_id	path		string	true	"User Account ID"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
-//	@Success		200		{object}	handlers.ResetUserPasswordResponse
+//	@Success		200		{object}	handlers.GeneratePasswordResetLinkResponse
 //	@Failure		400		{object}	responses.ErrorResponse
 //	@Failure		401		{object}	responses.ErrorResponse	"Unauthorized"
 //	@Failure		403		{object}	responses.ErrorResponse	"Forbidden - admin role required"
@@ -723,8 +723,8 @@ type ResetUserPasswordResponse struct {
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/api/admin/users/{user_id}/reset-password [put]
-func (a *AdminHandler) ResetUserPasswordHandler(w http.ResponseWriter, r *http.Request) {
+//	@Router			/api/admin/users/{user_id}/generate-password-reset-link [post]
+func (a *AdminHandler) GeneratePasswordResetLinkHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Get admin account ID from context (set by middleware)
 	adminAccountID, ok := auth.ContextAccountID(r.Context())
@@ -746,19 +746,6 @@ func (a *AdminHandler) ResetUserPasswordHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Parse request body
-	var req ResetUserPasswordRequest
-	defer r.Body.Close()
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
-		return
-	}
-
 	// Verify user exists
 	user, err := a.queries.GetUserByID(r.Context(), userID)
 	if err != nil {
@@ -775,32 +762,25 @@ func (a *AdminHandler) ResetUserPasswordHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Validate the new password
-	if req.NewPassword == "" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "new_password is required")
-		return
-	}
-
-	if len(req.NewPassword) < signalsd.MinimumPasswordLength {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodePasswordTooShort, fmt.Sprintf("password must be at least %d characters", signalsd.MinimumPasswordLength))
-		return
-	}
-
-	// Hash the new password
-	hashedPassword, err := a.authService.HashPassword(req.NewPassword)
+	// Delete any existing password reset tokens for this user (following service account pattern)
+	_, err = a.queries.DeletePasswordResetTokensForUser(r.Context(), userID)
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
+			slog.String("user_id", userID.String()),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "internal server error")
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
-	// Update the password in the database
-	rowsAffected, err := a.queries.UpdatePassword(r.Context(), database.UpdatePasswordParams{
-		AccountID:      userID,
-		HashedPassword: hashedPassword,
+	// Create password reset token record
+	expiresAt := time.Now().Add(signalsd.PasswordResetExpiry)
+	tokenID, err := a.queries.CreatePasswordResetToken(r.Context(), database.CreatePasswordResetTokenParams{
+		ID:               uuid.New(),
+		UserAccountID:    userID,
+		ExpiresAt:        expiresAt,
+		CreatedByAdminID: adminAccountID,
 	})
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
@@ -812,18 +792,27 @@ func (a *AdminHandler) ResetUserPasswordHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	if rowsAffected != 1 {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "password update affected unexpected number of rows")
-		return
-	}
-
-	logger.ContextWithLogAttrs(r.Context(),
-		slog.String("admin_account_id", adminAccountID.String()),
-		slog.String("user_id", userID.String()),
+	// Generate the one-time password reset URL (following service account pattern)
+	resetURL := fmt.Sprintf("%s://%s/api/auth/password-reset/%s",
+		utils.GetScheme(r),
+		r.Host,
+		tokenID.String(),
 	)
 
-	response := ResetUserPasswordResponse{
-		Message: fmt.Sprintf("Password successfully reset for user %s", user.Email),
+	// Add reset URL and account ID to final request log context
+	logger.ContextWithLogAttrs(r.Context(),
+		slog.String("reset_url", resetURL),
+		slog.String("user_id", userID.String()),
+		slog.String("admin_account_id", adminAccountID.String()),
+	)
+
+	// Return the reset link information
+	response := GeneratePasswordResetLinkResponse{
+		UserEmail: user.Email,
+		AccountID: userID,
+		ResetURL:  resetURL,
+		ExpiresAt: expiresAt,
+		ExpiresIn: int(signalsd.PasswordResetExpiry.Seconds()),
 	}
 
 	responses.RespondWithJSON(w, http.StatusOK, response)
