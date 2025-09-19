@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -10,7 +8,6 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
-	"github.com/information-sharing-networks/signalsd/app/internal/ui/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
@@ -53,29 +50,11 @@ func (h *HandlerService) RenderSignalTypeOptions(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Get permissions data from cookie
-	permsCookie, err := r.Cookie(config.IsnPermsCookieName)
-	if err != nil {
+	// Get permissions data from context
+	perms, ok := auth.ContextIsnPerms(r.Context())
+	if !ok {
+		reqLogger.Error("Failed to get ISN permissions from context in signal types handler")
 		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
-	// Decode base64 cookie value
-	decodedPerms, err := base64.StdEncoding.DecodeString(permsCookie.Value)
-	if err != nil {
-		reqLogger.Error("Failed to decode permissions cookie in signal types handler",
-			slog.String("error", err.Error()),
-			slog.String("cookie_value", permsCookie.Value))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	var perms map[string]types.IsnPerm
-	if err := json.Unmarshal(decodedPerms, &perms); err != nil {
-		reqLogger.Error("Failed to parse permissions JSON in signal types handler",
-			slog.String("error", err.Error()),
-			slog.String("json_data", string(decodedPerms)))
-		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -122,29 +101,11 @@ func (h *HandlerService) RenderSignalTypeVersionOptions(w http.ResponseWriter, r
 		return
 	}
 
-	// Get permissions data from cookie
-	permsCookie, err := r.Cookie(config.IsnPermsCookieName)
-	if err != nil {
+	// Get permissions data from context
+	perms, ok := auth.ContextIsnPerms(r.Context())
+	if !ok {
+		reqLogger.Error("Failed to get ISN permissions from context in versions handler")
 		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-
-	// Decode base64 cookie value
-	decodedPerms, err := base64.StdEncoding.DecodeString(permsCookie.Value)
-	if err != nil {
-		reqLogger.Error("Failed to decode permissions cookie in versions handler",
-			slog.String("error", err.Error()),
-			slog.String("cookie_value", permsCookie.Value))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	var perms map[string]types.IsnPerm
-	if err := json.Unmarshal(decodedPerms, &perms); err != nil {
-		reqLogger.Error("Failed to parse permissions JSON in versions handler",
-			slog.String("error", err.Error()),
-			slog.String("json_data", string(decodedPerms)))
-		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
@@ -174,20 +135,18 @@ func (h *HandlerService) RenderSignalTypeVersionOptions(w http.ResponseWriter, r
 	}
 }
 
-func (h *HandlerService) RenderUserOptions(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerService) RenderUserOptionsGeneratePasswordLink(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
-	// Get access token from cookie
-	accessTokenCookie, err := r.Cookie(config.AccessTokenCookieName)
-	if err != nil {
+	// Get access token from context
+	accessToken, ok := auth.ContextAccessToken(r.Context())
+	if !ok {
 		component := templates.ErrorAlert("Authentication required. Please log in again.")
 		if err := component.Render(r.Context(), w); err != nil {
 			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
 		}
 		return
 	}
-
-	accessToken := accessTokenCookie.Value
 	// Get users from API
 	users, err := h.ApiClient.GetUserOptionsList(accessToken)
 	if err != nil {
@@ -200,7 +159,7 @@ func (h *HandlerService) RenderUserOptions(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Render user dropdown options
-	component := templates.UserOptions(users)
+	component := templates.UserOptionsGeneratePasswordLink(users)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render web user options", slog.String("error", err.Error()))
 	}
@@ -209,9 +168,9 @@ func (h *HandlerService) RenderUserOptions(w http.ResponseWriter, r *http.Reques
 func (h *HandlerService) RenderServiceAccountOptions(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
-	// Get access token from cookie
-	accessTokenCookie, err := r.Cookie(config.AccessTokenCookieName)
-	if err != nil {
+	// Get access token from context
+	accessToken, ok := auth.ContextAccessToken(r.Context())
+	if !ok {
 		component := templates.ErrorAlert("Authentication required. Please log in again.")
 		if err := component.Render(r.Context(), w); err != nil {
 			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
@@ -219,10 +178,8 @@ func (h *HandlerService) RenderServiceAccountOptions(w http.ResponseWriter, r *h
 		return
 	}
 
-	accessToken := accessTokenCookie.Value
-
 	// Get service accounts from API
-	serviceAccountOptions, err := h.ApiClient.GetServiceAccountOptionsList(accessToken)
+	ServiceAccountOptions, err := h.ApiClient.GetServiceAccountOptionsList(accessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get service accounts", slog.String("error", err.Error()))
 		component := templates.ErrorAlert("Failed to load service accounts. Please try again.")
@@ -232,9 +189,74 @@ func (h *HandlerService) RenderServiceAccountOptions(w http.ResponseWriter, r *h
 		return
 	}
 
-	// Render service account dropdown options
-	component := templates.ServiceAccountOptions(serviceAccountOptions)
+	// Render service account dropdown with reissue button integration
+	component := templates.ServiceAccountSelectorForReissue(ServiceAccountOptions)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render service account options", slog.String("error", err.Error()))
+	}
+}
+
+func (h *HandlerService) RenderAccountIdentifierField(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	accountType := r.FormValue("account-type")
+	if accountType == "" {
+		// Return placeholder if no account type selected
+		component := templates.AccountIdentifierPlaceholder()
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render account identifier placeholder", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	// Get access token from context
+	accessToken, ok := auth.ContextAccessToken(r.Context())
+	if !ok {
+		component := templates.ErrorAlert("Authentication required. Please log in again.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	switch accountType {
+	case "user":
+		users, err := h.ApiClient.GetUserOptionsList(accessToken)
+		if err != nil {
+			reqLogger.Error("Failed to get users", slog.String("error", err.Error()))
+			component := templates.ErrorAlert("Failed to load users. Please try again.")
+			if err := component.Render(r.Context(), w); err != nil {
+				reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+			}
+			return
+		}
+
+		component := templates.UserSelectorForAccountIdentifier(users)
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render user dropdown", slog.String("error", err.Error()))
+		}
+
+	case "service-account":
+		serviceAccounts, err := h.ApiClient.GetServiceAccountOptionsList(accessToken)
+		if err != nil {
+			reqLogger.Error("Failed to get service accounts", slog.String("error", err.Error()))
+			component := templates.ErrorAlert("Failed to load service accounts. Please try again.")
+			if err := component.Render(r.Context(), w); err != nil {
+				reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+			}
+			return
+		}
+
+		// Render service account dropdown
+		component := templates.ServiceAccountSelectorForAccountIdentifier(serviceAccounts)
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render service account dropdown", slog.String("error", err.Error()))
+		}
+
+	default:
+		component := templates.AccountIdentifierPlaceholder()
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render account identifier placeholder", slog.String("error", err.Error()))
+		}
 	}
 }

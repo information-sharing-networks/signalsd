@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
-	"github.com/information-sharing-networks/signalsd/app/internal/ui/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
 )
 
@@ -39,9 +39,9 @@ func (h *HandlerService) CreateIsn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get access token from cookie
-	accessTokenCookie, err := r.Cookie(config.AccessTokenCookieName)
-	if err != nil {
+	// Get access token from context
+	accessToken, ok := auth.ContextAccessToken(r.Context())
+	if !ok {
 		component := templates.ErrorAlert("Authentication required. Please log in again.")
 		if err := component.Render(r.Context(), w); err != nil {
 			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
@@ -50,7 +50,6 @@ func (h *HandlerService) CreateIsn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call the API to create the ISN
-	accessToken := accessTokenCookie.Value
 	req := client.CreateIsnRequest{
 		Title:      title,
 		Detail:     detail,

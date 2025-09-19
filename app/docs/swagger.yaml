@@ -493,11 +493,8 @@ definitions:
     type: object
   handlers.ReissueServiceAccountCredentialsRequest:
     properties:
-      client_contact_email:
-        example: example@example.com
-        type: string
-      client_organization:
-        example: example org
+      client_id:
+        example: sa_example-org_k7j2m9x1
         type: string
     type: object
   handlers.ReissueServiceAccountCredentialsResponse:

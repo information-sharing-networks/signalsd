@@ -8,7 +8,6 @@ import (
 )
 
 // UpdateIsnAccount grants or revokes an permissions to access an ISN
-// accountType should be "user" or "service_account"
 func (c *Client) UpdateIsnAccount(accessToken, isnSlug, accountType, accountIdentifier, permission string) error {
 	var accountID string
 
@@ -20,7 +19,7 @@ func (c *Client) UpdateIsnAccount(accessToken, isnSlug, accountType, accountIden
 			return err
 		}
 		accountID = user.AccountID
-	case "service_account":
+	case "service-account":
 		serviceAccount, err := c.LookupServiceAccountByClientID(accessToken, accountIdentifier)
 		if err != nil {
 			return err

@@ -49,7 +49,7 @@ func ManageServiceAccounts() templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Manage Service Accounts</h1><!-- Create New Service Account Section --><div class=\"card mb-6\"><div class=\"card-body\"><h3 class=\"card-title\">Create New Service Account</h3><form hx-post=\"/ui-api/create-service-account\" hx-target=\"#create-result\" class=\"space-y-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\"><label for=\"email\" class=\"form-label\">Contact Email</label> <input id=\"email\" name=\"email\" type=\"email\" class=\"form-input\" placeholder=\"Contact email for the service account\"></div></div><div class=\"form-group\"><label for=\"organization\" class=\"form-label\">Client Organization</label> <input id=\"organization\" name=\"organization\" type=\"text\" required class=\"form-input\" placeholder=\"Client organization name\"></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Create Service Account</button></div></form><div id=\"create-result\" class=\"mt-4\"></div></div></div><!-- Reissue Service Account Credentials Section --><div class=\"card mb-6\"><div class=\"card-body\"><h3 class=\"card-title\">Reissue Service Account Credentials</h3>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Manage Service Accounts</h1><!-- Create New Service Account Section --><div class=\"card mb-6\"><div class=\"card-header\"><h3 class=\"card-title\">Create New Service Account</h3></div><div class=\"card-body\"><form hx-post=\"/ui-api/create-service-account\" hx-target=\"#create-result\" class=\"space-y-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\"><label for=\"email\" class=\"form-label\">Contact Email</label> <input id=\"email\" name=\"email\" type=\"email\" class=\"form-input\" placeholder=\"Contact email for the service account\"></div><div class=\"form-group\"><label for=\"organization\" class=\"form-label\">Client Organization</label> <input id=\"organization\" name=\"organization\" type=\"text\" required class=\"form-input\" placeholder=\"Client organization name\"></div></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Create Service Account</button></div></form></div></div><div id=\"create-result\"><!-- Results will appear here --></div><!-- Reissue Service Account Credentials Section --><div class=\"card mb-6\"><div class=\"card-header\"><h3 class=\"card-title\">Reissue Service Account Credentials</h3></div><div class=\"card-body\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -57,13 +57,29 @@ func ManageServiceAccounts() templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<p class=\"text-muted mb-4\">Select an existing service account to reissue its credentials.</p><div class=\"form-group\"><label for=\"service-account-dropdown\" class=\"form-label\">Service Account</label> <select id=\"service-account-dropdown\" hx-get=\"/ui-api/service-account-options\" hx-trigger=\"load\" hx-swap=\"outerHTML\"><!-- Service account dropdown will be loaded here --></select></div><div id=\"reissue-btn-container\" class=\"form-group mt-4\"><button id=\"reissue-btn\" hx-post=\"/ui-api/reissue-service-account\" hx-target=\"#reissue-result\" hx-include=\"#service-account-dropdown\" class=\"btn\" disabled>Reissue Credentials</button></div><!-- Update button state when dropdown changes --><div hx-get=\"/ui-api/reissue-btn-state\" hx-trigger=\"change from:#service-account-dropdown\" hx-target=\"#reissue-btn-container\" hx-swap=\"innerHTML\" style=\"display: none;\"></div><div id=\"reissue-result\" class=\"mt-4\"></div></div></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<p class=\"text-muted mb-4\">Select an existing service account to reissue its credentials.</p><div class=\"form-group\"><label for=\"service-account-dropdown\" class=\"form-label\">Service Account</label>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = ServiceAccountPlaceholder().Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div><!-- Load service account options on page load --><div hx-get=\"/ui-api/service-account-options\" hx-trigger=\"load\" hx-target=\"#service-account-dropdown\" hx-swap=\"outerHTML\" style=\"display: none;\"></div><div id=\"reissue-btn-container\" class=\"form-group mt-4\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = ReissueButton(false).Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</div><div id=\"reissue-result\"><!-- Results will appear here --></div></div></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = BaseLayout("Create New Service Account").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = BaseLayout("Manage Service Accounts").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -92,7 +108,7 @@ func ServiceAccountCreationSuccess(response client.CreateServiceAccountResponse)
 			templ_7745c5c3_Var3 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div class=\"card\"><div class=\"card-body\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div class=\"card\"><div class=\"card-body\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -100,46 +116,46 @@ func ServiceAccountCreationSuccess(response client.CreateServiceAccountResponse)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"mt-4 space-y-2\"><p><strong>Client ID:</strong> <code class=\"text-sm bg-gray-100 px-2 py-1 rounded\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<div class=\"mt-4 space-y-2\"><p><strong>Client ID:</strong> <code class=\"text-sm bg-gray-100 px-2 py-1 rounded\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(response.ClientID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 106, Col: 106}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 97, Col: 106}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</code></p><p><strong>Account ID:</strong> <code class=\"text-sm bg-gray-100 px-2 py-1 rounded\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</code></p><p><strong>Account ID:</strong> <code class=\"text-sm bg-gray-100 px-2 py-1 rounded\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(response.AccountID.String())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 107, Col: 117}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 98, Col: 117}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</code></p><p><strong>Setup URL:</strong> <code class=\"text-xs bg-gray-100 px-2 py-1 rounded block break-all\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</code></p><p><strong>Setup URL:</strong> <code class=\"text-xs bg-gray-100 px-2 py-1 rounded block break-all\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(response.SetupURL)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 109, Col: 92}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 100, Col: 92}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</code></p></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</code></p></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -168,7 +184,7 @@ func ServiceAccountReissueSuccess(response client.ReissueServiceAccountResponse)
 			templ_7745c5c3_Var7 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<div class=\"card\"><div class=\"card-body\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<div class=\"card\"><div class=\"card-body\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -176,33 +192,41 @@ func ServiceAccountReissueSuccess(response client.ReissueServiceAccountResponse)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<div class=\"mt-4 space-y-2\"><p><strong>Client ID:</strong> <code class=\"text-sm bg-gray-100 px-2 py-1 rounded\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<div class=\"mt-4 space-y-2\"><p><strong>Client ID:</strong> <code class=\"text-sm bg-gray-100 px-2 py-1 rounded\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(response.ClientID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 121, Col: 106}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 112, Col: 106}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</code></p><p><strong>New Setup URL:</strong> <code class=\"text-sm bg-gray-100 px-2 py-1 rounded block break-all\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</code></p><p><strong>New Setup URL:</strong> <code class=\"text-sm bg-gray-100 px-2 py-1 rounded block break-all\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(response.SetupURL)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 123, Col: 92}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 114, Col: 92}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</code></p><p class=\"text-sm text-gray-600 mt-2\"><strong>Note:</strong> All previous client secrets have been revoked. The owner of this account can use the link above to retrieve their new client secret (the link can only be used once and expires in 48 hours).</p></div></div></div><!-- Update button to disabled state --><div hx-swap-oob=\"true\" id=\"reissue-btn-container\"><button id=\"reissue-btn\" class=\"btn opacity-50 cursor-not-allowed\" disabled>Credentials Reissued</button></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</code></p><p class=\"text-sm text-gray-600 mt-2\"><strong>Note:</strong> All previous client secrets have been revoked. The owner of this account can use the link above to retrieve their new client secret (the link can only be used once and expires in 48 hours).</p></div></div></div><!-- Update button to disabled state using out-of-band swap --><div hx-swap-oob=\"true\" id=\"reissue-btn-container\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = ReissueButton(false, "Credentials Reissued").Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -210,8 +234,7 @@ func ServiceAccountReissueSuccess(response client.ReissueServiceAccountResponse)
 	})
 }
 
-// reissue button template
-func ReissueButton(isEnabled bool) templ.Component {
+func ReissueButton(isEnabled bool, customText ...string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -232,17 +255,43 @@ func ReissueButton(isEnabled bool) templ.Component {
 			templ_7745c5c3_Var10 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<button id=\"reissue-btn\" hx-post=\"/ui-api/reissue-service-account\" hx-target=\"#reissue-result\" hx-include=\"#service-account-dropdown\" class=\"btn \"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<button id=\"reissue-btn\" hx-post=\"/ui-api/reissue-service-account\" hx-target=\"#reissue-result\" hx-include=\"#service-account-dropdown\" class=\"btn\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if !isEnabled {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, " disabled")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, " class=\"btn opacity-50 cursor-not-allowed\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, ">Reissue Credentials</button>")
+		if !isEnabled {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, " disabled")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, ">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if len(customText) > 0 {
+			var templ_7745c5c3_Var11 string
+			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(customText[0])
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 141, Col: 18}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "Reissue Credentials")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</button>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

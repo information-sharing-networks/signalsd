@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
-	"github.com/information-sharing-networks/signalsd/app/internal/ui/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
 )
 
@@ -43,17 +43,15 @@ func (h *HandlerService) GeneratePasswordResetLink(w http.ResponseWriter, r *htt
 
 	email := parts[0]
 
-	// Get access token from cookie
-	accessTokenCookie, err := r.Cookie(config.AccessTokenCookieName)
-	if err != nil {
+	// Get access token from context
+	accessToken, ok := auth.ContextAccessToken(r.Context())
+	if !ok {
 		component := templates.ErrorAlert("Authentication required. Please log in again.")
 		if err := component.Render(r.Context(), w); err != nil {
 			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
 		}
 		return
 	}
-
-	accessToken := accessTokenCookie.Value
 
 	res, err := h.ApiClient.GeneratePasswordResetLink(accessToken, email)
 	if err != nil {

@@ -90,7 +90,7 @@ var ValidRoles = map[string]bool{ // users.user_role
 
 var ValidAccountTypes = map[string]bool{ // accounts.account_type
 	"user":            true,
-	"service_account": true,
+	"service-account": true,
 }
 
 var ValidISNPermissions = map[string]bool{ // isn_accounts.permission

@@ -37,7 +37,7 @@ This approach enables rapid implementation of effective data sharing, while main
 ## Integrating with existing systems
 The service supports logged-in web users and system-to-system access via service accounts.  Authentication follows Oauth 2.0 standards and data is submitted and received as JSON over simple REST APIs.
 
-Signal types are defined as JSON schema and the service can (optionally) validate data against the nominated schema prior to loading.
+Signal types are defined as JSON schemas and the service can (optionally) validate data against the registered schema prior to loading.
 
 ## Reference Implementations
 The [initial implementation](https://github.com/information-sharing-networks/isn-ref-impl) was a proof of concept used as part of the UK government's Border Trade Demonstrator (BTD) initiative. The BTDs established ISNs that were used by several government agencies and industry groups to improve processes at the border by sharing supply chain information.
@@ -91,7 +91,9 @@ DB_CONNECT_TIMEOUT=5s
 **Note**: In the Docker development environment, DATABASE_URL and SECRET_KEY are automatically configured with development-appropriate defaults. In production you should use a secret management service to supply these two settings.
 
 
+
 ## Quick Start (Docker Development Environment)
+the simplest approach to get a dev environment is to to use the included Docker configuration (If you want to install the software, database and tools locally then see the [local develppment setup](#local-development-setup-macos) section below).
 
 **Prerequisites**: 
 The following must be installed on your system
@@ -107,7 +109,7 @@ cd signalsd
 ### Using the Docker Environment
 the docker compose file in the root of the repo (`docker-compose.yml`) starts the service and a PostgreSQL database (the containers are called `app` and `db` respectively)
 
-the docker compose file mounts the local repo directory into the app container, so you can edit code locally and see the changes immediately after restarting the app container.  The app container has all the tools you need to test and run the service.
+the docker compose file mounts the local repo directory into the app container, so you can edit code locally and see the changes in the container.  The app container has all the tools you need to test and run the service.
 ```bash
 # Start the service and database
 docker compose up
@@ -149,7 +151,20 @@ The API documentation is hosted as part of the service or you can refer to the [
 
 ### Development Tools
 
-You can use the Makefile for common development tasks:
+The app uses the following external tools:
+- goose - database migrations
+- sqlc - type safe SQL queries
+- swag - generates OpenAPI from go comments
+- staticcheck - linter
+- gosec - security analysis
+- templ - ui templates
+- Air - live reload
+
+All these tools are installed as part of the docker image.
+
+The Docker app is started with Air which will restart the service whenever you save changes to the code.  Air is configured to automatically run goose/sqlc/swag after each change.
+
+If you need to run these tools individually, you can use the Makefile for common tasks:
 
 ```bash
 # Start containers first
@@ -163,7 +178,7 @@ make migrate  # Run database migrations
 ...
 ```
 
-alternatively, you can use docker compose to run the same commands inside the app container individually:
+alternatively, you can use docker compose to run the same commands inside the app container:
 
 ```bash
 # Generate API docs
@@ -190,15 +205,6 @@ DATABASE_URL="postgres://signalsd-dev@localhost:15432/signalsd_admin?sslmode=dis
 # Stop and remove the environment completely
 docker compose down --rmi local -v
 ```
-
-### Tool Version Issues
-If you encounter errors or missing features in development tools (goose, sqlc, swag etc), this is likely due to Docker layer caching using older tool versions.
-
-Force rebuild the Docker image to get the latest tool versions:
-```bash
-docker compose up --build
-```
-
 
 ## Database Schema Management
 database schema migration is managed using [goose](https://github.com/pressly/goose).  
@@ -233,7 +239,10 @@ SQL queries are kept in `app/sql/queries`.
 Run `sqlc generate` from the root of the project to regenerate the type safe Go code after adding or altering any queries (runs automatically for docker users)
 
 ## Testing
-For information about the testing strategy and how to run tests, see the [Integration Testing Documentation](app/test/integration/README.md).
+
+`make check` will run all the security, linting, unit and integration tests.
+
+For information about the testing strategy and how to run indvidual tests, see the [Integration Testing Documentation](app/test/integration/README.md).
 
 details on performance testing are in [Performance Testing Documentation](test/perf/README.md).
 
@@ -254,6 +263,8 @@ go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest         # type safe code for
 go install github.com/swaggo/swag/cmd/swag@latest           # generates OpenAPI specs from go comments
 go install honnef.co/go/tools/cmd/staticcheck@latest        # linter
 go install github.com/securego/gosec/v2/cmd/gosec@latest    # security analysis
+go install github.com/a-h/templ/cmd/templ@latest            # UI templates
+go install github.com/air-verse/air@latest                  # live reload
 ```
 
 ### Local Development Environment Variables

@@ -1,7 +1,6 @@
 package templates
 
 import (
-    "strings"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
@@ -21,66 +20,24 @@ templ IsnAccountManagementPage(isns []types.IsnOption) {
 						<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 							<div class="form-group">
 								<label for="isn-slug" class="form-label">ISN</label>
-								<select
-									id="isn-slug"
-									name="isn-slug"
-									required
-									class="form-select"
-								>
-									<option value="">Select ISN...</option>
-									for _, isn := range isns {
-										<option value={ isn.Slug }>{ strings.ReplaceAll(isn.Slug, "-", " ") }</option>
-									}
-								</select>
+								@IsnSelector(isns)
 							</div>
 							<div class="form-group">
 								<label for="account-type" class="form-label">Account Type</label>
-								<select
-									id="account-type"
-									name="account-type"
-									required
-									class="form-select"
-									hx-trigger="change"
-									hx-target="#account-identifier-field"
-									hx-swap="outerHTML"
-									hx-post="/ui-api/account-identifier-field"
-								>
-									<option value="">Select Type...</option>
-									<option value="user">Web User</option>
-									<option value="service-account">Service Account</option>
-								</select>
+								@AccountTypeSelector()
 							</div>
-							<div class="form-group" id="account-identifier-field">
-								<label for="account-identifier" class="form-label">Account Identifier</label>
-								<input
-									type="text"
-									id="account-identifier"
-									name="account-identifier"
-									required
-									placeholder="Select account type first"
-									class="form-input"
-									disabled
-								/>
+							
+							<div class="form-group">
+								<label for="account-identifier" class="form-label">Account</label>
+								@AccountIdentifierPlaceholder()
+							</div>
+							<div class="form-group">
+								<label for="permission" class="form-label">Permission Level</label>
+								@IsnAccountPermissionsDropdown()
 							</div>
 						</div>
 						<div class="form-group">
-							<label for="permission" class="form-label">Permission Level</label>
-							<select
-								id="permission"
-								name="permission"
-								required
-								class="form-select"
-							>
-								<option value="">Select Permission...</option>
-								<option value="none">None - Revoke access to the ISN</option>
-								<option value="read">Read - Can view signals</option>
-								<option value="write">Write - Can create and view signals</option>
-							</select>
-						</div>
-						<div class="form-group">
-							<button type="submit" class="btn btn-primary">
-								Update Account
-							</button>
+							<button type="submit" class="btn btn-primary">Submit</button>
 						</div>
 					</form>
 				</div>
@@ -90,44 +47,5 @@ templ IsnAccountManagementPage(isns []types.IsnOption) {
 				<!-- Results will appear here -->
 			</div>
 		</div>
-	}
-}
-
-// AccountIdentifierField renders the appropriate input field based on account type
-templ AccountIdentifierField(accountType string) {
-	<div class="form-group" id="account-identifier-field">
-		switch accountType {
-		case "user":
-			<label for="account-identifier" class="form-label">Account Email</label>
-			<input
-				type="email"
-				id="account-identifier"
-				name="account-identifier"
-				required
-				placeholder="user@example.com"
-				class="form-input"
-			/>
-		case "service-account":
-			<label for="account-identifier" class="form-label">Client ID</label>
-			<input
-				type="text"
-				id="account-identifier"
-				name="account-identifier"
-				required
-				placeholder="sa_example-org_abc123"
-				class="form-input"
-			/>
-		default:
-			<label for="account-identifier" class="form-label">Account Identifier</label>
-			<input
-				type="text"
-				id="account-identifier"
-				name="account-identifier"
-				required
-				placeholder="Select account type first"
-				class="form-input"
-				disabled
-			/>
-		}
-	</div>
+	}	
 }

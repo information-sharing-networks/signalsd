@@ -1,8 +1,10 @@
 package auth
 
 import (
+	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -251,61 +253,58 @@ func (a *AuthService) ClearAuthCookies(w http.ResponseWriter, environment string
 	})
 }
 
-// GetIsnPermsFromCookie reads and decodes the ISN permissions from the cookie
-func (a *AuthService) GetIsnPermsFromCookie(r *http.Request) (map[string]types.IsnPerm, error) {
-	permsCookie, err := r.Cookie(config.IsnPermsCookieName)
+// addAuthDataToContext extracts authentication data from cookies and adds it to the context
+// This is used by RequireAuth middleware to make auth data available to handlers via context
+// The three cookies extracted are:
+//   - access token (required)
+//   - account info (required)
+//   - ISN perms (optional - ISN permissions will not exist for accounts that have not been granted access to any ISNs)
+func (a *AuthService) addAuthDataToContext(ctx context.Context, r *http.Request) (context.Context, error) {
+	// add access token to context
+	accessTokenCookie, err := r.Cookie(config.AccessTokenCookieName)
 	if err != nil {
-		return make(map[string]types.IsnPerm), err
+		return ctx, fmt.Errorf("access token cookie not found: %w", err)
 	}
 
-	// Decode base64
-	decodedPerms, err := base64.StdEncoding.DecodeString(permsCookie.Value)
-	if err != nil {
-		return make(map[string]types.IsnPerm), err
-	}
+	ctx = ContextWithAccessToken(ctx, accessTokenCookie.Value)
 
-	// Unmarshal JSON
-	var isnPerms map[string]types.IsnPerm
-	if err := json.Unmarshal(decodedPerms, &isnPerms); err != nil {
-		return make(map[string]types.IsnPerm), err
-	}
-
-	return isnPerms, nil
-}
-
-func (a *AuthService) GetAccountInfoFromCookie(r *http.Request) (*types.AccountInfo, error) {
+	// add account info to context
 	accountInfoCookie, err := r.Cookie(config.AccountInfoCookieName)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error getting account info cookie not found: %w", err)
 	}
 
-	// Decode base64
 	decodedAccountInfo, err := base64.StdEncoding.DecodeString(accountInfoCookie.Value)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error decoding account info cookie: %w", err)
 	}
-	//unmarshal json to struct
+
 	accountInfo := &types.AccountInfo{}
 	if err := json.Unmarshal(decodedAccountInfo, accountInfo); err != nil {
 		return nil, err
 	}
 
-	return accountInfo, nil
-}
-
-// CheckIsnPermission validates user has access to the ISN and returns the ISN permission deails (read/write, availalbe signal types, visibility)
-func (a *AuthService) CheckIsnPermission(r *http.Request, isnSlug string) (*types.IsnPerm, error) {
-	// Get permissions from cookie
-	perms, err := a.GetIsnPermsFromCookie(r)
+	ctx = ContextWithAccountInfo(ctx, accountInfo)
+	// Add isn perms to context
+	permsCookie, err := r.Cookie(config.IsnPermsCookieName)
+	if errors.Is(err, http.ErrNoCookie) {
+		// this is expected - accounts without ISN access will not have this cookie
+		return ctx, nil
+	}
 	if err != nil {
-		return nil, err
+		return ctx, fmt.Errorf("error getting ISN permissions cookie: %w", err)
 	}
 
-	// Validate user has access to this ISN
-	isnPerm, exists := perms[isnSlug]
-	if !exists {
-		return nil, fmt.Errorf("no permission for this ISN")
+	decodedPerms, err := base64.StdEncoding.DecodeString(permsCookie.Value)
+	if err != nil {
+		return ctx, fmt.Errorf("error decoding ISN permissions cookie: %w", err)
 	}
 
-	return &isnPerm, nil
+	var isnPerms map[string]types.IsnPerm
+	if err := json.Unmarshal(decodedPerms, &isnPerms); err != nil {
+		return ctx, fmt.Errorf("error unmarshalling ISN permissions cookie: %w", err)
+	}
+	ctx = ContextWithIsnPerms(ctx, isnPerms)
+
+	return ctx, nil
 }
