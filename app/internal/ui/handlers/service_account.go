@@ -3,11 +3,10 @@ package handlers
 import (
 	"log/slog"
 	"net/http"
-	"strings"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
-	"github.com/information-sharing-networks/signalsd/app/internal/ui/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
 )
 
@@ -34,17 +33,15 @@ func (h *HandlerService) CreateServiceAccount(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Get access token from cookie
-	accessTokenCookie, err := r.Cookie(config.AccessTokenCookieName)
-	if err != nil {
+	// Get access token from context
+	accessToken, ok := auth.ContextAccessToken(r.Context())
+	if !ok {
 		component := templates.ErrorAlert("Authentication required. Please log in again.")
 		if err := component.Render(r.Context(), w); err != nil {
 			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
 		}
 		return
 	}
-
-	accessToken := accessTokenCookie.Value
 
 	req := client.CreateServiceAccountRequest{
 		ClientOrganization: organization,
@@ -79,8 +76,8 @@ func (h *HandlerService) CreateServiceAccount(w http.ResponseWriter, r *http.Req
 func (h *HandlerService) ReissueServiceAccount(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
-	serviceAccountValue := r.FormValue("service-account-dropdown")
-	if serviceAccountValue == "" {
+	clientID := r.FormValue("service-account-dropdown")
+	if clientID == "" {
 		component := templates.ErrorAlert("you must select a service account to reissue credentials")
 		if err := component.Render(r.Context(), w); err != nil {
 			reqLogger.Error("Failed to render ErrorAlert", slog.String("error", err.Error()))
@@ -88,22 +85,9 @@ func (h *HandlerService) ReissueServiceAccount(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Parse the combined organization|email value
-	parts := strings.Split(serviceAccountValue, "|")
-	if len(parts) != 2 {
-		component := templates.ErrorAlert("invalid service account selection")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render ErrorAlert", slog.String("error", err.Error()))
-		}
-		return
-	}
-
-	organization := parts[0]
-	email := parts[1]
-
-	// Get access token from cookie
-	accessTokenCookie, err := r.Cookie(config.AccessTokenCookieName)
-	if err != nil {
+	// Get access token from context
+	accessToken, ok := auth.ContextAccessToken(r.Context())
+	if !ok {
 		component := templates.ErrorAlert("Authentication required. Please log in again.")
 		if err := component.Render(r.Context(), w); err != nil {
 			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
@@ -111,11 +95,8 @@ func (h *HandlerService) ReissueServiceAccount(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	accessToken := accessTokenCookie.Value
-
 	req := client.ReissueServiceAccountRequest{
-		ClientOrganization: organization,
-		ClientContactEmail: email,
+		ClientID: clientID,
 	}
 
 	res, err := h.ApiClient.ReissueServiceAccount(accessToken, req)

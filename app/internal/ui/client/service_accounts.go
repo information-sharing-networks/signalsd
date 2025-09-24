@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -25,8 +27,7 @@ type CreateServiceAccountResponse struct {
 }
 
 type ReissueServiceAccountRequest struct {
-	ClientOrganization string `json:"client_organization" example:"example org"`
-	ClientContactEmail string `json:"client_contact_email" example:"example@example.com"`
+	ClientID string `json:"client_id" example:"sa_example-org_k7j2m9x1"`
 }
 
 type ReissueServiceAccountResponse struct {
@@ -62,6 +63,15 @@ func (c *Client) GetServiceAccountOptionsList(accessToken string) ([]types.Servi
 	if err := json.NewDecoder(res.Body).Decode(&serviceAccounts); err != nil {
 		return nil, NewClientInternalError(err, "decoding service accounts response")
 	}
+	slices.SortFunc(serviceAccounts, func(a, b types.ServiceAccountOption) int {
+		if strings.ToLower(a.ClientOrganization) < strings.ToLower(b.ClientOrganization) {
+			return -1
+		}
+		if strings.ToLower(a.ClientOrganization) > strings.ToLower(b.ClientOrganization) {
+			return 1
+		}
+		return 0
+	})
 
 	return serviceAccounts, nil
 }

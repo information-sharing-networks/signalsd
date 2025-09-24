@@ -2836,13 +2836,9 @@
         "handlers.ReissueServiceAccountCredentialsRequest": {
             "type": "object",
             "properties": {
-                "client_contact_email": {
+                "client_id": {
                     "type": "string",
-                    "example": "example@example.com"
-                },
-                "client_organization": {
-                    "type": "string",
-                    "example": "example org"
+                    "example": "sa_example-org_k7j2m9x1"
                 }
             }
         },

@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
-	"github.com/information-sharing-networks/signalsd/app/internal/ui/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
 )
 
@@ -16,10 +16,10 @@ import (
 func (h *HandlerService) CreateSignalTypePage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
-	// Get user permissions from cookie
-	isnPerms, err := h.AuthService.GetIsnPermsFromCookie(r)
-	if err != nil {
-		reqLogger.Error("failed to read IsnPerms from cookie", slog.String("error", err.Error()))
+	// Get user permissions from context
+	isnPerms, ok := auth.ContextIsnPerms(r.Context())
+	if !ok {
+		reqLogger.Error("failed to read IsnPerms from context")
 		return
 	}
 
@@ -55,16 +55,15 @@ func (h *HandlerService) CreateSignalType(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Get access token from cookie
-	accessTokenCookie, err := r.Cookie(config.AccessTokenCookieName)
-	if err != nil {
+	// Get access token from context
+	accessToken, ok := auth.ContextAccessToken(r.Context())
+	if !ok {
 		component := templates.ErrorAlert("Authentication required. Please log in again.")
 		if err := component.Render(r.Context(), w); err != nil {
 			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
 		}
 		return
 	}
-	accessToken := accessTokenCookie.Value
 
 	// Prepare request
 	createReq := client.CreateSignalTypeRequest{

@@ -51,8 +51,7 @@ type CreateServiceAccountResponse struct {
 }
 
 type ReissueServiceAccountCredentialsRequest struct {
-	ClientOrganization string `json:"client_organization" example:"example org"`
-	ClientContactEmail string `json:"client_contact_email" example:"example@example.com"`
+	ClientID string `json:"client_id" example:"sa_example-org_k7j2m9x1"`
 }
 
 type ReissueServiceAccountCredentialsResponse struct {
@@ -296,16 +295,13 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentialsHandler(w http.R
 		return
 	}
 
-	if req.ClientContactEmail == "" || req.ClientOrganization == "" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "client_organization and client_contact_email are required")
+	if req.ClientID == "" {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "client_id is required")
 		return
 	}
 
 	// Check if service account exists
-	serviceAccount, err := s.queries.GetServiceAccountWithOrganizationAndEmail(r.Context(), database.GetServiceAccountWithOrganizationAndEmailParams{
-		ClientOrganization: req.ClientOrganization,
-		ClientContactEmail: req.ClientContactEmail,
-	})
+	serviceAccount, err := s.queries.GetServiceAccountByClientID(r.Context(), req.ClientID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "service account not found for this organization and email combination")
@@ -336,8 +332,8 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentialsHandler(w http.R
 	}
 
 	_, err = s.queries.DeleteOneTimeClientSecretsByOrgAndEmail(r.Context(), database.DeleteOneTimeClientSecretsByOrgAndEmailParams{
-		ClientContactEmail: req.ClientContactEmail,
-		ClientOrganization: req.ClientOrganization,
+		ClientContactEmail: serviceAccount.ClientContactEmail,
+		ClientOrganization: serviceAccount.ClientOrganization,
 	})
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),

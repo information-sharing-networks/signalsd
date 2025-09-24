@@ -6,7 +6,6 @@ import (
 
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
-	"github.com/information-sharing-networks/signalsd/app/internal/ui/config"
 )
 
 // RequireAuth is middleware that checks authentication and attempts token refresh if needed.
@@ -15,8 +14,9 @@ import (
 // 1. All requests have valid authentication (redirects to login if not)
 // 2. Expired tokens are automatically refreshed when possible
 // 3. Fresh cookies are set after token refresh for subsequent requests
+// 4. Authentication data is extracted from cookies and added to request context
 //
-// Handlers can read auth data directly from cookies using helper methods.
+// Handlers can read auth data from context using helper methods.
 func (a *AuthService) RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		reqLogger := logger.ContextRequestLogger(r.Context())
@@ -28,8 +28,20 @@ func (a *AuthService) RequireAuth(next http.Handler) http.Handler {
 			reqLogger.Debug("Authentication check successful",
 				slog.String("component", "ui.RequireAuth"),
 			)
-			// Authentication is valid, proceed to handler
-			next.ServeHTTP(w, r)
+
+			// Extract authentication data from cookies and add to context
+			ctx, err := a.addAuthDataToContext(r.Context(), r)
+			if err != nil {
+				reqLogger.Error("Failed to extract authentication data from cookies",
+					slog.String("component", "ui.RequireAuth"),
+					slog.String("error", err.Error()),
+				)
+				redirectToLogin(w, r)
+				return
+			}
+
+			// Authentication is valid, proceed to handler with context
+			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		case TokenMissing, TokenInvalid:
 			reqLogger.Debug("Authentication failed - redirecting to login",
@@ -74,8 +86,19 @@ func (a *AuthService) RequireAuth(next http.Handler) http.Handler {
 				slog.String("component", "ui.RequireAuth"),
 			)
 
-			// Continue to handler with fresh cookies set
-			next.ServeHTTP(w, r)
+			// Extract authentication data from fresh cookies and add to context
+			ctx, err := a.addAuthDataToContext(r.Context(), r)
+			if err != nil {
+				reqLogger.Error("Failed to extract authentication data from refreshed cookies",
+					slog.String("component", "ui.RequireAuth"),
+					slog.String("error", err.Error()),
+				)
+				redirectToLogin(w, r)
+				return
+			}
+
+			// Continue to handler with fresh cookies set and context
+			next.ServeHTTP(w, r.WithContext(ctx))
 		}
 	})
 }
@@ -85,11 +108,10 @@ func (a *AuthService) RequireAdminOrOwnerRole(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		reqLogger := logger.ContextRequestLogger(r.Context())
 
-		accountInfo, err := a.GetAccountInfoFromCookie(r)
-		if err != nil {
-			reqLogger.Error("Could not get accountInfo from Cookie",
+		accountInfo, ok := ContextAccountInfo(r.Context())
+		if !ok {
+			reqLogger.Error("Could not get accountInfo from context",
 				slog.String("component", "ui.RequireAdminAccess"),
-				slog.String("error", err.Error()),
 			)
 			redirectToAccessDeniedPage(w, r)
 			return
@@ -121,8 +143,8 @@ func (a *AuthService) RequireIsnAdmin(next http.Handler) http.Handler {
 
 		reqLogger := logger.ContextRequestLogger(r.Context())
 
-		isnPerms, err := a.GetIsnPermsFromCookie(r)
-		if err != nil {
+		isnPerms, ok := ContextIsnPerms(r.Context())
+		if !ok {
 			reqLogger.Debug("access denied - user does not have access to any ISNs",
 				slog.String("component", "ui.RequireIsnAccess"),
 			)
@@ -153,10 +175,10 @@ func (a *AuthService) RequireIsnAccess(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		reqLogger := logger.ContextRequestLogger(r.Context())
 
-		// the UI middleware extracts the ISN permissions from the access token claims and stores them in a cookie.
-		// The middleware only sets this cookie if the account has access to one or more ISNs
-		_, err := r.Cookie(config.IsnPermsCookieName)
-		if err != nil {
+		// Check if ISN permissions exist in context
+		// ISN permissions are only added to context if the account has access to one or more ISNs
+		_, ok := ContextIsnPerms(r.Context())
+		if !ok {
 			reqLogger.Debug("access denied - user does not have access to any ISNs",
 				slog.String("component", "ui.RequireIsnAccess"),
 			)
@@ -168,7 +190,7 @@ func (a *AuthService) RequireIsnAccess(next http.Handler) http.Handler {
 			slog.String("component", "ui.RequireIsnAccess"),
 		)
 
-		// Cookie exists = user has access to one or more ISNs, proceed to handler
+		// ISN permissions exist in context = user has access to one or more ISNs, proceed to handler
 		next.ServeHTTP(w, r)
 	})
 }

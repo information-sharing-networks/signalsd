@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
-	"github.com/information-sharing-networks/signalsd/app/internal/ui/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
 )
 
@@ -15,10 +15,10 @@ import (
 func (h *HandlerService) SearchSignalsPage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
-	// Get ISN permissions from cookie - middleware ensures this exists
-	isnPerms, err := h.AuthService.GetIsnPermsFromCookie(r)
-	if err != nil {
-		reqLogger.Error("failed to read IsnPerms from cookie", slog.String("error", err.Error()))
+	// Get ISN permissions from context - middleware ensures this exists
+	isnPerms, ok := auth.ContextIsnPerms(r.Context())
+	if !ok {
+		reqLogger.Error("failed to read IsnPerms from context")
 		return
 	}
 
@@ -59,10 +59,10 @@ func (h *HandlerService) SearchSignals(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get access token from cookie
-	accessTokenCookie, err := r.Cookie(config.AccessTokenCookieName)
-	if err != nil {
-		reqLogger.Error("Access token not found", slog.String("error", err.Error()))
+	// Get access token from context
+	accessToken, ok := auth.ContextAccessToken(r.Context())
+	if !ok {
+		reqLogger.Error("Access token not found in context")
 
 		component := templates.ErrorAlert("Authentication required. Please log in again.")
 		if err := component.Render(r.Context(), w); err != nil {
@@ -70,11 +70,10 @@ func (h *HandlerService) SearchSignals(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	accessToken := accessTokenCookie.Value
 
 	// Get user permissions to determine visibility of the isn being searched
-	isnPerms, err := h.AuthService.GetIsnPermsFromCookie(r)
-	if err != nil {
+	isnPerms, ok := auth.ContextIsnPerms(r.Context())
+	if !ok {
 		component := templates.ErrorAlert("You don't have permission to access this ISN.")
 		if err := component.Render(r.Context(), w); err != nil {
 			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))

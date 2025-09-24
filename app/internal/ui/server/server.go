@@ -96,10 +96,10 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 		r.Post("/ui-api/signal-type-options", handlerService.RenderSignalTypeOptions)
 		r.Post("/ui-api/signal-type-version-options", handlerService.RenderSignalTypeVersionOptions)
 		r.Get("/ui-api/service-account-options", handlerService.RenderServiceAccountOptions)
-		r.Get("/ui-api/user-options", handlerService.RenderUserOptions)
+		r.Get("/ui-api/user-options", handlerService.RenderUserOptionsGeneratePasswordLink)
 
 		// render individual fields
-		r.Post("/ui-api/account-identifier-field", handlerService.RenderAccountIdentifierField)
+		r.Get("/ui-api/account-identifier-field", handlerService.RenderAccountIdentifierField)
 
 		r.Group(func(r chi.Router) {
 			r.Use(s.authService.RequireIsnAccess)

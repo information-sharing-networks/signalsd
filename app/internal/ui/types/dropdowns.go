@@ -22,6 +22,7 @@ type VersionOption struct {
 type ServiceAccountOption struct {
 	ClientOrganization string `json:"client_organization"`
 	ClientContactEmail string `json:"client_contact_email"`
+	ClientID           string `json:"client_id"`
 }
 
 type UserOption struct {

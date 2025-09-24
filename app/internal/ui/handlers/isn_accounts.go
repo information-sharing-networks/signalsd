@@ -1,13 +1,14 @@
 package handlers
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
-	"github.com/information-sharing-networks/signalsd/app/internal/ui/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
 )
 
@@ -15,10 +16,10 @@ import (
 func (h *HandlerService) UpdateIsnAccountPage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
-	// Get user permissions from cookie
-	isnPerms, err := h.AuthService.GetIsnPermsFromCookie(r)
-	if err != nil {
-		reqLogger.Error("failed to read IsnPerms from cookie", slog.String("error", err.Error()))
+	// Get user permissions from context
+	isnPerms, ok := auth.ContextIsnPerms(r.Context())
+	if !ok {
+		reqLogger.Error("failed to read IsnPerms from context")
 		return
 	}
 
@@ -53,18 +54,18 @@ func (h *HandlerService) UpdateIsnAccount(w http.ResponseWriter, r *http.Request
 
 	// Validate account type
 	if !signalsd.ValidAccountTypes[accountType] {
-		component := templates.ErrorAlert("Invalid account type selected.")
+		component := templates.ErrorAlert(fmt.Sprintf("Invalid account type selected: %v", accountType))
 		if err := component.Render(r.Context(), w); err != nil {
 			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
 		}
 		return
 	}
 
-	// Get access token from cookie
-	accessTokenCookie, err := r.Cookie(config.AccessTokenCookieName)
-	if err != nil {
-		// unexpected - this should be caught by middlware check on ISN access
-		reqLogger.Error("Failed to read access token cookie", slog.String("component", "templates.handleAddIsnAccount"), slog.String("error", err.Error()))
+	// Get access token from context
+	accessToken, ok := auth.ContextAccessToken(r.Context())
+	if !ok {
+		// unexpected - this should be caught by middleware check on ISN access
+		reqLogger.Error("Failed to read access token from context", slog.String("component", "templates.handleAddIsnAccount"))
 
 		component := templates.ErrorAlert("Authentication required. Please log in again.")
 		if err := component.Render(r.Context(), w); err != nil {
@@ -72,10 +73,9 @@ func (h *HandlerService) UpdateIsnAccount(w http.ResponseWriter, r *http.Request
 		}
 		return
 	}
-	accessToken := accessTokenCookie.Value
 
 	// Call the API to add the account to the ISN
-	err = h.ApiClient.UpdateIsnAccount(accessToken, isnSlug, accountType, accountIdentifier, permission)
+	err := h.ApiClient.UpdateIsnAccount(accessToken, isnSlug, accountType, accountIdentifier, permission)
 	if err != nil {
 		reqLogger.Error("Failed to add account to ISN", slog.String("component", "templates.handleAddIsnAccount"), slog.String("error", err.Error()))
 
@@ -104,16 +104,5 @@ func (h *HandlerService) UpdateIsnAccount(w http.ResponseWriter, r *http.Request
 	component := templates.SuccessAlert(msg)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
-	}
-}
-
-// RenderAccountIdentifierField renders the appropriate input field based on account type
-func (h *HandlerService) RenderAccountIdentifierField(w http.ResponseWriter, r *http.Request) {
-	accountType := r.FormValue("account-type")
-
-	component := templates.AccountIdentifierField(accountType)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger := logger.ContextRequestLogger(r.Context())
-		reqLogger.Error("Failed to render account identifier field", slog.String("error", err.Error()))
 	}
 }
