@@ -232,10 +232,9 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 		return
 	}
 
-	// Generate the one-time setup URL
-	setupURL := fmt.Sprintf("%s://%s/api/auth/service-accounts/setup/%s",
-		utils.GetScheme(r),
-		r.Host,
+	// Generate the one-time setup URL using forwarded headers
+	setupURL := fmt.Sprintf("%s/api/auth/service-accounts/setup/%s",
+		signalsd.GetPublicBaseURL(r),
 		oneTimeSecretID.String(),
 	)
 
@@ -405,10 +404,9 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentialsHandler(w http.R
 		return
 	}
 
-	// Generate the one-time setup URL
-	setupURL := fmt.Sprintf("%s://%s/api/auth/service-accounts/setup/%s",
-		utils.GetScheme(r),
-		r.Host,
+	// Generate the one-time setup URL using forwarded headers
+	setupURL := fmt.Sprintf("%s/api/auth/service-accounts/setup/%s",
+		signalsd.GetPublicBaseURL(r),
 		oneTimeSecretID.String(),
 	)
 

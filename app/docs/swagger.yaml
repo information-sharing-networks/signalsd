@@ -1209,8 +1209,15 @@ paths:
   /api/admin/users/{user_id}/generate-password-reset-link:
     post:
       description: |-
-        Allows admins to generate a one-time password reset link for a user (use this endpoint when a user has forgotten their password)
+        Allows admins or the site owner to generate a one-time password reset link for a user (use this endpoint when a user has forgotten their password)
+
+        The generated link can be used to reset the password of the associated account using the page rendered by the PasswordResetTokenPageHandler.
         The generated link expires in 30 minutes and can only be used once.
+
+        Admins can create links on behalf of users with a member role.  The site owner role can create links for admins and members.
+
+        **Note:** The generated link can be used by any user in possession of the link to reset the password of the associated account.
+        The link should be treated as sensitive and protected accordingly.
       parameters:
       - description: User Account ID
         example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
@@ -1315,8 +1322,10 @@ paths:
       - auth
     post:
       description: |-
-        Processes a password reset request with a valid reset token
-        Validates the token, updates the user's password, and consumes the token
+        Endpoint to handle password requests received from the PasswordResetTokenPageHandler (do not call the endpoint directly)
+        The handler validates the token, updates the user password, and consumes the one-time-use token.
+        Any user in possession of the token can use it to reset the password of the associated account
+        One time tokens can only be issued by admins or the site owner.
       parameters:
       - description: Password reset token ID
         example: 550e8400-e29b-41d4-a716-446655440000
@@ -1345,7 +1354,7 @@ paths:
           description: Gone
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-      summary: Process password reset
+      summary: Process password reset token
       tags:
       - auth
   /api/auth/password/reset:
@@ -1372,7 +1381,7 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Password reset
+      summary: Password reset (self service)
       tags:
       - auth
   /api/auth/register:

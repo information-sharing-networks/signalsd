@@ -221,9 +221,8 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resourceURL := fmt.Sprintf("%s://%s/api/isn/%s",
-		utils.GetScheme(r),
-		r.Host,
+	resourceURL := fmt.Sprintf("%s/api/isn/%s",
+		signalsd.GetPublicBaseURL(r),
 		slug,
 	)
 

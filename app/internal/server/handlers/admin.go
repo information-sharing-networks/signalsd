@@ -15,7 +15,6 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
-	"github.com/information-sharing-networks/signalsd/app/internal/server/utils"
 	"github.com/information-sharing-networks/signalsd/app/internal/version"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -709,8 +708,15 @@ type GeneratePasswordResetLinkResponse struct {
 // GeneratePasswordResetLinkHandler godoc
 //
 //	@Summary		Generate password reset link
-//	@Description	Allows admins to generate a one-time password reset link for a user (use this endpoint when a user has forgotten their password)
+//	@Description	Allows admins or the site owner to generate a one-time password reset link for a user (use this endpoint when a user has forgotten their password)
+//	@Description
+//	@Description	The generated link can be used to reset the password of the associated account using the page rendered by the PasswordResetTokenPageHandler.
 //	@Description	The generated link expires in 30 minutes and can only be used once.
+//	@Description
+//	@Description	Admins can create links on behalf of users with a member role.  The site owner role can create links for admins and members.
+//	@Description
+//	@Description	**Note:** The generated link can be used by any user in possession of the link to reset the password of the associated account.
+//	@Description	The link should be treated as sensitive and protected accordingly.
 //	@Tags			Site Admin
 //
 //	@Param			user_id	path		string	true	"User Account ID"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
@@ -724,30 +730,44 @@ type GeneratePasswordResetLinkResponse struct {
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/admin/users/{user_id}/generate-password-reset-link [post]
+//
+//	this handler must use the RequireRole (admin/owner) middleware
 func (a *AdminHandler) GeneratePasswordResetLinkHandler(w http.ResponseWriter, r *http.Request) {
 
-	// Get admin account ID from context (set by middleware)
-	adminAccountID, ok := auth.ContextAccountID(r.Context())
+	// Get account ID from context (set by middleware)
+	accountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "admin account ID not found in context")
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "account ID not found in context")
+		return
+	}
+
+	// verify the account generating the request is an admin or owner
+	claims, ok := auth.ContextClaims(r.Context())
+	if !ok {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
+		return
+	}
+
+	if claims.Role != "owner" && claims.Role != "admin" {
+		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you do not have permission to generate password reset links")
 		return
 	}
 
 	// Get user ID from URL parameter
-	userIDStr := r.PathValue("user_id")
-	if userIDStr == "" {
+	tagetUserIDStr := r.PathValue("user_id")
+	if tagetUserIDStr == "" {
 		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "user_id parameter is required")
 		return
 	}
 
-	userID, err := uuid.Parse(userIDStr)
+	tagetUserID, err := uuid.Parse(tagetUserIDStr)
 	if err != nil {
 		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "invalid user_id format")
 		return
 	}
 
 	// Verify user exists
-	user, err := a.queries.GetUserByID(r.Context(), userID)
+	user, err := a.queries.GetUserByID(r.Context(), tagetUserID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "user not found")
@@ -755,19 +775,24 @@ func (a *AdminHandler) GeneratePasswordResetLinkHandler(w http.ResponseWriter, r
 		}
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
-			slog.String("user_id", userID.String()),
+			slog.String("user_id", tagetUserID.String()),
 		)
 
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
+	// admins can only update members
+	if claims.Role == "admin" && user.UserRole != "member" {
+		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "admins cannot generate password reset for other admins or site owners")
+		return
+	}
 	// Delete any existing password reset tokens for this user (following service account pattern)
-	_, err = a.queries.DeletePasswordResetTokensForUser(r.Context(), userID)
+	_, err = a.queries.DeletePasswordResetTokensForUser(r.Context(), tagetUserID)
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
-			slog.String("user_id", userID.String()),
+			slog.String("user_id", tagetUserID.String()),
 		)
 
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
@@ -778,38 +803,37 @@ func (a *AdminHandler) GeneratePasswordResetLinkHandler(w http.ResponseWriter, r
 	expiresAt := time.Now().Add(signalsd.PasswordResetExpiry)
 	tokenID, err := a.queries.CreatePasswordResetToken(r.Context(), database.CreatePasswordResetTokenParams{
 		ID:               uuid.New(),
-		UserAccountID:    userID,
+		UserAccountID:    tagetUserID,
 		ExpiresAt:        expiresAt,
-		CreatedByAdminID: adminAccountID,
+		CreatedByAdminID: accountID,
 	})
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
-			slog.String("user_id", userID.String()),
+			slog.String("user_id", tagetUserID.String()),
 		)
 
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
-	// Generate the one-time password reset URL (following service account pattern)
-	resetURL := fmt.Sprintf("%s://%s/api/auth/password-reset/%s",
-		utils.GetScheme(r),
-		r.Host,
+	// Generate the one-time password reset URL using forwarded headers
+	resetURL := fmt.Sprintf("%s/api/auth/password-reset/%s",
+		signalsd.GetPublicBaseURL(r),
 		tokenID.String(),
 	)
 
 	// Add reset URL and account ID to final request log context
 	logger.ContextWithLogAttrs(r.Context(),
 		slog.String("reset_url", resetURL),
-		slog.String("user_id", userID.String()),
-		slog.String("admin_account_id", adminAccountID.String()),
+		slog.String("user_id", tagetUserID.String()),
+		slog.String("admin_account_id", accountID.String()),
 	)
 
 	// Return the reset link information
 	response := GeneratePasswordResetLinkResponse{
 		UserEmail: user.Email,
-		AccountID: userID,
+		AccountID: tagetUserID,
 		ResetURL:  resetURL,
 		ExpiresAt: expiresAt,
 		ExpiresIn: int(signalsd.PasswordResetExpiry.Seconds()),
