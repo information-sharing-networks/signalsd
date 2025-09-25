@@ -766,8 +766,8 @@ func (a *AdminHandler) GeneratePasswordResetLinkHandler(w http.ResponseWriter, r
 		return
 	}
 
-	// Verify user exists
-	user, err := a.queries.GetUserByID(r.Context(), tagetUserID)
+	// Verify targetUser exists
+	targetUser, err := a.queries.GetUserByID(r.Context(), tagetUserID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "user not found")
@@ -783,10 +783,11 @@ func (a *AdminHandler) GeneratePasswordResetLinkHandler(w http.ResponseWriter, r
 	}
 
 	// admins can only update members
-	if claims.Role == "admin" && user.UserRole != "member" {
+	if claims.Role == "admin" && targetUser.UserRole != "member" {
 		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "admins cannot generate password reset for other admins or site owners")
 		return
 	}
+
 	// Delete any existing password reset tokens for this user (following service account pattern)
 	_, err = a.queries.DeletePasswordResetTokensForUser(r.Context(), tagetUserID)
 	if err != nil {
@@ -832,7 +833,7 @@ func (a *AdminHandler) GeneratePasswordResetLinkHandler(w http.ResponseWriter, r
 
 	// Return the reset link information
 	response := GeneratePasswordResetLinkResponse{
-		UserEmail: user.Email,
+		UserEmail: targetUser.Email,
 		AccountID: tagetUserID,
 		ResetURL:  resetURL,
 		ExpiresAt: expiresAt,

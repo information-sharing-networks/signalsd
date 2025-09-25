@@ -2819,7 +2819,7 @@ const docTemplate = `{
         "handlers.PasswordResetRequest": {
             "type": "object",
             "properties": {
-                "new-password": {
+                "new_password": {
                     "type": "string",
                     "example": "ue6U\u003e\u0026X3j570"
                 }

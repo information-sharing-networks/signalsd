@@ -487,7 +487,7 @@ func (u *UserHandler) RevokeUserAdminRoleHandler(w http.ResponseWriter, r *http.
 
 // Password reset types
 type PasswordResetRequest struct {
-	NewPassword string `json:"new-password" example:"ue6U>&X3j570"`
+	NewPassword string `json:"new_password" example:"ue6U>&X3j570"`
 }
 
 type PasswordResetPageData struct {

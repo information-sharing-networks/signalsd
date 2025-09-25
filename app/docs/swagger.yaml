@@ -476,7 +476,7 @@ definitions:
     type: object
   handlers.PasswordResetRequest:
     properties:
-      new-password:
+      new_password:
         example: ue6U>&X3j570
         type: string
     type: object
