@@ -198,7 +198,7 @@ func (u *UserHandler) RegisterUserHandler(w http.ResponseWriter, r *http.Request
 
 // UpdatePasswordHandler godoc
 //
-//	@Summary		Password reset
+//	@Summary		Password reset (self service)
 //	@Description	Self-service endpoint for users to reset their password.  Requires a valid access token and the current password
 //	@Description
 //	@Tags		auth
@@ -497,7 +497,7 @@ type PasswordResetPageData struct {
 	ExpiresIn time.Duration
 }
 
-// PasswordResetPageHandler godoc
+// PasswordResetTokenPageHandler godoc
 //
 //	@Summary		Display password reset form
 //	@Description	Renders a password reset form for users with a valid reset token
@@ -512,7 +512,7 @@ type PasswordResetPageData struct {
 //	@Failure		410	{object}	responses.ErrorResponse
 //
 //	@Router			/api/auth/password-reset/{token_id} [get]
-func (u *UserHandler) PasswordResetPageHandler(w http.ResponseWriter, r *http.Request) {
+func (u *UserHandler) PasswordResetTokenPageHandler(w http.ResponseWriter, r *http.Request) {
 	// Extract token from URL path
 	tokenIDString := r.PathValue("token_id")
 
@@ -575,9 +575,10 @@ func (u *UserHandler) PasswordResetPageHandler(w http.ResponseWriter, r *http.Re
 		slog.String("user_id", resetToken.UserAccountID.String()),
 	)
 
-	// Render password reset form using templ
+	// Render password reset form
+	// the rendered page contains a form that posts to the PasswordResetTokenHandler
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := authTemplates.PasswordResetPage(data).Render(r.Context(), w); err != nil {
+	if err := authTemplates.PasswordResetTokenPage(data).Render(r.Context(), w); err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
 		)
@@ -587,11 +588,14 @@ func (u *UserHandler) PasswordResetPageHandler(w http.ResponseWriter, r *http.Re
 	}
 }
 
-// PasswordResetHandler godoc
+// PasswordResetTokenHandler godoc
 //
-//	@Summary		Process password reset
-//	@Description	Processes a password reset request with a valid reset token
-//	@Description	Validates the token, updates the user's password, and consumes the token
+//	@Summary		Process password reset token
+//	@Description	Endpoint to handle password requests received from the PasswordResetTokenPageHandler (do not call the endpoint directly)
+//	@Description	The handler validates the token, updates the user password, and consumes the one-time-use token.
+//	@Description	Any user in possession of the token can use it to reset the password of the associated account
+//	@Description	One time tokens can only be issued by admins or the site owner.
+//
 //	@Tags			auth
 //
 //	@Param			token_id	path	string							true	"Password reset token ID"	example(550e8400-e29b-41d4-a716-446655440000)
@@ -603,7 +607,7 @@ func (u *UserHandler) PasswordResetPageHandler(w http.ResponseWriter, r *http.Re
 //	@Failure		410	{object}	responses.ErrorResponse
 //
 //	@Router			/api/auth/password-reset/{token_id} [post]
-func (u *UserHandler) PasswordResetHandler(w http.ResponseWriter, r *http.Request) {
+func (u *UserHandler) PasswordResetTokenHandler(w http.ResponseWriter, r *http.Request) {
 	// Extract token from URL path
 	tokenIDString := r.PathValue("token_id")
 
@@ -638,7 +642,6 @@ func (u *UserHandler) PasswordResetHandler(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Start transaction (following service account pattern)
 	tx, err := u.pool.BeginTx(r.Context(), pgx.TxOptions{})
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),

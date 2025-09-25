@@ -224,11 +224,12 @@ func (s *Server) registerAdminRoutes() {
 					r.Post("/service-accounts/rotate-secret", tokens.RotateServiceAccountSecretHandler)
 				})
 
+				// no authentication required
 				r.Post("/register", users.RegisterUserHandler)
 				r.Post("/login", login.LoginHandler)
 				r.Get("/service-accounts/setup/{setup_id}", serviceAccounts.SetupServiceAccountHandler)
-				r.Get("/password-reset/{token_id}", users.PasswordResetPageHandler)
-				r.Post("/password-reset/{token_id}", users.PasswordResetHandler)
+				r.Get("/password-reset/{token_id}", users.PasswordResetTokenPageHandler)
+				r.Post("/password-reset/{token_id}", users.PasswordResetTokenHandler)
 			})
 
 			// isn admin endpoints

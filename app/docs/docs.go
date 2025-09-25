@@ -424,7 +424,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Allows admins to generate a one-time password reset link for a user (use this endpoint when a user has forgotten their password)\nThe generated link expires in 30 minutes and can only be used once.",
+                "description": "Allows admins or the site owner to generate a one-time password reset link for a user (use this endpoint when a user has forgotten their password)\n\nThe generated link can be used to reset the password of the associated account using the page rendered by the PasswordResetTokenPageHandler.\nThe generated link expires in 30 minutes and can only be used once.\n\nAdmins can create links on behalf of users with a member role.  The site owner role can create links for admins and members.\n\n**Note:** The generated link can be used by any user in possession of the link to reset the password of the associated account.\nThe link should be treated as sensitive and protected accordingly.",
                 "tags": [
                     "Site Admin"
                 ],
@@ -561,11 +561,11 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "Processes a password reset request with a valid reset token\nValidates the token, updates the user's password, and consumes the token",
+                "description": "Endpoint to handle password requests received from the PasswordResetTokenPageHandler (do not call the endpoint directly)\nThe handler validates the token, updates the user password, and consumes the one-time-use token.\nAny user in possession of the token can use it to reset the password of the associated account\nOne time tokens can only be issued by admins or the site owner.",
                 "tags": [
                     "auth"
                 ],
-                "summary": "Process password reset",
+                "summary": "Process password reset token",
                 "parameters": [
                     {
                         "type": "string",
@@ -621,7 +621,7 @@ const docTemplate = `{
                 "tags": [
                     "auth"
                 ],
-                "summary": "Password reset",
+                "summary": "Password reset (self service)",
                 "parameters": [
                     {
                         "description": "user details",

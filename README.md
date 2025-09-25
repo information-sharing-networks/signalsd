@@ -162,7 +162,7 @@ The app uses the following external tools:
 
 All these tools are installed as part of the docker image.
 
-The Docker app is started with Air which will restart the service whenever you save changes to the code.  Air is configured to automatically run goose/sqlc/swag after each change.
+The Docker app is started with Air which will restart the service whenever you save changes to the code.  Air is configured to automatically run sqlc and swag after each change.  Database migrations are applied when you restart the docker app container (if you ar running locally, you will need to run the migrations manually - see the section on goose below)
 
 If you need to run these tools individually, you can use the Makefile for common tasks:
 
