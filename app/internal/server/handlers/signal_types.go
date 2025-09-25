@@ -330,9 +330,8 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 		return
 	}
 
-	resourceURL := fmt.Sprintf("%s://%s/api/isn/%s/signal_types/%s/v%s",
-		utils.GetScheme(r),
-		r.Host,
+	resourceURL := fmt.Sprintf("%s/api/isn/%s/signal_types/%s/v%s",
+		signalsd.GetPublicBaseURL(r),
 		isn.Slug,
 		slug,
 		semVer,

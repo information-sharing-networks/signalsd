@@ -13,6 +13,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
+	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/utils"
 	"github.com/jackc/pgx/v5"
@@ -166,9 +167,8 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 		return
 	}
 
-	resourceURL := fmt.Sprintf("%s://%s/api/isn/%s/account/%s/batch/%s",
-		utils.GetScheme(r),
-		r.Host,
+	resourceURL := fmt.Sprintf("%s/api/isn/%s/account/%s/batch/%s",
+		signalsd.GetPublicBaseURL(r),
 		isnSlug,
 		account.ID,
 		returnedRow.ID,

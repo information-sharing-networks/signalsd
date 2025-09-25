@@ -129,6 +129,25 @@ func NewServerConfig() (*ServerConfig, *CORSConfigs, error) {
 	return &cfg, corsConfigs, nil
 }
 
+// GetPublicBaseURL returns the appropriate base URL for user-facing links.
+// The default value is based on the request TLS and Host header information.
+// Where X-Forwarded-Proto and X-Forwarded-Host are set by a reverse proxy these are used instead.
+func GetPublicBaseURL(r *http.Request) string {
+	scheme := "http"
+	if forwardedProto := r.Header.Get("X-Forwarded-Proto"); forwardedProto != "" {
+		scheme = forwardedProto
+	} else if r.TLS != nil {
+		scheme = "https"
+	}
+
+	host := r.Host
+	if forwardedHost := r.Header.Get("X-Forwarded-Host"); forwardedHost != "" {
+		host = forwardedHost
+	}
+
+	return fmt.Sprintf("%s://%s", scheme, host)
+}
+
 // validateConfig checks for required env variables
 func validateConfig(cfg *ServerConfig) error {
 	if cfg.Environment == "prod" {

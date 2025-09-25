@@ -15,7 +15,6 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
-	"github.com/information-sharing-networks/signalsd/app/internal/server/utils"
 	"github.com/information-sharing-networks/signalsd/app/internal/version"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -792,10 +791,9 @@ func (a *AdminHandler) GeneratePasswordResetLinkHandler(w http.ResponseWriter, r
 		return
 	}
 
-	// Generate the one-time password reset URL (following service account pattern)
-	resetURL := fmt.Sprintf("%s://%s/api/auth/password-reset/%s",
-		utils.GetScheme(r),
-		r.Host,
+	// Generate the one-time password reset URL using forwarded headers
+	resetURL := fmt.Sprintf("%s/api/auth/password-reset/%s",
+		signalsd.GetPublicBaseURL(r),
 		tokenID.String(),
 	)
 
