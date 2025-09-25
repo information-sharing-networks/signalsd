@@ -12,11 +12,25 @@ import (
 type Client struct {
 	baseURL    string
 	httpClient *http.Client
+	publicHost string // Public domain name for URL generation (e.g., "signalsd.btddemo.org")
+	isHTTPS    bool   // Whether the public domain uses HTTPS
 }
 
 func NewClient(baseURL string) *Client {
 	return &Client{
 		baseURL: baseURL,
+		httpClient: &http.Client{
+			Timeout: 10 * time.Second,
+		},
+	}
+}
+
+// NewClientWithPublicHost creates a client with public host information for URL generation
+func NewClientWithPublicHost(baseURL, publicHost string, isHTTPS bool) *Client {
+	return &Client{
+		baseURL:    baseURL,
+		publicHost: publicHost,
+		isHTTPS:    isHTTPS,
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},

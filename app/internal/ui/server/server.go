@@ -61,9 +61,17 @@ func NewIntegratedServer(router *chi.Mux, cfg *config.Config, logger *slog.Logge
 // note: dynamic HMTX handlers are registered with routes starting /ui-api
 func (s *Server) RegisterRoutes(router *chi.Mux) {
 
+	// Create API client with public host information if configured
+	var apiClient *client.Client
+	if s.config.PublicHost != "" {
+		apiClient = client.NewClientWithPublicHost(s.config.APIBaseURL, s.config.PublicHost, s.config.PublicHTTPS)
+	} else {
+		apiClient = client.NewClient(s.config.APIBaseURL)
+	}
+
 	handlerService := &handlers.HandlerService{
 		AuthService: auth.NewAuthService(s.config.APIBaseURL, s.config.Environment),
-		ApiClient:   client.NewClient(s.config.APIBaseURL),
+		ApiClient:   apiClient,
 		Environment: s.config.Environment,
 	}
 	// Public routes (no auth required)

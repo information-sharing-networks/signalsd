@@ -49,7 +49,6 @@ func (c *Client) GetUserOptionsList(accessToken string) ([]types.UserOption, err
 
 // GeneratePasswordResetLink generates a password reset link for the user associated witht the supplied email
 func (c *Client) GeneratePasswordResetLink(accessToken, email string) (*GeneratePasswordResetLinkResponse, error) {
-
 	user, err := c.LookupUserByEmail(accessToken, email)
 	if err != nil {
 		return nil, NewClientInternalError(err, "looking up user by email")
@@ -60,6 +59,17 @@ func (c *Client) GeneratePasswordResetLink(accessToken, email string) (*Generate
 	req, err := http.NewRequest("POST", url, nil)
 	if err != nil {
 		return nil, NewClientInternalError(err, "creating generate password reset link request")
+	}
+
+	// Forward public host information to ensure the API generates URLs
+	// with the public domain name instead of localhost
+	if c.publicHost != "" {
+		req.Header.Set("X-Forwarded-Host", c.publicHost)
+		if c.isHTTPS {
+			req.Header.Set("X-Forwarded-Proto", "https")
+		} else {
+			req.Header.Set("X-Forwarded-Proto", "http")
+		}
 	}
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))

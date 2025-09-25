@@ -434,6 +434,8 @@ func (s *Server) setupUIServer() {
 		WriteTimeout: s.serverConfig.WriteTimeout,
 		IdleTimeout:  s.serverConfig.IdleTimeout,
 		APIBaseURL:   fmt.Sprintf("http://localhost:%d", s.serverConfig.Port), // use the API port
+		PublicHost:   s.serverConfig.PublicHost,                               // Pass through public host for URL generation
+		PublicHTTPS:  s.serverConfig.PublicHTTPS,                              // Pass through HTTPS setting
 	}
 
 	// Create UI server and register its routes on the signalsd router

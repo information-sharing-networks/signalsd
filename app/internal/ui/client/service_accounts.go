@@ -89,6 +89,17 @@ func (c *Client) CreateServiceAccount(accessToken string, req CreateServiceAccou
 		return nil, NewClientInternalError(err, "creating service account request")
 	}
 
+	// Forward public host information to ensure the API generates URLs
+	// with the public domain name instead of localhost
+	if c.publicHost != "" {
+		httpReq.Header.Set("X-Forwarded-Host", c.publicHost)
+		if c.isHTTPS {
+			httpReq.Header.Set("X-Forwarded-Proto", "https")
+		} else {
+			httpReq.Header.Set("X-Forwarded-Proto", "http")
+		}
+	}
+
 	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 	httpReq.Header.Set("Content-type", "application/json")
 

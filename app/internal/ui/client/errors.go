@@ -32,7 +32,10 @@ func NewClientConnectionError(err error) *ClientError {
 	}
 }
 
-// NewClientInternalError creates a ClientError for internal errors, supply the error and an explanation of what was being done when the error occurred
+// NewClientInternalError creates a ClientError for internal errors.
+// Supply the detailed error and an explanation of what was being done when the error occurred
+// (this information is used for logging).
+// A generic error message is also recorded and this should be presented to the user.
 func NewClientInternalError(err error, while string) *ClientError {
 	return &ClientError{
 		StatusCode:  0,

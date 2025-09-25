@@ -17,6 +17,8 @@ type Config struct {
 	WriteTimeout time.Duration `envconfig:"WRITE_TIMEOUT" default:"15s"`
 	IdleTimeout  time.Duration `envconfig:"IDLE_TIMEOUT" default:"60s"`
 	APIBaseURL   string        `envconfig:"API_BASE_URL" default:"http://localhost:8080"`
+	PublicHost   string        `envconfig:"PUBLIC_HOST" default:""`      // Public domain name (e.g., "signalsd.btddemo.org")
+	PublicHTTPS  bool          `envconfig:"PUBLIC_HTTPS" default:"true"` // Whether public domain uses HTTPS
 }
 
 var validEnvs = map[string]bool{

@@ -27,6 +27,8 @@ type ServerConfig struct {
 	RateLimitRPS         int32         `envconfig:"RATE_LIMIT_RPS" default:"100"`
 	RateLimitBurst       int32         `envconfig:"RATE_LIMIT_BURST" default:"20"`
 	ServiceMode          string        `envconfig:"SERVICE_MODE"`                   // Set by CLI flag, not env var
+	PublicHost           string        `envconfig:"PUBLIC_HOST" default:""`         // Public domain name for URL generation
+	PublicHTTPS          bool          `envconfig:"PUBLIC_HTTPS" default:"true"`    // Whether public domain uses HTTPS
 	DBMaxConnections     int32         `envconfig:"DB_MAX_CONNECTIONS" default:"4"` // pgx pool defaults
 	DBMinConnections     int32         `envconfig:"DB_MIN_CONNECTIONS" default:"0"`
 	DBMaxConnLifetime    time.Duration `envconfig:"DB_MAX_CONN_LIFETIME" default:"60m"`
