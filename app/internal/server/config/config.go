@@ -123,6 +123,9 @@ func NewServerConfig() (*ServerEnvironment, *CORSConfigs, error) {
 		cfg.PublicBaseURL = fmt.Sprintf("http://%s:%d", cfg.Host, cfg.Port)
 	}
 
+	// remove trailing slash from base url (if present)
+	cfg.PublicBaseURL = strings.TrimSuffix(cfg.PublicBaseURL, "/")
+
 	if err := validateConfig(&cfg); err != nil {
 		return nil, nil, err
 	}
