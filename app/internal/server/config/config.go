@@ -3,35 +3,37 @@ package signalsd
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
+	"github.com/Netflix/go-env"
 	"github.com/jub0bs/cors"
-	"github.com/kelseyhightower/envconfig"
 )
 
-// Environment variables are automatically mapped using envconfig.
-type ServerConfig struct {
-	Environment          string        `envconfig:"ENVIRONMENT" default:"dev"`
-	Host                 string        `envconfig:"HOST" default:"0.0.0.0"`
-	Port                 int           `envconfig:"PORT" default:"8080"`
-	SecretKey            string        `envconfig:"SECRET_KEY" required:"true"`
-	LogLevel             string        `envconfig:"LOG_LEVEL" default:"debug"`
-	DatabaseURL          string        `envconfig:"DATABASE_URL" required:"true"`
-	ReadTimeout          time.Duration `envconfig:"READ_TIMEOUT" default:"15s"`
-	WriteTimeout         time.Duration `envconfig:"WRITE_TIMEOUT" default:"15s"`
-	IdleTimeout          time.Duration `envconfig:"IDLE_TIMEOUT" default:"60s"`
-	AllowedOrigins       []string      `envconfig:"ALLOWED_ORIGINS" default:"*"`
-	MaxSignalPayloadSize int64         `envconfig:"MAX_SIGNAL_PAYLOAD_SIZE" default:"5242880"` // 5MB
-	MaxAPIRequestSize    int64         `envconfig:"MAX_API_REQUEST_SIZE" default:"65536"`      // 64KB
-	RateLimitRPS         int32         `envconfig:"RATE_LIMIT_RPS" default:"100"`
-	RateLimitBurst       int32         `envconfig:"RATE_LIMIT_BURST" default:"20"`
-	ServiceMode          string        `envconfig:"SERVICE_MODE"`                   // Set by CLI flag, not env var
-	DBMaxConnections     int32         `envconfig:"DB_MAX_CONNECTIONS" default:"4"` // pgx pool defaults
-	DBMinConnections     int32         `envconfig:"DB_MIN_CONNECTIONS" default:"0"`
-	DBMaxConnLifetime    time.Duration `envconfig:"DB_MAX_CONN_LIFETIME" default:"60m"`
-	DBMaxConnIdleTime    time.Duration `envconfig:"DB_MAX_CONN_IDLE_TIME" default:"30m"`
-	DBConnectTimeout     time.Duration `envconfig:"DB_CONNECT_TIMEOUT" default:"5s"`
+// Environment variables with defaults
+type ServerEnvironment struct {
+	Environment          string        `env:"ENVIRONMENT,default=dev"`
+	Host                 string        `env:"HOST,default=0.0.0.0"`
+	Port                 int           `env:"PORT,default=8080"`
+	PublicBaseURL        string        `env:"PUBLIC_BASE_URL"` // base url for user facing links (defaults to Host/Port values = see below)
+	SecretKey            string        `env:"SECRET_KEY,required=true"`
+	LogLevel             string        `env:"LOG_LEVEL,default=debug"`
+	DatabaseURL          string        `env:"DATABASE_URL,required=true"`
+	ReadTimeout          time.Duration `env:"READ_TIMEOUT,default=15s"`
+	WriteTimeout         time.Duration `env:"WRITE_TIMEOUT,default=15s"`
+	IdleTimeout          time.Duration `env:"IDLE_TIMEOUT,default=60s"`
+	AllowedOrigins       []string      `env:"ALLOWED_ORIGINS,default=*"`
+	MaxSignalPayloadSize int64         `env:"MAX_SIGNAL_PAYLOAD_SIZE,default=5242880"` // 5MB
+	MaxAPIRequestSize    int64         `env:"MAX_API_REQUEST_SIZE,default=65536"`      // 64KB
+	RateLimitRPS         int32         `env:"RATE_LIMIT_RPS,default=100"`
+	RateLimitBurst       int32         `env:"RATE_LIMIT_BURST,default=20"`
+	ServiceMode          string        `env:"SERVICE_MODE"`                 // Set by CLI flag, not env var
+	DBMaxConnections     int32         `env:"DB_MAX_CONNECTIONS,default=4"` // pgx pool defaults
+	DBMinConnections     int32         `env:"DB_MIN_CONNECTIONS,default=0"`
+	DBMaxConnLifetime    time.Duration `env:"DB_MAX_CONN_LIFETIME,default=60m"`
+	DBMaxConnIdleTime    time.Duration `env:"DB_MAX_CONN_IDLE_TIME,default=30m"`
+	DBConnectTimeout     time.Duration `env:"DB_CONNECT_TIMEOUT,default=5s"`
 }
 
 // CORSConfigs holds the CORS middleware instances for different endpoint types
@@ -108,16 +110,21 @@ var ValidServiceModes = map[string]bool{ // service modes for CLI
 }
 
 // NewServerConfig loads environment variables using envconfig and returns a ServerConfig struct and CORSConfigs
-func NewServerConfig() (*ServerConfig, *CORSConfigs, error) {
-	var cfg ServerConfig
+func NewServerConfig() (*ServerEnvironment, *CORSConfigs, error) {
+	var cfg ServerEnvironment
 
-	// load environment variables with defaults
-	if err := envconfig.Process("", &cfg); err != nil {
-		return nil, nil, fmt.Errorf("failed to process environment variables: %w", err)
+	_, err := env.UnmarshalFromEnviron(&cfg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to unmarshal environment variables: %w", err)
+	}
+
+	// default to host/port if not set (the env must be set for production - checked in the validateConfig function)
+	if cfg.Environment != "prod" && cfg.PublicBaseURL == "" {
+		cfg.PublicBaseURL = fmt.Sprintf("http://%s:%d", cfg.Host, cfg.Port)
 	}
 
 	if err := validateConfig(&cfg); err != nil {
-		return nil, nil, fmt.Errorf("configuration validation failed: %w", err)
+		return nil, nil, err
 	}
 
 	// Initialize CORS configurations
@@ -129,27 +136,8 @@ func NewServerConfig() (*ServerConfig, *CORSConfigs, error) {
 	return &cfg, corsConfigs, nil
 }
 
-// GetPublicBaseURL returns the appropriate base URL for user-facing links.
-// The default value is based on the request TLS and Host header information.
-// Where X-Forwarded-Proto and X-Forwarded-Host are set by a reverse proxy these are used instead.
-func GetPublicBaseURL(r *http.Request) string {
-	scheme := "http"
-	if forwardedProto := r.Header.Get("X-Forwarded-Proto"); forwardedProto != "" {
-		scheme = forwardedProto
-	} else if r.TLS != nil {
-		scheme = "https"
-	}
-
-	host := r.Host
-	if forwardedHost := r.Header.Get("X-Forwarded-Host"); forwardedHost != "" {
-		host = forwardedHost
-	}
-
-	return fmt.Sprintf("%s://%s", scheme, host)
-}
-
 // validateConfig checks for required env variables
-func validateConfig(cfg *ServerConfig) error {
+func validateConfig(cfg *ServerEnvironment) error {
 	if cfg.Environment == "prod" {
 		if cfg.DatabaseURL == "" {
 			return fmt.Errorf("DATABASE_URL is required in %s environment", cfg.Environment)
@@ -185,11 +173,41 @@ func validateConfig(cfg *ServerConfig) error {
 		return fmt.Errorf("DB_MIN_CONNECTIONS (%d) cannot be greater than DB_MAX_CONNECTIONS (%d)", cfg.DBMinConnections, cfg.DBMaxConnections)
 	}
 
+	u, err := url.ParseRequestURI(cfg.PublicBaseURL)
+	if err != nil {
+		return fmt.Errorf("PUBLIC_BASE_URL is not a valid URL: %s", cfg.PublicBaseURL)
+	}
+
+	if u.Scheme == "" {
+		return fmt.Errorf("PUBLIC_BASE_URL does not include a valid scheme (http or https): %s", cfg.PublicBaseURL)
+	}
+
+	if cfg.Environment == "prod" {
+
+		if u.Scheme == "http" && u.Hostname() == "localhost" {
+			return fmt.Errorf("PUBLIC_BASE_URL must be set in production")
+		}
+		if u.Scheme != "https" {
+			return fmt.Errorf("PUBLIC_BASE_URL must use https in production: %s", cfg.PublicBaseURL)
+		}
+		if u.Port() != "" {
+			return fmt.Errorf("PUBLIC_BASE_URL should not include a port in production: %s", cfg.PublicBaseURL)
+		}
+	}
+
+	if u.Hostname() == "" {
+		return fmt.Errorf("PUBLIC_BASE_URL does not include a host: %s", cfg.PublicBaseURL)
+	}
+
+	if u.Path != "" || u.Path == "/" {
+		return fmt.Errorf("PUBLIC_BASE_URL should not include a path: %s", cfg.PublicBaseURL)
+	}
+
 	return nil
 }
 
 // createCORSConfigs creates the CORS configurations based on the server config
-func createCORSConfigs(cfg *ServerConfig) (*CORSConfigs, error) {
+func createCORSConfigs(cfg *ServerEnvironment) (*CORSConfigs, error) {
 	var origins []string
 	if len(cfg.AllowedOrigins) == 0 || (len(cfg.AllowedOrigins) == 1 && strings.TrimSpace(cfg.AllowedOrigins[0]) == "*") {
 		origins = []string{"*"}

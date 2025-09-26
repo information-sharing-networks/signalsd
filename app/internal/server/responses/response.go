@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
+	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 )
 
 type ErrorResponse struct {
@@ -34,6 +35,9 @@ func RespondWithError(w http.ResponseWriter, r *http.Request, statusCode int, er
 		_, _ = w.Write([]byte(`{"error_code":"internal_error","message":"Internal Server Error"}`))
 		return
 	}
+
+	// add user message to the final log message
+	logger.ContextWithLogAttrs(r.Context(), slog.String("message", message), slog.String("error_code", errorCode.String()))
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(statusCode)

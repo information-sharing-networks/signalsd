@@ -212,9 +212,17 @@ func createTestDatabase(t *testing.T, ctx context.Context, pool *pgxpool.Pool, d
 
 // startInProcessServer starts the signalsd server in-process for testing - returns the base URL for the API and a shutdown function
 // when using public isns be sure to load the test data before starting the server (the public isn cache is not dynamic and is only populated at startup)
-func startInProcessServer(t *testing.T, ctx context.Context, testDB *pgxpool.Pool, testDatabaseURL string) (string, func()) {
+// if you are not testing a function that generates end user facing urls then send an empty string for publicBaseURL
+func startInProcessServer(t *testing.T, ctx context.Context, testDB *pgxpool.Pool, testDatabaseURL string, publicBaseURL string) (string, func()) {
+
+	enableServerLogs := false
+
+	if os.Getenv("ENABLE_SERVER_LOGS") == "true" {
+		enableServerLogs = true
+	}
 
 	// Set environment variables before calling NewServerConfig
+
 	originalEnvVars := make(map[string]string)
 	testEnvVars := map[string]string{
 		"SECRET_KEY":   secretKey,
@@ -224,11 +232,8 @@ func startInProcessServer(t *testing.T, ctx context.Context, testDB *pgxpool.Poo
 		"PORT":         fmt.Sprintf("%d", findFreePort(t)),
 	}
 
-	// Save original values and set test values
+	// set test env vars
 	for key, value := range testEnvVars {
-		if original := os.Getenv(key); original != "" {
-			originalEnvVars[key] = original
-		}
 		os.Setenv(key, value)
 	}
 
@@ -250,6 +255,11 @@ func startInProcessServer(t *testing.T, ctx context.Context, testDB *pgxpool.Poo
 
 	cfg.ServiceMode = "all"
 
+	// publicBaseURL is only used when generating end user facing links like password reset - default to the test env url
+	if publicBaseURL != "" {
+		cfg.PublicBaseURL = publicBaseURL
+	}
+
 	queries := database.New(testDB)
 	authService := auth.NewAuthService(cfg.SecretKey, environment, queries)
 
@@ -263,7 +273,12 @@ func startInProcessServer(t *testing.T, ctx context.Context, testDB *pgxpool.Poo
 		t.Logf("Warning: Failed to load public ISN cache: %v", err)
 	}
 
-	appLogger := logger.InitLogger(logger.ParseLogLevel(cfg.LogLevel), "debug")
+	logLevel := logger.ParseLogLevel("none")
+
+	if enableServerLogs {
+		logLevel = logger.ParseLogLevel("debug")
+	}
+	appLogger := logger.InitLogger(logLevel, "dev")
 
 	serverInstance := server.NewServer(
 		testDB,

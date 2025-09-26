@@ -30,6 +30,10 @@ type serviceAccountDetails struct {
 	Email        string `json:"client_contact_email"`
 }
 
+type reissueCredentialsRequest struct {
+	ClientID string `json:"client_id"`
+}
+
 type loginDetails struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
@@ -133,10 +137,11 @@ func TestServiceAccountRegistration(t *testing.T) {
 	ctx := context.Background()
 	testDB := setupTestDatabase(t, ctx)
 	testEnv := setupTestEnvironment(testDB)
+	publicBaseURL := "https://testserver.com"
 
 	// Start server
 	testURL := getTestDatabaseURL()
-	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL)
+	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, publicBaseURL)
 	defer stopServer()
 
 	t.Log("Creating test data...")
@@ -198,10 +203,10 @@ func TestServiceAccountRegistration(t *testing.T) {
 
 				// Verify response structure
 				if _, exists := result["client_id"]; !exists {
-					t.Error("Response missing 'client_id' field")
+					t.Fatal("Response missing 'client_id' field")
 				}
 				if _, exists := result["setup_url"]; !exists {
-					t.Error("Response missing 'setup_url' field")
+					t.Fatal("Response missing 'setup_url' field")
 				}
 
 				// Verify the service account was created in the database
@@ -219,6 +224,28 @@ func TestServiceAccountRegistration(t *testing.T) {
 				}
 			})
 		}
+	})
+	t.Run("setup_url test", func(t *testing.T) {
+		requestBody := serviceAccountDetails{"Urltest Organization", "email@example.com"}
+		response := makeServiceAccountRegRequest(t, baseURL, ownerToken, requestBody)
+		defer response.Body.Close()
+		if response.StatusCode != http.StatusCreated {
+			t.Fatalf("Expected status %d, got %d", http.StatusCreated, response.StatusCode)
+			return
+		}
+
+		var result map[string]any
+		if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
+			t.Fatalf("Failed to decode response: %v", err)
+		}
+		if _, exists := result["setup_url"]; !exists {
+			t.Fatal("Response missing 'setup_url' field")
+		}
+		setupURL := result["setup_url"].(string)
+		if !strings.HasPrefix(setupURL, publicBaseURL) {
+			t.Fatalf("expected a setup URL with a public base url of %v got %v", publicBaseURL, setupURL)
+		}
+
 	})
 
 	t.Run("duplicate_registration_conflict", func(t *testing.T) {
@@ -321,10 +348,11 @@ func TestServiceAccountReissue(t *testing.T) {
 	ctx := context.Background()
 	testDB := setupTestDatabase(t, ctx)
 	testEnv := setupTestEnvironment(testDB)
+	publicBaseURL := "https://testserver.com"
 
 	// Start server
 	testURL := getTestDatabaseURL()
-	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL)
+	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, publicBaseURL)
 	defer stopServer()
 
 	t.Log("Creating test data...")
@@ -348,6 +376,49 @@ func TestServiceAccountReissue(t *testing.T) {
 		t.Fatalf("could not create test service account: %d", response.StatusCode)
 	}
 
+	var result map[string]any
+	if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+
+	if _, exists := result["client_id"]; !exists {
+		t.Fatal("client_id not in response")
+	}
+	clientID := result["client_id"].(string)
+	if clientID == "" {
+		t.Fatalf("Could not read client_id from response")
+	}
+
+	requestBody := reissueCredentialsRequest{
+		ClientID: clientID,
+	}
+
+	t.Run("setup_url format", func(t *testing.T) {
+
+		response := makeServiceAccountReissueRequest(t, baseURL, ownerToken, requestBody)
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusOK {
+			t.Fatalf("Expected status %d, got %d", http.StatusOK, response.StatusCode)
+			return
+		}
+
+		var result map[string]any
+		if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
+			t.Fatalf("Failed to decode response: %v", err)
+		}
+
+		if _, exists := result["setup_url"]; !exists {
+			t.Fatalf("setup_url not found in reissue credentials response body")
+		}
+
+		setupURL := result["setup_url"].(string)
+
+		if !strings.HasPrefix(setupURL, publicBaseURL) {
+			t.Errorf("expected a public base url of %v got %v", publicBaseURL, result["setup_url"])
+		}
+
+	})
 	t.Run("permissions tests", func(t *testing.T) {
 		testCases := []struct {
 			name           string
@@ -372,7 +443,7 @@ func TestServiceAccountReissue(t *testing.T) {
 		}
 		for _, tt := range testCases {
 			t.Run(tt.name, func(t *testing.T) {
-				response := makeServiceAccountReissueRequest(t, baseURL, tt.token, adminServiceAccountDetails)
+				response := makeServiceAccountReissueRequest(t, baseURL, tt.token, requestBody)
 				defer response.Body.Close()
 
 				if response.StatusCode != tt.expectedStatus {
@@ -400,57 +471,10 @@ func TestServiceAccountReissue(t *testing.T) {
 			})
 		}
 	})
-
-	t.Run("case insenstive tests", func(t *testing.T) {
-		testCases := []struct {
-			name           string
-			requestBody    serviceAccountDetails
-			token          string
-			expectedStatus int
-		}{
-			{
-				name:           "can_reissue_case_insensitive_email",
-				token:          ownerToken,
-				requestBody:    serviceAccountDetails{"Admin Organization", "Admin@example.com"},
-				expectedStatus: http.StatusOK,
-			},
-			{
-				name:           "can_reissue_case_insensitive_org",
-				token:          ownerToken,
-				requestBody:    serviceAccountDetails{"ADMIN ORGANIZATION", "admin@example.com"},
-				expectedStatus: http.StatusOK,
-			},
-		}
-		for _, tt := range testCases {
-			t.Run(tt.name, func(t *testing.T) {
-				response := makeServiceAccountReissueRequest(t, baseURL, tt.token, tt.requestBody)
-				defer response.Body.Close()
-
-				if response.StatusCode != tt.expectedStatus {
-					t.Fatalf("Expected status %d, got %d", tt.expectedStatus, response.StatusCode)
-					return
-				}
-
-				var result map[string]any
-				if err := json.NewDecoder(response.Body).Decode(&result); err != nil {
-					t.Fatalf("Failed to decode response: %v", err)
-				}
-
-				// Verify response structure
-				if _, exists := result["client_id"]; !exists {
-					t.Error("Response missing 'client_id' field")
-				}
-				if _, exists := result["setup_url"]; !exists {
-					t.Error("Response missing 'setup_url' field")
-				}
-
-			})
-		}
-	})
 }
 
 // makeServiceAccountReissueRequest makes a POST request to the service account credential reissuing endpoint
-func makeServiceAccountReissueRequest(t *testing.T, baseURL, token string, requestBody serviceAccountDetails) *http.Response {
+func makeServiceAccountReissueRequest(t *testing.T, baseURL, token string, requestBody reissueCredentialsRequest) *http.Response {
 	requestURL := fmt.Sprintf("%s/api/auth/service-accounts/reissue-credentials", baseURL)
 
 	jsonData, err := json.Marshal(requestBody)
@@ -485,7 +509,7 @@ func TestUserLogin(t *testing.T) {
 
 	// Start server
 	testURL := getTestDatabaseURL()
-	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL)
+	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, "")
 	defer stopServer()
 
 	t.Log("Creating test data...")
@@ -766,7 +790,7 @@ func TestUserRegistration(t *testing.T) {
 
 	// Start server
 	testURL := getTestDatabaseURL()
-	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL)
+	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, "")
 	defer stopServer()
 
 	t.Log("Testing user registration endpoint...")
@@ -1033,6 +1057,7 @@ func TestPasswordResetFlow(t *testing.T) {
 	testDB := setupTestDatabase(t, ctx)
 	queries := database.New(testDB)
 	authService := auth.NewAuthService(secretKey, "test", queries)
+	publicBaseURL := "https://testserver.com"
 
 	// Create test accounts
 	adminAccount := createTestAccount(t, ctx, queries, "admin", "user", "admin@example.com")
@@ -1040,7 +1065,7 @@ func TestPasswordResetFlow(t *testing.T) {
 
 	// Start test server
 	testURL := getTestDatabaseURL()
-	baseURL, stopServer := startInProcessServer(t, ctx, testDB, testURL)
+	baseURL, stopServer := startInProcessServer(t, ctx, testDB, testURL, publicBaseURL)
 	defer stopServer()
 
 	t.Run("non admin cannot generate reset link", func(t *testing.T) {
@@ -1102,6 +1127,11 @@ func TestPasswordResetFlow(t *testing.T) {
 		if !strings.Contains(resetResponse.ResetURL, "/api/auth/password-reset/") {
 			t.Errorf("Expected reset URL to contain '/api/auth/password-reset/', got '%s'", resetResponse.ResetURL)
 		}
+
+		if !strings.HasPrefix(resetResponse.ResetURL, publicBaseURL) {
+			t.Errorf("Expected reset url to have a public base url of %v got %v", publicBaseURL, resetResponse.ResetURL)
+		}
+
 		if resetResponse.ExpiresIn != int(signalsd.PasswordResetExpiry.Seconds()) {
 			t.Errorf("Expected expires_in %d, got %d", int(signalsd.PasswordResetExpiry.Seconds()), resetResponse.ExpiresIn)
 		}
