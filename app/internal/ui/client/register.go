@@ -97,8 +97,6 @@ func (c *Client) LookupServiceAccountByClientID(accessToken, clientID string) (*
 	// Use the admin service accounts endpoint to get all service accounts, then filter by client_id
 	// This is similar to how the user lookup works but for service accounts
 
-	fmt.Printf("debug !!!! LookupServiceAccountByClientID: %s\n", clientID)
-
 	url := fmt.Sprintf("%s/api/admin/service-accounts?client_id=%s", c.baseURL, clientID)
 
 	req, err := http.NewRequest("GET", url, nil)

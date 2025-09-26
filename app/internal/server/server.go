@@ -25,7 +25,7 @@ type Server struct {
 	pool           *pgxpool.Pool
 	queries        *database.Queries
 	authService    *auth.AuthService
-	serverConfig   *signalsd.ServerConfig
+	serverConfig   *signalsd.ServerEnvironment
 	corsConfigs    *signalsd.CORSConfigs
 	logger         *slog.Logger
 	router         *chi.Mux
@@ -37,7 +37,7 @@ func NewServer(
 	pool *pgxpool.Pool,
 	queries *database.Queries,
 	authService *auth.AuthService,
-	cfg *signalsd.ServerConfig,
+	cfg *signalsd.ServerEnvironment,
 	corsConfigs *signalsd.CORSConfigs,
 	logger *slog.Logger,
 	schemaCache *schemas.SchemaCache,
@@ -155,15 +155,15 @@ func (s *Server) setupMiddleware() {
 func (s *Server) registerAdminRoutes() {
 	// user registration and authentication handlers
 	users := handlers.NewUserHandler(s.queries, s.authService, s.pool)
-	serviceAccounts := handlers.NewServiceAccountHandler(s.queries, s.authService, s.pool)
+	serviceAccounts := handlers.NewServiceAccountHandler(s.queries, s.authService, s.pool, s.serverConfig.PublicBaseURL)
 	login := handlers.NewLoginHandler(s.queries, s.authService, s.serverConfig.Environment)
 	tokens := handlers.NewTokenHandler(s.queries, s.authService, s.pool, s.serverConfig.Environment)
 
 	// site admin handlers
-	admin := handlers.NewAdminHandler(s.queries, s.pool, s.authService)
+	admin := handlers.NewAdminHandler(s.queries, s.pool, s.authService, s.serverConfig.PublicBaseURL)
 
 	// isn definition handlers
-	isn := handlers.NewIsnHandler(s.queries, s.pool)
+	isn := handlers.NewIsnHandler(s.queries, s.pool, s.serverConfig.PublicBaseURL)
 	signalTypes := handlers.NewSignalTypeHandler(s.queries)
 
 	// isn permissions
@@ -368,7 +368,7 @@ func (s *Server) registerSignalReadRoutes() {
 // registerCommonRoutes registers routes that are always available regardless of service mode
 // These routes include health checks and version information
 func (s *Server) registerCommonRoutes() {
-	admin := handlers.NewAdminHandler(s.queries, s.pool, s.authService)
+	admin := handlers.NewAdminHandler(s.queries, s.pool, s.authService, s.serverConfig.PublicBaseURL)
 
 	// Health check endpoints
 	s.router.Route("/health", func(r chi.Router) {

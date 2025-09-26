@@ -50,7 +50,7 @@ func TestCORS(t *testing.T) {
 	testDB := setupTestDatabase(t, ctx)
 	testEnv := setupTestEnvironment(testDB)
 	testDatabaseURL := getTestDatabaseURL()
-	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testDatabaseURL)
+	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testDatabaseURL, "")
 	privateEndpoint := baseURL + "/api/accounts"
 	publicEndpoint := baseURL + "/health/live"
 

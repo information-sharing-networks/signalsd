@@ -2487,10 +2487,6 @@
         "handlers.CreateSignalTypeResponse": {
             "type": "object",
             "properties": {
-                "resource_url": {
-                    "type": "string",
-                    "example": "http://localhost:8080/api/isn/sample-isn--example-org/signals_types/sample-signal--example-org/v0.0.1"
-                },
                 "sem_ver": {
                     "type": "string",
                     "example": "0.0.1"
@@ -2507,10 +2503,6 @@
                 "account_id": {
                     "type": "string",
                     "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3"
-                },
-                "resource_url": {
-                    "type": "string",
-                    "example": "http://localhost:8080/api/isn/sample-isn--example-org/account/{account_id}/batch/{signals_batch_id}"
                 },
                 "signals_batch_id": {
                     "type": "string",

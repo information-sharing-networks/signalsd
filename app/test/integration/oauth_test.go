@@ -32,7 +32,7 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 
 	// Start server
 	testURL := getTestDatabaseURL()
-	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL)
+	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, "")
 	defer stopServer()
 
 	t.Log("Creating test data...")
@@ -417,7 +417,7 @@ func TestOAuthRevokeEndpoint(t *testing.T) {
 
 	// Start server
 	testURL := getTestDatabaseURL()
-	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL)
+	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, "")
 	defer stopServer()
 
 	t.Log("Creating test data...")

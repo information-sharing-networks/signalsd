@@ -60,36 +60,36 @@ The service has sensible defaults for all configuration values. You only need to
 ```bash
 # Required (for production and local dev environments)
 DATABASE_URL=postgres://user:password@host:port/database?sslmode=disable # note production urls must use ssl.
-SECRET_KEY=your-random-secret-key-here  # Generate with: openssl rand -base64 64
+SECRET_KEY=your-random-secret-key-here # Generate with: openssl rand -base64 64
+PUBLIC_BASE_URL=https://yourdomain.com # Base URL for user facing links(e.g one-time password links (default: http://localhost:8080)
 
 # Server Configuration (all optional - defaults shown)
-HOST=0.0.0.0                    # Bind address (default: 0.0.0.0)
-PORT=8080                       # Server port (default: 8080)
-ENVIRONMENT=dev                 # Options: dev, prod, test, perf, staging (default: dev)
-LOG_LEVEL=debug                 # Options: debug, info, warn, error (default: debug)
+HOST=0.0.0.0                          # Bind address (default: 0.0.0.0)
+PORT=8080                             # Server port (default: 8080)
+ENVIRONMENT=dev                       #  Options: dev, prod, test, perf, staging (default: dev)
+LOG_LEVEL=debug                       #  Options: debug, info, warn, error (default: debug)
 
 # Performance Tuning (all optional - defaults shown)
-READ_TIMEOUT=15s                # HTTP read timeout (default: 15s)
-WRITE_TIMEOUT=15s               # HTTP write timeout (default: 15s)
-IDLE_TIMEOUT=60s                # HTTP idle timeout (default: 60s)
-RATE_LIMIT_RPS=100              # Requests per second (default: 100, set to 0 to disable)
-RATE_LIMIT_BURST=20             # Burst allowance (default: 20)
-MAX_SIGNAL_PAYLOAD_SIZE=5242880 # Max payload size (default: 5MB)
-MAX_API_REQUEST_SIZE=65536      # Max API request size (default: 64KB)
+READ_TIMEOUT=15s                      #  HTTP read timeout (default: 15s)
+WRITE_TIMEOUT=15s                     #  HTTP write timeout (default: 15s)
+IDLE_TIMEOUT=60s                      #  HTTP idle timeout (default: 60s)
+RATE_LIMIT_RPS=100                    #  Requests per second (default: 100, set to 0 to disable)
+RATE_LIMIT_BURST=20                   #  Burst allowance (default: 20)
+MAX_SIGNAL_PAYLOAD_SIZE=5242880       #  Max payload size (default: 5MB)
+MAX_API_REQUEST_SIZE=65536            #  Max API request size (default: 64KB)
 
 # Security - list sites that are allowed to use the service
-ALLOWED_ORIGINS=*               # CORS origins (default: *, comma-separated for multiple)
+ALLOWED_ORIGINS=*                     #  CORS origins (default: *, comma-separated for multiple)
 
 # Database Connection Pool (the default used are the same as those used by pgx )
 DB_MAX_CONNECTIONS=4
-DB_MIN_CONNECTIONS=0            # Allow scaling to zero (Cloud Run)
+DB_MIN_CONNECTIONS=0                  #  Allow scaling to zero (Cloud Run)
 DB_MAX_CONN_LIFETIME=60m
 DB_MAX_CONN_IDLE_TIME=30m
 DB_CONNECT_TIMEOUT=5s
 ```
 
 **Note**: In the Docker development environment, DATABASE_URL and SECRET_KEY are automatically configured with development-appropriate defaults. In production you should use a secret management service to supply these two settings.
-
 
 
 ## Quick Start (Docker Development Environment)
@@ -133,7 +133,7 @@ PORT=8081 docker compose up app
 ENVIRONMENT=perf DB_MAX_CONNECTIONS=50 DB_MIN_CONNECTIONS=5 RATE_LIMIT_RPS=0 docker compose up app
 
 # Production-like configuration
-ENVIRONMENT=prod DB_MAX_CONNECTIONS=25 DB_CONNECT_TIMEOUT=10s RATE_LIMIT_RPS=200 docker compose up app
+ENVIRONMENT=prod PUBLIC_BASE_URL=https://yourdomain.com DB_MAX_CONNECTIONS=25 DB_CONNECT_TIMEOUT=10s RATE_LIMIT_RPS=200 docker compose up app
 
 # Rebuild the image when you change:
 # - dockerfile_inline content
@@ -309,7 +309,7 @@ PORT=8081 go run cmd/signalsd/main.go --mode all
 ENVIRONMENT=perf DB_MAX_CONNECTIONS=50 DB_MIN_CONNECTIONS=5 RATE_LIMIT_RPS=0 go run cmd/signalsd/main.go --mode all
 
 # Production-like settings
-ENVIRONMENT=prod DB_MAX_CONNECTIONS=25 DB_CONNECT_TIMEOUT=10s go run cmd/signalsd/main.go --mode all
+PUBLIC_BASE_URL=https://yourdomain.com ENVIRONMENT=prod DB_MAX_CONNECTIONS=25 DB_CONNECT_TIMEOUT=10s go run cmd/signalsd/main.go --mode all
 ```
 
 ## User Interface
@@ -487,6 +487,14 @@ You will need three secrets:
 if you are deploying to a staging environment you need to create a separate database and two additional secrets:
 - `STAGING_DATABASE_URL`
 - `STAGING_SECRET_KEY`
+
+You need to create a single github environment variable to hold the public base url for your app:
+- `PUBLIC_BASE_URL` (e.g. https://yourdomain.com)
+
+If you are deploying to a staging environment you need to create a separate variable to hold the public base url:
+- `STAGING_PUBLIC_BASE_URL` (e.g. https://staging.yourdomain.com)
+
+The public base URL is used by the back-end server when generating password reset and service account setup links.
 
 #### DNS
 google will automatically assign a *.run.app domain name to your Gcloud run service(s) and these can be mapped to custom domains using Google Cloud run DNS (see https://cloud.google.com/run/docs/mapping-custom-domains)

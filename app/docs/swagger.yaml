@@ -248,9 +248,6 @@ definitions:
     type: object
   handlers.CreateSignalTypeResponse:
     properties:
-      resource_url:
-        example: http://localhost:8080/api/isn/sample-isn--example-org/signals_types/sample-signal--example-org/v0.0.1
-        type: string
       sem_ver:
         example: 0.0.1
         type: string
@@ -262,9 +259,6 @@ definitions:
     properties:
       account_id:
         example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
-        type: string
-      resource_url:
-        example: http://localhost:8080/api/isn/sample-isn--example-org/account/{account_id}/batch/{signals_batch_id}
         type: string
       signals_batch_id:
         example: b51faf05-aaed-4250-b334-2258ccdf1ff2

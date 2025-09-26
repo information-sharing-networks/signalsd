@@ -21,16 +21,18 @@ import (
 )
 
 type AdminHandler struct {
-	queries     *database.Queries
-	pool        *pgxpool.Pool
-	authService *auth.AuthService
+	queries       *database.Queries
+	pool          *pgxpool.Pool
+	authService   *auth.AuthService
+	publicBaseURL string
 }
 
-func NewAdminHandler(queries *database.Queries, pool *pgxpool.Pool, authService *auth.AuthService) *AdminHandler {
+func NewAdminHandler(queries *database.Queries, pool *pgxpool.Pool, authService *auth.AuthService, publicBaseURL string) *AdminHandler {
 	return &AdminHandler{
-		queries:     queries,
-		pool:        pool,
-		authService: authService,
+		queries:       queries,
+		pool:          pool,
+		authService:   authService,
+		publicBaseURL: publicBaseURL,
 	}
 }
 
@@ -820,7 +822,7 @@ func (a *AdminHandler) GeneratePasswordResetLinkHandler(w http.ResponseWriter, r
 
 	// Generate the one-time password reset URL using forwarded headers
 	resetURL := fmt.Sprintf("%s/api/auth/password-reset/%s",
-		signalsd.GetPublicBaseURL(r),
+		a.publicBaseURL,
 		tokenID.String(),
 	)
 

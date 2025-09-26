@@ -22,14 +22,16 @@ import (
 )
 
 type IsnHandler struct {
-	queries *database.Queries
-	pool    *pgxpool.Pool
+	queries       *database.Queries
+	pool          *pgxpool.Pool
+	publicBaseURL string
 }
 
-func NewIsnHandler(queries *database.Queries, pool *pgxpool.Pool) *IsnHandler {
+func NewIsnHandler(queries *database.Queries, pool *pgxpool.Pool, publicBaseURL string) *IsnHandler {
 	return &IsnHandler{
-		queries: queries,
-		pool:    pool,
+		queries:       queries,
+		pool:          pool,
+		publicBaseURL: publicBaseURL,
 	}
 }
 
@@ -222,7 +224,7 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resourceURL := fmt.Sprintf("%s/api/isn/%s",
-		signalsd.GetPublicBaseURL(r),
+		i.publicBaseURL,
 		slug,
 	)
 

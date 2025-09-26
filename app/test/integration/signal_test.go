@@ -387,7 +387,7 @@ func TestSignalSubmission(t *testing.T) {
 
 	// select database and start the signalsd server
 	testURL := getTestDatabaseURL()
-	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL)
+	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, "")
 	defer stopServer()
 	t.Logf("✅ Server started at %s", baseURL)
 
@@ -807,7 +807,7 @@ func TestIsInUseStatus(t *testing.T) {
 
 	// select database and start the signalsd server
 	testURL := getTestDatabaseURL()
-	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL)
+	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, "")
 	defer stopServer()
 	t.Logf("✅ Server started at %s", baseURL)
 
@@ -1074,7 +1074,7 @@ func TestSignalSearch(t *testing.T) {
 
 	// note that the server must be started after the test data is created so the public isn cache is populated
 	testURL := getTestDatabaseURL()
-	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL)
+	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, "")
 	defer stopServer()
 	t.Logf("✅ Server started at %s", baseURL)
 
@@ -1382,7 +1382,7 @@ func TestCorrelatedAndPreviousVersionsSearch(t *testing.T) {
 
 	// select database and start the signalsd server
 	testURL := getTestDatabaseURL()
-	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL)
+	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, "")
 	defer stopServer()
 	t.Logf("✅ Server started at %s", baseURL)
 

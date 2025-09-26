@@ -24,16 +24,18 @@ import (
 )
 
 type ServiceAccountHandler struct {
-	queries     *database.Queries
-	authService *auth.AuthService
-	pool        *pgxpool.Pool
+	queries       *database.Queries
+	authService   *auth.AuthService
+	pool          *pgxpool.Pool
+	publicBaseURL string
 }
 
-func NewServiceAccountHandler(queries *database.Queries, authService *auth.AuthService, pool *pgxpool.Pool) *ServiceAccountHandler {
+func NewServiceAccountHandler(queries *database.Queries, authService *auth.AuthService, pool *pgxpool.Pool, publicBaseURL string) *ServiceAccountHandler {
 	return &ServiceAccountHandler{
-		queries:     queries,
-		authService: authService,
-		pool:        pool,
+		queries:       queries,
+		authService:   authService,
+		pool:          pool,
+		publicBaseURL: publicBaseURL,
 	}
 }
 
@@ -234,7 +236,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 
 	// Generate the one-time setup URL using forwarded headers
 	setupURL := fmt.Sprintf("%s/api/auth/service-accounts/setup/%s",
-		signalsd.GetPublicBaseURL(r),
+		s.publicBaseURL,
 		oneTimeSecretID.String(),
 	)
 
@@ -295,6 +297,7 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentialsHandler(w http.R
 	}
 
 	if req.ClientID == "" {
+
 		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "client_id is required")
 		return
 	}
@@ -406,7 +409,7 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentialsHandler(w http.R
 
 	// Generate the one-time setup URL using forwarded headers
 	setupURL := fmt.Sprintf("%s/api/auth/service-accounts/setup/%s",
-		signalsd.GetPublicBaseURL(r),
+		s.publicBaseURL,
 		oneTimeSecretID.String(),
 	)
 

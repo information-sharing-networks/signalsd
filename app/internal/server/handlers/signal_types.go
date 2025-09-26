@@ -38,9 +38,8 @@ type CreateSignalTypeRequest struct {
 }
 
 type CreateSignalTypeResponse struct {
-	Slug        string `json:"slug" example:"sample-signal--example-org"`
-	SemVer      string `json:"sem_ver" example:"0.0.1"`
-	ResourceURL string `json:"resource_url" example:"http://localhost:8080/api/isn/sample-isn--example-org/signals_types/sample-signal--example-org/v0.0.1"`
+	Slug   string `json:"slug" example:"sample-signal--example-org"`
+	SemVer string `json:"sem_ver" example:"0.0.1"`
 }
 
 type UpdateSignalTypeRequest struct {
@@ -330,17 +329,9 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 		return
 	}
 
-	resourceURL := fmt.Sprintf("%s/api/isn/%s/signal_types/%s/v%s",
-		signalsd.GetPublicBaseURL(r),
-		isn.Slug,
-		slug,
-		semVer,
-	)
-
 	responses.RespondWithJSON(w, http.StatusCreated, CreateSignalTypeResponse{
-		Slug:        returnedSignalType.Slug,
-		SemVer:      returnedSignalType.SemVer,
-		ResourceURL: resourceURL,
+		Slug:   returnedSignalType.Slug,
+		SemVer: returnedSignalType.SemVer,
 	})
 }
 

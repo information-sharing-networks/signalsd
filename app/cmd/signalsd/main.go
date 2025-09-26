@@ -189,6 +189,7 @@ func run(mode string) error {
 		slog.String("ENVIRONMENT", cfg.Environment),
 		slog.String("HOST", cfg.Host),
 		slog.Int("PORT", cfg.Port),
+		slog.String("PUBLIC_BASE_URL", cfg.PublicBaseURL),
 		slog.String("LOG_LEVEL", cfg.LogLevel),
 		slog.Duration("READ_TIMEOUT", cfg.ReadTimeout),
 		slog.Duration("WRITE_TIMEOUT", cfg.WriteTimeout),

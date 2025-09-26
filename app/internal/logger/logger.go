@@ -88,6 +88,8 @@ func ParseLogLevel(level string) slog.Level {
 		return slog.LevelWarn
 	case "error":
 		return slog.LevelError
+	case "none":
+		return 100
 	default:
 		return slog.LevelDebug
 	}
