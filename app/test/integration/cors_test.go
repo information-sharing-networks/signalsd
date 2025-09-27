@@ -2,6 +2,9 @@
 
 package integration
 
+// CORS tests
+// Origin validation and enforcement
+// Public vs protected endpoint policies
 import (
 	"context"
 	"net/http"

@@ -2,6 +2,18 @@
 
 package integration
 
+// Auth integration tests
+// These tests verify the authentication and authorization system by running database queries directly
+// and inspecting generated tokens.
+// tests:
+//
+// JWT token structure and claims validation
+// Role-based permissions (owner, admin, member)
+// Explicit permission grants and ISN access control
+// Service account batch handling and client credentials
+// Login flows and refresh token rotation
+// Disabled account handling
+
 import (
 	"context"
 	"fmt"
@@ -20,8 +32,6 @@ import (
 // - Auth database queries
 // - Permission logic
 // - JWT token creation
-//
-// Each test creates an empty temporary database and applies all the migrations so the schema reflects the latest code. The database is dropped after each test.
 func TestPermissions(t *testing.T) {
 	ctx := context.Background()
 	testDB := setupTestDatabase(t, ctx)

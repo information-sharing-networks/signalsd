@@ -2,6 +2,15 @@
 
 package integration
 
+// test environment setup and server lifecycle management.
+//
+// the end-2-end tests start the signalsd http server with a temporary database and runs tests against it.
+// Each test creates an empty temporary database and applies all the migrations so the schema reflects the latest code. The database is dropped after each test.
+//
+// By default the server logs are not included in the test output, you can enable them with:
+//
+//	ENABLE_SERVER_LOGS=true go test -tags=integration -v ./test/integration
+//
 import (
 	"context"
 	"database/sql"
