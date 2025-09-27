@@ -11,7 +11,7 @@ import (
 	"testing"
 )
 
-// checkOriginIsAllowed checks if the given origin is allowed for the given endpoint - all errors are fatal
+// checkOriginIsAllowed checks if the given origin is allowed for the given endpoint
 func checkOriginIsAllowed(t *testing.T, endpoint, origin string) (bool, string) {
 	t.Helper()
 
