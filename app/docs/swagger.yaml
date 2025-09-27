@@ -1776,24 +1776,12 @@ paths:
       - Signal Exchange
   /api/isn/{isn_slug}/signal_types:
     get:
-      description: Get details for the signal types defined on the ISN
+      description: Get details for all the signal types defined on the ISN
       parameters:
       - description: ISN slug
         example: sample-isn--example-org
         in: path
         name: isn_slug
-        required: true
-        type: string
-      - description: signal type slug
-        example: sample-signal--example-org
-        in: path
-        name: signal_type_slug
-        required: true
-        type: string
-      - description: version to be deleted
-        example: 0.0.1
-        in: path
-        name: sem_ver
         required: true
         type: string
       responses:

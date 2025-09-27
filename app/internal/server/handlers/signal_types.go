@@ -233,7 +233,10 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 	}
 
 	//  if this is the first version then the query below returns currentSignalType.semver == "0.0.0"
-	currentSignalType, err := s.queries.GetSemVerAndSchemaForLatestSlugVersion(r.Context(), slug)
+	currentSignalType, err := s.queries.GetLatestSlugVersion(r.Context(), database.GetLatestSlugVersionParams{
+		IsnID: isn.ID,
+		Slug:  slug,
+	})
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
@@ -246,8 +249,9 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 
 	// if there is already a version for this slug, assume the client wants to bump the version and...
 	if currentSignalType.SemVer != "0.0.0" {
-		//... check the signal type was not previously registerd with this schema
+		//... check the signal type was not previously registered with this schema
 		exists, err := s.queries.ExistsSignalTypeWithSlugAndSchema(r.Context(), database.ExistsSignalTypeWithSlugAndSchemaParams{
+			IsnID:     isn.ID,
 			Slug:      slug,
 			SchemaURL: req.SchemaURL,
 		})
@@ -387,7 +391,8 @@ func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *ht
 		return
 	}
 	// check signal def exists
-	signalType, err := s.queries.GetSignalTypeBySlug(r.Context(), database.GetSignalTypeBySlugParams{
+	signalType, err := s.queries.GetSignalTypeByIsnAndSlug(r.Context(), database.GetSignalTypeByIsnAndSlugParams{
+		IsnID:  isn.ID,
 		Slug:   signalTypeSlug,
 		SemVer: semVer,
 	})
@@ -531,7 +536,7 @@ func (s *SignalTypeHandler) GetSignalTypeHandler(w http.ResponseWriter, r *http.
 	signalTypeSlug := r.PathValue("signal_type_slug")
 	semVer := r.PathValue("sem_ver")
 	// check isn exists
-	_, err := s.queries.GetIsnBySlug(r.Context(), isnSlug)
+	isn, err := s.queries.GetIsnBySlug(r.Context(), isnSlug)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
@@ -547,7 +552,8 @@ func (s *SignalTypeHandler) GetSignalTypeHandler(w http.ResponseWriter, r *http.
 	}
 
 	// check signal def exists
-	dbSignalType, err := s.queries.GetSignalTypeBySlug(r.Context(), database.GetSignalTypeBySlugParams{
+	dbSignalType, err := s.queries.GetSignalTypeByIsnAndSlug(r.Context(), database.GetSignalTypeByIsnAndSlugParams{
+		IsnID:  isn.ID,
 		Slug:   signalTypeSlug,
 		SemVer: semVer,
 	})
@@ -584,10 +590,8 @@ func (s *SignalTypeHandler) GetSignalTypeHandler(w http.ResponseWriter, r *http.
 // GetSignalTypesHandler godoc
 //
 //	@Summary		Get Signal types
-//	@Description	Get details for the signal types defined on the ISN
-//	@Param			isn_slug			path	string	true	"ISN slug"				example(sample-isn--example-org)
-//	@Param			signal_type_slug	path	string	true	"signal type slug"		example(sample-signal--example-org)
-//	@Param			sem_ver				path	string	true	"version to be deleted"	example(0.0.1)
+//	@Description	Get details for all the signal types defined on the ISN
+//	@Param			isn_slug	path	string	true	"ISN slug"	example(sample-isn--example-org)
 //	@Tags			Signal Type Definitions
 //
 //	@Success		200	{array}	handlers.SignalTypeDetail
@@ -706,7 +710,8 @@ func (s *SignalTypeHandler) DeleteSignalTypeHandler(w http.ResponseWriter, r *ht
 	}
 
 	// check signal type exists
-	signalType, err := s.queries.GetSignalTypeBySlug(r.Context(), database.GetSignalTypeBySlugParams{
+	signalType, err := s.queries.GetSignalTypeByIsnAndSlug(r.Context(), database.GetSignalTypeByIsnAndSlugParams{
+		IsnID:  isn.ID,
 		Slug:   signalTypeSlug,
 		SemVer: semVer,
 	})
@@ -721,12 +726,6 @@ func (s *SignalTypeHandler) DeleteSignalTypeHandler(w http.ResponseWriter, r *ht
 		)
 
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
-	}
-
-	// verify signal type belongs to the ISN
-	if signalType.IsnID != isn.ID {
-		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("Signal type %s/v%s not found in ISN %s", signalTypeSlug, semVer, isnSlug))
 		return
 	}
 

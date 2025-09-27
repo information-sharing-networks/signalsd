@@ -1180,7 +1180,7 @@ const docTemplate = `{
         },
         "/api/isn/{isn_slug}/signal_types": {
             "get": {
-                "description": "Get details for the signal types defined on the ISN",
+                "description": "Get details for all the signal types defined on the ISN",
                 "tags": [
                     "Signal Type Definitions"
                 ],
@@ -1191,22 +1191,6 @@ const docTemplate = `{
                         "example": "sample-isn--example-org",
                         "description": "ISN slug",
                         "name": "isn_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "example": "sample-signal--example-org",
-                        "description": "signal type slug",
-                        "name": "signal_type_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "example": "0.0.1",
-                        "description": "version to be deleted",
-                        "name": "sem_ver",
                         "in": "path",
                         "required": true
                     }

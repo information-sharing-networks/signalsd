@@ -234,10 +234,9 @@ func (s *Server) registerAdminRoutes() {
 
 			// isn admin endpoints
 			r.Route("/isn", func(r chi.Router) {
+				r.Use(s.authService.RequireValidAccessToken)
 
 				r.Group(func(r chi.Router) {
-
-					r.Use(s.authService.RequireValidAccessToken)
 
 					// ISN configuration
 					r.Group(func(r chi.Router) {
@@ -274,7 +273,7 @@ func (s *Server) registerAdminRoutes() {
 					// view ISN and signal type details
 					r.Get("/", isn.GetIsnsHandler)
 					r.Get("/{isn_slug}", isn.GetIsnHandler)
-					r.Get("/{isn_slug}/signal_types", signalTypes.GetSignalTypesHandler)
+					r.Get("/signal_types", signalTypes.GetSignalTypesHandler)
 					r.Get("/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}", signalTypes.GetSignalTypeHandler)
 				})
 
