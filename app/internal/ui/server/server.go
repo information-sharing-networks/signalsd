@@ -94,7 +94,7 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 		r.Get("/ui-api/clear-alerts", handlerService.ClearAlerts)
 
 		// render dropdown list options
-		r.Post("/ui-api/signal-type-options", handlerService.RenderSignalTypeOptions)
+		r.Post("/ui-api/signal-type-slug-options", handlerService.RenderSignalTypeSlugOptions)
 		r.Post("/ui-api/signal-type-version-options", handlerService.RenderSignalTypeVersionOptions)
 		r.Get("/ui-api/service-account-options", handlerService.RenderServiceAccountOptions)
 		r.Get("/ui-api/user-options", handlerService.RenderUserOptionsGeneratePasswordLink)

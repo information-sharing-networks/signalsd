@@ -55,7 +55,7 @@ func SignalSearchPage(isns []types.IsnOption, perms map[string]types.IsnPerm, re
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Search Signals</h1><div class=\"card mb-6\"><div class=\"card-body\"><form hx-post=\"/ui-api/search-signals\" hx-target=\"#search-results\" class=\"space-y-4\"><div class=\"grid grid-cols-1 md:grid-cols-3\"><div class=\"form-group\"><label for=\"isn-slug\" class=\"form-label\">ISN</label> <select id=\"isn-slug\" name=\"isn-slug\" required hx-post=\"/ui-api/signal-type-options\" hx-target=\"#signal-type-slug\" hx-swap=\"outerHTML\" hx-trigger=\"change\" hx-include=\"#isn-slug, this\" class=\"form-select\"><option value=\"\">Select ISN...</option> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Search Signals</h1><div class=\"card mb-6\"><div class=\"card-body\"><form hx-post=\"/ui-api/search-signals\" hx-target=\"#search-results\" class=\"space-y-4\"><div class=\"grid grid-cols-1 md:grid-cols-3\"><div class=\"form-group\"><label for=\"isn-slug\" class=\"form-label\">ISN</label> <select id=\"isn-slug\" name=\"isn-slug\" required hx-post=\"/ui-api/signal-type-slug-options\" hx-target=\"#signal-type-slug\" hx-swap=\"outerHTML\" hx-trigger=\"change\" hx-include=\"#isn-slug, this\" class=\"form-select\"><option value=\"\">Select ISN...</option> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

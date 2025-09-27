@@ -5,7 +5,7 @@ import (
 )
 
 // CreateSignalTypePage renders the signal type management page
-templ CreateSignalTypePage(isns []types.IsnOption) {
+templ CreateSignalTypePage(isns []types.IsnOption, signalTypePaths []types.SignalTypePathOption) {
 	@BaseLayout("Create New Signal Type") {
 		@Navigation()
 		<div class="page-container">
