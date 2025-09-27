@@ -617,6 +617,7 @@ func (s *SignalTypeHandler) GetSignalTypesHandler(w http.ResponseWriter, r *http
 		return
 	}
 
+	fmt.Printf("Debug !!!!: isn.ID = %s\n", isn.ID)
 	dbSignalTypes, err := s.queries.GetSignalTypesByIsnID(r.Context(), isn.ID)
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),

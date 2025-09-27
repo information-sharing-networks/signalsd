@@ -192,7 +192,6 @@ type GetLatestSlugVersionRow struct {
 	SchemaURL string `json:"schema_url"`
 }
 
-// TODO Debug
 // if there are no signals defs for the supplied slug, this query returns an empty string for schema_url and a sem_ver of '0.0.0'
 func (q *Queries) GetLatestSlugVersion(ctx context.Context, arg GetLatestSlugVersionParams) (GetLatestSlugVersionRow, error) {
 	row := q.db.QueryRow(ctx, GetLatestSlugVersion, arg.IsnID, arg.Slug)

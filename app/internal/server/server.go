@@ -273,7 +273,7 @@ func (s *Server) registerAdminRoutes() {
 					// view ISN and signal type details
 					r.Get("/", isn.GetIsnsHandler)
 					r.Get("/{isn_slug}", isn.GetIsnHandler)
-					r.Get("/signal_types", signalTypes.GetSignalTypesHandler)
+					r.Get("/{isn_slug}/signal_types", signalTypes.GetSignalTypesHandler)
 					r.Get("/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}", signalTypes.GetSignalTypeHandler)
 				})
 

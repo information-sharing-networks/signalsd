@@ -48,7 +48,6 @@ SELECT
 FROM signal_types st
 WHERE st.isn_id = $1;
 
--- TODO Debug
 -- if there are no signals defs for the supplied slug, this query returns an empty string for schema_url and a sem_ver of '0.0.0' 
 -- name: GetLatestSlugVersion :one
 SELECT '0.0.0' AS sem_ver,
