@@ -40,24 +40,6 @@ func (h *HandlerService) getIsnOptions(isnPerms map[string]types.IsnPerm, filter
 	return isns
 }
 
-// getSignalTypePathOptions is a helper that returns a list of signal types for the dropdown list.
-// supply a nil isnSlug to get all the signal types available for the user
-func (h *HandlerService) getSignalTypePathOptions(isnPerms map[string]types.IsnPerm, isnSlugFilter string) []types.SignalTypePathOption {
-	signalTypePaths := make([]types.SignalTypePathOption, 0)
-	for isnSlug, perm := range isnPerms {
-		if isnSlugFilter != "" && isnSlug != isnSlugFilter {
-			continue
-		}
-		for _, path := range perm.SignalTypePaths {
-			signalTypePaths = append(signalTypePaths, types.SignalTypePathOption{
-				IsnSlug:        isnSlug,
-				SignalTypePath: path,
-			})
-		}
-	}
-	return signalTypePaths
-}
-
 // RenderSignalTypeOptions gets the signal types for the selected ISN and renders the dropdown options
 func (h *HandlerService) RenderSignalTypeSlugOptions(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())

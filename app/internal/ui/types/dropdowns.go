@@ -15,11 +15,6 @@ type SignalTypeSlugOption struct {
 	Slug string `json:"slug"`
 }
 
-type SignalTypePathOption struct {
-	IsnSlug        string `json:"isn_slug"`
-	SignalTypePath string `json:"signal_type_path"`
-}
-
 type VersionOption struct {
 	Version string `json:"version"`
 }
