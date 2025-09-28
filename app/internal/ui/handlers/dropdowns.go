@@ -50,16 +50,17 @@ func (h *HandlerService) RenderSignalTypeOptions(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Get permissions data from context
-	perms, ok := auth.ContextIsnPerms(r.Context())
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
-		reqLogger.Error("Failed to get ISN permissions from context in signal types handler")
+		reqLogger.Error("Failed to get accessTokenDetails from context in signal types handler")
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
+	isnPerms := accessTokenDetails.IsnPerms
+
 	// Get signal types for the selected ISN
-	isnPerm, exists := perms[isnSlug]
+	isnPerm, exists := isnPerms[isnSlug]
 	if !exists {
 		w.WriteHeader(http.StatusForbidden)
 		return
@@ -101,16 +102,16 @@ func (h *HandlerService) RenderSignalTypeVersionOptions(w http.ResponseWriter, r
 		return
 	}
 
-	// Get permissions data from context
-	perms, ok := auth.ContextIsnPerms(r.Context())
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
-		reqLogger.Error("Failed to get ISN permissions from context in versions handler")
+		reqLogger.Error("Failed to get accessTokenDetails from context in versions handler")
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
+	isnPerms := accessTokenDetails.IsnPerms
 
 	// Get signal types for the selected ISN
-	isnPerm, exists := perms[isnSlug]
+	isnPerm, exists := isnPerms[isnSlug]
 	if !exists {
 		w.WriteHeader(http.StatusForbidden)
 		return
@@ -138,8 +139,7 @@ func (h *HandlerService) RenderSignalTypeVersionOptions(w http.ResponseWriter, r
 func (h *HandlerService) RenderUserOptionsGeneratePasswordLink(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
-	// Get access token from context
-	accessToken, ok := auth.ContextAccessToken(r.Context())
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
 		component := templates.ErrorAlert("Authentication required. Please log in again.")
 		if err := component.Render(r.Context(), w); err != nil {
@@ -148,7 +148,7 @@ func (h *HandlerService) RenderUserOptionsGeneratePasswordLink(w http.ResponseWr
 		return
 	}
 	// Get users from API
-	users, err := h.ApiClient.GetUserOptionsList(accessToken)
+	users, err := h.ApiClient.GetUserOptionsList(accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get users", slog.String("error", err.Error()))
 		component := templates.ErrorAlert("Failed to load users. Please try again.")
@@ -168,8 +168,7 @@ func (h *HandlerService) RenderUserOptionsGeneratePasswordLink(w http.ResponseWr
 func (h *HandlerService) RenderServiceAccountOptions(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
-	// Get access token from context
-	accessToken, ok := auth.ContextAccessToken(r.Context())
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
 		component := templates.ErrorAlert("Authentication required. Please log in again.")
 		if err := component.Render(r.Context(), w); err != nil {
@@ -179,7 +178,7 @@ func (h *HandlerService) RenderServiceAccountOptions(w http.ResponseWriter, r *h
 	}
 
 	// Get service accounts from API
-	ServiceAccountOptions, err := h.ApiClient.GetServiceAccountOptionsList(accessToken)
+	ServiceAccountOptions, err := h.ApiClient.GetServiceAccountOptionsList(accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get service accounts", slog.String("error", err.Error()))
 		component := templates.ErrorAlert("Failed to load service accounts. Please try again.")
@@ -210,7 +209,8 @@ func (h *HandlerService) RenderAccountIdentifierField(w http.ResponseWriter, r *
 	}
 
 	// Get access token from context
-	accessToken, ok := auth.ContextAccessToken(r.Context())
+
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
 		component := templates.ErrorAlert("Authentication required. Please log in again.")
 		if err := component.Render(r.Context(), w); err != nil {
@@ -221,7 +221,7 @@ func (h *HandlerService) RenderAccountIdentifierField(w http.ResponseWriter, r *
 
 	switch accountType {
 	case "user":
-		users, err := h.ApiClient.GetUserOptionsList(accessToken)
+		users, err := h.ApiClient.GetUserOptionsList(accessTokenDetails.AccessToken)
 		if err != nil {
 			reqLogger.Error("Failed to get users", slog.String("error", err.Error()))
 			component := templates.ErrorAlert("Failed to load users. Please try again.")
@@ -237,7 +237,7 @@ func (h *HandlerService) RenderAccountIdentifierField(w http.ResponseWriter, r *
 		}
 
 	case "service-account":
-		serviceAccounts, err := h.ApiClient.GetServiceAccountOptionsList(accessToken)
+		serviceAccounts, err := h.ApiClient.GetServiceAccountOptionsList(accessTokenDetails.AccessToken)
 		if err != nil {
 			reqLogger.Error("Failed to get service accounts", slog.String("error", err.Error()))
 			component := templates.ErrorAlert("Failed to load service accounts. Please try again.")

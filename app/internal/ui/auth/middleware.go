@@ -1,60 +1,80 @@
 package auth
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/config"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
 // RequireAuth is middleware that checks authentication and attempts token refresh if needed.
 //
-// This middleware ensures that:
-// 1. All requests have valid authentication (redirects to login if not)
-// 2. Expired tokens are automatically refreshed when possible
-// 3. Fresh cookies are set after token refresh for subsequent requests
-// 4. Authentication data is extracted from cookies and added to request context
-//
-// Handlers can read auth data from context using helper methods.
+// This middleware:
+// Checks for an access token details cookie that was set at login:
+//   - If found and not expired, adds the access token details to the context and allows the request to proceed
+//   - if not found, or the token is expired, it will attempt to refresh the token.
+//   - If the refresh is successful, sets the new access token details/refresh cookie in the browser and adds the access token details to the context and the request is allowed to proceed (otherwise redirects to login)
 func (a *AuthService) RequireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		reqLogger := logger.ContextRequestLogger(r.Context())
-		tokenStatus := a.CheckTokenStatus(r)
+
+		ctx := r.Context()
+		var tokenStatus AccessTokenStatus
+
+		// Extract access token details from cookie
+		accessTokenDetailsCookie, err := r.Cookie(config.AccessTokenDetailsCookieName)
+		if err != nil {
+			tokenStatus = TokenMissing
+
+		} else {
+
+			// Decode the access token details cookie
+			decodedAccessTokenDetails, err := base64.StdEncoding.DecodeString(accessTokenDetailsCookie.Value)
+			if err != nil {
+				reqLogger.Error("could not decode access token detail cookie ", slog.String("error", err.Error()), slog.String("component", "ui.RequireAuth"))
+				redirectToLogin(w, r)
+			}
+
+			accessTokenDetails := &types.AccessTokenDetails{}
+			if err := json.Unmarshal(decodedAccessTokenDetails, accessTokenDetails); err != nil {
+				reqLogger.Error("could not unmarshal access token detail", slog.String("error", err.Error()), slog.String("component", "ui.RequireAuth"))
+				redirectToLogin(w, r)
+			}
+
+			// check the access token status
+			tokenStatus = a.CheckAccessTokenStatus(accessTokenDetails)
+
+			// create context with access token details
+			ctx = ContextWithAccessTokenDetails(ctx, accessTokenDetails)
+		}
 
 		switch tokenStatus {
 		case TokenValid:
-			// Log successful authentication check
 			reqLogger.Debug("Authentication check successful",
 				slog.String("component", "ui.RequireAuth"),
 			)
 
-			// Extract authentication data from cookies and add to context
-			ctx, err := a.addAuthDataToContext(r.Context(), r)
-			if err != nil {
-				reqLogger.Error("Failed to extract authentication data from cookies",
-					slog.String("component", "ui.RequireAuth"),
-					slog.String("error", err.Error()),
-				)
-				redirectToLogin(w, r)
-				return
-			}
-
-			// Authentication is valid, proceed to handler with context
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
-		case TokenMissing, TokenInvalid:
-			reqLogger.Debug("Authentication failed - redirecting to login",
+
+		case TokenInvalid:
+			reqLogger.Error("Authentication failed - invalid access token received - redirecting to login",
 				slog.String("component", "ui.RequireAuth"),
 				slog.String("status", tokenStatus.String()),
 			)
 			redirectToLogin(w, r)
 			return
-		case TokenExpired:
-			// attempt refresh
+
+		case TokenMissing, TokenExpired:
+			// check for a refresh token cookie
 			refreshTokenCookie, err := r.Cookie(signalsd.RefreshTokenCookieName)
 			if err != nil {
-				reqLogger.Error("Failed to get refresh token cookie",
+				reqLogger.Debug("Failed to get refresh token cookie - redirecting to login",
 					slog.String("component", "ui.RequireAuth"),
 					slog.String("error", err.Error()),
 				)
@@ -73,7 +93,7 @@ func (a *AuthService) RequireAuth(next http.Handler) http.Handler {
 				return
 			}
 
-			if err := a.SetAuthCookies(w, accessTokenDetails, newRefreshTokenCookie, a.environment); err != nil {
+			if err := a.SetAuthCookies(w, accessTokenDetails, newRefreshTokenCookie); err != nil {
 				reqLogger.Error("Failed to set authentication cookies after refresh",
 					slog.String("component", "ui.RequireAuth"),
 					slog.String("error", err.Error()),
@@ -82,22 +102,14 @@ func (a *AuthService) RequireAuth(next http.Handler) http.Handler {
 				return
 			}
 
-			reqLogger.Debug("Token refresh successful",
+			// add refreshed access token details to context
+			ctx := ContextWithAccessTokenDetails(r.Context(), accessTokenDetails)
+
+			reqLogger.Info("Token refresh successful",
 				slog.String("component", "ui.RequireAuth"),
+				slog.String("account_id", accessTokenDetails.AccountID),
 			)
 
-			// Extract authentication data from fresh cookies and add to context
-			ctx, err := a.addAuthDataToContext(r.Context(), r)
-			if err != nil {
-				reqLogger.Error("Failed to extract authentication data from refreshed cookies",
-					slog.String("component", "ui.RequireAuth"),
-					slog.String("error", err.Error()),
-				)
-				redirectToLogin(w, r)
-				return
-			}
-
-			// Continue to handler with fresh cookies set and context
 			next.ServeHTTP(w, r.WithContext(ctx))
 		}
 	})
@@ -108,29 +120,25 @@ func (a *AuthService) RequireAdminOrOwnerRole(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		reqLogger := logger.ContextRequestLogger(r.Context())
 
-		accountInfo, ok := ContextAccountInfo(r.Context())
+		accessTokenDetails, ok := ContextAccessTokenDetails(r.Context())
 		if !ok {
-			reqLogger.Error("Could not get accountInfo from context",
-				slog.String("component", "ui.RequireAdminAccess"),
-			)
+			reqLogger.Error("Could not get accessTokenDetails from context", slog.String("component", "ui.RequireAdminOrOwnerAccess"))
 			redirectToAccessDeniedPage(w, r)
 			return
 		}
 
-		if accountInfo.Role != "owner" && accountInfo.Role != "admin" {
+		if accessTokenDetails.Role != "owner" && accessTokenDetails.Role != "admin" {
 			reqLogger.Debug("Access denied - account attempted to access admin feature",
 				slog.String("component", "ui.RequireAdminAccess"),
-				slog.String("account_id", accountInfo.AccountID),
-				slog.String("role", accountInfo.Role),
+				slog.String("account_id", accessTokenDetails.AccountID),
+				slog.String("role", accessTokenDetails.Role),
 			)
 			redirectToAccessDeniedPage(w, r)
 			return
 		}
 
 		// Log successful admin access check
-		reqLogger.Debug("Admin access check successful",
-			slog.String("component", "ui.RequireAdminAccess"),
-		)
+		reqLogger.Debug("Admin access check successful", slog.String("component", "ui.RequireAdminAccess"))
 
 		next.ServeHTTP(w, r)
 	})
@@ -143,27 +151,22 @@ func (a *AuthService) RequireIsnAdmin(next http.Handler) http.Handler {
 
 		reqLogger := logger.ContextRequestLogger(r.Context())
 
-		isnPerms, ok := ContextIsnPerms(r.Context())
+		accessTokenDetails, ok := ContextAccessTokenDetails(r.Context())
 		if !ok {
-			reqLogger.Debug("access denied - user does not have access to any ISNs",
-				slog.String("component", "ui.RequireIsnAccess"),
-			)
-			redirectToNeedIsnAdminPage(w, r)
+			reqLogger.Error("Could not get accessTokenDetails from context", slog.String("component", "ui.RequireIsnAdmin"))
+			redirectToAccessDeniedPage(w, r)
 			return
 		}
-		for perm := range isnPerms {
-			if isnPerms[perm].IsnAdmin {
-				reqLogger.Debug("ISN admin check successful",
-					slog.String("component", "ui.RequireIsnAdmin"),
-				)
+
+		for perm := range accessTokenDetails.IsnPerms {
+			if accessTokenDetails.IsnPerms[perm].IsnAdmin {
+				reqLogger.Debug("ISN admin check successful", slog.String("component", "ui.RequireIsnAdmin"))
 				next.ServeHTTP(w, r)
 				return
 			}
 		}
 
-		reqLogger.Debug("access denied - user does not have admin role for any ISNs",
-			slog.String("component", "ui.RequireIsnAdmin"),
-		)
+		reqLogger.Debug("access denied - user does not have admin role for any ISNs", slog.String("component", "ui.RequireIsnAdmin"))
 		redirectToNeedIsnAdminPage(w, r)
 
 	})
@@ -175,22 +178,39 @@ func (a *AuthService) RequireIsnAccess(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		reqLogger := logger.ContextRequestLogger(r.Context())
 
-		// Check if ISN permissions exist in context
-		// ISN permissions are only added to context if the account has access to one or more ISNs
-		_, ok := ContextIsnPerms(r.Context())
+		// Check if this account has any ISN access
+		accessTokenDetails, ok := ContextAccessTokenDetails(r.Context())
 		if !ok {
-			reqLogger.Debug("access denied - user does not have access to any ISNs",
-				slog.String("component", "ui.RequireIsnAccess"),
-			)
+			reqLogger.Error("Could not get accessTokenDetails from context", slog.String("component", "ui.RequireIsnAccess"))
+			redirectToAccessDeniedPage(w, r)
+			return
+		}
+
+		if len(accessTokenDetails.IsnPerms) == 0 {
+			reqLogger.Debug("access denied - user does not have access to any ISNs", slog.String("component", "ui.RequireIsnAccess"))
 			redirectToNeedIsnAccessPage(w, r)
 			return
 		}
 
-		reqLogger.Debug("ISN access check successful",
-			slog.String("component", "ui.RequireIsnAccess"),
-		)
+		reqLogger.Debug("ISN access check successful", slog.String("component", "ui.RequireIsnAccess"))
 
 		// ISN permissions exist in context = user has access to one or more ISNs, proceed to handler
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (a *AuthService) AddAccountIDToLogContext(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		accessTokenDetails, ok := ContextAccessTokenDetails(r.Context())
+		if !ok {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("account_id", accessTokenDetails.AccountID),
+		)
+
 		next.ServeHTTP(w, r)
 	})
 }

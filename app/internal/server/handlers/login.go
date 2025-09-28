@@ -147,7 +147,7 @@ func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// include the new refresh token in a http-only cookie
-	newCookie := l.authService.NewRefreshTokenCookie(l.environment, refreshToken)
+	newCookie := l.authService.NewRefreshTokenCookie(refreshToken)
 
 	http.SetCookie(w, newCookie)
 

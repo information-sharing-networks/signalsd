@@ -44,7 +44,7 @@ func (h *HandlerService) GeneratePasswordResetLink(w http.ResponseWriter, r *htt
 	email := parts[0]
 
 	// Get access token from context
-	accessToken, ok := auth.ContextAccessToken(r.Context())
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
 		component := templates.ErrorAlert("Authentication required. Please log in again.")
 		if err := component.Render(r.Context(), w); err != nil {
@@ -53,7 +53,7 @@ func (h *HandlerService) GeneratePasswordResetLink(w http.ResponseWriter, r *htt
 		return
 	}
 
-	res, err := h.ApiClient.GeneratePasswordResetLink(accessToken, email)
+	res, err := h.ApiClient.GeneratePasswordResetLink(accessTokenDetails.AccessToken, email)
 	if err != nil {
 		reqLogger.Error("Failed to generate password reset link for user", slog.String("error", err.Error()))
 

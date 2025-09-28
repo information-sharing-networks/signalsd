@@ -16,13 +16,21 @@ import (
 func (h *HandlerService) UpdateIsnAccountPage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
-	// Get user permissions from context
-	isnPerms, ok := auth.ContextIsnPerms(r.Context())
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
-		reqLogger.Error("failed to read IsnPerms from context")
+		reqLogger.Error("failed to read accessTokenDetails from context")
 		return
 	}
 
+	isnPerms := accessTokenDetails.IsnPerms
+
+	if len(isnPerms) == 0 {
+		component := templates.ErrorAlert("You don't have permission to access any ISNs.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
 	// Convert permissions to ISN list for dropdown (only ISNs where user has admin rights)
 	isns := h.getIsnOptions(isnPerms, true, false)
 
@@ -62,7 +70,7 @@ func (h *HandlerService) UpdateIsnAccount(w http.ResponseWriter, r *http.Request
 	}
 
 	// Get access token from context
-	accessToken, ok := auth.ContextAccessToken(r.Context())
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
 		// unexpected - this should be caught by middleware check on ISN access
 		reqLogger.Error("Failed to read access token from context", slog.String("component", "templates.handleAddIsnAccount"))
@@ -75,7 +83,7 @@ func (h *HandlerService) UpdateIsnAccount(w http.ResponseWriter, r *http.Request
 	}
 
 	// Call the API to add the account to the ISN
-	err := h.ApiClient.UpdateIsnAccount(accessToken, isnSlug, accountType, accountIdentifier, permission)
+	err := h.ApiClient.UpdateIsnAccount(accessTokenDetails.AccessToken, isnSlug, accountType, accountIdentifier, permission)
 	if err != nil {
 		reqLogger.Error("Failed to add account to ISN", slog.String("component", "templates.handleAddIsnAccount"), slog.String("error", err.Error()))
 

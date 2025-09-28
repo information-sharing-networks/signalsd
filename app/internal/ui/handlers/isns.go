@@ -40,7 +40,7 @@ func (h *HandlerService) CreateIsn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get access token from context
-	accessToken, ok := auth.ContextAccessToken(r.Context())
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
 		component := templates.ErrorAlert("Authentication required. Please log in again.")
 		if err := component.Render(r.Context(), w); err != nil {
@@ -57,7 +57,7 @@ func (h *HandlerService) CreateIsn(w http.ResponseWriter, r *http.Request) {
 		Visibility: visibility,
 	}
 
-	res, err := h.ApiClient.CreateIsn(accessToken, req)
+	res, err := h.ApiClient.CreateIsn(accessTokenDetails.AccessToken, req)
 	if err != nil {
 		reqLogger.Error("Failed to create ISN", slog.String("error", err.Error()))
 

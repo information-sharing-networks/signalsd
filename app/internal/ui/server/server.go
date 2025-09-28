@@ -70,6 +70,7 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 	router.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("./web/static/"))))
 	router.Get("/login", handlerService.LoginPage)
 	router.Post("/login", handlerService.Login)
+	router.Post("/logout", handlerService.Logout)
 	router.Get("/register", handlerService.RegisterPage)
 	router.Post("/register", handlerService.Register)
 
@@ -79,12 +80,12 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 	// Protected routes
 	router.Group(func(r chi.Router) {
 		r.Use(s.authService.RequireAuth)
+		r.Use(s.authService.AddAccountIDToLogContext)
 
 		// entry point after login
 		r.Get("/dashboard", handlerService.DashboardPage)
 
 		// auth
-		r.Post("/logout", handlerService.Logout)
 		r.Get("/access-denied", handlerService.AccessDeniedPage)
 		r.Get("/need-isn-admin", handlerService.AccessDeniedNeedIsnAdminPage)
 		r.Get("/need-isn-access", handlerService.AccessDeniedNeedIsnAccessPage)
@@ -115,6 +116,7 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 	router.Group(func(r chi.Router) {
 		r.Use(s.authService.RequireAuth)
 		r.Use(s.authService.RequireAdminOrOwnerRole)
+		r.Use(s.authService.AddAccountIDToLogContext)
 
 		//dashboard
 		r.Get("/admin", handlerService.IsnAdminDashboardPage)

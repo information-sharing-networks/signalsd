@@ -871,7 +871,7 @@ info:
 
     ### CSRF Protection
     The refresh token used by the /oauth API endpoints is stored in an HttpOnly cookie (to prevent access by JavaScript)
-    and marked with SameSite=Lax (to prevent it from being sent in cross-site requests, mitigating CSRF).
+    and marked with SameSite=Strict (to prevent it from being sent in cross-site requests, mitigating CSRF).
 
     ### CORS Protection
 
