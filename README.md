@@ -79,7 +79,7 @@ MAX_SIGNAL_PAYLOAD_SIZE=5242880       #  Max payload size (default: 5MB)
 MAX_API_REQUEST_SIZE=65536            #  Max API request size (default: 64KB)
 
 # Security - list sites that are allowed to use the service
-ALLOWED_ORIGINS=*                     #  CORS origins (default: *, comma-separated for multiple)
+ALLOWED_ORIGINS=https://mydomain.com  #  CORS origins (use a pipe seperated list for multiple sites)
 
 # Database Connection Pool (the default used are the same as those used by pgx )
 DB_MAX_CONNECTIONS=4
@@ -133,7 +133,7 @@ PORT=8081 docker compose up app
 ENVIRONMENT=perf DB_MAX_CONNECTIONS=50 DB_MIN_CONNECTIONS=5 RATE_LIMIT_RPS=0 docker compose up app
 
 # Production-like configuration
-ENVIRONMENT=prod PUBLIC_BASE_URL=https://yourdomain.com DB_MAX_CONNECTIONS=25 DB_CONNECT_TIMEOUT=10s RATE_LIMIT_RPS=200 docker compose up app
+ENVIRONMENT=prod PUBLIC_BASE_URL=https://yourdomain.com ALLOWED_ORIGINS=https://yourdomain.com DB_MAX_CONNECTIONS=25 DB_CONNECT_TIMEOUT=10s RATE_LIMIT_RPS=200 docker compose up app
 
 # Rebuild the image when you change:
 # - dockerfile_inline content
@@ -309,7 +309,7 @@ PORT=8081 go run cmd/signalsd/main.go --mode all
 ENVIRONMENT=perf DB_MAX_CONNECTIONS=50 DB_MIN_CONNECTIONS=5 RATE_LIMIT_RPS=0 go run cmd/signalsd/main.go --mode all
 
 # Production-like settings
-PUBLIC_BASE_URL=https://yourdomain.com ENVIRONMENT=prod DB_MAX_CONNECTIONS=25 DB_CONNECT_TIMEOUT=10s go run cmd/signalsd/main.go --mode all
+PUBLIC_BASE_URL=https://yourdomain.com ALLOWED_ORIGINS=https://yourdomain.com ENVIRONMENT=prod DB_MAX_CONNECTIONS=25 DB_CONNECT_TIMEOUT=10s go run cmd/signalsd/main.go --mode all
 ```
 
 ## User Interface
@@ -488,11 +488,13 @@ if you are deploying to a staging environment you need to create a separate data
 - `STAGING_DATABASE_URL`
 - `STAGING_SECRET_KEY`
 
-You need to create a single github environment variable to hold the public base url for your app:
-- `PUBLIC_BASE_URL` (e.g. https://yourdomain.com)
+You need to create two github environment variables: 
+- `PUBLIC_BASE_URL` (e.g. https://yourdomain.com) to hold the public base url for your app
+- `ALLOWED_ORIGINS` (e.g. https://yourdomain.com) to hold a pipe-separated list of allowed CORS origins
 
-If you are deploying to a staging environment you need to create a separate variable to hold the public base url:
+If you are deploying to a staging environment you need to create separate variable to hold these values:
 - `STAGING_PUBLIC_BASE_URL` (e.g. https://staging.yourdomain.com)
+- `STAGING_ALLOWED_ORIGINS` (e.g. https://staging.yourdomain.com)
 
 The public base URL is used by the back-end server when generating password reset and service account setup links.
 

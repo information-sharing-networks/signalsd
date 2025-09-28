@@ -16,6 +16,7 @@ env:
   STAGING_SECRET_KEY: ${{ secrets.STAGING_SECRET_KEY }}
   GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
   STAGING_PUBLIC_BASE_URL: ${{ vars.STAGING_PUBLIC_BASE_URL }}
+  STAGING_ALLOWED_ORIGINS: ${{ vars.STAGING_ALLOWED_ORIGINS }}
 
   # Service configuration
   ENVIRONMENT: staging
@@ -97,6 +98,7 @@ jobs:
           ENV_VARS="${ENV_VARS},ENVIRONMENT=${{ env.ENVIRONMENT }}"
           ENV_VARS="${ENV_VARS},LOG_LEVEL=${{ env.LOG_LEVEL }}"
           ENV_VARS="${ENV_VARS},PUBLIC_BASE_URL=${{ env.STAGING_PUBLIC_BASE_URL }}"
+          ENV_VARS="${ENV_VARS},ALLOWED_ORIGINS=${{ env.STAGING_ALLOWED_ORIGINS }}"
 
           # Add optional configuration variables only if they are set
           if [ -n "${{ vars.DB_MAX_CONNECTIONS }}" ]; then

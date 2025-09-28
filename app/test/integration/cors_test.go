@@ -41,10 +41,12 @@ func checkOriginIsAllowed(t *testing.T, endpoint, origin string) (bool, string) 
 // TestCORS tests that protected endpoints respect ALLOWED_ORIGINS configuration and that untrusted origins are blocked
 func TestCORS(t *testing.T) {
 	// Configure specific allowed origin
-	allowedOrigin := "https://trusted-app.example.com"
+	allowedOrigins := "https://trusted-app.example.com|https://trusted-app2.example.com"
+	allowedOrigin1 := "https://trusted-app.example.com"
+	allowedOrigin2 := "https://trusted-app2.example.com"
 	disallowedOrigin := "https://malicious-site.com"
 
-	t.Setenv("ALLOWED_ORIGINS", allowedOrigin)
+	t.Setenv("ALLOWED_ORIGINS", allowedOrigins)
 
 	ctx := context.Background()
 	testDB := setupTestDatabase(t, ctx)
@@ -57,10 +59,13 @@ func TestCORS(t *testing.T) {
 	defer stopServer()
 
 	t.Run("trusted origin allowed", func(t *testing.T) {
-		// Test trusted origin is allowed
-		allowed, returnedOrigin := checkOriginIsAllowed(t, privateEndpoint, allowedOrigin)
+		allowed, returnedOrigin := checkOriginIsAllowed(t, privateEndpoint, allowedOrigin1)
 		if !allowed {
-			t.Errorf("Expected origin %s to be allowed, but got Access-Control-Allow-Origin: %s", allowedOrigin, returnedOrigin)
+			t.Errorf("Expected origin %s to be allowed, but got Access-Control-Allow-Origin: %s", allowedOrigin1, returnedOrigin)
+		}
+		allowed, returnedOrigin = checkOriginIsAllowed(t, privateEndpoint, allowedOrigin2)
+		if !allowed {
+			t.Errorf("Expected origin %s to be allowed, but got Access-Control-Allow-Origin: %s", allowedOrigin2, returnedOrigin)
 		}
 	})
 

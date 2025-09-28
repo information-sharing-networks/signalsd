@@ -23,7 +23,7 @@ type ServerEnvironment struct {
 	ReadTimeout          time.Duration `env:"READ_TIMEOUT,default=15s"`
 	WriteTimeout         time.Duration `env:"WRITE_TIMEOUT,default=15s"`
 	IdleTimeout          time.Duration `env:"IDLE_TIMEOUT,default=60s"`
-	AllowedOrigins       []string      `env:"ALLOWED_ORIGINS,default=*"`
+	AllowedOrigins       []string      `env:"ALLOWED_ORIGINS,separator=|"`
 	MaxSignalPayloadSize int64         `env:"MAX_SIGNAL_PAYLOAD_SIZE,default=5242880"` // 5MB
 	MaxAPIRequestSize    int64         `env:"MAX_API_REQUEST_SIZE,default=65536"`      // 64KB
 	RateLimitRPS         int32         `env:"RATE_LIMIT_RPS,default=100"`
@@ -203,20 +203,22 @@ func validateConfig(cfg *ServerEnvironment) error {
 		return fmt.Errorf("PUBLIC_BASE_URL should not include a path: %s", cfg.PublicBaseURL)
 	}
 
+	if cfg.AllowedOrigins == nil {
+		if cfg.Environment == "prod" {
+			return fmt.Errorf("ALLOWED_ORIGINS must be set in production")
+		}
+		// default to all origins when not in prod
+		cfg.AllowedOrigins = []string{"*"}
+	}
 	return nil
 }
 
 // createCORSConfigs creates the CORS configurations based on the server config
 func createCORSConfigs(cfg *ServerEnvironment) (*CORSConfigs, error) {
-	var origins []string
-	if len(cfg.AllowedOrigins) == 0 || (len(cfg.AllowedOrigins) == 1 && strings.TrimSpace(cfg.AllowedOrigins[0]) == "*") {
-		origins = []string{"*"}
-	} else {
-		// Trim whitespace from all origins
-		origins = make([]string, len(cfg.AllowedOrigins))
-		for i, origin := range cfg.AllowedOrigins {
-			origins[i] = strings.TrimSpace(origin)
-		}
+	// Trim whitespace from all origins
+	origins := make([]string, len(cfg.AllowedOrigins))
+	for i, origin := range cfg.AllowedOrigins {
+		origins[i] = strings.TrimSpace(origin)
 	}
 
 	publicConfig := cors.Config{
