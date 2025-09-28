@@ -276,8 +276,8 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 					t.Errorf("the refresh token should expire between %v and %v but got : %v", earliestExpiry, latestExpiry, cookieExpiry)
 				}
 
-				if latestRefreshTokenCookie.Path != "/" {
-					t.Errorf("Expected the cookie path to be / but got %v", latestRefreshTokenCookie.Path)
+				if latestRefreshTokenCookie.Path != "/oauth" {
+					t.Errorf("Expected the cookie path to be /oauth but got %v", latestRefreshTokenCookie.Path)
 				}
 				if !latestRefreshTokenCookie.HttpOnly {
 					t.Errorf("httpOnly should be set to true but found :%v ", latestRefreshTokenCookie.HttpOnly)

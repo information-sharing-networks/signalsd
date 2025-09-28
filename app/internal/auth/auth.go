@@ -333,7 +333,7 @@ func (a *AuthService) NewRefreshTokenCookie(environment string, refreshToken str
 	newCookie := &http.Cookie{
 		Name:     signalsd.RefreshTokenCookieName,
 		Value:    refreshToken,
-		Path:     "/",
+		Path:     "/oauth",
 		MaxAge:   int(signalsd.RefreshTokenExpiry.Seconds()),
 		HttpOnly: true,
 		Secure:   isProd,

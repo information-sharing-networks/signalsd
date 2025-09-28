@@ -877,9 +877,9 @@ info:
 
     CORS is used to control which browser-based clients can make cross-origin requests to the API and read responses.
 
-    By default the server will start with ALLOWED_ORIGINS=*
+    the `ALLOWED_ORIGINS` environment variable is used to configure the CORS rules.
 
-    In production, you should restrict ALLOWED_ORIGINS to trusted client origins rather than leaving it as *.
+    In production, you should restrict ALLOWED_ORIGINS to trusted client origins (the server will not start if it is not set)
 
     ## Date/Time Handling:
 
