@@ -119,7 +119,7 @@ func NewServerConfig() (*ServerEnvironment, *CORSConfigs, error) {
 	}
 
 	// default to host/port if not set (the env must be set for production - checked in the validateConfig function)
-	if cfg.Environment != "prod" && cfg.PublicBaseURL == "" {
+	if cfg.Environment != "prod" && cfg.Environment != "staging" && cfg.PublicBaseURL == "" {
 		cfg.PublicBaseURL = fmt.Sprintf("http://%s:%d", cfg.Host, cfg.Port)
 	}
 
