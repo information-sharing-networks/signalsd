@@ -328,7 +328,7 @@ func (a *AuthService) RotateRefreshToken(ctx context.Context) (string, error) {
 }
 func (a *AuthService) NewRefreshTokenCookie(refreshToken string) *http.Cookie {
 
-	isProd := a.environment == "prod" //secure flag only true on prod
+	isProdOrStaging := a.environment == "prod" || a.environment == "staging" //secure flag only true on prod and staging
 
 	newCookie := &http.Cookie{
 		Name:     signalsd.RefreshTokenCookieName,
@@ -336,8 +336,8 @@ func (a *AuthService) NewRefreshTokenCookie(refreshToken string) *http.Cookie {
 		Path:     "/oauth",
 		MaxAge:   int(signalsd.RefreshTokenExpiry.Seconds()),
 		HttpOnly: true,
-		Secure:   isProd,
-		SameSite: http.SameSiteStrictMode,
+		Secure:   isProdOrStaging,
+		SameSite: http.SameSiteLaxMode,
 	}
 
 	return newCookie

@@ -143,7 +143,7 @@ func (a *AuthService) CheckAccessTokenStatus(accessTokenDetails *types.AccessTok
 //   - refresh token cookie (forwarded from signalsd API)
 //   - a cookie containing the access token and account information returned from the access token provided by the server,
 func (a *AuthService) SetAuthCookies(w http.ResponseWriter, accessTokenDetails *types.AccessTokenDetails, refreshTokenCookie *http.Cookie) error {
-	isProd := a.environment == "prod"
+	isProdOrStaging := a.environment == "prod" || a.environment == "staging" //secure flag only true on prod and staging
 
 	accessTokenDetailsJSON, err := json.Marshal(accessTokenDetails)
 	if err != nil {
@@ -158,8 +158,8 @@ func (a *AuthService) SetAuthCookies(w http.ResponseWriter, accessTokenDetails *
 		Value:    encodedAccessTokenDetails,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   isProd,
-		SameSite: http.SameSiteStrictMode,
+		Secure:   isProdOrStaging,
+		SameSite: http.SameSiteLaxMode,
 		MaxAge:   accessTokenDetails.ExpiresIn,
 	})
 
@@ -168,17 +168,17 @@ func (a *AuthService) SetAuthCookies(w http.ResponseWriter, accessTokenDetails *
 		Value:    refreshTokenCookie.Value,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   isProd,
-		SameSite: http.SameSiteStrictMode,
-		MaxAge:   refreshTokenCookie.MaxAge,
+		Secure:   isProdOrStaging,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   accessTokenDetails.ExpiresIn,
 	})
 
 	return nil
 }
 
 // ClearAuthCookies clears all authentication-related cookies
-func (a *AuthService) ClearAuthCookies(w http.ResponseWriter) {
-	isProd := a.environment == "prod"
+func (a *AuthService) ClearAuthCookies(w http.ResponseWriter, environment string) {
+	isProdOrStaging := a.environment == "prod" || a.environment == "staging" //secure flag only true on prod and staging
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     config.AccessTokenDetailsCookieName,
@@ -186,8 +186,8 @@ func (a *AuthService) ClearAuthCookies(w http.ResponseWriter) {
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
-		Secure:   isProd,
-		SameSite: http.SameSiteStrictMode,
+		Secure:   isProdOrStaging,
+		SameSite: http.SameSiteLaxMode,
 	})
 
 	http.SetCookie(w, &http.Cookie{
@@ -196,8 +196,8 @@ func (a *AuthService) ClearAuthCookies(w http.ResponseWriter) {
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
-		Secure:   isProd,
-		SameSite: http.SameSiteStrictMode,
+		Secure:   isProdOrStaging,
+		SameSite: http.SameSiteLaxMode,
 	})
 
 }
@@ -212,8 +212,8 @@ func (a *AuthService) SetLoginEventCookie(w http.ResponseWriter) {
 		Path:     "/",
 		MaxAge:   10,
 		HttpOnly: true,
-		Secure:   isProd,
-		SameSite: http.SameSiteStrictMode,
+		Secure:   isProdOrStaging,
+		SameSite: http.SameSiteLaxMode,
 	})
 }
 
@@ -226,6 +226,6 @@ func (a *AuthService) ClearLoginEventCookie(w http.ResponseWriter) {
 		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   isProd,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode,
 	})
 }
