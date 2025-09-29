@@ -2,12 +2,12 @@
 
 package integration
 
-//e2e tests for
-// Register new service account
-// Service account reissue credentials
+// Tests for user and service account registration via HTTP requests.
 // User registration
-// User login
-// User password reset (admin generated link)
+// Login
+// Password reset (admin generated link)
+// Service account registration
+// Service acccount credential reissue
 import (
 	"bytes"
 	"context"

@@ -246,15 +246,6 @@ definitions:
         example: Sample Signal @example.org
         type: string
     type: object
-  handlers.CreateSignalTypeResponse:
-    properties:
-      sem_ver:
-        example: 0.0.1
-        type: string
-      slug:
-        example: sample-signal--example-org
-        type: string
-    type: object
   handlers.CreateSignalsBatchResponse:
     properties:
       account_id:
@@ -466,6 +457,43 @@ definitions:
       password:
         description: passwords must be at least 11 characters long
         example: lkIB53@6O^Y
+        type: string
+    type: object
+  handlers.NewSignalTypeResponse:
+    properties:
+      sem_ver:
+        example: 0.0.1
+        type: string
+      slug:
+        example: sample-signal--example-org
+        type: string
+    type: object
+  handlers.NewSignalTypeSchemaRequest:
+    properties:
+      bump_type:
+        description: this is used to increment semver for the signal type
+        enum:
+        - major
+        - minor
+        - patch
+        example: patch
+        type: string
+      detail:
+        description: description
+        example: description
+        type: string
+      readme_url:
+        description: 'README file URL: must be a GitHub URL ending in .md'
+        example: https://github.com/user/project/blob/2025.01.01/readme.md
+        type: string
+      schema_url:
+        description: 'JSON schema URL: must be a GitHub URL ending in .json, OR use
+          https://github.com/skip/validation/main/schema.json to disable validation'
+        example: https://github.com/user/project/blob/2025.01.01/schema.json
+        type: string
+      slug:
+        description: unique title
+        example: sample_signal_@example.org
         type: string
     type: object
   handlers.PasswordResetRequest:
@@ -1776,24 +1804,12 @@ paths:
       - Signal Exchange
   /api/isn/{isn_slug}/signal_types:
     get:
-      description: Get details for the signal types defined on the ISN
+      description: Get details for all the signal types defined on the ISN
       parameters:
       - description: ISN slug
         example: sample-isn--example-org
         in: path
         name: isn_slug
-        required: true
-        type: string
-      - description: signal type slug
-        example: sample-signal--example-org
-        in: path
-        name: signal_type_slug
-        required: true
-        type: string
-      - description: version to be deleted
-        example: 0.0.1
-        in: path
-        name: sem_ver
         required: true
         type: string
       responses:
@@ -1824,7 +1840,8 @@ paths:
         Versions
         - A signal type can have multiple versions - these share the same title/slug but have different JSON schemas
         - Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)
-        - Subsequent POSTs to this endpoint that reference a previously submitted title/slug but point to a different schema will increment the version based on the supplied bump_type
+
+        To register a new schema for an existing signal type, use the RegisterNewSignalTypeSchema endpoint
 
         Signal type definitions are referred to like this: /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver} (e.g., /api/isn/sample-isn--example-org/signal_types/sample-signal--example-org/v0.0.1)
       parameters:
@@ -1838,7 +1855,7 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/handlers.CreateSignalTypeResponse'
+            $ref: '#/definitions/handlers.NewSignalTypeResponse'
         "400":
           description: Bad Request
           schema:
@@ -1854,6 +1871,41 @@ paths:
       security:
       - BearerAccessToken: []
       summary: Create signal type
+      tags:
+      - Signal Type Definitions
+  /api/isn/{isn_slug}/signal_types/{signal_type_slug}/schemas:
+    post:
+      description: |-
+        You must specify a schema_url that has not been previously registered for this signal type.
+
+        Use the bump_type (major/minor/patch) parameter to determine how the version number should be incremented.
+      parameters:
+      - description: signal type details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.NewSignalTypeSchemaRequest'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.NewSignalTypeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Registe a new schema for an existing signal type
       tags:
       - Signal Type Definitions
   /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}:

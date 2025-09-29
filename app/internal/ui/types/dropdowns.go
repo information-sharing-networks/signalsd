@@ -11,7 +11,7 @@ type IsnOption struct {
 	Visibility string `json:"visibility"`
 }
 
-type SignalTypeOption struct {
+type SignalTypeSlugOption struct {
 	Slug string `json:"slug"`
 }
 

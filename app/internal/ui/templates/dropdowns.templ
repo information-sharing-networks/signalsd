@@ -5,26 +5,6 @@ import (
     "github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
-// =============================================================================
-// DROPDOWN COMPONENTS NAMING CONVENTION
-// =============================================================================
-//
-// Base Components: [Entity]Selector(data, id, name) - Generic, reusable
-// Context Variants: [Entity]SelectorFor[Context](data) - Specific use cases
-//
-// Examples:
-// - ServiceAccountSelector() - Base component, flexible id/name
-// - ServiceAccountSelectorForReissue() - Specific to reissue credentials form
-// - ServiceAccountSelectorForAccountIdentifier() - Specific to account management
-//
-// This pattern makes it clear:
-// 1. Which component is the base/generic one
-// 2. What specific context each variant is designed for
-// 3. The relationship between components
-// =============================================================================
-
-
-
 
 templ AccountTypeSelector() {
     <select
@@ -179,7 +159,8 @@ templ UserOptionsGeneratePasswordLink(users []types.UserOption) {
 	</div>
 }
 
-templ IsnAccountPermissionsDropdown() {
+templ IsnAccountPermissionSelector() {
+	<label for="permission" class="form-label">Permission Level</label>
     <select
         id="permission"
         name="permission"
@@ -195,6 +176,7 @@ templ IsnAccountPermissionsDropdown() {
 
 // ISN selector dropdown
 templ IsnSelector(isns []types.IsnOption) {
+	<lable for="isn-slug" class="form-label">ISN</lable>
     <select
         id="isn-slug"
         name="isn-slug"
@@ -211,12 +193,12 @@ templ IsnSelector(isns []types.IsnOption) {
 
 
 // the list of available signal types for the selected ISN
-templ SignalTypeOptions(signalTypes []types.SignalTypeOption) {
+templ SignalTypeSlugOptions(signalTypes []types.SignalTypeSlugOption) {
 	<select
 		id="signal-type-slug"
 		name="signal-type-slug"
 		required
-		hx-post="/ui-api/signal-type-version-options"
+		hx-get="/ui-api/signal-type-version-options"
 		hx-target="#sem-ver"
 		hx-swap="outerHTML"
 		hx-trigger="change"

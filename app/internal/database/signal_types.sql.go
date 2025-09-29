@@ -102,17 +102,19 @@ const ExistsSignalTypeWithSlugAndSchema = `-- name: ExistsSignalTypeWithSlugAndS
 SELECT EXISTS
   (SELECT 1
    FROM signal_types
-   WHERE slug = $1
-   AND schema_url = $2) AS EXISTS
+   WHERE isn_id = $1
+   AND slug = $2
+   AND schema_url = $3) AS EXISTS
 `
 
 type ExistsSignalTypeWithSlugAndSchemaParams struct {
-	Slug      string `json:"slug"`
-	SchemaURL string `json:"schema_url"`
+	IsnID     uuid.UUID `json:"isn_id"`
+	Slug      string    `json:"slug"`
+	SchemaURL string    `json:"schema_url"`
 }
 
 func (q *Queries) ExistsSignalTypeWithSlugAndSchema(ctx context.Context, arg ExistsSignalTypeWithSlugAndSchemaParams) (bool, error) {
-	row := q.db.QueryRow(ctx, ExistsSignalTypeWithSlugAndSchema, arg.Slug, arg.SchemaURL)
+	row := q.db.QueryRow(ctx, ExistsSignalTypeWithSlugAndSchema, arg.IsnID, arg.Slug, arg.SchemaURL)
 	var exists bool
 	err := row.Scan(&exists)
 	return exists, err
@@ -159,34 +161,80 @@ func (q *Queries) GetInUseSignalTypesByIsnID(ctx context.Context, isnID uuid.UUI
 	return items, nil
 }
 
-const GetSemVerAndSchemaForLatestSlugVersion = `-- name: GetSemVerAndSchemaForLatestSlugVersion :one
+const GetLatestSlugVersion = `-- name: GetLatestSlugVersion :one
 SELECT '0.0.0' AS sem_ver,
-       '' AS schema_url
+       '' AS schema_url,
+       '' AS title
 WHERE NOT EXISTS
     (SELECT 1
      FROM signal_types st1
-     WHERE st1.slug = $1)
+     WHERE st1.isn_id = $1
+        AND st1.slug = $2)
 UNION ALL
 SELECT st2.sem_ver,
-       st2.schema_url
+       st2.schema_url,
+       st2.title
 FROM signal_types st2
-WHERE st2.slug = $1
+WHERE st2.isn_id = $1
+  AND st2.slug = $2
   AND st2.sem_ver =
     (SELECT max(st3.sem_ver)
      FROM signal_types st3
-     WHERE st3.slug = $1)
+     WHERE st3.isn_id = $1
+        AND st3.slug = $2)
 `
 
-type GetSemVerAndSchemaForLatestSlugVersionRow struct {
+type GetLatestSlugVersionParams struct {
+	IsnID uuid.UUID `json:"isn_id"`
+	Slug  string    `json:"slug"`
+}
+
+type GetLatestSlugVersionRow struct {
 	SemVer    string `json:"sem_ver"`
 	SchemaURL string `json:"schema_url"`
+	Title     string `json:"title"`
 }
 
 // if there are no signals defs for the supplied slug, this query returns an empty string for schema_url and a sem_ver of '0.0.0'
-func (q *Queries) GetSemVerAndSchemaForLatestSlugVersion(ctx context.Context, slug string) (GetSemVerAndSchemaForLatestSlugVersionRow, error) {
-	row := q.db.QueryRow(ctx, GetSemVerAndSchemaForLatestSlugVersion, slug)
-	var i GetSemVerAndSchemaForLatestSlugVersionRow
-	err := row.Scan(&i.SemVer, &i.SchemaURL)
+func (q *Queries) GetLatestSlugVersion(ctx context.Context, arg GetLatestSlugVersionParams) (GetLatestSlugVersionRow, error) {
+	row := q.db.QueryRow(ctx, GetLatestSlugVersion, arg.IsnID, arg.Slug)
+	var i GetLatestSlugVersionRow
+	err := row.Scan(&i.SemVer, &i.SchemaURL, &i.Title)
+	return i, err
+}
+
+const GetSignalTypeByIsnAndSlug = `-- name: GetSignalTypeByIsnAndSlug :one
+
+SELECT st.id, st.created_at, st.updated_at, st.isn_id, st.slug, st.schema_url, st.readme_url, st.title, st.detail, st.sem_ver, st.is_in_use, st.schema_content
+FROM signal_types st
+WHERE st.isn_id = $1
+AND st.slug = $2
+AND st.sem_ver = $3
+`
+
+type GetSignalTypeByIsnAndSlugParams struct {
+	IsnID  uuid.UUID `json:"isn_id"`
+	Slug   string    `json:"slug"`
+	SemVer string    `json:"sem_ver"`
+}
+
+func (q *Queries) GetSignalTypeByIsnAndSlug(ctx context.Context, arg GetSignalTypeByIsnAndSlugParams) (SignalType, error) {
+	row := q.db.QueryRow(ctx, GetSignalTypeByIsnAndSlug, arg.IsnID, arg.Slug, arg.SemVer)
+	var i SignalType
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IsnID,
+		&i.Slug,
+		&i.SchemaURL,
+		&i.ReadmeURL,
+		&i.Title,
+		&i.Detail,
+		&i.SemVer,
+		&i.IsInUse,
+		&i.SchemaContent,
+	)
 	return i, err
 }
 
@@ -228,39 +276,6 @@ func (q *Queries) GetSignalTypeByIsnID(ctx context.Context, isnID uuid.UUID) ([]
 		return nil, err
 	}
 	return items, nil
-}
-
-const GetSignalTypeBySlug = `-- name: GetSignalTypeBySlug :one
-
-SELECT st.id, st.created_at, st.updated_at, st.isn_id, st.slug, st.schema_url, st.readme_url, st.title, st.detail, st.sem_ver, st.is_in_use, st.schema_content
-FROM signal_types st
-WHERE st.slug = $1
-AND st.sem_ver = $2
-`
-
-type GetSignalTypeBySlugParams struct {
-	Slug   string `json:"slug"`
-	SemVer string `json:"sem_ver"`
-}
-
-func (q *Queries) GetSignalTypeBySlug(ctx context.Context, arg GetSignalTypeBySlugParams) (SignalType, error) {
-	row := q.db.QueryRow(ctx, GetSignalTypeBySlug, arg.Slug, arg.SemVer)
-	var i SignalType
-	err := row.Scan(
-		&i.ID,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.IsnID,
-		&i.Slug,
-		&i.SchemaURL,
-		&i.ReadmeURL,
-		&i.Title,
-		&i.Detail,
-		&i.SemVer,
-		&i.IsInUse,
-		&i.SchemaContent,
-	)
-	return i, err
 }
 
 const GetSignalTypes = `-- name: GetSignalTypes :many

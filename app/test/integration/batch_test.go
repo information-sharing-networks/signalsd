@@ -1,8 +1,9 @@
 //go:build integration
 
+package integration
+
 // Integration tests for signal batch functionality
 // Tests service account batch creation, validation, and lifecycle management
-package integration
 
 import (
 	"context"

@@ -1,13 +1,17 @@
 //go:build integration
 
-// this end-2-end test starts the signalsd http server and runs tests against it. By default the server logs are not included in the test output, you can enable them with:
-//
-//	ENABLE_SERVER_LOGS=true go test -tags=integration -v ./test/integration
-//
-// Each test creates an empty temporary database and applies all the migrations so the schema reflects the latest code. The database is dropped after each test.
-//
-// the goal of these tests is to ensure that signals are correctly loaded and can only be seen by authorized users.
 package integration
+
+// Tests signal creation, search, and security controls via HTTP requests.
+//
+// Signal submission (successful and failed scenarios)
+// Schema validation and correlation handling
+// Multi-signal payload processing
+// Signal search with authorization controls
+// Public vs private ISN access
+// Withdrawn signal handling
+// Token validation (expired, malformed, missing)
+// Cross-ISN data leakage prevention
 
 import (
 	"bytes"

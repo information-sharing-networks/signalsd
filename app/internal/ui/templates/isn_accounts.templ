@@ -19,7 +19,6 @@ templ IsnAccountManagementPage(isns []types.IsnOption) {
 					<form hx-post="/ui-api/update-isn-account" hx-target="#update-access-result" class="space-y-4">
 						<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 							<div class="form-group">
-								<label for="isn-slug" class="form-label">ISN</label>
 								@IsnSelector(isns)
 							</div>
 							<div class="form-group">
@@ -32,8 +31,7 @@ templ IsnAccountManagementPage(isns []types.IsnOption) {
 								@AccountIdentifierPlaceholder()
 							</div>
 							<div class="form-group">
-								<label for="permission" class="form-label">Permission Level</label>
-								@IsnAccountPermissionsDropdown()
+								@IsnAccountPermissionSelector()
 							</div>
 						</div>
 						<div class="form-group">

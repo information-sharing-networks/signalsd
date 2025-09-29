@@ -30,7 +30,7 @@ func SecurityHeaders(environment string) func(http.Handler) http.Handler {
 			w.Header().Set("X-XSS-Protection", "1; mode=block")
 			w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 
-			if environment == "prod" {
+			if environment == "prod" || environment == "staging" {
 				w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 			}
 

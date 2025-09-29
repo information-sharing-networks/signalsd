@@ -119,9 +119,12 @@ func NewServerConfig() (*ServerEnvironment, *CORSConfigs, error) {
 	}
 
 	// default to host/port if not set (the env must be set for production - checked in the validateConfig function)
-	if cfg.Environment != "prod" && cfg.PublicBaseURL == "" {
+	if cfg.Environment != "prod" && cfg.Environment != "staging" && cfg.PublicBaseURL == "" {
 		cfg.PublicBaseURL = fmt.Sprintf("http://%s:%d", cfg.Host, cfg.Port)
 	}
+
+	// remove trailing slash from base url (if present)
+	cfg.PublicBaseURL = strings.TrimSuffix(cfg.PublicBaseURL, "/")
 
 	if err := validateConfig(&cfg); err != nil {
 		return nil, nil, err
@@ -138,7 +141,7 @@ func NewServerConfig() (*ServerEnvironment, *CORSConfigs, error) {
 
 // validateConfig checks for required env variables
 func validateConfig(cfg *ServerEnvironment) error {
-	if cfg.Environment == "prod" {
+	if cfg.Environment == "prod" || cfg.Environment == "staging" {
 		if cfg.DatabaseURL == "" {
 			return fmt.Errorf("DATABASE_URL is required in %s environment", cfg.Environment)
 		}
@@ -182,16 +185,16 @@ func validateConfig(cfg *ServerEnvironment) error {
 		return fmt.Errorf("PUBLIC_BASE_URL does not include a valid scheme (http or https): %s", cfg.PublicBaseURL)
 	}
 
-	if cfg.Environment == "prod" {
+	if cfg.Environment == "prod" || cfg.Environment == "staging" {
 
 		if u.Scheme == "http" && u.Hostname() == "localhost" {
-			return fmt.Errorf("PUBLIC_BASE_URL must be set in production")
+			return fmt.Errorf("PUBLIC_BASE_URL must be set in %v", cfg.Environment)
 		}
 		if u.Scheme != "https" {
-			return fmt.Errorf("PUBLIC_BASE_URL must use https in production: %s", cfg.PublicBaseURL)
+			return fmt.Errorf("PUBLIC_BASE_URL must use https in %v: %s", cfg.Environment, cfg.PublicBaseURL)
 		}
 		if u.Port() != "" {
-			return fmt.Errorf("PUBLIC_BASE_URL should not include a port in production: %s", cfg.PublicBaseURL)
+			return fmt.Errorf("PUBLIC_BASE_URL should not include a port in %s: %s", cfg.Environment, cfg.PublicBaseURL)
 		}
 	}
 

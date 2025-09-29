@@ -1,8 +1,8 @@
 //go:build integration
 
-// this packate is used to set up the integration test db.
 package integration
 
+// database helpers
 import (
 	"context"
 	"errors"
@@ -15,8 +15,6 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/server/utils"
 	"github.com/jackc/pgx/v5"
 )
-
-// DATA HELPERS
 
 // createTestAccount creates entries in account and user/service_account tables
 func createTestAccount(t *testing.T, ctx context.Context, queries *database.Queries, role, accountType string, email string) database.GetAccountByIDRow {
