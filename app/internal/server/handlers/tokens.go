@@ -131,7 +131,7 @@ func (a *TokenHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.
 			slog.String("account_type", accountType),
 		)
 
-		newCookie := a.authService.NewRefreshTokenCookie(a.environment, newRefreshToken)
+		newCookie := a.authService.NewRefreshTokenCookie(newRefreshToken)
 
 		http.SetCookie(w, newCookie)
 	}

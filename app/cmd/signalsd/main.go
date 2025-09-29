@@ -83,7 +83,7 @@ import (
 //	@description
 //	@description	### CSRF Protection
 //	@description	The refresh token used by the /oauth API endpoints is stored in an HttpOnly cookie (to prevent access by JavaScript)
-//	@description	and marked with SameSite=Lax (to prevent it from being sent in cross-site requests, mitigating CSRF).
+//	@description	and marked with SameSite=Strict (to prevent it from being sent in cross-site requests, mitigating CSRF).
 //	@description
 //	@description	### CORS Protection
 //	@description
@@ -207,8 +207,8 @@ func run(mode string) error {
 	// cross-origin resource sharing rules for browser based access to the API (based on the ALLOWED_ORIGINS env config) - the cors middleware will ensure that only the listed partner sites can access the protected endpoints.
 	appLogger.Info("CORS allowed origins", slog.Any("origins", cfg.AllowedOrigins))
 
-	if cfg.Environment == "prod" && (len(cfg.AllowedOrigins) == 0 || (len(cfg.AllowedOrigins) == 1 && strings.TrimSpace(cfg.AllowedOrigins[0]) == "*")) {
-		appLogger.Warn("production env is configured to allow all origins for CORS. Use the ALLOWED_ORIGINS env variable to restrict access to specific origins")
+	if len(cfg.AllowedOrigins) == 0 || (len(cfg.AllowedOrigins) == 1 && strings.TrimSpace(cfg.AllowedOrigins[0]) == "*") {
+		appLogger.Warn("env is configured to allow all origins for CORS. Use the ALLOWED_ORIGINS env variable to restrict access to specific origins")
 	}
 
 	// the --mode command line param determines which endpoints should be served: all, admin, signals, signals-read, signals-write, or ui

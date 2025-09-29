@@ -16,13 +16,18 @@ import (
 func (h *HandlerService) CreateSignalTypePage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
-	// Get user permissions from context
-	isnPerms, ok := auth.ContextIsnPerms(r.Context())
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
-		reqLogger.Error("failed to read IsnPerms from context")
+		reqLogger.Error("failed to read accessTokenDetails from context")
 		return
 	}
 
+	isnPerms := accessTokenDetails.IsnPerms
+
+	if len(isnPerms) == 0 {
+		reqLogger.Error("user does not have permission to access any ISNs")
+		return
+	}
 	// populate the isn dropdown list with ISNs where the user is an admin
 	isns := h.getIsnOptions(isnPerms, true, false)
 
@@ -56,7 +61,7 @@ func (h *HandlerService) CreateSignalType(w http.ResponseWriter, r *http.Request
 	}
 
 	// Get access token from context
-	accessToken, ok := auth.ContextAccessToken(r.Context())
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
 		component := templates.ErrorAlert("Authentication required. Please log in again.")
 		if err := component.Render(r.Context(), w); err != nil {
@@ -81,7 +86,7 @@ func (h *HandlerService) CreateSignalType(w http.ResponseWriter, r *http.Request
 	}
 
 	// Call the API to create the signal type
-	response, err := h.ApiClient.CreateSignalType(accessToken, isnSlug, createReq)
+	response, err := h.ApiClient.CreateSignalType(accessTokenDetails.AccessToken, isnSlug, createReq)
 	if err != nil {
 		reqLogger.Error("Failed to create signal type", slog.String("error", err.Error()))
 

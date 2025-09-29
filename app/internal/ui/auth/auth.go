@@ -1,10 +1,8 @@
 package auth
 
 import (
-	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -38,11 +36,11 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 
-// TokenStatus represents the status of an access token used in a UI request
-type TokenStatus int
+// AccessTokenStatus represents the status of an access token used in a UI request
+type AccessTokenStatus int
 
 const (
-	TokenMissing TokenStatus = iota
+	TokenMissing AccessTokenStatus = iota // initial state immediately after login
 	TokenInvalid
 	TokenExpired
 	TokenValid
@@ -50,14 +48,14 @@ const (
 
 var tokenStatusNames = []string{"TokenMissing", "TokenInvalid", "TokenExpired", "TokenValid"}
 
-func (t TokenStatus) String() string {
+func (t AccessTokenStatus) String() string {
 	if t < 0 || int(t) >= len(tokenStatusNames) {
 		return fmt.Sprintf("TokenStatus(%d)", int(t))
 	}
 	return tokenStatusNames[t]
 }
 
-// RefreshToken is a UI-specific method that uses the signalsd backend API to refresh an access token using the supplied refresh token.
+// RefreshToken uses the signalsd backend API to refresh an access token using the supplied refresh token.
 // Returns a new refresh token cookie and access token.
 func (a *AuthService) RefreshToken(refreshTokenCookie *http.Cookie) (*types.AccessTokenDetails, *http.Cookie, error) {
 	url := fmt.Sprintf("%s/oauth/token?grant_type=refresh_token", a.apiBaseURL)
@@ -72,27 +70,27 @@ func (a *AuthService) RefreshToken(refreshTokenCookie *http.Cookie) (*types.Acce
 	// add the refresh token cookie from the browser's request to the API request
 	req.AddCookie(refreshTokenCookie)
 
-	resp, err := a.httpClient.Do(req)
+	res, err := a.httpClient.Do(req)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to make request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer res.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
+	if res.StatusCode != http.StatusOK {
 		var errorResp types.ErrorResponse
-		if err := json.NewDecoder(resp.Body).Decode(&errorResp); err != nil {
-			return nil, nil, fmt.Errorf("token refresh failed with status %d", resp.StatusCode)
+		if err := json.NewDecoder(res.Body).Decode(&errorResp); err != nil {
+			return nil, nil, fmt.Errorf("token refresh failed with status %d", res.StatusCode)
 		}
 		return nil, nil, fmt.Errorf("token refresh failed: %s", errorResp.Message)
 	}
 
-	var refreshResp types.AccessTokenDetails
-	if err := json.NewDecoder(resp.Body).Decode(&refreshResp); err != nil {
+	var accessTokenDetails types.AccessTokenDetails
+	if err := json.NewDecoder(res.Body).Decode(&accessTokenDetails); err != nil {
 		return nil, nil, fmt.Errorf("failed to decode response: %w", err)
 	}
 
 	// Extract the new refresh token cookie from the API response
-	cookies := resp.Cookies()
+	cookies := res.Cookies()
 	var newRefreshTokenCookie *http.Cookie
 	for _, cookie := range cookies {
 		if cookie.Name == signalsd.RefreshTokenCookieName {
@@ -105,35 +103,36 @@ func (a *AuthService) RefreshToken(refreshTokenCookie *http.Cookie) (*types.Acce
 		return nil, nil, fmt.Errorf("new refresh token cookie not found in API response")
 	}
 
-	return &refreshResp, newRefreshTokenCookie, nil
+	return &accessTokenDetails, newRefreshTokenCookie, nil
 }
 
-// CheckTokenStatus checks the status of an access token from the request cookies
-func (a *AuthService) CheckTokenStatus(r *http.Request) TokenStatus {
-	accessTokenCookie, err := r.Cookie(config.AccessTokenCookieName)
-	if err != nil {
+// CheckAccessTokenStatus checks the status of an access token from context
+func (a *AuthService) CheckAccessTokenStatus(accessTokenDetails *types.AccessTokenDetails) AccessTokenStatus {
+
+	if accessTokenDetails == nil {
+
 		return TokenMissing
+	}
+
+	if accessTokenDetails.AccessToken == "" {
+		return TokenInvalid
 	}
 
 	// Parse token without validation to check expiry
 	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
 	claims := &jwt.RegisteredClaims{}
 
-	_, _, err = parser.ParseUnverified(accessTokenCookie.Value, claims)
+	_, _, err := parser.ParseUnverified(accessTokenDetails.AccessToken, claims)
 	if err != nil {
 		return TokenInvalid
 	}
 
-	if claims.ExpiresAt == nil {
-		return TokenInvalid
+	// Check if token is expired (in normal operations the browser will remove the expired cookie and this code will not be reached)
+	if claims.ExpiresAt.Before(time.Now()) {
+		return TokenExpired
 	}
 
-	// Check if token is expired
-	if claims.ExpiresAt.After(time.Now()) {
-		return TokenValid
-	}
-
-	return TokenExpired
+	return TokenValid
 }
 
 // SetAuthCookies sets the authentication-related cookies in the UI HTTP response after authentication
@@ -142,84 +141,53 @@ func (a *AuthService) CheckTokenStatus(r *http.Request) TokenStatus {
 //
 // The following cookies are set:
 //   - refresh token cookie (forwarded from signalsd API)
-//   - a cookie containing the access token provided by the server,
-//   - a cookie containg the isn permissions as JSON.
-//   - a cookie containing the account information (ID, type, role) as JSON.
-func (a *AuthService) SetAuthCookies(w http.ResponseWriter, accessTokenDetails *types.AccessTokenDetails, refreshTokenCookie *http.Cookie, environment string) error {
-	isProd := environment == "prod"
+//   - a cookie containing the access token and account information returned from the access token provided by the server,
+func (a *AuthService) SetAuthCookies(w http.ResponseWriter, accessTokenDetails *types.AccessTokenDetails, refreshTokenCookie *http.Cookie) error {
+	isProd := a.environment == "prod"
 
-	// Set refresh token cookie (from API response)
-	http.SetCookie(w, refreshTokenCookie)
+	accessTokenDetailsJSON, err := json.Marshal(accessTokenDetails)
+	if err != nil {
+		return fmt.Errorf("failed to marshal access token details: %w", err)
+	}
 
-	// Set access token cookie
+	// Base64 encode to avoid cookie encoding issues
+	encodedAccessTokenDetails := base64.StdEncoding.EncodeToString(accessTokenDetailsJSON)
+
 	http.SetCookie(w, &http.Cookie{
-		Name:     config.AccessTokenCookieName,
-		Value:    accessTokenDetails.AccessToken,
+		Name:     config.AccessTokenDetailsCookieName,
+		Value:    encodedAccessTokenDetails,
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   isProd,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: http.SameSiteStrictMode,
 		MaxAge:   accessTokenDetails.ExpiresIn,
 	})
 
-	// Set permissions cookie if permissions exist
-	if len(accessTokenDetails.Perms) > 0 {
-		permsJSON, err := json.Marshal(accessTokenDetails.Perms)
-		if err != nil {
-			return fmt.Errorf("failed to marshal permissions: %w", err)
-		}
-
-		// Base64 encode to avoid cookie encoding issues
-		encodedPerms := base64.StdEncoding.EncodeToString(permsJSON)
-		http.SetCookie(w, &http.Cookie{
-			Name:     config.IsnPermsCookieName,
-			Value:    encodedPerms,
-			Path:     "/",
-			HttpOnly: true,
-			Secure:   isProd,
-			SameSite: http.SameSiteLaxMode,
-			MaxAge:   accessTokenDetails.ExpiresIn,
-		})
-	}
-
-	// Set account information cookie (base64 encoded JSON)
-	accountInfo := types.AccountInfo{
-		AccountID:   accessTokenDetails.AccountID,
-		AccountType: accessTokenDetails.AccountType,
-		Role:        accessTokenDetails.Role,
-	}
-
-	accountInfoJSON, err := json.Marshal(accountInfo)
-	if err != nil {
-		return fmt.Errorf("failed to marshal account information: %w", err)
-	}
-
-	accountInfoBase64 := base64.StdEncoding.EncodeToString(accountInfoJSON)
 	http.SetCookie(w, &http.Cookie{
-		Name:     config.AccountInfoCookieName,
-		Value:    accountInfoBase64,
+		Name:     config.RefreshTokenCookieName,
+		Value:    refreshTokenCookie.Value,
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   isProd,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   accessTokenDetails.ExpiresIn,
+		SameSite: http.SameSiteStrictMode,
+		MaxAge:   refreshTokenCookie.MaxAge,
 	})
 
 	return nil
 }
 
 // ClearAuthCookies clears all authentication-related cookies
-func (a *AuthService) ClearAuthCookies(w http.ResponseWriter, environment string) {
-	isProd := environment == "prod"
+func (a *AuthService) ClearAuthCookies(w http.ResponseWriter) {
+	isProd := a.environment == "prod"
 
 	http.SetCookie(w, &http.Cookie{
-		Name:     config.AccessTokenCookieName,
+		Name:     config.AccessTokenDetailsCookieName,
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   isProd,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: http.SameSiteStrictMode,
 	})
 
 	http.SetCookie(w, &http.Cookie{
@@ -229,82 +197,35 @@ func (a *AuthService) ClearAuthCookies(w http.ResponseWriter, environment string
 		MaxAge:   -1,
 		HttpOnly: true,
 		Secure:   isProd,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: http.SameSiteStrictMode,
 	})
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     config.IsnPermsCookieName,
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-		Secure:   isProd,
-		SameSite: http.SameSiteLaxMode,
-	})
+}
 
+// SetLoginEventCookie sets a cookie to indicate a login event.
+// This cookie is used by the RequireAuth middleware to determine if the auth cookies need to be added to the context
+func (a *AuthService) SetLoginEventCookie(w http.ResponseWriter) {
+	isProd := a.environment == "prod"
 	http.SetCookie(w, &http.Cookie{
-		Name:     config.AccountInfoCookieName,
-		Value:    "",
+		Name:     config.LoginEventCookieName,
+		Value:    "true",
 		Path:     "/",
-		MaxAge:   -1,
+		MaxAge:   10,
 		HttpOnly: true,
 		Secure:   isProd,
-		SameSite: http.SameSiteLaxMode,
+		SameSite: http.SameSiteStrictMode,
 	})
 }
 
-// addAuthDataToContext extracts authentication data from cookies and adds it to the context
-// This is used by RequireAuth middleware to make auth data available to handlers via context
-// The three cookies extracted are:
-//   - access token (required)
-//   - account info (required)
-//   - ISN perms (optional - ISN permissions will not exist for accounts that have not been granted access to any ISNs)
-func (a *AuthService) addAuthDataToContext(ctx context.Context, r *http.Request) (context.Context, error) {
-	// add access token to context
-	accessTokenCookie, err := r.Cookie(config.AccessTokenCookieName)
-	if err != nil {
-		return ctx, fmt.Errorf("access token cookie not found: %w", err)
-	}
-
-	ctx = ContextWithAccessToken(ctx, accessTokenCookie.Value)
-
-	// add account info to context
-	accountInfoCookie, err := r.Cookie(config.AccountInfoCookieName)
-	if err != nil {
-		return nil, fmt.Errorf("error getting account info cookie not found: %w", err)
-	}
-
-	decodedAccountInfo, err := base64.StdEncoding.DecodeString(accountInfoCookie.Value)
-	if err != nil {
-		return nil, fmt.Errorf("error decoding account info cookie: %w", err)
-	}
-
-	accountInfo := &types.AccountInfo{}
-	if err := json.Unmarshal(decodedAccountInfo, accountInfo); err != nil {
-		return nil, err
-	}
-
-	ctx = ContextWithAccountInfo(ctx, accountInfo)
-	// Add isn perms to context
-	permsCookie, err := r.Cookie(config.IsnPermsCookieName)
-	if errors.Is(err, http.ErrNoCookie) {
-		// this is expected - accounts without ISN access will not have this cookie
-		return ctx, nil
-	}
-	if err != nil {
-		return ctx, fmt.Errorf("error getting ISN permissions cookie: %w", err)
-	}
-
-	decodedPerms, err := base64.StdEncoding.DecodeString(permsCookie.Value)
-	if err != nil {
-		return ctx, fmt.Errorf("error decoding ISN permissions cookie: %w", err)
-	}
-
-	var isnPerms map[string]types.IsnPerm
-	if err := json.Unmarshal(decodedPerms, &isnPerms); err != nil {
-		return ctx, fmt.Errorf("error unmarshalling ISN permissions cookie: %w", err)
-	}
-	ctx = ContextWithIsnPerms(ctx, isnPerms)
-
-	return ctx, nil
+func (a *AuthService) ClearLoginEventCookie(w http.ResponseWriter) {
+	isProd := a.environment == "prod"
+	http.SetCookie(w, &http.Cookie{
+		Name:     config.LoginEventCookieName,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   isProd,
+		SameSite: http.SameSiteStrictMode,
+	})
 }

@@ -34,7 +34,7 @@ func (h *HandlerService) CreateServiceAccount(w http.ResponseWriter, r *http.Req
 	}
 
 	// Get access token from context
-	accessToken, ok := auth.ContextAccessToken(r.Context())
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
 		component := templates.ErrorAlert("Authentication required. Please log in again.")
 		if err := component.Render(r.Context(), w); err != nil {
@@ -48,7 +48,7 @@ func (h *HandlerService) CreateServiceAccount(w http.ResponseWriter, r *http.Req
 		ClientContactEmail: email,
 	}
 
-	res, err := h.ApiClient.CreateServiceAccount(accessToken, req)
+	res, err := h.ApiClient.CreateServiceAccount(accessTokenDetails.AccessToken, req)
 	if err != nil {
 		reqLogger.Error("Failed to create service account", slog.String("error", err.Error()))
 
@@ -86,7 +86,7 @@ func (h *HandlerService) ReissueServiceAccount(w http.ResponseWriter, r *http.Re
 	}
 
 	// Get access token from context
-	accessToken, ok := auth.ContextAccessToken(r.Context())
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
 		component := templates.ErrorAlert("Authentication required. Please log in again.")
 		if err := component.Render(r.Context(), w); err != nil {
@@ -99,7 +99,7 @@ func (h *HandlerService) ReissueServiceAccount(w http.ResponseWriter, r *http.Re
 		ClientID: clientID,
 	}
 
-	res, err := h.ApiClient.ReissueServiceAccount(accessToken, req)
+	res, err := h.ApiClient.ReissueServiceAccount(accessTokenDetails.AccessToken, req)
 	if err != nil {
 		reqLogger.Error("Failed to reissue service account credentials", slog.String("error", err.Error()))
 

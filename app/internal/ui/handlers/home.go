@@ -13,7 +13,14 @@ import (
 
 // HomePage handles the root path and redirects to the dashboard if authenticated, login if not
 func (h *HandlerService) HomePage(w http.ResponseWriter, r *http.Request) {
-	status := h.AuthService.CheckTokenStatus(r)
+
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
+	if !ok {
+		h.RedirectToLogin(w, r)
+		return
+	}
+
+	status := h.AuthService.CheckAccessTokenStatus(accessTokenDetails)
 
 	switch status {
 	case auth.TokenValid:
@@ -68,8 +75,8 @@ func (h *HandlerService) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Set all authentication cookies using shared method
-	if err := h.AuthService.SetAuthCookies(w, accessTokenDetails, refreshTokenCookie, h.Environment); err != nil {
+	// Set all authentication cookies
+	if err := h.AuthService.SetAuthCookies(w, accessTokenDetails, refreshTokenCookie); err != nil {
 		reqLogger.Error("Failed to set authentication cookies", slog.String("error", err.Error()))
 
 		component := templates.ErrorAlert("An error occurred. Please try again.")
@@ -79,7 +86,10 @@ func (h *HandlerService) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Login successful - add account log attribute to context so it is included in the final request log
+	// Login successful - set a cookie to indicate a login event
+	h.AuthService.SetLoginEventCookie(w)
+
+	//  add account log attribute to context so it is included in the final request log
 	_ = logger.ContextWithLogAttrs(r.Context(),
 		slog.String("account_id", accessTokenDetails.AccountID),
 	)
@@ -149,7 +159,7 @@ func (h *HandlerService) Register(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *HandlerService) Logout(w http.ResponseWriter, r *http.Request) {
-	h.AuthService.ClearAuthCookies(w, h.Environment)
+	h.AuthService.ClearAuthCookies(w)
 
 	// Redirect to login page
 	if r.Header.Get("HX-Request") == "true" {

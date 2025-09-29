@@ -16,17 +16,24 @@ func (h *HandlerService) SearchSignalsPage(w http.ResponseWriter, r *http.Reques
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Get ISN permissions from context - middleware ensures this exists
-	isnPerms, ok := auth.ContextIsnPerms(r.Context())
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
-		reqLogger.Error("failed to read IsnPerms from context")
+		reqLogger.Error("failed to read accessTokenDetails from context")
+		return
+	}
+
+	insPerms := accessTokenDetails.IsnPerms
+
+	if len(insPerms) == 0 {
+		reqLogger.Error("user does not have permission to access any ISNs")
 		return
 	}
 
 	// Convert permissions to ISN list for dropdown
-	isns := h.getIsnOptions(isnPerms, false, false)
+	isns := h.getIsnOptions(insPerms, false, false)
 
 	// Render search page
-	component := templates.SignalSearchPage(isns, isnPerms, nil)
+	component := templates.SignalSearchPage(isns, insPerms, nil)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render signal search page", slog.String("error", err.Error()))
 	}
@@ -60,9 +67,9 @@ func (h *HandlerService) SearchSignals(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get access token from context
-	accessToken, ok := auth.ContextAccessToken(r.Context())
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
-		reqLogger.Error("Access token not found in context")
+		reqLogger.Error("Access token details not found in context")
 
 		component := templates.ErrorAlert("Authentication required. Please log in again.")
 		if err := component.Render(r.Context(), w); err != nil {
@@ -72,8 +79,8 @@ func (h *HandlerService) SearchSignals(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get user permissions to determine visibility of the isn being searched
-	isnPerms, ok := auth.ContextIsnPerms(r.Context())
-	if !ok {
+	isnPerms := accessTokenDetails.IsnPerms
+	if len(isnPerms) == 0 {
 		component := templates.ErrorAlert("You don't have permission to access this ISN.")
 		if err := component.Render(r.Context(), w); err != nil {
 			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
@@ -82,7 +89,7 @@ func (h *HandlerService) SearchSignals(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Perform search using ISN visibility to determine endpoint
-	searchResp, err := h.ApiClient.SearchSignals(accessToken, params, isnPerms[params.IsnSlug].Visibility)
+	searchResp, err := h.ApiClient.SearchSignals(accessTokenDetails.AccessToken, params, isnPerms[params.IsnSlug].Visibility)
 	if err != nil {
 		reqLogger.Error("Signal search failed", slog.String("error", err.Error()))
 

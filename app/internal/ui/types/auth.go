@@ -15,17 +15,9 @@ type AccessTokenDetails struct {
 	AccountID   string             `json:"account_id"`
 	AccountType string             `json:"account_type"`
 	Role        string             `json:"role"`
-	Perms       map[string]IsnPerm `json:"isn_perms,omitempty"`
+	IsnPerms    map[string]IsnPerm `json:"isn_perms,omitempty"`
 }
 
-// AccountInfo represents the user's account information stored in cookies
-type AccountInfo struct {
-	AccountID   string `json:"account_id"`
-	AccountType string `json:"account_type"`
-	Role        string `json:"role"`
-}
-
-// IsnPerm represents permissions for an ISN
 type IsnPerm struct {
 	Permission      string   `json:"permission"`
 	SignalBatchID   string   `json:"signal_batch_id"`
