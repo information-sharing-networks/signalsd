@@ -24,7 +24,7 @@ templ SignalSearchPage(isns []types.IsnOption, perms map[string]types.IsnPerm, r
 										id="isn-slug"
 										name="isn-slug"
 										required
-										hx-post="/ui-api/signal-type-options"
+										hx-post="/ui-api/signal-type-slug-options"
 										hx-target="#signal-type-slug"
 										hx-swap="outerHTML"
 										hx-trigger="change"
@@ -47,7 +47,7 @@ templ SignalSearchPage(isns []types.IsnOption, perms map[string]types.IsnPerm, r
 									id="signal-type-slug"
 									name="signal-type-slug"
 									required
-									hx-post="/ui-api/signal-type-version-options"
+									hx-get="/ui-api/signal-type-version-options"
 									hx-target="#sem-ver"
 									hx-swap="outerHTML"
 									hx-trigger="change"

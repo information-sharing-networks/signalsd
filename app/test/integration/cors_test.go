@@ -2,13 +2,16 @@
 
 package integration
 
+// CORS tests
+// Origin validation and enforcement
+// Public vs protected endpoint policies
 import (
 	"context"
 	"net/http"
 	"testing"
 )
 
-// checkOriginIsAllowed checks if the given origin is allowed for the given endpoint - all errors are fatal
+// checkOriginIsAllowed checks if the given origin is allowed for the given endpoint
 func checkOriginIsAllowed(t *testing.T, endpoint, origin string) (bool, string) {
 	t.Helper()
 

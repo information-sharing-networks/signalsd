@@ -34,12 +34,13 @@ WHERE st.isn_id = $1;
 
 
 
--- name: GetSignalTypeBySlug :one
+-- name: GetSignalTypeByIsnAndSlug :one
 
 SELECT st.*
 FROM signal_types st
-WHERE st.slug = $1
-AND st.sem_ver = $2;
+WHERE st.isn_id = $1
+AND st.slug = $2
+AND st.sem_ver = $3;
 
 -- name: GetSignalTypeByIsnID :many
 SELECT 
@@ -48,22 +49,27 @@ FROM signal_types st
 WHERE st.isn_id = $1;
 
 -- if there are no signals defs for the supplied slug, this query returns an empty string for schema_url and a sem_ver of '0.0.0' 
--- name: GetSemVerAndSchemaForLatestSlugVersion :one
+-- name: GetLatestSlugVersion :one
 SELECT '0.0.0' AS sem_ver,
-       '' AS schema_url
+       '' AS schema_url,
+       '' AS title
 WHERE NOT EXISTS
     (SELECT 1
      FROM signal_types st1
-     WHERE st1.slug = $1)
+     WHERE st1.isn_id = $1
+        AND st1.slug = $2)
 UNION ALL
 SELECT st2.sem_ver,
-       st2.schema_url
+       st2.schema_url,
+       st2.title
 FROM signal_types st2
-WHERE st2.slug = $1
+WHERE st2.isn_id = $1
+  AND st2.slug = $2
   AND st2.sem_ver =
     (SELECT max(st3.sem_ver)
      FROM signal_types st3
-     WHERE st3.slug = $1);
+     WHERE st3.isn_id = $1
+        AND st3.slug = $2);
 
 -- name: GetInUseSignalTypesByIsnID :many
 -- only returns active signal_types (is_in_use = true)
@@ -76,8 +82,9 @@ AND is_in_use = true;
 SELECT EXISTS
   (SELECT 1
    FROM signal_types
-   WHERE slug = $1
-   AND schema_url = $2) AS EXISTS;
+   WHERE isn_id = $1
+   AND slug = $2
+   AND schema_url = $3) AS EXISTS;
 
 
 

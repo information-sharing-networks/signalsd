@@ -234,10 +234,9 @@ func (s *Server) registerAdminRoutes() {
 
 			// isn admin endpoints
 			r.Route("/isn", func(r chi.Router) {
+				r.Use(s.authService.RequireValidAccessToken)
 
 				r.Group(func(r chi.Router) {
-
-					r.Use(s.authService.RequireValidAccessToken)
 
 					// ISN configuration
 					r.Group(func(r chi.Router) {
@@ -251,6 +250,7 @@ func (s *Server) registerAdminRoutes() {
 
 						// signal types managment
 						r.Post("/{isn_slug}/signal_types", signalTypes.CreateSignalTypeHandler)
+						r.Post("/{isn_slug}/signal_types/{signal_type_slug}/schemas", signalTypes.NewSignalTypeSchemaHandler)
 						r.Put("/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}", signalTypes.UpdateSignalTypeHandler)
 						r.Delete("/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}", signalTypes.DeleteSignalTypeHandler)
 

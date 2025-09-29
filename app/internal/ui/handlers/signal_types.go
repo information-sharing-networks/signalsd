@@ -52,7 +52,7 @@ func (h *HandlerService) CreateSignalType(w http.ResponseWriter, r *http.Request
 	detail := r.FormValue("detail")
 
 	// Validate required fields
-	if isnSlug == "" || title == "" || schemaURL == "" || bumpType == "" {
+	if isnSlug == "" || title == "" || schemaURL == "" || bumpType == "" || readmeURL == "" || detail == "" {
 		component := templates.ErrorAlert("Please fill in all required fields.")
 		if err := component.Render(r.Context(), w); err != nil {
 			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
@@ -72,23 +72,85 @@ func (h *HandlerService) CreateSignalType(w http.ResponseWriter, r *http.Request
 
 	// Prepare request
 	createReq := client.CreateSignalTypeRequest{
+		IsnSlug:   isnSlug,
 		SchemaURL: schemaURL,
 		Title:     title,
 		BumpType:  bumpType,
-	}
-
-	// Add optional fields if provided
-	if readmeURL != "" {
-		createReq.ReadmeURL = &readmeURL
-	}
-	if detail != "" {
-		createReq.Detail = &detail
+		ReadmeURL: readmeURL,
+		Detail:    detail,
 	}
 
 	// Call the API to create the signal type
-	response, err := h.ApiClient.CreateSignalType(accessTokenDetails.AccessToken, isnSlug, createReq)
+	response, err := h.ApiClient.CreateSignalType(accessTokenDetails.AccessToken, createReq)
 	if err != nil {
 		reqLogger.Error("Failed to create signal type", slog.String("error", err.Error()))
+
+		var msg string
+		if ce, ok := err.(*client.ClientError); ok {
+			msg = ce.UserError()
+		} else {
+			msg = "An error occurred. Please try again."
+		}
+
+		component := templates.ErrorAlert(msg)
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	// Success response
+	component := templates.SignalTypeCreationSuccess(*response)
+	if err := component.Render(r.Context(), w); err != nil {
+		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
+	}
+}
+
+// NewSignalTypeSchema handles the form submission to register a new schema for an existing signal type
+// Use with RequireAdminOrOwnerRole and RequireIsnAdmin middleware
+func (h *HandlerService) NewSignalTypeSchema(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	// Parse form data
+	isnSlug := r.FormValue("isn-slug")
+	slug := r.FormValue("signal-type-slug")
+	schemaURL := r.FormValue("schema-url")
+	bumpType := r.FormValue("bump-type")
+	readmeURL := r.FormValue("readme-url")
+	detail := r.FormValue("detail")
+
+	if isnSlug == "" || slug == "" || schemaURL == "" || bumpType == "" || readmeURL == "" || detail == "" {
+		component := templates.ErrorAlert("Please fill in all required fields.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	// Get access token from context
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
+	if !ok {
+		component := templates.ErrorAlert("Authentication required. Please log in again.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	// Prepare request
+	createReq := client.NewSignalTypeSchemaRequest{
+		IsnSlug:   isnSlug,
+		SchemaURL: schemaURL,
+		Slug:      slug,
+		BumpType:  bumpType,
+		ReadmeURL: readmeURL,
+		Detail:    detail,
+	}
+
+	// Call the API to create the signal type
+	response, err := h.ApiClient.NewSignalTypeSchema(accessTokenDetails.AccessToken, createReq)
+	if err != nil {
+		reqLogger.Error("Failed to register new schema for signal type", slog.String("error", err.Error()))
 
 		var msg string
 		if ce, ok := err.(*client.ClientError); ok {

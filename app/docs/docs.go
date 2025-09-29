@@ -1180,7 +1180,7 @@ const docTemplate = `{
         },
         "/api/isn/{isn_slug}/signal_types": {
             "get": {
-                "description": "Get details for the signal types defined on the ISN",
+                "description": "Get details for all the signal types defined on the ISN",
                 "tags": [
                     "Signal Type Definitions"
                 ],
@@ -1191,22 +1191,6 @@ const docTemplate = `{
                         "example": "sample-isn--example-org",
                         "description": "ISN slug",
                         "name": "isn_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "example": "sample-signal--example-org",
-                        "description": "signal type slug",
-                        "name": "signal_type_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "example": "0.0.1",
-                        "description": "version to be deleted",
-                        "name": "sem_ver",
                         "in": "path",
                         "required": true
                     }
@@ -1229,7 +1213,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Signal types specify a record that can be shared over the ISN\n- Each type has a unique title and this is used to create a URL-friendly slug\n- The title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.\n- The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading\n\nSchema URL Requirements\n- Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)\n- To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json\n\nReadme URL requirements\n- Must be a link to a file ending .md on a public github repo.\n- Use the special URL: https://github.com/skip/readme/main/readme.md to indicate there is no readme\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas\n- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)\n- Subsequent POSTs to this endpoint that reference a previously submitted title/slug but point to a different schema will increment the version based on the supplied bump_type\n\nSignal type definitions are referred to like this: /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver} (e.g., /api/isn/sample-isn--example-org/signal_types/sample-signal--example-org/v0.0.1)\n",
+                "description": "Signal types specify a record that can be shared over the ISN\n- Each type has a unique title and this is used to create a URL-friendly slug\n- The title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.\n- The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading\n\nSchema URL Requirements\n- Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)\n- To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json\n\nReadme URL requirements\n- Must be a link to a file ending .md on a public github repo.\n- Use the special URL: https://github.com/skip/readme/main/readme.md to indicate there is no readme\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas\n- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)\n\nTo register a new schema for an existing signal type, use the RegisterNewSignalTypeSchema endpoint\n\nSignal type definitions are referred to like this: /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver} (e.g., /api/isn/sample-isn--example-org/signal_types/sample-signal--example-org/v0.0.1)\n",
                 "tags": [
                     "Signal Type Definitions"
                 ],
@@ -1249,7 +1233,58 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/handlers.CreateSignalTypeResponse"
+                            "$ref": "#/definitions/handlers.NewSignalTypeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/isn/{isn_slug}/signal_types/{signal_type_slug}/schemas": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "You must specify a schema_url that has not been previously registered for this signal type.\n\nUse the bump_type (major/minor/patch) parameter to determine how the version number should be incremented.",
+                "tags": [
+                    "Signal Type Definitions"
+                ],
+                "summary": "Registe a new schema for an existing signal type",
+                "parameters": [
+                    {
+                        "description": "signal type details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.NewSignalTypeSchemaRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.NewSignalTypeResponse"
                         }
                     },
                     "400": {
@@ -2493,19 +2528,6 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.CreateSignalTypeResponse": {
-            "type": "object",
-            "properties": {
-                "sem_ver": {
-                    "type": "string",
-                    "example": "0.0.1"
-                },
-                "slug": {
-                    "type": "string",
-                    "example": "sample-signal--example-org"
-                }
-            }
-        },
         "handlers.CreateSignalsBatchResponse": {
             "type": "object",
             "properties": {
@@ -2805,6 +2827,54 @@ const docTemplate = `{
                     "description": "passwords must be at least 11 characters long",
                     "type": "string",
                     "example": "lkIB53@6O^Y"
+                }
+            }
+        },
+        "handlers.NewSignalTypeResponse": {
+            "type": "object",
+            "properties": {
+                "sem_ver": {
+                    "type": "string",
+                    "example": "0.0.1"
+                },
+                "slug": {
+                    "type": "string",
+                    "example": "sample-signal--example-org"
+                }
+            }
+        },
+        "handlers.NewSignalTypeSchemaRequest": {
+            "type": "object",
+            "properties": {
+                "bump_type": {
+                    "description": "this is used to increment semver for the signal type",
+                    "type": "string",
+                    "enum": [
+                        "major",
+                        "minor",
+                        "patch"
+                    ],
+                    "example": "patch"
+                },
+                "detail": {
+                    "description": "description",
+                    "type": "string",
+                    "example": "description"
+                },
+                "readme_url": {
+                    "description": "README file URL: must be a GitHub URL ending in .md",
+                    "type": "string",
+                    "example": "https://github.com/user/project/blob/2025.01.01/readme.md"
+                },
+                "schema_url": {
+                    "description": "JSON schema URL: must be a GitHub URL ending in .json, OR use https://github.com/skip/validation/main/schema.json to disable validation",
+                    "type": "string",
+                    "example": "https://github.com/user/project/blob/2025.01.01/schema.json"
+                },
+                "slug": {
+                    "description": "unique title",
+                    "type": "string",
+                    "example": "sample_signal_@example.org"
                 }
             }
         },

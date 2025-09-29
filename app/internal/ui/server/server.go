@@ -94,8 +94,9 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 		r.Get("/ui-api/clear-alerts", handlerService.ClearAlerts)
 
 		// render dropdown list options
-		r.Post("/ui-api/signal-type-options", handlerService.RenderSignalTypeOptions)
-		r.Post("/ui-api/signal-type-version-options", handlerService.RenderSignalTypeVersionOptions)
+		r.Get("/ui-api/signal-type-slug-options", handlerService.RenderSignalTypeSlugOptions)
+		r.Get("/ui-api/signal-type-version-options", handlerService.RenderSignalTypeVersionOptions)
+		r.Get("/ui-api/signal-type-options", handlerService.RenderSignalTypeOptions)
 		r.Get("/ui-api/service-account-options", handlerService.RenderServiceAccountOptions)
 		r.Get("/ui-api/user-options", handlerService.RenderUserOptionsGeneratePasswordLink)
 
@@ -144,6 +145,7 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 
 			r.Get("/admin/signal-types", handlerService.CreateSignalTypePage)
 			r.Post("/ui-api/create-signal-type", handlerService.CreateSignalType)
+			r.Post("/ui-api/new-signal-type-schema", handlerService.NewSignalTypeSchema)
 
 			r.Get("/admin/isn-accounts", handlerService.UpdateIsnAccountPage)
 			r.Post("/ui-api/update-isn-account", handlerService.UpdateIsnAccount)

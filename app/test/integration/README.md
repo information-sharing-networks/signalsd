@@ -27,7 +27,7 @@ These tests verify the authentication and authorization system by running databa
 - ✅ Disabled account handling
 
 
-### 2. User & Service Account Registration (`register_login_reset_test.go`)
+### 2. User & Service Account Registration (`account_test.go`)
 Tests for user and service account registration via HTTP requests.
 
 - ✅ User registration 
@@ -64,10 +64,6 @@ Tests signal creation, search, and security controls via HTTP requests.
 - ✅ Batch creation and automatic closure
 - ✅ Service account submission requirements
 - ✅ Batch validation and error handling
-
-**TODO**
-- Rate limiting integration tests (unit tests exist)
-- ISN admin endpoints (auth is tested but HTTP handling not yet implemented)
 
 ### 6. CORS (`cors_test.go`)
 

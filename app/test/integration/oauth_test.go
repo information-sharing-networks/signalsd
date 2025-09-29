@@ -1,8 +1,14 @@
 //go:build integration
 
-// OAuth endpoint integration tests
-// Tests the HTTP-level OAuth flows including middleware routing and request/response handling
 package integration
+
+// Tests OAuth token generation and revocation via HTTP requests.
+//
+// Client credentials grant (service accounts)
+// Refresh token grant (web users)
+// Token revocation for both account types
+// Cookie handling and rotation
+// Error response validation
 
 import (
 	"bytes"

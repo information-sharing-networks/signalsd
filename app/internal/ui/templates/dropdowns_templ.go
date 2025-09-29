@@ -13,23 +13,6 @@ import (
 	"strings"
 )
 
-// =============================================================================
-// DROPDOWN COMPONENTS NAMING CONVENTION
-// =============================================================================
-//
-// Base Components: [Entity]Selector(data, id, name) - Generic, reusable
-// Context Variants: [Entity]SelectorFor[Context](data) - Specific use cases
-//
-// Examples:
-// - ServiceAccountSelector() - Base component, flexible id/name
-// - ServiceAccountSelectorForReissue() - Specific to reissue credentials form
-// - ServiceAccountSelectorForAccountIdentifier() - Specific to account management
-//
-// This pattern makes it clear:
-// 1. Which component is the base/generic one
-// 2. What specific context each variant is designed for
-// 3. The relationship between components
-// =============================================================================
 func AccountTypeSelector() templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -122,7 +105,7 @@ func UserSelector(users []types.UserOption, id, name string) templ.Component {
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(id)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 68, Col: 15}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 48, Col: 15}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -135,7 +118,7 @@ func UserSelector(users []types.UserOption, id, name string) templ.Component {
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 69, Col: 19}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 49, Col: 19}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
@@ -153,7 +136,7 @@ func UserSelector(users []types.UserOption, id, name string) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(user.Email)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 75, Col: 38}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 55, Col: 38}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -166,7 +149,7 @@ func UserSelector(users []types.UserOption, id, name string) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(user.Email)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 75, Col: 53}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 55, Col: 53}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -179,7 +162,7 @@ func UserSelector(users []types.UserOption, id, name string) templ.Component {
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(user.UserRole)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 75, Col: 72}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 55, Col: 72}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
@@ -269,7 +252,7 @@ func ServiceAccountSelector(serviceAccounts []types.ServiceAccountOption, id, na
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(id)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 94, Col: 9}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 74, Col: 9}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {
@@ -282,7 +265,7 @@ func ServiceAccountSelector(serviceAccounts []types.ServiceAccountOption, id, na
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 95, Col: 13}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 75, Col: 13}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
@@ -300,7 +283,7 @@ func ServiceAccountSelector(serviceAccounts []types.ServiceAccountOption, id, na
 			var templ_7745c5c3_Var13 string
 			templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(account.ClientID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 101, Col: 35}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 81, Col: 35}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 			if templ_7745c5c3_Err != nil {
@@ -313,7 +296,7 @@ func ServiceAccountSelector(serviceAccounts []types.ServiceAccountOption, id, na
 			var templ_7745c5c3_Var14 string
 			templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(account.ClientOrganization)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 101, Col: 66}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 81, Col: 66}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 			if templ_7745c5c3_Err != nil {
@@ -326,7 +309,7 @@ func ServiceAccountSelector(serviceAccounts []types.ServiceAccountOption, id, na
 			var templ_7745c5c3_Var15 string
 			templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(account.ClientContactEmail)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 101, Col: 99}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 81, Col: 99}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 			if templ_7745c5c3_Err != nil {
@@ -339,7 +322,7 @@ func ServiceAccountSelector(serviceAccounts []types.ServiceAccountOption, id, na
 			var templ_7745c5c3_Var16 string
 			templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(account.ClientID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 101, Col: 121}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 81, Col: 121}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 			if templ_7745c5c3_Err != nil {
@@ -430,7 +413,7 @@ func ServiceAccountSelectorForReissue(serviceAccounts []types.ServiceAccountOpti
 			var templ_7745c5c3_Var19 string
 			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(account.ClientID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 128, Col: 35}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 108, Col: 35}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 			if templ_7745c5c3_Err != nil {
@@ -443,7 +426,7 @@ func ServiceAccountSelectorForReissue(serviceAccounts []types.ServiceAccountOpti
 			var templ_7745c5c3_Var20 string
 			templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(account.ClientOrganization)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 128, Col: 66}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 108, Col: 66}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 			if templ_7745c5c3_Err != nil {
@@ -456,7 +439,7 @@ func ServiceAccountSelectorForReissue(serviceAccounts []types.ServiceAccountOpti
 			var templ_7745c5c3_Var21 string
 			templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(account.ClientContactEmail)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 128, Col: 99}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 108, Col: 99}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 			if templ_7745c5c3_Err != nil {
@@ -469,7 +452,7 @@ func ServiceAccountSelectorForReissue(serviceAccounts []types.ServiceAccountOpti
 			var templ_7745c5c3_Var22 string
 			templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(account.ClientID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 128, Col: 121}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 108, Col: 121}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 			if templ_7745c5c3_Err != nil {
@@ -552,7 +535,7 @@ func UserOptionsGeneratePasswordLink(users []types.UserOption) templ.Component {
 			var templ_7745c5c3_Var25 string
 			templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(user.Email + "|" + user.UserRole)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 170, Col: 51}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 150, Col: 51}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 			if templ_7745c5c3_Err != nil {
@@ -565,7 +548,7 @@ func UserOptionsGeneratePasswordLink(users []types.UserOption) templ.Component {
 			var templ_7745c5c3_Var26 string
 			templ_7745c5c3_Var26, templ_7745c5c3_Err = templ.JoinStringErrs(user.Email)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 170, Col: 66}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 150, Col: 66}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var26))
 			if templ_7745c5c3_Err != nil {
@@ -578,7 +561,7 @@ func UserOptionsGeneratePasswordLink(users []types.UserOption) templ.Component {
 			var templ_7745c5c3_Var27 string
 			templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinStringErrs(user.UserRole)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 170, Col: 85}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 150, Col: 85}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 			if templ_7745c5c3_Err != nil {
@@ -597,7 +580,7 @@ func UserOptionsGeneratePasswordLink(users []types.UserOption) templ.Component {
 	})
 }
 
-func IsnAccountPermissionsDropdown() templ.Component {
+func IsnAccountPermissionSelector() templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -618,7 +601,7 @@ func IsnAccountPermissionsDropdown() templ.Component {
 			templ_7745c5c3_Var28 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "<select id=\"permission\" name=\"permission\" required class=\"form-select\"><option value=\"\">Select Permission...</option> <option value=\"none\">None - Revoke access to the ISN</option> <option value=\"read\">Read - Can view signals</option> <option value=\"write\">Write - Can create and view signals</option></select>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "<label for=\"permission\" class=\"form-label\">Permission Level</label> <select id=\"permission\" name=\"permission\" required class=\"form-select\"><option value=\"\">Select Permission...</option> <option value=\"none\">None - Revoke access to the ISN</option> <option value=\"read\">Read - Can view signals</option> <option value=\"write\">Write - Can create and view signals</option></select>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -648,7 +631,7 @@ func IsnSelector(isns []types.IsnOption) templ.Component {
 			templ_7745c5c3_Var29 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<select id=\"isn-slug\" name=\"isn-slug\" required class=\"form-select\"><option value=\"\">Select ISN...</option> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<lable for=\"isn-slug\" class=\"form-label\">ISN</lable> <select id=\"isn-slug\" name=\"isn-slug\" required class=\"form-select\"><option value=\"\">Select ISN...</option> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -660,7 +643,7 @@ func IsnSelector(isns []types.IsnOption) templ.Component {
 			var templ_7745c5c3_Var30 string
 			templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(isn.Slug)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 206, Col: 36}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 188, Col: 36}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 			if templ_7745c5c3_Err != nil {
@@ -673,7 +656,7 @@ func IsnSelector(isns []types.IsnOption) templ.Component {
 			var templ_7745c5c3_Var31 string
 			templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(strings.ReplaceAll(isn.Slug, "-", " "))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 206, Col: 79}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 188, Col: 79}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 			if templ_7745c5c3_Err != nil {
@@ -693,7 +676,7 @@ func IsnSelector(isns []types.IsnOption) templ.Component {
 }
 
 // the list of available signal types for the selected ISN
-func SignalTypeOptions(signalTypes []types.SignalTypeOption) templ.Component {
+func SignalTypeSlugOptions(signalTypes []types.SignalTypeSlugOption) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -714,7 +697,7 @@ func SignalTypeOptions(signalTypes []types.SignalTypeOption) templ.Component {
 			templ_7745c5c3_Var32 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "<select id=\"signal-type-slug\" name=\"signal-type-slug\" required hx-post=\"/ui-api/signal-type-version-options\" hx-target=\"#sem-ver\" hx-swap=\"outerHTML\" hx-trigger=\"change\" hx-include=\"#isn-slug, this\" class=\"form-select\"><option value=\"\">Select Signal Type...</option> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "<select id=\"signal-type-slug\" name=\"signal-type-slug\" required hx-get=\"/ui-api/signal-type-version-options\" hx-target=\"#sem-ver\" hx-swap=\"outerHTML\" hx-trigger=\"change\" hx-include=\"#isn-slug, this\" class=\"form-select\"><option value=\"\">Select Signal Type...</option> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -726,7 +709,7 @@ func SignalTypeOptions(signalTypes []types.SignalTypeOption) templ.Component {
 			var templ_7745c5c3_Var33 string
 			templ_7745c5c3_Var33, templ_7745c5c3_Err = templ.JoinStringErrs(signalType.Slug)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 228, Col: 34}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 210, Col: 34}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var33))
 			if templ_7745c5c3_Err != nil {
@@ -739,7 +722,7 @@ func SignalTypeOptions(signalTypes []types.SignalTypeOption) templ.Component {
 			var templ_7745c5c3_Var34 string
 			templ_7745c5c3_Var34, templ_7745c5c3_Err = templ.JoinStringErrs(strings.ReplaceAll(signalType.Slug, "-", " "))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 228, Col: 84}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 210, Col: 84}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var34))
 			if templ_7745c5c3_Err != nil {
@@ -792,7 +775,7 @@ func SignalTypeVersionOptions(versions []types.VersionOption) templ.Component {
 			var templ_7745c5c3_Var36 string
 			templ_7745c5c3_Var36, templ_7745c5c3_Err = templ.JoinStringErrs(version.Version)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 243, Col: 34}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 225, Col: 34}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var36))
 			if templ_7745c5c3_Err != nil {
@@ -805,7 +788,7 @@ func SignalTypeVersionOptions(versions []types.VersionOption) templ.Component {
 			var templ_7745c5c3_Var37 string
 			templ_7745c5c3_Var37, templ_7745c5c3_Err = templ.JoinStringErrs(version.Version)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 243, Col: 54}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 225, Col: 54}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var37))
 			if templ_7745c5c3_Err != nil {

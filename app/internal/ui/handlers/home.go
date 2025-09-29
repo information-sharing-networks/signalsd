@@ -86,9 +86,6 @@ func (h *HandlerService) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Login successful - set a cookie to indicate a login event
-	h.AuthService.SetLoginEventCookie(w)
-
 	//  add account log attribute to context so it is included in the final request log
 	_ = logger.ContextWithLogAttrs(r.Context(),
 		slog.String("account_id", accessTokenDetails.AccountID),

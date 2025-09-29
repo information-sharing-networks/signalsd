@@ -41,7 +41,7 @@ func (h *HandlerService) getIsnOptions(isnPerms map[string]types.IsnPerm, filter
 }
 
 // RenderSignalTypeOptions gets the signal types for the selected ISN and renders the dropdown options
-func (h *HandlerService) RenderSignalTypeOptions(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerService) RenderSignalTypeSlugOptions(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	isnSlug := r.FormValue("isn-slug")
@@ -77,15 +77,15 @@ func (h *HandlerService) RenderSignalTypeOptions(w http.ResponseWriter, r *http.
 	}
 
 	// Convert to slice of SignalTypeOption
-	signalTypes := make([]types.SignalTypeOption, 0, len(signalTypeMap))
+	signalTypeSlugs := make([]types.SignalTypeSlugOption, 0, len(signalTypeMap))
 	for signalType := range signalTypeMap {
-		signalTypes = append(signalTypes, types.SignalTypeOption{
+		signalTypeSlugs = append(signalTypeSlugs, types.SignalTypeSlugOption{
 			Slug: signalType,
 		})
 	}
 
 	// Render signal types dropdown options
-	component := templates.SignalTypeOptions(signalTypes)
+	component := templates.SignalTypeSlugOptions(signalTypeSlugs)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render signal type options", slog.String("error", err.Error()))
 	}
@@ -258,5 +258,51 @@ func (h *HandlerService) RenderAccountIdentifierField(w http.ResponseWriter, r *
 		if err := component.Render(r.Context(), w); err != nil {
 			reqLogger.Error("Failed to render account identifier placeholder", slog.String("error", err.Error()))
 		}
+	}
+}
+
+func (h *HandlerService) RenderSignalTypeOptions(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
+	if !ok {
+		component := templates.ErrorAlert("Authentication required. Please log in again.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	// Get signal types for the selected ISN
+	isnSlug := r.FormValue("isn-slug")
+	isnPerms := accessTokenDetails.IsnPerms
+	isnPerm, exists := isnPerms[isnSlug]
+	if !exists {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	// Parse signal type paths to extract unique signal types
+	signalTypeMap := make(map[string]bool)
+	for _, path := range isnPerm.SignalTypePaths {
+		// Path format: "signal-type-slug/v1.0.0"
+		parts := strings.Split(path, "/v")
+		if len(parts) == 2 {
+			signalTypeMap[parts[0]] = true
+		}
+	}
+
+	// Convert to slice of SignalTypeOption
+	signalTypeSlugs := make([]types.SignalTypeSlugOption, 0, len(signalTypeMap))
+	for signalType := range signalTypeMap {
+		signalTypeSlugs = append(signalTypeSlugs, types.SignalTypeSlugOption{
+			Slug: signalType,
+		})
+	}
+
+	// Render signal types dropdown options
+	component := templates.SignalTypeSlugOptions(signalTypeSlugs)
+	if err := component.Render(r.Context(), w); err != nil {
+		reqLogger.Error("Failed to render signal type options", slog.String("error", err.Error()))
 	}
 }
