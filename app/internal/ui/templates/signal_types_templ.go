@@ -51,7 +51,7 @@ func CreateSignalTypePage(isns []types.IsnOption) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Signal Type Management</h1><div class=\"card mb-6\"><div class=\"card-body\"><h3 class=\"card-title\">Create New Signal Type</h3><form hx-post=\"/ui-api/create-signal-type\" hx-target=\"#create-signal-type-btn-container\" hx-swap=\"innerHTML\" class=\"space-y-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Signal Type Management</h1><div class=\"card mb-6\"><div class=\"card-body\"><h3 class=\"card-title\">Create New Signal Type</h3><form hx-post=\"/ui-api/create-signal-type\" hx-target=\"#create-signal-type-result\" hx-swap=\"innerHTML\" class=\"space-y-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -99,7 +99,7 @@ func CreateSignalTypePage(isns []types.IsnOption) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</div><div class=\"form-group\" id=\"create-signal-type-btn-container\"><button type=\"submit\" class=\"btn btn-primary\">Create Signal Type</button></div></form></div></div><div id=\"signal-type-result\"></div><div class=\"card mb-6\"><div class=\"card-body\"><h3 class=\"card-title\">Register a new schema for an existing Signal Type</h3><p class=\"text-muted mb-4\">Search and manage existing signal types.</p><form hx-post=\"/ui-api/new-signal-type-schema\" hx-target=\"#register-new-schema-btn-container\" hx-swap=\"innerHTML\" class=\"space-y-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\"><label for=\"isn-slug\" class=\"form-label\">ISN</label> <select id=\"isn-slug\" name=\"isn-slug\" class=\"form-select\" hx-get=\"/ui-api/signal-type-slug-options\" hx-target=\"#signal-type-slug\" hx-swap=\"outerHTML\" hx-trigger=\"change\" hx-include=\"#isn-slug\"><option value=\"\">Select ISN...</option> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</div><div class=\"form-group\" id=\"create-signal-type-result\"></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Create Signal Type</button></div></form></div></div><div class=\"card mb-6\"><div class=\"card-body\"><h3 class=\"card-title\">Register a new schema for an existing Signal Type</h3><p class=\"text-muted mb-4\">Search and manage existing signal types.</p><form hx-post=\"/ui-api/new-signal-type-schema\" hx-target=\"#register-new-schema-result\" hx-swap=\"innerHTML\" class=\"space-y-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\"><label for=\"isn-slug\" class=\"form-label\">ISN</label> <select id=\"isn-slug\" name=\"isn-slug\" class=\"form-select\" hx-get=\"/ui-api/signal-type-slug-options\" hx-target=\"#signal-type-slug\" hx-swap=\"outerHTML\" hx-trigger=\"change\" hx-include=\"#isn-slug\"><option value=\"\">Select ISN...</option> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -167,7 +167,7 @@ func CreateSignalTypePage(isns []types.IsnOption) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</div><div class=\"form-group\" id=\"register-new-schema-btn-container\"><button type=\"submit\" id=\"register-new-schema-btn\" class=\"btn btn-primary\">Register new schema</button></div></form></div></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</div><div class=\"form-group\" id=\"register-new-schema-result\"></div><div class=\"form-group\"><button type=\"submit\" id=\"register-new-schema-btn\" class=\"btn btn-primary\">Register new schema</button></div></form></div></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -214,7 +214,7 @@ func SignalTypeCreationSuccess(response client.NewSignalTypeResponse) templ.Comp
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(response.Slug)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/signal_types.templ`, Line: 113, Col: 97}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/signal_types.templ`, Line: 114, Col: 95}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
@@ -227,13 +227,13 @@ func SignalTypeCreationSuccess(response client.NewSignalTypeResponse) templ.Comp
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(response.SemVer)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/signal_types.templ`, Line: 114, Col: 102}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/signal_types.templ`, Line: 115, Col: 100}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</code></p></div><div class=\"mt-4\"><button disabled class=\"btn btn-primary \">Added!</button></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</code></p></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -349,7 +349,7 @@ func ReadmeURLInput() templ.Component {
 			templ_7745c5c3_Var11 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "<label for=\"readme-url\" class=\"form-label\">README URL</label> <input id=\"readme-url\" name=\"readme-url\" type=\"url\" class=\"form-input\" placeholder=\"enter a GitHub URL for the README file\"><p class=\"text-muted text-sm mt-1\">Use <code class=\"text-xs bg-gray-100 px-1 py-0.5 rounded\">https://github.com/skip/readme/main/readme.md</code> to indicate there is no readme</p>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "<label for=\"readme-url\" class=\"form-label\">README URL</label> <input id=\"readme-url\" name=\"readme-url\" type=\"url\" required class=\"form-input\" placeholder=\"enter a GitHub URL for the README file\"><p class=\"text-muted text-sm mt-1\">Use <code class=\"text-xs bg-gray-100 px-1 py-0.5 rounded\">https://github.com/skip/readme/main/readme.md</code> to indicate there is no readme</p>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -378,7 +378,7 @@ func DescriptionInput() templ.Component {
 			templ_7745c5c3_Var12 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<label for=\"detail\" class=\"form-label\">Description</label> <textarea id=\"detail\" name=\"detail\" rows=\"3\" class=\"form-input\" placeholder=\"Description of the signal type\"></textarea>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<label for=\"detail\" class=\"form-label\">Description</label> <textarea id=\"detail\" name=\"detail\" rows=\"3\" required class=\"form-input\" placeholder=\"Description of the signal type\"></textarea>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

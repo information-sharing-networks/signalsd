@@ -14,7 +14,7 @@ templ CreateSignalTypePage(isns []types.IsnOption) {
 				<div class="card-body">
 					<h3 class="card-title">Create New Signal Type</h3>
 					<form hx-post="/ui-api/create-signal-type" 
-						hx-target="#create-signal-type-btn-container" 
+						hx-target="#create-signal-type-result" 
 						hx-swap="innerHTML"
 						class="space-y-4">
 						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -37,7 +37,8 @@ templ CreateSignalTypePage(isns []types.IsnOption) {
 						<div class="form-group">
 							@DescriptionInput()							
 						</div>
-						<div class="form-group" id="create-signal-type-btn-container">
+						<div class="form-group" id="create-signal-type-result"></div>
+						<div class="form-group">
 							<button type="submit" class="btn btn-primary">
 								Create Signal Type
 							</button>
@@ -45,13 +46,12 @@ templ CreateSignalTypePage(isns []types.IsnOption) {
 					</form>
 				</div>
 			</div>
-			<div id="signal-type-result"></div>
 
 			<div class="card mb-6">
 				<div class="card-body">	
 					<h3 class="card-title">Register a new schema for an existing Signal Type</h3>	
 					<p class="text-muted mb-4">Search and manage existing signal types.</p>	
-					<form hx-post="/ui-api/new-signal-type-schema" hx-target="#register-new-schema-btn-container" hx-swap="innerHTML" class="space-y-4">
+					<form hx-post="/ui-api/new-signal-type-schema" hx-target="#register-new-schema-result" hx-swap="innerHTML" class="space-y-4">
 						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">		
 							<div class="form-group">	
 								<label for="isn-slug" class="form-label">ISN</label>
@@ -93,7 +93,8 @@ templ CreateSignalTypePage(isns []types.IsnOption) {
 						<div class="form-group">
 							@DescriptionInput()							
 						</div>
-						<div class="form-group" id="register-new-schema-btn-container">
+						<div class="form-group" id="register-new-schema-result"></div>
+						<div class="form-group">
 							<button type="submit" id="register-new-schema-btn" class="btn btn-primary">
 								Register new schema
 							</button>
@@ -108,19 +109,11 @@ templ CreateSignalTypePage(isns []types.IsnOption) {
 
 // SignalTypeCreationSuccess renders a success message after signal type creation
 templ SignalTypeCreationSuccess(response client.NewSignalTypeResponse) {
-			@SuccessAlert("Signal type created successfully!")
-			<div class="mt-4 space-y-2">
-				<p><strong>Slug:</strong> <code class="text-sm bg-gray-100 px-2 py-1 rounded">{ response.Slug }</code></p>
-				<p><strong>Version:</strong> <code class="text-sm bg-gray-100 px-2 py-1 rounded">{ response.SemVer }</code></p>
-			</div>
-			<div class="mt-4">
-				<button
-					disabled
-					class="btn btn-primary "
-				>
-					Added!
-				</button>
-			</div>
+	@SuccessAlert("Signal type created successfully!")
+	<div class="mt-4 space-y-2">
+		<p><strong>Slug:</strong> <code class="text-sm bg-gray-100 px-2 py-1 rounded">{ response.Slug }</code></p>
+		<p><strong>Version:</strong> <code class="text-sm bg-gray-100 px-2 py-1 rounded">{ response.SemVer }</code></p>
+	</div>
 }
 
 templ TitleInput() {
@@ -170,6 +163,7 @@ templ ReadmeURLInput() {
 		id="readme-url"
 		name="readme-url"
 		type="url"
+		required
 		class="form-input"
 		placeholder="enter a GitHub URL for the README file"
 	/>
@@ -185,6 +179,7 @@ templ DescriptionInput() {
 		id="detail"
 		name="detail"
 		rows="3"
+		required
 		class="form-input"
 		placeholder="Description of the signal type"
 	></textarea>

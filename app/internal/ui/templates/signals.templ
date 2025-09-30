@@ -1,7 +1,6 @@
 package templates
 
 import (
-    "strings"
 	"fmt"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
@@ -17,58 +16,7 @@ templ SignalSearchPage(isns []types.IsnOption, perms map[string]types.IsnPerm, r
 				<div class="card mb-6">
 					<div class="card-body">
 						<form hx-post="/ui-api/search-signals" hx-target="#search-results" class="space-y-4">
-							<div class="grid grid-cols-1 md:grid-cols-3">
-								<div class="form-group">
-									<label for="isn-slug" class="form-label">ISN</label>
-									<select
-										id="isn-slug"
-										name="isn-slug"
-										required
-										hx-post="/ui-api/signal-type-slug-options"
-										hx-target="#signal-type-slug"
-										hx-swap="outerHTML"
-										hx-trigger="change"
-										hx-include="#isn-slug, this"
-										class="form-select"
-									>
-										<option value="">Select ISN...</option>
-										if isns != nil {
-											for _, isn := range isns {
-												if isn.IsInUse {
-													<option value={ isn.Slug }>{ strings.ReplaceAll(isn.Slug, "-", " ") }</option>
-												}
-											}
-										}
-									</select>
-								</div>
-							<div id="signal-type-select" class="form-group">
-								<label for="signal-type-slug" class="form-label">Signal Type</label>
-								<select
-									id="signal-type-slug"
-									name="signal-type-slug"
-									required
-									hx-get="/ui-api/signal-type-version-options"
-									hx-target="#sem-ver"
-									hx-swap="outerHTML"
-									hx-trigger="change"
-									hx-include="#isn-slug, this"
-									class="form-select"
-								>
-									<option value="">Select Signal Type...</option>
-								</select>
-							</div>
-							<div id="version-select" class="form-group">
-								<label for="sem-ver" class="form-label">Version</label>
-								<select
-									id="sem-ver"
-									name="sem-ver"
-									required
-									class="form-select"
-								>
-									<option value="">Select Version...</option>
-								</select>
-							</div>
-						</div>
+						@SignalTypeSelectorFields(isns)
 						<div class="grid grid-cols-1 md:grid-cols-2">
 							<div class="form-group">
 								<label for="start-date" class="form-label">Start Date</label>

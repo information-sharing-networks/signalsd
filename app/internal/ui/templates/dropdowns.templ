@@ -192,7 +192,66 @@ templ IsnSelector(isns []types.IsnOption) {
 
 
 
-// the list of available signal types for the selected ISN
+
+// ************************************************************************ //
+// SIGNAL TYPE SELECTOR
+// ************************************************************************ //
+
+// creates the ISN, Signal Type, and Version select elements for use in forms
+templ SignalTypeSelectorFields(isns []types.IsnOption) {
+	<div class="grid grid-cols-1 md:grid-cols-3">
+		<div class="form-group">
+			<label for="isn-slug" class="form-label">ISN</label>
+			<select
+				id="isn-slug"
+				name="isn-slug"
+				required
+				hx-get="/ui-api/signal-type-slug-options"
+				hx-target="#signal-type-slug"
+				hx-swap="outerHTML"
+				hx-trigger="change"
+				hx-include="#isn-slug, this"
+				class="form-select"
+			>
+				<option value="">Select ISN...</option>
+				if isns != nil {
+					for _, isn := range isns {
+						if isn.IsInUse {
+							<option value={ isn.Slug }>{ strings.ReplaceAll(isn.Slug, "-", " ") }</option>
+						}
+					}
+				}
+			</select>
+		</div>
+		<div class="form-group">
+			<label for="signal-type-slug" class="form-label">Signal Type</label>
+			<select
+				id="signal-type-slug"
+				name="signal-type-slug"
+				required
+				disabled
+				class="form-select"
+			>
+				<option value="">Select Signal Type...</option>
+			</select>
+		</div>
+		<div id="version-select" class="form-group">
+			<label for="sem-ver" class="form-label">Version</label>
+			<select
+				id="sem-ver"
+				name="sem-ver"
+				required
+				disabled
+				class="form-select"
+			>
+				<option value="">Select Version...</option>
+			</select>
+		</div>
+	</div>
+}
+
+
+// the list of available signal types for the selected ISN (use with SignalTypeSelectorFields)
 templ SignalTypeSlugOptions(signalTypes []types.SignalTypeSlugOption) {
 	<select
 		id="signal-type-slug"
@@ -212,7 +271,8 @@ templ SignalTypeSlugOptions(signalTypes []types.SignalTypeSlugOption) {
 	</select>
 }
 
-//the list of available versions for the selected signal type
+
+//the list of available versions for the selected signal type use with SignalTypeSelectorFields)
 templ SignalTypeVersionOptions(versions []types.VersionOption) {
 	<select
 		id="sem-ver"
