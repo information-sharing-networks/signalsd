@@ -5,9 +5,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
-// =============================================================================
-// SIGNAL SEARCH PAGE & RESULTS
-// =============================================================================
+
 templ SignalSearchPage(isns []types.IsnOption, perms map[string]types.IsnPerm, results []client.SearchSignalWithCorrelationsAndVersions) {
 	@BaseLayout("Signal Search") {
 		@Navigation()
@@ -15,59 +13,16 @@ templ SignalSearchPage(isns []types.IsnOption, perms map[string]types.IsnPerm, r
 			<h1 class="page-title">Search Signals</h1>
 				<div class="card mb-6">
 					<div class="card-body">
-						<form hx-post="/ui-api/search-signals" hx-target="#search-results" class="space-y-4">
+						<form hx-get="/ui-api/search-signals" hx-target="#search-results" class="space-y-4">
 						@SignalTypeSelectorFields(isns)
 						<div class="grid grid-cols-1 md:grid-cols-2">
-							<div class="form-group">
-								<label for="start-date" class="form-label">Start Date</label>
-								<input
-									type="date"
-									id="start-date"
-									name="start-date"
-									class="form-input"
-								/>
-							</div>
-							<div class="form-group">
-								<label for="end-date" class="form-label">End Date</label>
-								<input
-									type="date"
-									id="end-date"
-									name="end-date"
-									class="form-input"
-								/>
-							</div>
+							@StartDateField()	
+							@EndDateField()
 						</div>
 						<div class="grid grid-cols-1 md:grid-cols-3">
-							<div class="form-group">
-								<label for="local-ref" class="form-label">Local Reference</label>
-								<input
-									type="text"
-									id="local-ref"
-									name="local-ref"
-									placeholder="e.g., item_id_#1"
-									class="form-input"
-								/>
-							</div>
-							<div class="form-group">
-								<label for="signal-id" class="form-label">Signal ID</label>
-								<input
-									type="text"
-									id="signal-id"
-									name="signal-id"
-									placeholder="UUID"
-									class="form-input"
-								/>
-							</div>
-							<div class="form-group">
-								<label for="account-id" class="form-label">Account ID</label>
-								<input
-									type="text"
-									id="account-id"
-									name="account-id"
-									placeholder="UUID"
-									class="form-input"
-								/>
-							</div>
+							@LocalRefField()		
+							@SignalIDField()	
+							@AccountIDField()
 						</div>
 						<div class="checkbox-group">
 							@CheckboxField("include-withdrawn", "true", "Include withdrawn signals")
@@ -82,19 +37,14 @@ templ SignalSearchPage(isns []types.IsnOption, perms map[string]types.IsnPerm, r
 					</form>
 				</div>
 			</div>
-			<div id="search-results">
-
-				if results != nil {
-					@SearchResults(results)
-				}
-			</div>
+			<div id="search-results"> </div>
 		</div>
 	}
 }
 
 
 
-// Search Results renders the search results
+// redner search results from the SearchSignals handler
 templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions) {
 	<div class="card">
 		<div class="card-header">
@@ -112,28 +62,24 @@ templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions) {
 						<div class="signal-header">
 							<div style="flex: 1;">
 								<div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
-									if signal.LocalRef != "" {
-										<h4 class="signal-title">{ signal.LocalRef }</h4>
-									} else {
-										<h4 class="signal-title">Signal { signal.SignalID[:8] }...</h4>
-									}
+									<h4 class="signal-local-ref">{ "local ref: " + signal.LocalRef }</h4>
 									if signal.IsWithdrawn {
 										<span class="signal-badge signal-badge-withdrawn">
 											Withdrawn
 										</span>
 									}
-								</div>
-								<div class="signal-metadata">
-									@SignalMetadataItem("Signal ID", signal.SignalID)
-									@SignalMetadataItem("Version ID", signal.SignalVersionID)
-									@SignalMetadataSimple("Version", fmt.Sprintf("%d", signal.VersionNumber))
-									@SignalMetadataSimple("Created", signal.SignalCreatedAt)
-									@SignalMetadataSimple("Updated", signal.VersionCreatedAt)
-									if signal.Email != "" {
-										@SignalMetadataSimple("Created by", signal.Email)
+
+									if signal.VersionNumber > 1 {
+										<span class="signal-badge signal-badge-version">
+											{ fmt.Sprintf("(version %d)", signal.VersionNumber) }
+										</span>
 									}
 								</div>
-								if signal.CorrelatedToSignalID != "" {
+								<div class="signal-metadata">
+									@SignalMetadataItem("Created", types.FormatDateTime(signal.SignalCreatedAt))
+									@SignalMetadataItem("Created by", signal.Email)
+								</div>
+								if signal.CorrelatedToSignalID != "" && signal.CorrelatedToSignalID != signal.SignalID {
 									<div class="correlation-info">
 										<span class="text-sm" style="color: #1e40af;">
 											<span style="font-weight: 500;">Correlated to:</span> { signal.CorrelatedToSignalID }
@@ -144,21 +90,17 @@ templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions) {
 						</div>
 						<!-- Signal Content -->
 						<div style="margin-top: 1rem;">
-							<div class="json-header">
-								<h5 class="text-sm" style="font-weight: 500; color: #111827;">Signal Content</h5>
-								<button
-									type="button"
-									data-signal-id={ signal.SignalID }
-									class="pretty-print-btn btn btn-secondary text-xs"
-								>
-									Pretty Print
-								</button>
-							</div>
-							<div class="json-container">
-								<pre id={ fmt.Sprintf("json-%s", signal.SignalID) } class="json-content">{ string(signal.Content) }</pre>
+							<button
+								type="button"
+								data-signal-id={ signal.SignalID }
+								class="pretty-print-btn btn btn-secondary text-xs"
+							>
+								Pretty Print
+							</button>
+						<div class="json-container">
+							<pre id={ fmt.Sprintf("json-%s", signal.SignalID) } class="json-content">{ string(signal.Content) }</pre>
 							</div>
 						</div>
-						<!-- Additional Information -->
 						if len(signal.CorrelatedSignals) > 0 {
 							<div class="correlated-signals">
 								<h5 class="text-sm" style="font-weight: 500; color: #111827; margin-bottom: 0.5rem;">Correlated Signals ({ fmt.Sprintf("%d", len(signal.CorrelatedSignals)) })</h5>
@@ -188,20 +130,18 @@ templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions) {
 								</div>
 							</div>
 						}
-						<!-- Additional Technical Info -->
-						if signal.AccountID != "" || signal.AccountType != "" {
-							<div class="technical-details">
-								<h6 class="text-xs" style="font-weight: 500; color: #6b7280; margin-bottom: 0.5rem;">Additional Information</h6>
-								<div class="signal-metadata text-xs" style="color: #6b7280;">
-									if signal.AccountID != "" {
-										<div><span style="font-weight: 500;">Account ID:</span> <span class="font-mono">{ signal.AccountID }</span></div>
-									}
-									if signal.AccountType != "" {
-										<div><span style="font-weight: 500;">Account Type:</span> { signal.AccountType }</div>
-									}
-								</div>
+						<!-- Additional Info -->
+						<div class="additional-details">
+						<div class="text-xs" style="font-weight: bold; color: #6b7280; margin-top: 0.5rem; margin-bottom: 0.5rem;">Additional Information</div>
+							<div class="additional-detail-items text-xs" style="color: #6b7280;">
+								if signal.SignalCreatedAt != signal.VersionCreatedAt { 
+									@SignalMetadataSimple("Updated", types.FormatDateTime(signal.VersionCreatedAt))
+								}
+								@SignalMetadataSimple("Account ID", signal.AccountID)
+								@SignalMetadataSimple("Signal Id", signal.SignalID)
+								@SignalMetadataSimple("Signal Version ID", signal.SignalVersionID)
 							</div>
-						}
+						</div>
 					</div>
 				}
 			</div>
@@ -256,4 +196,65 @@ templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions) {
 			}
 		});
 	</script>
+}
+
+templ StartDateField() {
+	<div class="form-group">
+		<label for="start-date" class="form-label">Start Date</label>
+		<input
+			type="date"
+			id="start-date"
+			name="start-date"
+			class="form-input"
+		/>
+	</div>
+}
+templ EndDateField() {
+	<div class="form-group">
+		<label for="end-date" class="form-label">End Date</label>
+		<input
+			type="date"
+			id="end-date"
+			name="end-date"
+			class="form-input"
+		/>
+	</div>
+}
+
+templ LocalRefField() {
+	<div class="form-group">
+		<label for="local-ref" class="form-label">Local Reference</label>
+		<input
+			type="text"
+			id="local-ref"
+			name="local-ref"
+			placeholder="e.g., item_id_#1"
+			class="form-input"
+		/>
+	</div>
+}
+templ SignalIDField() {
+	<div class="form-group">
+		<label for="signal-id" class="form-label">Signal ID</label>
+		<input
+			type="text"
+			id="signal-id"
+			name="signal-id"
+			placeholder="UUID"
+			class="form-input"
+		/>
+	</div>
+}
+
+templ AccountIDField() {
+	<div class="form-group">
+		<label for="account-id" class="form-label">Account ID</label>
+		<input
+			type="text"
+			id="account-id"
+			name="account-id"
+			placeholder="UUID"
+			class="form-input"
+		/>
+	</div>
 }

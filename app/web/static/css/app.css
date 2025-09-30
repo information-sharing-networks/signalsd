@@ -430,28 +430,21 @@ body {
 }
 
 .signal-metadata {
-    display: grid;
-    grid-template-columns: repeat(1, 1fr);
+    display: flex;
     gap: 1rem;
-    font-size: 0.875rem;
-    color: #6b7280;
 }
-
-@media (min-width: 768px) {
-    .signal-metadata {
-        grid-template-columns: repeat(2, 1fr);
-    }
-}
-
-@media (min-width: 1024px) {
-    .signal-metadata {
-        grid-template-columns: repeat(3, 1fr);
-    }
+.signal-metadata-item {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 1rem;
 }
 
 .signal-metadata-item {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.5rem;
 }
 
 .signal-metadata-label {
@@ -541,11 +534,17 @@ body {
     border-radius: 0.375rem;
 }
 
-.technical-details {
-    margin-top: 1rem;
-    padding-top: 0.75rem;
+.additional-details {
+    margin-top: 2rem;
     border-top: 1px solid #e5e7eb;
+
 }
+.additional-detail-items {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}§
 
 /* Utility Classes */
 .text-center {
