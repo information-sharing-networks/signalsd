@@ -94,8 +94,8 @@ func (h *HandlerService) SearchSignals(w http.ResponseWriter, r *http.Request) {
 		reqLogger.Error("Signal search failed", slog.String("error", err.Error()))
 
 		var msg string
-		if ce, ok := err.(*client.ClientError); ok {
-			msg = ce.UserError()
+		if clientError, ok := err.(*client.ClientError); ok {
+			msg = clientError.UserError()
 		} else {
 			msg = "An error occurred. Please try again."
 		}

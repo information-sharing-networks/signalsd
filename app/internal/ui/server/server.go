@@ -108,7 +108,7 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 
 			// search signals
 			r.Get("/search", handlerService.SearchSignalsPage)
-			r.Post("/ui-api/search-signals", handlerService.SearchSignals)
+			r.Get("/ui-api/search-signals", handlerService.SearchSignals)
 		})
 
 	})
