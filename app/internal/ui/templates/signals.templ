@@ -44,7 +44,7 @@ templ SignalSearchPage(isns []types.IsnOption, perms map[string]types.IsnPerm, r
 }
 
 // render search results from the SearchSignals handler
-templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions,  isnSlug , SignalTypeSlug, SemVer string) {
+templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions,  params client.SignalSearchParams) {
 	<div class="card">
 		<div class="card-header">
 			<h3 class="card-title">Search Results ({ types.FormatRecordsReturned(len(signals)) })</h3>
@@ -59,55 +59,49 @@ templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions,  i
 					<div class="signal-card">
 						<!-- Signal Header -->
 						<div class="signal-header">
-							<div style="flex: 1;">
-								<div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
-									<h4 class="signal-local-ref">{ "local ref: " + signal.LocalRef }</h4>
-									if signal.IsWithdrawn {
-										<span class="signal-badge signal-badge-withdrawn">
-											Withdrawn
-										</span>
-									}
-									if signal.VersionNumber > 1 {
-										<span class="signal-badge signal-badge-version">
-											{ fmt.Sprintf("(version %d)", signal.VersionNumber) }
-										</span>
-									}
-								</div>
-								<div class="signal-metadata">
-									@SignalMetadataItem("Created", types.FormatDateTime(signal.SignalCreatedAt))
-									@SignalMetadataItem("Created by", signal.Email)
-								</div>
-								if signal.CorrelatedToSignalID != "" && signal.CorrelatedToSignalID != signal.SignalID {
-									<div class="correlation-info">
-										<span class="text-sm" style="color: #1e40af;">
-											<span style="font-weight: 500;">Correlated to:</span> { signal.CorrelatedToSignalID }
-										</span>
-									</div>
-								}
-							</div>
+							<h4 class="signal-local-ref">{ "local ref: " + signal.LocalRef }</h4>
+							if signal.IsWithdrawn {
+								<span class="signal-badge signal-badge-withdrawn">
+									Withdrawn
+								</span>
+							}
+							if signal.VersionNumber > 1 {
+								<span class="signal-badge signal-badge-version">
+									{ fmt.Sprintf("(version %d)", signal.VersionNumber) }
+								</span>
+							}
+						</div>
+						<div class="signal-metadata">
+							@SignalMetadataItem("Created", types.FormatDateTime(signal.SignalCreatedAt))
+							@SignalMetadataItem("Created by", signal.Email)
 						</div>
 						<!-- Signal Content -->
 						<div style="margin-top: 1rem;">
-							<button
-								type="button"
-								data-signal-id={ signal.SignalID }
-								class="pretty-print-btn btn btn-secondary text-xs"
-							>
-								Pretty Print
-							</button>
-							<div class="json-container">
-								<pre id={ fmt.Sprintf("json-%s", signal.SignalID) } class="json-content">{ string(signal.Content) }</pre>
+							{{ id := fmt.Sprintf("json-%s", signal.SignalID) }}
+							<div class="json-container compact" id={ id }>
+								<pre class="json-content compact">{ string(signal.Content) }</pre>
+								<pre style="display: none;" class="json-content pretty-printed">{ prettyPrintJSON(signal.Content) }</pre>
+								<button
+									type="button"
+									data-signal-id={ signal.SignalID }
+									class="pretty-print-btn btn text-xs "
+								>
+									<image src="/static/images/prettyprint.svg" alt="pretty print" style="width: 20px; height: 20px;"></image>
+								</button>
 							</div>
 						</div>
-						if len(signal.CorrelatedSignals) > 0 {
-							{{ endpoint := fmt.Sprintf("/ui-api/isn/%s/signal_types/%s/v%s/signals/%s/correlated-count/%d", isnSlug, SignalTypeSlug, SemVer, signal.SignalID, len(signal.CorrelatedSignals)) }}
+						if params.IncludeCorrelated {
+							{{ endpoint := fmt.Sprintf("/ui-api/isn/%s/signal_types/%s/v%s/signals/%s/correlated-count/%d", params.IsnSlug, params.SignalTypeSlug, params.SemVer, signal.SignalID, len(signal.CorrelatedSignals)) }}
+							{{ tableTarget := fmt.Sprintf("#correlated-signals-table-%s",signal.SignalID) }}
 							<div 
 								hx-get={ endpoint } 
-								hx-target="#correlated-signals-table" 
-								hx-trigger="every 5s"></div>
-							<h4>related documents</h4>
+								hx-target={ tableTarget }
+								hx-trigger="every 8s">
+							</div>
+							<h4>Related Signals</h4>
 							@CorrelatedSignalsTable(signal, len(signal.CorrelatedSignals))
 						}
+
 						<!-- todo previous versions -->
 						<!-- Additional Info -->
 						<div class="additional-details">
@@ -118,7 +112,9 @@ templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions,  i
 								}
 								@SignalMetadataSimple("Account ID", signal.AccountID)
 								@SignalMetadataSimple("Signal Id", signal.SignalID)
-								@SignalMetadataSimple("Signal Version ID", signal.SignalVersionID)
+								if signal.CorrelatedToSignalID != "" && signal.CorrelatedToSignalID != signal.SignalID {
+									@SignalMetadataSimple("Correlated To", signal.CorrelatedToSignalID)
+								}
 							</div>
 						</div>
 					</div>
@@ -126,113 +122,134 @@ templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions,  i
 			</div>
 		}
 	</div>
-	<script>
 
-		// Store original JSON content for each signal
-		const originalJsonContent = new Map();
+	@SearchSignalScripts()
 
-		document.addEventListener('click', function(e) {
-		if (!e.target.classList.contains('pretty-print-btn')) {
-			return
-		}
-
-		const signalId = e.target.getAttribute('data-signal-id');
-		const jsonElement = document.getElementById('json-' + signalId);
-
-		if (!jsonElement) {
-			return;
-		}
-
-		try {
-			const currentButtonText = e.target.textContent.trim();
-
-			if (currentButtonText === 'Pretty Print') {
-				let originalContent = originalJsonContent.get(signalId);
-				if (!originalContent) {
-					originalContent = jsonElement.textContent.trim();
-					originalJsonContent.set(signalId, originalContent);
-				}
-				// Parse and pretty print JSON
-				const parsed = JSON.parse(originalContent);
-				jsonElement.textContent = JSON.stringify(parsed, null, 2);
-				e.target.textContent = 'Compact';
-				jsonElement.classList.add('pretty-printed');
-			} else {
-				let originalContent = originalJsonContent.get(signalId);
-				jsonElement.textContent = originalContent;
-				e.target.textContent = 'Pretty Print';
-				jsonElement.classList.remove('pretty-printed');
-			}
-		} catch (error) {
-			// Show error message briefly
-			const originalText = e.target.textContent;
-			e.target.textContent = 'Invalid JSON';
-			e.target.classList.add('text-red-600');
-			setTimeout(function() {
-				e.target.textContent = originalText;
-				e.target.classList.remove('text-red-600');
-			}, 2000);
-			}
-		});
-	</script>
 }
 
+// render the correlated signals table - where the count of correlated signals has changed, highlight the new rows
 templ CorrelatedSignalsTable(signal client.SearchSignalWithCorrelationsAndVersions, originalCount int) {
-	<table id="correlated-signals-table" 
-	>
-		<thead>
-			<tr>
-				<th>local_ref</th>
-				<th>created at</th>
-				<th>email</th>
-				<th>details</th>
-			</tr>
-		</thead>
-		<tbody>
-			for i, correlated := range signal.CorrelatedSignals {
-				<tr
-				if i >= originalCount {
-					style="outline: 2px solid red; outline-offset: 2px;"
-				}
-				
-				>
-					<td>{ correlated.LocalRef } </td>
-					<td>{ types.FormatDateTime(correlated.SignalCreatedAt) }</td>
-					<td>{ correlated.Email }</td>
-					<td>
-						<button class="open-modal-btn btn btn-primary" data-correlated-signal-id={ correlated.SignalID }>View</button>
-						<dialog class="modal" id="modal" data-correlated-signal-id={ correlated.SignalID }>
-							<h3> { correlated.LocalRef }</h3>
-							<pre>{ prettyPrintJSON(correlated.Content) }</pre>
-							<button class="close-modal-btn btn btn-primary" data-correlated-signal-id={ correlated.SignalID }>Close</button>
-						</dialog>
-					</td>
+	{{ id := fmt.Sprintf("correlated-signals-table-%s",signal.SignalID) }}
+
+	if len(signal.CorrelatedSignals) == 0 {
+		<span id={ id } class="text-sm">
+			<img src="/static/images/bars.svg" alt="Loading..." style="width: 20px; height: 20px;">
+			Monitoring ...
+		</span>
+	} else { 
+		<table id={ id }>
+			<thead>
+				<tr>
+					<th>local_ref</th>
+					<th>created at</th>
+					<th>email</th>
+					<th>details</th>
 				</tr>
-			}
-		</tbody>
-	</table>
+			</thead>
+			<tbody>
+				for i, correlated := range signal.CorrelatedSignals {
+					<tr
+					if i >= originalCount {
+						style="outline: 0.5px solid limegreen;"
+					}
+					>
+						<td>{ correlated.LocalRef } </td>
+						<td>{ types.FormatDateTime(correlated.SignalCreatedAt) }</td>
+						<td>{ correlated.Email }</td>
+						<td>
+							<button class="open-modal-btn btn btn-primary" data-correlated-signal-id={ correlated.SignalID }>View</button>
+							<dialog class="modal" id="modal" data-correlated-signal-id={ correlated.SignalID }>
+								<h3> { correlated.LocalRef }</h3>
+								<pre>{ prettyPrintJSON(correlated.Content) }</pre>
+								<button class="close-modal-btn btn btn-primary" data-correlated-signal-id={ correlated.SignalID }>Close</button>
+							</dialog>
+						</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	}
+	
+}
 
+templ SearchSignalScripts() {
 	<script>
+		/* button click handler */
+		document.addEventListener('click', function(e) {
+			/* pretty print json */
+			if (e.target.classList.contains('pretty-print-btn')) {
+				const signalId = e.target.getAttribute('data-signal-id');
+				if (!signalId) {
+					return;
+				}
+				togglePrettyPrint(signalId);
+			}
 
-	/* open and close modals that show the correlated id content */
-	 document.addEventListener('click', function(e) {
-		if (e.target.classList.contains('open-modal-btn') ||
-		 e.target.classList.contains('close-modal-btn')) {
-			const signalId = e.target.getAttribute('data-correlated-signal-id');
-			const modal = document.querySelector(`[data-correlated-signal-id="${signalId}"].modal`);	
-
+			/* open and close modals that show the correlated id content */
 			if (e.target.classList.contains('open-modal-btn')) {
-				modal.showModal();
+				const signalId = e.target.getAttribute('data-correlated-signal-id');
+				if (!signalId) {
+					return;
+				}
+				toggleCorrelatedSignalModal(signalId,'open');
 			}
 			if (e.target.classList.contains('close-modal-btn')) {
+				const signalId = e.target.getAttribute('data-correlated-signal-id');
+				if (!signalId) {
+					return;
+				}
+				toggleCorrelatedSignalModal(signalId,'close');
+			}
+		});
+
+		function togglePrettyPrint(signalId) {
+			const jsonContainer = document.getElementById('json-' + signalId);
+			if (!jsonContainer) {
+				return;
+			}	
+
+			compactJsonElement = jsonContainer.querySelector('.json-content.compact');
+			ppJsonElement = jsonContainer.querySelector('.json-content.pretty-printed');
+
+			if (!compactJsonElement || !ppJsonElement) {
+				return;
+			}
+
+				if (jsonContainer.classList.contains('compact')) {	
+					jsonContainer.classList.remove('compact');	
+					jsonContainer.classList.add('pretty-printed');
+					compactJsonElement.style.display = 'none';
+					ppJsonElement.style.display = 'block';
+				} else {		
+					jsonContainer.classList.remove('pretty-printed');	
+					jsonContainer.classList.add('compact');
+					compactJsonElement.style.display = 'block';
+					ppJsonElement.style.display = 'none';
+				}
+		}
+
+		function toggleCorrelatedSignalModal(signalId, action) {
+			if (!signalId || !action) {
+				return;
+			}
+
+			const modal = document.querySelector(`[data-correlated-signal-id="${signalId}"].modal`);	
+			if (!modal) {
+				return;
+			}
+
+			if (action == 'close') {
 				modal.close();	
 			}
+			if (action == 'open') {
+				modal.showModal();
+			}
 		}
-	 })
 
 	 </script>
 }
 
+/* pretty print json */
 func prettyPrintJSON(jsonElement []byte) string {
 	var obj any
 	if err:= json.Unmarshal([]byte(jsonElement), &obj); err != nil {
@@ -244,6 +261,7 @@ func prettyPrintJSON(jsonElement []byte) string {
 	}	
 	return string(pretty)
 }
+
 templ StartDateField() {
 	<div class="form-group">
 		<label for="start-date" class="form-label">Start Date</label>
