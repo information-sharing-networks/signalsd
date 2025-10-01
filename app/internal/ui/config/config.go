@@ -30,7 +30,6 @@ var validEnvs = map[string]bool{
 const (
 	AccessTokenDetailsCookieName = "access_details_token"
 	RefreshTokenCookieName       = "refresh_token"
-	LoginEventCookieName         = "login_event"
 )
 
 func NewConfig() (*Config, error) {

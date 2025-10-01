@@ -170,7 +170,7 @@ func (a *AuthService) SetAuthCookies(w http.ResponseWriter, accessTokenDetails *
 		HttpOnly: true,
 		Secure:   isProdOrStaging,
 		SameSite: http.SameSiteStrictMode,
-		MaxAge:   accessTokenDetails.ExpiresIn,
+		MaxAge:   refreshTokenCookie.MaxAge,
 	})
 
 	return nil
@@ -191,7 +191,7 @@ func (a *AuthService) ClearAuthCookies(w http.ResponseWriter) {
 	})
 
 	http.SetCookie(w, &http.Cookie{
-		Name:     signalsd.RefreshTokenCookieName,
+		Name:     config.RefreshTokenCookieName,
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,

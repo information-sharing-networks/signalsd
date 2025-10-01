@@ -7,7 +7,6 @@ import (
 	"net/http"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
-	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
@@ -72,7 +71,7 @@ func (a *AuthService) RequireAuth(next http.Handler) http.Handler {
 
 		case TokenMissing, TokenExpired:
 			// check for a refresh token cookie
-			refreshTokenCookie, err := r.Cookie(signalsd.RefreshTokenCookieName)
+			refreshTokenCookie, err := r.Cookie(config.RefreshTokenCookieName)
 			if err != nil {
 				reqLogger.Debug("Failed to get refresh token cookie - redirecting to login",
 					slog.String("component", "ui.RequireAuth"),
