@@ -2,6 +2,7 @@ package templates
 
 import (
 	"fmt"
+	"encoding/json"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
@@ -11,17 +12,17 @@ templ SignalSearchPage(isns []types.IsnOption, perms map[string]types.IsnPerm, r
 		@Navigation()
 		<div class="page-container">
 			<h1 class="page-title">Search Signals</h1>
-				<div class="card mb-6">
-					<div class="card-body">
-						<form hx-get="/ui-api/search-signals" hx-target="#search-results" class="space-y-4">
+			<div class="card mb-6">
+				<div class="card-body">
+					<form hx-get="/ui-api/search-signals" hx-target="#search-results" class="space-y-4">
 						@SignalTypeSelectorFields(isns)
 						<div class="grid grid-cols-1 md:grid-cols-2">
-							@StartDateField()	
+							@StartDateField()
 							@EndDateField()
 						</div>
 						<div class="grid grid-cols-1 md:grid-cols-3">
-							@LocalRefField()		
-							@SignalIDField()	
+							@LocalRefField()
+							@SignalIDField()
 							@AccountIDField()
 						</div>
 						<div class="checkbox-group">
@@ -37,18 +38,16 @@ templ SignalSearchPage(isns []types.IsnOption, perms map[string]types.IsnPerm, r
 					</form>
 				</div>
 			</div>
-			<div id="search-results"> </div>
+			<div id="search-results"></div>
 		</div>
 	}
 }
 
-
-
-// redner search results from the SearchSignals handler
-templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions) {
+// render search results from the SearchSignals handler
+templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions,  isnSlug , SignalTypeSlug, SemVer string) {
 	<div class="card">
 		<div class="card-header">
-			<h3 class="card-title">Search Results ({ fmt.Sprintf("%d", len(signals)) } signals found)</h3>
+			<h3 class="card-title">Search Results ({ types.FormatRecordsReturned(len(signals)) })</h3>
 		</div>
 		if len(signals) == 0 {
 			<div class="card-body text-center text-muted">
@@ -68,7 +67,6 @@ templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions) {
 											Withdrawn
 										</span>
 									}
-
 									if signal.VersionNumber > 1 {
 										<span class="signal-badge signal-badge-version">
 											{ fmt.Sprintf("(version %d)", signal.VersionNumber) }
@@ -97,44 +95,25 @@ templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions) {
 							>
 								Pretty Print
 							</button>
-						<div class="json-container">
-							<pre id={ fmt.Sprintf("json-%s", signal.SignalID) } class="json-content">{ string(signal.Content) }</pre>
+							<div class="json-container">
+								<pre id={ fmt.Sprintf("json-%s", signal.SignalID) } class="json-content">{ string(signal.Content) }</pre>
 							</div>
 						</div>
 						if len(signal.CorrelatedSignals) > 0 {
-							<div class="correlated-signals">
-								<h5 class="text-sm" style="font-weight: 500; color: #111827; margin-bottom: 0.5rem;">Correlated Signals ({ fmt.Sprintf("%d", len(signal.CorrelatedSignals)) })</h5>
-								<div class="space-y-1">
-									for _, correlated := range signal.CorrelatedSignals {
-										<div class="text-sm" style="color: #374151;">
-											<span class="font-mono">{ correlated.SignalID[:8] }...</span>
-											if correlated.LocalRef != "" {
-												<span style="margin-left: 0.5rem;">({ correlated.LocalRef })</span>
-											}
-											<span style="margin-left: 0.5rem; color: #6b7280;">v{ fmt.Sprintf("%d", correlated.VersionNumber) }</span>
-										</div>
-									}
-								</div>
-							</div>
+							{{ endpoint := fmt.Sprintf("/ui-api/isn/%s/signal_types/%s/v%s/signals/%s/correlated-count/%d", isnSlug, SignalTypeSlug, SemVer, signal.SignalID, len(signal.CorrelatedSignals)) }}
+							<div 
+								hx-get={ endpoint } 
+								hx-target="#correlated-signals-table" 
+								hx-trigger="every 5s"></div>
+							<h4>related documents</h4>
+							@CorrelatedSignalsTable(signal, len(signal.CorrelatedSignals))
 						}
-						if len(signal.PreviousSignalVersions) > 0 {
-							<div class="previous-versions">
-								<h5 class="text-sm" style="font-weight: 500; color: #111827; margin-bottom: 0.5rem;">Previous Versions ({ fmt.Sprintf("%d", len(signal.PreviousSignalVersions)) })</h5>
-								<div class="space-y-1">
-									for _, version := range signal.PreviousSignalVersions {
-										<div class="text-sm" style="color: #374151;">
-											<span style="font-weight: 500;">Version { fmt.Sprintf("%d", version.VersionNumber) }</span>
-											<span style="margin-left: 0.5rem; color: #6b7280;">{ version.CreatedAt }</span>
-										</div>
-									}
-								</div>
-							</div>
-						}
+						<!-- todo previous versions -->
 						<!-- Additional Info -->
 						<div class="additional-details">
-						<div class="text-xs" style="font-weight: bold; color: #6b7280; margin-top: 0.5rem; margin-bottom: 0.5rem;">Additional Information</div>
+							<div class="text-xs" style="font-weight: bold; color: #6b7280; margin-top: 0.5rem; margin-bottom: 0.5rem;">Additional Information</div>
 							<div class="additional-detail-items text-xs" style="color: #6b7280;">
-								if signal.SignalCreatedAt != signal.VersionCreatedAt { 
+								if signal.SignalCreatedAt != signal.VersionCreatedAt {
 									@SignalMetadataSimple("Updated", types.FormatDateTime(signal.VersionCreatedAt))
 								}
 								@SignalMetadataSimple("Account ID", signal.AccountID)
@@ -198,6 +177,73 @@ templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions) {
 	</script>
 }
 
+templ CorrelatedSignalsTable(signal client.SearchSignalWithCorrelationsAndVersions, originalCount int) {
+	<table id="correlated-signals-table" 
+	>
+		<thead>
+			<tr>
+				<th>local_ref</th>
+				<th>created at</th>
+				<th>email</th>
+				<th>details</th>
+			</tr>
+		</thead>
+		<tbody>
+			for i, correlated := range signal.CorrelatedSignals {
+				<tr
+				if i >= originalCount {
+					style="outline: 2px solid red; outline-offset: 2px;"
+				}
+				
+				>
+					<td>{ correlated.LocalRef } </td>
+					<td>{ types.FormatDateTime(correlated.SignalCreatedAt) }</td>
+					<td>{ correlated.Email }</td>
+					<td>
+						<button class="open-modal-btn btn btn-primary" data-correlated-signal-id={ correlated.SignalID }>View</button>
+						<dialog class="modal" id="modal" data-correlated-signal-id={ correlated.SignalID }>
+							<h3> { correlated.LocalRef }</h3>
+							<pre>{ prettyPrintJSON(correlated.Content) }</pre>
+							<button class="close-modal-btn btn btn-primary" data-correlated-signal-id={ correlated.SignalID }>Close</button>
+						</dialog>
+					</td>
+				</tr>
+			}
+		</tbody>
+	</table>
+
+	<script>
+
+	/* open and close modals that show the correlated id content */
+	 document.addEventListener('click', function(e) {
+		if (e.target.classList.contains('open-modal-btn') ||
+		 e.target.classList.contains('close-modal-btn')) {
+			const signalId = e.target.getAttribute('data-correlated-signal-id');
+			const modal = document.querySelector(`[data-correlated-signal-id="${signalId}"].modal`);	
+
+			if (e.target.classList.contains('open-modal-btn')) {
+				modal.showModal();
+			}
+			if (e.target.classList.contains('close-modal-btn')) {
+				modal.close();	
+			}
+		}
+	 })
+
+	 </script>
+}
+
+func prettyPrintJSON(jsonElement []byte) string {
+	var obj any
+	if err:= json.Unmarshal([]byte(jsonElement), &obj); err != nil {
+		return string(jsonElement)
+	}
+	pretty, err := json.MarshalIndent(obj, "", "  ");
+	if err != nil {
+		return string(jsonElement)
+	}	
+	return string(pretty)
+}
 templ StartDateField() {
 	<div class="form-group">
 		<label for="start-date" class="form-label">Start Date</label>
@@ -209,6 +255,7 @@ templ StartDateField() {
 		/>
 	</div>
 }
+
 templ EndDateField() {
 	<div class="form-group">
 		<label for="end-date" class="form-label">End Date</label>
@@ -233,6 +280,7 @@ templ LocalRefField() {
 		/>
 	</div>
 }
+
 templ SignalIDField() {
 	<div class="form-group">
 		<label for="signal-id" class="form-label">Signal ID</label>

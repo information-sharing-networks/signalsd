@@ -109,6 +109,7 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 			// search signals
 			r.Get("/search", handlerService.SearchSignalsPage)
 			r.Get("/ui-api/search-signals", handlerService.SearchSignals)
+			r.Get("/ui-api/isn/{isnSlug}/signal_types/{signalTypeSlug}/v{semVer}/signals/{signalID}/correlated-count/{count}", handlerService.GetLatestCorrelatedSignals)
 		})
 
 	})

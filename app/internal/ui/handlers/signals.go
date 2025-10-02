@@ -1,9 +1,12 @@
 package handlers
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
@@ -36,6 +39,60 @@ func (h *HandlerService) SearchSignalsPage(w http.ResponseWriter, r *http.Reques
 	component := templates.SignalSearchPage(isns, insPerms, nil)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render signal search page", slog.String("error", err.Error()))
+	}
+}
+
+func (h *HandlerService) GetLatestCorrelatedSignals(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	signalID := chi.URLParam(r, "signalID")
+	countString := chi.URLParam(r, "count")
+	isnSlug := chi.URLParam(r, "isnSlug")
+	signalTypeSlug := chi.URLParam(r, "signalTypeSlug")
+	semVer := chi.URLParam(r, "semVer")
+	params := client.SignalSearchParams{
+		IsnSlug:           isnSlug,
+		SignalTypeSlug:    signalTypeSlug,
+		SemVer:            semVer,
+		SignalID:          signalID,
+		IncludeCorrelated: true,
+	}
+
+	// Get access token from context
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
+	if !ok {
+		reqLogger.Error("Access token details not found in context")
+
+		component := templates.ErrorAlert("Authentication required. Please log in again.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	count, err := strconv.Atoi(countString)
+	if err != nil {
+		reqLogger.Error("Failed to convert count to int", slog.String("error", err.Error()))
+		return
+	}
+
+	// Perform search using ISN visibility to determine endpoint
+	searchResp, err := h.ApiClient.SearchSignals(accessTokenDetails.AccessToken, params, "private")
+	if err != nil {
+		reqLogger.Error("Signal search failed", slog.String("error", err.Error()))
+
+		return
+	}
+
+	if len(*searchResp) != 1 { // todo handle error
+		reqLogger.Error(fmt.Sprintf("Expected 1 signal, got %d", len(*searchResp)))
+		return
+	}
+
+	// render correlated signals table
+	component := templates.CorrelatedSignalsTable((*searchResp)[0], count)
+	if err := component.Render(r.Context(), w); err != nil {
+		reqLogger.Error("Failed to render correlated signals table", slog.String("error", err.Error()))
 	}
 }
 
@@ -108,7 +165,7 @@ func (h *HandlerService) SearchSignals(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Render search results
-	component := templates.SearchResults(*searchResp)
+	component := templates.SearchResults(*searchResp, params.IsnSlug, params.SignalTypeSlug, params.SemVer)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render search results", slog.String("error", err.Error()))
 	}
