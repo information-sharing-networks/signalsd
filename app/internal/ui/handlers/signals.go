@@ -165,7 +165,7 @@ func (h *HandlerService) SearchSignals(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Render search results
-	component := templates.SearchResults(*searchResp, params.IsnSlug, params.SignalTypeSlug, params.SemVer)
+	component := templates.SearchResults(*searchResp, params)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render search results", slog.String("error", err.Error()))
 	}

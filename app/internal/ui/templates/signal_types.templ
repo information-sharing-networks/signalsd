@@ -29,19 +29,23 @@ templ CreateSignalTypePage(isns []types.IsnOption) {
 							</div>
 						</div>
 						<div class="form-group">
-							@SchemaURLInput()	
+							@SkipValidationCheckbox()	
 						</div>
 						<div class="form-group">
-							@ReadmeURLInput()
+							@SchemaURLInput(false)	
+						</div>
+						<div class="form-group">
+							@SkipReadmeCheckbox()
+						</div>
+						<div class="form-group">
+							@ReadmeURLInput(false)
 						</div>
 						<div class="form-group">
 							@DescriptionInput()							
 						</div>
 						<div class="form-group" id="create-signal-type-result"></div>
 						<div class="form-group">
-							<button type="submit" class="btn btn-primary">
-								Create Signal Type
-							</button>
+							<button type="submit" class="btn btn-primary"> Create Signal Type </button>
 						</div>
 					</form>
 				</div>
@@ -85,10 +89,10 @@ templ CreateSignalTypePage(isns []types.IsnOption) {
 							</div>
 						</div>
 						<div class="form-group">
-							@SchemaURLInput()	
+							@SchemaURLInput(false)	
 						</div>
 						<div class="form-group">
-							@ReadmeURLInput()
+							@ReadmeURLInput(false)
 						</div>
 						<div class="form-group">
 							@DescriptionInput()							
@@ -142,35 +146,40 @@ templ VersionNumberSelector() {
 		<option value="major">Major (1.0.0)</option>
 	</select>
 }
-templ SchemaURLInput() {
-		<label for="schema-url" class="form-label">Schema URL</label>
-		<input
-			id="schema-url"
-			name="schema-url"
-			type="url"
-			required
-			class="form-input"
-			placeholder="enter a GitHub URL for the JSON schema"
-		/>
-		<p class="text-muted text-sm mt-1">
-			Use <code class="text-xs bg-gray-100 px-1 py-0.5 rounded">https://github.com/skip/validation/main/schema.json</code>
-			to disable validation.
-		</p>
+
+templ SchemaURLInput(skipValidation bool) {
+	if skipValidation {
+		<div id="schema-url-container"/>
+	} else {	
+		<div id="schema-url-container" class="form-group">
+			<label for="schema-url" class="form-label">Schema Validation URL</label>
+			<input
+				id="schema-url"
+				name="valdation-url"
+				type="url"
+				required
+				class="form-input"
+				placeholder="enter a GitHub URL for the JSON schema"
+			/>
+		</div>
+	}
 }
-templ ReadmeURLInput() {
-	<label for="readme-url" class="form-label">README URL</label>
-	<input
-		id="readme-url"
-		name="readme-url"
-		type="url"
-		required
-		class="form-input"
-		placeholder="enter a GitHub URL for the README file"
-	/>
-	<p class="text-muted text-sm mt-1">
-		Use <code class="text-xs bg-gray-100 px-1 py-0.5 rounded">https://github.com/skip/readme/main/readme.md</code>
-		to indicate there is no readme
-	</p>
+templ ReadmeURLInput(skipReadme bool) {
+	if skipReadme {
+		<div id="readme-url-container" />
+	} else {
+		<div id="readme-url-container" class="form-group">
+			<label for="readme-url" class="form-label">README URL</label>
+			<input
+				id="readme-url"
+				name="readme-url"
+				type="url"
+				required
+				class="form-input"
+				placeholder="enter a GitHub URL for the README file"
+			/>
+		</div>
+	}
 }
 
 templ DescriptionInput() {
@@ -183,4 +192,30 @@ templ DescriptionInput() {
 		class="form-input"
 		placeholder="Description of the signal type"
 	></textarea>
+}
+
+
+templ SkipReadmeCheckbox() {
+	<input type="checkbox" 
+		name="skip-readme" 
+		id="skip-readme"
+		value="true" 
+		class="checkbox-input"
+		hx-get="/ui-api/toggle-skip-readme"
+		hx-target="#readme-url-container"
+		hx-swap="outerHTML"
+	/>
+	<label for="skip-readme">Skip Readme</label>
+}
+templ SkipValidationCheckbox() {
+	<input type="checkbox" 
+		name="skip-validation" 
+		id="skip-validation"
+		value="true" 
+		class="checkbox-input"
+		hx-get="/ui-api/toggle-skip-validation"
+		hx-target="#schema-url-container"
+		hx-swap="outerHTML"
+	/>
+	<label for="skip-validation">Skip JSON Schema Validation</label>
 }

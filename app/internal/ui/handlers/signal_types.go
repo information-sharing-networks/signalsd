@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
+	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
@@ -50,6 +51,15 @@ func (h *HandlerService) CreateSignalType(w http.ResponseWriter, r *http.Request
 	bumpType := r.FormValue("bump-type")
 	readmeURL := r.FormValue("readme-url")
 	detail := r.FormValue("detail")
+	skipValidation := r.FormValue("skip-validation") == "true"
+	skipReadme := r.FormValue("skip-readme") == "true"
+
+	if skipValidation {
+		schemaURL = signalsd.SkipValidationURL
+	}
+	if skipReadme {
+		readmeURL = signalsd.SkipReadmeURL
+	}
 
 	// Validate required fields
 	if isnSlug == "" || title == "" || schemaURL == "" || bumpType == "" || readmeURL == "" || detail == "" {
@@ -170,5 +180,27 @@ func (h *HandlerService) NewSignalTypeSchema(w http.ResponseWriter, r *http.Requ
 	component := templates.SignalTypeCreationSuccess(*response)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
+	}
+}
+
+func (h *HandlerService) ToggleSkipValidation(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	skipValidation := r.FormValue("skip-validation") == "true"
+
+	component := templates.SchemaURLInput(skipValidation)
+	if err := component.Render(r.Context(), w); err != nil {
+		reqLogger.Error("Failed to render schema URL input", slog.String("error", err.Error()))
+	}
+}
+
+func (h *HandlerService) ToggleSkipReadme(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	skipReadme := r.FormValue("skip-readme") == "true"
+
+	component := templates.ReadmeURLInput(skipReadme)
+	if err := component.Render(r.Context(), w); err != nil {
+		reqLogger.Error("Failed to render readme URL input", slog.String("error", err.Error()))
 	}
 }

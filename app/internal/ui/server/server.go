@@ -103,6 +103,10 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 		// render individual fields
 		r.Get("/ui-api/account-identifier-field", handlerService.RenderAccountIdentifierField)
 
+		// toggles
+		r.Get("/ui-api/toggle-skip-validation", handlerService.ToggleSkipValidation)
+		r.Get("/ui-api/toggle-skip-readme", handlerService.ToggleSkipReadme)
+
 		r.Group(func(r chi.Router) {
 			r.Use(s.authService.RequireIsnAccess)
 
