@@ -27,6 +27,8 @@ require (
 require (
 	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/Netflix/go-env v0.1.2 // indirect
+	github.com/alecthomas/chroma/v2 v2.20.0 // indirect
+	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/go-openapi/jsonpointer v0.21.1 // indirect
 	github.com/go-openapi/jsonreference v0.21.0 // indirect
 	github.com/go-openapi/spec v0.21.0 // indirect

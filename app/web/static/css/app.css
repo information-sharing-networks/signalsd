@@ -97,7 +97,7 @@ body {
     "Helvetica Neue", Arial, sans-serif;
   line-height: 1.5;
   color: #111827;
-  background-color: #f9fafb;
+  background-color: #f9fafb!important;
   min-height: 100vh;
 }
 
@@ -506,11 +506,13 @@ table tbody tr:hover {
   font-size: 0.875rem;
   color: #374151;
   overflow-x: auto;
-  white-space: pre-wrap;
   font-family: "Monaco", "Menlo", "Ubuntu Mono", monospace;
   max-height: 400px;
   overflow-y: auto;
   line-height: 1.4;
+}
+.json-content.compact {
+  white-space: pre-wrap;
 }
 
 .pretty-print-btn {
