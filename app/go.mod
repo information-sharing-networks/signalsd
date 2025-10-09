@@ -10,13 +10,15 @@ require (
 )
 
 require (
+	github.com/Netflix/go-env v0.1.2
 	github.com/a-h/templ v0.3.943
+	github.com/alecthomas/chroma/v2 v2.20.0
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/jub0bs/cors v0.9.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lmittmann/tint v1.1.2
-	github.com/pressly/goose/v3 v3.25.0
+	github.com/pressly/goose/v3 v3.26.0
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1
 	github.com/spf13/cobra v1.10.1
 	github.com/swaggo/swag v1.16.6
@@ -26,8 +28,6 @@ require (
 
 require (
 	github.com/KyleBanks/depth v1.2.1 // indirect
-	github.com/Netflix/go-env v0.1.2 // indirect
-	github.com/alecthomas/chroma/v2 v2.20.0 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/go-openapi/jsonpointer v0.21.1 // indirect
 	github.com/go-openapi/jsonreference v0.21.0 // indirect
