@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
+	"github.com/alecthomas/chroma/v2/quick"
+	"bytes"
 )
 
 templ SignalSearchPage(isns []types.IsnOption, perms map[string]types.IsnPerm, results []client.SearchSignalWithCorrelationsAndVersions) {
@@ -28,7 +30,6 @@ templ SignalSearchPage(isns []types.IsnOption, perms map[string]types.IsnPerm, r
 						<div class="checkbox-group">
 							@CheckboxField("include-withdrawn", "true", "Include withdrawn signals")
 							@CheckboxField("include-correlated", "true", "Include correlated signals")
-							@CheckboxField("include-previous-versions", "true", "Include previous versions")
 						</div>
 						<div class="form-group">
 							<button type="submit" class="btn btn-primary">
@@ -39,6 +40,7 @@ templ SignalSearchPage(isns []types.IsnOption, perms map[string]types.IsnPerm, r
 				</div>
 			</div>
 			<div id="search-results"></div>
+			@SearchSignalScripts()
 		</div>
 	}
 }
@@ -79,8 +81,14 @@ templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions,  p
 						<div style="margin-top: 1rem;">
 							{{ id := fmt.Sprintf("json-%s", signal.SignalID) }}
 							<div class="json-container compact" id={ id }>
-								<pre class="json-content compact">{ string(signal.Content) }</pre>
-								<pre style="display: none;" class="json-content pretty-printed">{ prettyPrintJSON(signal.Content) }</pre>
+								<pre class="json-content compact language-json">
+									<code class="language-json">
+										{ string(signal.Content) }
+									</code>
+								</pre>
+								<div style="display: none;" class="json-content pretty-printed">
+									@templ.Raw(HighlightJSON(signal.Content)) 
+								</div>
 								<button
 									type="button"
 									data-signal-id={ signal.SignalID }
@@ -122,10 +130,9 @@ templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions,  p
 			</div>
 		}
 	</div>
-
-	@SearchSignalScripts()
-
+	
 }
+
 
 // render the correlated signals table - where the count of correlated signals has changed, highlight the new rows
 templ CorrelatedSignalsTable(signal client.SearchSignalWithCorrelationsAndVersions, originalCount int) {
@@ -149,9 +156,9 @@ templ CorrelatedSignalsTable(signal client.SearchSignalWithCorrelationsAndVersio
 			<tbody>
 				for i, correlated := range signal.CorrelatedSignals {
 					<tr
-					if i >= originalCount {
-						style="outline: 0.5px solid limegreen;"
-					}
+						if i >= originalCount {
+							style="outline: 0.5px solid limegreen;"
+						}
 					>
 						<td>{ correlated.LocalRef } </td>
 						<td>{ types.FormatDateTime(correlated.SignalCreatedAt) }</td>
@@ -215,17 +222,17 @@ templ SearchSignalScripts() {
 				return;
 			}
 
-				if (jsonContainer.classList.contains('compact')) {	
-					jsonContainer.classList.remove('compact');	
-					jsonContainer.classList.add('pretty-printed');
-					compactJsonElement.style.display = 'none';
-					ppJsonElement.style.display = 'block';
-				} else {		
-					jsonContainer.classList.remove('pretty-printed');	
-					jsonContainer.classList.add('compact');
-					compactJsonElement.style.display = 'block';
-					ppJsonElement.style.display = 'none';
-				}
+			if (jsonContainer.classList.contains('compact')) {	
+				jsonContainer.classList.remove('compact');	
+				jsonContainer.classList.add('pretty-printed');
+				compactJsonElement.style.display = 'none';
+				ppJsonElement.style.display = 'block';
+			} else {		
+				jsonContainer.classList.remove('pretty-printed');	
+				jsonContainer.classList.add('compact');
+				compactJsonElement.style.display = 'block';
+				ppJsonElement.style.display = 'none';
+			}
 		}
 
 		function toggleCorrelatedSignalModal(signalId, action) {
@@ -239,7 +246,7 @@ templ SearchSignalScripts() {
 			}
 
 			if (action == 'close') {
-				modal.close();	
+				modal.close();
 			}
 			if (action == 'open') {
 				modal.showModal();
@@ -249,18 +256,6 @@ templ SearchSignalScripts() {
 	 </script>
 }
 
-/* pretty print json */
-func prettyPrintJSON(jsonElement []byte) string {
-	var obj any
-	if err:= json.Unmarshal([]byte(jsonElement), &obj); err != nil {
-		return string(jsonElement)
-	}
-	pretty, err := json.MarshalIndent(obj, "", "  ");
-	if err != nil {
-		return string(jsonElement)
-	}	
-	return string(pretty)
-}
 
 templ StartDateField() {
 	<div class="form-group">
@@ -323,4 +318,31 @@ templ AccountIDField() {
 			class="form-input"
 		/>
 	</div>
+}
+
+/* code highlgiht json  - todo - test escaping of html characters */
+func HighlightJSON(jsonElement json.RawMessage) string {
+	prettyPrintJSON := prettyPrintJSON(jsonElement)
+	var buf bytes.Buffer
+
+	err := quick.Highlight(&buf, string(prettyPrintJSON), "json", "html", "trac")
+	if err != nil {
+		return ""
+	}
+
+	return buf.String()
+}
+
+
+/* pretty print json */
+func prettyPrintJSON(jsonElement []byte) string {
+	var obj any
+	if err:= json.Unmarshal([]byte(jsonElement), &obj); err != nil {
+		return string(jsonElement)
+	}
+	pretty, err := json.MarshalIndent(obj, "", "  ");
+	if err != nil {
+		return string(jsonElement)
+	}	
+	return string(pretty)
 }
