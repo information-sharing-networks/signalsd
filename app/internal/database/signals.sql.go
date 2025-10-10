@@ -517,9 +517,7 @@ WHERE
     AND ($8::timestamptz IS NULL OR lsv.created_at >= $8::timestamptz)
     AND ($9::timestamptz IS NULL OR lsv.created_at <= $9::timestamptz)
 ORDER BY
-    lsv.created_at,
-    s.local_ref,
-    lsv.version_number
+    s.updated_at ASC
 `
 
 type GetSignalsWithOptionalFiltersParams struct {

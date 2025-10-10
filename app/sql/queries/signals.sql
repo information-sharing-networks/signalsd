@@ -191,9 +191,7 @@ WHERE
     AND (sqlc.narg('start_date')::timestamptz IS NULL OR lsv.created_at >= sqlc.narg('start_date')::timestamptz)
     AND (sqlc.narg('end_date')::timestamptz IS NULL OR lsv.created_at <= sqlc.narg('end_date')::timestamptz)
 ORDER BY
-    lsv.created_at,
-    s.local_ref,
-    lsv.version_number;
+    s.updated_at ASC;
 
 -- name: GetSignalByAccountAndLocalRef :one
 SELECT s.*, i.slug as isn_slug, st.slug as signal_type_slug, st.sem_ver

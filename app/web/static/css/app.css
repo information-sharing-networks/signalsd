@@ -215,6 +215,22 @@ body {
   box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3);
 }
 
+.btn-small {
+  background: white;
+  color: black;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid black;
+}
+
+.monitor-spinner {
+  display: none;
+}
+
+.monitoring + div + .monitor-spinner {
+  display: inline-flex;
+  padding-left: 8px;
+}
 
 
 /* Forms */
@@ -355,6 +371,13 @@ table {
   line-height: 1.4;
   color: #0b0c0c;
 }
+table caption {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+  margin-top: 2rem;
+  margin-bottom: 1rem;
+}
 
 table th,
 table td {
@@ -429,14 +452,13 @@ table tbody tr:hover {
 .signal-header {
   display: flex;
   flex-direction: row;
-  margin-bottom: 1rem;
 }
 
 .signal-title {
   font-size: 1.125rem;
   font-weight: 600;
   color: #111827;
-  margin: 0 0 0.5rem 0;
+  margin-bottom: 1rem;
 }
 
 .signal-badge {
