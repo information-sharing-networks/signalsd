@@ -70,11 +70,11 @@ ENVIRONMENT=dev                       #  Options: dev, prod, test, perf, staging
 LOG_LEVEL=debug                       #  Options: debug, info, warn, error (default: debug)
 
 # Performance Tuning (all optional - defaults shown)
-READ_TIMEOUT=15s                      #  HTTP read timeout (default: 15s)
-WRITE_TIMEOUT=15s                     #  HTTP write timeout (default: 15s)
-IDLE_TIMEOUT=60s                      #  HTTP idle timeout (default: 60s)
-RATE_LIMIT_RPS=100                    #  Requests per second (default: 100, set to 0 to disable)
-RATE_LIMIT_BURST=20                   #  Burst allowance (default: 20)
+READ_TIMEOUT=15s                      #  HTTP read timeout 
+WRITE_TIMEOUT=15s                     #  HTTP write timeout 
+IDLE_TIMEOUT=60s                      #  HTTP idle timeout 
+RATE_LIMIT_RPS=2500                   #  Requests per second (set to 0 to disable)
+RATE_LIMIT_BURST=5000                 #  Burst allowance 
 MAX_SIGNAL_PAYLOAD_SIZE=5242880       #  Max payload size (default: 5MB)
 MAX_API_REQUEST_SIZE=65536            #  Max API request size (default: 64KB)
 
@@ -517,8 +517,8 @@ DB_MAX_CONN_IDLE_TIME=20m
 DB_CONNECT_TIMEOUT=10s
 
 # Performance Configuration
-RATE_LIMIT_RPS=200
-RATE_LIMIT_BURST=50
+RATE_LIMIT_RPS=2000
+RATE_LIMIT_BURST=5000
 
 # Server Configuration
 READ_TIMEOUT=30s

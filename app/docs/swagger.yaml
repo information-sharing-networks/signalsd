@@ -860,7 +860,7 @@ info:
 
     ## Request Limits
     All endpoints are protected by:
-    - **Rate limiting**: Configurable requests per second (default: 100 RPS, 20 burst)
+    - **Rate limiting**: Configurable requests per second
     - **Request size limits**: 64KB for admin/auth endpoints, 5MB for signal ingestion
 
     Check the X-Max-Request-Body response header for the configured limit on signals payload.

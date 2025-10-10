@@ -44,7 +44,7 @@ import (
 //	@description
 //	@description	## Request Limits
 //	@description	All endpoints are protected by:
-//	@description	- **Rate limiting**: Configurable requests per second (default: 100 RPS, 20 burst)
+//	@description	- **Rate limiting**: Configurable requests per second
 //	@description	- **Request size limits**: 64KB for admin/auth endpoints, 5MB for signal ingestion
 //	@description
 //	@description	Check the X-Max-Request-Body response header for the configured limit on signals payload.
