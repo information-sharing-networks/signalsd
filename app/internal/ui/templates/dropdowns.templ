@@ -7,16 +7,12 @@ import (
 
 
 templ AccountTypeSelector() {
+	<label for="account-type" class="form-label">Account Type</label>
     <select
         id="account-type"
         name="account-type"
         required
         class="form-select"
-        hx-get="/ui-api/account-identifier-field"
-        hx-target="#account-identifier-container"
-        hx-swap="outerHTML"
-        hx-trigger="change"
-        hx-include="this"
     >
         <option value="">Select Account Type...</option>
         <option value="user">User</option>
@@ -24,18 +20,78 @@ templ AccountTypeSelector() {
     </select>
 }
 
-// Placeholder input field (disabled)
-templ AccountIdentifierPlaceholder() {
+
+// AccountSelector displays both user and service account dropdowns with JavaScript to toggle visibility
+templ AccountSelector(users []types.UserOption, serviceAccounts []types.ServiceAccountOption) {
     <div id="account-identifier-container">
-        <input
-            id="account-identifier"
-            name="account-identifier"
-            type="text"
-            placeholder="Select account type first..."
-            disabled
-            class="form-input"
-        />
+        <div id="user-selector" style="display: none;">
+			<label for="user-identifier" class="form-label">Account</label>
+            <select
+                id="user-identifier"
+                name="user-identifier"
+                class="form-select"
+            >
+                <option value="">Select User...</option>
+                for _, user := range users {
+                    <option value={ user.Email }>{ user.Email } ({ user.UserRole })</option>
+                }
+            </select>
+        </div>
+        <div id="service-account-selector" style="display: none;">
+			<label for="service-account-identifier" class="form-label">Account</label>
+            <select
+                id="service-account-identifier"
+                name="service-account-identifier"
+                class="form-select"
+            >
+                <option value="">Select Service Account...</option>
+                for _, account := range serviceAccounts {
+                    <option value={ account.ClientID }>{ account.ClientOrganization } / { account.ClientContactEmail } ({ account.ClientID })</option>
+                }
+            </select>
+        </div>
+        <div id="account-placeholder" class="account-selector-default">
+            <lable for="account-identifier-placeholder" class="form-label">Account</lable>
+            <input
+                id="account-identifier-placeholder"
+                type="text"
+                placeholder="Select account type first..."
+                disabled
+                class="form-input"
+            />
+        </div>
     </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const accountTypeSelect = document.getElementById('account-type');
+            const userSelector = document.getElementById('user-selector');
+            const serviceAccountSelector = document.getElementById('service-account-selector');
+            const placeholder = document.getElementById('account-placeholder');
+
+            function toggleAccountSelector() {
+                // Hide all selectors
+                userSelector.style.display = 'none';
+                serviceAccountSelector.style.display = 'none';
+                placeholder.style.display = 'none';
+
+                // Show appropriate selector based on account type
+                const accountType = accountTypeSelect.value;
+                if (accountType === 'user') {
+                    userSelector.style.display = 'block';
+                } else if (accountType === 'service-account') {
+                    serviceAccountSelector.style.display = 'block';
+                } else {
+                    placeholder.style.display = 'block';
+                }
+            }
+
+            // Set initial state
+            toggleAccountSelector();
+
+            // Listen for changes
+            accountTypeSelect.addEventListener('change', toggleAccountSelector);
+        });
+    </script>
 }
 
 // =============================================================================
@@ -57,22 +113,21 @@ templ UserSelector(users []types.UserOption, id, name string) {
     </select>
 }
 
-// User selector for account identifier context (wrapped in container)
-templ UserSelectorForAccountIdentifier(users []types.UserOption) {
-    <div id="account-identifier-container">
-        @UserSelector(users, "account-identifier", "account-identifier")
-    </div>
-}
+
 
 // =============================================================================
 // SERVICE ACCOUNT SELECTORS
 // =============================================================================
 
-// Base service account selector component
-templ ServiceAccountSelector(serviceAccounts []types.ServiceAccountOption, id, name string) {
+
+
+// service account selector component.
+// supply the id for the select element.
+templ ServiceAccountSelector(serviceAccounts []types.ServiceAccountOption) {
+	<label for="service-account-dropdown" class="form-label">Service Account</label>
 	<select
-		id={ id }
-		name={ name }
+		id="service-account-dropdown"
+		name="service-account-dropdown"
 		required
 		class="form-select"
 	>
@@ -83,80 +138,23 @@ templ ServiceAccountSelector(serviceAccounts []types.ServiceAccountOption, id, n
 	</select>
 }
 
-// Service account selector for account identifier context (wrapped in container)
-templ ServiceAccountSelectorForAccountIdentifier(serviceAccounts []types.ServiceAccountOption) {
-    <div id="account-identifier-container">
-        @ServiceAccountSelector(serviceAccounts, "account-identifier", "account-identifier")
-    </div>
-}
-
-// Service account selector for reissue credentials context (with HTMX integration)
-templ ServiceAccountSelectorForReissue(serviceAccounts []types.ServiceAccountOption) {
-	<select
-		id="service-account-dropdown"
-		name="service-account-dropdown"
-		required
-		class="form-select"
-		hx-get="/ui-api/reissue-btn-state"
-		hx-trigger="change"
-		hx-target="#reissue-btn-container"
-		hx-swap="innerHTML"
-		hx-include="this"
-	>
-		<option value="">Select Service Account...</option>
-		for _, account := range serviceAccounts {
-			<option value={ account.ClientID }>{ account.ClientOrganization } / { account.ClientContactEmail } ({ account.ClientID })</option>
-		}
-	</select>
-	<!-- Clear alerts when dropdown selection changes -->
-	<div hx-get="/ui-api/clear-alerts"
-		hx-trigger="change from:#service-account-dropdown"
-		hx-target="#reissue-result"
-		hx-swap="innerHTML"
-		style="display: none;">
-	</div>
-}
-
-// Service account placeholder (disabled, gets replaced when loaded)
-templ ServiceAccountPlaceholder() {
-	<select
-		id="service-account-dropdown"
-		name="service-account-dropdown"
-		disabled
-		class="form-select"
-	>
-		<option value="">Loading service accounts...</option>
-	</select>
-}
 
 
 
 
-// User dropdown for password reset functionality
-templ UserOptionsGeneratePasswordLink(users []types.UserOption) {
+templ UserOptionsSelector(users []types.UserOption) {
+	<label for="user-dropdown" class="form-label">User</label>
 	<select
 		id="user-dropdown"
 		name="user-dropdown"
 		required
 		class="form-select"
-		hx-get="/ui-api/generate-password-reset-btn-state"
-		hx-trigger="change"
-		hx-target="#generate-password-reset-btn-container"
-		hx-swap="innerHTML"
-		hx-include="this"
 	>
 		<option value="">Select User...</option>
 		for _, user := range users {
 			<option value={ user.Email + "|" + user.UserRole }>{ user.Email } ({ user.UserRole })</option>
 		}
 	</select>
-	<!-- Clear alerts when dropdown selection changes -->
-	<div hx-get="/ui-api/clear-alerts"
-		hx-trigger="change from:#user-dropdown"
-		hx-target="#generate-password-reset-result"
-		hx-swap="innerHTML"
-		style="display: none;">
-	</div>
 }
 
 templ IsnAccountPermissionSelector() {
@@ -174,7 +172,7 @@ templ IsnAccountPermissionSelector() {
     </select>
 }
 
-// ISN selector dropdown
+// ISN selector dropdown 
 templ IsnSelector(isns []types.IsnOption) {
 	<lable for="isn-slug" class="form-label">ISN</lable>
     <select
@@ -197,7 +195,8 @@ templ IsnSelector(isns []types.IsnOption) {
 // SIGNAL TYPE SELECTOR
 // ************************************************************************ //
 
-// creates the ISN, Signal Type, and Version select elements for use in forms
+// SignalTypeSelectorFields creates cascading dropdowns: ISN → Signal Type → Version
+// Uses HTMX to dynamically load options based on selections
 templ SignalTypeSelectorFields(isns []types.IsnOption) {
 	<div class="grid grid-cols-1 md:grid-cols-3">
 		<div class="form-group">
@@ -206,11 +205,12 @@ templ SignalTypeSelectorFields(isns []types.IsnOption) {
 				id="isn-slug"
 				name="isn-slug"
 				required
-				hx-get="/ui-api/signal-type-slug-options"
+				hx-get="/ui-api/options/signal-type-slugs"
 				hx-target="#signal-type-slug"
 				hx-swap="outerHTML"
 				hx-trigger="change"
 				hx-include="#isn-slug, this"
+				hx-indicator="#signal-type-loading"
 				class="form-select"
 			>
 				<option value="">Select ISN...</option>
@@ -225,15 +225,18 @@ templ SignalTypeSelectorFields(isns []types.IsnOption) {
 		</div>
 		<div class="form-group">
 			<label for="signal-type-slug" class="form-label">Signal Type</label>
-			<select
-				id="signal-type-slug"
-				name="signal-type-slug"
-				required
-				disabled
-				class="form-select"
-			>
-				<option value="">Select Signal Type...</option>
-			</select>
+			<div class="relative">
+				<select
+					id="signal-type-slug"
+					name="signal-type-slug"
+					required
+					disabled
+					class="form-select"
+				>
+					<option value="">Select Signal Type...</option>
+				</select>
+				<div id="signal-type-loading" class="htmx-indicator loading-spinner">Loading...</div>
+			</div>
 		</div>
 		<div id="version-select" class="form-group">
 			<label for="sem-ver" class="form-label">Version</label>
@@ -251,13 +254,14 @@ templ SignalTypeSelectorFields(isns []types.IsnOption) {
 }
 
 
-// the list of available signal types for the selected ISN (use with SignalTypeSelectorFields)
+// SignalTypeSlugOptions renders signal type dropdown options via HTMX
+// Called when ISN selection changes in SignalTypeSelectorFields
 templ SignalTypeSlugOptions(signalTypes []types.SignalTypeSlugOption) {
 	<select
 		id="signal-type-slug"
 		name="signal-type-slug"
 		required
-		hx-get="/ui-api/signal-type-version-options"
+		hx-get="/ui-api/options/signal-type-versions"
 		hx-target="#sem-ver"
 		hx-swap="outerHTML"
 		hx-trigger="change"

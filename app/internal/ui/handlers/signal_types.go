@@ -11,7 +11,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
 )
 
-// CreateSignalTypePage renders the signal type management page.
+// CreateSignalTypePage renders the create signal type page.
 //
 // Use with RequireAdminOrOwnerRole and RequireIsnAdmin middleware
 func (h *HandlerService) CreateSignalTypePage(w http.ResponseWriter, r *http.Request) {
@@ -32,8 +32,32 @@ func (h *HandlerService) CreateSignalTypePage(w http.ResponseWriter, r *http.Req
 	// populate the isn dropdown list with ISNs where the user is an admin
 	isns := h.getIsnOptions(isnPerms, true, false)
 
-	// Render signal type management page
 	component := templates.CreateSignalTypePage(isns)
+	if err := component.Render(r.Context(), w); err != nil {
+		reqLogger.Error("Failed to render signal type management page", slog.String("error", err.Error()))
+	}
+}
+
+func (h *HandlerService) RegisterNewSignalTypeSchemaPage(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
+	if !ok {
+		reqLogger.Error("failed to read accessTokenDetails from context")
+		return
+	}
+
+	isnPerms := accessTokenDetails.IsnPerms
+
+	if len(isnPerms) == 0 {
+		reqLogger.Error("user does not have permission to access any ISNs")
+		return
+	}
+	// populate the isn dropdown list with ISNs where the user is an admin
+	isns := h.getIsnOptions(isnPerms, true, false)
+
+	// Render signal type management page
+	component := templates.RegisterNewSignalTypeSchemaPage(isns)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render signal type management page", slog.String("error", err.Error()))
 	}
@@ -116,9 +140,9 @@ func (h *HandlerService) CreateSignalType(w http.ResponseWriter, r *http.Request
 	}
 }
 
-// NewSignalTypeSchema handles the form submission to register a new schema for an existing signal type
+// RegisterNewSignalTypeSchema handles the form submission to register a new schema for an existing signal type
 // Use with RequireAdminOrOwnerRole and RequireIsnAdmin middleware
-func (h *HandlerService) NewSignalTypeSchema(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerService) RegisterNewSignalTypeSchema(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Parse form data
@@ -148,7 +172,7 @@ func (h *HandlerService) NewSignalTypeSchema(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Prepare request
-	createReq := client.NewSignalTypeSchemaRequest{
+	createReq := client.RegisterNewSignalTypeSchemaRequest{
 		IsnSlug:   isnSlug,
 		SchemaURL: schemaURL,
 		Slug:      slug,
@@ -158,7 +182,7 @@ func (h *HandlerService) NewSignalTypeSchema(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Call the API to create the signal type
-	response, err := h.ApiClient.NewSignalTypeSchema(accessTokenDetails.AccessToken, createReq)
+	response, err := h.ApiClient.RegisterNewSignalTypeSchema(accessTokenDetails.AccessToken, createReq)
 	if err != nil {
 		reqLogger.Error("Failed to register new schema for signal type", slog.String("error", err.Error()))
 

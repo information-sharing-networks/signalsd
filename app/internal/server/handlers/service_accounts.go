@@ -57,11 +57,12 @@ type ReissueServiceAccountCredentialsRequest struct {
 }
 
 type ReissueServiceAccountCredentialsResponse struct {
-	ClientID  string    `json:"client_id" example:"sa_example-org_k7j2m9x1"`
-	AccountID uuid.UUID `json:"account_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	SetupURL  string    `json:"setup_url" example:"https://api.example.com/api/auth/service-accounts/setup/550e8400-e29b-41d4-a716-446655440000"`
-	ExpiresAt time.Time `json:"expires_at" example:"2024-12-25T10:30:00Z"`
-	ExpiresIn int       `json:"expires_in" example:"172800"`
+	ClientID           string    `json:"client_id" example:"sa_example-org_k7j2m9x1"`
+	ClientContactEmail string    `json:"client_contact_email" example:"example@example.com"`
+	AccountID          uuid.UUID `json:"account_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	SetupURL           string    `json:"setup_url" example:"https://api.example.com/api/auth/service-accounts/setup/550e8400-e29b-41d4-a716-446655440000"`
+	ExpiresAt          time.Time `json:"expires_at" example:"2024-12-25T10:30:00Z"`
+	ExpiresIn          int       `json:"expires_in" example:"172800"`
 }
 
 type SetupPageData struct {
@@ -422,11 +423,12 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentialsHandler(w http.R
 
 	// Return the setup information
 	response := ReissueServiceAccountCredentialsResponse{
-		ClientID:  clientID,
-		AccountID: serviceAccountID,
-		SetupURL:  setupURL,
-		ExpiresAt: expiresAt,
-		ExpiresIn: int(signalsd.OneTimeSecretExpiry.Seconds()),
+		ClientID:           clientID,
+		ClientContactEmail: serviceAccount.ClientContactEmail,
+		AccountID:          serviceAccountID,
+		SetupURL:           setupURL,
+		ExpiresAt:          expiresAt,
+		ExpiresIn:          int(signalsd.OneTimeSecretExpiry.Seconds()),
 	}
 
 	responses.RespondWithJSON(w, http.StatusOK, response)

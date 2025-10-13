@@ -18,7 +18,7 @@ type CreateSignalTypeRequest struct {
 }
 
 // CreateSignalTypeRequest represents the request body for creating a signal type
-type NewSignalTypeSchemaRequest struct {
+type RegisterNewSignalTypeSchemaRequest struct {
 	IsnSlug   string `json:"isn_slug"`
 	SchemaURL string `json:"schema_url"`
 	Slug      string `json:"slug"`
@@ -81,7 +81,7 @@ func (c *Client) CreateSignalType(accessToken string, req CreateSignalTypeReques
 }
 
 // CreateSignalType creates a new signal type using the signalsd API
-func (c *Client) NewSignalTypeSchema(accessToken string, req NewSignalTypeSchemaRequest) (*NewSignalTypeResponse, error) {
+func (c *Client) RegisterNewSignalTypeSchema(accessToken string, req RegisterNewSignalTypeSchemaRequest) (*NewSignalTypeResponse, error) {
 	url := fmt.Sprintf("%s/api/isn/%s/signal_types/%s/schemas", c.baseURL, req.IsnSlug, req.Slug)
 
 	jsonData, err := json.Marshal(req)

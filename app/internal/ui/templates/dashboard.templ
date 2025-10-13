@@ -7,13 +7,22 @@ templ DashboardPage() {
 		@Navigation()
 		<div class="page-container">
 			<h1 class="page-title">Dashboard</h1>
-			<p class="text-muted mb-6">Welcome to the Signalsd management interface.</p>
+			<p class="card-description text-muted">Welcome to the Signalsd management interface.</p>
 
 			<div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
 				<div class="card">
 					<div class="card-body">
-						<h3 class="card-title">Signal Management</h3>
-						<p class="text-muted mb-4">Search and manage signals across Information Sharing Networks.</p>
+						<h3 class="card-title">Site Management</h3>
+						<p class="card-description text-muted">Manage ISNs and accounts</p>
+						<a href="/admin" class="btn btn-primary">
+							Manage ISNs
+						</a>
+					</div>
+				</div>
+                <div class="card">
+					<div class="card-body">
+						<h3 class="card-title">Signals</h3>
+						<p class="card-description text-muted">Search and manage signals across Information Sharing Networks.</p>
 						<a href="/search" class="btn btn-primary">
 							Search Signals
 						</a>
@@ -22,18 +31,9 @@ templ DashboardPage() {
 				<div class="card">
 					<div class="card-body">
 						<h3 class="card-title">API Documentation</h3>
-						<p class="text-muted mb-4">View the complete API reference and interactive documentation.</p>
+						<p class="card-description text-muted">View the complete API reference and interactive documentation.</p>
 						<a href="/docs" target="_blank" class="btn btn-primary">
 							View Docs ↗
-						</a>
-					</div>
-				</div>
-				<div class="card">
-					<div class="card-body">
-						<h3 class="card-title">Information Sharing Networks</h3>
-						<p class="text-muted mb-4">Manage ISNs and configure data sharing.</p>
-						<a href="/admin" class="btn btn-primary">
-							Manage ISNs
 						</a>
 					</div>
 				</div>

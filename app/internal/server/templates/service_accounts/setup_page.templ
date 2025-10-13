@@ -123,6 +123,14 @@ templ SetupPage(data SetupPageData) {
 							btn.style.background = '#007bff';
 							btn.disabled = false;
 						}, 1500);
+					}).catch(err => {
+						console.error('Failed to copy text: ', err);
+						btn.textContent = 'Failed';
+						btn.style.background = '#dc3545';
+						setTimeout(() => {
+							btn.textContent = 'Copy';
+							btn.style.background = '#007bff';
+						}, 1500);
 					});
 				}
 			</script>

@@ -8,11 +8,9 @@ package templates
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-import (
-	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
-)
+import "github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 
-func IsnAccountManagementPage(isns []types.IsnOption) templ.Component {
+func IsnAccountManagementPage(isns []types.IsnOption, users []types.UserOption, serviceAccounts []types.ServiceAccountOption) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -49,7 +47,7 @@ func IsnAccountManagementPage(isns []types.IsnOption) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">ISN Account Management</h1><p class=\"text-muted mb-6\">Grant or revoke access to Information Sharing Networks.</p><div class=\"card mb-6\"><div class=\"card-header\"><h3 class=\"card-title\">Change ISN permissions for an account</h3></div><div class=\"card-body\"><form hx-post=\"/ui-api/update-isn-account\" hx-target=\"#update-access-result\" class=\"space-y-4\"><div class=\"grid grid-cols-1 md:grid-cols-3 gap-4\"><div class=\"form-group\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Add or Remove Account ISN Permissions</h1><div class=\"card\"><div class=\"card-header\"></div><div class=\"card-body\"><form hx-put=\"/ui-api/isn/accounts/update\" hx-target=\"#result\" class=\"margin-top-4\"><div class=\"grid grid-cols-1 md:grid-cols-3 gap-4\"><div class=\"form-group\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -57,7 +55,7 @@ func IsnAccountManagementPage(isns []types.IsnOption) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</div><div class=\"form-group\"><label for=\"account-type\" class=\"form-label\">Account Type</label>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</div><div class=\"form-group\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -65,11 +63,11 @@ func IsnAccountManagementPage(isns []types.IsnOption) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div><div class=\"form-group\"><label for=\"account-identifier\" class=\"form-label\">Account</label>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div><div class=\"form-group\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = AccountIdentifierPlaceholder().Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = AccountSelector(users, serviceAccounts).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -81,13 +79,13 @@ func IsnAccountManagementPage(isns []types.IsnOption) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</div></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Submit</button></div></form></div></div><div id=\"update-access-result\"><!-- Results will appear here --></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</div></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Submit</button></div></form></div></div><div id=\"result\"><!-- Results will appear here --></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = BaseLayout("ISN Account Management").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = BaseLayout("ISN Account Permissions").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

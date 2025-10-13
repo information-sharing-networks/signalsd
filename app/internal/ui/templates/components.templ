@@ -45,3 +45,32 @@ templ CheckboxField(name, value, label string) {
 }
 
 
+// use this script for any page that needs copy to clipboard functionality.
+// the button should be defined as:
+//
+// <button class="btn, btn-copy" data-text={ data.Yourdata } onclick="copyText(this.dataset.text, this)">Copy</button>
+templ CopyToClipboardFunction() {
+  <script>
+		// Copy text function for copy buttons
+		function copyText(text, btn) {
+			navigator.clipboard.writeText(text).then(() => {
+				btn.textContent = '✓ Copied!';
+				btn.classList.add('btn-success');
+				btn.disabled = true;
+				setTimeout(() => {
+					btn.textContent = 'Copy';
+					btn.classList.remove('btn-success');
+					btn.disabled = false;
+				}, 1500);
+			}).catch(err => {
+				console.error('Failed to copy text: ', err);
+				btn.textContent = 'Failed';
+				btn.classList.add('btn-error');
+				setTimeout(() => {
+					btn.textContent = 'Copy';
+					btn.classList.remove('btn-error');
+				}, 1500);
+			});
+        }
+    </script>
+}

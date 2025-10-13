@@ -37,7 +37,7 @@ type CreateSignalTypeRequest struct {
 	Detail    string `json:"detail" example:"description"`                                                     // description
 }
 
-type NewSignalTypeSchemaRequest struct {
+type RegisterNewSignalTypeSchemaRequest struct {
 	SchemaURL string `json:"schema_url" example:"https://github.com/user/project/blob/2025.01.01/schema.json"` // JSON schema URL: must be a GitHub URL ending in .json, OR use https://github.com/skip/validation/main/schema.json to disable validation
 	Slug      string `json:"slug" example:"sample_signal_@example.org"`                                        // unique title
 	BumpType  string `json:"bump_type" example:"patch" enums:"major,minor,patch"`                              // this is used to increment semver for the signal type
@@ -90,7 +90,7 @@ type SignalTypeDetail struct {
 //	@Description	- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas
 //	@Description	- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)
 //	@Description
-//	@Description	To register a new schema for an existing signal type, use the RegisterNewSignalTypeSchema endpoint
+//	@Description	To register a new schema for an existing signal type, use the RegisterRegisterNewSignalTypeSchema endpoint
 //	@Description
 //	@Description	Signal type definitions are referred to like this: /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver} (e.g., /api/isn/sample-isn--example-org/signal_types/sample-signal--example-org/v0.0.1)
 //	@Description
@@ -331,7 +331,7 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 	})
 }
 
-// NewSignalTypeSchemaHandler godoc
+// RegisterNewSignalTypeSchemaHandler godoc
 //
 //	@Summary		Registe a new schema for an existing signal type
 //	@Description	You must specify a schema_url that has not been previously registered for this signal type.
@@ -340,7 +340,7 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 //
 //	@Tags			Signal Type Definitions
 //
-//	@Param			request	body		handlers.NewSignalTypeSchemaRequest	true	"signal type details"
+//	@Param			request	body		handlers.RegisterNewSignalTypeSchemaRequest	true	"signal type details"
 //
 //	@Success		201		{object}	handlers.NewSignalTypeResponse
 //	@Failure		400		{object}	responses.ErrorResponse
@@ -352,9 +352,9 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 //	@Router			/api/isn/{isn_slug}/signal_types/{signal_type_slug}/schemas [post]
 //
 // Should only be used with RequiresRole (admin,owner) middleware
-func (s *SignalTypeHandler) NewSignalTypeSchemaHandler(w http.ResponseWriter, r *http.Request) {
+func (s *SignalTypeHandler) RegisterNewSignalTypeSchemaHandler(w http.ResponseWriter, r *http.Request) {
 	//var res createSignalTypeResponse
-	var req NewSignalTypeSchemaRequest
+	var req RegisterNewSignalTypeSchemaRequest
 
 	var semVer string
 

@@ -10,13 +10,34 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
 )
 
-func (h *HandlerService) ManageServiceAccountsPage(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerService) CreateServiceAccountsPage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
-	if err := templates.ManageServiceAccounts().Render(r.Context(), w); err != nil {
+	if err := templates.CreateServiceAccountsPage().Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render CreateServiceAccount template", slog.String("error", err.Error()))
 	}
 
+}
+
+func (h *HandlerService) ReissueServiceAccountCredentialsPage(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
+	if !ok {
+		h.renderErrorAlert(w, r, "Authentication required. Please log in again.", "Failed to get accessTokenDetails from context in ReissueServiceAccountCredentialsPage")
+		return
+	}
+
+	// Get service accounts from API
+	serviceAccounts, err := h.ApiClient.GetServiceAccountOptionsList(accessTokenDetails.AccessToken)
+	if err != nil {
+		h.renderErrorAlert(w, r, "Failed to load service accounts. Please try again.", "Failed to get service accounts: "+err.Error())
+		return
+	}
+
+	if err := templates.ReissueServiceAccountCredentialsPage(serviceAccounts).Render(r.Context(), w); err != nil {
+		reqLogger.Error("Failed to render ReissueServiceAccount template", slog.String("error", err.Error()))
+	}
 }
 
 func (h *HandlerService) CreateServiceAccount(w http.ResponseWriter, r *http.Request) {
@@ -73,7 +94,7 @@ func (h *HandlerService) CreateServiceAccount(w http.ResponseWriter, r *http.Req
 	}
 }
 
-func (h *HandlerService) ReissueServiceAccount(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerService) ReissueServiceAccountCredentials(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	clientID := r.FormValue("service-account-dropdown")
@@ -99,7 +120,7 @@ func (h *HandlerService) ReissueServiceAccount(w http.ResponseWriter, r *http.Re
 		ClientID: clientID,
 	}
 
-	res, err := h.ApiClient.ReissueServiceAccount(accessTokenDetails.AccessToken, req)
+	res, err := h.ApiClient.ReissueServiceAccountCredentials(accessTokenDetails.AccessToken, req)
 	if err != nil {
 		reqLogger.Error("Failed to reissue service account credentials", slog.String("error", err.Error()))
 
@@ -119,27 +140,15 @@ func (h *HandlerService) ReissueServiceAccount(w http.ResponseWriter, r *http.Re
 
 	// Success response - reuse the same template as creation since the response structure is the same
 	successResponse := client.ReissueServiceAccountResponse{
-		ClientID:  res.ClientID,
-		AccountID: res.AccountID,
-		SetupURL:  res.SetupURL,
-		ExpiresAt: res.ExpiresAt,
-		ExpiresIn: res.ExpiresIn,
+		ClientID:           res.ClientID,
+		ClientContactEmail: res.ClientContactEmail,
+		AccountID:          res.AccountID,
+		SetupURL:           res.SetupURL,
+		ExpiresAt:          res.ExpiresAt,
+		ExpiresIn:          res.ExpiresIn,
 	}
 	component := templates.ServiceAccountReissueSuccess(successResponse)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
-	}
-}
-
-// ReissueButtonState returns the reissue button in the correct enabled/disabled state
-func (h *HandlerService) ReissueButtonState(w http.ResponseWriter, r *http.Request) {
-	reqLogger := logger.ContextRequestLogger(r.Context())
-
-	serviceAccountValue := r.FormValue("service-account-dropdown")
-	isEnabled := serviceAccountValue != ""
-
-	component := templates.ReissueButton(isEnabled)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render reissue button", slog.String("error", err.Error()))
 	}
 }

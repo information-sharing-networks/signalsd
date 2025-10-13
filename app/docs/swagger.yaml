@@ -468,7 +468,24 @@ definitions:
         example: sample-signal--example-org
         type: string
     type: object
-  handlers.NewSignalTypeSchemaRequest:
+  handlers.PasswordResetRequest:
+    properties:
+      new_password:
+        example: ue6U>&X3j570
+        type: string
+    type: object
+  handlers.PreviousSignalVersion:
+    properties:
+      content:
+        type: object
+      created_at:
+        type: string
+      signal_version_id:
+        type: string
+      version_number:
+        type: integer
+    type: object
+  handlers.RegisterNewSignalTypeSchemaRequest:
     properties:
       bump_type:
         description: this is used to increment semver for the signal type
@@ -496,23 +513,6 @@ definitions:
         example: sample_signal_@example.org
         type: string
     type: object
-  handlers.PasswordResetRequest:
-    properties:
-      new_password:
-        example: ue6U>&X3j570
-        type: string
-    type: object
-  handlers.PreviousSignalVersion:
-    properties:
-      content:
-        type: object
-      created_at:
-        type: string
-      signal_version_id:
-        type: string
-      version_number:
-        type: integer
-    type: object
   handlers.ReissueServiceAccountCredentialsRequest:
     properties:
       client_id:
@@ -523,6 +523,9 @@ definitions:
     properties:
       account_id:
         example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      client_contact_email:
+        example: example@example.com
         type: string
       client_id:
         example: sa_example-org_k7j2m9x1
@@ -1841,7 +1844,7 @@ paths:
         - A signal type can have multiple versions - these share the same title/slug but have different JSON schemas
         - Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)
 
-        To register a new schema for an existing signal type, use the RegisterNewSignalTypeSchema endpoint
+        To register a new schema for an existing signal type, use the RegisterRegisterNewSignalTypeSchema endpoint
 
         Signal type definitions are referred to like this: /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver} (e.g., /api/isn/sample-isn--example-org/signal_types/sample-signal--example-org/v0.0.1)
       parameters:
@@ -1885,7 +1888,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/handlers.NewSignalTypeSchemaRequest'
+          $ref: '#/definitions/handlers.RegisterNewSignalTypeSchemaRequest'
       responses:
         "201":
           description: Created

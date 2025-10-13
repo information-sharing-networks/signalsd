@@ -8,10 +8,10 @@ templ CreateIsnPage() {
 	@BaseLayout("Create ISN") {
 		@Navigation()
 		<div class="page-container">
-			<h1 class="page-title">Create ISN</h1>
-			<div class="card mb-6">     
+			<h1 class="page-title">Create a new Information Sharing Network</h1>
+			<div class="card">     
 				<div class="card-body"> 
-					<form hx-post="/ui-api/create-isn" hx-target="#isn-result" class="space-y-4">
+					<form hx-post="/ui-api/isn/create" hx-target="#isn-result" class="margin-top-4">
 						<div class="form-group">
 							<label for="title" class="form-label">Title</label>
 							<input
@@ -67,10 +67,10 @@ templ IsnCreationSuccess(response client.CreateIsnResponse) {
 	<div class="card">
 		<div class="card-body">
 			@SuccessAlert("ISN created successfully!")
-			<div class="mt-4 space-y-2">
-				<p><strong>Slug:</strong> <code class="text-sm bg-gray-100 px-2 py-1 rounded">{ response.Slug }</code></p>
+			<div class="margin-top-4">
+				<p><strong>Slug:</strong> <code class="text-sm">{ response.Slug }</code></p>
 				<p><strong>Resource URL:</strong>
-					<code class="text-xs bg-gray-100 px-2 py-1 rounded block break-all">{ response.ResourceURL }</code>
+					<code class="text-xs block break-all">{ response.ResourceURL }</code>
 				</p>
 			</div>
 		</div>
