@@ -23,7 +23,7 @@ require (
 	github.com/spf13/cobra v1.10.1
 	github.com/swaggo/swag v1.16.6
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20250803194717-c247dead11de
-	golang.org/x/time v0.13.0
+	golang.org/x/time v0.14.0
 )
 
 require (
