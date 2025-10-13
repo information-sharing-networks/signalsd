@@ -31,11 +31,12 @@ type ReissueServiceAccountRequest struct {
 }
 
 type ReissueServiceAccountResponse struct {
-	ClientID  string    `json:"client_id" example:"sa_example-org_k7j2m9x1"`
-	AccountID uuid.UUID `json:"account_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	SetupURL  string    `json:"setup_url" example:"https://api.example.com/api/auth/service-accounts/setup/550e8400-e29b-41d4-a716-446655440000"`
-	ExpiresAt time.Time `json:"expires_at" example:"2024-12-25T10:30:00Z"`
-	ExpiresIn int       `json:"expires_in" example:"172800"`
+	ClientID           string    `json:"client_id" example:"sa_example-org_k7j2m9x1"`
+	ClientContactEmail string    `json:"client_contact_email" example:"example@example.com"`
+	AccountID          uuid.UUID `json:"account_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	SetupURL           string    `json:"setup_url" example:"https://api.example.com/api/auth/service-accounts/setup/550e8400-e29b-41d4-a716-446655440000"`
+	ExpiresAt          time.Time `json:"expires_at" example:"2024-12-25T10:30:00Z"`
+	ExpiresIn          int       `json:"expires_in" example:"172800"`
 }
 
 // GetServiceAccountOptionsList returns a list of service accounts for use in a dropdown component
@@ -110,8 +111,8 @@ func (c *Client) CreateServiceAccount(accessToken string, req CreateServiceAccou
 	return &createServiceAccountResponse, nil
 }
 
-// ReissueServiceAccount reissues credentials for an existing service account
-func (c *Client) ReissueServiceAccount(accessToken string, reissueServiceAccountRequest ReissueServiceAccountRequest) (*ReissueServiceAccountResponse, error) {
+// ReissueServiceAccountCredentials reissues credentials for an existing service account
+func (c *Client) ReissueServiceAccountCredentials(accessToken string, reissueServiceAccountRequest ReissueServiceAccountRequest) (*ReissueServiceAccountResponse, error) {
 	url := fmt.Sprintf("%s/api/auth/service-accounts/reissue-credentials", c.baseURL)
 
 	jsonData, err := json.Marshal(reissueServiceAccountRequest)

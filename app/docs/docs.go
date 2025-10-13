@@ -1213,7 +1213,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Signal types specify a record that can be shared over the ISN\n- Each type has a unique title and this is used to create a URL-friendly slug\n- The title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.\n- The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading\n\nSchema URL Requirements\n- Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)\n- To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json\n\nReadme URL requirements\n- Must be a link to a file ending .md on a public github repo.\n- Use the special URL: https://github.com/skip/readme/main/readme.md to indicate there is no readme\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas\n- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)\n\nTo register a new schema for an existing signal type, use the RegisterNewSignalTypeSchema endpoint\n\nSignal type definitions are referred to like this: /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver} (e.g., /api/isn/sample-isn--example-org/signal_types/sample-signal--example-org/v0.0.1)\n",
+                "description": "Signal types specify a record that can be shared over the ISN\n- Each type has a unique title and this is used to create a URL-friendly slug\n- The title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.\n- The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading\n\nSchema URL Requirements\n- Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)\n- To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json\n\nReadme URL requirements\n- Must be a link to a file ending .md on a public github repo.\n- Use the special URL: https://github.com/skip/readme/main/readme.md to indicate there is no readme\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas\n- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)\n\nTo register a new schema for an existing signal type, use the RegisterRegisterNewSignalTypeSchema endpoint\n\nSignal type definitions are referred to like this: /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver} (e.g., /api/isn/sample-isn--example-org/signal_types/sample-signal--example-org/v0.0.1)\n",
                 "tags": [
                     "Signal Type Definitions"
                 ],
@@ -1276,7 +1276,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.NewSignalTypeSchemaRequest"
+                            "$ref": "#/definitions/handlers.RegisterNewSignalTypeSchemaRequest"
                         }
                     }
                 ],
@@ -2843,7 +2843,33 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.NewSignalTypeSchemaRequest": {
+        "handlers.PasswordResetRequest": {
+            "type": "object",
+            "properties": {
+                "new_password": {
+                    "type": "string",
+                    "example": "ue6U\u003e\u0026X3j570"
+                }
+            }
+        },
+        "handlers.PreviousSignalVersion": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "object"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "signal_version_id": {
+                    "type": "string"
+                },
+                "version_number": {
+                    "type": "integer"
+                }
+            }
+        },
+        "handlers.RegisterNewSignalTypeSchemaRequest": {
             "type": "object",
             "properties": {
                 "bump_type": {
@@ -2878,32 +2904,6 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.PasswordResetRequest": {
-            "type": "object",
-            "properties": {
-                "new_password": {
-                    "type": "string",
-                    "example": "ue6U\u003e\u0026X3j570"
-                }
-            }
-        },
-        "handlers.PreviousSignalVersion": {
-            "type": "object",
-            "properties": {
-                "content": {
-                    "type": "object"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "signal_version_id": {
-                    "type": "string"
-                },
-                "version_number": {
-                    "type": "integer"
-                }
-            }
-        },
         "handlers.ReissueServiceAccountCredentialsRequest": {
             "type": "object",
             "properties": {
@@ -2919,6 +2919,10 @@ const docTemplate = `{
                 "account_id": {
                     "type": "string",
                     "example": "550e8400-e29b-41d4-a716-446655440000"
+                },
+                "client_contact_email": {
+                    "type": "string",
+                    "example": "example@example.com"
                 },
                 "client_id": {
                     "type": "string",

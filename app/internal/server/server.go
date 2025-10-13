@@ -250,7 +250,7 @@ func (s *Server) registerAdminRoutes() {
 
 						// signal types managment
 						r.Post("/{isn_slug}/signal_types", signalTypes.CreateSignalTypeHandler)
-						r.Post("/{isn_slug}/signal_types/{signal_type_slug}/schemas", signalTypes.NewSignalTypeSchemaHandler)
+						r.Post("/{isn_slug}/signal_types/{signal_type_slug}/schemas", signalTypes.RegisterNewSignalTypeSchemaHandler)
 						r.Put("/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}", signalTypes.UpdateSignalTypeHandler)
 						r.Delete("/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}", signalTypes.DeleteSignalTypeHandler)
 

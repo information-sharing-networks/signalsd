@@ -1,38 +1,39 @@
 package templates
+
 import (
-    "github.com/information-sharing-networks/signalsd/app/internal/ui/client"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
-// CreateSignalTypePage renders the signal type management page
 templ CreateSignalTypePage(isns []types.IsnOption) {
 	@BaseLayout("Create New Signal Type") {
 		@Navigation()
 		<div class="page-container">
-			<h1 class="page-title">Signal Type Management</h1>
-			<div class="card mb-6">
+			<h1 class="page-title">Create a New Signal Type</h1>
+			<div class="card">
 				<div class="card-body">
-					<h3 class="card-title">Create New Signal Type</h3>
-					<form hx-post="/ui-api/create-signal-type" 
-						hx-target="#create-signal-type-result" 
+					<form
+						hx-post="/ui-api/signal-types/create"
+						hx-target="#create-signal-type-result"
 						hx-swap="innerHTML"
-						class="space-y-4">
+						class="margin-top-4"
+					>
 						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 							<div class="form-group">
 								@IsnSelector(isns)
 							</div>
 							<div class="form-group">
 								@TitleInput()
-							</div>	
+							</div>
 							<div class="form-group">
 								@VersionNumberSelector()
 							</div>
 						</div>
 						<div class="form-group">
-							@SkipValidationCheckbox()	
+							@SkipValidationCheckbox()
 						</div>
 						<div class="form-group">
-							@SchemaURLInput(false)	
+							@SchemaURLInput(false)
 						</div>
 						<div class="form-group">
 							@SkipReadmeCheckbox()
@@ -41,36 +42,46 @@ templ CreateSignalTypePage(isns []types.IsnOption) {
 							@ReadmeURLInput(false)
 						</div>
 						<div class="form-group">
-							@DescriptionInput()							
+							@DescriptionInput()
 						</div>
 						<div class="form-group" id="create-signal-type-result"></div>
 						<div class="form-group">
-							<button type="submit" class="btn btn-primary"> Create Signal Type </button>
+							<button type="submit" class="btn btn-primary">Create Signal Type </button>
 						</div>
 					</form>
 				</div>
 			</div>
+		</div>
+	}
+}
 
-			<div class="card mb-6">
-				<div class="card-body">	
-					<h3 class="card-title">Register a new schema for an existing Signal Type</h3>	
-					<p class="text-muted mb-4">Search and manage existing signal types.</p>	
-					<form hx-post="/ui-api/new-signal-type-schema" hx-target="#register-new-schema-result" hx-swap="innerHTML" class="space-y-4">
-						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">		
-							<div class="form-group">	
+templ RegisterNewSignalTypeSchemaPage(isns []types.IsnOption) {
+	@BaseLayout("Register a New Signal schema") {
+		@Navigation()
+		<div class="page-container">
+			<h1 class="page-title">Register a New Schema</h1>
+			<div class="card">
+				<div class="card-body">
+					<p class="card-description text-muted">Register a new schema for an existing signal type.</p>
+					<form hx-put="/ui-api/signal-types/register-new-schema" hx-target="#register-new-schema-result" hx-swap="innerHTML" class="margin-top-4">
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+							<div class="form-group">
 								<label for="isn-slug" class="form-label">ISN</label>
-								<select id="isn-slug" name="isn-slug" class="form-select"
-									hx-get="/ui-api/signal-type-slug-options"
+								<select
+									id="isn-slug"
+									name="isn-slug"
+									class="form-select"
+									hx-get="/ui-api/options/signal-type-slugs"
 									hx-target="#signal-type-slug"
 									hx-swap="outerHTML"
 									hx-trigger="change"
 									hx-include="#isn-slug"
-								>		
-									<option value="">Select ISN...</option>			
-									for _, isn := range isns {					
-										<option value={ isn.Slug }>{ isn.Slug }</option>			
+								>
+									<option value="">Select ISN...</option>
+									for _, isn := range isns {
+										<option value={ isn.Slug }>{ isn.Slug }</option>
 									}
-								</select>	
+								</select>
 							</div>
 							<div class="form-group">
 								<label for="signal-type-slug" class="form-label">Signal Type</label>
@@ -89,13 +100,13 @@ templ CreateSignalTypePage(isns []types.IsnOption) {
 							</div>
 						</div>
 						<div class="form-group">
-							@SchemaURLInput(false)	
+							@SchemaURLInput(false)
 						</div>
 						<div class="form-group">
 							@ReadmeURLInput(false)
 						</div>
 						<div class="form-group">
-							@DescriptionInput()							
+							@DescriptionInput()
 						</div>
 						<div class="form-group" id="register-new-schema-result"></div>
 						<div class="form-group">
@@ -110,13 +121,12 @@ templ CreateSignalTypePage(isns []types.IsnOption) {
 	}
 }
 
-
 // SignalTypeCreationSuccess renders a success message after signal type creation
 templ SignalTypeCreationSuccess(response client.NewSignalTypeResponse) {
 	@SuccessAlert("Signal type created successfully!")
-	<div class="mt-4 space-y-2">
-		<p><strong>Slug:</strong> <code class="text-sm bg-gray-100 px-2 py-1 rounded">{ response.Slug }</code></p>
-		<p><strong>Version:</strong> <code class="text-sm bg-gray-100 px-2 py-1 rounded">{ response.SemVer }</code></p>
+	<div class="margin-top-4">
+		<p><strong>Slug:</strong> <code class="text-sm">{ response.Slug }</code></p>
+		<p><strong>Version:</strong> <code class="text-sm">{ response.SemVer }</code></p>
 	</div>
 }
 
@@ -149,13 +159,13 @@ templ VersionNumberSelector() {
 
 templ SchemaURLInput(skipValidation bool) {
 	if skipValidation {
-		<div id="schema-url-container"/>
-	} else {	
+		<div id="schema-url-container"></div>
+	} else {
 		<div id="schema-url-container" class="form-group">
 			<label for="schema-url" class="form-label">Schema Validation URL</label>
 			<input
 				id="schema-url"
-				name="valdation-url"
+				name="schema-url"
 				type="url"
 				required
 				class="form-input"
@@ -164,9 +174,10 @@ templ SchemaURLInput(skipValidation bool) {
 		</div>
 	}
 }
+
 templ ReadmeURLInput(skipReadme bool) {
 	if skipReadme {
-		<div id="readme-url-container" />
+		<div id="readme-url-container"></div>
 	} else {
 		<div id="readme-url-container" class="form-group">
 			<label for="readme-url" class="form-label">README URL</label>
@@ -194,26 +205,28 @@ templ DescriptionInput() {
 	></textarea>
 }
 
-
 templ SkipReadmeCheckbox() {
-	<input type="checkbox" 
-		name="skip-readme" 
+	<input
+		type="checkbox"
+		name="skip-readme"
 		id="skip-readme"
-		value="true" 
+		value="true"
 		class="checkbox-input"
-		hx-get="/ui-api/toggle-skip-readme"
+		hx-get="/ui-api/toggles/skip-readme"
 		hx-target="#readme-url-container"
 		hx-swap="outerHTML"
 	/>
 	<label for="skip-readme">Skip Readme</label>
 }
+
 templ SkipValidationCheckbox() {
-	<input type="checkbox" 
-		name="skip-validation" 
+	<input
+		type="checkbox"
+		name="skip-validation"
 		id="skip-validation"
-		value="true" 
+		value="true"
 		class="checkbox-input"
-		hx-get="/ui-api/toggle-skip-validation"
+		hx-get="/ui-api/toggles/skip-validation"
 		hx-target="#schema-url-container"
 		hx-swap="outerHTML"
 	/>

@@ -338,4 +338,37 @@ func CheckboxField(name, value, label string) templ.Component {
 	})
 }
 
+// use this script for any page that needs copy to clipboard functionality.
+// the button should be defined as:
+//
+// <button class="btn, btn-copy" data-text={ data.Yourdata } onclick="copyText(this.dataset.text, this)">Copy</button>
+func CopyToClipboardFunction() templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var18 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var18 == nil {
+			templ_7745c5c3_Var18 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "<script>\n\t\t// Copy text function for copy buttons\n\t\tfunction copyText(text, btn) {\n\t\t\tnavigator.clipboard.writeText(text).then(() => {\n\t\t\t\tbtn.textContent = '✓ Copied!';\n\t\t\t\tbtn.classList.add('btn-success');\n\t\t\t\tbtn.disabled = true;\n\t\t\t\tsetTimeout(() => {\n\t\t\t\t\tbtn.textContent = 'Copy';\n\t\t\t\t\tbtn.classList.remove('btn-success');\n\t\t\t\t\tbtn.disabled = false;\n\t\t\t\t}, 1500);\n\t\t\t}).catch(err => {\n\t\t\t\tconsole.error('Failed to copy text: ', err);\n\t\t\t\tbtn.textContent = 'Failed';\n\t\t\t\tbtn.classList.add('btn-error');\n\t\t\t\tsetTimeout(() => {\n\t\t\t\t\tbtn.textContent = 'Copy';\n\t\t\t\t\tbtn.classList.remove('btn-error');\n\t\t\t\t}, 1500);\n\t\t\t});\n        }\n    </script>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
 var _ = templruntime.GeneratedTemplate

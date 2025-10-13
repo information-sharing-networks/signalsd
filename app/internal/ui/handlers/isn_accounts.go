@@ -12,8 +12,8 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
 )
 
-// UpdateIsnAccountPage renders the ISN accounts administration page
-func (h *HandlerService) UpdateIsnAccountPage(w http.ResponseWriter, r *http.Request) {
+// UpdateIsnAccountsPage renders the ISN accounts administration page
+func (h *HandlerService) UpdateIsnAccountsPage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
@@ -34,22 +34,52 @@ func (h *HandlerService) UpdateIsnAccountPage(w http.ResponseWriter, r *http.Req
 	// Convert permissions to ISN list for dropdown (only ISNs where user has admin rights)
 	isns := h.getIsnOptions(isnPerms, true, false)
 
+	// Fetch users for dropdown
+	users, err := h.ApiClient.GetUserOptionsList(accessTokenDetails.AccessToken)
+	if err != nil {
+		reqLogger.Error("Failed to get users list", slog.String("error", err.Error()))
+		component := templates.ErrorAlert("Failed to load users. Please try again.")
+		if renderErr := component.Render(r.Context(), w); renderErr != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", renderErr.Error()))
+		}
+		return
+	}
+
+	// Fetch service accounts for dropdown
+	serviceAccounts, err := h.ApiClient.GetServiceAccountOptionsList(accessTokenDetails.AccessToken)
+	if err != nil {
+		reqLogger.Error("Failed to get service accounts list", slog.String("error", err.Error()))
+		component := templates.ErrorAlert("Failed to load service accounts. Please try again.")
+		if renderErr := component.Render(r.Context(), w); renderErr != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", renderErr.Error()))
+		}
+		return
+	}
+
 	// Render admin page
-	component := templates.IsnAccountManagementPage(isns)
+	component := templates.IsnAccountManagementPage(isns, users, serviceAccounts)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render ISN accounts admin page", slog.String("error", err.Error()))
 	}
 }
 
-// UpdateIsnAccount handles the form submission to add an account to an ISN
-func (h *HandlerService) UpdateIsnAccount(w http.ResponseWriter, r *http.Request) {
+// UpdateIsnAccounts handles the form submission to add an account to an ISN
+func (h *HandlerService) UpdateIsnAccounts(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Parse form data
 	isnSlug := r.FormValue("isn-slug")
 	accountType := r.FormValue("account-type")
-	accountIdentifier := r.FormValue("account-identifier")
 	permission := r.FormValue("permission")
+
+	// Get account identifier based on account type
+	var accountIdentifier string
+	switch accountType {
+	case "user":
+		accountIdentifier = r.FormValue("user-identifier")
+	case "service-account":
+		accountIdentifier = r.FormValue("service-account-identifier")
+	}
 
 	// Validate required fields
 	if isnSlug == "" || accountType == "" || accountIdentifier == "" || permission == "" {
@@ -83,7 +113,7 @@ func (h *HandlerService) UpdateIsnAccount(w http.ResponseWriter, r *http.Request
 	}
 
 	// Call the API to add the account to the ISN
-	err := h.ApiClient.UpdateIsnAccount(accessTokenDetails.AccessToken, isnSlug, accountType, accountIdentifier, permission)
+	err := h.ApiClient.UpdateIsnAccounts(accessTokenDetails.AccessToken, isnSlug, accountType, accountIdentifier, permission)
 	if err != nil {
 		reqLogger.Error("Failed to add account to ISN", slog.String("component", "templates.handleAddIsnAccount"), slog.String("error", err.Error()))
 

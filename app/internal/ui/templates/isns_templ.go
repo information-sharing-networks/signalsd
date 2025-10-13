@@ -50,7 +50,7 @@ func CreateIsnPage() templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Create ISN</h1><div class=\"card mb-6\"><div class=\"card-body\"><form hx-post=\"/ui-api/create-isn\" hx-target=\"#isn-result\" class=\"space-y-4\"><div class=\"form-group\"><label for=\"title\" class=\"form-label\">Title</label> <input id=\"title\" name=\"title\" type=\"text\" required class=\"form-input\" placeholder=\"e.g., Sample ISN @example.org\"><p class=\"text-muted text-sm mt-1\">Unique title for the ISN. This will be used to create a URL-friendly slug.</p></div><div class=\"form-group\"><label for=\"detail\" class=\"form-label\">Description</label> <textarea id=\"detail\" name=\"detail\" rows=\"3\" class=\"form-input\" placeholder=\"Description of the ISN\"></textarea><p class=\"text-muted text-sm mt-1\">Provide a detailed description of this ISN.</p></div><div class=\"form-group\"><label for=\"visibility\" class=\"form-label\">Visibility</label> <select id=\"visibility\" name=\"visibility\" required class=\"form-select\"><option value=\"\">Select Visibility...</option> <option value=\"public\">Public - Anyone can view signals</option> <option value=\"private\">Private - Only network participants can view signals</option></select></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Create ISN</button></div></form></div></div><div id=\"isn-result\"></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Create a new Information Sharing Network</h1><div class=\"card\"><div class=\"card-body\"><form hx-post=\"/ui-api/isn/create\" hx-target=\"#isn-result\" class=\"margin-top-4\"><div class=\"form-group\"><label for=\"title\" class=\"form-label\">Title</label> <input id=\"title\" name=\"title\" type=\"text\" required class=\"form-input\" placeholder=\"e.g., Sample ISN @example.org\"><p class=\"text-muted text-sm mt-1\">Unique title for the ISN. This will be used to create a URL-friendly slug.</p></div><div class=\"form-group\"><label for=\"detail\" class=\"form-label\">Description</label> <textarea id=\"detail\" name=\"detail\" rows=\"3\" class=\"form-input\" placeholder=\"Description of the ISN\"></textarea><p class=\"text-muted text-sm mt-1\">Provide a detailed description of this ISN.</p></div><div class=\"form-group\"><label for=\"visibility\" class=\"form-label\">Visibility</label> <select id=\"visibility\" name=\"visibility\" required class=\"form-select\"><option value=\"\">Select Visibility...</option> <option value=\"public\">Public - Anyone can view signals</option> <option value=\"private\">Private - Only network participants can view signals</option></select></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Create ISN</button></div></form></div></div><div id=\"isn-result\"></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -94,27 +94,27 @@ func IsnCreationSuccess(response client.CreateIsnResponse) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div class=\"mt-4 space-y-2\"><p><strong>Slug:</strong> <code class=\"text-sm bg-gray-100 px-2 py-1 rounded\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div class=\"margin-top-4\"><p><strong>Slug:</strong> <code class=\"text-sm\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(response.Slug)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/isns.templ`, Line: 71, Col: 97}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/isns.templ`, Line: 71, Col: 67}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</code></p><p><strong>Resource URL:</strong> <code class=\"text-xs bg-gray-100 px-2 py-1 rounded block break-all\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</code></p><p><strong>Resource URL:</strong> <code class=\"text-xs block break-all\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(response.ResourceURL)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/isns.templ`, Line: 73, Col: 95}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/isns.templ`, Line: 73, Col: 65}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {

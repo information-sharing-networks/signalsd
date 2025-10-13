@@ -11,10 +11,23 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
 )
 
-func (h *HandlerService) ManageUsersPage(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerService) GeneratePasswordResetLinkPage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
-	if err := templates.ManageUsersPage().Render(r.Context(), w); err != nil {
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
+	if !ok {
+		h.renderErrorAlert(w, r, "Authentication required. Please log in again.", "Failed to get accessTokenDetails from context in GeneratePasswordResetLinkPage")
+		return
+	}
+
+	// Get users from API
+	users, err := h.ApiClient.GetUserOptionsList(accessTokenDetails.AccessToken)
+	if err != nil {
+		h.renderErrorAlert(w, r, "Failed to load users. Please try again.", "Failed to get users: "+err.Error())
+		return
+	}
+
+	if err := templates.GeneratePasswordResetLinkPage(users).Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render manage users page", slog.String("error", err.Error()))
 	}
 }
@@ -82,17 +95,5 @@ func (h *HandlerService) GeneratePasswordResetLink(w http.ResponseWriter, r *htt
 	component := templates.GeneratePasswordResetLinkSuccess(successResponse)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
-	}
-}
-
-// ReissueButtonState returns the reissue button in the correct enabled/disabled state following a dropdown change
-func (h *HandlerService) GeneratePasswordResetButtonState(w http.ResponseWriter, r *http.Request) {
-	reqLogger := logger.ContextRequestLogger(r.Context())
-
-	user := r.FormValue("user-dropdown")
-	isEnabled := user != ""
-
-	if err := templates.GeneratePasswordResetButton(isEnabled).Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render generate password reset button", slog.String("error", err.Error()))
 	}
 }
