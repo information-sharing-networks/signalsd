@@ -9,9 +9,9 @@ import (
 	"bytes"
 )
 
-templ SignalSearchPage(isns []types.IsnOption, perms map[string]types.IsnPerm, results []client.SearchSignalWithCorrelationsAndVersions) {
+templ SignalSearchPage(environment string, isns []types.IsnOption, perms map[string]types.IsnPerm, results []client.SearchSignalWithCorrelationsAndVersions) {
 	@BaseLayout("Signal Search") {
-		@Navigation()
+		@Navigation(environment)
 		<div class="page-container">
 			<h1 class="page-title">Search Signals</h1>
 			<div class="card">

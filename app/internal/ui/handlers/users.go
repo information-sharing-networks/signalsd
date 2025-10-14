@@ -27,7 +27,7 @@ func (h *HandlerService) GeneratePasswordResetLinkPage(w http.ResponseWriter, r 
 		return
 	}
 
-	if err := templates.GeneratePasswordResetLinkPage(users).Render(r.Context(), w); err != nil {
+	if err := templates.GeneratePasswordResetLinkPage(h.Environment, users).Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render manage users page", slog.String("error", err.Error()))
 	}
 }

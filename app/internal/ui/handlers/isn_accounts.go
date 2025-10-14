@@ -57,7 +57,7 @@ func (h *HandlerService) UpdateIsnAccountsPage(w http.ResponseWriter, r *http.Re
 	}
 
 	// Render admin page
-	component := templates.IsnAccountManagementPage(isns, users, serviceAccounts)
+	component := templates.IsnAccountManagementPage(h.Environment, isns, users, serviceAccounts)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render ISN accounts admin page", slog.String("error", err.Error()))
 	}

@@ -2,9 +2,9 @@ package templates
 
 import "github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 
-templ IsnAccountManagementPage(isns []types.IsnOption, users []types.UserOption, serviceAccounts []types.ServiceAccountOption) {
+templ IsnAccountManagementPage(environment string, isns []types.IsnOption, users []types.UserOption, serviceAccounts []types.ServiceAccountOption) {
 	@BaseLayout("ISN Account Permissions") {
-		@Navigation()
+		@Navigation(environment)
 		<div class="page-container">
 			<h1 class="page-title">Add or Remove Account ISN Permissions</h1>
 			<div class="card">

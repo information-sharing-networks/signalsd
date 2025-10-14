@@ -72,6 +72,8 @@ h4 {
     font-weight: 600;
     color: #111827;
     margin: 0;
+    display: flex;
+    align-items: center;
 }
 
 .nav-links {
@@ -99,6 +101,55 @@ body {
     min-height: 100vh;
 }
 
+/* Add environment indicators to navigation */
+.navigation[data-environment="prod"] .nav-title::after {
+    content: " [PROD]";
+    color: #dc2626;
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-left: 0.5rem;
+}
+
+.navigation[data-environment="staging"] .nav-title::after {
+    content: " [STAGING]";
+    color: #f59e0b;
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-left: 0.5rem;
+}
+
+.navigation[data-environment="dev"] .nav-title::after {
+    content: " [DEV]";
+    color: #22c55e;
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-left: 0.5rem;
+}
+
+/* Environment indicators for login page */
+body[data-environment="prod"] .login-title::after {
+    content: " [PROD]";
+    color: #dc2626;
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-left: 0.5rem;
+}
+
+body[data-environment="staging"] .login-title::after {
+    content: " [STAGING]";
+    color: #f59e0b;
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-left: 0.5rem;
+}
+
+body[data-environment="dev"] .login-title::after {
+    content: " [DEV]";
+    color: #22c55e;
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-left: 0.5rem;
+}
 /* pages */
 .page-container {
     max-width: 80rem;
@@ -111,6 +162,11 @@ body {
     font-size: 1.5rem;
     font-weight: 700;
     color: #111827;
+}
+
+.login-title {
+    display: flex;
+    align-items: center;
 }
 
 /* text */

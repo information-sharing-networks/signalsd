@@ -14,7 +14,7 @@ import (
 func (h *HandlerService) CreateIsnPage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
-	component := templates.CreateIsnPage()
+	component := templates.CreateIsnPage(h.Environment)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render create ISN page", slog.String("error", err.Error()))
 	}

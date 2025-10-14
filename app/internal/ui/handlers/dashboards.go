@@ -9,7 +9,7 @@ import (
 )
 
 func (h *HandlerService) DashboardPage(w http.ResponseWriter, r *http.Request) {
-	component := templates.DashboardPage()
+	component := templates.DashboardPage(h.Environment)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger := logger.ContextRequestLogger(r.Context())
 		reqLogger.Error("Failed to render dashboard page", slog.String("error", err.Error()))
@@ -20,7 +20,7 @@ func (h *HandlerService) DashboardPage(w http.ResponseWriter, r *http.Request) {
 // Access control is handled by RequireAdminAccess middleware
 func (h *HandlerService) IsnAdminDashboardPage(w http.ResponseWriter, r *http.Request) {
 	// Render admin dashboard - access is validated by middleware
-	component := templates.AdminDashboardPage()
+	component := templates.AdminDashboardPage(h.Environment)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger := logger.ContextRequestLogger(r.Context())
 		reqLogger.Error("Failed to render admin dashboard", slog.String("error", err.Error()))

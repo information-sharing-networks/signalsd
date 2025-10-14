@@ -12,7 +12,7 @@ import (
 func (h *HandlerService) renderAccessDeniedPage(w http.ResponseWriter, r *http.Request, message string) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
-	component := templates.AccessDeniedPage("Access Denied", message)
+	component := templates.AccessDeniedPage(h.Environment, "Access Denied", message)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render access denied page", slog.String("error", err.Error()))
 	}

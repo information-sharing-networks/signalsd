@@ -1,9 +1,9 @@
 
 package templates
 
-templ AdminDashboardPage() {
+templ AdminDashboardPage(environment string) {
 	@BaseLayout("Site Mangement") {
-		@Navigation()
+		@Navigation(environment)
 		<div class="page-container">
 			<h1 class="page-title">Site Management</h1>
 			<p class="card-description text-muted">Manage Information Sharing Networks and user access.</p>
@@ -44,8 +44,8 @@ templ AdminDashboardPage() {
 					<div class="card-body">
 						<h3 class="card-title">Service Account Management</h3>
 						<p class="card-description text-muted">Manage API service accounts and credentials.</p>
-						<a href="/admin/service-accounts/create" class="btn btn-primary">Create Service Accounts</a> 
-						<a href="/admin/service-accounts/reissue-credentials" class="btn btn-primary">Reissue Credentials</a> 
+						<a href="/admin/service-accounts/create" class="btn btn-primary">Create Service Accounts</a>
+						<a href="/admin/service-accounts/reissue-credentials" class="btn btn-primary">Reissue Credentials</a>
 					</div>
 				</div>
 

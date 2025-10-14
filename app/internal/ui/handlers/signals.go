@@ -36,7 +36,7 @@ func (h *HandlerService) SearchSignalsPage(w http.ResponseWriter, r *http.Reques
 	isns := h.getIsnOptions(insPerms, false, false)
 
 	// Render search page
-	component := templates.SignalSearchPage(isns, insPerms, nil)
+	component := templates.SignalSearchPage(h.Environment, isns, insPerms, nil)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render signal search page", slog.String("error", err.Error()))
 	}

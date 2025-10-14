@@ -4,9 +4,9 @@ import (
     "github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 )
 // CreateISNPage renders the create ISN page
-templ CreateIsnPage() {
+templ CreateIsnPage(environment string) {
 	@BaseLayout("Create ISN") {
-		@Navigation()
+		@Navigation(environment)
 		<div class="page-container">
 			<h1 class="page-title">Create a new Information Sharing Network</h1>
 			<div class="card">     

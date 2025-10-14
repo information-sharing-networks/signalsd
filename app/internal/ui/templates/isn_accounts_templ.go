@@ -10,7 +10,7 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import "github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 
-func IsnAccountManagementPage(isns []types.IsnOption, users []types.UserOption, serviceAccounts []types.ServiceAccountOption) templ.Component {
+func IsnAccountManagementPage(environment string, isns []types.IsnOption, users []types.UserOption, serviceAccounts []types.ServiceAccountOption) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -43,7 +43,7 @@ func IsnAccountManagementPage(isns []types.IsnOption, users []types.UserOption, 
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = Navigation().Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = Navigation(environment).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

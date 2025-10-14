@@ -2,9 +2,9 @@ package templates
 // =============================================================================
 // MAIN DASHBOARD PAGE
 // =============================================================================
-templ DashboardPage() {
+templ DashboardPage(environment string) {
 	@BaseLayout("Dashboard") {
-		@Navigation()
+		@Navigation(environment)
 		<div class="page-container">
 			<h1 class="page-title">Dashboard</h1>
 			<p class="card-description text-muted">Welcome to the Signalsd management interface.</p>

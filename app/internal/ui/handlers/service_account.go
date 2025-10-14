@@ -13,7 +13,7 @@ import (
 func (h *HandlerService) CreateServiceAccountsPage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
-	if err := templates.CreateServiceAccountsPage().Render(r.Context(), w); err != nil {
+	if err := templates.CreateServiceAccountsPage(h.Environment).Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render CreateServiceAccount template", slog.String("error", err.Error()))
 	}
 
@@ -35,7 +35,7 @@ func (h *HandlerService) ReissueServiceAccountCredentialsPage(w http.ResponseWri
 		return
 	}
 
-	if err := templates.ReissueServiceAccountCredentialsPage(serviceAccounts).Render(r.Context(), w); err != nil {
+	if err := templates.ReissueServiceAccountCredentialsPage(h.Environment, serviceAccounts).Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render ReissueServiceAccount template", slog.String("error", err.Error()))
 	}
 }
