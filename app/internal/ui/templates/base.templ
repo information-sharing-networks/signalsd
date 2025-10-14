@@ -21,10 +21,10 @@ templ BaseLayout(title string) {
 }
 
 // =============================================================================
-// NAVIGATION 
+// NAVIGATION
 // =============================================================================
-templ Navigation() {
-	<nav class="navigation">
+templ Navigation(environment string) {
+	<nav class="navigation" data-environment={ environment }>
 		<div class="nav-container">
 			<div class="nav-content">
 				<div class="nav-brand">

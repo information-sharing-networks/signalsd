@@ -32,7 +32,7 @@ func (h *HandlerService) CreateSignalTypePage(w http.ResponseWriter, r *http.Req
 	// populate the isn dropdown list with ISNs where the user is an admin
 	isns := h.getIsnOptions(isnPerms, true, false)
 
-	component := templates.CreateSignalTypePage(isns)
+	component := templates.CreateSignalTypePage(h.Environment, isns)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render signal type management page", slog.String("error", err.Error()))
 	}
@@ -57,7 +57,7 @@ func (h *HandlerService) RegisterNewSignalTypeSchemaPage(w http.ResponseWriter, 
 	isns := h.getIsnOptions(isnPerms, true, false)
 
 	// Render signal type management page
-	component := templates.RegisterNewSignalTypeSchemaPage(isns)
+	component := templates.RegisterNewSignalTypeSchemaPage(h.Environment, isns)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render signal type management page", slog.String("error", err.Error()))
 	}

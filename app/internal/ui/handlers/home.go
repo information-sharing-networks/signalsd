@@ -32,7 +32,7 @@ func (h *HandlerService) HomePage(w http.ResponseWriter, r *http.Request) {
 
 func (h *HandlerService) LoginPage(w http.ResponseWriter, r *http.Request) {
 	// Render login page
-	component := templates.LoginPage()
+	component := templates.LoginPageWithEnvironment(h.Environment)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger := logger.ContextRequestLogger(r.Context())
 		reqLogger.Error("Failed to render login page", slog.String("error", err.Error()))

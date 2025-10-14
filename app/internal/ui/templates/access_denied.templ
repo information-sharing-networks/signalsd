@@ -3,9 +3,9 @@ package templates
 // =============================================================================
 // ACCESS DENIED PAGE 
 // =============================================================================
-templ AccessDeniedPage(title, message string) {
+templ AccessDeniedPage(environment string, title, message string) {
 	@BaseLayout(title) {
-		@Navigation()
+		@Navigation(environment)
 		<div class="page-container">
 			<div class="text-center">
 				<h1 class="page-title">Access Denied</h1>

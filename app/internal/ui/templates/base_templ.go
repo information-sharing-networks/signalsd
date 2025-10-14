@@ -64,7 +64,7 @@ func BaseLayout(title string) templ.Component {
 // =============================================================================
 // NAVIGATION
 // =============================================================================
-func Navigation() templ.Component {
+func Navigation(environment string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -85,7 +85,20 @@ func Navigation() templ.Component {
 			templ_7745c5c3_Var3 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<nav class=\"navigation\"><div class=\"nav-container\"><div class=\"nav-content\"><div class=\"nav-brand\"><h1 class=\"nav-title\">Signals</h1><div class=\"nav-links\"><a href=\"/dashboard\" class=\"nav-link active\">Dashboard</a></div></div><div class=\"nav-actions\"><button hx-post=\"/logout\" hx-confirm=\"Are you sure you want to logout?\" class=\"nav-link\">Logout</button></div></div></div></nav>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<nav class=\"navigation\" data-environment=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var4 string
+		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(environment)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/base.templ`, Line: 27, Col: 55}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\"><div class=\"nav-container\"><div class=\"nav-content\"><div class=\"nav-brand\"><h1 class=\"nav-title\">Signals</h1><div class=\"nav-links\"><a href=\"/dashboard\" class=\"nav-link active\">Dashboard</a></div></div><div class=\"nav-actions\"><button hx-post=\"/logout\" hx-confirm=\"Are you sure you want to logout?\" class=\"nav-link\">Logout</button></div></div></div></nav>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

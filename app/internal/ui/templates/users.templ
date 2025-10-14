@@ -6,9 +6,9 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
-templ GeneratePasswordResetLinkPage(users []types.UserOption) {
+templ GeneratePasswordResetLinkPage(environment string, users []types.UserOption) {
 	@BaseLayout("Generate password reset link for users") {
-		@Navigation()
+		@Navigation(environment)
 		<div class="page-container">
 			<h1 class="page-title">Generate password reset link for a user</h1>
 			<div class="card">

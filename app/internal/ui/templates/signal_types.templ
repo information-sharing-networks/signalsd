@@ -5,9 +5,9 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
-templ CreateSignalTypePage(isns []types.IsnOption) {
+templ CreateSignalTypePage(environment string, isns []types.IsnOption) {
 	@BaseLayout("Create New Signal Type") {
-		@Navigation()
+		@Navigation(environment)
 		<div class="page-container">
 			<h1 class="page-title">Create a New Signal Type</h1>
 			<div class="card">
@@ -55,9 +55,9 @@ templ CreateSignalTypePage(isns []types.IsnOption) {
 	}
 }
 
-templ RegisterNewSignalTypeSchemaPage(isns []types.IsnOption) {
+templ RegisterNewSignalTypeSchemaPage(environment string, isns []types.IsnOption) {
 	@BaseLayout("Register a New Signal schema") {
-		@Navigation()
+		@Navigation(environment)
 		<div class="page-container">
 			<h1 class="page-title">Register a New Schema</h1>
 			<div class="card">

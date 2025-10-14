@@ -4,63 +4,72 @@ package templates
 // =============================================================================
 // LOGIN & REGISTRATION
 // =============================================================================
-templ LoginPage() {
-	@BaseLayout("Login") {
-		<div class="form-container">
-			<div class="form-card">
-				<h2 class="form-title">
-					Sign in to Signal ISN
-				</h2>
+templ LoginPageWithEnvironment(environment string) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+			<title>Login - Signalsd</title>
+			<script src="https://unpkg.com/htmx.org@2.0.4"></script>
+			<link href="/static/css/app.css" rel="stylesheet"/>
+		</head>
+		<body data-environment={ environment }>
+			<div class="form-container">
+				<div class="form-card">
+					<h2 class="form-title login-title">
+						Sign in to Signals
+					</h2>
 
-				<!-- Error message area - positioned prominently above the form -->
-				<div id="login-error"></div>
+					<!-- Error message area - positioned prominently above the form -->
+					<div id="login-error"></div>
 
-				<form hx-post="/login" hx-target="#login-error">
-					<div class="form-group">
-						<div class="form-group-stacked">
-							<label for="email" class="form-label-sr">Email address</label>
-							<input
-								id="email"
-								name="email"
-								type="email"
-								required
-								class="form-input form-input-stacked"
-								placeholder="Email address"
-							/>
+					<form hx-post="/login" hx-target="#login-error">
+						<div class="form-group">
+							<div class="form-group-stacked">
+								<label for="email" class="form-label-sr">Email address</label>
+								<input
+									id="email"
+									name="email"
+									type="email"
+									required
+									class="form-input form-input-stacked"
+									placeholder="Email address"
+								/>
+							</div>
+							<div class="form-group-stacked">
+								<label for="password" class="form-label-sr">Password</label>
+								<input
+									id="password"
+									name="password"
+									type="password"
+									required
+									class="form-input form-input-stacked"
+									placeholder="Password"
+								/>
+							</div>
 						</div>
-						<div class="form-group-stacked">
-							<label for="password" class="form-label-sr">Password</label>
-							<input
-								id="password"
-								name="password"
-								type="password"
-								required
-								class="form-input form-input-stacked"
-								placeholder="Password"
-							/>
+						<div class="form-group">
+							<button type="submit" class="btn btn-primary btn-full">
+								Sign in
+							</button>
 						</div>
-					</div>
-					<div class="form-group">
-						<button type="submit" class="btn btn-primary btn-full">
-							Sign in
+					</form>
+					<div class="form-group text-center">
+						<p class="card-description text-muted">Don't have an account?</p>
+						<button
+							hx-get="/register"
+							hx-target="body"
+							hx-swap="outerHTML"
+							class="btn btn-secondary"
+						>
+							Create Account
 						</button>
 					</div>
-				</form>
-				<div class="form-group text-center">
-					<p class="card-description text-muted">Don't have an account?</p>
-					<button
-						hx-get="/register"
-						hx-target="body"
-						hx-swap="outerHTML"
-						class="btn btn-secondary"
-					>
-						Create Account
-					</button>
 				</div>
 			</div>
-
-		</div>
-	}
+		</body>
+	</html>
 }
 
 // REGISTER
