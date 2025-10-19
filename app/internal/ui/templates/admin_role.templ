@@ -1,0 +1,71 @@
+package templates
+
+import "github.com/information-sharing-networks/signalsd/app/internal/ui/types"
+
+// AdminRoleManagementPage renders the admin role management page
+templ AdminRoleManagementPage(environment string, users []types.UserOption) {
+	@BaseLayout("Admin Role Management") {
+		@Navigation(environment)
+		<div class="page-container">
+			<h1 class="page-title">Admin Role Management</h1>
+			<div class="card">
+				<div class="card-body">
+					<p class="card-description text-muted">
+						Grant or revoke admin roles for user accounts. 
+					</p>
+					@WarningAlert("Warning: Granting admin role will give the user access to create ISNs, manage accounts, and perform other administrative functions. Revoking admin role will remove these privileges.")
+					
+					<form 
+						hx-put="/ui-api/admin/accounts/admin-role"
+						hx-target="#role-result"
+						hx-swap="innerHTML"
+						class="margin-top-4">
+						
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+							<div class="form-group">
+								<label for="user-email" class="form-label">User Account</label>
+								<select
+									id="user-email"
+									name="user-email"
+									required
+									class="form-select"
+								>
+									<option value="">Select User...</option>
+									if users != nil {
+										for _, user := range users {
+											<option value={ user.Email }>{ user.Email } ({ user.UserRole })</option>
+										}
+									}
+								</select>
+							</div>
+							
+							<div class="form-group">
+								<label for="action" class="form-label">Action</label>
+								<select
+									id="action"
+									name="action"
+									required
+									class="form-select"
+								>
+									<option value="">Select Action...</option>
+									<option value="grant">Grant Admin Role</option>
+									<option value="revoke">Revoke Admin Role</option>
+								</select>
+								<p class="text-muted text-sm mt-1">Choose whether to grant or revoke admin privileges.</p>
+							</div>
+						</div>
+						
+						<div class="form-group">
+							<button type="submit" class="btn btn-primary">
+								Update Admin Role
+							</button>
+						</div>
+					</form>
+				</div>
+			</div>
+			<div id="role-result">
+				<!-- Results will appear here -->
+			</div>
+		</div>
+	}
+}

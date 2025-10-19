@@ -58,14 +58,15 @@ type CreateIsnResponse struct {
 
 // Response structs for GET handlers
 type Isn struct {
-	ID         uuid.UUID `json:"id" example:"67890684-3b14-42cf-b785-df28ce570400"`
-	CreatedAt  time.Time `json:"created_at" example:"2025-06-03T13:47:47.331787+01:00"`
-	UpdatedAt  time.Time `json:"updated_at" example:"2025-06-03T13:47:47.331787+01:00"`
-	Title      string    `json:"title" example:"Sample ISN @example.org"`
-	Slug       string    `json:"slug" example:"sample-isn--example-org"`
-	Detail     string    `json:"detail" example:"Sample ISN description"`
-	IsInUse    bool      `json:"is_in_use" example:"true"`
-	Visibility string    `json:"visibility" example:"private" enums:"public,private"`
+	ID            uuid.UUID `json:"id" example:"67890684-3b14-42cf-b785-df28ce570400"`
+	CreatedAt     time.Time `json:"created_at" example:"2025-06-03T13:47:47.331787+01:00"`
+	UpdatedAt     time.Time `json:"updated_at" example:"2025-06-03T13:47:47.331787+01:00"`
+	UserAccountID uuid.UUID `json:"user_account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
+	Title         string    `json:"title" example:"Sample ISN @example.org"`
+	Slug          string    `json:"slug" example:"sample-isn--example-org"`
+	Detail        string    `json:"detail" example:"Sample ISN description"`
+	IsInUse       bool      `json:"is_in_use" example:"true"`
+	Visibility    string    `json:"visibility" example:"private" enums:"public,private"`
 }
 
 type User struct {
@@ -339,13 +340,14 @@ func (i *IsnHandler) UpdateIsnHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	responses.RespondWithStatusCodeOnly(w, http.StatusCreated)
+	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
 }
 
 // GetIsnsHandler godoc
 //
 //	@Summary		Get ISN configurations
 //	@Description	get a list of the configured ISNs
+//	@Param			include_inactive	query	bool	false	"Include inactive ISNs"	default(false)
 //	@Tags			ISN Configuration
 //
 //	@Success		200	{array}	handlers.Isn
@@ -353,7 +355,17 @@ func (i *IsnHandler) UpdateIsnHandler(w http.ResponseWriter, r *http.Request) {
 //	@Router			/api/isn [get]
 func (s *IsnHandler) GetIsnsHandler(w http.ResponseWriter, r *http.Request) {
 
-	dbIsns, err := s.queries.GetIsns(r.Context())
+	includeInactive := r.URL.Query().Get("include_inactive") == "true"
+
+	var dbIsns []database.Isn
+	var err error
+
+	if includeInactive {
+		dbIsns, err = s.queries.GetIsns(r.Context())
+	} else {
+		dbIsns, err = s.queries.GetInUseIsns(r.Context())
+	}
+
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
@@ -366,14 +378,15 @@ func (s *IsnHandler) GetIsnsHandler(w http.ResponseWriter, r *http.Request) {
 	isns := make([]Isn, len(dbIsns))
 	for i, dbIsn := range dbIsns {
 		isns[i] = Isn{
-			ID:         dbIsn.ID,
-			CreatedAt:  dbIsn.CreatedAt,
-			UpdatedAt:  dbIsn.UpdatedAt,
-			Title:      dbIsn.Title,
-			Slug:       dbIsn.Slug,
-			Detail:     dbIsn.Detail,
-			IsInUse:    dbIsn.IsInUse,
-			Visibility: dbIsn.Visibility,
+			ID:            dbIsn.ID,
+			CreatedAt:     dbIsn.CreatedAt,
+			UpdatedAt:     dbIsn.UpdatedAt,
+			UserAccountID: dbIsn.UserAccountID,
+			Title:         dbIsn.Title,
+			Slug:          dbIsn.Slug,
+			Detail:        dbIsn.Detail,
+			IsInUse:       dbIsn.IsInUse,
+			Visibility:    dbIsn.Visibility,
 		}
 	}
 

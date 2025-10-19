@@ -1,0 +1,61 @@
+package templates
+
+import "github.com/information-sharing-networks/signalsd/app/internal/ui/types"
+
+// AccountStatusPage renders the admin account disable/enable page
+templ AccountStatusPage(environment string, users []types.UserOption, serviceAccounts []types.ServiceAccountOption) {
+	@BaseLayout("Account Status Management") {
+		@Navigation(environment)
+		<div class="page-container">
+			<h1 class="page-title">Account Status Management</h1>
+			<div class="card">
+				<div class="card-body">
+					<p class="card-description text-muted">
+						Enable or disable user and service accounts. 
+					</p>
+					@WarningAlert("Warning: Disabling an account revokes all client secrets/one-time secrets for service accounts and revokes all refresh tokens for web users. The account owner will need to contact an administrator to re-enable their account.")
+
+					<form
+						hx-put="/ui-api/admin/accounts/status"
+						hx-target="#status-result"
+						hx-swap="innerHTML"
+						class="margin-top-4">
+
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+							<div class="form-group">
+								@AccountTypeSelector()
+							</div>
+							<div class="form-group">
+								@AccountSelector(users, serviceAccounts)
+							</div>
+							<div class="form-group">
+								<label for="action" class="form-label">Action</label>
+								<select
+									id="action"
+									name="action"
+									required
+									class="form-select"
+								>
+									<option value="">Select Action...</option>
+									<option value="disable">Disable Account</option>
+									<option value="enable">Enable Account</option>
+								</select>
+								<p class="text-muted text-sm mt-1">Choose whether to enable or disable the account.</p>
+							</div>
+						</div>
+
+						<div class="form-group">
+							<button type="submit" class="btn btn-primary">
+								Update Account Status
+							</button>
+						</div>
+					</form>
+				</div>
+			</div>
+			<div id="status-result">
+				<!-- Results will appear here -->
+			</div>
+		</div>
+	}
+}
+

@@ -879,6 +879,15 @@ const docTemplate = `{
                     "ISN Configuration"
                 ],
                 "summary": "Get ISN configurations",
+                "parameters": [
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include inactive ISNs",
+                        "name": "include_inactive",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -1193,6 +1202,13 @@ const docTemplate = `{
                         "name": "isn_slug",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include inactive signal types",
+                        "name": "include_inactive",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -2722,6 +2738,10 @@ const docTemplate = `{
                 "updated_at": {
                     "type": "string",
                     "example": "2025-06-03T13:47:47.331787+01:00"
+                },
+                "user_account_id": {
+                    "type": "string",
+                    "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3"
                 },
                 "visibility": {
                     "type": "string",

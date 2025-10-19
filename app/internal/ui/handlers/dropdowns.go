@@ -3,7 +3,6 @@ package handlers
 import (
 	"log/slog"
 	"net/http"
-	"strings"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
@@ -41,6 +40,7 @@ func (h *HandlerService) getIsnOptions(isnPerms map[string]types.IsnPerm, filter
 }
 
 // RenderSignalTypeSlugOptions gets the signal types for the selected ISN and renders the dropdown options
+// optionally the calling form can specify include_inactive=true to include signal types that are not in use
 func (h *HandlerService) RenderSignalTypeSlugOptions(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
@@ -60,44 +60,37 @@ func (h *HandlerService) RenderSignalTypeSlugOptions(w http.ResponseWriter, r *h
 		return
 	}
 
-	isnPerms := accessTokenDetails.IsnPerms
+	includeInactive := r.FormValue("include_inactive") == "true"
 
 	// Get signal types for the selected ISN
-	isnPerm, exists := isnPerms[isnSlug]
-	if !exists {
-		component := templates.ErrorAlert("You don't have permission to access this ISN")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+	signalTypes, err := h.ApiClient.GetSignalTypes(accessTokenDetails.AccessToken, isnSlug, includeInactive)
+	if err != nil {
+		reqLogger.Error("Failed to get signal types", slog.String("error", err.Error()))
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	// Parse signal type paths to extract unique signal types
-	signalTypeMap := make(map[string]bool)
-	for _, path := range isnPerm.SignalTypePaths {
-		// Path format: "signal-type-slug/v1.0.0"
-		parts := strings.Split(path, "/v")
-		if len(parts) == 2 {
-			signalTypeMap[parts[0]] = true
+	// create a slice of signalTypeSlugOptions - note we are not interested in the signal type version at this stage so return a deduplicated list of slugs
+	signalTypeSlugs := make([]types.SignalTypeSlugOption, 0, len(signalTypes))
+	seen := make(map[string]bool)
+
+	for _, signalType := range signalTypes {
+		if !seen[signalType.Slug] {
+			seen[signalType.Slug] = true
+			signalTypeSlugs = append(signalTypeSlugs, types.SignalTypeSlugOption{
+				Slug: signalType.Slug,
+			})
 		}
 	}
-
-	// Convert to slice of SignalTypeOption
-	signalTypeSlugs := make([]types.SignalTypeSlugOption, 0, len(signalTypeMap))
-	for signalType := range signalTypeMap {
-		signalTypeSlugs = append(signalTypeSlugs, types.SignalTypeSlugOption{
-			Slug: signalType,
-		})
-	}
-
 	// Render signal types dropdown options
-	component := templates.SignalTypeSlugOptions(signalTypeSlugs)
+	component := templates.SignalTypeSlugOptions(signalTypeSlugs, includeInactive)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render signal type options", slog.String("error", err.Error()))
 	}
 }
 
 // RenderSignalTypeVersionOptions gets the versions for the selected signal type and returns the dropdown options
+// optionally the calling form can specify include_inactive=true to include versions that are not in use
 func (h *HandlerService) RenderSignalTypeVersionOptions(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
@@ -108,29 +101,29 @@ func (h *HandlerService) RenderSignalTypeVersionOptions(w http.ResponseWriter, r
 		return
 	}
 
+	includeInactive := r.FormValue("include_inactive") == "true"
+
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
 		reqLogger.Error("Failed to get accessTokenDetails from context in versions handler")
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-	isnPerms := accessTokenDetails.IsnPerms
 
 	// Get signal types for the selected ISN
-	isnPerm, exists := isnPerms[isnSlug]
-	if !exists {
-		w.WriteHeader(http.StatusForbidden)
+	signalTypes, err := h.ApiClient.GetSignalTypes(accessTokenDetails.AccessToken, isnSlug, includeInactive)
+	if err != nil {
+		reqLogger.Error("Failed to get signal types", slog.String("error", err.Error()))
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	// Find versions for the specific signal type
 	versions := make([]types.VersionOption, 0)
-	for _, path := range isnPerm.SignalTypePaths {
-		// Path format: "signal-type-slug/v1.0.0"
-		parts := strings.Split(path, "/v")
-		if len(parts) == 2 && parts[0] == signalTypeSlug {
+	for _, signalType := range signalTypes {
+		if signalType.Slug == signalTypeSlug {
 			versions = append(versions, types.VersionOption{
-				Version: parts[1],
+				Version: signalType.SemVer,
 			})
 		}
 	}

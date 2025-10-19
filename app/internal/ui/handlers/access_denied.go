@@ -20,15 +20,11 @@ func (h *HandlerService) renderAccessDeniedPage(w http.ResponseWriter, r *http.R
 
 // AccessDeniedPage renders the general access denied page.
 func (h *HandlerService) AccessDeniedPage(w http.ResponseWriter, r *http.Request) {
-	h.renderAccessDeniedPage(w, r, "You do not have permission to use this feature")
-}
-
-// AccessDeniedNeedIsnAdminPage renders the access denied page for users who need to create ISNs.
-func (h *HandlerService) AccessDeniedNeedIsnAdminPage(w http.ResponseWriter, r *http.Request) {
-	h.renderAccessDeniedPage(w, r, "You need to create one or more ISNs before accessing this page")
-}
-
-// AccessDeniedNeedIsnAccessPage renders the access denied page for users who need to be added to ISNs.
-func (h *HandlerService) AccessDeniedNeedIsnAccessPage(w http.ResponseWriter, r *http.Request) {
-	h.renderAccessDeniedPage(w, r, "You need to be added to one or more ISNs before accessing this page")
+	// Check if roles parameter is provided for more specific messaging
+	msg := r.URL.Query().Get("msg")
+	if msg != "" {
+		h.renderAccessDeniedPage(w, r, msg)
+	} else {
+		h.renderAccessDeniedPage(w, r, "You do not have permission to use this feature")
+	}
 }

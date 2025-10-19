@@ -382,6 +382,9 @@ definitions:
       updated_at:
         example: "2025-06-03T13:47:47.331787+01:00"
         type: string
+      user_account_id:
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+        type: string
       visibility:
         enum:
         - public
@@ -1586,6 +1589,12 @@ paths:
   /api/isn:
     get:
       description: get a list of the configured ISNs
+      parameters:
+      - default: false
+        description: Include inactive ISNs
+        in: query
+        name: include_inactive
+        type: boolean
       responses:
         "200":
           description: OK
@@ -1815,6 +1824,11 @@ paths:
         name: isn_slug
         required: true
         type: string
+      - default: false
+        description: Include inactive signal types
+        in: query
+        name: include_inactive
+        type: boolean
       responses:
         "200":
           description: OK

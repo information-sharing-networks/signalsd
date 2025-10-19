@@ -45,6 +45,11 @@ type SignalTypeDetail struct {
 	SemVer    string `json:"sem_ver"`
 }
 
+// UpdateSignalTypeStatusRequest represents the request body for updating signal type status
+type UpdateSignalTypeStatusRequest struct {
+	IsInUse bool `json:"is_in_use"`
+}
+
 // CreateSignalType creates a new signal type using the signalsd API
 func (c *Client) CreateSignalType(accessToken string, req CreateSignalTypeRequest) (*NewSignalTypeResponse, error) {
 	url := fmt.Sprintf("%s/api/isn/%s/signal_types", c.baseURL, req.IsnSlug)
@@ -116,8 +121,12 @@ func (c *Client) RegisterNewSignalTypeSchema(accessToken string, req RegisterNew
 }
 
 // GetSignalTypes gets the signal types for the specified ISN using the signalsd API
-func (c *Client) GetSignalTypes(accessToken, isnSlug string) ([]SignalTypeDetail, error) {
+func (c *Client) GetSignalTypes(accessToken, isnSlug string, includeInactive bool) ([]SignalTypeDetail, error) {
 	url := fmt.Sprintf("%s/api/isn/%s/signal_types", c.baseURL, isnSlug)
+
+	if includeInactive {
+		url += "?include_inactive=true"
+	}
 
 	httpReq, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -143,4 +152,38 @@ func (c *Client) GetSignalTypes(accessToken, isnSlug string) ([]SignalTypeDetail
 	}
 
 	return signalTypes, nil
+}
+
+// UpdateSignalTypeStatus updates the is_in_use status of a signal type
+func (c *Client) UpdateSignalTypeStatus(accessToken, isnSlug, slug, semVer string, isInUse bool) error {
+	url := fmt.Sprintf("%s/api/isn/%s/signal_types/%s/v%s", c.baseURL, isnSlug, slug, semVer)
+
+	req := UpdateSignalTypeStatusRequest{
+		IsInUse: isInUse,
+	}
+
+	jsonData, err := json.Marshal(req)
+	if err != nil {
+		return NewClientInternalError(err, "marshaling update signal type status request")
+	}
+
+	httpReq, err := http.NewRequest("PUT", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return NewClientInternalError(err, "creating update signal type status request")
+	}
+
+	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	res, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return NewClientConnectionError(err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusNoContent {
+		return NewClientApiError(res)
+	}
+
+	return nil
 }

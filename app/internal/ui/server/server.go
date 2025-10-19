@@ -87,8 +87,6 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 
 		// auth
 		r.Get("/access-denied", handlerService.AccessDeniedPage)
-		r.Get("/need-isn-admin", handlerService.AccessDeniedNeedIsnAdminPage)
-		r.Get("/need-isn-access", handlerService.AccessDeniedNeedIsnAccessPage)
 
 		// HTMX endpoints for cascading signal type dropdowns
 		r.Get("/ui-api/options/signal-type-slugs", handlerService.RenderSignalTypeSlugOptions)
@@ -111,7 +109,7 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 		r.Group(func(r chi.Router) {
 
 			// ISN Admin routes (require admin/owner role)
-			r.Use(s.authService.RequireAdminOrOwnerRole)
+			r.Use(s.authService.RequireRole("admin", "owner"))
 			r.Use(s.authService.AddAccountIDToLogContext)
 
 			//dashboard
@@ -125,11 +123,19 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 			r.Get("/admin/isn/create", handlerService.CreateIsnPage)
 			r.Post("/ui-api/isn/create", handlerService.CreateIsn)
 
+			// ISN status management
+			r.Get("/admin/isn/status", handlerService.IsnStatusPage)
+			r.Put("/ui-api/isn/status", handlerService.IsnStatus)
+
 			// service accounts
 			r.Get("/admin/service-accounts/create", handlerService.CreateServiceAccountsPage)
 			r.Get("/admin/service-accounts/reissue-credentials", handlerService.ReissueServiceAccountCredentialsPage)
 			r.Post("/ui-api/service-accounts/create", handlerService.CreateServiceAccount)
 			r.Put("/ui-api/service-accounts/reissue-credentials", handlerService.ReissueServiceAccountCredentials)
+
+			// Account enabled/disabled status management
+			r.Get("/admin/accounts/status", handlerService.AccountStatusPage)
+			r.Put("/ui-api/admin/accounts/status", handlerService.AdminAccountStatus)
 
 			r.Group(func(r chi.Router) {
 				// the below features are only relevant to admins that have created one or more ISN
@@ -140,10 +146,25 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 				r.Get("/admin/signal-types/register-new-schema", handlerService.RegisterNewSignalTypeSchemaPage)
 				r.Post("/ui-api/signal-types/create", handlerService.CreateSignalType)
 				r.Put("/ui-api/signal-types/register-new-schema", handlerService.RegisterNewSignalTypeSchema)
+				r.Get("/admin/signal-types/status", handlerService.SignalTypeStatusPage)
+				r.Put("/ui-api/signal-types/status", handlerService.AdminSignalTypeStatus)
 
 				// isn account permissions
 				r.Get("/admin/isn/accounts/update", handlerService.UpdateIsnAccountsPage)
 				r.Put("/ui-api/isn/accounts/update", handlerService.UpdateIsnAccounts)
+			})
+
+			r.Group(func(r chi.Router) {
+				// Owner-only features
+				r.Use(s.authService.RequireRole("owner"))
+
+				// ISN ownership transfer
+				r.Get("/admin/isn/transfer-ownership", handlerService.TransferOwnershipPage)
+				r.Put("/ui-api/isn/transfer-ownership", handlerService.TransferOwnership)
+
+				// Admin role management
+				r.Get("/admin/accounts/admin-role", handlerService.AdminRoleManagementPage)
+				r.Put("/ui-api/admin/accounts/admin-role", handlerService.AdminRoleManagement)
 			})
 		})
 	})
@@ -151,7 +172,6 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 
 // setupMiddleware creates the routes when running the ui in standalone mode.
 func (s *Server) setupMiddleware() {
-	// middleware
 	s.router.Use(chimiddleware.RequestID)
 	s.router.Use(chimiddleware.RealIP)
 	s.router.Use(logger.RequestLogging(s.logger)) // use the signalsd request logger
