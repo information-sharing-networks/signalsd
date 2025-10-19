@@ -2,6 +2,7 @@ package templates
 
 import (
     "strings"
+    "fmt"
     "github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
@@ -197,15 +198,16 @@ templ IsnSelector(isns []types.IsnOption) {
 
 // SignalTypeSelectorFields creates cascading dropdowns: ISN → Signal Type → Version
 // Uses HTMX to dynamically load options based on selections
-templ SignalTypeSelectorFields(isns []types.IsnOption) {
+templ SignalTypeSelectorFields(isns []types.IsnOption, includeInactive bool) {
 	<div class="grid grid-cols-1 md:grid-cols-3">
 		<div class="form-group">
 			<label for="isn-slug" class="form-label">ISN</label>
+            {{ endpoint:= fmt.Sprintf("/ui-api/options/signal-type-slugs?include_inactive=%v", includeInactive) }}
 			<select
 				id="isn-slug"
 				name="isn-slug"
 				required
-				hx-get="/ui-api/options/signal-type-slugs"
+				hx-get={ endpoint }
 				hx-target="#signal-type-slug"
 				hx-swap="outerHTML"
 				hx-trigger="change"
@@ -256,12 +258,13 @@ templ SignalTypeSelectorFields(isns []types.IsnOption) {
 
 // SignalTypeSlugOptions renders signal type dropdown options via HTMX
 // Called when ISN selection changes in SignalTypeSelectorFields
-templ SignalTypeSlugOptions(signalTypes []types.SignalTypeSlugOption) {
+templ SignalTypeSlugOptions(signalTypes []types.SignalTypeSlugOption, includeInactive bool) {
+    {{ endpoint:= fmt.Sprintf("/ui-api/options/signal-type-versions?include_inactive=%v", includeInactive) }}
 	<select
 		id="signal-type-slug"
 		name="signal-type-slug"
 		required
-		hx-get="/ui-api/options/signal-type-versions"
+		hx-get= { endpoint }
 		hx-target="#sem-ver"
 		hx-swap="outerHTML"
 		hx-trigger="change"

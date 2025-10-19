@@ -4,8 +4,10 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -342,7 +344,7 @@ func (a *AuthService) RequireRole(allowedRoles ...string) func(http.Handler) htt
 				slog.Any("expected_roles", allowedRoles),
 				slog.String("got_role", claims.Role),
 			)
-			responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you do not have permission to use this feature")
+			responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, fmt.Sprintf("account does not have required role - must be one of %v", strings.Join(allowedRoles, ", ")))
 		})
 	}
 }

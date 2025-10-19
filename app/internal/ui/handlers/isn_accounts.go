@@ -144,3 +144,98 @@ func (h *HandlerService) UpdateIsnAccounts(w http.ResponseWriter, r *http.Reques
 		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
 	}
 }
+
+// TransferOwnershipPage renders the transfer ISN ownership page
+func (h *HandlerService) TransferOwnershipPage(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
+	if !ok {
+		reqLogger.Error("failed to read accessTokenDetails from context")
+		return
+	}
+
+	isnPerms := accessTokenDetails.IsnPerms
+
+	if len(isnPerms) == 0 {
+		component := templates.ErrorAlert("You don't have permission to access any ISNs.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	// Convert permissions to ISN list for dropdown (only ISNs where user has admin rights)
+	isns := h.getIsnOptions(isnPerms, true, false)
+
+	// Fetch admin users for dropdown
+	users, err := h.ApiClient.GetUserOptionsList(accessTokenDetails.AccessToken)
+	if err != nil {
+		reqLogger.Error("Failed to get users list", slog.String("error", err.Error()))
+		component := templates.ErrorAlert("Failed to load users. Please try again.")
+		if renderErr := component.Render(r.Context(), w); renderErr != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", renderErr.Error()))
+		}
+		return
+	}
+
+	// Render transfer ownership page
+	component := templates.TransferOwnershipPage(h.Environment, isns, users)
+	if err := component.Render(r.Context(), w); err != nil {
+		reqLogger.Error("Failed to render transfer ownership page", slog.String("error", err.Error()))
+	}
+}
+
+// TransferOwnership handles the form submission to transfer ISN ownership
+func (h *HandlerService) TransferOwnership(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	// Parse form data
+	isnSlug := r.FormValue("isn-slug")
+	newOwnerEmail := r.FormValue("new-owner-email")
+
+	// Validate required fields
+	if isnSlug == "" || newOwnerEmail == "" {
+		component := templates.ErrorAlert("Please fill in all fields.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	// Get access token from context
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
+	if !ok {
+		component := templates.ErrorAlert("Authentication required. Please log in again.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	// Call the API to transfer ownership
+	err := h.ApiClient.TransferIsnOwnership(accessTokenDetails.AccessToken, isnSlug, newOwnerEmail)
+	if err != nil {
+		reqLogger.Error("Failed to transfer ISN ownership", slog.String("error", err.Error()))
+
+		var msg string
+		if ce, ok := err.(*client.ClientError); ok {
+			msg = ce.UserError()
+		} else {
+			msg = "An error occurred. Please try again."
+		}
+
+		component := templates.ErrorAlert(msg)
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	// Success response
+	msg := fmt.Sprintf("ISN ownership successfully transferred to %s", newOwnerEmail)
+	component := templates.SuccessAlert(msg)
+	if err := component.Render(r.Context(), w); err != nil {
+		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
+	}
+}

@@ -7,11 +7,15 @@ import (
 	"net/http"
 )
 
+// TransferIsnOwnershipRequest represents the request to transfer ISN ownership
+type TransferIsnOwnershipRequest struct {
+	NewOwnerAccountID string `json:"new_owner_account_id"`
+}
+
 // UpdateIsnAccounts grants or revokes an permissions to access an ISN
 func (c *Client) UpdateIsnAccounts(accessToken, isnSlug, accountType, accountIdentifier, permission string) error {
 	var accountID string
 
-	// Lookup account based on type
 	switch accountType {
 	case "user":
 		user, err := c.LookupUserByEmail(accessToken, accountIdentifier)
@@ -77,6 +81,46 @@ func (c *Client) UpdateIsnAccounts(accessToken, isnSlug, accountType, accountIde
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusCreated {
+		return NewClientApiError(res)
+	}
+
+	return nil
+}
+
+// TransferIsnOwnership transfers ownership of an ISN to another admin account
+func (c *Client) TransferIsnOwnership(accessToken, isnSlug, newOwnerEmail string) error {
+	// First, lookup the new owner by email to get their account ID
+	user, err := c.LookupUserByEmail(accessToken, newOwnerEmail)
+	if err != nil {
+		return err
+	}
+
+	req := TransferIsnOwnershipRequest{
+		NewOwnerAccountID: user.AccountID,
+	}
+
+	url := fmt.Sprintf("%s/api/admin/isn/%s/transfer-ownership", c.baseURL, isnSlug)
+
+	jsonData, err := json.Marshal(req)
+	if err != nil {
+		return NewClientInternalError(err, "marshaling transfer ownership request")
+	}
+
+	httpReq, err := http.NewRequest("PUT", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return NewClientInternalError(err, "creating transfer ownership request")
+	}
+
+	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	res, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return NewClientConnectionError(err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
 		return NewClientApiError(res)
 	}
 

@@ -1,0 +1,54 @@
+package templates
+
+import "github.com/information-sharing-networks/signalsd/app/internal/ui/types"
+
+// SignalTypeStatusPage renders the admin signal type enable/disable page
+templ SignalTypeStatusPage(environment string, isns []types.IsnOption) {
+	@BaseLayout("Signal Type Status Management") {
+		@Navigation(environment)
+		<div class="page-container">
+			<h1 class="page-title">Signal Type Status Management</h1>
+			<div class="card">
+				<div class="card-body">
+					<p class="card-description text-muted">
+						Enable or disable signal types. Disabled signal types cannot receive new signals and are not returned in signal searches.
+					</p>
+					@WarningAlert("Warning: Disabling a signal type will prevent new signals from being submitted to it. Existing signals will remain archived but inaccessible.")
+
+					<form
+						hx-put="/ui-api/signal-types/status"
+						hx-target="#status-result"
+						hx-swap="innerHTML"
+						class="margin-top-4">
+
+						@SignalTypeSelectorFields(isns, true)
+
+						<div class="form-group">
+							<label for="action" class="form-label">Action</label>
+							<select
+								id="action"
+								name="action"
+								required
+								class="form-select"
+							>
+								<option value="">Select Action...</option>
+								<option value="disable">Disable</option>
+								<option value="enable">Enable</option>
+							</select>
+						</div>
+
+						<div class="form-group">
+							<button type="submit" class="btn btn-primary">
+								Update Signal Type Status
+							</button>
+						</div>
+					</form>
+				</div>
+			</div>
+			<div id="status-result">
+				<!-- Results will appear here -->
+			</div>
+		</div>
+	}
+}
+

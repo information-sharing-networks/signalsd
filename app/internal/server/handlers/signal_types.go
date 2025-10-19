@@ -752,7 +752,7 @@ func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *ht
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error - more than one signal type deleted")
 		return
 	}
-	responses.RespondWithStatusCodeOnly(w, http.StatusCreated)
+	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
 }
 
 // GetSignalTypeHandler godoc
@@ -833,7 +833,8 @@ func (s *SignalTypeHandler) GetSignalTypeHandler(w http.ResponseWriter, r *http.
 //
 //	@Summary		Get Signal types
 //	@Description	Get details for all the signal types defined on the ISN
-//	@Param			isn_slug	path	string	true	"ISN slug"	example(sample-isn--example-org)
+//	@Param			isn_slug			path	string	true	"ISN slug"	example(sample-isn--example-org)
+//	@Param			include_inactive	query	bool	false	"Include inactive signal types"	default(false)
 //	@Tags			Signal Type Definitions
 //
 //	@Success		200	{array}	handlers.SignalTypeDetail
@@ -842,6 +843,7 @@ func (s *SignalTypeHandler) GetSignalTypeHandler(w http.ResponseWriter, r *http.
 func (s *SignalTypeHandler) GetSignalTypesHandler(w http.ResponseWriter, r *http.Request) {
 
 	isnSlug := r.PathValue("isn_slug")
+	includeInactive := r.URL.Query().Get("include_inactive") == "true"
 
 	// check isn exists
 	isn, err := s.queries.GetIsnBySlug(r.Context(), isnSlug)
@@ -859,7 +861,13 @@ func (s *SignalTypeHandler) GetSignalTypesHandler(w http.ResponseWriter, r *http
 		return
 	}
 
-	dbSignalTypes, err := s.queries.GetSignalTypesByIsnID(r.Context(), isn.ID)
+	var dbSignalTypes []database.SignalType
+	if includeInactive {
+		dbSignalTypes, err = s.queries.GetSignalTypesByIsnID(r.Context(), isn.ID)
+	} else {
+		dbSignalTypes, err = s.queries.GetInUseSignalTypesByIsnID(r.Context(), isn.ID)
+	}
+
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),

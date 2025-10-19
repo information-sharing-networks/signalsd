@@ -380,7 +380,7 @@ func (u *UserHandler) GrantUserAdminRoleHandler(w http.ResponseWriter, r *http.R
 	}
 
 	if targetAccount.AccountRole == "admin" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, fmt.Sprintf("%v is already an admin", targetAccountID))
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "this account is already an admin")
 		return
 	}
 
@@ -399,7 +399,7 @@ func (u *UserHandler) GrantUserAdminRoleHandler(w http.ResponseWriter, r *http.R
 		slog.String("target_account_id", targetAccountID.String()),
 	)
 
-	responses.RespondWithStatusCodeOnly(w, http.StatusCreated)
+	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
 }
 
 // RevokeAccountAdmin godocs
@@ -463,7 +463,7 @@ func (u *UserHandler) RevokeUserAdminRoleHandler(w http.ResponseWriter, r *http.
 	}
 
 	if targetAccount.AccountRole != "admin" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, fmt.Sprintf("%v is not an admin", targetAccountID))
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "this account is not an admin")
 		return
 	}
 
@@ -482,7 +482,7 @@ func (u *UserHandler) RevokeUserAdminRoleHandler(w http.ResponseWriter, r *http.
 		slog.String("target_account_id", targetAccountID.String()),
 	)
 
-	responses.RespondWithStatusCodeOnly(w, http.StatusCreated)
+	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
 }
 
 // Password reset types

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/config"
@@ -114,33 +116,49 @@ func (a *AuthService) RequireAuth(next http.Handler) http.Handler {
 	})
 }
 
-// RequireAdminOrOwnerRole is middleware that checks if user has admin/owner role
-func (a *AuthService) RequireAdminOrOwnerRole(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		reqLogger := logger.ContextRequestLogger(r.Context())
+// RequireRole checks if the user has one of the specified roles
+func (a *AuthService) RequireRole(allowedRoles ...string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			reqLogger := logger.ContextRequestLogger(r.Context())
 
-		accessTokenDetails, ok := ContextAccessTokenDetails(r.Context())
-		if !ok {
-			reqLogger.Error("Could not get accessTokenDetails from context", slog.String("component", "ui.RequireAdminOrOwnerAccess"))
-			redirectToAccessDeniedPage(w, r)
-			return
-		}
+			accessTokenDetails, ok := ContextAccessTokenDetails(r.Context())
+			if !ok {
+				reqLogger.Error("Could not get accessTokenDetails from context", slog.String("component", "ui.RequireRole"))
+				redirectToAccessDeniedPage(w, r, "unexpected error - please log in again")
+				return
+			}
 
-		if accessTokenDetails.Role != "owner" && accessTokenDetails.Role != "admin" {
-			reqLogger.Debug("Access denied - account attempted to access admin feature",
-				slog.String("component", "ui.RequireAdminAccess"),
+			for _, role := range allowedRoles {
+				if accessTokenDetails.Role == role {
+					reqLogger.Debug("Role authorization successful",
+						slog.String("component", "ui.RequireRole"),
+						slog.String("account_id", accessTokenDetails.AccountID),
+						slog.Any("allowed_roles", allowedRoles),
+						slog.String("role", role),
+					)
+
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+
+			// Access denied - log and redirect
+			reqLogger.Debug("Access denied - account does not have required role",
+				slog.String("component", "ui.RequireRole"),
 				slog.String("account_id", accessTokenDetails.AccountID),
-				slog.String("role", accessTokenDetails.Role),
+				slog.String("user_role", accessTokenDetails.Role),
+				slog.Any("allowed_roles", allowedRoles),
 			)
-			redirectToAccessDeniedPage(w, r)
-			return
-		}
-
-		// Log successful admin access check
-		reqLogger.Debug("Admin access check successful", slog.String("component", "ui.RequireAdminAccess"))
-
-		next.ServeHTTP(w, r)
-	})
+			msg := ""
+			if len(allowedRoles) == 1 {
+				msg = "Your account needs the " + allowedRoles[0] + " role to access this feature."
+			} else {
+				msg = "You must be one of the following roles to access this feature: " + strings.Join(allowedRoles, ", ")
+			}
+			redirectToAccessDeniedPage(w, r, msg)
+		})
+	}
 }
 
 // RequireIsnAdmin is middleware that checks if user is the admin for one or more ISNs.
@@ -153,7 +171,7 @@ func (a *AuthService) RequireIsnAdmin(next http.Handler) http.Handler {
 		accessTokenDetails, ok := ContextAccessTokenDetails(r.Context())
 		if !ok {
 			reqLogger.Error("Could not get accessTokenDetails from context", slog.String("component", "ui.RequireIsnAdmin"))
-			redirectToAccessDeniedPage(w, r)
+			redirectToAccessDeniedPage(w, r, "unexpected error - please log in again")
 			return
 		}
 
@@ -181,13 +199,13 @@ func (a *AuthService) RequireIsnAccess(next http.Handler) http.Handler {
 		accessTokenDetails, ok := ContextAccessTokenDetails(r.Context())
 		if !ok {
 			reqLogger.Error("Could not get accessTokenDetails from context", slog.String("component", "ui.RequireIsnAccess"))
-			redirectToAccessDeniedPage(w, r)
+			redirectToAccessDeniedPage(w, r, "unexpected error - please log in again")
 			return
 		}
 
 		if len(accessTokenDetails.IsnPerms) == 0 {
 			reqLogger.Debug("access denied - user does not have access to any ISNs", slog.String("component", "ui.RequireIsnAccess"))
-			redirectToNeedIsnAccessPage(w, r)
+			redirectToAccessDeniedPage(w, r, "You need to be added to one or more ISNs before accessing this page")
 			return
 		}
 
@@ -225,13 +243,16 @@ func redirectToLogin(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// redirectToAccessDeniedPage redirects to access denied page
-func redirectToAccessDeniedPage(w http.ResponseWriter, r *http.Request) {
+// redirectToAccessDeniedPage redirects to access denied page with a message
+func redirectToAccessDeniedPage(w http.ResponseWriter, r *http.Request, msg string) {
+
+	accessDeniedURL := "/access-denied?msg=" + url.QueryEscape(msg)
+
 	if r.Header.Get("HX-Request") == "true" {
-		w.Header().Set("HX-Redirect", "/access-denied")
+		w.Header().Set("HX-Redirect", accessDeniedURL)
 		w.WriteHeader(http.StatusOK)
 	} else {
-		http.Redirect(w, r, "/access-denied", http.StatusSeeOther)
+		http.Redirect(w, r, accessDeniedURL, http.StatusSeeOther)
 	}
 }
 
@@ -242,15 +263,5 @@ func redirectToNeedIsnAdminPage(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	} else {
 		http.Redirect(w, r, "/need-isn-admin", http.StatusSeeOther)
-	}
-}
-
-// redirectToNeedIsnAccessPage redirects to page explaining the user needs to be granted access to one or more isns
-func redirectToNeedIsnAccessPage(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("HX-Request") == "true" {
-		w.Header().Set("HX-Redirect", "/need-isn-access")
-		w.WriteHeader(http.StatusOK)
-	} else {
-		http.Redirect(w, r, "/need-isn-access", http.StatusSeeOther)
 	}
 }

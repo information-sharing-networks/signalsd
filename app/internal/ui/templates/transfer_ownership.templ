@@ -1,0 +1,64 @@
+package templates
+
+import "github.com/information-sharing-networks/signalsd/app/internal/ui/types"
+
+// TransferOwnershipPage renders the transfer ISN ownership page
+templ TransferOwnershipPage(environment string, isns []types.IsnOption, users []types.UserOption) {
+	@BaseLayout("Transfer ISN Ownership") {
+		@Navigation(environment)
+		<div class="page-container">
+			<h1 class="page-title">Transfer ISN Ownership</h1>
+			<div class="card">
+				<div class="card-body">
+					<p class="card-description text-muted">
+						Transfer ownership of an Information Sharing Network to another admin account. 
+						This action can only be performed by the site owner and cannot be undone.
+					</p>
+					@WarningAlert("Warning: This action will transfer ownership of the selected ISN to the chosen admin account. The current owner will lose administrative privileges for this ISN.")
+					
+					<form 
+						hx-put="/ui-api/isn/transfer-ownership" 
+						hx-target="#transfer-result"
+						hx-swap="innerHTML"
+						class="margin-top-4">
+						
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+							<div class="form-group">
+                                @IsnSelector(isns) 
+							</div>
+							
+							<div class="form-group">
+								<label for="new-owner-email" class="form-label">New Owner</label>
+								<select
+									id="new-owner-email"
+									name="new-owner-email"
+									required
+									class="form-select"
+								>
+									<option value="">Select New Owner...</option>
+									if users != nil {
+										for _, user := range users {
+											if user.UserRole == "admin" {
+												<option value={ user.Email }>{ user.Email } (Admin)</option>
+											}
+										}
+									}
+								</select>
+								<p class="text-muted text-sm mt-1">Select an admin account to become the new owner.</p>
+							</div>
+						</div>
+						
+						<div class="form-group">
+							<button type="submit" class="btn btn-primary">
+								Transfer Ownership
+							</button>
+						</div>
+					</form>
+				</div>
+			</div>
+			<div id="transfer-result">
+				<!-- Results will appear here -->
+			</div>
+		</div>
+	}
+}

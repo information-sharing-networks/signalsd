@@ -82,3 +82,109 @@ func (c *Client) GeneratePasswordResetLink(accessToken, email string) (*Generate
 
 	return generatePasswordResetLinkResponse, nil
 }
+
+// GrantAdminRole grants admin role to a user account
+func (c *Client) GrantAdminRole(accessToken, userEmail string) error {
+	user, err := c.LookupUserByEmail(accessToken, userEmail)
+	if err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf("%s/api/admin/accounts/%s/admin-role", c.baseURL, user.AccountID)
+
+	httpReq, err := http.NewRequest("PUT", url, nil)
+	if err != nil {
+		return NewClientInternalError(err, "creating grant admin role request")
+	}
+
+	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+
+	res, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return NewClientConnectionError(err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusNoContent {
+		return NewClientApiError(res)
+	}
+
+	return nil
+}
+
+// RevokeAdminRole revokes admin role from a user account
+func (c *Client) RevokeAdminRole(accessToken, userEmail string) error {
+	user, err := c.LookupUserByEmail(accessToken, userEmail)
+	if err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf("%s/api/admin/accounts/%s/admin-role", c.baseURL, user.AccountID)
+
+	httpReq, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		return NewClientInternalError(err, "creating revoke admin role request")
+	}
+
+	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+
+	res, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return NewClientConnectionError(err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusNoContent {
+		return NewClientApiError(res)
+	}
+
+	return nil
+}
+
+// DisableAccount disables an account
+func (c *Client) DisableAccount(accessToken, accountID string) error {
+	url := fmt.Sprintf("%s/api/admin/accounts/%s/disable", c.baseURL, accountID)
+
+	httpReq, err := http.NewRequest("POST", url, nil)
+	if err != nil {
+		return NewClientInternalError(err, "creating disable account request")
+	}
+
+	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+
+	res, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return NewClientConnectionError(err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return NewClientApiError(res)
+	}
+
+	return nil
+}
+
+// EnableAccount enables an account
+func (c *Client) EnableAccount(accessToken, accountID string) error {
+	url := fmt.Sprintf("%s/api/admin/accounts/%s/enable", c.baseURL, accountID)
+
+	httpReq, err := http.NewRequest("POST", url, nil)
+	if err != nil {
+		return NewClientInternalError(err, "creating enable account request")
+	}
+
+	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+
+	res, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return NewClientConnectionError(err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return NewClientApiError(res)
+	}
+
+	return nil
+}

@@ -207,6 +207,112 @@ func (h *HandlerService) RegisterNewSignalTypeSchema(w http.ResponseWriter, r *h
 	}
 }
 
+// SignalTypeStatusPage renders the signal type status management page
+func (h *HandlerService) SignalTypeStatusPage(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
+	if !ok {
+		reqLogger.Error("failed to read accessTokenDetails from context")
+		return
+	}
+
+	isnPerms := accessTokenDetails.IsnPerms
+
+	if len(isnPerms) == 0 {
+		component := templates.ErrorAlert("You don't have permission to access any ISNs.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	// Convert permissions to ISN list for dropdown (only ISNs where user has admin rights)
+	isns := h.getIsnOptions(isnPerms, true, false)
+
+	// Render signal type status management page
+	component := templates.SignalTypeStatusPage(h.Environment, isns)
+	if err := component.Render(r.Context(), w); err != nil {
+		reqLogger.Error("Failed to render signal type status management page", slog.String("error", err.Error()))
+	}
+}
+
+// AdminSignalTypeStatus handles the form submission to enable or disable signal types
+func (h *HandlerService) AdminSignalTypeStatus(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	// Parse form data
+	isnSlug := r.FormValue("isn-slug")
+	slug := r.FormValue("signal-type-slug")
+	semVer := r.FormValue("sem-ver")
+	action := r.FormValue("action")
+
+	// Validate required fields
+	if isnSlug == "" || slug == "" || semVer == "" || action == "" {
+		component := templates.ErrorAlert("Please fill in all fields.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	// Get access token from context
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
+	if !ok {
+		reqLogger.Error("Failed to read access token from context", slog.String("component", "handlers.AdminSignalTypeStatus"))
+
+		component := templates.ErrorAlert("Authentication required. Please log in again.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	// Determine the new status based on action
+	var isInUse bool
+	var successMsg string
+
+	switch action {
+	case "disable":
+		isInUse = false
+		successMsg = "Signal type disabled successfully"
+	case "enable":
+		isInUse = true
+		successMsg = "Signal type enabled successfully"
+	default:
+		component := templates.ErrorAlert("Invalid action. Please select a valid action.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	// Call the API to update signal type status
+	err := h.ApiClient.UpdateSignalTypeStatus(accessTokenDetails.AccessToken, isnSlug, slug, semVer, isInUse)
+	if err != nil {
+		reqLogger.Error("Failed to update signal type status", slog.String("error", err.Error()))
+
+		var msg string
+		if ce, ok := err.(*client.ClientError); ok {
+			msg = ce.UserError()
+		} else {
+			msg = "An error occurred. Please try again."
+		}
+
+		component := templates.ErrorAlert(msg)
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	// Success response
+	component := templates.SuccessAlert(successMsg)
+	if err := component.Render(r.Context(), w); err != nil {
+		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
+	}
+}
+
 func (h *HandlerService) ToggleSkipValidation(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 

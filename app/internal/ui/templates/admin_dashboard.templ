@@ -10,13 +10,25 @@ templ AdminDashboardPage(environment string) {
 
 			<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 
+		        <!-- Site Access -->
+				<div class="card">
+					<div class="card-body">
+						<h3 class="card-title"> Site access controls</h3>
+						<p class="card-description text-muted">Site-wide account management.</p>
+						<a href="/admin/accounts/status" class="btn btn-primary">Enable/Disable Accounts</a>
+						<a href="/admin/isn/transfer-ownership" class="btn btn-primary">Transfer ISN Ownership</a>
+						<a href="/admin/accounts/admin-role" class="btn btn-primary">Manage Admin Roles</a>
+					</div>
+				</div>
+
 				<!-- ISN Configuration -->
 				<div class="card">
 					<div class="card-body">
 						<h3 class="card-title">ISN Configuration</h3>
 						<p class="card-description text-muted">Manage Information Sharing Networks.</p>
 						<a href="/admin/isn/create" class="btn btn-primary">Create an ISN</a>
-						<a href="/admin/isn/accounts/update" class="btn btn-primary">Manage Account Access</a>
+						<a href="/admin/isn/accounts/update" class="btn btn-primary">Manage ISN Access</a>
+						<a href="/admin/isn/status" class="btn btn-primary">Enable/Disable ISNs</a>
 					</div>
 				</div>
 
@@ -27,8 +39,10 @@ templ AdminDashboardPage(environment string) {
 						<p class="card-description text-muted">Register the types of signal used in an ISN.</p>
 						<a href="/admin/signal-types/create" class="btn btn-primary">Create Signal Types</a>
 						<a href="/admin/signal-types/register-new-schema" class="btn btn-primary">Register a New Schema</a>
+						<a href="/admin/signal-types/status" class="btn btn-primary">Enable/Disable Signal Types</a>
 					</div>
 				</div>
+
 
 				<!-- User Management -->
 				<div class="card">
@@ -49,15 +63,7 @@ templ AdminDashboardPage(environment string) {
 					</div>
 				</div>
 
-				<!-- System Settings -->
-				<div class="card">
-					<div class="card-body">
-						<h3 class="card-title">System Settings</h3>
-						<p class="card-description text-muted">Configure system-wide settings and preferences.</p>
-						<button class="btn btn-secondary" disabled>System Settings</button>
-						<p class="text-xs text-muted">Coming soon</p>
-					</div>
-				</div>
+		
 			</div>
 
 		</div>

@@ -17,7 +17,7 @@ templ SignalSearchPage(environment string, isns []types.IsnOption, perms map[str
 			<div class="card">
 				<div class="card-body">
 					<form hx-get="/ui-api/signals/search" hx-target="#search-results" class="margin-top-4">
-						@SignalTypeSelectorFields(isns)
+						@SignalTypeSelectorFields(isns, false)
 						<div class="grid grid-cols-1 md:grid-cols-2">
 							@StartDateField()
 							@EndDateField()
