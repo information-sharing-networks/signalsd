@@ -8,10 +8,8 @@ package templates
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-// =============================================================================
-// MAIN DASHBOARD PAGE
-// =============================================================================
-func DashboardPage(environment string) templ.Component {
+// SettingsPage renders the user account settings page
+func SettingsPage(environment string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -48,13 +46,13 @@ func DashboardPage(environment string) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Dashboard</h1><p class=\"card-description text-muted\">Welcome to the ISN management dashboard.</p><div class=\"dashboard grid grid-cols-1 md:grid-cols-3 gap-6 mb-8\"><div class=\"card\"><div class=\"card-body\"><h3 class=\"card-title\">Site Admin</h3><p class=\"card-description text-muted\">Site adminstration tools.</p><a href=\"/admin\" class=\"btn btn-primary\">Admin Tools</a></div></div><div class=\"card\"><div class=\"card-body\"><h3 class=\"card-title\">Signals</h3><p class=\"card-description text-muted\">Search and manage signals across Information Sharing Networks.</p><a href=\"/search\" class=\"btn btn-primary\">Search Signals</a></div></div><div class=\"card\"><div class=\"card-body\"><h3 class=\"card-title\">API Documentation</h3><p class=\"card-description text-muted\">View the complete API reference and interactive documentation.</p><a href=\"/docs\" target=\"_blank\" class=\"btn btn-primary\">View Docs ↗</a></div></div></div><div id=\"dashboard-error\"></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Account Settings</h1><p class=\"card-description text-muted\">Manage your account settings and security.</p><div class=\"grid grid-cols-1 md:grid-cols-2 gap-6\"><!-- Change Password Card --><div class=\"card\"><div class=\"card-body\"><h3 class=\"card-title\">Change Password</h3><p class=\"card-description text-muted\">Use this form to change your login password.</p><form hx-put=\"/ui-api/account/password\" hx-target=\"#password-result\" hx-swap=\"innerHTML\" class=\"margin-top-4\"><div class=\"form-group\"><label for=\"current-password\" class=\"form-label\">Current Password</label> <input id=\"current-password\" name=\"current-password\" type=\"password\" required class=\"form-input\" placeholder=\"Enter your current password\"><p class=\"text-muted text-sm mt-1\">We need your current password to verify your identity.</p></div><div class=\"form-group\"><label for=\"new-password\" class=\"form-label\">New Password</label> <input id=\"new-password\" name=\"new-password\" type=\"password\" required minlength=\"11\" class=\"form-input\" placeholder=\"Enter your new password (minimum 11 characters)\"><p class=\"text-muted text-sm mt-1\">Password must be at least 11 characters long.</p></div><div class=\"form-group\"><label for=\"confirm-password\" class=\"form-label\">Confirm New Password</label> <input id=\"confirm-password\" name=\"confirm-password\" type=\"password\" required minlength=\"11\" class=\"form-input\" placeholder=\"Confirm your new password\"></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Update Password</button></div></form></div></div></div><div id=\"password-result\"><!-- Results will appear here --></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = BaseLayout("Dashboard").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = BaseLayout("Account Settings").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

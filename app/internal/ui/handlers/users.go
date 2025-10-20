@@ -11,6 +11,78 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
 )
 
+// SettingsPage renders the user account settings page
+func (h *HandlerService) SettingsPage(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	component := templates.SettingsPage(h.Environment)
+	if err := component.Render(r.Context(), w); err != nil {
+		reqLogger.Error("Failed to render settings page", slog.String("error", err.Error()))
+	}
+}
+
+// UpdatePassword handles the password change form submission
+func (h *HandlerService) UpdatePassword(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	// Parse form data
+	currentPassword := r.FormValue("current-password")
+	newPassword := r.FormValue("new-password")
+	confirmPassword := r.FormValue("confirm-password")
+
+	if currentPassword == "" || newPassword == "" || confirmPassword == "" {
+		component := templates.ErrorAlert("Please fill in all fields.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	// Validate passwords match
+	if newPassword != confirmPassword {
+		component := templates.ErrorAlert("New passwords do not match.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	// Get access token from context
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
+	if !ok {
+		component := templates.ErrorAlert("Authentication required. Please log in again.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	// Call the API to update password
+	err := h.ApiClient.UpdatePassword(accessTokenDetails.AccessToken, currentPassword, newPassword)
+	if err != nil {
+		reqLogger.Error("Failed to update password", slog.String("error", err.Error()))
+
+		var msg string
+		if ce, ok := err.(*client.ClientError); ok {
+			msg = ce.UserError()
+		} else {
+			msg = "An error occurred. Please try again."
+		}
+
+		component := templates.ErrorAlert(msg)
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	// Success response
+	component := templates.SuccessAlert("Password updated successfully. Your new password is now active.")
+	if err := component.Render(r.Context(), w); err != nil {
+		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
+	}
+}
+
 func (h *HandlerService) GeneratePasswordResetLinkPage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 

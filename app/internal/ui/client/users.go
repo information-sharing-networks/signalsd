@@ -1,6 +1,7 @@
 package client
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -183,6 +184,44 @@ func (c *Client) EnableAccount(accessToken, accountID string) error {
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
+		return NewClientApiError(res)
+	}
+
+	return nil
+}
+
+// UpdatePassword updates the user's password (self-service)
+func (c *Client) UpdatePassword(accessToken, currentPassword, newPassword string) error {
+	updatePasswordReq := struct {
+		CurrentPassword string `json:"current_password"`
+		NewPassword     string `json:"new-password"`
+	}{
+		CurrentPassword: currentPassword,
+		NewPassword:     newPassword,
+	}
+
+	jsonData, err := json.Marshal(updatePasswordReq)
+	if err != nil {
+		return NewClientInternalError(err, "marshaling update password request")
+	}
+
+	url := fmt.Sprintf("%s/api/auth/password/reset", c.baseURL)
+
+	httpReq, err := http.NewRequest("PUT", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return NewClientInternalError(err, "creating update password request")
+	}
+
+	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	res, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return NewClientConnectionError(err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusNoContent {
 		return NewClientApiError(res)
 	}
 

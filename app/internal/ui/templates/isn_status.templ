@@ -17,7 +17,9 @@ templ IsnStatusPage(environment string, isns []types.IsnOption) {
 					<p class="card-description text-muted">
 						Enable or disable Information Sharing Networks. Disabled ISNs cannot receive new signals and are not returned in signal searches.
 					</p>
-					@WarningAlert("Warning: Disabling an ISN will prevent new signals from being submitted to it. Existing signals will remain archived but inaccessible.")
+					@NoticeAlert() {
+						Disabling an ISN will prevent new signals from being submitted to it. Existing signals will remain archived but inaccessible.
+					}
 
 					<form
 						hx-put="/ui-api/isn/status"

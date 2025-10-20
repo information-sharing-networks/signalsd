@@ -14,7 +14,11 @@ templ TransferOwnershipPage(environment string, isns []types.IsnOption, users []
 						Transfer ownership of an Information Sharing Network to another admin account. 
 						This action can only be performed by the site owner and cannot be undone.
 					</p>
-					@WarningAlert("Warning: This action will transfer ownership of the selected ISN to the chosen admin account. The current owner will lose administrative privileges for this ISN.")
+					@NoticeAlert() {
+						This action will transfer ownership of the selected ISN to the chosen admin account.
+                        <br/><br/>
+                        The current owner will lose administrative privileges for this ISN and will also loose read/write permissions unless the are added to the ISN via the <em>Grant ISN Access</em> feature.
+					}
 					
 					<form 
 						hx-put="/ui-api/isn/transfer-ownership" 

@@ -48,15 +48,33 @@ func AccountStatusPage(environment string, users []types.UserOption, serviceAcco
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Account Status Management</h1><div class=\"card\"><div class=\"card-body\"><p class=\"card-description text-muted\">Enable or disable user and service accounts. </p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Account Status Management</h1><div class=\"card\"><div class=\"card-body\"><p class=\"card-description text-muted\">Enable or disable user and service accounts.</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = WarningAlert("Warning: Disabling an account revokes all client secrets/one-time secrets for service accounts and revokes all refresh tokens for web users. The account owner will need to contact an administrator to re-enable their account.").Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Var3 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+				templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+				templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+				if !templ_7745c5c3_IsBuffer {
+					defer func() {
+						templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+						if templ_7745c5c3_Err == nil {
+							templ_7745c5c3_Err = templ_7745c5c3_BufErr
+						}
+					}()
+				}
+				ctx = templ.InitializeContext(ctx)
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<u>Disabling</u> an account revokes:<ul><li>all client secrets/one-time secrets for service accounts</li><li>all refresh tokens for web users</li></ul>Disabled accounts will be unable to use the system until they are re-enabled.<br><br><u>Enabling</u> a disabled account automatically restores access for web users.  Service accounts will need a new client secret via the <em>Reissue Credentials</em> feature.")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				return nil
+			})
+			templ_7745c5c3_Err = NoticeAlert().Render(templ.WithChildren(ctx, templ_7745c5c3_Var3), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<form hx-put=\"/ui-api/admin/accounts/status\" hx-target=\"#status-result\" hx-swap=\"innerHTML\" class=\"margin-top-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<form hx-put=\"/ui-api/admin/accounts/status\" hx-target=\"#status-result\" hx-swap=\"innerHTML\" class=\"margin-top-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -64,7 +82,7 @@ func AccountStatusPage(environment string, users []types.UserOption, serviceAcco
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div><div class=\"form-group\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</div><div class=\"form-group\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -72,7 +90,7 @@ func AccountStatusPage(environment string, users []types.UserOption, serviceAcco
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</div><div class=\"form-group\"><label for=\"action\" class=\"form-label\">Action</label> <select id=\"action\" name=\"action\" required class=\"form-select\"><option value=\"\">Select Action...</option> <option value=\"disable\">Disable Account</option> <option value=\"enable\">Enable Account</option></select><p class=\"text-muted text-sm mt-1\">Choose whether to enable or disable the account.</p></div></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Update Account Status</button></div></form></div></div><div id=\"status-result\"><!-- Results will appear here --></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</div><div class=\"form-group\"><label for=\"action\" class=\"form-label\">Action</label> <select id=\"action\" name=\"action\" required class=\"form-select\"><option value=\"\">Select Action...</option> <option value=\"disable\">Disable Account</option> <option value=\"enable\">Enable Account</option></select><p class=\"text-muted text-sm mt-1\">Choose whether to enable or disable the account.</p></div></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Update Account Status</button></div></form></div></div><div id=\"status-result\"><!-- Results will appear here --></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

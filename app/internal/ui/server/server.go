@@ -85,6 +85,10 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 		// entry point after login
 		r.Get("/dashboard", handlerService.DashboardPage)
 
+		// account settings
+		r.Get("/settings", handlerService.SettingsPage)
+		r.Put("/ui-api/account/password", handlerService.UpdatePassword)
+
 		// auth
 		r.Get("/access-denied", handlerService.AccessDeniedPage)
 

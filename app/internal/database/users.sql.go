@@ -141,6 +141,23 @@ func (q *Queries) GetUserByIsnID(ctx context.Context, id uuid.UUID) (User, error
 	return i, err
 }
 
+const GetUserWithPasswordByID = `-- name: GetUserWithPasswordByID :one
+SELECT u.account_id, u.email, u.hashed_password FROM users u WHERE u.account_id = $1
+`
+
+type GetUserWithPasswordByIDRow struct {
+	AccountID      uuid.UUID `json:"account_id"`
+	Email          string    `json:"email"`
+	HashedPassword string    `json:"hashed_password"`
+}
+
+func (q *Queries) GetUserWithPasswordByID(ctx context.Context, accountID uuid.UUID) (GetUserWithPasswordByIDRow, error) {
+	row := q.db.QueryRow(ctx, GetUserWithPasswordByID, accountID)
+	var i GetUserWithPasswordByIDRow
+	err := row.Scan(&i.AccountID, &i.Email, &i.HashedPassword)
+	return i, err
+}
+
 const GetUsers = `-- name: GetUsers :many
 SELECT u.account_id, u.email, u.user_role, u.created_at , u.updated_at FROM users u
 `
