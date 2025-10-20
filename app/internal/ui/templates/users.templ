@@ -14,6 +14,11 @@ templ GeneratePasswordResetLinkPage(environment string, users []types.UserOption
 			<div class="card">
 				<div class="card-body">
     		        <p class="card-description text-muted">Select an existing user account to generate a password reset link.</p>
+                    @NoticeAlert() {
+                    Generate a one-time password reset link for a user (use this endpoint when a user has forgotten their password).
+                    <br/><br/>
+                    <b>Warning</b> anyone in possession of the link can reset the password of the associated account. The link should be treated as sensitive and handled accordingly.
+                    }
                     <div class="form-group">
                         @UserOptionsSelector(users)
                     </div>

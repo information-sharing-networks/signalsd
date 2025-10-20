@@ -52,11 +52,29 @@ func TransferOwnershipPage(environment string, isns []types.IsnOption, users []t
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = WarningAlert("Warning: This action will transfer ownership of the selected ISN to the chosen admin account. The current owner will lose administrative privileges for this ISN.").Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Var3 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+				templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+				templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+				if !templ_7745c5c3_IsBuffer {
+					defer func() {
+						templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+						if templ_7745c5c3_Err == nil {
+							templ_7745c5c3_Err = templ_7745c5c3_BufErr
+						}
+					}()
+				}
+				ctx = templ.InitializeContext(ctx)
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "This action will transfer ownership of the selected ISN to the chosen admin account.<br><br>The current owner will lose administrative privileges for this ISN and will also loose read/write permissions unless the are added to the ISN via the <em>Grant ISN Access</em> feature.")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				return nil
+			})
+			templ_7745c5c3_Err = NoticeAlert().Render(templ.WithChildren(ctx, templ_7745c5c3_Var3), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<form hx-put=\"/ui-api/isn/transfer-ownership\" hx-target=\"#transfer-result\" hx-swap=\"innerHTML\" class=\"margin-top-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<form hx-put=\"/ui-api/isn/transfer-ownership\" hx-target=\"#transfer-result\" hx-swap=\"innerHTML\" class=\"margin-top-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -64,47 +82,47 @@ func TransferOwnershipPage(environment string, isns []types.IsnOption, users []t
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div><div class=\"form-group\"><label for=\"new-owner-email\" class=\"form-label\">New Owner</label> <select id=\"new-owner-email\" name=\"new-owner-email\" required class=\"form-select\"><option value=\"\">Select New Owner...</option> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</div><div class=\"form-group\"><label for=\"new-owner-email\" class=\"form-label\">New Owner</label> <select id=\"new-owner-email\" name=\"new-owner-email\" required class=\"form-select\"><option value=\"\">Select New Owner...</option> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if users != nil {
 				for _, user := range users {
 					if user.UserRole == "admin" {
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<option value=\"")
-						if templ_7745c5c3_Err != nil {
-							return templ_7745c5c3_Err
-						}
-						var templ_7745c5c3_Var3 string
-						templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(user.Email)
-						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/transfer_ownership.templ`, Line: 42, Col: 38}
-						}
-						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
-						if templ_7745c5c3_Err != nil {
-							return templ_7745c5c3_Err
-						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\">")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<option value=\"")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 						var templ_7745c5c3_Var4 string
 						templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(user.Email)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/transfer_ownership.templ`, Line: 42, Col: 53}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/transfer_ownership.templ`, Line: 46, Col: 38}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, " (Admin)</option>")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "\">")
+						if templ_7745c5c3_Err != nil {
+							return templ_7745c5c3_Err
+						}
+						var templ_7745c5c3_Var5 string
+						templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(user.Email)
+						if templ_7745c5c3_Err != nil {
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/transfer_ownership.templ`, Line: 46, Col: 53}
+						}
+						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
+						if templ_7745c5c3_Err != nil {
+							return templ_7745c5c3_Err
+						}
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, " (Admin)</option>")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
 					}
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</select><p class=\"text-muted text-sm mt-1\">Select an admin account to become the new owner.</p></div></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Transfer Ownership</button></div></form></div></div><div id=\"transfer-result\"><!-- Results will appear here --></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</select><p class=\"text-muted text-sm mt-1\">Select an admin account to become the new owner.</p></div></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Transfer Ownership</button></div></form></div></div><div id=\"transfer-result\"><!-- Results will appear here --></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

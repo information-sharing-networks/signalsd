@@ -30,9 +30,10 @@ These tests verify the authentication and authorization system by running databa
 ### 2. User & Service Account Registration (`account_test.go`)
 Tests for user and service account registration via HTTP requests.
 
-- ✅ User registration 
-- ✅ Login 
+- ✅ User registration
+- ✅ Login
 - ✅ Password reset (admin generated link)
+- ✅ Self-serve password change (authenticated users)
 - ✅ Service account registration
 - ✅ Service acccount credential reissue
 

@@ -52,11 +52,29 @@ func SignalTypeStatusPage(environment string, isns []types.IsnOption) templ.Comp
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = WarningAlert("Warning: Disabling a signal type will prevent new signals from being submitted to it. Existing signals will remain archived but inaccessible.").Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Var3 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+				templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+				templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+				if !templ_7745c5c3_IsBuffer {
+					defer func() {
+						templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+						if templ_7745c5c3_Err == nil {
+							templ_7745c5c3_Err = templ_7745c5c3_BufErr
+						}
+					}()
+				}
+				ctx = templ.InitializeContext(ctx)
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "Disabling a signal type will prevent new signals from being submitted to it. Existing signals will remain archived but inaccessible.")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				return nil
+			})
+			templ_7745c5c3_Err = NoticeAlert().Render(templ.WithChildren(ctx, templ_7745c5c3_Var3), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<form hx-put=\"/ui-api/signal-types/status\" hx-target=\"#status-result\" hx-swap=\"innerHTML\" class=\"margin-top-4\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<form hx-put=\"/ui-api/signal-types/status\" hx-target=\"#status-result\" hx-swap=\"innerHTML\" class=\"margin-top-4\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -64,7 +82,7 @@ func SignalTypeStatusPage(environment string, isns []types.IsnOption) templ.Comp
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div class=\"form-group\"><label for=\"action\" class=\"form-label\">Action</label> <select id=\"action\" name=\"action\" required class=\"form-select\"><option value=\"\">Select Action...</option> <option value=\"disable\">Disable</option> <option value=\"enable\">Enable</option></select></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Update Signal Type Status</button></div></form></div></div><div id=\"status-result\"><!-- Results will appear here --></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"form-group\"><label for=\"action\" class=\"form-label\">Action</label> <select id=\"action\" name=\"action\" required class=\"form-select\"><option value=\"\">Select Action...</option> <option value=\"disable\">Disable</option> <option value=\"enable\">Enable</option></select></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Update Signal Type Status</button></div></form></div></div><div id=\"status-result\"><!-- Results will appear here --></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

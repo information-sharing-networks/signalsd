@@ -21,6 +21,9 @@ SELECT u.account_id, u.email, u.user_role, u.created_at , u.updated_at FROM user
 -- name: GetUserByID :one
 SELECT  u.account_id, u.email, u.user_role, u.created_at , u.updated_at FROM users u WHERE u.account_id = $1;
 
+-- name: GetUserWithPasswordByID :one
+SELECT u.account_id, u.email, u.hashed_password FROM users u WHERE u.account_id = $1;
+
 -- name: GetUserByIsnID :one
 SELECT u.*
 FROM users u 

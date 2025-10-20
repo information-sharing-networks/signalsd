@@ -239,7 +239,7 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	user, err := u.queries.GetUserByID(r.Context(), userAccountID)
+	user, err := u.queries.GetUserWithPasswordByID(r.Context(), userAccountID)
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
@@ -250,19 +250,13 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	currentPasswordHash, err := u.authService.HashPassword(req.CurrentPassword)
+	// Verify the current password against the stored hash
+	err = u.authService.CheckPasswordHash(user.HashedPassword, req.CurrentPassword)
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
+			slog.String("account_id", userAccountID.String()),
 		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "internal server error")
-		return
-	}
-
-	err = u.authService.CheckPasswordHash(currentPasswordHash, req.CurrentPassword)
-	if err != nil {
-		responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "Incorrect email or password")
+		responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "Current password is incorrect")
 		return
 	}
 
@@ -500,8 +494,10 @@ type PasswordResetPageData struct {
 // PasswordResetTokenPageHandler godoc
 //
 //	@Summary		Display password reset form
-//	@Description	Renders a password reset form for users with a valid reset token
-//	@Description	The reset token is validated and if valid, displays a form for the user to enter a new password
+//	@Description	Renders a password reset form for users with a valid reset token.
+//	@Description	The reset token is validated and if valid, displays a form for the user to enter a new password.
+//	@Description
+//	@Description	Do not call this endpoint directly, it will be called when the user clicks on the URL created by the *Generate password reset link* endpoint.
 //	@Tags			auth
 //
 //	@Param			token_id	path	string	true	"Password reset token ID"	example(550e8400-e29b-41d4-a716-446655440000)

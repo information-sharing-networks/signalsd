@@ -52,62 +52,80 @@ func AdminRoleManagementPage(environment string, users []types.UserOption) templ
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = WarningAlert("Warning: Granting admin role will give the user access to create ISNs, manage accounts, and perform other administrative functions. Revoking admin role will remove these privileges.").Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Var3 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+				templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+				templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+				if !templ_7745c5c3_IsBuffer {
+					defer func() {
+						templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+						if templ_7745c5c3_Err == nil {
+							templ_7745c5c3_Err = templ_7745c5c3_BufErr
+						}
+					}()
+				}
+				ctx = templ.InitializeContext(ctx)
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "Granting the admin role will give the user access to:<ul><li>Create an ISN</li><li>Define the Signal Types used in the ISN</li><li>read/write to their own ISNs</li><li>Grant other accounts read or write access to their ISNs</li><li>Manage service accounts</li><li>Disable/Enable accounts</li><li>View all users and their email addresses</li><li>Reset user passwords</li></ul>Note that admins can't change ISNs they don't own (the site owner must use the <em>transfer ownership</em> feature if this is requred)")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				return nil
+			})
+			templ_7745c5c3_Err = NoticeAlert().Render(templ.WithChildren(ctx, templ_7745c5c3_Var3), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<form hx-put=\"/ui-api/admin/accounts/admin-role\" hx-target=\"#role-result\" hx-swap=\"innerHTML\" class=\"margin-top-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\"><label for=\"user-email\" class=\"form-label\">User Account</label> <select id=\"user-email\" name=\"user-email\" required class=\"form-select\"><option value=\"\">Select User...</option> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<form hx-put=\"/ui-api/admin/accounts/admin-role\" hx-target=\"#role-result\" hx-swap=\"innerHTML\" class=\"margin-top-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\"><label for=\"user-email\" class=\"form-label\">User Account</label> <select id=\"user-email\" name=\"user-email\" required class=\"form-select\"><option value=\"\">Select User...</option> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if users != nil {
 				for _, user := range users {
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<option value=\"")
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					var templ_7745c5c3_Var3 string
-					templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(user.Email)
-					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/admin_role.templ`, Line: 36, Col: 37}
-					}
-					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<option value=\"")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var4 string
 					templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(user.Email)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/admin_role.templ`, Line: 36, Col: 52}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/admin_role.templ`, Line: 49, Col: 37}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, " (")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var5 string
-					templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(user.UserRole)
+					templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(user.Email)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/admin_role.templ`, Line: 36, Col: 71}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/admin_role.templ`, Line: 49, Col: 52}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, ")</option>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, " (")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var6 string
+					templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(user.UserRole)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/admin_role.templ`, Line: 49, Col: 71}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, ")</option>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</select></div><div class=\"form-group\"><label for=\"action\" class=\"form-label\">Action</label> <select id=\"action\" name=\"action\" required class=\"form-select\"><option value=\"\">Select Action...</option> <option value=\"grant\">Grant Admin Role</option> <option value=\"revoke\">Revoke Admin Role</option></select><p class=\"text-muted text-sm mt-1\">Choose whether to grant or revoke admin privileges.</p></div></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Update Admin Role</button></div></form></div></div><div id=\"role-result\"><!-- Results will appear here --></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</select></div><div class=\"form-group\"><label for=\"action\" class=\"form-label\">Action</label> <select id=\"action\" name=\"action\" required class=\"form-select\"><option value=\"\">Select Action...</option> <option value=\"grant\">Grant Admin Role</option> <option value=\"revoke\">Revoke Admin Role</option></select><p class=\"text-muted text-sm mt-1\">Choose whether to grant or revoke admin privileges.</p></div></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Update Admin Role</button></div></form></div></div><div id=\"role-result\"><!-- Results will appear here --></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

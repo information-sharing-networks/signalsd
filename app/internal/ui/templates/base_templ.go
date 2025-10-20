@@ -45,7 +45,7 @@ func BaseLayout(title string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " - Signalsd</title><script src=\"https://unpkg.com/htmx.org@2.0.4\"></script><link href=\"/static/css/app.css\" rel=\"stylesheet\"></head><body>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " - Signals</title><script src=\"https://unpkg.com/htmx.org@2.0.4\"></script><link href=\"/static/css/app.css\" rel=\"stylesheet\"></head><body>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -98,7 +98,7 @@ func Navigation(environment string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\"><div class=\"nav-container\"><div class=\"nav-content\"><div class=\"nav-brand\"><h1 class=\"nav-title\">Signals</h1><div class=\"nav-links\"><a href=\"/dashboard\" class=\"nav-link active\">Dashboard</a></div></div><div class=\"nav-actions\"><button hx-post=\"/logout\" hx-confirm=\"Are you sure you want to logout?\" class=\"nav-link\">Logout</button></div></div></div></nav>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\"><div class=\"nav-container\"><div class=\"nav-content\"><div class=\"nav-brand\"><h1 class=\"nav-title\">Signals</h1><div class=\"nav-links\"><a href=\"/dashboard\" class=\"nav-link active\">Dashboard</a></div></div><div class=\"nav-actions\"><a href=\"/settings\" class=\"nav-link\">Settings</a> <button hx-post=\"/logout\" hx-confirm=\"Are you sure you want to logout?\" class=\"nav-link\">Logout</button></div></div></div></nav>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

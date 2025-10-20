@@ -11,9 +11,20 @@ templ AccountStatusPage(environment string, users []types.UserOption, serviceAcc
 			<div class="card">
 				<div class="card-body">
 					<p class="card-description text-muted">
-						Enable or disable user and service accounts. 
+						Enable or disable user and service accounts.
 					</p>
-					@WarningAlert("Warning: Disabling an account revokes all client secrets/one-time secrets for service accounts and revokes all refresh tokens for web users. The account owner will need to contact an administrator to re-enable their account.")
+					@NoticeAlert() {
+                        <u>Disabling</u> an account revokes:
+                        <ul>
+                            <li>all client secrets/one-time secrets for service accounts</li>
+                            <li>all refresh tokens for web users</li>
+                        </ul>
+                        Disabled accounts will be unable to use the system until they are re-enabled.
+						<br/>
+						<br/>
+                        <u>Enabling</u> a disabled account automatically restores access for web users. 
+                        Service accounts will need a new client secret via the <em>Reissue Credentials</em> feature.
+					}
 
 					<form
 						hx-put="/ui-api/admin/accounts/status"

@@ -68,6 +68,7 @@ func (a *AuthService) HashPassword(password string) (string, error) {
 	return string(dat), nil
 }
 
+// CheckPasswordHash compares a bcrypt hashed password with its possible plaintext equivalent.
 func (a *AuthService) CheckPasswordHash(hash, password string) error {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 }

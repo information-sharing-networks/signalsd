@@ -10,7 +10,7 @@ templ BaseLayout(title string) {
 		<head>
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-			<title>{ title } - Signalsd</title>
+			<title>{ title } - Signals</title>
 			<script src="https://unpkg.com/htmx.org@2.0.4"></script>
 			<link href="/static/css/app.css" rel="stylesheet"/>
 		</head>
@@ -36,6 +36,9 @@ templ Navigation(environment string) {
 					</div>
 				</div>
 				<div class="nav-actions">
+					<a href="/settings" class="nav-link">
+						Settings
+					</a>
 					<button
 						hx-post="/logout"
 						hx-confirm="Are you sure you want to logout?"

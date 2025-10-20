@@ -1277,3 +1277,314 @@ func TestPasswordResetFlow(t *testing.T) {
 		})
 	})
 }
+
+// TestSelfServePasswordChange tests the self-serve password change endpoint
+// This tests the PUT /api/auth/password/reset endpoint when called by an authenticated user
+func TestSelfServePasswordChange(t *testing.T) {
+	ctx := context.Background()
+	testDB := setupTestDatabase(t, ctx)
+	queries := database.New(testDB)
+	authService := auth.NewAuthService(secretKey, "test", queries)
+
+	// Start test server
+	testURL := getTestDatabaseURL()
+	baseURL, stopServer := startInProcessServer(t, ctx, testDB, testURL, "")
+	defer stopServer()
+
+	t.Run("successful password change with correct current password", func(t *testing.T) {
+		// Create test user
+		userPassword := "original-password-123"
+		userEmail := "user1@password.test"
+		userAccount := createTestUserWithPassword(t, ctx, queries, authService, "member", userEmail, userPassword)
+		userToken := getAccessToken(t, authService, userAccount.ID)
+		newPassword := "new-secure-password-456"
+		changeRequest := map[string]string{
+			"current_password": userPassword,
+			"new-password":     newPassword,
+		}
+
+		requestBody, err := json.Marshal(changeRequest)
+		if err != nil {
+			t.Fatalf("Failed to marshal request: %v", err)
+		}
+
+		url := fmt.Sprintf("%s/api/auth/password/reset", baseURL)
+		req, err := http.NewRequest("PUT", url, bytes.NewBuffer(requestBody))
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+userToken)
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("Failed to make request: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("Expected %d, got %d", http.StatusNoContent, resp.StatusCode)
+		}
+
+		// Verify user can login with new password
+		t.Run("user can login with new password", func(t *testing.T) {
+			loginRequest := map[string]string{
+				"email":    userEmail,
+				"password": newPassword,
+			}
+
+			requestBody, err := json.Marshal(loginRequest)
+			if err != nil {
+				t.Fatalf("Failed to marshal login request: %v", err)
+			}
+
+			loginURL := fmt.Sprintf("%s/api/auth/login", baseURL)
+			req, err := http.NewRequest("POST", loginURL, bytes.NewBuffer(requestBody))
+			if err != nil {
+				t.Fatalf("Failed to create login request: %v", err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("Failed to login: %v", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+			}
+		})
+
+		// Verify old password no longer works
+		t.Run("old password no longer works", func(t *testing.T) {
+			loginRequest := map[string]string{
+				"email":    userEmail,
+				"password": userPassword,
+			}
+
+			requestBody, err := json.Marshal(loginRequest)
+			if err != nil {
+				t.Fatalf("Failed to marshal login request: %v", err)
+			}
+
+			loginURL := fmt.Sprintf("%s/api/auth/login", baseURL)
+			req, err := http.NewRequest("POST", loginURL, bytes.NewBuffer(requestBody))
+			if err != nil {
+				t.Fatalf("Failed to create login request: %v", err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("Failed to login: %v", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusUnauthorized {
+				t.Fatalf("Expected status 401, got %d", resp.StatusCode)
+			}
+		})
+	})
+
+	t.Run("password change fails with incorrect current password", func(t *testing.T) {
+		// Create fresh test user for this test
+		userPassword := "original-password-456"
+		userEmail := "user2@password.test"
+		userAccount := createTestUserWithPassword(t, ctx, queries, authService, "member", userEmail, userPassword)
+		userToken := getAccessToken(t, authService, userAccount.ID)
+
+		wrongPassword := "wrong-password-xyz"
+		newPassword := "another-new-password-789"
+		changeRequest := map[string]string{
+			"current_password": wrongPassword,
+			"new-password":     newPassword,
+		}
+
+		requestBody, err := json.Marshal(changeRequest)
+		if err != nil {
+			t.Fatalf("Failed to marshal request: %v", err)
+		}
+
+		url := fmt.Sprintf("%s/api/auth/password/reset", baseURL)
+		req, err := http.NewRequest("PUT", url, bytes.NewBuffer(requestBody))
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+userToken)
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("Failed to make request: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("Expected status 401 for incorrect password, got %d", resp.StatusCode)
+		}
+
+		// Verify password was NOT changed - user should still be able to login with original password
+		t.Run("original password still works after failed change attempt", func(t *testing.T) {
+			loginRequest := map[string]string{
+				"email":    userEmail,
+				"password": userPassword,
+			}
+
+			requestBody, err := json.Marshal(loginRequest)
+			if err != nil {
+				t.Fatalf("Failed to marshal login request: %v", err)
+			}
+
+			loginURL := fmt.Sprintf("%s/api/auth/login", baseURL)
+			req, err := http.NewRequest("POST", loginURL, bytes.NewBuffer(requestBody))
+			if err != nil {
+				t.Fatalf("Failed to create login request: %v", err)
+			}
+			req.Header.Set("Content-Type", "application/json")
+
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatalf("Failed to login: %v", err)
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+			}
+		})
+	})
+
+	t.Run("password change requires authentication", func(t *testing.T) {
+		changeRequest := map[string]string{
+			"current_password": "some-password",
+			"new-password":     "new-password-123",
+		}
+
+		requestBody, err := json.Marshal(changeRequest)
+		if err != nil {
+			t.Fatalf("Failed to marshal request: %v", err)
+		}
+
+		url := fmt.Sprintf("%s/api/auth/password/reset", baseURL)
+		req, err := http.NewRequest("PUT", url, bytes.NewBuffer(requestBody))
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		// No Authorization header
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("Failed to make request: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("Expected status %d for unauthenticated request, got %d", http.StatusUnauthorized, resp.StatusCode)
+		}
+	})
+
+	t.Run("password change fails with empty fields", func(t *testing.T) {
+		// Create fresh test user for this test
+		userPassword := "original-password-789"
+		userEmail := "user3@password.test"
+		userAccount := createTestUserWithPassword(t, ctx, queries, authService, "member", userEmail, userPassword)
+		userToken := getAccessToken(t, authService, userAccount.ID)
+
+		testCases := []struct {
+			name           string
+			currentPass    string
+			newPass        string
+			expectedStatus int
+		}{
+			{
+				name:           "empty_current_password",
+				currentPass:    "",
+				newPass:        "new-password-123",
+				expectedStatus: http.StatusBadRequest,
+			},
+			{
+				name:           "empty_new_password",
+				currentPass:    userPassword,
+				newPass:        "",
+				expectedStatus: http.StatusBadRequest,
+			},
+			{
+				name:           "both_empty",
+				currentPass:    "",
+				newPass:        "",
+				expectedStatus: http.StatusBadRequest,
+			},
+		}
+
+		for _, tt := range testCases {
+			t.Run(tt.name, func(t *testing.T) {
+				changeRequest := map[string]string{
+					"current_password": tt.currentPass,
+					"new-password":     tt.newPass,
+				}
+
+				requestBody, err := json.Marshal(changeRequest)
+				if err != nil {
+					t.Fatalf("Failed to marshal request: %v", err)
+				}
+
+				url := fmt.Sprintf("%s/api/auth/password/reset", baseURL)
+				req, err := http.NewRequest("PUT", url, bytes.NewBuffer(requestBody))
+				if err != nil {
+					t.Fatalf("Failed to create request: %v", err)
+				}
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set("Authorization", "Bearer "+userToken)
+
+				resp, err := http.DefaultClient.Do(req)
+				if err != nil {
+					t.Fatalf("Failed to make request: %v", err)
+				}
+				defer resp.Body.Close()
+
+				if resp.StatusCode != tt.expectedStatus {
+					t.Fatalf("Expected status %d, got %d", tt.expectedStatus, resp.StatusCode)
+				}
+			})
+		}
+	})
+
+	t.Run("password change fails with password too short", func(t *testing.T) {
+		// Create fresh test user for this test
+		userPassword := "original-password-999"
+		userEmail := "user4@password.test"
+		userAccount := createTestUserWithPassword(t, ctx, queries, authService, "member", userEmail, userPassword)
+		userToken := getAccessToken(t, authService, userAccount.ID)
+
+		tooShortPassword := "short"
+		changeRequest := map[string]string{
+			"current_password": userPassword,
+			"new-password":     tooShortPassword,
+		}
+
+		requestBody, err := json.Marshal(changeRequest)
+		if err != nil {
+			t.Fatalf("Failed to marshal request: %v", err)
+		}
+
+		url := fmt.Sprintf("%s/api/auth/password/reset", baseURL)
+		req, err := http.NewRequest("PUT", url, bytes.NewBuffer(requestBody))
+		if err != nil {
+			t.Fatalf("Failed to create request: %v", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+userToken)
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("Failed to make request: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusBadRequest {
+			t.Fatalf("Expected status 400 for password too short, got %d", resp.StatusCode)
+		}
+	})
+}

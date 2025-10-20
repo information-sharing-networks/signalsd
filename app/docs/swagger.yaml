@@ -1244,8 +1244,7 @@ paths:
 
         Admins can create links on behalf of users with a member role.  The site owner role can create links for admins and members.
 
-        **Note:** The generated link can be used by any user in possession of the link to reset the password of the associated account.
-        The link should be treated as sensitive and protected accordingly.
+        **Note:** anyone in possession of the link can reset the password of the associated account. The link should be treated as sensitive and handled accordingly.
       parameters:
       - description: User Account ID
         example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
@@ -1321,8 +1320,10 @@ paths:
   /api/auth/password-reset/{token_id}:
     get:
       description: |-
-        Renders a password reset form for users with a valid reset token
-        The reset token is validated and if valid, displays a form for the user to enter a new password
+        Renders a password reset form for users with a valid reset token.
+        The reset token is validated and if valid, displays a form for the user to enter a new password.
+
+        Do not call this endpoint directly, it will be called when the user clicks on the URL created by the *Generate password reset link* endpoint.
       parameters:
       - description: Password reset token ID
         example: 550e8400-e29b-41d4-a716-446655440000

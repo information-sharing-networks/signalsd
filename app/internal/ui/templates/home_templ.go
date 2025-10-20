@@ -32,7 +32,7 @@ func LoginPageWithEnvironment(environment string) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Login - Signalsd</title><script src=\"https://unpkg.com/htmx.org@2.0.4\"></script><link href=\"/static/css/app.css\" rel=\"stylesheet\"></head><body data-environment=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Login - Signals</title><script src=\"https://unpkg.com/htmx.org@2.0.4\"></script><link href=\"/static/css/app.css\" rel=\"stylesheet\"></head><body data-environment=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -717,8 +717,7 @@ type GeneratePasswordResetLinkResponse struct {
 //	@Description
 //	@Description	Admins can create links on behalf of users with a member role.  The site owner role can create links for admins and members.
 //	@Description
-//	@Description	**Note:** The generated link can be used by any user in possession of the link to reset the password of the associated account.
-//	@Description	The link should be treated as sensitive and protected accordingly.
+//	@Description	**Note:** anyone in possession of the link can reset the password of the associated account. The link should be treated as sensitive and handled accordingly.
 //	@Tags			Site Admin
 //
 //	@Param			user_id	path		string	true	"User Account ID"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
