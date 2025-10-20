@@ -64,7 +64,7 @@ func TransferOwnershipPage(environment string, isns []types.IsnOption, users []t
 					}()
 				}
 				ctx = templ.InitializeContext(ctx)
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "This action will transfer ownership of the selected ISN to the chosen admin account.<br><br>The current owner will lose administrative privileges for this ISN and will also loose read/write permissions unless the are added to the ISN via the <em>Grant ISN Access</em> feature.")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "This action will transfer ownership of the selected ISN to the chosen admin account.<br><br>The current owner will lose administrative privileges for this ISN and will also lose read/write permissions unless they are added to the ISN via the <em>Grant ISN Access</em> feature.")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
