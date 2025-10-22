@@ -92,11 +92,6 @@ func (a *AuthService) HashToken(token string) string {
 	return base64.URLEncoding.EncodeToString(hasher.Sum(nil))
 }
 
-// check that the hashed value of a token is the same as the supplied hash
-func (a *AuthService) CheckTokenHash(hash string, token string) bool {
-	return hash == a.HashToken(token)
-}
-
 // create a JWT access token signed with HS256 using the app's secret key.
 //
 // Roles and ISN read/write permissions are retreived from the database and included in the token claims and the response body.
