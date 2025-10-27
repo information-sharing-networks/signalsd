@@ -15,7 +15,7 @@ require (
 	github.com/alecthomas/chroma/v2 v2.20.0
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/jackc/pgx/v5 v5.7.6
-	github.com/jub0bs/cors v0.9.1
+	github.com/jub0bs/cors v0.9.2
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/lmittmann/tint v1.1.2
 	github.com/pressly/goose/v3 v3.26.0
@@ -44,7 +44,7 @@ require (
 	github.com/spf13/pflag v1.0.9 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/mod v0.28.0 // indirect
-	golang.org/x/net v0.45.0 // indirect
+	golang.org/x/net v0.46.0 // indirect
 	golang.org/x/sync v0.17.0 // indirect
 	golang.org/x/tools v0.37.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
