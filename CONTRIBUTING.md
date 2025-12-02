@@ -22,6 +22,8 @@ docker compose up
 
 The service runs on http://localhost:8080 with API docs at `/docs`.
 
+**Note**: Even when using Docker, you should have Go 1.25.4 or above installed locally for code editing, linting, and running local tests. See the [Local Development Setup](README.md#local-development-setup-macos) section in the README for details.
+
 ## Testing
 
 Nearly all the testing is done via integration tests that live in `app/test/integration/`.  See the [integration testing guide](app/test/integration/README.md) for more information.

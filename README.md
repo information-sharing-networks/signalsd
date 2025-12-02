@@ -95,10 +95,10 @@ DB_CONNECT_TIMEOUT=5s
 ## Quick Start (Docker Development Environment)
 the simplest approach to get a dev environment is to to use the included Docker configuration (If you want to install the software, database and tools locally then see the [local develppment setup](#local-development-setup-macos) section below).
 
-**Prerequisites**: 
+**Prerequisites**:
 The following must be installed on your system
-- [Docker Desktop](https://docs.docker.com/get-docker) 
-- [go 1.25+](https://go.dev/doc/install)
+- [Docker Desktop](https://docs.docker.com/get-docker)
+- [Go 1.25.4 or above](https://go.dev/doc/install)
 
 Clone the repo:
 ```bash
@@ -252,7 +252,7 @@ if you do not want to use Docker, you need to install the following dependencies
 
 ### Prerequisites
 Install the following:
-- Go 1.25 or above
+- Go 1.25.4 or above
 - PostgreSQL@17 or above
 
 ### Go Development tools
