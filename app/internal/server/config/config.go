@@ -109,7 +109,7 @@ var ValidServiceModes = map[string]bool{ // service modes for CLI
 	"signals-write": true, // write-only signal operations
 }
 
-// NewServerConfig loads environment variables using envconfig and returns a ServerConfig struct and CORSConfigs
+// NewServerConfig loads environment variables and returns a ServerEnvironment struct and CORSConfigs
 func NewServerConfig() (*ServerEnvironment, *CORSConfigs, error) {
 	var cfg ServerEnvironment
 

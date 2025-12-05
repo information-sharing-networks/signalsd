@@ -4,19 +4,19 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kelseyhightower/envconfig"
+	"github.com/Netflix/go-env"
 )
 
 // UI server config - used when the ui is run in standalone mode
 type Config struct {
-	Environment  string        `envconfig:"ENVIRONMENT" default:"dev"`
-	Host         string        `envconfig:"HOST" default:"0.0.0.0"`
-	Port         int           `envconfig:"PORT" default:"3000"`
-	LogLevel     string        `envconfig:"LOG_LEVEL" default:"debug"`
-	ReadTimeout  time.Duration `envconfig:"READ_TIMEOUT" default:"15s"`
-	WriteTimeout time.Duration `envconfig:"WRITE_TIMEOUT" default:"15s"`
-	IdleTimeout  time.Duration `envconfig:"IDLE_TIMEOUT" default:"60s"`
-	APIBaseURL   string        `envconfig:"API_BASE_URL" default:"http://localhost:8080"`
+	Environment  string        `env:"ENVIRONMENT,default=dev"`
+	Host         string        `env:"HOST,default=0.0.0.0"`
+	Port         int           `env:"PORT,default=3000"`
+	LogLevel     string        `env:"LOG_LEVEL,default=debug"`
+	ReadTimeout  time.Duration `env:"READ_TIMEOUT,default=15s"`
+	WriteTimeout time.Duration `env:"WRITE_TIMEOUT,default=15s"`
+	IdleTimeout  time.Duration `env:"IDLE_TIMEOUT,default=60s"`
+	APIBaseURL   string        `env:"API_BASE_URL,default=http://localhost:8080"`
 }
 
 var validEnvs = map[string]bool{
@@ -35,8 +35,9 @@ const (
 func NewConfig() (*Config, error) {
 	var cfg Config
 
-	if err := envconfig.Process("", &cfg); err != nil {
-		return nil, fmt.Errorf("failed to process environment variables: %w", err)
+	_, err := env.UnmarshalFromEnviron(&cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal environment variables: %w", err)
 	}
 
 	if err := validateUIConfig(&cfg); err != nil {
