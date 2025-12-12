@@ -138,7 +138,7 @@ jobs:
             --allow-unauthenticated \
             --service-account ${{ env.RUNTIME_SERVICE_ACCOUNT }} \
             --set-env-vars "${ENV_VARS}" \
-            --args="--mode,all" \
+            --args="run,all" \
             --port 8080 \
             --memory ${{ env.MEMORY }} \
             --cpu ${{ env.CPU }} \

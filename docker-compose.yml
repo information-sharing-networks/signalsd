@@ -90,7 +90,7 @@ services:
         air 
       "
     networks:
-        #go run -mod=readonly cmd/signalsd/main.go --mode all
+        #go run -mod=readonly cmd/signalsd/main.go run all
       - app-network
     deploy:
       resources:
