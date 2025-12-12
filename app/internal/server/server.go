@@ -25,7 +25,7 @@ type Server struct {
 	pool           *pgxpool.Pool
 	queries        *database.Queries
 	authService    *auth.AuthService
-	serverConfig   *signalsd.ServerEnvironment
+	config         *signalsd.ServerEnvironment
 	corsConfigs    *signalsd.CORSConfigs
 	logger         *slog.Logger
 	router         *chi.Mux
@@ -37,7 +37,7 @@ func NewServer(
 	pool *pgxpool.Pool,
 	queries *database.Queries,
 	authService *auth.AuthService,
-	cfg *signalsd.ServerEnvironment,
+	config *signalsd.ServerEnvironment,
 	corsConfigs *signalsd.CORSConfigs,
 	logger *slog.Logger,
 	schemaCache *schemas.SchemaCache,
@@ -47,7 +47,7 @@ func NewServer(
 		pool:           pool,
 		queries:        queries,
 		authService:    authService,
-		serverConfig:   cfg,
+		config:         config,
 		corsConfigs:    corsConfigs,
 		logger:         logger,
 		router:         chi.NewRouter(),
@@ -58,7 +58,7 @@ func NewServer(
 	server.setupMiddleware()
 	server.registerCommonRoutes()
 
-	switch server.serverConfig.ServiceMode {
+	switch server.config.ServiceMode {
 	case "all":
 		server.registerAdminRoutes()
 		server.registerSignalReadRoutes()
@@ -85,14 +85,14 @@ func NewServer(
 }
 
 func (s *Server) Start(ctx context.Context) error {
-	serverAddr := fmt.Sprintf("%s:%d", s.serverConfig.Host, s.serverConfig.Port)
+	serverAddr := fmt.Sprintf("%s:%d", s.config.Host, s.config.Port)
 
 	httpServer := &http.Server{
 		Addr:         serverAddr,
 		Handler:      s.router,
-		ReadTimeout:  s.serverConfig.ReadTimeout,
-		WriteTimeout: s.serverConfig.WriteTimeout,
-		IdleTimeout:  s.serverConfig.IdleTimeout,
+		ReadTimeout:  s.config.ReadTimeout,
+		WriteTimeout: s.config.WriteTimeout,
+		IdleTimeout:  s.config.IdleTimeout,
 	}
 
 	serverErrors := make(chan error, 1)
@@ -100,7 +100,7 @@ func (s *Server) Start(ctx context.Context) error {
 	// Start HTTP server
 	go func() {
 		s.logger.Info("service listening",
-			slog.String("environment", s.serverConfig.Environment),
+			slog.String("environment", s.config.Environment),
 			slog.String("address", serverAddr))
 
 		err := httpServer.ListenAndServe()
@@ -148,22 +148,22 @@ func (s *Server) setupMiddleware() {
 	s.router.Use(chimiddleware.RequestID)
 	s.router.Use(logger.RequestLogging(s.logger))
 	s.router.Use(chimiddleware.StripSlashes)
-	s.router.Use(middleware.SecurityHeaders(s.serverConfig.Environment))
-	s.router.Use(middleware.RateLimit(s.serverConfig.RateLimitRPS, s.serverConfig.RateLimitBurst))
+	s.router.Use(middleware.SecurityHeaders(s.config.Environment))
+	s.router.Use(middleware.RateLimit(s.config.RateLimitRPS, s.config.RateLimitBurst))
 }
 
 func (s *Server) registerAdminRoutes() {
 	// user registration and authentication handlers
 	users := handlers.NewUserHandler(s.queries, s.authService, s.pool)
-	serviceAccounts := handlers.NewServiceAccountHandler(s.queries, s.authService, s.pool, s.serverConfig.PublicBaseURL)
-	login := handlers.NewLoginHandler(s.queries, s.authService, s.serverConfig.Environment)
-	tokens := handlers.NewTokenHandler(s.queries, s.authService, s.pool, s.serverConfig.Environment)
+	serviceAccounts := handlers.NewServiceAccountHandler(s.queries, s.authService, s.pool, s.config.PublicBaseURL)
+	login := handlers.NewLoginHandler(s.queries, s.authService, s.config.Environment)
+	tokens := handlers.NewTokenHandler(s.queries, s.authService, s.pool, s.config.Environment)
 
 	// site admin handlers
-	admin := handlers.NewAdminHandler(s.queries, s.pool, s.authService, s.serverConfig.PublicBaseURL)
+	admin := handlers.NewAdminHandler(s.queries, s.pool, s.authService, s.config.PublicBaseURL)
 
 	// isn definition handlers
-	isn := handlers.NewIsnHandler(s.queries, s.pool, s.serverConfig.PublicBaseURL)
+	isn := handlers.NewIsnHandler(s.queries, s.pool, s.config.PublicBaseURL)
 	signalTypes := handlers.NewSignalTypeHandler(s.queries)
 
 	// isn permissions
@@ -175,7 +175,7 @@ func (s *Server) registerAdminRoutes() {
 	// protected routes
 	s.router.Group(func(r chi.Router) {
 		r.Use(middleware.CORS(s.corsConfigs.Protected))
-		r.Use(middleware.RequestSizeLimit(s.serverConfig.MaxAPIRequestSize))
+		r.Use(middleware.RequestSizeLimit(s.config.MaxAPIRequestSize))
 
 		//oauth2.0 token handling
 		r.Route("/oauth", func(r chi.Router) {
@@ -330,7 +330,7 @@ func (s *Server) registerSignalWriteRoutes() {
 
 	s.router.Group(func(r chi.Router) {
 		r.Use(middleware.CORS(s.corsConfigs.Protected))
-		r.Use(middleware.RequestSizeLimit(s.serverConfig.MaxSignalPayloadSize))
+		r.Use(middleware.RequestSizeLimit(s.config.MaxSignalPayloadSize))
 		r.Use(s.authService.RequireValidAccessToken)
 		r.Use(s.authService.RequireIsnPermission("write"))
 
@@ -368,7 +368,7 @@ func (s *Server) registerSignalReadRoutes() {
 // registerCommonRoutes registers routes that are always available regardless of service mode
 // These routes include health checks and version information
 func (s *Server) registerCommonRoutes() {
-	admin := handlers.NewAdminHandler(s.queries, s.pool, s.authService, s.serverConfig.PublicBaseURL)
+	admin := handlers.NewAdminHandler(s.queries, s.pool, s.authService, s.config.PublicBaseURL)
 
 	// Health check endpoints
 	s.router.Route("/health", func(r chi.Router) {
@@ -403,7 +403,7 @@ func (s *Server) registerApiDocoRoutes() {
 		r.Use(middleware.CORS(s.corsConfigs.Public))
 
 		// When UI is integrated (mode "all"), the UI handles the root route
-		if s.serverConfig.ServiceMode != "all" {
+		if s.config.ServiceMode != "all" {
 			// Redirect root to API documentation for API-only modes
 			r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 				http.Redirect(w, r, "/docs", http.StatusMovedPermanently)
@@ -426,14 +426,14 @@ func (s *Server) registerApiDocoRoutes() {
 func (s *Server) setupUIServer() {
 	// Create UI configuration based on signalsd configuration
 	uiConfig := &config.Config{
-		Environment:  s.serverConfig.Environment,
-		Host:         s.serverConfig.Host,
-		Port:         s.serverConfig.Port, // Same port as API
-		LogLevel:     s.serverConfig.LogLevel,
-		ReadTimeout:  s.serverConfig.ReadTimeout,
-		WriteTimeout: s.serverConfig.WriteTimeout,
-		IdleTimeout:  s.serverConfig.IdleTimeout,
-		APIBaseURL:   fmt.Sprintf("http://localhost:%d", s.serverConfig.Port), // use the API port
+		Environment:  s.config.Environment,
+		Host:         s.config.Host,
+		Port:         s.config.Port, // Same port as API
+		LogLevel:     s.config.LogLevel,
+		ReadTimeout:  s.config.ReadTimeout,
+		WriteTimeout: s.config.WriteTimeout,
+		IdleTimeout:  s.config.IdleTimeout,
+		APIBaseURL:   fmt.Sprintf("http://localhost:%d", s.config.Port), // use the API port
 	}
 
 	// Create UI server and register its routes on the signalsd router
