@@ -91,7 +91,7 @@ jobs:
             --allow-unauthenticated \
             --service-account ${{ env.RUNTIME_SERVICE_ACCOUNT }} \
             --set-env-vars "DATABASE_URL=${{ env.DATABASE_URL }},SECRET_KEY=${{ env.SECRET_KEY }},ENVIRONMENT=${{ env.ENVIRONMENT }}, LOG_LEVEL=${{ env.LOG_LEVEL }}" \
-            --args="--mode,admin" \
+            --args="run,admin" \
             --port 8080 \
             --memory 256Mi \
             --cpu ${{ env.ADMIN_CPU }} \
@@ -107,7 +107,7 @@ jobs:
             --allow-unauthenticated \
             --service-account ${{ env.RUNTIME_SERVICE_ACCOUNT }} \
             --set-env-vars "DATABASE_URL=${{ env.DATABASE_URL }},SECRET_KEY=${{ env.SECRET_KEY }},ENVIRONMENT=${{ env.ENVIRONMENT }}, LOG_LEVEL=${{ env.LOG_LEVEL }}" \
-            --args="--mode,signals" \
+            --args="run,signals" \
             --port 8080 \
             --memory 512Mi \
             --cpu ${{ env.SIGNALS_CPU }} \

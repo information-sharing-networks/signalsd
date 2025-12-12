@@ -199,8 +199,8 @@ docker compose exec app sh -c "cd /signalsd/app && gosec -exclude-generated ./..
 # Connect to the postgres database
 docker compose exec -it db psql -U signalsd-dev -d signalsd_admin
 
-# run the go app locally and use the docker postgres database 
-DATABASE_URL="postgres://signalsd-dev@localhost:15432/signalsd_admin?sslmode=disable" SECRET_KEY="mysecretkey" go run cmd/signalsd/main.go --mode all
+# run the go app locally and use the docker postgres database
+DATABASE_URL="postgres://signalsd-dev@localhost:15432/signalsd_admin?sslmode=disable" SECRET_KEY="mysecretkey" go run cmd/signalsd/main.go run all
 
 # Stop and remove the environment completely
 docker compose down --rmi local -v
@@ -297,19 +297,19 @@ export DATABASE_URL="postgres://$(whoami):@localhost:5432/signalsd_admin?sslmode
 ```bash
 cd app
 go build ./cmd/signalsd/
-./signalsd --mode all
+./signalsd run all
 
 # Or run directly
-go run cmd/signalsd/main.go --mode all
+go run cmd/signalsd/main.go run all
 
 # Configure the service environment
-PORT=8081 go run cmd/signalsd/main.go --mode all
+PORT=8081 go run cmd/signalsd/main.go run all
 
 # Performance testing with custom database pool settings
-ENVIRONMENT=perf DB_MAX_CONNECTIONS=50 DB_MIN_CONNECTIONS=5 RATE_LIMIT_RPS=0 go run cmd/signalsd/main.go --mode all
+ENVIRONMENT=perf DB_MAX_CONNECTIONS=50 DB_MIN_CONNECTIONS=5 RATE_LIMIT_RPS=0 go run cmd/signalsd/main.go run all
 
 # Production-like settings
-PUBLIC_BASE_URL=https://yourdomain.com ALLOWED_ORIGINS=https://yourdomain.com ENVIRONMENT=prod DB_MAX_CONNECTIONS=25 DB_CONNECT_TIMEOUT=10s go run cmd/signalsd/main.go --mode all
+PUBLIC_BASE_URL=https://yourdomain.com ALLOWED_ORIGINS=https://yourdomain.com ENVIRONMENT=prod DB_MAX_CONNECTIONS=25 DB_CONNECT_TIMEOUT=10s go run cmd/signalsd/main.go run all
 ```
 
 ## User Interface
@@ -377,9 +377,9 @@ The service mode is specified using the `-mode` command line flag:
 - **`signals-write`**: Serves only signal write operations
 
 ```sh
-PORT=8080 go run cmd/signalsd/main.go --mode all
-PORT=8081 go run cmd/signalsd/main.go --mode signals-read
-PORT=8082 go run cmd/signalsd/main.go --mode signals-write
+PORT=8080 go run cmd/signalsd/main.go run all
+PORT=8081 go run cmd/signalsd/main.go run signals-read
+PORT=8082 go run cmd/signalsd/main.go run signals-write
 ```
 
 ## Deployment Configurations

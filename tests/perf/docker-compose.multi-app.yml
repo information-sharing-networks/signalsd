@@ -66,7 +66,7 @@ services:
       timeout: 5s
       retries: 5
     command: >
-      sh -c "cd /signalsd/app && go run cmd/signalsd/main.go -m signals"
+      sh -c "cd /signalsd/app && go run cmd/signalsd/main.go run signals"
     networks:
       - multi-app-network
     deploy:
@@ -115,7 +115,7 @@ services:
       timeout: 5s
       retries: 5
     command: >
-      sh -c "cd /signalsd/app && go run cmd/signalsd/main.go -m signals"
+      sh -c "cd /signalsd/app && go run cmd/signalsd/main.go run signals"
     networks:
       - multi-app-network
     deploy:
@@ -164,7 +164,7 @@ services:
       timeout: 5s
       retries: 5
     command: >
-      sh -c "cd /signalsd/app && go run cmd/signalsd/main.go -m signals"
+      sh -c "cd /signalsd/app && go run cmd/signalsd/main.go run signals"
     networks:
       - multi-app-network
     deploy:
@@ -231,7 +231,7 @@ services:
         echo 'Running database migrations...' &&
         goose -dir sql/schema postgres \"$$DATABASE_URL\" -env=none up &&
         echo 'Starting signalsd service (live reload on code changes)...' &&
-        go run -mod=readonly cmd/signalsd/main.go --mode admin
+        go run -mod=readonly cmd/signalsd/main.go run admin
       "
     networks:
       - multi-app-network

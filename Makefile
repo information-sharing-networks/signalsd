@@ -138,7 +138,7 @@ psql:
 # Run api locally using docker db
 go-api:
 	@echo "🔄 Running local api + docker db"
-	cd app && DATABASE_URL="postgres://signalsd-dev@localhost:15432/signalsd_admin?sslmode=disable" SECRET_KEY="secretkey" go run cmd/signalsd/main.go --mode api
+	cd app && DATABASE_URL="postgres://signalsd-dev@localhost:15432/signalsd_admin?sslmode=disable" SECRET_KEY="secretkey" go run cmd/signalsd/main.go run api
 
 # Run ui in standalone mode
 go-ui:
@@ -148,4 +148,4 @@ go-ui:
 # Run api and integrated ui locally using docker db
 go-all:
 	@echo "🔄 Running local api + docker db"
-	cd app && DATABASE_URL="postgres://signalsd-dev@localhost:15432/signalsd_admin?sslmode=disable" SECRET_KEY="secretkey" go run cmd/signalsd/main.go --mode all
+	cd app && DATABASE_URL="postgres://signalsd-dev@localhost:15432/signalsd_admin?sslmode=disable" SECRET_KEY="secretkey" go run cmd/signalsd/main.go run all

@@ -25,7 +25,7 @@ The steps to add a new interactive page to the UI are:
 
 ###  Integrated UI (Default)
 
-The default integrated mode (`signalsd --mode all`) is the simplest way to run the ui, everything runs on the same domain/port:
+The default integrated mode (`signalsd run all`) is the simplest way to run the ui, everything runs on the same domain/port:
 
 ```
 ┌─────────────────────────────────────┐
@@ -60,7 +60,7 @@ if you want to run the app locally (not in docker) you can use the below.  Note 
 make go-all # note expects the docker database to be running
 
 # or specify your own local database
-SECRET_KEY=your-secret DATABASE_URL="postgres://signalsd-dev:@localhost:5432/signalsd_admin?sslmode=disable" signalsd --mode all
+SECRET_KEY=your-secret DATABASE_URL="postgres://signalsd-dev:@localhost:5432/signalsd_admin?sslmode=disable" signalsd run all
 
 ```
 
@@ -101,7 +101,7 @@ To deploy a standalone UI you will need to build and deploy two containers:
 ```bash
 # API container
  go build -o signalsd cmd/signalsd/main.go 
-signalsd --mode api
+signalsd run api
 
 # UI container
 cd app &&  go build -o signalsd-ui cmd/signalsd-ui/main.go 
@@ -133,7 +133,7 @@ server {
 ## Configuration
 
 ### Integrated Mode (Default)
-When running as integrated UI (`signalsd --mode all`), the UI uses signalsd's configuration. No separate configuration needed.
+When running as integrated UI (`signalsd run all`), the UI uses signalsd's configuration. No separate configuration needed.
 
 ### Standalone Mode (Development/Custom Deployments)
 

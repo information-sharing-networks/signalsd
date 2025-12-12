@@ -833,7 +833,7 @@ func (s *SignalTypeHandler) GetSignalTypeHandler(w http.ResponseWriter, r *http.
 //
 //	@Summary		Get Signal types
 //	@Description	Get details for all the signal types defined on the ISN
-//	@Param			isn_slug			path	string	true	"ISN slug"	example(sample-isn--example-org)
+//	@Param			isn_slug			path	string	true	"ISN slug"						example(sample-isn--example-org)
 //	@Param			include_inactive	query	bool	false	"Include inactive signal types"	default(false)
 //	@Tags			Signal Type Definitions
 //

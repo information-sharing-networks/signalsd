@@ -2,7 +2,7 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-  args_bin = ["--mode", "all"]
+  args_bin = ["run", "all"]
   bin = "./bin/signalsd"
   cmd = "swag init -g ./cmd/signalsd/main.go && sqlc generate && templ generate && go build -o ./bin/signalsd ./cmd/signalsd/main.go"
   delay = 1000

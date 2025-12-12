@@ -138,37 +138,50 @@ import (
 // @tag.name			Service Accounts
 // @tag.description	Manage service account end points
 func main() {
-	var mode string
-
-	cmd := &cobra.Command{
+	rootCmd := &cobra.Command{
 		Use:   "signalsd",
 		Short: "Signalsd service for ISNs",
-		Long:  `Signalsd provides APIs for operating a Signals Information Sharing Network`,
-		Example: `
-  signalsd --mode all           # Single service with all endpoints + UI
-  signalsd --mode api           # API endpoints only (no UI)
-  signalsd --mode admin         # Admin endpoints only
-  signalsd --mode signals       # Signal exchange service (read + write)
-  signalsd --mode signals-read  # Signal read operations only
-  signalsd --mode signals-write # Signal write operations only`,
+		Long: `Signalsd provides APIs for operating a Signals Information Sharing Network
+
+To start the service, use the 'run' command with a service mode:
+
+  signalsd run all           # Single service with all endpoints + UI
+  signalsd run api           # API endpoints only (no UI)
+  signalsd run admin         # Admin endpoints only
+  signalsd run signals       # Signal exchange service (read + write)
+  signalsd run signals-read  # Signal read operations only
+  signalsd run signals-write # Signal write operations only`,
+	}
+
+	// Add the 'run' subcommand
+	runCmd := &cobra.Command{
+		Use:   "run MODE",
+		Short: "Run signalsd in the specified mode",
+		Long: `Run signalsd in the specified service mode.
+
+Available modes:
+  all           - Single service with all endpoints + UI
+  api           - API endpoints only (no UI)
+  admin         - Admin endpoints only
+  signals       - Signal exchange service (read + write)
+  signals-read  - Signal read operations only
+  signals-write - Signal write operations only`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			mode := args[0]
 			if !signalsd.ValidServiceModes[mode] {
 				return fmt.Errorf("invalid service mode '%s'. Valid modes: all, api, admin, signals, signals-read, signals-write", mode)
 			}
-
 			return run(mode)
 		},
 	}
 
-	cmd.Flags().StringVarP(&mode, "mode", "m", "", "Service mode (required): all, api, admin, signals, signals-read, signals-write")
-	if err := cmd.MarkFlagRequired("mode"); err != nil {
-		log.Fatalf("Failed to mark mode flag as required: %v", err)
-	}
+	rootCmd.AddCommand(runCmd)
 
 	v := version.Get()
-	cmd.Version = fmt.Sprintf("%s (built %s, commit %s)", v.Version, v.BuildDate, v.GitCommit)
+	rootCmd.Version = fmt.Sprintf("%s (built %s, commit %s)", v.Version, v.BuildDate, v.GitCommit)
 
-	if err := cmd.Execute(); err != nil {
+	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
 }
