@@ -18,9 +18,10 @@ import (
 
 func main() {
 	cmd := &cobra.Command{
-		Use:   "signalsd-ui",
-		Short: "Signalsd web user interface",
-		Long:  `Web UI for managing Information Sharing Networks`,
+		Use:               "signalsd-ui",
+		CompletionOptions: cobra.CompletionOptions{DisableDefaultCmd: true},
+		Short:             "Signalsd web user interface",
+		Long:              `Web UI for managing Information Sharing Networks`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return run()
 		},

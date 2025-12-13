@@ -155,8 +155,9 @@ To start the service, use the 'run' command with a service mode:
 
 	// Add the 'run' subcommand
 	runCmd := &cobra.Command{
-		Use:   "run MODE",
-		Short: "Run signalsd in the specified mode",
+		Use:               "run MODE",
+		CompletionOptions: cobra.CompletionOptions{DisableDefaultCmd: true},
+		Short:             "Run signalsd in the specified mode",
 		Long: `Run signalsd in the specified service mode.
 
 Available modes:
