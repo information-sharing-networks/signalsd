@@ -74,28 +74,28 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 			clientID       string
 			clientSecret   string
 			expectedStatus int
-			expectError    bool
+			wantErr        bool
 		}{
 			{
 				name:           "valid_credentials",
 				clientID:       serviceAccountDetails.ClientID,
 				clientSecret:   clientSecret,
 				expectedStatus: http.StatusOK,
-				expectError:    false,
+				wantErr:        false,
 			},
 			{
 				name:           "invalid_client_secret",
 				clientID:       serviceAccountDetails.ClientID,
 				clientSecret:   "wrong-secret",
 				expectedStatus: http.StatusUnauthorized,
-				expectError:    true,
+				wantErr:        true,
 			},
 			{
 				name:           "invalid_client_id",
 				clientID:       "wrong-client-id",
 				clientSecret:   clientSecret,
 				expectedStatus: http.StatusUnauthorized,
-				expectError:    true,
+				wantErr:        true,
 			},
 		}
 
@@ -119,7 +119,7 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 					t.Fatalf("Failed to decode response: %v", err)
 				}
 
-				if tt.expectError {
+				if tt.wantErr {
 					if _, hasErrorCode := responseBody["error_code"]; !hasErrorCode {
 						t.Error("Expected error_code in error response")
 					}
@@ -178,26 +178,26 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 			name           string
 			cookie         *http.Cookie // when nil the cookie from the last sucessful login will be used
 			expectedStatus int
-			expectError    bool
+			wantErr        bool
 		}{
 			{
 				name:           "valid refresh_token",
 				cookie:         originaRefreshTokenCookie,
 				expectedStatus: http.StatusOK,
-				expectError:    false,
+				wantErr:        false,
 			},
 			{
 				// the previous sucessful refresh should have revoked the original refresh token
 				name:           "revoked refresh_token",
 				cookie:         originaRefreshTokenCookie,
 				expectedStatus: http.StatusUnauthorized,
-				expectError:    true,
+				wantErr:        true,
 			},
 			{
 				name:           "valid refresh_token (second refresh)",
 				cookie:         nil, // use the latest refresh token from previous successful test
 				expectedStatus: http.StatusOK,
-				expectError:    false,
+				wantErr:        false,
 			},
 			{
 				name: "invalid refresh_token",
@@ -207,7 +207,7 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 					Path:  "/",
 				},
 				expectedStatus: http.StatusUnauthorized,
-				expectError:    true,
+				wantErr:        true,
 			},
 		}
 
@@ -231,7 +231,7 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 					t.Fatalf("Failed to decode response: %v", err)
 				}
 
-				if tt.expectError {
+				if tt.wantErr {
 					if _, hasErrorCode := responseBody["error_code"]; !hasErrorCode {
 						t.Error("Expected error_code in error response")
 						return

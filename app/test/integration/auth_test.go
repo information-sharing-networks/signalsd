@@ -342,7 +342,7 @@ func TestLoginAuth(t *testing.T) {
 			expectedRole        string
 			expectedAccountID   uuid.UUID
 			expectedAccountType string
-			expectError         bool
+			wantErr             bool
 		}{
 			{
 				name:                "owner can login with correct password",
@@ -351,7 +351,7 @@ func TestLoginAuth(t *testing.T) {
 				expectedRole:        ownerTestLogin.role,
 				expectedAccountID:   ownerAccount.ID,
 				expectedAccountType: ownerTestLogin.accountType,
-				expectError:         false,
+				wantErr:             false,
 			},
 			{
 				name:                "owner can't login with incorrect password",
@@ -360,7 +360,7 @@ func TestLoginAuth(t *testing.T) {
 				expectedRole:        ownerTestLogin.role,
 				expectedAccountID:   ownerAccount.ID,
 				expectedAccountType: ownerTestLogin.accountType,
-				expectError:         true,
+				wantErr:             true,
 			},
 			{
 				name:                "member can login with correct password",
@@ -369,7 +369,7 @@ func TestLoginAuth(t *testing.T) {
 				expectedRole:        memberTestLogin.role,
 				expectedAccountID:   memberAccount.ID,
 				expectedAccountType: memberTestLogin.accountType,
-				expectError:         false,
+				wantErr:             false,
 			},
 			{
 				name:                "member can't login with incorrect password",
@@ -378,7 +378,7 @@ func TestLoginAuth(t *testing.T) {
 				expectedRole:        memberTestLogin.role,
 				expectedAccountID:   memberAccount.ID,
 				expectedAccountType: memberTestLogin.accountType,
-				expectError:         true,
+				wantErr:             true,
 			},
 			{
 				name:                "admin can login with correct password",
@@ -387,7 +387,7 @@ func TestLoginAuth(t *testing.T) {
 				expectedRole:        adminTestLogin.role,
 				expectedAccountID:   adminAccount.ID,
 				expectedAccountType: adminTestLogin.accountType,
-				expectError:         false,
+				wantErr:             false,
 			},
 			{
 				name:                "admin can't login with incorrect password",
@@ -396,7 +396,7 @@ func TestLoginAuth(t *testing.T) {
 				expectedRole:        adminTestLogin.role,
 				expectedAccountID:   adminAccount.ID,
 				expectedAccountType: adminTestLogin.accountType,
-				expectError:         true,
+				wantErr:             true,
 			},
 		}
 
@@ -413,7 +413,7 @@ func TestLoginAuth(t *testing.T) {
 				// Test password validation
 				err = authService.CheckPasswordHash(user.HashedPassword, tt.password)
 				if err != nil {
-					if tt.expectError {
+					if tt.wantErr {
 						return
 					}
 					t.Fatalf("Password hash check failed: %v", err)

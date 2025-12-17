@@ -656,7 +656,7 @@ func TestSignalSubmission(t *testing.T) {
 			correlatedID      string
 			accountID         uuid.UUID
 			endpoint          testSignalEndpoint
-			expectError       bool
+			wantErr           bool
 			expectedStatus    int
 			expectedErrorCode string
 		}{
@@ -664,7 +664,7 @@ func TestSignalSubmission(t *testing.T) {
 				name:              "empty_correlation_id",
 				endpoint:          adminEndpoint,
 				accountID:         adminAccount.ID,
-				expectError:       true,
+				wantErr:           true,
 				expectedStatus:    400,
 				expectedErrorCode: apperrors.ErrCodeMalformedBody.String(),
 			},
@@ -673,7 +673,7 @@ func TestSignalSubmission(t *testing.T) {
 				endpoint:          adminEndpoint,
 				accountID:         adminAccount.ID,
 				correlatedID:      "not-a-uuid",
-				expectError:       true,
+				wantErr:           true,
 				expectedStatus:    400,
 				expectedErrorCode: apperrors.ErrCodeMalformedBody.String(),
 			},
@@ -682,7 +682,7 @@ func TestSignalSubmission(t *testing.T) {
 				endpoint:          adminEndpoint,
 				accountID:         adminAccount.ID,
 				correlatedID:      uuid.New().String(),
-				expectError:       true,
+				wantErr:           true,
 				expectedStatus:    422,
 				expectedErrorCode: apperrors.ErrCodeInvalidCorrelationID.String(),
 			},
@@ -692,7 +692,7 @@ func TestSignalSubmission(t *testing.T) {
 				endpoint:          adminEndpoint,
 				accountID:         adminAccount.ID,
 				correlatedID:      ownerSignalID,
-				expectError:       true,
+				wantErr:           true,
 				expectedStatus:    422,
 				expectedErrorCode: apperrors.ErrCodeInvalidCorrelationID.String(),
 			},
@@ -701,7 +701,7 @@ func TestSignalSubmission(t *testing.T) {
 				endpoint:       adminEndpoint,
 				accountID:      adminAccount.ID,
 				correlatedID:   adminSignalID,
-				expectError:    false,
+				wantErr:        false,
 				expectedStatus: 200,
 			},
 		}
@@ -720,7 +720,7 @@ func TestSignalSubmission(t *testing.T) {
 					t.Fatalf("Failed to decode response: %v", err)
 				}
 
-				if tt.expectError {
+				if tt.wantErr {
 					var errorCode string
 					var ok bool
 					if tt.expectedStatus != correlatedSignalResponse.StatusCode {
@@ -747,7 +747,7 @@ func TestSignalSubmission(t *testing.T) {
 					return
 				}
 
-				if !tt.expectError && correlatedSignalResponse.StatusCode != 200 {
+				if !tt.wantErr && correlatedSignalResponse.StatusCode != 200 {
 					t.Errorf("Expected status %d, got %d", http.StatusOK, correlatedSignalResponse.StatusCode)
 					return
 				}
