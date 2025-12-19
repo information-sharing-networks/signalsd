@@ -367,7 +367,7 @@ This service is deployed to Google Cloud Run.  Google handles HTTPS, firewall, l
 ## Service Mode Configuration
 
 You can run multiple instances of the signalsd service, each in a different mode.  This enables you to, for example, run a separate service for admin and signal processing workloads.
-The service mode is specified using the `-mode` command line flag:
+The service mode is specified using the `run` command with one of the following arguments:
 
 - **`all`**: Serves all API endpoints + UI
 - **`api`**: Serves all API endpoints 

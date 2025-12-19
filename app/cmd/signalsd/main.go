@@ -225,7 +225,7 @@ func run(mode string) error {
 		appLogger.Warn("env is configured to allow all origins for CORS. Use the ALLOWED_ORIGINS env variable to restrict access to specific origins")
 	}
 
-	// the --mode command line param determines which endpoints should be served: all, admin, signals, signals-read, signals-write, or ui
+	// the mode command line param determines which endpoints should be served: all, admin, signals, signals-read, signals-write, or ui
 	cfg.ServiceMode = mode
 
 	// set up the pgx database connection pool
