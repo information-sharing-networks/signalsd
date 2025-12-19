@@ -50,9 +50,10 @@ func (a *AuthService) RequireValidAccessToken(next http.Handler) http.Handler {
 		claims := &Claims{}
 
 		// extract the claims from the jwt and validate the signature
+		// WithValidMethods ensures only HS256 tokens are accepted, preventing algorithm confusion attacks
 		_, err = jwt.ParseWithClaims(accessToken, claims, func(token *jwt.Token) (any, error) {
 			return []byte(a.secretKey), nil
-		})
+		}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 		if err != nil {
 			if errors.Is(err, jwt.ErrTokenExpired) {
 				logger.ContextWithLogAttrs(r.Context(),

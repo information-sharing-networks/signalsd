@@ -198,7 +198,7 @@ func checkPermissions(t *testing.T, authService *auth.AuthService, accountID uui
 	claims := &auth.Claims{}
 	_, err = jwt.ParseWithClaims(response.AccessToken, claims, func(token *jwt.Token) (any, error) {
 		return []byte(secretKey), nil
-	})
+	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 	if err != nil {
 		t.Fatalf("Failed to parse JWT token: %v", err)
 	}

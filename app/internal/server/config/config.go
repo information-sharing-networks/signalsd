@@ -28,7 +28,7 @@ type ServerEnvironment struct {
 	MaxAPIRequestSize    int64         `env:"MAX_API_REQUEST_SIZE,default=65536"`      // 64KB
 	RateLimitRPS         int32         `env:"RATE_LIMIT_RPS,default=2500"`
 	RateLimitBurst       int32         `env:"RATE_LIMIT_BURST,default=5000"`
-	ServiceMode          string        `env:"SERVICE_MODE"`                 // Set by CLI flag, not env var
+	ServiceMode          string        `env:"SERVICE_MODE"`                 // Set by CLI argument, not env var
 	DBMaxConnections     int32         `env:"DB_MAX_CONNECTIONS,default=4"` // pgx pool defaults
 	DBMinConnections     int32         `env:"DB_MIN_CONNECTIONS,default=0"`
 	DBMaxConnLifetime    time.Duration `env:"DB_MAX_CONN_LIFETIME,default=60m"`
