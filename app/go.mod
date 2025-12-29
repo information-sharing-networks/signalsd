@@ -14,7 +14,7 @@ require (
 	github.com/a-h/templ v0.3.960
 	github.com/alecthomas/chroma/v2 v2.21.1
 	github.com/go-chi/chi/v5 v5.2.3
-	github.com/jackc/pgx/v5 v5.7.6
+	github.com/jackc/pgx/v5 v5.8.0
 	github.com/jub0bs/cors v0.9.2
 	github.com/lmittmann/tint v1.1.2
 	github.com/pressly/goose/v3 v3.26.0
