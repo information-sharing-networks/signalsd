@@ -9,7 +9,7 @@ import (
 
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
-	"github.com/santhosh-tekuri/jsonschema/v5"
+	"github.com/santhosh-tekuri/jsonschema/v6"
 )
 
 func SkipValidation(url string) bool {
@@ -36,17 +36,23 @@ func NewSchemaCache() *SchemaCache {
 
 // ValidateAndCompileSchema validates schema content and returns the compiled schema
 func ValidateAndCompileSchema(schemaURL, content string) (*jsonschema.Schema, error) {
-	// check if it's valid JSON
-	var jsonData any
-	if err := json.Unmarshal([]byte(content), &jsonData); err != nil {
+	// Parse the schema content using UnmarshalJSON
+	schemaData, err := jsonschema.UnmarshalJSON(strings.NewReader(content))
+	if err != nil {
 		return nil, fmt.Errorf("schema content is not valid JSON: %v", err)
 	}
 
-	// Compile the schema (this also validates it)
-	schema, err := jsonschema.CompileString(schemaURL, content)
-	if err != nil {
-		return nil, fmt.Errorf("invalid JSON Schema format: %w", err)
+	// Compile the schema using the Compiler API
+	compiler := jsonschema.NewCompiler()
+	if err := compiler.AddResource(schemaURL, schemaData); err != nil {
+		return nil, fmt.Errorf("failed to add schema resource: %w", err)
 	}
+
+	schema, err := compiler.Compile(schemaURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to compile schema: %w", err)
+	}
+
 	return schema, nil
 }
 
