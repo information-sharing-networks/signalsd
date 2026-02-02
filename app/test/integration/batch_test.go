@@ -22,7 +22,7 @@ import (
 
 func TestBatchLifecycle(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupTestDatabase(t, ctx)
+	testDB := setupCleanDatabase(t, ctx)
 
 	queries := database.New(testDB)
 
@@ -63,7 +63,7 @@ func TestBatchLifecycle(t *testing.T) {
 
 	t.Run("service account signal submission without batch fails", func(t *testing.T) {
 		// Create auth service
-		authService := auth.NewAuthService(secretKey, environment, queries)
+		authService := auth.NewAuthService(testServerConfig.secretKey, testServerConfig.environment, queries)
 
 		// Create access token for service account (should have no batch ID)
 		ctx := auth.ContextWithAccountID(context.Background(), serviceAccount.ID)

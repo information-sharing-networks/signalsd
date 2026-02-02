@@ -98,7 +98,7 @@ func ParseLogLevel(level string) slog.Level {
 // InitLogger creates a logger with the specified log level.
 // Uses colorized text format for dev environment otherwise output is JSON
 func InitLogger(logLevel slog.Level, environment string) *slog.Logger {
-	if environment == "dev" {
+	if environment == "dev" || environment == "test" {
 		return slog.New(
 			tint.NewHandler(os.Stderr, &tint.Options{
 				Level:      logLevel,

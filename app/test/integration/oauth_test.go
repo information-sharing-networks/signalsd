@@ -33,11 +33,11 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 
 	// set up test env
 	ctx := context.Background()
-	testDB := setupTestDatabase(t, ctx)
+	testDB := setupCleanDatabase(t, ctx)
 	testEnv := setupTestEnvironment(testDB)
 
 	// Start server
-	testURL := getTestDatabaseURL()
+	testURL := getDatabaseURL()
 	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, "")
 	defer stopServer()
 
@@ -418,11 +418,11 @@ func makeLoginRequest(t *testing.T, baseURL string, payload map[string]string) *
 // TestOAuthRevokeEndpoint tests POST /oauth/revoke for both account types
 func TestOAuthRevokeEndpoint(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupTestDatabase(t, ctx)
+	testDB := setupCleanDatabase(t, ctx)
 	testEnv := setupTestEnvironment(testDB)
 
 	// Start server
-	testURL := getTestDatabaseURL()
+	testURL := getDatabaseURL()
 	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, "")
 	defer stopServer()
 

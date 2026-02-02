@@ -43,29 +43,42 @@ type testEnvironment struct {
 	authService *auth.AuthService
 }
 
-// setupTestEnvironment creates a new test environment with database connection and services
-func setupTestEnvironment(dbConn *pgxpool.Pool) *testEnvironment {
-	env := &testEnvironment{
-		dbConn:      dbConn,
-		queries:     database.New(dbConn),
-		authService: auth.NewAuthService(secretKey, environment, database.New(dbConn)),
-	}
-	return env
+type databaseConfig struct {
+	userAndPassword string
+	password        string
+	dbname          string
+	host            string
+	port            int
 }
 
-// Test configuration constants
+type serverConfig struct {
+	secretKey   string
+	environment string
+	logLevel    string
+}
+
+var (
+	ciDatabaseConfig = databaseConfig{
+		userAndPassword: "postgres:postgres",
+		dbname:          "tmp_signalsd_integration_test",
+		host:            "localhost",
+		port:            5432,
+	}
+	localDatabaseConfig = databaseConfig{
+		userAndPassword: "signalsd-dev:",
+		dbname:          "tmp_signalsd_integration_test",
+		host:            "localhost",
+		port:            15432,
+	}
+
+	testServerConfig = serverConfig{
+		secretKey:   "test-secret-key-12345",
+		environment: "test",
+		logLevel:    "debug",
+	}
+)
+
 const (
-	secretKey        = "test-secret"
-	environment      = "test"
-	testDatabaseName = "tmp_signalsd_integration_test"
-
-	// CI database configuration
-	ciPostgresDatabaseURL = "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
-	ciTestDatabaseURL     = "postgres://postgres:postgres@localhost:5432/" + testDatabaseName + "?sslmode=disable"
-
-	// Local development database configuration
-	localPostgresDatabaseURL = "postgres://signalsd-dev:@localhost:15432/postgres?sslmode=disable"
-	localTestDatabaseURL     = "postgres://signalsd-dev:@localhost:15432/" + testDatabaseName + "?sslmode=disable"
 
 	// Test signal type
 	testSignalTypeDetail = "Simple test signal type for integration tests"
@@ -74,84 +87,104 @@ const (
 	testSchemaContent    = `{"type": "object", "properties": {"test": {"type": "string"}}, "required": ["test"], "additionalProperties": false }`
 )
 
-// getTestDatabaseURL returns the appropriate test database URL for the local docker db when running locally or the CI test database when being run in github action
-func getTestDatabaseURL() string {
-	if os.Getenv("GITHUB_ACTIONS") == "true" {
-		return ciTestDatabaseURL
-	}
-	return localTestDatabaseURL
+func buildConnString(userAndPassword string, host string, port int, dbname string) string {
+	return fmt.Sprintf("postgres://%s@%s:%d/%s?sslmode=disable",
+		userAndPassword, host, port, dbname)
 }
 
-// setupTestDatabase sets up a test database environment:
-// - In CI: uses GitHub Actions PostgreSQL service
-// - Locally: uses Docker Compose PostgreSQL container
-// - applies database migrations and drops database on exit
-func setupTestDatabase(t *testing.T, ctx context.Context) *pgxpool.Pool {
-
-	// Check if we're in CI environment
-	if os.Getenv("GITHUB_ACTIONS") == "true" {
-		return setupCIDatabase(t, ctx)
+// setupTestEnvironment creates a new test environment with database connection and services
+func setupTestEnvironment(dbConn *pgxpool.Pool) *testEnvironment {
+	queries := database.New(dbConn)
+	authService := auth.NewAuthService(testServerConfig.secretKey, testServerConfig.environment, queries)
+	return &testEnvironment{
+		dbConn:      dbConn,
+		queries:     queries,
+		authService: authService,
 	}
-
-	// local dev env
-	return setupLocalDatabase(t, ctx)
 }
 
-// setupCIDatabase uses GitHub Actions PostgreSQL service
-func setupCIDatabase(t *testing.T, ctx context.Context) *pgxpool.Pool {
-	t.Log("Running integration tests")
+// getDatabaseURL returns the appropriate test database URL for the local docker db when running locally
+// or the CI test database when being run in github action
+func getDatabaseURL() string {
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		return buildConnString(ciDatabaseConfig.userAndPassword, ciDatabaseConfig.host, ciDatabaseConfig.port, ciDatabaseConfig.dbname)
+	}
+	return buildConnString(localDatabaseConfig.userAndPassword, localDatabaseConfig.host, localDatabaseConfig.port, localDatabaseConfig.dbname)
+}
+
+// setupCleanDatabase creates an empty test db, applies migrations and returns a connection pool
+func setupCleanDatabase(t *testing.T, ctx context.Context) *pgxpool.Pool {
+
+	config := localDatabaseConfig
+
+	ci := false
+	if os.Getenv("GITHUB_ACTIONS") == "true" {
+		config = ciDatabaseConfig
+		ci = true
+	}
+
+	// postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable
+	// postgres://signalsd-dev@localhost:14532/postgres?sslmode=disable
+
+	// connect to the postgres database to create the test database
+	postgresConnectionURL := buildConnString(config.userAndPassword, config.host, config.port, "postgres")
 
 	// Check PostgreSQL server connectivity
-	postgresDatabase := setupDatabaseConn(t, ciPostgresDatabaseURL)
-	if err := postgresDatabase.Ping(ctx); err != nil {
-		t.Fatalf("❌ Can't ping PostgreSQL server %s", ciPostgresDatabaseURL)
+	postgresPool := setupCleanDatabaseConn(t, postgresConnectionURL)
+	if err := postgresPool.Ping(ctx); err != nil {
+		if !ci {
+			t.Fatalf("⚠️ Can't ping PostgreSQL server %s - is the docker db running?", postgresConnectionURL)
+		} else {
+			t.Fatalf("❌ Can't ping PostgreSQL server %s", postgresConnectionURL)
+		}
 	}
 
-	// create the test database
-	t.Logf("setting up test database %v", ciTestDatabaseURL)
-	createTestDatabase(t, ctx, postgresDatabase, testDatabaseName)
+	_, err := postgresPool.Exec(ctx, "DROP DATABASE IF EXISTS "+config.dbname)
+	if err != nil {
+		t.Fatalf("DROP DATABASE IF EXISTS Failed : %v", err)
+	}
 
-	testDatabase := setupDatabaseConn(t, ciTestDatabaseURL)
+	_, err = postgresPool.Exec(ctx, "CREATE DATABASE "+config.dbname)
+	if err != nil {
+		t.Fatalf("CREATE DATABASE Failed : %v", err)
+	}
 
+	// drop the test database when the test is complete
+	t.Cleanup(func() {
+		_, err := postgresPool.Exec(ctx, "DROP DATABASE "+config.dbname)
+		if err != nil {
+			t.Fatalf("Failed to drop test database: %v", err)
+		}
+	})
 	t.Log("test database created")
 
+	testDatabaseURLTODO := buildConnString(config.userAndPassword, config.host, config.port, config.dbname)
+	testDatabasePool := setupCleanDatabaseConn(t, testDatabaseURLTODO)
+
 	// Apply database migrations
-	if err := runDatabaseMigrations(t, testDatabase); err != nil {
+	if err := runDatabaseMigrations(t, testDatabasePool); err != nil {
 		t.Fatalf("❌ Failed to apply database migrations: %v", err)
+	}
+	// Convert pgx pool to database/sql interface that Goose expects
+	var db *sql.DB = stdlib.OpenDBFromPool(testDatabasePool)
+	defer db.Close()
+
+	if err := goose.SetDialect("postgres"); err != nil {
+		t.Fatalf("failed to set goose dialect: %v", err)
+	}
+
+	// Apply migrations from the sql/schema directory
+	migrationDir := "../../sql/schema"
+	if err := goose.Up(db, migrationDir); err != nil {
+		t.Fatalf("failed to apply migrations: %v", err)
 	}
 
 	t.Log("✅ Database created")
 
-	return testDatabase
+	return testDatabasePool
 }
 
-// setupLocalDatabase uses Docker Compose database
-func setupLocalDatabase(t *testing.T, ctx context.Context) *pgxpool.Pool {
-	t.Log("Running local integration test")
-
-	// Check PostgreSQL server connectivity
-	postgresDatabase := setupDatabaseConn(t, localPostgresDatabaseURL)
-	if err := postgresDatabase.Ping(ctx); err != nil {
-		t.Fatalf("❌ Can't ping PostgreSQL server %s - is the docker db container running? Run: docker compose up db", localPostgresDatabaseURL)
-	}
-
-	// create the test database
-	t.Logf("setting up test database %v", localTestDatabaseURL)
-	createTestDatabase(t, ctx, postgresDatabase, testDatabaseName)
-
-	testDatabase := setupDatabaseConn(t, localTestDatabaseURL)
-
-	// Apply database migrations
-	if err := runDatabaseMigrations(t, testDatabase); err != nil {
-		t.Fatalf("❌ Failed to apply database migrations: %v", err)
-	}
-
-	t.Log("✅ Database created")
-
-	return testDatabase
-}
-
-func setupDatabaseConn(t *testing.T, databaseURL string) *pgxpool.Pool {
+func setupCleanDatabaseConn(t *testing.T, databaseURL string) *pgxpool.Pool {
 	t.Helper()
 
 	ctx := context.Background()
@@ -194,31 +227,6 @@ func runDatabaseMigrations(t *testing.T, pool *pgxpool.Pool) error {
 	return nil
 }
 
-func createTestDatabase(t *testing.T, ctx context.Context, pool *pgxpool.Pool, databaseName string) {
-	t.Helper()
-
-	// try to drop db in case previous run was killed and the test db still exists
-	_, err := pool.Exec(ctx, "DROP DATABASE IF EXISTS "+databaseName)
-	if err != nil {
-		t.Fatalf("DROP DATABASE IF EXISTS Failed : %v", err)
-	}
-
-	_, err = pool.Exec(ctx, "CREATE DATABASE "+databaseName)
-	if err != nil {
-		t.Fatalf("CREATE DATABASE Failed : %v", err)
-	}
-
-	t.Cleanup(func() {
-		_, err := pool.Exec(ctx, "DROP DATABASE "+databaseName)
-		if err != nil {
-			t.Fatalf("Failed to drop test database: %v",
-				err)
-		}
-	})
-
-	t.Log("Test database created")
-}
-
 // startInProcessServer starts the signalsd server in-process for testing - returns the base URL for the API and a shutdown function
 // when using public isns be sure to load the test data before starting the server (the public isn cache is not dynamic and is only populated at startup)
 // if you are not testing a function that generates end user facing urls then send an empty string for publicBaseURL
@@ -234,10 +242,10 @@ func startInProcessServer(t *testing.T, ctx context.Context, testDB *pgxpool.Poo
 
 	originalEnvVars := make(map[string]string)
 	testEnvVars := map[string]string{
-		"SECRET_KEY":   secretKey,
+		"SECRET_KEY":   testServerConfig.secretKey,
 		"DATABASE_URL": testDatabaseURL,
-		"ENVIRONMENT":  environment,
-		"LOG_LEVEL":    "debug",
+		"ENVIRONMENT":  testServerConfig.environment,
+		"LOG_LEVEL":    testServerConfig.logLevel,
 		"PORT":         fmt.Sprintf("%d", findFreePort(t)),
 	}
 
@@ -270,7 +278,7 @@ func startInProcessServer(t *testing.T, ctx context.Context, testDB *pgxpool.Poo
 	}
 
 	queries := database.New(testDB)
-	authService := auth.NewAuthService(cfg.SecretKey, environment, queries)
+	authService := auth.NewAuthService(cfg.SecretKey, testServerConfig.environment, queries)
 
 	schemaCache := schemas.NewSchemaCache()
 	if err := schemaCache.Load(ctx, queries); err != nil {
@@ -287,7 +295,7 @@ func startInProcessServer(t *testing.T, ctx context.Context, testDB *pgxpool.Poo
 	if enableServerLogs {
 		logLevel = logger.ParseLogLevel("debug")
 	}
-	appLogger := logger.InitLogger(logLevel, "dev")
+	appLogger := logger.InitLogger(logLevel, testServerConfig.environment)
 
 	serverInstance := server.NewServer(
 		testDB,
@@ -412,7 +420,7 @@ func createExpiredAccessToken(t *testing.T, accountID uuid.UUID) string {
 
 	// Create and sign the token using the same secret key as the auth service
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signedToken, err := token.SignedString([]byte(secretKey))
+	signedToken, err := token.SignedString([]byte(testServerConfig.secretKey))
 	if err != nil {
 		t.Fatalf("Failed to create expired access token: %v", err)
 	}

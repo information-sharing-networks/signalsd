@@ -34,11 +34,11 @@ import (
 // - JWT token creation
 func TestPermissions(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupTestDatabase(t, ctx)
+	testDB := setupCleanDatabase(t, ctx)
 
 	queries := database.New(testDB)
 
-	authService := auth.NewAuthService(secretKey, "test", queries)
+	authService := auth.NewAuthService(testServerConfig.secretKey, testServerConfig.environment, queries)
 
 	// Create test accounts
 	ownerAccount := createTestAccount(t, ctx, queries, "owner", "user", "owner@gmail.com")
@@ -197,7 +197,7 @@ func checkPermissions(t *testing.T, authService *auth.AuthService, accountID uui
 	// parse the claims (confirms signature and structure)
 	claims := &auth.Claims{}
 	_, err = jwt.ParseWithClaims(response.AccessToken, claims, func(token *jwt.Token) (any, error) {
-		return []byte(secretKey), nil
+		return []byte(testServerConfig.secretKey), nil
 	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 	if err != nil {
 		t.Fatalf("Failed to parse JWT token: %v", err)
@@ -295,10 +295,10 @@ func createClientSecret(t *testing.T, ctx context.Context, queries *database.Que
 // note this is a very slow test as it has to hash the passwords for each sub-test
 func TestLoginAuth(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupTestDatabase(t, ctx)
+	testDB := setupCleanDatabase(t, ctx)
 
 	queries := database.New(testDB)
-	authService := auth.NewAuthService(secretKey, "test", queries)
+	authService := auth.NewAuthService(testServerConfig.secretKey, testServerConfig.environment, queries)
 
 	// Create test accounts with real hashed passwords
 
@@ -477,9 +477,9 @@ func TestLoginAuth(t *testing.T) {
 // - Failed authentication with invalid credentials, expired credentials, revoked credentials
 func TestClientCredentialsAuth(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupTestDatabase(t, ctx)
+	testDB := setupCleanDatabase(t, ctx)
 	queries := database.New(testDB)
-	authService := auth.NewAuthService(secretKey, "test", queries)
+	authService := auth.NewAuthService(testServerConfig.secretKey, testServerConfig.environment, queries)
 
 	// Create test service account
 	serviceAccount := createTestAccount(t, ctx, queries, "member", "service_account", "service@client.com")
@@ -541,11 +541,11 @@ func TestClientCredentialsAuth(t *testing.T) {
 //     - refresh tokens (users)
 func TestDisabledAccountAuth(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupTestDatabase(t, ctx)
+	testDB := setupCleanDatabase(t, ctx)
 
 	queries := database.New(testDB)
 
-	authService := auth.NewAuthService(secretKey, "test", queries)
+	authService := auth.NewAuthService(testServerConfig.secretKey, testServerConfig.environment, queries)
 
 	// create test data
 	t.Log("Creating test data...")

@@ -385,12 +385,12 @@ func TestSignalSubmission(t *testing.T) {
 
 	ctx := context.Background()
 
-	testDB := setupTestDatabase(t, ctx)
+	testDB := setupCleanDatabase(t, ctx)
 
 	testEnv := setupTestEnvironment(testDB)
 
 	// select database and start the signalsd server
-	testURL := getTestDatabaseURL()
+	testURL := getDatabaseURL()
 	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, "")
 	defer stopServer()
 	t.Logf("✅ Server started at %s", baseURL)
@@ -805,12 +805,12 @@ func TestIsInUseStatus(t *testing.T) {
 
 	ctx := context.Background()
 
-	testDB := setupTestDatabase(t, ctx)
+	testDB := setupCleanDatabase(t, ctx)
 
 	testEnv := setupTestEnvironment(testDB)
 
 	// select database and start the signalsd server
-	testURL := getTestDatabaseURL()
+	testURL := getDatabaseURL()
 	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, "")
 	defer stopServer()
 	t.Logf("✅ Server started at %s", baseURL)
@@ -1036,7 +1036,7 @@ func TestIsInUseStatus(t *testing.T) {
 func TestSignalSearch(t *testing.T) {
 	ctx := context.Background()
 
-	testDB := setupTestDatabase(t, ctx)
+	testDB := setupCleanDatabase(t, ctx)
 
 	testEnv := setupTestEnvironment(testDB)
 
@@ -1077,7 +1077,7 @@ func TestSignalSearch(t *testing.T) {
 	memberToken := testEnv.createAuthToken(t, memberAccount.ID)
 
 	// note that the server must be started after the test data is created so the public isn cache is populated
-	testURL := getTestDatabaseURL()
+	testURL := getDatabaseURL()
 	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, "")
 	defer stopServer()
 	t.Logf("✅ Server started at %s", baseURL)
@@ -1381,11 +1381,11 @@ func TestSignalSearch(t *testing.T) {
 func TestCorrelatedAndPreviousVersionsSearch(t *testing.T) {
 	ctx := context.Background()
 
-	testDB := setupTestDatabase(t, ctx)
+	testDB := setupCleanDatabase(t, ctx)
 	testEnv := setupTestEnvironment(testDB)
 
 	// select database and start the signalsd server
-	testURL := getTestDatabaseURL()
+	testURL := getDatabaseURL()
 	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, "")
 	defer stopServer()
 	t.Logf("✅ Server started at %s", baseURL)

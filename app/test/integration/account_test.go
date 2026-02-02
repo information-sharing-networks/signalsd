@@ -135,12 +135,12 @@ func makeUserRegistrationRequest(t *testing.T, baseURL string, requestBody userD
 // TestServiceAccountRegistration tests the POST /api/auth/service-accounts/register endpoint
 func TestServiceAccountRegistration(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupTestDatabase(t, ctx)
+	testDB := setupCleanDatabase(t, ctx)
 	testEnv := setupTestEnvironment(testDB)
 	publicBaseURL := "https://testserver.com"
 
 	// Start server
-	testURL := getTestDatabaseURL()
+	testURL := getDatabaseURL()
 	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, publicBaseURL)
 	defer stopServer()
 
@@ -346,12 +346,12 @@ func TestServiceAccountRegistration(t *testing.T) {
 
 func TestServiceAccountReissue(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupTestDatabase(t, ctx)
+	testDB := setupCleanDatabase(t, ctx)
 	testEnv := setupTestEnvironment(testDB)
 	publicBaseURL := "https://testserver.com"
 
 	// Start server
-	testURL := getTestDatabaseURL()
+	testURL := getDatabaseURL()
 	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, publicBaseURL)
 	defer stopServer()
 
@@ -504,11 +504,11 @@ func makeServiceAccountReissueRequest(t *testing.T, baseURL, token string, reque
 // TestUserLogin tests the POST /api/auth/login endpoint
 func TestUserLogin(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupTestDatabase(t, ctx)
+	testDB := setupCleanDatabase(t, ctx)
 	testEnv := setupTestEnvironment(testDB)
 
 	// Start server
-	testURL := getTestDatabaseURL()
+	testURL := getDatabaseURL()
 	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, "")
 	defer stopServer()
 
@@ -785,11 +785,11 @@ func TestUserLogin(t *testing.T) {
 // TestUserRegistration tests the POST /api/auth/register endpoint
 func TestUserRegistration(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupTestDatabase(t, ctx)
+	testDB := setupCleanDatabase(t, ctx)
 	testEnv := setupTestEnvironment(testDB)
 
 	// Start server
-	testURL := getTestDatabaseURL()
+	testURL := getDatabaseURL()
 	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, "")
 	defer stopServer()
 
@@ -1054,9 +1054,9 @@ func TestUserRegistration(t *testing.T) {
 
 func TestPasswordResetFlow(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupTestDatabase(t, ctx)
+	testDB := setupCleanDatabase(t, ctx)
 	queries := database.New(testDB)
-	authService := auth.NewAuthService(secretKey, "test", queries)
+	authService := auth.NewAuthService(testServerConfig.secretKey, testServerConfig.environment, queries)
 	publicBaseURL := "https://testserver.com"
 
 	// Create test accounts
@@ -1064,7 +1064,7 @@ func TestPasswordResetFlow(t *testing.T) {
 	userAccount := createTestAccount(t, ctx, queries, "member", "user", "user@example.com")
 
 	// Start test server
-	testURL := getTestDatabaseURL()
+	testURL := getDatabaseURL()
 	baseURL, stopServer := startInProcessServer(t, ctx, testDB, testURL, publicBaseURL)
 	defer stopServer()
 
@@ -1282,12 +1282,12 @@ func TestPasswordResetFlow(t *testing.T) {
 // This tests the PUT /api/auth/password/reset endpoint when called by an authenticated user
 func TestSelfServePasswordChange(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupTestDatabase(t, ctx)
+	testDB := setupCleanDatabase(t, ctx)
 	queries := database.New(testDB)
-	authService := auth.NewAuthService(secretKey, "test", queries)
+	authService := auth.NewAuthService(testServerConfig.secretKey, testServerConfig.environment, queries)
 
 	// Start test server
-	testURL := getTestDatabaseURL()
+	testURL := getDatabaseURL()
 	baseURL, stopServer := startInProcessServer(t, ctx, testDB, testURL, "")
 	defer stopServer()
 

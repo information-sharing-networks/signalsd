@@ -52,9 +52,9 @@ func TestCORS(t *testing.T) {
 	t.Setenv("ALLOWED_ORIGINS", allowedOrigins)
 
 	ctx := context.Background()
-	testDB := setupTestDatabase(t, ctx)
+	testDB := setupCleanDatabase(t, ctx)
 	testEnv := setupTestEnvironment(testDB)
-	testDatabaseURL := getTestDatabaseURL()
+	testDatabaseURL := getDatabaseURL()
 	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testDatabaseURL, "")
 	privateEndpoint := baseURL + "/api/accounts"
 	publicEndpoint := baseURL + "/health/live"
