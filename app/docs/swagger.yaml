@@ -869,7 +869,7 @@ info:
     - **Rate limiting**: Configurable requests per second
     - **Request size limits**: 64KB for admin/auth endpoints, 5MB for signal ingestion
 
-    Check the X-Max-Request-Body response header for the configured limit on signals payload.
+    Check the Signalsd-Max-Request-Body response header for the configured limit on signals payload.
 
     The rate limit is set globaly and prevents abuse of the service.
     In production there will be additional protections in place such as per-IP rate limiting provided by the load balancer/reverse proxy.

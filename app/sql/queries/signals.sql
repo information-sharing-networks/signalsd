@@ -135,18 +135,18 @@ RETURNING id, version_number;
 -- name: WithdrawSignalByID :execrows
 UPDATE signals
 SET is_withdrawn = true, updated_at = NOW()
-WHERE id = $1;
+WHERE id = sqlc.arg(id);
 
 -- name: WithdrawSignalByLocalRef :execrows
 UPDATE signals
 SET is_withdrawn = true, updated_at = NOW()
-WHERE account_id = $1
+WHERE account_id = sqlc.arg(account_id)
     AND signal_type_id = (
         SELECT st.id
         FROM signal_types st
-        WHERE st.slug = $2 AND st.sem_ver = $3
+        WHERE st.slug = sqlc.arg(slug) AND st.sem_ver = sqlc.arg(sem_ver)
     )
-    AND local_ref = $4;
+    AND local_ref = sqlc.arg(local_ref);
 
 -- name: GetSignalsWithOptionalFilters :many
 -- you must supply the isn_slug,signal_type_slug & sem_ver params - other filters are optional

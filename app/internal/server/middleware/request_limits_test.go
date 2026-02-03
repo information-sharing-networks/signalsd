@@ -59,8 +59,8 @@ func TestRequestSizeLimits(t *testing.T) {
 			}
 
 			// Verify header is always set
-			if header := rr.Header().Get("X-Max-Request-Size"); header == "" {
-				t.Error("X-Max-Request-Size header not set")
+			if header := rr.Header().Get("Signalsd-Max-Request-Size"); header == "" {
+				t.Error("Signalsd-Max-Request-Size header not set")
 			}
 		})
 	}

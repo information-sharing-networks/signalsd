@@ -245,7 +245,6 @@ func createCORSConfigs(cfg *ServerEnvironment) (*CORSConfigs, error) {
 		RequestHeaders: []string{
 			"Accept",
 			"Content-Type",
-			"X-Requested-With",
 		},
 		MaxAgeInSeconds: CORSMaxAgeInSeconds,
 	}
@@ -267,7 +266,6 @@ func createCORSConfigs(cfg *ServerEnvironment) (*CORSConfigs, error) {
 		RequestHeaders: []string{
 			"Content-Type",
 			"Authorization",
-			"X-Requested-With",
 		},
 		MaxAgeInSeconds: CORSMaxAgeInSeconds,
 	}
