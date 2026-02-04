@@ -184,7 +184,7 @@ func (a *AuthService) RequireIsnAdmin(next http.Handler) http.Handler {
 		}
 
 		reqLogger.Debug("access denied - user does not have admin role for any ISNs", slog.String("component", "ui.RequireIsnAdmin"))
-		redirectToNeedIsnAdminPage(w, r)
+		redirectToAccessDeniedPage(w, r, "You need to be an admin for at least one ISN to access this page")
 
 	})
 }
@@ -253,15 +253,5 @@ func redirectToAccessDeniedPage(w http.ResponseWriter, r *http.Request, msg stri
 		w.WriteHeader(http.StatusOK)
 	} else {
 		http.Redirect(w, r, accessDeniedURL, http.StatusSeeOther)
-	}
-}
-
-// redirectToNeedIsnAdminPage redirects to access denied page for both HTMX and direct requests
-func redirectToNeedIsnAdminPage(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("HX-Request") == "true" {
-		w.Header().Set("HX-Redirect", "/need-isn-admin")
-		w.WriteHeader(http.StatusOK)
-	} else {
-		http.Redirect(w, r, "/need-isn-admin", http.StatusSeeOther)
 	}
 }

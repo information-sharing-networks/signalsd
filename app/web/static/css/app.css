@@ -320,6 +320,22 @@ p {
   padding-left: 8px;
 }
 
+/* HTMX Loading Indicators */
+.htmx-indicator {
+  display: none;
+}
+
+.loading-spinner {
+  display: none;
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin-top: 0.25rem;
+}
+
+.htmx-request .loading-spinner {
+  display: block;
+}
+
 /* Forms */
 .form-container {
   min-height: 100vh;
