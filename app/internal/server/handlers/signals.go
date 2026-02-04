@@ -314,7 +314,8 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 //	@Description	- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.
 //	@Description	- If a local reference is received more than once from an account for the specified signal_type a new version of the signal will be stored with a incremented version number.
 //	@Description	- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.
-//	@Description	- requests are only accepted for the open signal batch for this account/ISN (service accounts need to manually create batches, web users have a batch automatically created when they first write to an ISN).
+//	@Description	- you need an open batch to submit signals on the ISN (service accounts need to manually create a new batch on the ISN before posting any signals,
+//	@Description	web users have a batch automatically created when they first write to an ISN).
 //	@Description
 //	@Description	**Authentication**
 //	@Description
