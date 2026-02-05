@@ -45,7 +45,7 @@ The [initial implementation](https://github.com/information-sharing-networks/isn
 This repo contains the second version (work in progress) - it develops the ISN administration facilities and is designed to scale to higher volumes of data.
 
 There are three components:
-- an [API](https://signalsd.btddemo.org/docs) used to configure ISNs, register participants and deploy the data sharing infrastructure
+- an [API](https://signalsd.corridorone.uk/docs) used to configure ISNs, register participants and deploy the data sharing infrastructure
 - an associated [framework agreement](https://github.com/information-sharing-networks/Framework) that establishes the responsibilities of the participants in an ISN
 - a demonstration [UI](app/internal/ui/README.md)
 
@@ -147,7 +147,7 @@ docker exec -it signalsd-app /bin/bash
 
 The service starts on [http://localhost:8080](http://localhost:8080) by default.
 
-The API documentation is hosted as part of the service or you can refer to the [docs](https://signals.btddemo.org/docs) for the current release.
+The API documentation is hosted as part of the service or you can refer to the [docs](https://signals.corridorone.uk/docs) for the current release.
 
 ### Development Tools
 
@@ -316,7 +316,7 @@ PUBLIC_BASE_URL=https://yourdomain.com ALLOWED_ORIGINS=https://yourdomain.com EN
 By default the signalsd service starts with a basic web interface. If you want to modify, replace or disable the UI see the [UI Documentation](app/internal/ui/README.md).
 
 ## Getting Help
-- Check the [API documentation](https://signalsd.btddemo.org/docs)
+- Check the [API documentation](https://signalsd.corridorone.uk/docs)
 - Review logs: `docker compose logs -f`
 - Open an [issue](https://github.com/information-sharing-networks/signalsd/issues) on GitHub
 
