@@ -152,20 +152,20 @@ func GeneratePasswordResetLinkSuccess(response client.GeneratePasswordResetLinkR
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</code> <button class=\"btn, btn-copy\" data-text=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "</code> <button class=\"btn btn-copy\" data-text=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(response.UserEmail)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/users.templ`, Line: 54, Col: 80}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/users.templ`, Line: 54, Col: 79}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\" onclick=\"copyText(this.dataset.text, this)\">Copy</button></p><p><strong>New Reset Password URL:</strong> <code class=\"text-sm\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "\">Copy</button></p><p><strong>New Reset Password URL:</strong> <code class=\"text-sm\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -178,20 +178,20 @@ func GeneratePasswordResetLinkSuccess(response client.GeneratePasswordResetLinkR
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</code> <button class=\"btn, btn-copy\" data-text=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</code> <button class=\"btn btn-copy\" data-text=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(response.ResetURL)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/users.templ`, Line: 58, Col: 79}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/users.templ`, Line: 58, Col: 78}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\" onclick=\"copyText(this.dataset.text, this)\">Copy</button></p><p class=\"text-sm\"><strong>Note:</strong> The user can use the link above to reset their password (the link can only be used once and expires in 30 minutes).</p></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "\">Copy</button></p><p class=\"text-sm\"><strong>Note:</strong> The user can use the link above to reset their password (the link can only be used once and expires in 30 minutes).</p></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -220,7 +220,7 @@ func GeneratePasswordResetLinkScript() templ.Component {
 			templ_7745c5c3_Var9 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<script>\n        // toggle button after clicking\n        document.getElementById(\"generate-password-reset-btn\").addEventListener(\"click\", function() {\n            this.disabled = true;\n        });\n\t\t// Clear alerts and enables button when dropdown selection changes\n\t\tdocument.addEventListener(\"change\", function (event) {\n            document.getElementById(\"generate-password-reset-btn\").disabled = false;\n\n\t\t\tif (event.target.id === \"user-dropdown\") {\n\t\t\t\tlet container = document.getElementById(\"result\");\n\t\t\t\tcontainer.innerHTML = \"\";\n\t\t\t}\n\t\t});\n\t</script>")
+		templ_7745c5c3_Err = PasswordResetFormScript().Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

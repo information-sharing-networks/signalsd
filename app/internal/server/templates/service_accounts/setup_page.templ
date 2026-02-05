@@ -17,89 +17,23 @@ templ SetupPage(data SetupPageData) {
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 			<title>Service Account Setup</title>
-			<style>
-				body {
-					font-family: system-ui, sans-serif;
-					max-width: 600px;
-					margin: 50px auto;
-					padding: 20px;
-				}
-				.container {
-					background: #f8f9fa;
-					border-radius: 8px;
-					padding: 30px;
-				}
-				.success {
-					color: #28a745;
-					font-size: 24px;
-					margin-bottom: 20px;
-				}
-				.credential {
-					background: white;
-					border: 1px solid #dee2e6;
-					border-radius: 4px;
-					padding: 15px;
-					margin: 15px 0;
-				}
-				.label {
-					font-weight: bold;
-					color: #495057;
-					margin-bottom: 5px;
-				}
-				.value {
-					font-family: monospace;
-					background: #f8f9fa;
-					padding: 8px;
-					border-radius: 3px;
-					word-break: break-all;
-				}
-				.warning {
-					background: #fff3cd;
-					border: 1px solid #ffeaa7;
-					border-radius: 4px;
-					padding: 15px;
-					margin: 20px 0;
-				}
-				.warning-title {
-					font-weight: bold;
-					color: #856404;
-				}
-				.expiry {
-					text-align: center;
-					margin: 20px 0;
-					padding: 15px;
-					background: #d1ecf1;
-					border-radius: 4px;
-				}
-				.copy-btn {
-					background: #007bff;
-					color: white;
-					border: none;
-					padding: 5px 10px;
-					border-radius: 3px;
-					cursor: pointer;
-					margin-left: 10px;
-				}
-				.copy-btn:hover {
-					background: #0056b3;
-				}
-			</style>
+			<link rel="stylesheet" href="/static/css/app.css"/>
 		</head>
 		<body>
-			<div class="container">
+			<div class="container setup-complete">
 				<div class="success">✓ Signals service account setup complete</div>
 				<div class="credential">
 					<div class="label">Client ID</div>
 					<div class="value">
 						{ data.ClientID }
-						<button class="copy-btn" data-text={ data.ClientID } onclick="copyText(this.dataset.text, this)">Copy</button>
+						<button class="btn-copy" data-text={ data.ClientID }>Copy</button>
 					</div>
 				</div>
 				<div class="credential">
 					<div class="label">Client Secret</div>
 					<div class="value">
 						{ data.ClientSecret }
-						<button class="copy-btn" data-text={ data.ClientSecret } onclick="copyText(this.dataset.text, this)">Copy</button>
+						<button class="btn-copy" data-text={ data.ClientSecret }>Copy</button>
 					</div>
 				</div>
 				<div class="warning">
@@ -109,31 +43,12 @@ templ SetupPage(data SetupPageData) {
 				</div>
 				<h3>Next Steps:</h3>
 				<p>Store the client ID and secret securely. You will need them to authenticate with the API.</p>
-				<p>access tokens are issued by calling the /oauth/token endpoint with your client_id and client_secret in the request body</p>
+                <br></br>
+				<p>Access tokens are issued by calling the /oauth/token endpoint with your client_id and client_secret in the request body.</p>
+                <br></br>
 				<p>When using the API include the access token as: <code>Authorization: Bearer &lt;token&gt;</code></p>
 			</div>
-			<script>
-				function copyText(text, btn) {
-					navigator.clipboard.writeText(text).then(() => {
-						btn.textContent = '✓ Copied!';
-						btn.style.background = '#28a745';
-						btn.disabled = true;
-						setTimeout(() => {
-							btn.textContent = 'Copy';
-							btn.style.background = '#007bff';
-							btn.disabled = false;
-						}, 1500);
-					}).catch(err => {
-						console.error('Failed to copy text: ', err);
-						btn.textContent = 'Failed';
-						btn.style.background = '#dc3545';
-						setTimeout(() => {
-							btn.textContent = 'Copy';
-							btn.style.background = '#007bff';
-						}, 1500);
-					});
-				}
-			</script>
+			<script src="/static/js/copy-text.js"></script>
 		</body>
 	</html>
 }

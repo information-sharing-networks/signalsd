@@ -39,72 +39,72 @@ func SetupPage(data SetupPageData) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Service Account Setup</title><style>\n\t\t\t\tbody {\n\t\t\t\t\tfont-family: system-ui, sans-serif;\n\t\t\t\t\tmax-width: 600px;\n\t\t\t\t\tmargin: 50px auto;\n\t\t\t\t\tpadding: 20px;\n\t\t\t\t}\n\t\t\t\t.container {\n\t\t\t\t\tbackground: #f8f9fa;\n\t\t\t\t\tborder-radius: 8px;\n\t\t\t\t\tpadding: 30px;\n\t\t\t\t}\n\t\t\t\t.success {\n\t\t\t\t\tcolor: #28a745;\n\t\t\t\t\tfont-size: 24px;\n\t\t\t\t\tmargin-bottom: 20px;\n\t\t\t\t}\n\t\t\t\t.credential {\n\t\t\t\t\tbackground: white;\n\t\t\t\t\tborder: 1px solid #dee2e6;\n\t\t\t\t\tborder-radius: 4px;\n\t\t\t\t\tpadding: 15px;\n\t\t\t\t\tmargin: 15px 0;\n\t\t\t\t}\n\t\t\t\t.label {\n\t\t\t\t\tfont-weight: bold;\n\t\t\t\t\tcolor: #495057;\n\t\t\t\t\tmargin-bottom: 5px;\n\t\t\t\t}\n\t\t\t\t.value {\n\t\t\t\t\tfont-family: monospace;\n\t\t\t\t\tbackground: #f8f9fa;\n\t\t\t\t\tpadding: 8px;\n\t\t\t\t\tborder-radius: 3px;\n\t\t\t\t\tword-break: break-all;\n\t\t\t\t}\n\t\t\t\t.warning {\n\t\t\t\t\tbackground: #fff3cd;\n\t\t\t\t\tborder: 1px solid #ffeaa7;\n\t\t\t\t\tborder-radius: 4px;\n\t\t\t\t\tpadding: 15px;\n\t\t\t\t\tmargin: 20px 0;\n\t\t\t\t}\n\t\t\t\t.warning-title {\n\t\t\t\t\tfont-weight: bold;\n\t\t\t\t\tcolor: #856404;\n\t\t\t\t}\n\t\t\t\t.expiry {\n\t\t\t\t\ttext-align: center;\n\t\t\t\t\tmargin: 20px 0;\n\t\t\t\t\tpadding: 15px;\n\t\t\t\t\tbackground: #d1ecf1;\n\t\t\t\t\tborder-radius: 4px;\n\t\t\t\t}\n\t\t\t\t.copy-btn {\n\t\t\t\t\tbackground: #007bff;\n\t\t\t\t\tcolor: white;\n\t\t\t\t\tborder: none;\n\t\t\t\t\tpadding: 5px 10px;\n\t\t\t\t\tborder-radius: 3px;\n\t\t\t\t\tcursor: pointer;\n\t\t\t\t\tmargin-left: 10px;\n\t\t\t\t}\n\t\t\t\t.copy-btn:hover {\n\t\t\t\t\tbackground: #0056b3;\n\t\t\t\t}\n\t\t\t</style></head><body><div class=\"container\"><div class=\"success\">✓ Signals service account setup complete</div><div class=\"credential\"><div class=\"label\">Client ID</div><div class=\"value\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Service Account Setup</title><link rel=\"stylesheet\" href=\"/static/css/app.css\"></head><body><div class=\"container setup-complete\"><div class=\"success\">✓ Signals service account setup complete</div><div class=\"credential\"><div class=\"label\">Client ID</div><div class=\"value\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(data.ClientID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/server/templates/service_accounts/setup_page.templ`, Line: 94, Col: 21}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/server/templates/service_accounts/setup_page.templ`, Line: 28, Col: 21}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " <button class=\"copy-btn\" data-text=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " <button class=\"btn-copy\" data-text=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(data.ClientID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/server/templates/service_accounts/setup_page.templ`, Line: 95, Col: 56}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/server/templates/service_accounts/setup_page.templ`, Line: 29, Col: 56}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\" onclick=\"copyText(this.dataset.text, this)\">Copy</button></div></div><div class=\"credential\"><div class=\"label\">Client Secret</div><div class=\"value\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\">Copy</button></div></div><div class=\"credential\"><div class=\"label\">Client Secret</div><div class=\"value\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var4 string
 		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(data.ClientSecret)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/server/templates/service_accounts/setup_page.templ`, Line: 101, Col: 25}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/server/templates/service_accounts/setup_page.templ`, Line: 35, Col: 25}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, " <button class=\"copy-btn\" data-text=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, " <button class=\"btn-copy\" data-text=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var5 string
 		templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(data.ClientSecret)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/server/templates/service_accounts/setup_page.templ`, Line: 102, Col: 60}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/server/templates/service_accounts/setup_page.templ`, Line: 36, Col: 60}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\" onclick=\"copyText(this.dataset.text, this)\">Copy</button></div></div><div class=\"warning\"><div class=\"warning-title\">⚠️ Important</div>This is the only time you'll see the client secret. These credentials expire on ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "\">Copy</button></div></div><div class=\"warning\"><div class=\"warning-title\">⚠️ Important</div>This is the only time you'll see the client secret. These credentials expire on ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(data.ExpiresAt.Format("January 2, 2006"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/server/templates/service_accounts/setup_page.templ`, Line: 108, Col: 75}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/server/templates/service_accounts/setup_page.templ`, Line: 42, Col: 75}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, ".</div><h3>Next Steps:</h3><p>Store the client ID and secret securely. You will need them to authenticate with the API.</p><p>access tokens are issued by calling the /oauth/token endpoint with your client_id and client_secret in the request body</p><p>When using the API include the access token as: <code>Authorization: Bearer &lt;token&gt;</code></p></div><script>\n\t\t\t\tfunction copyText(text, btn) {\n\t\t\t\t\tnavigator.clipboard.writeText(text).then(() => {\n\t\t\t\t\t\tbtn.textContent = '✓ Copied!';\n\t\t\t\t\t\tbtn.style.background = '#28a745';\n\t\t\t\t\t\tbtn.disabled = true;\n\t\t\t\t\t\tsetTimeout(() => {\n\t\t\t\t\t\t\tbtn.textContent = 'Copy';\n\t\t\t\t\t\t\tbtn.style.background = '#007bff';\n\t\t\t\t\t\t\tbtn.disabled = false;\n\t\t\t\t\t\t}, 1500);\n\t\t\t\t\t}).catch(err => {\n\t\t\t\t\t\tconsole.error('Failed to copy text: ', err);\n\t\t\t\t\t\tbtn.textContent = 'Failed';\n\t\t\t\t\t\tbtn.style.background = '#dc3545';\n\t\t\t\t\t\tsetTimeout(() => {\n\t\t\t\t\t\t\tbtn.textContent = 'Copy';\n\t\t\t\t\t\t\tbtn.style.background = '#007bff';\n\t\t\t\t\t\t}, 1500);\n\t\t\t\t\t});\n\t\t\t\t}\n\t\t\t</script></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, ".</div><h3>Next Steps:</h3><p>Store the client ID and secret securely. You will need them to authenticate with the API.</p><br><p>Access tokens are issued by calling the /oauth/token endpoint with your client_id and client_secret in the request body.</p><br><p>When using the API include the access token as: <code>Authorization: Bearer &lt;token&gt;</code></p></div><script src=\"/static/js/copy-text.js\"></script></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

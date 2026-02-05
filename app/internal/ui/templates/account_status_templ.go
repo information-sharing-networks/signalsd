@@ -90,7 +90,15 @@ func AccountStatusPage(environment string, users []types.UserOption, serviceAcco
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</div><div class=\"form-group\"><label for=\"action\" class=\"form-label\">Action</label> <select id=\"action\" name=\"action\" required class=\"form-select\"><option value=\"\">Select Action...</option> <option value=\"disable\">Disable Account</option> <option value=\"enable\">Enable Account</option></select><p class=\"text-muted text-sm mt-1\">Choose whether to enable or disable the account.</p></div></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Update Account Status</button></div></form></div></div><div id=\"status-result\"><!-- Results will appear here --></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</div><div class=\"form-group\"><label for=\"action\" class=\"form-label\">Action</label> <select id=\"action\" name=\"action\" required class=\"form-select\"><option value=\"\">Select Action...</option> <option value=\"disable\">Disable Account</option> <option value=\"enable\">Enable Account</option></select><p class=\"text-muted text-sm mt-1\">Choose whether to enable or disable the account.</p></div></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Update Account Status</button></div></form></div></div><div id=\"status-result\"><!-- Results will appear here --></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = AccountTypeSelectorScript().Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

@@ -123,7 +123,11 @@ func RegistrationSuccess() templ.Component {
 			templ_7745c5c3_Var5 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"alert alert-success\"><strong>Account created!</strong> You can now sign in.<div class=\"form-group text-center\" style=\"margin-top: 1rem;\"><button hx-get=\"/login\" hx-target=\"body\" hx-swap=\"outerHTML\" class=\"btn btn-primary\">Continue to Sign In</button></div></div><script>\n\t\t// Auto-redirect to login after 5 seconds\n\t\tsetTimeout(function() {\n\t\t\thtmx.ajax('GET', '/login', {target: 'body', swap: 'outerHTML'});\n\t\t}, 5000);\n\t</script>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"alert alert-success\" data-auto-redirect-to-login=\"true\"><strong>Account created!</strong> You can now sign in.<div class=\"form-group text-center\" style=\"margin-top: 1rem;\"><button hx-get=\"/login\" hx-target=\"body\" hx-swap=\"outerHTML\" class=\"btn btn-primary\">Continue to Sign In</button></div></div>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = HomeRedirectScript().Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

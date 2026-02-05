@@ -49,13 +49,13 @@ templ GeneratePasswordResetLinkSuccess(response client.GeneratePasswordResetLink
 	<div class="card">
 		<div class="card-body">
 			@SuccessAlert("Password reset link generated")
-				<p><strong>User Email:</strong> 
+				<p><strong>User Email:</strong>
                     <code>{ response.UserEmail }</code>
-                    <button class="btn, btn-copy" data-text={ response.UserEmail } onclick="copyText(this.dataset.text, this)">Copy</button>
+                    <button class="btn btn-copy" data-text={ response.UserEmail }>Copy</button>
                 </p>
 				<p><strong>New Reset Password URL:</strong>
 					<code class="text-sm">{ response.ResetURL }</code>
-                    <button class="btn, btn-copy" data-text={ response.ResetURL } onclick="copyText(this.dataset.text, this)">Copy</button>
+                    <button class="btn btn-copy" data-text={ response.ResetURL }>Copy</button>
 				</p>
 				<p class="text-sm">
 					<strong>Note:</strong> The user can use the link above to reset their password (the link can only be used once and expires in 30 minutes).
@@ -65,19 +65,5 @@ templ GeneratePasswordResetLinkSuccess(response client.GeneratePasswordResetLink
 }
 
 templ GeneratePasswordResetLinkScript() {
-	<script>
-        // toggle button after clicking
-        document.getElementById("generate-password-reset-btn").addEventListener("click", function() {
-            this.disabled = true;
-        });
-		// Clear alerts and enables button when dropdown selection changes
-		document.addEventListener("change", function (event) {
-            document.getElementById("generate-password-reset-btn").disabled = false;
-
-			if (event.target.id === "user-dropdown") {
-				let container = document.getElementById("result");
-				container.innerHTML = "";
-			}
-		});
-	</script>
+	@PasswordResetFormScript()
 }

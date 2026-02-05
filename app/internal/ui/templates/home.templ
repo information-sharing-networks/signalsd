@@ -144,7 +144,7 @@ templ RegisterPage() {
 // REGISTRATION SUCCESS
 
 templ RegistrationSuccess() {
-	<div class="alert alert-success">
+	<div class="alert alert-success" data-auto-redirect-to-login="true">
 		<strong>Account created!</strong> You can now sign in.
 		<div class="form-group text-center" style="margin-top: 1rem;">
 			<button
@@ -157,11 +157,6 @@ templ RegistrationSuccess() {
 			</button>
 		</div>
 	</div>
-	<script>
-		// Auto-redirect to login after 5 seconds
-		setTimeout(function() {
-			htmx.ajax('GET', '/login', {target: 'body', swap: 'outerHTML'});
-		}, 5000);
-	</script>
+    @HomeRedirectScript()
 }
 	

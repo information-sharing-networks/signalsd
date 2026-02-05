@@ -634,7 +634,7 @@ func SearchSignalScripts() templ.Component {
 			templ_7745c5c3_Var25 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "<script>\n\t\t/* button click handler */\n\t\tdocument.addEventListener('click', function(e) {\n\t\t\t/* pretty print json */\n\t\t\tconst prettyPrintBtn = e.target.closest('.pretty-print-btn');\n\t\t\tif (prettyPrintBtn) {\n\t\t\t\tconst signalId = prettyPrintBtn.getAttribute('data-signal-id');\n\t\t\t\tif (!signalId) {\n\t\t\t\t\treturn;\n\t\t\t\t}\n\t\t\t\ttogglePrettyPrint(signalId);\n\t\t\t}\n\n\t\t\t/* open and close modals that show the correlated id content */\n\t\t\tconst openModalBtn = e.target.closest('.open-modal-btn');\n\t\t\tif (openModalBtn) {\n\t\t\t\tconst signalId = openModalBtn.getAttribute('data-correlated-signal-id');\n\t\t\t\tif (!signalId) {\n\t\t\t\t\treturn;\n\t\t\t\t}\n\t\t\t\ttoggleCorrelatedSignalModal(signalId,'open');\n\t\t\t\treturn;\n\t\t\t}\n\t\t\tconst closeModalBtn = e.target.closest('.close-modal-btn');\n\t\t\tif (closeModalBtn) {\n\t\t\t\tconst signalId = closeModalBtn.getAttribute('data-correlated-signal-id');\n\t\t\t\tif (!signalId) {\n\t\t\t\t\treturn;\n\t\t\t\t}\n\t\t\t\ttoggleCorrelatedSignalModal(signalId,'close');\n\t\t\t\treturn;\n\t\t\t}\n\n\t\t\t/* monitor button toggle */\n\t\t\tconst monitorBtn = e.target.closest('.monitor-btn');\n\t\t\tif (monitorBtn) {\n\t\t\t\tmonitorBtn.classList.toggle('monitoring');\n\t\t\t\tmonitorBtn.textContent = monitorBtn.classList.contains('monitoring') ? 'Stop Monitoring' : 'Monitor';\n\t\t\t}\n\t\t});\n\n\t\tfunction togglePrettyPrint(signalId) {\n\t\t\t\n\t\t\tconsole.log('togglePrettyPrint', signalId)\n\t\t\tconst signalCard = document.getElementById(signalId);\n\t\t\tif (!signalCard) {\n\t\t\t\treturn;\n\t\t\t}\t\n\t\t\tconsole.log('signalCard', signalCard)\n\n\t\t\tcompactJsonElement = signalCard.querySelector('.json-content.compact');\n\t\t\tppJsonElement = signalCard.querySelector('.json-content.pretty-printed');\n\n\t\t\tif (!compactJsonElement || !ppJsonElement) {\n\t\t\t\tconsole.log('compact or pp json element not found')\n\t\t\t\treturn;\n\t\t\t}\n\n\t\t\tif (signalCard.classList.contains('compact')) {\t\n\t\t\t\tsignalCard.classList.remove('compact');\t\n\t\t\t\tsignalCard.classList.add('pretty-printed');\n\t\t\t\tcompactJsonElement.style.display = 'none';\n\t\t\t\tppJsonElement.style.display = 'block';\n\t\t\t} else {\t\t\n\t\t\t\tsignalCard.classList.remove('pretty-printed');\t\n\t\t\t\tsignalCard.classList.add('compact');\n\t\t\t\tcompactJsonElement.style.display = 'block';\n\t\t\t\tppJsonElement.style.display = 'none';\n\t\t\t}\n\t\t}\n\n\t\tfunction toggleCorrelatedSignalModal(signalId, action) {\n\t\t\tif (!signalId || !action) {\n\t\t\t\treturn;\n\t\t\t}\n\n\t\t\tconst modal = document.querySelector(`#modal-${signalId}.modal`);\n\t\t\tconsole.log('modal', modal)\n\t\t\tif (!modal) {\n\t\t\t\treturn;\n\t\t\t}\n\n\t\t\tif (action == 'close') {\n\t\t\t\tmodal.close();\n\t\t\t}\n\t\t\tif (action == 'open') {\n\t\t\t\tmodal.showModal();\n\t\t\t}\n\t\t}\n\n\t </script>")
+		templ_7745c5c3_Err = SignalSearchScript().Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -663,7 +663,7 @@ func StartDateField() templ.Component {
 			templ_7745c5c3_Var26 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "<div class=\"form-group\"><label for=\"start-date\" class=\"form-label\">Start Date</label> <input type=\"date\" id=\"start-date\" name=\"start-date\" class=\"form-input\"></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "<div class=\"form-group\"><label for=\"start-date\" class=\"form-label\">Start Date</label> <input type=\"date\" id=\"start-date\" name=\"start-date\" class=\"form-input\"></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -692,7 +692,7 @@ func EndDateField() templ.Component {
 			templ_7745c5c3_Var27 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "<div class=\"form-group\"><label for=\"end-date\" class=\"form-label\">End Date</label> <input type=\"date\" id=\"end-date\" name=\"end-date\" class=\"form-input\"></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "<div class=\"form-group\"><label for=\"end-date\" class=\"form-label\">End Date</label> <input type=\"date\" id=\"end-date\" name=\"end-date\" class=\"form-input\"></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -721,7 +721,7 @@ func LocalRefField() templ.Component {
 			templ_7745c5c3_Var28 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "<div class=\"form-group\"><label for=\"local-ref\" class=\"form-label\">Local Reference</label> <input type=\"text\" id=\"local-ref\" name=\"local-ref\" placeholder=\"e.g., item_id_#1\" class=\"form-input\"></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "<div class=\"form-group\"><label for=\"local-ref\" class=\"form-label\">Local Reference</label> <input type=\"text\" id=\"local-ref\" name=\"local-ref\" placeholder=\"e.g., item_id_#1\" class=\"form-input\"></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -750,7 +750,7 @@ func SignalIDField() templ.Component {
 			templ_7745c5c3_Var29 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "<div class=\"form-group\"><label for=\"signal-id\" class=\"form-label\">Signal ID</label> <input type=\"text\" id=\"signal-id\" name=\"signal-id\" placeholder=\"UUID\" class=\"form-input\"></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "<div class=\"form-group\"><label for=\"signal-id\" class=\"form-label\">Signal ID</label> <input type=\"text\" id=\"signal-id\" name=\"signal-id\" placeholder=\"UUID\" class=\"form-input\"></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -779,7 +779,7 @@ func AccountIDField() templ.Component {
 			templ_7745c5c3_Var30 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "<div class=\"form-group\"><label for=\"account-id\" class=\"form-label\">Account ID</label> <input type=\"text\" id=\"account-id\" name=\"account-id\" placeholder=\"UUID\" class=\"form-input\"></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "<div class=\"form-group\"><label for=\"account-id\" class=\"form-label\">Account ID</label> <input type=\"text\" id=\"account-id\" name=\"account-id\" placeholder=\"UUID\" class=\"form-input\"></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

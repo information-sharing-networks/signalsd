@@ -31,7 +31,7 @@ func SecurityHeaders(environment string) func(http.Handler) http.Handler {
 			// for legacy support
 			w.Header().Set("X-Frame-Options", "DENY")
 
-			w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' https://unpkg.com; frame-ancestors 'none';")
+			w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' 'unsafe-inline'; frame-ancestors 'none';")
 
 			w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 

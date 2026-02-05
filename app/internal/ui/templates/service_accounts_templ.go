@@ -50,7 +50,15 @@ func CreateServiceAccountsPage(environment string) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Create a New Service Account</h1><div class=\"card\"><div class=\"card-body\"><form hx-post=\"/ui-api/service-accounts/create\" hx-target=\"#result\" class=\"margin-top-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\"><label for=\"email\" class=\"form-label\">Contact Email</label> <input id=\"email\" name=\"email\" type=\"email\" class=\"form-input\" placeholder=\"Contact email for the service account\"></div><div class=\"form-group\"><label for=\"organization\" class=\"form-label\">Client Organization</label> <input id=\"organization\" name=\"organization\" type=\"text\" required class=\"form-input\" placeholder=\"Client organization name\"></div></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Create Service Account</button></div></form></div></div><div id=\"result\"><!-- Results will appear here --></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Create a New Service Account</h1><div class=\"card\"><div class=\"card-body\"><form hx-post=\"/ui-api/service-accounts/create\" hx-target=\"#result\" class=\"margin-top-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\"><label for=\"email\" class=\"form-label\">Contact Email</label> <input id=\"email\" name=\"email\" type=\"email\" class=\"form-input\" placeholder=\"Contact email for the service account\"></div><div class=\"form-group\"><label for=\"organization\" class=\"form-label\">Client Organization</label> <input id=\"organization\" name=\"organization\" type=\"text\" required class=\"form-input\" placeholder=\"Client organization name\"></div></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Create Service Account</button></div></form></div></div><div id=\"result\"><!-- Results will appear here --></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = CopyToClipboardFunction().Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -101,7 +109,7 @@ func ReissueServiceAccountCredentialsPage(environment string, serviceAccounts []
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " <div class=\"page-container\"><h1 class=\"page-title\">Reissue a Service Account's Credentials</h1><div class=\"card\"><div class=\"card-body\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, " <div class=\"page-container\"><h1 class=\"page-title\">Reissue a Service Account's Credentials</h1><div class=\"card\"><div class=\"card-body\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -117,7 +125,7 @@ func ReissueServiceAccountCredentialsPage(environment string, serviceAccounts []
 					}()
 				}
 				ctx = templ.InitializeContext(ctx)
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "Reissuing credentials will revoke any existing client secrets for the service account, including any unused one-time setup URLs.<br><br>After submitting the form, a one-time setup URL will be shown below and should be supplied to the account owner.")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "Reissuing credentials will revoke any existing client secrets for the service account, including any unused one-time setup URLs.<br><br>After submitting the form, a one-time setup URL will be shown below and should be supplied to the account owner.")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -127,7 +135,7 @@ func ReissueServiceAccountCredentialsPage(environment string, serviceAccounts []
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<p class=\"card-description text-muted\">Select an existing service account to reissue its credentials.</p><div class=\"form-group\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<p class=\"card-description text-muted\">Select an existing service account to reissue its credentials.</p><div class=\"form-group\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -135,7 +143,7 @@ func ReissueServiceAccountCredentialsPage(environment string, serviceAccounts []
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</div><div id=\"reissue-btn-container\" class=\"form-group margin-top-4\"><button id=\"reissue-btn\" hx-put=\"/ui-api/service-accounts/reissue-credentials\" hx-target=\"#result\" hx-include=\"#service-account-dropdown\" disabled class=\"btn\">Reissue Credentials</button></div><div id=\"result\"><!-- Results will appear here --></div></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</div><div id=\"reissue-btn-container\" class=\"form-group margin-top-4\"><button id=\"reissue-btn\" hx-put=\"/ui-api/service-accounts/reissue-credentials\" hx-target=\"#result\" hx-include=\"#service-account-dropdown\" disabled class=\"btn\">Reissue Credentials</button></div><div id=\"result\"><!-- Results will appear here --></div></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -147,7 +155,7 @@ func ReissueServiceAccountCredentialsPage(environment string, serviceAccounts []
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -182,7 +190,7 @@ func ServiceAccountCreationSuccess(response client.CreateServiceAccountResponse)
 			templ_7745c5c3_Var6 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<div class=\"card\"><div class=\"card-body\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<div class=\"card\"><div class=\"card-body\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -190,59 +198,59 @@ func ServiceAccountCreationSuccess(response client.CreateServiceAccountResponse)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<p><strong>Client ID:</strong> <code class=\"text-sm\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<p><strong>Client ID:</strong> <code class=\"text-sm\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(response.ClientID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 102, Col: 73}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 103, Col: 73}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</code></p><p><strong>Account ID:</strong> <code class=\"text-sm\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</code></p><p><strong>Account ID:</strong> <code class=\"text-sm\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(response.AccountID.String())
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 105, Col: 84}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 106, Col: 84}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</code></p><p><strong>Setup URL:</strong> <code class=\"text-xs\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</code></p><p><strong>Setup URL:</strong> <code class=\"text-xs\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(response.SetupURL)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 109, Col: 45}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 110, Col: 45}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</code> <button class=\"btn, btn-copy\" data-text=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</code> <button class=\"btn btn-copy\" data-text=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(response.SetupURL)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 110, Col: 75}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 111, Col: 74}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\" onclick=\"copyText(this.dataset.text, this)\">Copy</button></p></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "\">Copy</button></p></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -250,7 +258,7 @@ func ServiceAccountCreationSuccess(response client.CreateServiceAccountResponse)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -279,7 +287,7 @@ func ServiceAccountReissueSuccess(response client.ReissueServiceAccountResponse)
 			templ_7745c5c3_Var11 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<div class=\"card\"><!-- Debug: ClientContactEmail should now display: { response.ClientContactEmail } --><div class=\"card-body\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<div class=\"card\"><!-- Debug: ClientContactEmail should now display: { response.ClientContactEmail } --><div class=\"card-body\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -287,72 +295,72 @@ func ServiceAccountReissueSuccess(response client.ReissueServiceAccountResponse)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<p><strong>Client ID:</strong> <code class=\"text-sm\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "<p><strong>Client ID:</strong> <code class=\"text-sm\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var12 string
 		templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs(response.ClientID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 123, Col: 73}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 124, Col: 73}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</code></p><p><strong>Client Contact Email:</strong> <code class=\"text-sm\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</code></p><p><strong>Client Contact Email:</strong> <code class=\"text-sm\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var13 string
 		templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(response.ClientContactEmail)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 126, Col: 94}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 127, Col: 94}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "</code> <button class=\"btn, btn-copy\" data-text=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "</code> <button class=\"btn btn-copy\" data-text=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var14 string
 		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(response.ClientContactEmail)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 127, Col: 73}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 128, Col: 72}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "\" onclick=\"copyText(this.dataset.text, this)\">Copy</button></p><p><strong>New Setup URL:</strong><div class=\"text-smflex items-center gap-2\"><span class=\"break-all\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "\">Copy</button></p><p><strong>New Setup URL:</strong><div class=\"text-smflex items-center gap-2\"><span class=\"break-all\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var15 string
 		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(response.SetupURL)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 132, Col: 48}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 133, Col: 48}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</span> <button class=\"btn, btn-copy\" data-text=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "</span> <button class=\"btn btn-copy\" data-text=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var16 string
 		templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(response.SetupURL)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 133, Col: 64}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/service_accounts.templ`, Line: 134, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "\" onclick=\"copyText(this.dataset.text, this)\">Copy</button></div></p><p class=\"text-sm\"><strong>Note:</strong> All previous client secrets have been revoked. The owner of this account can use the link above to retrieve their new client secret (the link can only be used once and expires in 48 hours).</p></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "\">Copy</button></div></p><p class=\"text-sm\"><strong>Note:</strong> All previous client secrets have been revoked. The owner of this account can use the link above to retrieve their new client secret (the link can only be used once and expires in 48 hours).</p></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -381,7 +389,7 @@ func ReissueServiceAccountCredentialsScript() templ.Component {
 			templ_7745c5c3_Var17 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<script>\n        // toggle button after clicking\n        document.getElementById(\"reissue-btn\").addEventListener(\"click\", function() {\n            this.disabled = true;\n        });\n\t\t// Clear alerts and enables button when dropdown selection changes\n\t\tdocument.addEventListener(\"change\", function (event) {\n            document.getElementById(\"reissue-btn\").disabled = false;\n\n\t\t\tif (event.target.id === \"service-account-dropdown\") {\n\t\t\t\tlet container = document.getElementById(\"result\");\n\t\t\t\tcontainer.innerHTML = \"\";\n\t\t\t}\n\t\t});\n\t</script>")
+		templ_7745c5c3_Err = ServiceAccountFormScript().Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
