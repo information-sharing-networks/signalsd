@@ -38,6 +38,12 @@ document.addEventListener('click', function(e) {
 	if (monitorBtn) {
 		monitorBtn.classList.toggle('monitoring');
 		monitorBtn.textContent = monitorBtn.classList.contains('monitoring') ? 'Stop Monitoring' : 'Monitor';
+
+		// Trigger the monitor timer to start/stop polling
+		const monitorTimer = document.getElementById('monitor-timer');
+		if (monitorTimer) {
+			htmx.trigger(monitorTimer, 'every 15s');
+		}
 	}
 });
 
