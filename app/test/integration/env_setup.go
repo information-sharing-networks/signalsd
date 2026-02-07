@@ -36,47 +36,63 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/server/schemas"
 )
 
-// testEnvironment holds common test dependencies
-type testEnvironment struct {
-	dbConn      *pgxpool.Pool
+// testEnv provides access to test db and server for integration tests
+type testEnv struct {
+	baseURL     string
+	pool        *pgxpool.Pool
 	queries     *database.Queries
 	authService *auth.AuthService
+	shutdown    func()
 }
 
 type databaseConfig struct {
 	userAndPassword string
-	password        string
 	dbname          string
 	host            string
 	port            int
 }
 
-type serverConfig struct {
-	secretKey   string
-	environment string
-	logLevel    string
+func (d *databaseConfig) connectionURL() string {
+	return fmt.Sprintf("postgres://%s@%s:%d/%s?sslmode=disable",
+		d.userAndPassword, d.host, d.port, d.dbname)
 }
 
-var (
-	ciDatabaseConfig = databaseConfig{
-		userAndPassword: "postgres:postgres",
-		dbname:          "tmp_signalsd_integration_test",
-		host:            "localhost",
-		port:            5432,
+func (d *databaseConfig) WithDatabase(dbname string) *databaseConfig {
+	return &databaseConfig{
+		userAndPassword: d.userAndPassword,
+		host:            d.host,
+		port:            d.port,
+		dbname:          dbname,
 	}
-	localDatabaseConfig = databaseConfig{
+}
+
+func localDatabaseConfig() *databaseConfig {
+	return &databaseConfig{
 		userAndPassword: "signalsd-dev:",
 		dbname:          "tmp_signalsd_integration_test",
 		host:            "localhost",
 		port:            15432,
 	}
+}
 
-	testServerConfig = serverConfig{
-		secretKey:   "test-secret-key-12345",
-		environment: "test",
-		logLevel:    "debug",
+func ciDatabaseConfig() *databaseConfig {
+	return &databaseConfig{
+		userAndPassword: "postgres:postgres",
+		dbname:          "tmp_signalsd_integration_test",
+		host:            "localhost",
+		port:            5432,
 	}
-)
+}
+
+var testServerConfig = struct {
+	secretKey   string
+	environment string
+	logLevel    string
+}{
+	secretKey:   "test-secret-key-12345",
+	environment: "test",
+	logLevel:    "debug",
+}
 
 const (
 
@@ -87,59 +103,39 @@ const (
 	testSchemaContent    = `{"type": "object", "properties": {"test": {"type": "string"}}, "required": ["test"], "additionalProperties": false }`
 )
 
-func buildConnString(userAndPassword string, host string, port int, dbname string) string {
-	return fmt.Sprintf("postgres://%s@%s:%d/%s?sslmode=disable",
-		userAndPassword, host, port, dbname)
-}
+// setupTestDatabase creates an empty test db, applies migrations and returns a connection pool
+// the function auto-detects if it is running in CI (github actions) and uses the appropriate database config
+func setupTestDatabase(t *testing.T) *pgxpool.Pool {
 
-// setupTestEnvironment creates a new test environment with database connection and services
-func setupTestEnvironment(dbConn *pgxpool.Pool) *testEnvironment {
-	queries := database.New(dbConn)
-	authService := auth.NewAuthService(testServerConfig.secretKey, testServerConfig.environment, queries)
-	return &testEnvironment{
-		dbConn:      dbConn,
-		queries:     queries,
-		authService: authService,
-	}
-}
+	ctx := context.Background()
+	var config *databaseConfig
 
-// getDatabaseURL returns the appropriate test database URL for the local docker db when running locally
-// or the CI test database when being run in github action
-func getDatabaseURL() string {
 	if os.Getenv("GITHUB_ACTIONS") == "true" {
-		return buildConnString(ciDatabaseConfig.userAndPassword, ciDatabaseConfig.host, ciDatabaseConfig.port, ciDatabaseConfig.dbname)
-	}
-	return buildConnString(localDatabaseConfig.userAndPassword, localDatabaseConfig.host, localDatabaseConfig.port, localDatabaseConfig.dbname)
-}
-
-// setupCleanDatabase creates an empty test db, applies migrations and returns a connection pool
-func setupCleanDatabase(t *testing.T, ctx context.Context) *pgxpool.Pool {
-
-	config := localDatabaseConfig
-
-	ci := false
-	if os.Getenv("GITHUB_ACTIONS") == "true" {
-		config = ciDatabaseConfig
-		ci = true
+		config = ciDatabaseConfig()
+	} else {
+		config = localDatabaseConfig()
 	}
 
-	// postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable
-	// postgres://signalsd-dev@localhost:14532/postgres?sslmode=disable
+	postgresConfig := config.WithDatabase("postgres")
 
 	// connect to the postgres database to create the test database
-	postgresConnectionURL := buildConnString(config.userAndPassword, config.host, config.port, "postgres")
+	postgresConnectionURL := postgresConfig.connectionURL()
 
-	// Check PostgreSQL server connectivity
-	postgresPool := setupCleanDatabaseConn(t, postgresConnectionURL)
-	if err := postgresPool.Ping(ctx); err != nil {
-		if !ci {
-			t.Fatalf("⚠️ Can't ping PostgreSQL server %s - is the docker db running?", postgresConnectionURL)
-		} else {
-			t.Fatalf("❌ Can't ping PostgreSQL server %s", postgresConnectionURL)
-		}
+	postgresPoolConfig, err := pgxpool.ParseConfig(postgresConnectionURL)
+	if err != nil {
+		t.Fatalf("Failed to parse postgres database URL: %v", err)
 	}
 
-	_, err := postgresPool.Exec(ctx, "DROP DATABASE IF EXISTS "+config.dbname)
+	postgresPool, err := pgxpool.NewWithConfig(ctx, postgresPoolConfig)
+	if err != nil {
+		t.Fatalf("Unable to create postgres connection pool: %v", err)
+	}
+
+	if err := postgresPool.Ping(ctx); err != nil {
+		t.Fatalf("Can't ping PostgreSQL server %s", postgresConnectionURL)
+	}
+
+	_, err = postgresPool.Exec(ctx, "DROP DATABASE IF EXISTS "+config.dbname)
 	if err != nil {
 		t.Fatalf("DROP DATABASE IF EXISTS Failed : %v", err)
 	}
@@ -149,6 +145,11 @@ func setupCleanDatabase(t *testing.T, ctx context.Context) *pgxpool.Pool {
 		t.Fatalf("CREATE DATABASE Failed : %v", err)
 	}
 
+	// Close the postgres pool
+	t.Cleanup(func() {
+		postgresPool.Close()
+	})
+
 	// drop the test database when the test is complete
 	t.Cleanup(func() {
 		_, err := postgresPool.Exec(ctx, "DROP DATABASE "+config.dbname)
@@ -156,14 +157,14 @@ func setupCleanDatabase(t *testing.T, ctx context.Context) *pgxpool.Pool {
 			t.Fatalf("Failed to drop test database: %v", err)
 		}
 	})
-	t.Log("test database created")
 
-	testDatabaseURLTODO := buildConnString(config.userAndPassword, config.host, config.port, config.dbname)
-	testDatabasePool := setupCleanDatabaseConn(t, testDatabaseURLTODO)
+	// connect to the new database
+	testDatabaseURL := config.connectionURL()
+	testDatabasePool := setupDatabaseConn(t, testDatabaseURL)
 
 	// Apply database migrations
 	if err := runDatabaseMigrations(t, testDatabasePool); err != nil {
-		t.Fatalf("❌ Failed to apply database migrations: %v", err)
+		t.Fatalf("Failed to apply database migrations: %v", err)
 	}
 	// Convert pgx pool to database/sql interface that Goose expects
 	var db *sql.DB = stdlib.OpenDBFromPool(testDatabasePool)
@@ -179,12 +180,12 @@ func setupCleanDatabase(t *testing.T, ctx context.Context) *pgxpool.Pool {
 		t.Fatalf("failed to apply migrations: %v", err)
 	}
 
-	t.Log("✅ Database created")
+	t.Logf("Database ready: %s", config.dbname)
 
 	return testDatabasePool
 }
 
-func setupCleanDatabaseConn(t *testing.T, databaseURL string) *pgxpool.Pool {
+func setupDatabaseConn(t *testing.T, databaseURL string) *pgxpool.Pool {
 	t.Helper()
 
 	ctx := context.Background()
@@ -202,7 +203,6 @@ func setupCleanDatabaseConn(t *testing.T, databaseURL string) *pgxpool.Pool {
 		pool.Close()
 	})
 
-	t.Log("Database pool created")
 	return pool
 }
 
@@ -227,43 +227,58 @@ func runDatabaseMigrations(t *testing.T, pool *pgxpool.Pool) error {
 	return nil
 }
 
-// startInProcessServer starts the signalsd server in-process for testing - returns the base URL for the API and a shutdown function
+// startInProcessServer starts the signalsd server in-process for testing - returns the testEnv with base URL and shutdown function
 // when using public isns be sure to load the test data before starting the server (the public isn cache is not dynamic and is only populated at startup)
 // if you are not testing a function that generates end user facing urls then send an empty string for publicBaseURL
-func startInProcessServer(t *testing.T, ctx context.Context, testDB *pgxpool.Pool, testDatabaseURL string, publicBaseURL string) (string, func()) {
+//
+// For tests that need to create test data before starting the server (e.g., to populate public ISN cache),
+// use setupTestDatabaseAndEnv instead, create your test data, then call startServerWithEnv.
+func startInProcessServer(t *testing.T, publicBaseURL string) *testEnv {
+	t.Helper()
 
-	enableServerLogs := false
+	testEnv := &testEnv{}
+
+	t.Log("Starting in-process server...")
+
+	// server config
+	var (
+		ctx       = context.Background()
+		port      = findFreePort(t)
+		logLevel  = logger.ParseLogLevel("none")
+		testDB    = setupTestDatabase(t)
+		testDBURL = testDB.Config().ConnString()
+	)
 
 	if os.Getenv("ENABLE_SERVER_LOGS") == "true" {
-		enableServerLogs = true
+		logLevel = logger.ParseLogLevel("debug")
 	}
 
 	// Set environment variables before calling NewServerConfig
-
-	originalEnvVars := make(map[string]string)
 	testEnvVars := map[string]string{
 		"SECRET_KEY":   testServerConfig.secretKey,
-		"DATABASE_URL": testDatabaseURL,
+		"DATABASE_URL": testDBURL,
 		"ENVIRONMENT":  testServerConfig.environment,
 		"LOG_LEVEL":    testServerConfig.logLevel,
-		"PORT":         fmt.Sprintf("%d", findFreePort(t)),
+		"PORT":         fmt.Sprintf("%d", port),
 	}
 
-	// set test env vars
+	// Save original env vars and set test values
+	originalEnvVars := make(map[string]string)
 	for key, value := range testEnvVars {
+		originalEnvVars[key] = os.Getenv(key)
 		os.Setenv(key, value)
 	}
 
 	// Restore original environment variables when test completes
-	defer func() {
-		for key := range testEnvVars {
-			if original, exists := originalEnvVars[key]; exists {
+	t.Cleanup(func() {
+		for key, original := range originalEnvVars {
+			if original != "" {
 				os.Setenv(key, original)
 			} else {
 				os.Unsetenv(key)
 			}
 		}
-	}()
+	})
 
 	cfg, corsConfigs, err := signalsd.NewServerConfig()
 	if err != nil {
@@ -277,30 +292,26 @@ func startInProcessServer(t *testing.T, ctx context.Context, testDB *pgxpool.Poo
 		cfg.PublicBaseURL = publicBaseURL
 	}
 
-	queries := database.New(testDB)
-	authService := auth.NewAuthService(cfg.SecretKey, testServerConfig.environment, queries)
+	testEnv.pool = testDB
+	testEnv.queries = database.New(testDB)
+	testEnv.authService = auth.NewAuthService(cfg.SecretKey, testServerConfig.environment, testEnv.queries)
 
 	schemaCache := schemas.NewSchemaCache()
-	if err := schemaCache.Load(ctx, queries); err != nil {
+	if err := schemaCache.Load(ctx, testEnv.queries); err != nil {
 		t.Logf("Warning: Failed to load schema cache: %v", err)
 	}
 
 	publicIsnCache := isns.NewPublicIsnCache()
-	if err := publicIsnCache.Load(ctx, queries); err != nil {
+	if err := publicIsnCache.Load(ctx, testEnv.queries); err != nil {
 		t.Logf("Warning: Failed to load public ISN cache: %v", err)
 	}
 
-	logLevel := logger.ParseLogLevel("none")
-
-	if enableServerLogs {
-		logLevel = logger.ParseLogLevel("debug")
-	}
 	appLogger := logger.InitLogger(logLevel, testServerConfig.environment)
 
 	serverInstance := server.NewServer(
 		testDB,
-		queries,
-		authService,
+		testEnv.queries,
+		testEnv.authService,
 		cfg,
 		corsConfigs,
 		appLogger,
@@ -321,7 +332,7 @@ func startInProcessServer(t *testing.T, ctx context.Context, testDB *pgxpool.Poo
 	}()
 
 	// Create shutdown function to be called by the test
-	shutdownFunc := func() {
+	testEnv.shutdown = func() {
 		t.Log("Stopping server...")
 
 		// Cancel the server context to trigger graceful shutdown
@@ -331,12 +342,11 @@ func startInProcessServer(t *testing.T, ctx context.Context, testDB *pgxpool.Poo
 		select {
 		case err := <-serverDone:
 			if err != nil {
-				t.Logf("Server shutdown with error: %v", err)
+				t.Logf("❌ Server shutdown with error: %v", err)
 			} else {
 				t.Log("✅ Server shut down gracefully")
 			}
 		case <-time.After(5 * time.Second):
-			// if the server won't shutdown it will most likely be due to bugs, e.g uncommitted transactions or unclosed http requests bodies
 			t.Log("⚠️ Server shutdown timeout")
 		}
 
@@ -344,16 +354,16 @@ func startInProcessServer(t *testing.T, ctx context.Context, testDB *pgxpool.Poo
 		serverInstance.DatabaseShutdown()
 	}
 
-	baseURL := fmt.Sprintf("http://localhost:%d", cfg.Port)
-	t.Logf("Starting in-process server at %s", baseURL)
+	testEnv.baseURL = fmt.Sprintf("http://localhost:%d", cfg.Port)
+	t.Logf("Starting in-process server at %s", testEnv.baseURL)
 
 	// Wait for server to be ready
-	if !waitForServer(t, baseURL+"/health/live", 30*time.Second) {
+	if !waitForServer(t, testEnv.baseURL+"/health/live", 30*time.Second) {
 		t.Fatal("Server failed to start within timeout")
 	}
 
 	// Test the server is working
-	resp, err := http.Get(baseURL + "/health/live")
+	resp, err := http.Get(testEnv.baseURL + "/health/live")
 	if err != nil {
 		t.Fatalf("Failed to call health endpoint: %v", err)
 	}
@@ -363,7 +373,144 @@ func startInProcessServer(t *testing.T, ctx context.Context, testDB *pgxpool.Poo
 		t.Errorf("Expected status 200, got %d", resp.StatusCode)
 	}
 
-	return baseURL, shutdownFunc
+	t.Log("✅ Server started")
+	return testEnv
+}
+
+// startServerWithEnv starts the signalsd server with an existing testEnv
+// Use this after setupTestDatabaseAndEnv when you need to create test data before starting the server
+func startServerWithEnv(t *testing.T, testEnv *testEnv) {
+	t.Helper()
+
+	ctx := context.Background()
+	port := findFreePort(t)
+	logLevel := logger.ParseLogLevel("none")
+
+	if os.Getenv("ENABLE_SERVER_LOGS") == "true" {
+		logLevel = logger.ParseLogLevel("debug")
+	}
+
+	testDBURL := testEnv.pool.Config().ConnString()
+
+	// Set environment variables before calling NewServerConfig
+	testEnvVars := map[string]string{
+		"SECRET_KEY":   testServerConfig.secretKey,
+		"DATABASE_URL": testDBURL,
+		"ENVIRONMENT":  testServerConfig.environment,
+		"LOG_LEVEL":    testServerConfig.logLevel,
+		"PORT":         fmt.Sprintf("%d", port),
+	}
+
+	// Save original env vars and set test values
+	originalEnvVars := make(map[string]string)
+	for key, value := range testEnvVars {
+		originalEnvVars[key] = os.Getenv(key)
+		os.Setenv(key, value)
+	}
+
+	// Restore original environment variables when test completes
+	t.Cleanup(func() {
+		for key, original := range originalEnvVars {
+			if original != "" {
+				os.Setenv(key, original)
+			} else {
+				os.Unsetenv(key)
+			}
+		}
+	})
+
+	cfg, corsConfigs, err := signalsd.NewServerConfig()
+	if err != nil {
+		t.Fatalf("Failed to load configuration: %v", err)
+	}
+
+	cfg.ServiceMode = "all"
+
+	schemaCache := schemas.NewSchemaCache()
+	if err := schemaCache.Load(ctx, testEnv.queries); err != nil {
+		t.Logf("Warning: Failed to load schema cache: %v", err)
+	}
+
+	publicIsnCache := isns.NewPublicIsnCache()
+	if err := publicIsnCache.Load(ctx, testEnv.queries); err != nil {
+		t.Logf("Warning: Failed to load public ISN cache: %v", err)
+	}
+
+	appLogger := logger.InitLogger(logLevel, testServerConfig.environment)
+
+	serverInstance := server.NewServer(
+		testEnv.pool,
+		testEnv.queries,
+		testEnv.authService,
+		cfg,
+		corsConfigs,
+		appLogger,
+		schemaCache,
+		publicIsnCache,
+	)
+
+	// Create a cancellable context for server shutdown
+	serverCtx, serverCancel := context.WithCancel(ctx)
+
+	// Start server
+	serverDone := make(chan error, 1)
+	go func() {
+		defer close(serverDone)
+		if err := serverInstance.Start(serverCtx); err != nil {
+			serverDone <- err
+		}
+	}()
+
+	// Create shutdown function to be called by the test
+	// Wrap any existing shutdown function (from setupTestDatabaseAndEnv)
+	oldShutdown := testEnv.shutdown
+	testEnv.shutdown = func() {
+		t.Log("Stopping server...")
+
+		// Cancel the server context to trigger graceful shutdown
+		serverCancel()
+
+		// Wait for server to shut down gracefully with timeout
+		select {
+		case err := <-serverDone:
+			if err != nil {
+				t.Logf("❌ Server shutdown with error: %v", err)
+			} else {
+				t.Log("✅ Server shut down gracefully")
+			}
+		case <-time.After(5 * time.Second):
+			t.Log("⚠️ Server shutdown timeout")
+		}
+
+		// Ensure database connections are closed
+		serverInstance.DatabaseShutdown()
+
+		// Call the old shutdown function if it exists (for cleanup from setupTestDatabaseAndEnv)
+		if oldShutdown != nil {
+			oldShutdown()
+		}
+	}
+
+	testEnv.baseURL = fmt.Sprintf("http://localhost:%d", cfg.Port)
+	t.Logf("Starting in-process server at %s", testEnv.baseURL)
+
+	// Wait for server to be ready
+	if !waitForServer(t, testEnv.baseURL+"/health/live", 30*time.Second) {
+		t.Fatal("Server failed to start within timeout")
+	}
+
+	// Test the server is working
+	resp, err := http.Get(testEnv.baseURL + "/health/live")
+	if err != nil {
+		t.Fatalf("Failed to call health endpoint: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	}
+
+	t.Log("✅ Server started")
 }
 
 func findFreePort(t *testing.T) int {
@@ -426,4 +573,27 @@ func createExpiredAccessToken(t *testing.T, accountID uuid.UUID) string {
 	}
 
 	return signedToken
+}
+
+// setupTestDatabaseAndEnv creates a test database and environment without starting the server
+// This is useful for tests that need to create test data before starting the server
+// (e.g., to populate public ISN cache which is only populated at startup)
+// After creating test data, call startServerWithEnv to start the server
+func setupTestDatabaseAndEnv(t *testing.T) *testEnv {
+	t.Helper()
+
+	testDB := setupTestDatabase(t)
+
+	testEnv := &testEnv{
+		pool:        testDB,
+		queries:     database.New(testDB),
+		authService: auth.NewAuthService(testServerConfig.secretKey, testServerConfig.environment, database.New(testDB)),
+		shutdown: func() {
+			// Default shutdown just closes the database pool
+			// This will be replaced by startServerWithEnv if the server is started
+			testDB.Close()
+		},
+	}
+
+	return testEnv
 }

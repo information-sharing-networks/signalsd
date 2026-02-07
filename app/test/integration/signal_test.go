@@ -28,7 +28,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 )
 
-func (env *testEnvironment) createAuthToken(t *testing.T, accountID uuid.UUID) string {
+func (env *testEnv) createAuthToken(t *testing.T, accountID uuid.UUID) string {
 	ctx := auth.ContextWithAccountID(context.Background(), accountID)
 	tokenResponse, err := env.authService.CreateAccessToken(ctx)
 	if err != nil {
@@ -385,15 +385,8 @@ func TestSignalSubmission(t *testing.T) {
 
 	ctx := context.Background()
 
-	testDB := setupCleanDatabase(t, ctx)
-
-	testEnv := setupTestEnvironment(testDB)
-
-	// select database and start the signalsd server
-	testURL := getDatabaseURL()
-	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, "")
-	defer stopServer()
-	t.Logf("✅ Server started at %s", baseURL)
+	testEnv := startInProcessServer(t, "")
+	defer testEnv.shutdown()
 
 	// create test data (take care if updating as used by multiple test below)
 	t.Log("Creating test data...")
@@ -556,7 +549,7 @@ func TestSignalSubmission(t *testing.T) {
 
 				payload := tt.payloadFunc()
 
-				response := submitCreateSignalRequest(t, baseURL, payload, authToken, tt.endpoint)
+				response := submitCreateSignalRequest(t, testEnv.baseURL, payload, authToken, tt.endpoint)
 				defer response.Body.Close()
 
 				// Verify response status
@@ -616,7 +609,7 @@ func TestSignalSubmission(t *testing.T) {
 		// create a signal in the admin isn
 		adminPayload := createValidSignalPayload("admin-correlation-test-signal-001")
 
-		adminSignalResponse := submitCreateSignalRequest(t, baseURL, adminPayload, adminToken, adminEndpoint)
+		adminSignalResponse := submitCreateSignalRequest(t, testEnv.baseURL, adminPayload, adminToken, adminEndpoint)
 		defer adminSignalResponse.Body.Close()
 
 		if adminSignalResponse.StatusCode != http.StatusOK {
@@ -632,7 +625,7 @@ func TestSignalSubmission(t *testing.T) {
 		// create a signal in the owner isn
 		ownerPayload := createValidSignalPayload("owner-correlation-test-signal-001")
 
-		ownerSignalResponse := submitCreateSignalRequest(t, baseURL, ownerPayload, ownerToken, ownerEndpoint)
+		ownerSignalResponse := submitCreateSignalRequest(t, testEnv.baseURL, ownerPayload, ownerToken, ownerEndpoint)
 		defer ownerSignalResponse.Body.Close()
 
 		if ownerSignalResponse.StatusCode != http.StatusOK {
@@ -713,7 +706,7 @@ func TestSignalSubmission(t *testing.T) {
 
 				authToken := testEnv.createAuthToken(t, tt.accountID)
 
-				correlatedSignalResponse := submitCreateSignalRequest(t, baseURL, correlatedPayload, authToken, tt.endpoint)
+				correlatedSignalResponse := submitCreateSignalRequest(t, testEnv.baseURL, correlatedPayload, authToken, tt.endpoint)
 				defer correlatedSignalResponse.Body.Close()
 				var correlatedSignalResponseBody map[string]any
 				if err := json.NewDecoder(correlatedSignalResponse.Body).Decode(&correlatedSignalResponseBody); err != nil {
@@ -805,15 +798,8 @@ func TestIsInUseStatus(t *testing.T) {
 
 	ctx := context.Background()
 
-	testDB := setupCleanDatabase(t, ctx)
-
-	testEnv := setupTestEnvironment(testDB)
-
-	// select database and start the signalsd server
-	testURL := getDatabaseURL()
-	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, "")
-	defer stopServer()
-	t.Logf("✅ Server started at %s", baseURL)
+	testEnv := startInProcessServer(t, "")
+	defer testEnv.shutdown()
 
 	t.Log("Creating test data...")
 
@@ -1001,7 +987,7 @@ func TestIsInUseStatus(t *testing.T) {
 				case "write":
 
 					payload := createValidSignalPayload("isinuse-isn-001")
-					response := submitCreateSignalRequest(t, baseURL, payload, authToken, tt.endpoint)
+					response := submitCreateSignalRequest(t, testEnv.baseURL, payload, authToken, tt.endpoint)
 					defer response.Body.Close()
 
 					// Verify response status
@@ -1010,7 +996,7 @@ func TestIsInUseStatus(t *testing.T) {
 						return
 					}
 				case "read":
-					response := searchPrivateSignals(t, baseURL, tt.endpoint, authToken, false, false, false)
+					response := searchPrivateSignals(t, testEnv.baseURL, tt.endpoint, authToken, false, false, false)
 					defer response.Body.Close()
 
 					// Verify response status
@@ -1036,9 +1022,11 @@ func TestIsInUseStatus(t *testing.T) {
 func TestSignalSearch(t *testing.T) {
 	ctx := context.Background()
 
-	testDB := setupCleanDatabase(t, ctx)
-
-	testEnv := setupTestEnvironment(testDB)
+	// Setup database and environment without starting server yet
+	// This allows us to create test data before the server starts
+	// so the public ISN cache is populated correctly
+	testEnv := setupTestDatabaseAndEnv(t)
+	defer testEnv.shutdown()
 
 	// create test data:
 	//
@@ -1076,11 +1064,8 @@ func TestSignalSearch(t *testing.T) {
 	adminToken := testEnv.createAuthToken(t, adminAccount.ID)
 	memberToken := testEnv.createAuthToken(t, memberAccount.ID)
 
-	// note that the server must be started after the test data is created so the public isn cache is populated
-	testURL := getDatabaseURL()
-	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, "")
-	defer stopServer()
-	t.Logf("✅ Server started at %s", baseURL)
+	// Now start the server after test data is created so the public ISN cache is populated
+	startServerWithEnv(t, testEnv)
 
 	// end point configs
 	ownerEndpoint := testSignalEndpoint{
@@ -1103,7 +1088,7 @@ func TestSignalSearch(t *testing.T) {
 
 	// create owner ISN signal
 	payload := createValidSignalPayload("owner-search-signal-001")
-	ownerResponse := submitCreateSignalRequest(t, baseURL, payload, ownerToken, ownerEndpoint)
+	ownerResponse := submitCreateSignalRequest(t, testEnv.baseURL, payload, ownerToken, ownerEndpoint)
 	defer ownerResponse.Body.Close()
 	if ownerResponse.StatusCode != http.StatusOK {
 		t.Fatalf("Failed to submit signal to owner ISN: %d", ownerResponse.StatusCode)
@@ -1111,7 +1096,7 @@ func TestSignalSearch(t *testing.T) {
 
 	// create admin ISN signal
 	payload = createValidSignalPayload("admin-search-signal-001")
-	adminResponse := submitCreateSignalRequest(t, baseURL, payload, adminToken, adminEndpoint)
+	adminResponse := submitCreateSignalRequest(t, testEnv.baseURL, payload, adminToken, adminEndpoint)
 	defer adminResponse.Body.Close()
 	if adminResponse.StatusCode != http.StatusOK {
 		t.Fatalf("Failed to submit signal to admin ISN: %d", adminResponse.StatusCode)
@@ -1119,7 +1104,7 @@ func TestSignalSearch(t *testing.T) {
 
 	// create public ISN signal
 	payload = createValidSignalPayload("public-search-signal-001")
-	publicResponse := submitCreateSignalRequest(t, baseURL, payload, adminToken, publicEndpoint)
+	publicResponse := submitCreateSignalRequest(t, testEnv.baseURL, payload, adminToken, publicEndpoint)
 	publicResponse.Body.Close()
 	if publicResponse.StatusCode != http.StatusOK {
 		t.Fatalf("Failed to submit signal to public ISN: %d", publicResponse.StatusCode)
@@ -1127,7 +1112,7 @@ func TestSignalSearch(t *testing.T) {
 
 	// check signal on public isn can be searched w/o auth
 	t.Run("public isn search", func(t *testing.T) {
-		response := searchPublicSignals(t, baseURL, publicEndpoint)
+		response := searchPublicSignals(t, testEnv.baseURL, publicEndpoint)
 		defer response.Body.Close()
 
 		// Verify response status
@@ -1156,7 +1141,7 @@ func TestSignalSearch(t *testing.T) {
 	// verify private isns are not accessible via public endpoints
 	t.Run("private isn blocked from public endpoint", func(t *testing.T) {
 		// Attempt to access private ISN via public endpoint - should fail
-		response := searchPublicSignals(t, baseURL, ownerEndpoint)
+		response := searchPublicSignals(t, testEnv.baseURL, ownerEndpoint)
 		defer response.Body.Close()
 
 		// Should return 404 Not Found (ISN not in public cache)
@@ -1244,7 +1229,7 @@ func TestSignalSearch(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			response := searchPrivateSignals(t, baseURL, tt.targetEndpoint, tt.requesterToken, false, false, false)
+			response := searchPrivateSignals(t, testEnv.baseURL, tt.targetEndpoint, tt.requesterToken, false, false, false)
 			defer response.Body.Close()
 
 			// Verify response status
@@ -1306,7 +1291,7 @@ func TestSignalSearch(t *testing.T) {
 	// Test withdrawn signals are excluded from search results by default
 	t.Run("withdrawn signals excluded from search", func(t *testing.T) {
 		// First, verify the admin signal is visible in search
-		response := searchPrivateSignals(t, baseURL, adminEndpoint, adminToken, false, false, false)
+		response := searchPrivateSignals(t, testEnv.baseURL, adminEndpoint, adminToken, false, false, false)
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusOK {
@@ -1323,7 +1308,7 @@ func TestSignalSearch(t *testing.T) {
 		}
 
 		// Withdraw the admin signal
-		withdrawResponse := withdrawSignal(t, baseURL, adminEndpoint, adminToken, "admin-search-signal-001")
+		withdrawResponse := withdrawSignal(t, testEnv.baseURL, adminEndpoint, adminToken, "admin-search-signal-001")
 		defer withdrawResponse.Body.Close()
 
 		if withdrawResponse.StatusCode != http.StatusNoContent {
@@ -1331,7 +1316,7 @@ func TestSignalSearch(t *testing.T) {
 		}
 
 		// Search again - should return no signals (withdrawn signal excluded by default)
-		response = searchPrivateSignals(t, baseURL, adminEndpoint, adminToken, false, false, false)
+		response = searchPrivateSignals(t, testEnv.baseURL, adminEndpoint, adminToken, false, false, false)
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusOK {
@@ -1348,7 +1333,7 @@ func TestSignalSearch(t *testing.T) {
 		}
 
 		// Search with include_withdrawn=true - should return the withdrawn signal
-		response = searchPrivateSignals(t, baseURL, adminEndpoint, adminToken, true, false, false)
+		response = searchPrivateSignals(t, testEnv.baseURL, adminEndpoint, adminToken, true, false, false)
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusOK {
@@ -1381,14 +1366,8 @@ func TestSignalSearch(t *testing.T) {
 func TestCorrelatedAndPreviousVersionsSearch(t *testing.T) {
 	ctx := context.Background()
 
-	testDB := setupCleanDatabase(t, ctx)
-	testEnv := setupTestEnvironment(testDB)
-
-	// select database and start the signalsd server
-	testURL := getDatabaseURL()
-	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, "")
-	defer stopServer()
-	t.Logf("✅ Server started at %s", baseURL)
+	testEnv := startInProcessServer(t, "")
+	defer testEnv.shutdown()
 
 	// create test data
 	t.Log("Creating test data...")
@@ -1411,7 +1390,7 @@ func TestCorrelatedAndPreviousVersionsSearch(t *testing.T) {
 	master001LocalRef := "master-001"
 	payload := createValidSignalPayload(master001LocalRef)
 
-	master001SignalResponse := submitCreateSignalRequest(t, baseURL, payload, ownerAuthToken, ownerEndpoint)
+	master001SignalResponse := submitCreateSignalRequest(t, testEnv.baseURL, payload, ownerAuthToken, ownerEndpoint)
 	defer master001SignalResponse.Body.Close()
 
 	if master001SignalResponse.StatusCode != http.StatusOK {
@@ -1422,14 +1401,14 @@ func TestCorrelatedAndPreviousVersionsSearch(t *testing.T) {
 	master002LocalRef := "master-002"
 	payload = createValidSignalPayload(master002LocalRef)
 
-	master002SignalResponse := submitCreateSignalRequest(t, baseURL, payload, ownerAuthToken, ownerEndpoint)
+	master002SignalResponse := submitCreateSignalRequest(t, testEnv.baseURL, payload, ownerAuthToken, ownerEndpoint)
 	defer master002SignalResponse.Body.Close()
 	if master002SignalResponse.StatusCode != http.StatusOK {
 		t.Fatalf("Failed to submit signal %v to owner ISN: %d", master002LocalRef, master002SignalResponse.StatusCode)
 	}
 
 	// create a second version of master-002
-	master002SignalResponseV2 := submitCreateSignalRequest(t, baseURL, payload, ownerAuthToken, ownerEndpoint)
+	master002SignalResponseV2 := submitCreateSignalRequest(t, testEnv.baseURL, payload, ownerAuthToken, ownerEndpoint)
 	defer master002SignalResponseV2.Body.Close()
 	if master002SignalResponseV2.StatusCode != http.StatusOK {
 		t.Fatalf("Failed to submit version 2 of signal %v to owner ISN: %d", master002LocalRef, master002SignalResponse.StatusCode)
@@ -1447,7 +1426,7 @@ func TestCorrelatedAndPreviousVersionsSearch(t *testing.T) {
 	correlated001LocalRef := "item-002>master-001"
 	payload = createValidSignalPayloadWithCorrelatedID(correlated001LocalRef, master001SignalID)
 
-	correlated001SignalResponse := submitCreateSignalRequest(t, baseURL, payload, ownerAuthToken, ownerEndpoint)
+	correlated001SignalResponse := submitCreateSignalRequest(t, testEnv.baseURL, payload, ownerAuthToken, ownerEndpoint)
 	defer correlated001SignalResponse.Body.Close()
 	if correlated001SignalResponse.StatusCode != http.StatusOK {
 		t.Fatalf("Failed to submit signal to owner ISN: %d", correlated001SignalResponse.StatusCode)
@@ -1456,14 +1435,14 @@ func TestCorrelatedAndPreviousVersionsSearch(t *testing.T) {
 	correlated002LocalRef := "item-003>master-001"
 	payload = createValidSignalPayloadWithCorrelatedID(correlated002LocalRef, master001SignalID)
 
-	correlated002SignalResponse := submitCreateSignalRequest(t, baseURL, payload, ownerAuthToken, ownerEndpoint)
+	correlated002SignalResponse := submitCreateSignalRequest(t, testEnv.baseURL, payload, ownerAuthToken, ownerEndpoint)
 	defer correlated002SignalResponse.Body.Close()
 	if correlated002SignalResponse.StatusCode != http.StatusOK {
 		t.Fatalf("Failed to submit signal to owner ISN: %d", correlated002SignalResponse.StatusCode)
 	}
 
 	t.Run("search without correlated signals", func(t *testing.T) {
-		response := searchPrivateSignals(t, baseURL, ownerEndpoint, ownerAuthToken, false, false, false)
+		response := searchPrivateSignals(t, testEnv.baseURL, ownerEndpoint, ownerAuthToken, false, false, false)
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusOK {
@@ -1488,7 +1467,7 @@ func TestCorrelatedAndPreviousVersionsSearch(t *testing.T) {
 	})
 
 	t.Run("search including previous versions", func(t *testing.T) {
-		response := searchPrivateSignals(t, baseURL, ownerEndpoint, ownerAuthToken, false, false, true)
+		response := searchPrivateSignals(t, testEnv.baseURL, ownerEndpoint, ownerAuthToken, false, false, true)
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusOK {
@@ -1527,7 +1506,7 @@ func TestCorrelatedAndPreviousVersionsSearch(t *testing.T) {
 	})
 
 	t.Run("search including correlated signals", func(t *testing.T) {
-		response := searchPrivateSignals(t, baseURL, ownerEndpoint, ownerAuthToken, false, true, false)
+		response := searchPrivateSignals(t, testEnv.baseURL, ownerEndpoint, ownerAuthToken, false, true, false)
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusOK {

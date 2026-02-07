@@ -34,7 +34,7 @@ import (
 // - JWT token creation
 func TestPermissions(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupCleanDatabase(t, ctx)
+	testDB := setupTestDatabase(t)
 
 	queries := database.New(testDB)
 
@@ -295,7 +295,7 @@ func createClientSecret(t *testing.T, ctx context.Context, queries *database.Que
 // note this is a very slow test as it has to hash the passwords for each sub-test
 func TestLoginAuth(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupCleanDatabase(t, ctx)
+	testDB := setupTestDatabase(t)
 
 	queries := database.New(testDB)
 	authService := auth.NewAuthService(testServerConfig.secretKey, testServerConfig.environment, queries)
@@ -477,7 +477,7 @@ func TestLoginAuth(t *testing.T) {
 // - Failed authentication with invalid credentials, expired credentials, revoked credentials
 func TestClientCredentialsAuth(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupCleanDatabase(t, ctx)
+	testDB := setupTestDatabase(t)
 	queries := database.New(testDB)
 	authService := auth.NewAuthService(testServerConfig.secretKey, testServerConfig.environment, queries)
 
@@ -541,7 +541,7 @@ func TestClientCredentialsAuth(t *testing.T) {
 //     - refresh tokens (users)
 func TestDisabledAccountAuth(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupCleanDatabase(t, ctx)
+	testDB := setupTestDatabase(t)
 
 	queries := database.New(testDB)
 

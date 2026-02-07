@@ -6,7 +6,6 @@ package integration
 // Origin validation and enforcement
 // Public vs protected endpoint policies
 import (
-	"context"
 	"net/http"
 	"testing"
 )
@@ -51,15 +50,12 @@ func TestCORS(t *testing.T) {
 
 	t.Setenv("ALLOWED_ORIGINS", allowedOrigins)
 
-	ctx := context.Background()
-	testDB := setupCleanDatabase(t, ctx)
-	testEnv := setupTestEnvironment(testDB)
-	testDatabaseURL := getDatabaseURL()
-	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testDatabaseURL, "")
-	privateEndpoint := baseURL + "/api/accounts"
-	publicEndpoint := baseURL + "/health/live"
+	// Start server
+	testEnv := startInProcessServer(t, "")
+	defer testEnv.shutdown()
 
-	defer stopServer()
+	privateEndpoint := testEnv.baseURL + "/api/accounts"
+	publicEndpoint := testEnv.baseURL + "/health/live"
 
 	t.Run("trusted origin allowed", func(t *testing.T) {
 		allowed, returnedOrigin := checkOriginIsAllowed(t, privateEndpoint, allowedOrigin1)

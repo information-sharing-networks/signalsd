@@ -14,10 +14,9 @@ import (
 )
 
 const (
-	defaultBatchSize   = 5
-	defaultNumBatches  = 10
-	defaultBaseURL     = "http://localhost"
-	defaultSignalsPort = "8080"
+	defaultBatchSize  = 5
+	defaultNumBatches = 10
+	defaultBaseURL    = "http://localhost"
 )
 
 var (
@@ -306,9 +305,9 @@ func reportMetrics(metrics PerformanceMetrics) {
 
 	// Performance summary
 	if metrics.FailedBatches == 0 {
-		fmt.Println("✅ All batches processed successfully")
+		fmt.Println("All batches processed successfully")
 	} else {
-		fmt.Printf("❌ %d batches failed\n", metrics.FailedBatches)
+		fmt.Printf("%d batches failed\n", metrics.FailedBatches)
 	}
 
 }
@@ -334,46 +333,6 @@ func generateRandomLowercase(length int) string {
 
 func generateRandomHex(length int) string {
 	const charset = "abcdef0123456789"
-	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[rand.Intn(len(charset))]
-	}
-	return string(b)
-}
-
-func generateVRN() string {
-	// Generate UK vehicle registration number: ^[A-Z]{2}[0-9]{2}\\s[A-Z]{3}$
-	// Format: AB12 CDE
-	letters1 := generateRandomLetters(2)
-	numbers := fmt.Sprintf("%02d", rand.Intn(100))
-	letters2 := generateRandomLetters(3)
-	return fmt.Sprintf("%s%s %s", letters1, numbers, letters2)
-}
-
-func generateLocation(index int) string {
-	// Generate location matching pattern: ^[a-z0-9_]+$
-	locations := []string{
-		"warehouse_1_area_1",
-		"warehouse_1_area_2",
-		"warehouse_2_area_1",
-		"loading_dock_1",
-		"loading_dock_2",
-		"loading_dock_3",
-		"parking_zone_a",
-		"parking_zone_b",
-		"parking_zone_c",
-		"entrance_gate_1",
-		"entrance_gate_2",
-		"exit_gate_1",
-		"maintenance_bay_1",
-		"maintenance_bay_2",
-		"fuel_station_1",
-	}
-	return locations[index%len(locations)]
-}
-
-func generateRandomLetters(length int) string {
-	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	b := make([]byte, length)
 	for i := range b {
 		b[i] = charset[rand.Intn(len(charset))]

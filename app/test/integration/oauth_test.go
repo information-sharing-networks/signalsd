@@ -33,13 +33,10 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 
 	// set up test env
 	ctx := context.Background()
-	testDB := setupCleanDatabase(t, ctx)
-	testEnv := setupTestEnvironment(testDB)
 
 	// Start server
-	testURL := getDatabaseURL()
-	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, "")
-	defer stopServer()
+	testEnv := startInProcessServer(t, "")
+	defer testEnv.shutdown()
 
 	t.Log("Creating test data...")
 
@@ -106,7 +103,7 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 					"client_secret": tt.clientSecret,
 				}
 
-				response := makeOAuthTokenRequest(t, baseURL, "client_credentials", payload, "")
+				response := makeOAuthTokenRequest(t, testEnv.baseURL, "client_credentials", payload, "")
 				defer response.Body.Close()
 
 				if response.StatusCode != tt.expectedStatus {
@@ -143,7 +140,7 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 			"email":    "user@oauth.test",
 			"password": "password123",
 		}
-		loginResponse := makeLoginRequest(t, baseURL, loginPayload)
+		loginResponse := makeLoginRequest(t, testEnv.baseURL, loginPayload)
 		defer loginResponse.Body.Close()
 
 		if loginResponse.StatusCode != http.StatusOK {
@@ -218,7 +215,7 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 				if tt.cookie == nil {
 					tt.cookie = latestRefreshTokenCookie
 				}
-				response := makeOAuthTokenRequest(t, baseURL, "refresh_token", nil, tt.cookie.Value)
+				response := makeOAuthTokenRequest(t, testEnv.baseURL, "refresh_token", nil, tt.cookie.Value)
 				defer response.Body.Close()
 
 				if response.StatusCode != tt.expectedStatus {
@@ -294,7 +291,7 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 	})
 
 	t.Run("invalid grant_type", func(t *testing.T) {
-		response := makeOAuthTokenRequest(t, baseURL, "invalid_grant", nil, "")
+		response := makeOAuthTokenRequest(t, testEnv.baseURL, "invalid_grant", nil, "")
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusBadRequest {
@@ -418,13 +415,10 @@ func makeLoginRequest(t *testing.T, baseURL string, payload map[string]string) *
 // TestOAuthRevokeEndpoint tests POST /oauth/revoke for both account types
 func TestOAuthRevokeEndpoint(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupCleanDatabase(t, ctx)
-	testEnv := setupTestEnvironment(testDB)
 
 	// Start server
-	testURL := getDatabaseURL()
-	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, "")
-	defer stopServer()
+	testEnv := startInProcessServer(t, "")
+	defer testEnv.shutdown()
 
 	t.Log("Creating test data...")
 
@@ -462,7 +456,7 @@ func TestOAuthRevokeEndpoint(t *testing.T) {
 			"client_id":     serviceAccountDetails.ClientID,
 			"client_secret": clientSecret,
 		}
-		tokenResponse := makeOAuthTokenRequest(t, baseURL, "client_credentials", tokenPayload, "")
+		tokenResponse := makeOAuthTokenRequest(t, testEnv.baseURL, "client_credentials", tokenPayload, "")
 		defer tokenResponse.Body.Close()
 
 		if tokenResponse.StatusCode != http.StatusOK {
@@ -480,7 +474,7 @@ func TestOAuthRevokeEndpoint(t *testing.T) {
 		}
 
 		// Test revoke with valid credentials (service accounts use client credentials, not access token)
-		revokeResponse := makeOAuthRevokeRequest(t, baseURL, tokenPayload, "")
+		revokeResponse := makeOAuthRevokeRequest(t, testEnv.baseURL, tokenPayload, "")
 		defer revokeResponse.Body.Close()
 
 		if revokeResponse.StatusCode != http.StatusOK {
@@ -488,7 +482,7 @@ func TestOAuthRevokeEndpoint(t *testing.T) {
 		}
 
 		// Verify client secret was revoked by trying to get another token
-		retryResponse := makeOAuthTokenRequest(t, baseURL, "client_credentials", tokenPayload, "")
+		retryResponse := makeOAuthTokenRequest(t, testEnv.baseURL, "client_credentials", tokenPayload, "")
 		defer retryResponse.Body.Close()
 
 		if retryResponse.StatusCode != http.StatusUnauthorized {
@@ -502,7 +496,7 @@ func TestOAuthRevokeEndpoint(t *testing.T) {
 			"email":    "revoke@oauth.test",
 			"password": "password123",
 		}
-		loginResponse := makeLoginRequest(t, baseURL, loginPayload)
+		loginResponse := makeLoginRequest(t, testEnv.baseURL, loginPayload)
 		defer loginResponse.Body.Close()
 
 		if loginResponse.StatusCode != http.StatusOK {
@@ -528,7 +522,7 @@ func TestOAuthRevokeEndpoint(t *testing.T) {
 		}
 
 		// Test revoke with valid refresh token
-		revokeResponse := makeOAuthRevokeRequest(t, baseURL, nil, refreshTokenCookie.Value)
+		revokeResponse := makeOAuthRevokeRequest(t, testEnv.baseURL, nil, refreshTokenCookie.Value)
 		defer revokeResponse.Body.Close()
 
 		if revokeResponse.StatusCode != http.StatusOK {
@@ -536,7 +530,7 @@ func TestOAuthRevokeEndpoint(t *testing.T) {
 		}
 
 		// Verify refresh token was revoked by trying to use it
-		retryResponse := makeOAuthTokenRequest(t, baseURL, "refresh_token", nil, refreshTokenCookie.Value)
+		retryResponse := makeOAuthTokenRequest(t, testEnv.baseURL, "refresh_token", nil, refreshTokenCookie.Value)
 		defer retryResponse.Body.Close()
 
 		if retryResponse.StatusCode != http.StatusUnauthorized {

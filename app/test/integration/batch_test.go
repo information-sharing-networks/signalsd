@@ -22,7 +22,7 @@ import (
 
 func TestBatchLifecycle(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupCleanDatabase(t, ctx)
+	testDB := setupTestDatabase(t)
 
 	queries := database.New(testDB)
 

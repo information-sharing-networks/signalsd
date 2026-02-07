@@ -20,7 +20,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
-	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/handlers"
 )
@@ -135,14 +134,11 @@ func makeUserRegistrationRequest(t *testing.T, baseURL string, requestBody userD
 // TestServiceAccountRegistration tests the POST /api/auth/service-accounts/register endpoint
 func TestServiceAccountRegistration(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupCleanDatabase(t, ctx)
-	testEnv := setupTestEnvironment(testDB)
 	publicBaseURL := "https://testserver.com"
 
 	// Start server
-	testURL := getDatabaseURL()
-	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, publicBaseURL)
-	defer stopServer()
+	testEnv := startInProcessServer(t, publicBaseURL)
+	defer testEnv.shutdown()
 
 	t.Log("Creating test data...")
 
@@ -184,7 +180,7 @@ func TestServiceAccountRegistration(t *testing.T) {
 		}
 		for _, tt := range testCases {
 			t.Run(tt.name, func(t *testing.T) {
-				response := makeServiceAccountRegRequest(t, baseURL, tt.token, tt.requestBody)
+				response := makeServiceAccountRegRequest(t, testEnv.baseURL, tt.token, tt.requestBody)
 				defer response.Body.Close()
 
 				if response.StatusCode != tt.expectedStatus {
@@ -227,7 +223,7 @@ func TestServiceAccountRegistration(t *testing.T) {
 	})
 	t.Run("setup_url test", func(t *testing.T) {
 		requestBody := serviceAccountDetails{"Urltest Organization", "email@example.com"}
-		response := makeServiceAccountRegRequest(t, baseURL, ownerToken, requestBody)
+		response := makeServiceAccountRegRequest(t, testEnv.baseURL, ownerToken, requestBody)
 		defer response.Body.Close()
 		if response.StatusCode != http.StatusCreated {
 			t.Fatalf("Expected status %d, got %d", http.StatusCreated, response.StatusCode)
@@ -276,7 +272,7 @@ func TestServiceAccountRegistration(t *testing.T) {
 		}
 		for _, tt := range testCases {
 			t.Run(tt.name, func(t *testing.T) {
-				response := makeServiceAccountRegRequest(t, baseURL, tt.token, tt.requestBody)
+				response := makeServiceAccountRegRequest(t, testEnv.baseURL, tt.token, tt.requestBody)
 				defer response.Body.Close()
 
 				if response.StatusCode != tt.expectedStatus {
@@ -320,7 +316,7 @@ func TestServiceAccountRegistration(t *testing.T) {
 		}
 		for _, tt := range testCases {
 			t.Run(tt.name, func(t *testing.T) {
-				response := makeServiceAccountRegRequest(t, baseURL, tt.token, tt.requestBody)
+				response := makeServiceAccountRegRequest(t, testEnv.baseURL, tt.token, tt.requestBody)
 				defer response.Body.Close()
 
 				if response.StatusCode != tt.expectedStatus {
@@ -346,14 +342,11 @@ func TestServiceAccountRegistration(t *testing.T) {
 
 func TestServiceAccountReissue(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupCleanDatabase(t, ctx)
-	testEnv := setupTestEnvironment(testDB)
 	publicBaseURL := "https://testserver.com"
 
 	// Start server
-	testURL := getDatabaseURL()
-	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, publicBaseURL)
-	defer stopServer()
+	testEnv := startInProcessServer(t, publicBaseURL)
+	defer testEnv.shutdown()
 
 	t.Log("Creating test data...")
 
@@ -369,7 +362,7 @@ func TestServiceAccountReissue(t *testing.T) {
 
 	adminServiceAccountDetails := serviceAccountDetails{"Admin Organization", "admin@example.com"}
 
-	response := makeServiceAccountRegRequest(t, baseURL, adminToken, adminServiceAccountDetails)
+	response := makeServiceAccountRegRequest(t, testEnv.baseURL, adminToken, adminServiceAccountDetails)
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusCreated {
@@ -395,7 +388,7 @@ func TestServiceAccountReissue(t *testing.T) {
 
 	t.Run("setup_url format", func(t *testing.T) {
 
-		response := makeServiceAccountReissueRequest(t, baseURL, ownerToken, requestBody)
+		response := makeServiceAccountReissueRequest(t, testEnv.baseURL, ownerToken, requestBody)
 		defer response.Body.Close()
 
 		if response.StatusCode != http.StatusOK {
@@ -443,7 +436,7 @@ func TestServiceAccountReissue(t *testing.T) {
 		}
 		for _, tt := range testCases {
 			t.Run(tt.name, func(t *testing.T) {
-				response := makeServiceAccountReissueRequest(t, baseURL, tt.token, requestBody)
+				response := makeServiceAccountReissueRequest(t, testEnv.baseURL, tt.token, requestBody)
 				defer response.Body.Close()
 
 				if response.StatusCode != tt.expectedStatus {
@@ -504,13 +497,10 @@ func makeServiceAccountReissueRequest(t *testing.T, baseURL, token string, reque
 // TestUserLogin tests the POST /api/auth/login endpoint
 func TestUserLogin(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupCleanDatabase(t, ctx)
-	testEnv := setupTestEnvironment(testDB)
 
 	// Start server
-	testURL := getDatabaseURL()
-	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, "")
-	defer stopServer()
+	testEnv := startInProcessServer(t, "")
+	defer testEnv.shutdown()
 
 	t.Log("Creating test data...")
 
@@ -555,7 +545,7 @@ func TestUserLogin(t *testing.T) {
 		}
 		for _, tt := range testCases {
 			t.Run(tt.name, func(t *testing.T) {
-				response := makeUserLoginRequest(t, baseURL, tt.requestBody)
+				response := makeUserLoginRequest(t, testEnv.baseURL, tt.requestBody)
 				defer response.Body.Close()
 
 				if response.StatusCode != tt.expectedStatus {
@@ -669,7 +659,7 @@ func TestUserLogin(t *testing.T) {
 		}
 		for _, tt := range testCases {
 			t.Run(tt.name, func(t *testing.T) {
-				response := makeUserLoginRequest(t, baseURL, tt.requestBody)
+				response := makeUserLoginRequest(t, testEnv.baseURL, tt.requestBody)
 				defer response.Body.Close()
 
 				if response.StatusCode != tt.expectedStatus {
@@ -723,7 +713,7 @@ func TestUserLogin(t *testing.T) {
 		}
 		for _, tt := range testCases {
 			t.Run(tt.name, func(t *testing.T) {
-				response := makeUserLoginRequest(t, baseURL, tt.requestBody)
+				response := makeUserLoginRequest(t, testEnv.baseURL, tt.requestBody)
 				defer response.Body.Close()
 
 				if response.StatusCode != tt.expectedStatus {
@@ -759,7 +749,7 @@ func TestUserLogin(t *testing.T) {
 		}
 
 		t.Run("disabled_account_cannot_login", func(t *testing.T) {
-			response := makeUserLoginRequest(t, baseURL, loginDetails{"disabled@login.test", disabledPassword})
+			response := makeUserLoginRequest(t, testEnv.baseURL, loginDetails{"disabled@login.test", disabledPassword})
 			defer response.Body.Close()
 
 			if response.StatusCode != http.StatusUnauthorized {
@@ -785,13 +775,10 @@ func TestUserLogin(t *testing.T) {
 // TestUserRegistration tests the POST /api/auth/register endpoint
 func TestUserRegistration(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupCleanDatabase(t, ctx)
-	testEnv := setupTestEnvironment(testDB)
 
 	// Start server
-	testURL := getDatabaseURL()
-	baseURL, stopServer := startInProcessServer(t, ctx, testEnv.dbConn, testURL, "")
-	defer stopServer()
+	testEnv := startInProcessServer(t, "")
+	defer testEnv.shutdown()
 
 	t.Log("Testing user registration endpoint...")
 
@@ -820,7 +807,7 @@ func TestUserRegistration(t *testing.T) {
 		}
 		for _, tt := range testCases {
 			t.Run(tt.name, func(t *testing.T) {
-				response := makeUserRegistrationRequest(t, baseURL, tt.requestBody)
+				response := makeUserRegistrationRequest(t, testEnv.baseURL, tt.requestBody)
 				defer response.Body.Close()
 
 				if response.StatusCode != tt.expectedStatus {
@@ -871,7 +858,7 @@ func TestUserRegistration(t *testing.T) {
 	t.Run("duplicate email tests", func(t *testing.T) {
 		// First, register a user
 		firstUser := userDetails{"duplicate@example.com", "validpassword123"}
-		response := makeUserRegistrationRequest(t, baseURL, firstUser)
+		response := makeUserRegistrationRequest(t, testEnv.baseURL, firstUser)
 		response.Body.Close()
 
 		if response.StatusCode != http.StatusCreated {
@@ -896,7 +883,7 @@ func TestUserRegistration(t *testing.T) {
 		}
 		for _, tt := range testCases {
 			t.Run(tt.name, func(t *testing.T) {
-				response := makeUserRegistrationRequest(t, baseURL, tt.requestBody)
+				response := makeUserRegistrationRequest(t, testEnv.baseURL, tt.requestBody)
 				defer response.Body.Close()
 
 				if response.StatusCode != tt.expectedStatus {
@@ -962,7 +949,7 @@ func TestUserRegistration(t *testing.T) {
 		}
 		for _, tt := range testCases {
 			t.Run(tt.name, func(t *testing.T) {
-				response := makeUserRegistrationRequest(t, baseURL, tt.requestBody)
+				response := makeUserRegistrationRequest(t, testEnv.baseURL, tt.requestBody)
 				defer response.Body.Close()
 
 				if response.StatusCode != tt.expectedStatus {
@@ -1008,7 +995,7 @@ func TestUserRegistration(t *testing.T) {
 
 	t.Run("malformed request tests", func(t *testing.T) {
 		t.Run("invalid_json", func(t *testing.T) {
-			requestURL := fmt.Sprintf("%s/api/auth/register", baseURL)
+			requestURL := fmt.Sprintf("%s/api/auth/register", testEnv.baseURL)
 
 			// Send malformed JSON
 			req, err := http.NewRequest("POST", requestURL, strings.NewReader("{invalid json"))
@@ -1054,24 +1041,20 @@ func TestUserRegistration(t *testing.T) {
 
 func TestPasswordResetFlow(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupCleanDatabase(t, ctx)
-	queries := database.New(testDB)
-	authService := auth.NewAuthService(testServerConfig.secretKey, testServerConfig.environment, queries)
 	publicBaseURL := "https://testserver.com"
 
-	// Create test accounts
-	adminAccount := createTestAccount(t, ctx, queries, "admin", "user", "admin@example.com")
-	userAccount := createTestAccount(t, ctx, queries, "member", "user", "user@example.com")
-
 	// Start test server
-	testURL := getDatabaseURL()
-	baseURL, stopServer := startInProcessServer(t, ctx, testDB, testURL, publicBaseURL)
-	defer stopServer()
+	testEnv := startInProcessServer(t, publicBaseURL)
+	defer testEnv.shutdown()
+
+	// Create test accounts
+	adminAccount := createTestAccount(t, ctx, testEnv.queries, "admin", "user", "admin@example.com")
+	userAccount := createTestAccount(t, ctx, testEnv.queries, "member", "user", "user@example.com")
 
 	t.Run("non admin cannot generate reset link", func(t *testing.T) {
-		userToken := getAccessToken(t, authService, userAccount.ID)
+		userToken := getAccessToken(t, testEnv.authService, userAccount.ID)
 
-		url := fmt.Sprintf("%s/api/admin/users/%s/generate-password-reset-link", baseURL, userAccount.ID)
+		url := fmt.Sprintf("%s/api/admin/users/%s/generate-password-reset-link", testEnv.baseURL, userAccount.ID)
 		req, err := http.NewRequest("POST", url, nil)
 		if err != nil {
 			t.Fatalf("Failed to create request: %v", err)
@@ -1092,10 +1075,10 @@ func TestPasswordResetFlow(t *testing.T) {
 	// 1. Admin generates password reset link
 	t.Run("Admin generates password reset link", func(t *testing.T) {
 		// Get admin access token
-		adminToken := getAccessToken(t, authService, adminAccount.ID)
+		adminToken := getAccessToken(t, testEnv.authService, adminAccount.ID)
 
 		// Generate password reset link
-		url := fmt.Sprintf("%s/api/admin/users/%s/generate-password-reset-link", baseURL, userAccount.ID)
+		url := fmt.Sprintf("%s/api/admin/users/%s/generate-password-reset-link", testEnv.baseURL, userAccount.ID)
 		req, err := http.NewRequest("POST", url, nil)
 		if err != nil {
 			t.Fatalf("Failed to create request: %v", err)
@@ -1142,7 +1125,7 @@ func TestPasswordResetFlow(t *testing.T) {
 
 		// 2: User visits reset link (GET) - should render HTML form
 		t.Run("User visits reset link", func(t *testing.T) {
-			resetURL := fmt.Sprintf("%s/api/auth/password-reset/%s", baseURL, tokenID)
+			resetURL := fmt.Sprintf("%s/api/auth/password-reset/%s", testEnv.baseURL, tokenID)
 			resp, err := http.Get(resetURL)
 			if err != nil {
 				t.Fatalf("Failed to get reset form: %v", err)
@@ -1188,7 +1171,7 @@ func TestPasswordResetFlow(t *testing.T) {
 				t.Fatalf("Failed to marshal request: %v", err)
 			}
 
-			resetURL := fmt.Sprintf("%s/api/auth/password-reset/%s", baseURL, tokenID)
+			resetURL := fmt.Sprintf("%s/api/auth/password-reset/%s", testEnv.baseURL, tokenID)
 			req, err := http.NewRequest("POST", resetURL, bytes.NewBuffer(requestBody))
 			if err != nil {
 				t.Fatalf("Failed to create request: %v", err)
@@ -1217,7 +1200,7 @@ func TestPasswordResetFlow(t *testing.T) {
 					t.Fatalf("Failed to marshal login request: %v", err)
 				}
 
-				loginURL := fmt.Sprintf("%s/api/auth/login", baseURL)
+				loginURL := fmt.Sprintf("%s/api/auth/login", testEnv.baseURL)
 				req, err := http.NewRequest("POST", loginURL, bytes.NewBuffer(requestBody))
 				if err != nil {
 					t.Fatalf("Failed to create login request: %v", err)
@@ -1256,7 +1239,7 @@ func TestPasswordResetFlow(t *testing.T) {
 					t.Fatalf("Failed to marshal request: %v", err)
 				}
 
-				resetURL := fmt.Sprintf("%s/api/auth/password-reset/%s", baseURL, tokenID)
+				resetURL := fmt.Sprintf("%s/api/auth/password-reset/%s", testEnv.baseURL, tokenID)
 				req, err := http.NewRequest("POST", resetURL, bytes.NewBuffer(requestBody))
 				if err != nil {
 					t.Fatalf("Failed to create request: %v", err)
@@ -1282,21 +1265,17 @@ func TestPasswordResetFlow(t *testing.T) {
 // This tests the PUT /api/auth/password/reset endpoint when called by an authenticated user
 func TestSelfServePasswordChange(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupCleanDatabase(t, ctx)
-	queries := database.New(testDB)
-	authService := auth.NewAuthService(testServerConfig.secretKey, testServerConfig.environment, queries)
 
 	// Start test server
-	testURL := getDatabaseURL()
-	baseURL, stopServer := startInProcessServer(t, ctx, testDB, testURL, "")
-	defer stopServer()
+	testEnv := startInProcessServer(t, "")
+	defer testEnv.shutdown()
 
 	t.Run("successful password change with correct current password", func(t *testing.T) {
 		// Create test user
 		userPassword := "original-password-123"
 		userEmail := "user1@password.test"
-		userAccount := createTestUserWithPassword(t, ctx, queries, authService, "member", userEmail, userPassword)
-		userToken := getAccessToken(t, authService, userAccount.ID)
+		userAccount := createTestUserWithPassword(t, ctx, testEnv.queries, testEnv.authService, "member", userEmail, userPassword)
+		userToken := getAccessToken(t, testEnv.authService, userAccount.ID)
 		newPassword := "new-secure-password-456"
 		changeRequest := map[string]string{
 			"current_password": userPassword,
@@ -1308,7 +1287,7 @@ func TestSelfServePasswordChange(t *testing.T) {
 			t.Fatalf("Failed to marshal request: %v", err)
 		}
 
-		url := fmt.Sprintf("%s/api/auth/password/reset", baseURL)
+		url := fmt.Sprintf("%s/api/auth/password/reset", testEnv.baseURL)
 		req, err := http.NewRequest("PUT", url, bytes.NewBuffer(requestBody))
 		if err != nil {
 			t.Fatalf("Failed to create request: %v", err)
@@ -1338,7 +1317,7 @@ func TestSelfServePasswordChange(t *testing.T) {
 				t.Fatalf("Failed to marshal login request: %v", err)
 			}
 
-			loginURL := fmt.Sprintf("%s/api/auth/login", baseURL)
+			loginURL := fmt.Sprintf("%s/api/auth/login", testEnv.baseURL)
 			req, err := http.NewRequest("POST", loginURL, bytes.NewBuffer(requestBody))
 			if err != nil {
 				t.Fatalf("Failed to create login request: %v", err)
@@ -1368,7 +1347,7 @@ func TestSelfServePasswordChange(t *testing.T) {
 				t.Fatalf("Failed to marshal login request: %v", err)
 			}
 
-			loginURL := fmt.Sprintf("%s/api/auth/login", baseURL)
+			loginURL := fmt.Sprintf("%s/api/auth/login", testEnv.baseURL)
 			req, err := http.NewRequest("POST", loginURL, bytes.NewBuffer(requestBody))
 			if err != nil {
 				t.Fatalf("Failed to create login request: %v", err)
@@ -1391,8 +1370,8 @@ func TestSelfServePasswordChange(t *testing.T) {
 		// Create fresh test user for this test
 		userPassword := "original-password-456"
 		userEmail := "user2@password.test"
-		userAccount := createTestUserWithPassword(t, ctx, queries, authService, "member", userEmail, userPassword)
-		userToken := getAccessToken(t, authService, userAccount.ID)
+		userAccount := createTestUserWithPassword(t, ctx, testEnv.queries, testEnv.authService, "member", userEmail, userPassword)
+		userToken := getAccessToken(t, testEnv.authService, userAccount.ID)
 
 		wrongPassword := "wrong-password-xyz"
 		newPassword := "another-new-password-789"
@@ -1406,7 +1385,7 @@ func TestSelfServePasswordChange(t *testing.T) {
 			t.Fatalf("Failed to marshal request: %v", err)
 		}
 
-		url := fmt.Sprintf("%s/api/auth/password/reset", baseURL)
+		url := fmt.Sprintf("%s/api/auth/password/reset", testEnv.baseURL)
 		req, err := http.NewRequest("PUT", url, bytes.NewBuffer(requestBody))
 		if err != nil {
 			t.Fatalf("Failed to create request: %v", err)
@@ -1436,7 +1415,7 @@ func TestSelfServePasswordChange(t *testing.T) {
 				t.Fatalf("Failed to marshal login request: %v", err)
 			}
 
-			loginURL := fmt.Sprintf("%s/api/auth/login", baseURL)
+			loginURL := fmt.Sprintf("%s/api/auth/login", testEnv.baseURL)
 			req, err := http.NewRequest("POST", loginURL, bytes.NewBuffer(requestBody))
 			if err != nil {
 				t.Fatalf("Failed to create login request: %v", err)
@@ -1466,7 +1445,7 @@ func TestSelfServePasswordChange(t *testing.T) {
 			t.Fatalf("Failed to marshal request: %v", err)
 		}
 
-		url := fmt.Sprintf("%s/api/auth/password/reset", baseURL)
+		url := fmt.Sprintf("%s/api/auth/password/reset", testEnv.baseURL)
 		req, err := http.NewRequest("PUT", url, bytes.NewBuffer(requestBody))
 		if err != nil {
 			t.Fatalf("Failed to create request: %v", err)
@@ -1489,8 +1468,8 @@ func TestSelfServePasswordChange(t *testing.T) {
 		// Create fresh test user for this test
 		userPassword := "original-password-789"
 		userEmail := "user3@password.test"
-		userAccount := createTestUserWithPassword(t, ctx, queries, authService, "member", userEmail, userPassword)
-		userToken := getAccessToken(t, authService, userAccount.ID)
+		userAccount := createTestUserWithPassword(t, ctx, testEnv.queries, testEnv.authService, "member", userEmail, userPassword)
+		userToken := getAccessToken(t, testEnv.authService, userAccount.ID)
 
 		testCases := []struct {
 			name           string
@@ -1530,7 +1509,7 @@ func TestSelfServePasswordChange(t *testing.T) {
 					t.Fatalf("Failed to marshal request: %v", err)
 				}
 
-				url := fmt.Sprintf("%s/api/auth/password/reset", baseURL)
+				url := fmt.Sprintf("%s/api/auth/password/reset", testEnv.baseURL)
 				req, err := http.NewRequest("PUT", url, bytes.NewBuffer(requestBody))
 				if err != nil {
 					t.Fatalf("Failed to create request: %v", err)
@@ -1555,8 +1534,8 @@ func TestSelfServePasswordChange(t *testing.T) {
 		// Create fresh test user for this test
 		userPassword := "original-password-999"
 		userEmail := "user4@password.test"
-		userAccount := createTestUserWithPassword(t, ctx, queries, authService, "member", userEmail, userPassword)
-		userToken := getAccessToken(t, authService, userAccount.ID)
+		userAccount := createTestUserWithPassword(t, ctx, testEnv.queries, testEnv.authService, "member", userEmail, userPassword)
+		userToken := getAccessToken(t, testEnv.authService, userAccount.ID)
 
 		tooShortPassword := "short"
 		changeRequest := map[string]string{
@@ -1569,7 +1548,7 @@ func TestSelfServePasswordChange(t *testing.T) {
 			t.Fatalf("Failed to marshal request: %v", err)
 		}
 
-		url := fmt.Sprintf("%s/api/auth/password/reset", baseURL)
+		url := fmt.Sprintf("%s/api/auth/password/reset", testEnv.baseURL)
 		req, err := http.NewRequest("PUT", url, bytes.NewBuffer(requestBody))
 		if err != nil {
 			t.Fatalf("Failed to create request: %v", err)
