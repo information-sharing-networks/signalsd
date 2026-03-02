@@ -11,7 +11,7 @@ require (
 
 require (
 	github.com/Netflix/go-env v0.1.2
-	github.com/a-h/templ v0.3.977
+	github.com/a-h/templ v0.3.1001
 	github.com/alecthomas/chroma/v2 v2.23.1
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/jackc/pgx/v5 v5.8.0
