@@ -46,15 +46,6 @@ Run all the pre-commit checks using `make`:
 make check
 ```
 
-Or check each item individually:
-- [ ] Db migrations have been applied (`make migrate` or `goose up`)
-- [ ] Generated code is up to date (`make generate`)
-- [ ] Code is formatted (`make fmt` or `go fmt ./...`)
-- [ ] No linting errors (`make vet` or `go vet ./...`)
-- [ ] No security errors (`make lint` or `staticcheck ./...`)
-- [ ] No security vulnerabilities (`make security` or `gosec ./...`)
-- [ ] Tests pass (`make test` or `go test ./... && go test -v -tags=integration ./test/integration/`)
-
 ## Database Changes
 
 - Add migrations to `app/sql/schema/`

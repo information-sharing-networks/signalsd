@@ -118,8 +118,10 @@ jobs:
       - name: Install gosec
         run: go install github.com/securego/gosec/v2/cmd/gosec@latest
 
+      # exclude G120 - FormValue is used extensively in the UI handlers
+      # and the size is limited by MaxBytesReader middleware (not detected by gosec)
       - name: Run gosec
-        run: gosec -exclude-generated ./... 
+        run: gosec -exclude-generated -exclude=G120 ./... 
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4

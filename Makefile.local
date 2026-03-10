@@ -70,7 +70,7 @@ lint:
 # Run security analysis
 security:
 	@echo "🔄 Running security analysis..."
-	@cd app && gosec -exclude-generated ./...
+	@cd app && gosec -exclude-generated -exclude=G120 ./...
 
 # Run tests
 test:

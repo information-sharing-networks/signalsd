@@ -119,9 +119,12 @@ lint:
 	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && staticcheck ./..."
 
 # Run security analysis
+# exclude G120 - FormValue is used extensively in the UI handlers
+# and the size is limited by MaxBytesReader middleware (not detected by gosec)
+security:
 security:
 	@echo "🔄 Running security analysis..."
-	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && gosec -exclude-generated ./..."
+	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && gosec -exclude-generated -exclude=G120 ./..."
 
 
 # Run vulnerability scan
