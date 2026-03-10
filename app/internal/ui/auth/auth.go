@@ -145,7 +145,7 @@ func (a *AuthService) CheckAccessTokenStatus(accessTokenDetails *types.AccessTok
 func (a *AuthService) SetAuthCookies(w http.ResponseWriter, accessTokenDetails *types.AccessTokenDetails, refreshTokenCookie *http.Cookie) error {
 	isProdOrStaging := a.environment == "prod" || a.environment == "staging" //secure flag only true on prod and staging
 
-	accessTokenDetailsJSON, err := json.Marshal(accessTokenDetails)
+	accessTokenDetailsJSON, err := json.Marshal(accessTokenDetails) // #nosec G117 - legitimate API call, not logging secrets
 	if err != nil {
 		return fmt.Errorf("failed to marshal access token details: %w", err)
 	}

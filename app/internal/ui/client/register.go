@@ -17,7 +17,7 @@ func (c *Client) RegisterUser(email, password string) error {
 		Password: password,
 	}
 
-	jsonData, err := json.Marshal(registerReq)
+	jsonData, err := json.Marshal(registerReq) // #nosec G117 - legitimate API call, not logging secrets
 	if err != nil {
 		return NewClientInternalError(err, "marshaling registration request")
 	}

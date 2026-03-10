@@ -18,7 +18,7 @@ func (c *Client) Login(email, password string) (*types.AccessTokenDetails, *http
 		Password: password,
 	}
 
-	jsonData, err := json.Marshal(loginReq)
+	jsonData, err := json.Marshal(loginReq) // #nosec G117 - legitimate API call, not logging secrets
 	if err != nil {
 		return nil, nil, NewClientInternalError(err, "marshaling login request")
 	}
