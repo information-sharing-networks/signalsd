@@ -200,7 +200,7 @@ func (c *Client) UpdatePassword(accessToken, currentPassword, newPassword string
 		NewPassword:     newPassword,
 	}
 
-	jsonData, err := json.Marshal(updatePasswordReq)
+	jsonData, err := json.Marshal(updatePasswordReq) // #nosec G117 - legitimate API call, not logging secrets
 	if err != nil {
 		return NewClientInternalError(err, "marshaling update password request")
 	}

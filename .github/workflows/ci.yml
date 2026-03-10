@@ -46,7 +46,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.25.4"
+          go-version-file: app/go.mod
           cache: true                                
           cache-dependency-path: app/go.sum    
 
@@ -74,7 +74,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.25.4"
+          go-version-file: app/go.mod
           cache: true                                
           cache-dependency-path: app/go.sum    
 
@@ -108,7 +108,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.25.4"
+          go-version-file: app/go.mod
           cache: true                                
           cache-dependency-path: app/go.sum    
 
@@ -118,8 +118,10 @@ jobs:
       - name: Install gosec
         run: go install github.com/securego/gosec/v2/cmd/gosec@latest
 
+      # exclude G120 - FormValue is used extensively in the UI handlers
+      # and the size is limited by MaxBytesReader middleware (not detected by gosec)
       - name: Run gosec
-        run: gosec -exclude-generated ./... 
+        run: gosec -exclude-generated -exclude=G120 ./... 
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4

@@ -98,7 +98,7 @@ the simplest approach to get a dev environment is to to use the included Docker 
 **Prerequisites**:
 The following must be installed on your system
 - [Docker Desktop](https://docs.docker.com/get-docker)
-- [Go 1.25.4 or above](https://go.dev/doc/install)
+- [Go](https://go.dev/doc/install)
 
 Clone the repo:
 ```bash
@@ -252,7 +252,7 @@ if you do not want to use Docker, you need to install the following dependencies
 
 ### Prerequisites
 Install the following:
-- Go 1.25.4 or above
+- Go (latest version)
 - PostgreSQL@17 or above
 
 ### Go Development tools

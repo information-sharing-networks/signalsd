@@ -54,6 +54,12 @@ type ServiceAccountDetails struct {
 	ClientOrganization string    `json:"client_organization" example:"Example Organization"`
 }
 
+type AccountStatusResponse struct {
+	AccountID   uuid.UUID `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
+	AccountType string    `json:"account_type" example:"user" enums:"user,service-account"`
+	Status      string    `json:"status" example:"disabled" enums:"enabled,disabled"`
+}
+
 // ResetHandler godoc
 //
 //	@Summary		reset
@@ -308,8 +314,12 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte(fmt.Sprintf("account %v (type %s) disabled", accountID, account.AccountType)))
+	response := AccountStatusResponse{
+		AccountID:   accountID,
+		AccountType: account.AccountType,
+		Status:      "disabled",
+	}
+	responses.RespondWithJSON(w, http.StatusOK, response)
 }
 
 // EnableAccountHandler godoc
@@ -388,8 +398,12 @@ func (a *AdminHandler) EnableAccountHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte(fmt.Sprintf("account %v (type %s) enabled", accountID, account.AccountType)))
+	response := AccountStatusResponse{
+		AccountID:   accountID,
+		AccountType: account.AccountType,
+		Status:      "enabled",
+	}
+	responses.RespondWithJSON(w, http.StatusOK, response)
 }
 
 // GetUsersHandler godoc

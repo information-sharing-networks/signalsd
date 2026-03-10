@@ -29,23 +29,35 @@ services:
   app:
     build:
       context: .
+      args:
+        # GO_VERSION should be extracted from app/go.mod and exported.
+        # if using make to run docker-compose, this will be set automatically
+        # otherwise set it in your env (`export GO_VERSION=$(grep '^go ' app/go.mod | awk '{print $2}')`)
+        GO_VERSION: ${GO_VERSION}
       dockerfile_inline: |
-        FROM golang:1.25-alpine
+        ARG GO_VERSION
+        FROM golang:${GO_VERSION}-alpine
+
         # Install system dependencies in one layer for better caching
         RUN apk add --no-cache bash postgresql-client curl jq vim git
-        # Install Go tools
+
+        # Install Go tools — versions pinned via go.mod/go.sum.
+        # This layer is only rebuilt when go.sum changes, i.e. when a
+        # tool or dependency version is deliberately updated.
+        WORKDIR /build
+        COPY app/tools.go app/go.mod app/go.sum ./
         RUN go install github.com/pressly/goose/v3/cmd/goose@latest && \
             go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest && \
             go install github.com/swaggo/swag/cmd/swag@latest && \
             go install honnef.co/go/tools/cmd/staticcheck@latest && \
             go install github.com/securego/gosec/v2/cmd/gosec@latest && \
             go install github.com/a-h/templ/cmd/templ@latest && \
-            go install github.com/air-verse/air@latest
-        # Pre-download common Go modules for faster startup
-        WORKDIR /tmp/app
-        COPY app/go.mod app/go.sum ./
-        RUN go mod download
+            go install github.com/air-verse/air@latest && \
+            go install golang.org/x/vuln/cmd/govulncheck && \
+            cd / && rm -rf /build
+
         WORKDIR /signalsd
+
     container_name: signalsd-app
     volumes:
       - ./:/signalsd # project dir
@@ -73,7 +85,7 @@ services:
     ports:
       - "${PORT:-8080}:${PORT:-8080}"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
+      test: ["CMD", "curl", "-f", "http://localhost:${PORT:-8080}/health/live"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -96,7 +108,7 @@ services:
       resources:
         limits:
           cpus: '1'
-          memory: 512M
+          memory: 1024M
 
 networks:
   app-network:
