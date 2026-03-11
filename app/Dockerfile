@@ -4,8 +4,11 @@
 # - CA root certificates: Go's crypto/x509 package includes embedded root certificates for TLS connections (required by signald when it validates JSON schemas from github)
 # - Timezone data: Go's time/tzdata package can embed timezone data when needed (not required for signalsd)
 # - Static compilation (CGO_ENABLED=0) ensures all dependencies are embedded in the binary 
-#
-FROM golang:1.25-alpine AS builder
+
+
+# GO version is replaced by the github workflow with the version in app/go.mod
+ARG GO_VERSION
+FROM golang:${GO_VERSION}-alpine AS builder
 
 WORKDIR /app
 
@@ -17,6 +20,7 @@ RUN go mod download
 COPY app .
 
 RUN mkdir runtime
+
 
 # placeholder args for version info
 ARG VERSION=dev
