@@ -22,22 +22,19 @@ import (
 
 func TestBatchLifecycle(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupTestDatabase(t)
-
-	queries := database.New(testDB)
-
+	testEnv := startInProcessServer(t, "")
 	// Create test data
 	t.Log("Creating test data...")
 
 	// Create owner account and ISN
-	ownerAccount := createTestAccount(t, ctx, queries, "owner", "user", "owner@batch-test.com")
-	testISN := createTestISN(t, ctx, queries, "batch-test-isn", "Batch Test ISN", ownerAccount.ID, "private")
+	ownerAccount := createTestAccount(t, ctx, testEnv.queries, "owner", "user", "owner@batch-test.com")
+	testISN := createTestISN(t, ctx, testEnv.queries, "batch-test-isn", "Batch Test ISN", ownerAccount.ID, "private")
 
 	// Create service account
-	serviceAccount := createTestAccount(t, ctx, queries, "member", "service_account", "service@batch-test.com")
+	serviceAccount := createTestAccount(t, ctx, testEnv.queries, "member", "service_account", "service@batch-test.com")
 
 	// Grant ISN permission
-	_, err := queries.CreateIsnAccount(ctx, database.CreateIsnAccountParams{
+	_, err := testEnv.queries.CreateIsnAccount(ctx, database.CreateIsnAccountParams{
 		IsnID:      testISN.ID,
 		AccountID:  serviceAccount.ID,
 		Permission: "write",
@@ -47,7 +44,7 @@ func TestBatchLifecycle(t *testing.T) {
 	}
 
 	// Create signal type for testing
-	_, err = queries.CreateSignalType(ctx, database.CreateSignalTypeParams{
+	_, err = testEnv.queries.CreateSignalType(ctx, database.CreateSignalTypeParams{
 		IsnID:         testISN.ID,
 		Slug:          "batch-test-signal",
 		SchemaURL:     testSchemaURL,
@@ -63,7 +60,7 @@ func TestBatchLifecycle(t *testing.T) {
 
 	t.Run("service account signal submission without batch fails", func(t *testing.T) {
 		// Create auth service
-		authService := auth.NewAuthService(testServerConfig.secretKey, testServerConfig.environment, queries)
+		authService := auth.NewAuthService(testEnv.cfg.SecretKey, testEnv.cfg.Environment, testEnv.queries)
 
 		// Create access token for service account (should have no batch ID)
 		ctx := auth.ContextWithAccountID(context.Background(), serviceAccount.ID)
@@ -90,13 +87,13 @@ func TestBatchLifecycle(t *testing.T) {
 
 	t.Run("service account can create initial batch", func(t *testing.T) {
 		// Verify no batch exists initially
-		initialBatch := getLatestBatchForAccountAndISN(t, ctx, queries, serviceAccount.ID, testISN.Slug)
+		initialBatch := getLatestBatchForAccountAndISN(t, ctx, testEnv.queries, serviceAccount.ID, testISN.Slug)
 		if initialBatch != nil {
 			t.Errorf("Expected no initial batch, got batch ID %v", initialBatch.ID)
 		}
 
 		// Create first batch
-		batch1, err := queries.CreateSignalBatch(ctx, database.CreateSignalBatchParams{
+		batch1, err := testEnv.queries.CreateSignalBatch(ctx, database.CreateSignalBatchParams{
 			IsnID:     testISN.ID,
 			AccountID: serviceAccount.ID,
 		})
@@ -105,10 +102,10 @@ func TestBatchLifecycle(t *testing.T) {
 		}
 
 		// Verify batch was created and is latest
-		assertBatchState(t, ctx, queries, batch1.ID, true)
+		assertBatchState(t, ctx, testEnv.queries, batch1.ID, true)
 
 		// Verify batch appears as the latest batch for this account/ISN
-		latestBatch := getLatestBatchForAccountAndISN(t, ctx, queries, serviceAccount.ID, testISN.Slug)
+		latestBatch := getLatestBatchForAccountAndISN(t, ctx, testEnv.queries, serviceAccount.ID, testISN.Slug)
 		if latestBatch == nil {
 			t.Fatal("Expected to find latest batch after creation")
 		}
@@ -122,14 +119,14 @@ func TestBatchLifecycle(t *testing.T) {
 
 	t.Run("creating second batch closes previous batch", func(t *testing.T) {
 		// Get the current latest batch
-		currentBatch := getLatestBatchForAccountAndISN(t, ctx, queries, serviceAccount.ID, testISN.Slug)
+		currentBatch := getLatestBatchForAccountAndISN(t, ctx, testEnv.queries, serviceAccount.ID, testISN.Slug)
 		if currentBatch == nil {
 			t.Fatal("Expected existing batch from previous test")
 		}
 		firstBatchID := currentBatch.ID
 
 		// Close any existing batches (simulating the CreateSignalsBatchHandler behavior)
-		_, err := queries.CloseISNSignalBatchByAccountID(ctx, database.CloseISNSignalBatchByAccountIDParams{
+		_, err := testEnv.queries.CloseISNSignalBatchByAccountID(ctx, database.CloseISNSignalBatchByAccountIDParams{
 			IsnID:     testISN.ID,
 			AccountID: serviceAccount.ID,
 		})
@@ -138,7 +135,7 @@ func TestBatchLifecycle(t *testing.T) {
 		}
 
 		// Create second batch
-		batch2, err := queries.CreateSignalBatch(ctx, database.CreateSignalBatchParams{
+		batch2, err := testEnv.queries.CreateSignalBatch(ctx, database.CreateSignalBatchParams{
 			IsnID:     testISN.ID,
 			AccountID: serviceAccount.ID,
 		})
@@ -147,13 +144,13 @@ func TestBatchLifecycle(t *testing.T) {
 		}
 
 		// Verify first batch is no longer latest
-		assertBatchState(t, ctx, queries, firstBatchID, false)
+		assertBatchState(t, ctx, testEnv.queries, firstBatchID, false)
 
 		// Verify second batch is latest
-		assertBatchState(t, ctx, queries, batch2.ID, true)
+		assertBatchState(t, ctx, testEnv.queries, batch2.ID, true)
 
 		// Verify only the second batch appears as the latest batch
-		latestBatch := getLatestBatchForAccountAndISN(t, ctx, queries, serviceAccount.ID, testISN.Slug)
+		latestBatch := getLatestBatchForAccountAndISN(t, ctx, testEnv.queries, serviceAccount.ID, testISN.Slug)
 		if latestBatch == nil {
 			t.Fatal("Expected to find latest batch after second batch creation")
 		}

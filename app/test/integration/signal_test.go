@@ -28,354 +28,6 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 )
 
-func (env *testEnv) createAuthToken(t *testing.T, accountID uuid.UUID) string {
-	ctx := auth.ContextWithAccountID(context.Background(), accountID)
-	tokenResponse, err := env.authService.CreateAccessToken(ctx)
-	if err != nil {
-		t.Fatalf("Failed to create access token: %v", err)
-	}
-	return tokenResponse.AccessToken
-}
-
-type testSignalEndpoint struct {
-	isnSlug          string
-	signalTypeSlug   string
-	signalTypeSemVer string
-}
-
-// createValidSignalPayload creates json valid for https://github.com/information-sharing-networks/signalsd_test_schemas/blob/main/2025.05.13/integration-test-schema.json
-func createValidSignalPayload(localRef string) map[string]any {
-	return map[string]any{
-		"signals": []map[string]any{
-			{
-				"local_ref": localRef,
-				"content": map[string]any{
-					"test": "valid content for simple schema",
-				},
-			},
-		},
-	}
-}
-
-func createValidSignalPayloadWithCorrelatedID(localRef string, correlationID string) map[string]any {
-	return map[string]any{
-		"signals": []map[string]any{
-			{
-				"local_ref":      localRef,
-				"correlation_id": correlationID,
-				"content": map[string]any{
-					"test": "valid content for simple schema",
-				},
-			},
-		},
-	}
-}
-
-func createInvalidSignalPayload(localRef string) map[string]any {
-	return map[string]any{
-		"signals": []map[string]any{
-			{
-				"local_ref": localRef,
-				"content": map[string]any{
-					"invalid_field": "this should fail schema validation",
-					// Missing required "test" field
-				},
-			},
-		},
-	}
-}
-
-// createMultipleSignalsPayload creates a payload with multiple signals
-func createMultipleSignalsPayload(localRefs []string) map[string]any {
-	signals := make([]map[string]any, len(localRefs))
-	for i, ref := range localRefs {
-		signals[i] = map[string]any{
-			"local_ref": ref,
-			"content": map[string]any{
-				"test": fmt.Sprintf("signal content %d", i+1),
-			},
-		}
-	}
-	return map[string]any{
-		"signals": signals,
-	}
-}
-
-// createMultipleSignalsPayloadPartialFailure creates a payload with multiple signals, one of which will fail schema validation
-func createMultipleSignalsPayloadPartialFailure(localRefs []string) map[string]any {
-	signals := make([]map[string]any, len(localRefs))
-
-	for i, ref := range localRefs {
-		if i == 1 {
-			signals[i] = map[string]any{
-				"local_ref": ref,
-				"content": map[string]any{
-					"invalid_field": "this should fail schema validation",
-					// Missing required "test" field
-				},
-			}
-			continue
-		}
-		signals[i] = map[string]any{
-			"local_ref": ref,
-			"content": map[string]any{
-				"test": fmt.Sprintf("signal content %d", i+1),
-			},
-		}
-	}
-	return map[string]any{
-		"signals": signals,
-	}
-}
-
-// createEmptySignalsPayload creates a payload with empty signals array
-func createEmptySignalsPayload() map[string]any {
-	return map[string]any{
-		"signals": []map[string]any{},
-	}
-}
-
-// Helper function to validate response counts
-func validateResponseCounts(t *testing.T, auditTrail map[string]any, expectedStored, expectedFailed int, testName string) bool {
-	t.Helper()
-
-	summary, ok := auditTrail["summary"]
-	if !ok {
-		t.Errorf("Missing summary in response for %s", testName)
-		return false
-	}
-
-	summaryMap, ok := summary.(map[string]any)
-	if !ok {
-		t.Errorf("Summary is not a map for %s", testName)
-		return false
-	}
-
-	var countMismatch bool
-
-	// Verify stored_count
-	if storedCount, ok := summaryMap["stored_count"]; ok {
-		if storedCountFloat, ok := storedCount.(float64); ok {
-			actualStored := int(storedCountFloat)
-			if actualStored != expectedStored {
-				countMismatch = true
-				t.Errorf("Expected stored_count %d, got %d for %s", expectedStored, actualStored, testName)
-			}
-		} else {
-			countMismatch = true
-			t.Errorf("stored_count is not a number for %s", testName)
-		}
-	} else {
-		countMismatch = true
-		t.Errorf("Missing stored_count in summary for %s", testName)
-	}
-
-	// Verify failed_count
-	if failedCount, ok := summaryMap["failed_count"]; ok {
-		if failedCountFloat, ok := failedCount.(float64); ok {
-			actualFailed := int(failedCountFloat)
-			if actualFailed != expectedFailed {
-				countMismatch = true
-				t.Errorf("Expected failed_count %d, got %d for %s", expectedFailed, actualFailed, testName)
-			}
-		} else {
-			countMismatch = true
-			t.Errorf("failed_count is not a number for %s", testName)
-		}
-	} else {
-		countMismatch = true
-		t.Errorf("Missing failed_count in summary for %s", testName)
-	}
-
-	return countMismatch
-}
-
-// submitCreateSignalRequest submits a signal payload with authentication
-func submitCreateSignalRequest(t *testing.T, baseURL string, payload map[string]any, token string, endpoint testSignalEndpoint) *http.Response {
-	jsonPayload, err := json.Marshal(payload)
-	if err != nil {
-		t.Fatalf("Failed to marshal payload: %v", err)
-	}
-
-	url := fmt.Sprintf("%s/api/isn/%s/signal_types/%s/v%s/signals",
-		baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
-
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonPayload))
-	if err != nil {
-		t.Fatalf("Failed to create request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			DisableKeepAlives: true,
-			MaxIdleConns:      0,
-		},
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		t.Fatalf("Failed to submit signals: %v", err)
-	}
-
-	return resp
-}
-
-// searchPublicSignals searches for signals on public ISNs (no authentication required)
-func searchPublicSignals(t *testing.T, baseURL string, endpoint testSignalEndpoint) *http.Response {
-	url := fmt.Sprintf("%s/api/public/isn/%s/signal_types/%s/v%s/signals/search",
-		baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		t.Fatalf("Failed to create request: %v", err)
-	}
-
-	q := req.URL.Query()
-	now := time.Now()
-	oneHourAgo := now.Add(-1 * time.Hour)
-	oneHourFromNow := now.Add(1 * time.Hour)
-	q.Add("start_date", oneHourAgo.Format(time.RFC3339))
-	q.Add("end_date", oneHourFromNow.Format(time.RFC3339))
-	req.URL.RawQuery = q.Encode()
-
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			DisableKeepAlives: true,
-			MaxIdleConns:      0,
-		},
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		t.Fatalf("Failed to search public signals: %v", err)
-	}
-
-	return resp
-}
-
-// searchPrivateSignals searches for signals on private ISNs with optional correlated signals
-func searchPrivateSignals(t *testing.T, baseURL string, endpoint testSignalEndpoint, token string, includeWithdrawn bool, includeCorrelated bool, includePrevious bool) *http.Response {
-	url := fmt.Sprintf("%s/api/isn/%s/signal_types/%s/v%s/signals/search",
-		baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		t.Fatalf("Failed to create request: %v", err)
-	}
-
-	q := req.URL.Query()
-	now := time.Now()
-	oneHourAgo := now.Add(-1 * time.Hour)
-	oneHourFromNow := now.Add(1 * time.Hour)
-	q.Add("start_date", oneHourAgo.Format(time.RFC3339))
-	q.Add("end_date", oneHourFromNow.Format(time.RFC3339))
-
-	if includeWithdrawn {
-		q.Add("include_withdrawn", "true")
-	}
-
-	if includeCorrelated {
-		q.Add("include_correlated", "true")
-	}
-
-	if includePrevious {
-		q.Add("include_previous_versions", "true")
-	}
-
-	req.URL.RawQuery = q.Encode()
-
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			DisableKeepAlives: true,
-			MaxIdleConns:      0,
-		},
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		t.Fatalf("Failed to search private signals: %v", err)
-	}
-
-	return resp
-}
-
-// withdrawSignal withdraws a signal by local reference
-func withdrawSignal(t *testing.T, baseURL string, endpoint testSignalEndpoint, token, localRef string) *http.Response {
-	url := fmt.Sprintf("%s/api/isn/%s/signal_types/%s/v%s/signals/withdraw",
-		baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
-
-	withdrawRequest := map[string]string{
-		"local_ref": localRef,
-	}
-
-	jsonData, err := json.Marshal(withdrawRequest)
-	if err != nil {
-		t.Fatalf("Failed to marshal withdrawal request: %v", err)
-	}
-
-	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(jsonData))
-	if err != nil {
-		t.Fatalf("Failed to create withdrawal request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			DisableKeepAlives: true,
-			MaxIdleConns:      0,
-		},
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		t.Fatalf("Failed to withdraw signal: %v", err)
-	}
-
-	return resp
-}
-
-// get the id of the created signal (only works when one signal is submitted)
-func getSignalIDFromCreateSignalResponse(t *testing.T, response map[string]any) string {
-	t.Helper()
-
-	results, ok := response["results"].(map[string]any)
-	if !ok {
-		t.Fatal("Failed to get results from response")
-	}
-
-	storedSignals, ok := results["stored_signals"].([]any)
-	if !ok || len(storedSignals) == 0 {
-		t.Fatal("No stored signals in response")
-	}
-	if len(storedSignals) == 0 {
-		t.Fatal("No stored signals in response")
-	}
-
-	firstSignal, ok := storedSignals[0].(map[string]any)
-	if !ok {
-		t.Fatal("First stored signal is not a map")
-	}
-
-	signalID, ok := firstSignal["signal_id"].(string)
-	if !ok {
-		t.Fatal("Signal ID is not a string")
-	}
-
-	return signalID
-
-}
-
 // TestSignalSubmission tests the signal submission process end-to-end including:
 // - Successful signal submission by authorized users
 // - Authorization failures (missing/invalid/expired tokens)
@@ -540,7 +192,7 @@ func TestSignalSubmission(t *testing.T) {
 				var authToken string
 				if tt.customAuthToken == "EXPIRED_TOKEN" {
 					// Create an expired token for this account
-					authToken = createExpiredAccessToken(t, tt.accountID)
+					authToken = createExpiredAccessToken(t, tt.accountID, testEnv.cfg.SecretKey)
 				} else if tt.customAuthToken != "" {
 					authToken = tt.customAuthToken
 				} else if !tt.skipAuthToken {
@@ -1022,11 +674,7 @@ func TestIsInUseStatus(t *testing.T) {
 func TestSignalSearch(t *testing.T) {
 	ctx := context.Background()
 
-	// Setup database and environment without starting server yet
-	// This allows us to create test data before the server starts
-	// so the public ISN cache is populated correctly
-	testEnv := setupTestDatabaseAndEnv(t)
-	defer testEnv.shutdown()
+	testEnv := startInProcessServer(t, "")
 
 	// create test data:
 	//
@@ -1064,9 +712,6 @@ func TestSignalSearch(t *testing.T) {
 	adminToken := testEnv.createAuthToken(t, adminAccount.ID)
 	memberToken := testEnv.createAuthToken(t, memberAccount.ID)
 
-	// Now start the server after test data is created so the public ISN cache is populated
-	startServerWithEnv(t, testEnv)
-
 	// end point configs
 	ownerEndpoint := testSignalEndpoint{
 		isnSlug:          ownerISN.Slug,
@@ -1084,6 +729,11 @@ func TestSignalSearch(t *testing.T) {
 		isnSlug:          publicISN.Slug,
 		signalTypeSlug:   publicSignalType.Slug,
 		signalTypeSemVer: publicSignalType.SemVer,
+	}
+
+	// Refresh the public ISN cache to include the newly created public ISN
+	if err := testEnv.publicIsnCache.Refresh(ctx, testEnv.queries); err != nil {
+		t.Fatalf("Failed to refresh public ISN cache: %v", err)
 	}
 
 	// create owner ISN signal
@@ -1218,7 +868,7 @@ func TestSignalSearch(t *testing.T) {
 		},
 		{
 			name:            "expired_token_rejected",
-			requesterToken:  createExpiredAccessToken(t, adminAccount.ID),
+			requesterToken:  createExpiredAccessToken(t, adminAccount.ID, testEnv.cfg.SecretKey),
 			targetEndpoint:  adminEndpoint,
 			expectedStatus:  http.StatusUnauthorized,
 			expectedSignals: 0,
@@ -1542,4 +1192,352 @@ func TestCorrelatedAndPreviousVersionsSearch(t *testing.T) {
 		}
 
 	})
+}
+
+func (env *testEnv) createAuthToken(t *testing.T, accountID uuid.UUID) string {
+	ctx := auth.ContextWithAccountID(context.Background(), accountID)
+	tokenResponse, err := env.authService.CreateAccessToken(ctx)
+	if err != nil {
+		t.Fatalf("Failed to create access token: %v", err)
+	}
+	return tokenResponse.AccessToken
+}
+
+type testSignalEndpoint struct {
+	isnSlug          string
+	signalTypeSlug   string
+	signalTypeSemVer string
+}
+
+// createValidSignalPayload creates json valid for https://github.com/information-sharing-networks/signalsd_test_schemas/blob/main/2025.05.13/integration-test-schema.json
+func createValidSignalPayload(localRef string) map[string]any {
+	return map[string]any{
+		"signals": []map[string]any{
+			{
+				"local_ref": localRef,
+				"content": map[string]any{
+					"test": "valid content for simple schema",
+				},
+			},
+		},
+	}
+}
+
+func createValidSignalPayloadWithCorrelatedID(localRef string, correlationID string) map[string]any {
+	return map[string]any{
+		"signals": []map[string]any{
+			{
+				"local_ref":      localRef,
+				"correlation_id": correlationID,
+				"content": map[string]any{
+					"test": "valid content for simple schema",
+				},
+			},
+		},
+	}
+}
+
+func createInvalidSignalPayload(localRef string) map[string]any {
+	return map[string]any{
+		"signals": []map[string]any{
+			{
+				"local_ref": localRef,
+				"content": map[string]any{
+					"invalid_field": "this should fail schema validation",
+					// Missing required "test" field
+				},
+			},
+		},
+	}
+}
+
+// createMultipleSignalsPayload creates a payload with multiple signals
+func createMultipleSignalsPayload(localRefs []string) map[string]any {
+	signals := make([]map[string]any, len(localRefs))
+	for i, ref := range localRefs {
+		signals[i] = map[string]any{
+			"local_ref": ref,
+			"content": map[string]any{
+				"test": fmt.Sprintf("signal content %d", i+1),
+			},
+		}
+	}
+	return map[string]any{
+		"signals": signals,
+	}
+}
+
+// createMultipleSignalsPayloadPartialFailure creates a payload with multiple signals, one of which will fail schema validation
+func createMultipleSignalsPayloadPartialFailure(localRefs []string) map[string]any {
+	signals := make([]map[string]any, len(localRefs))
+
+	for i, ref := range localRefs {
+		if i == 1 {
+			signals[i] = map[string]any{
+				"local_ref": ref,
+				"content": map[string]any{
+					"invalid_field": "this should fail schema validation",
+					// Missing required "test" field
+				},
+			}
+			continue
+		}
+		signals[i] = map[string]any{
+			"local_ref": ref,
+			"content": map[string]any{
+				"test": fmt.Sprintf("signal content %d", i+1),
+			},
+		}
+	}
+	return map[string]any{
+		"signals": signals,
+	}
+}
+
+// createEmptySignalsPayload creates a payload with empty signals array
+func createEmptySignalsPayload() map[string]any {
+	return map[string]any{
+		"signals": []map[string]any{},
+	}
+}
+
+// Helper function to validate response counts
+func validateResponseCounts(t *testing.T, auditTrail map[string]any, expectedStored, expectedFailed int, testName string) bool {
+	t.Helper()
+
+	summary, ok := auditTrail["summary"]
+	if !ok {
+		t.Errorf("Missing summary in response for %s", testName)
+		return false
+	}
+
+	summaryMap, ok := summary.(map[string]any)
+	if !ok {
+		t.Errorf("Summary is not a map for %s", testName)
+		return false
+	}
+
+	var countMismatch bool
+
+	// Verify stored_count
+	if storedCount, ok := summaryMap["stored_count"]; ok {
+		if storedCountFloat, ok := storedCount.(float64); ok {
+			actualStored := int(storedCountFloat)
+			if actualStored != expectedStored {
+				countMismatch = true
+				t.Errorf("Expected stored_count %d, got %d for %s", expectedStored, actualStored, testName)
+			}
+		} else {
+			countMismatch = true
+			t.Errorf("stored_count is not a number for %s", testName)
+		}
+	} else {
+		countMismatch = true
+		t.Errorf("Missing stored_count in summary for %s", testName)
+	}
+
+	// Verify failed_count
+	if failedCount, ok := summaryMap["failed_count"]; ok {
+		if failedCountFloat, ok := failedCount.(float64); ok {
+			actualFailed := int(failedCountFloat)
+			if actualFailed != expectedFailed {
+				countMismatch = true
+				t.Errorf("Expected failed_count %d, got %d for %s", expectedFailed, actualFailed, testName)
+			}
+		} else {
+			countMismatch = true
+			t.Errorf("failed_count is not a number for %s", testName)
+		}
+	} else {
+		countMismatch = true
+		t.Errorf("Missing failed_count in summary for %s", testName)
+	}
+
+	return countMismatch
+}
+
+// submitCreateSignalRequest submits a signal payload with authentication
+func submitCreateSignalRequest(t *testing.T, baseURL string, payload map[string]any, token string, endpoint testSignalEndpoint) *http.Response {
+	jsonPayload, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("Failed to marshal payload: %v", err)
+	}
+
+	url := fmt.Sprintf("%s/api/isn/%s/signal_types/%s/v%s/signals",
+		baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
+
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonPayload))
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+			MaxIdleConns:      0,
+		},
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("Failed to submit signals: %v", err)
+	}
+
+	return resp
+}
+
+// searchPublicSignals searches for signals on public ISNs (no authentication required)
+func searchPublicSignals(t *testing.T, baseURL string, endpoint testSignalEndpoint) *http.Response {
+	url := fmt.Sprintf("%s/api/public/isn/%s/signal_types/%s/v%s/signals/search",
+		baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+
+	q := req.URL.Query()
+	now := time.Now()
+	oneHourAgo := now.Add(-1 * time.Hour)
+	oneHourFromNow := now.Add(1 * time.Hour)
+	q.Add("start_date", oneHourAgo.Format(time.RFC3339))
+	q.Add("end_date", oneHourFromNow.Format(time.RFC3339))
+	req.URL.RawQuery = q.Encode()
+
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+			MaxIdleConns:      0,
+		},
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("Failed to search public signals: %v", err)
+	}
+
+	return resp
+}
+
+// searchPrivateSignals searches for signals on private ISNs with optional correlated signals
+func searchPrivateSignals(t *testing.T, baseURL string, endpoint testSignalEndpoint, token string, includeWithdrawn bool, includeCorrelated bool, includePrevious bool) *http.Response {
+	url := fmt.Sprintf("%s/api/isn/%s/signal_types/%s/v%s/signals/search",
+		baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+
+	q := req.URL.Query()
+	now := time.Now()
+	oneHourAgo := now.Add(-1 * time.Hour)
+	oneHourFromNow := now.Add(1 * time.Hour)
+	q.Add("start_date", oneHourAgo.Format(time.RFC3339))
+	q.Add("end_date", oneHourFromNow.Format(time.RFC3339))
+
+	if includeWithdrawn {
+		q.Add("include_withdrawn", "true")
+	}
+
+	if includeCorrelated {
+		q.Add("include_correlated", "true")
+	}
+
+	if includePrevious {
+		q.Add("include_previous_versions", "true")
+	}
+
+	req.URL.RawQuery = q.Encode()
+
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+			MaxIdleConns:      0,
+		},
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("Failed to search private signals: %v", err)
+	}
+
+	return resp
+}
+
+// withdrawSignal withdraws a signal by local reference
+func withdrawSignal(t *testing.T, baseURL string, endpoint testSignalEndpoint, token, localRef string) *http.Response {
+	url := fmt.Sprintf("%s/api/isn/%s/signal_types/%s/v%s/signals/withdraw",
+		baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
+
+	withdrawRequest := map[string]string{
+		"local_ref": localRef,
+	}
+
+	jsonData, err := json.Marshal(withdrawRequest)
+	if err != nil {
+		t.Fatalf("Failed to marshal withdrawal request: %v", err)
+	}
+
+	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		t.Fatalf("Failed to create withdrawal request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+			MaxIdleConns:      0,
+		},
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("Failed to withdraw signal: %v", err)
+	}
+
+	return resp
+}
+
+// get the id of the created signal (only works when one signal is submitted)
+func getSignalIDFromCreateSignalResponse(t *testing.T, response map[string]any) string {
+	t.Helper()
+
+	results, ok := response["results"].(map[string]any)
+	if !ok {
+		t.Fatal("Failed to get results from response")
+	}
+
+	storedSignals, ok := results["stored_signals"].([]any)
+	if !ok || len(storedSignals) == 0 {
+		t.Fatal("No stored signals in response")
+	}
+	if len(storedSignals) == 0 {
+		t.Fatal("No stored signals in response")
+	}
+
+	firstSignal, ok := storedSignals[0].(map[string]any)
+	if !ok {
+		t.Fatal("First stored signal is not a map")
+	}
+
+	signalID, ok := firstSignal["signal_id"].(string)
+	if !ok {
+		t.Fatal("Signal ID is not a string")
+	}
+
+	return signalID
+
 }

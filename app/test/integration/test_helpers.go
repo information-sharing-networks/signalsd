@@ -2,19 +2,63 @@
 
 package integration
 
-// database helpers
 import (
 	"context"
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
+	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/utils"
 	"github.com/jackc/pgx/v5"
 )
+
+const (
+
+	// Test signal type
+	testSignalTypeDetail = "Simple test signal type for integration tests"
+	testSchemaURL        = "https://github.com/information-sharing-networks/signalsd_test_schemas/blob/main/2025.05.13/integration-test-schema.json"
+	testReadmeURL        = "https://github.com/information-sharing-networks/signalsd_test_schemas/blob/main/2025.05.13/README.md"
+	testSchemaContent    = `{"type": "object", "properties": {"test": {"type": "string"}}, "required": ["test"], "additionalProperties": false }`
+)
+
+// createExpiredAccessToken creates an expired JWT access token for testing purposes
+func createExpiredAccessToken(t *testing.T, accountID uuid.UUID, secretKey string) string {
+	t.Helper()
+
+	// Create JWT claims with expired timestamp
+	issuedAt := time.Now().Add(-2 * time.Hour)  // 2 hours ago
+	expiresAt := time.Now().Add(-1 * time.Hour) // 1 hour ago (expired)
+
+	claims := auth.Claims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Subject:   accountID.String(),
+			IssuedAt:  jwt.NewNumericDate(issuedAt),
+			ExpiresAt: jwt.NewNumericDate(expiresAt),
+			Issuer:    signalsd.TokenIssuerName,
+		},
+		AccountID:   accountID,
+		AccountType: "user",
+		Role:        "member",
+		IsnPerms:    make(map[string]auth.IsnPerms),
+	}
+
+	// Create and sign the token using the same secret key as the auth service
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signedToken, err := token.SignedString([]byte(secretKey))
+	if err != nil {
+		t.Fatalf("Failed to create expired access token: %v", err)
+	}
+
+	return signedToken
+}
+
+// database helpers
 
 // createTestAccount creates entries in account and user/service_account tables
 func createTestAccount(t *testing.T, ctx context.Context, queries *database.Queries, role, accountType string, email string) database.GetAccountByIDRow {

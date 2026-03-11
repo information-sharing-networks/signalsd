@@ -34,37 +34,36 @@ import (
 // - JWT token creation
 func TestPermissions(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupTestDatabase(t)
+	testEnv := startInProcessServer(t, "")
+	defer testEnv.shutdown()
 
-	queries := database.New(testDB)
-
-	authService := auth.NewAuthService(testServerConfig.secretKey, testServerConfig.environment, queries)
+	authService := auth.NewAuthService(testEnv.cfg.SecretKey, testEnv.cfg.Environment, testEnv.queries)
 
 	// Create test accounts
-	ownerAccount := createTestAccount(t, ctx, queries, "owner", "user", "owner@gmail.com")
-	adminAccount := createTestAccount(t, ctx, queries, "admin", "user", "admin@gmail.com")
-	memberAccount := createTestAccount(t, ctx, queries, "member", "user", "member@gmail.com")
-	serviceAccount := createTestAccount(t, ctx, queries, "member", "service_account", "service@gmail.com")
+	ownerAccount := createTestAccount(t, ctx, testEnv.queries, "owner", "user", "owner@gmail.com")
+	adminAccount := createTestAccount(t, ctx, testEnv.queries, "admin", "user", "admin@gmail.com")
+	memberAccount := createTestAccount(t, ctx, testEnv.queries, "member", "user", "member@gmail.com")
+	serviceAccount := createTestAccount(t, ctx, testEnv.queries, "member", "service_account", "service@gmail.com")
 
 	// Create ISNs
-	ownerISN := createTestISN(t, ctx, queries, "owner-isn", "Owner ISN", ownerAccount.ID, "private")
-	adminISN := createTestISN(t, ctx, queries, "admin-isn", "Admin ISN", adminAccount.ID, "private")
-	publicISN := createTestISN(t, ctx, queries, "public-isn", "Public ISN", adminAccount.ID, "public")
+	ownerISN := createTestISN(t, ctx, testEnv.queries, "owner-isn", "Owner ISN", ownerAccount.ID, "private")
+	adminISN := createTestISN(t, ctx, testEnv.queries, "admin-isn", "Admin ISN", adminAccount.ID, "private")
+	publicISN := createTestISN(t, ctx, testEnv.queries, "public-isn", "Public ISN", adminAccount.ID, "public")
 
 	// Create signal types
-	_ = createTestSignalType(t, ctx, queries, ownerISN.ID, "owner ISN signal", "1.0.0")
-	_ = createTestSignalType(t, ctx, queries, adminISN.ID, "admin ISN signal", "1.0.0")
-	_ = createTestSignalType(t, ctx, queries, publicISN.ID, "public ISN signal", "1.0.0")
+	_ = createTestSignalType(t, ctx, testEnv.queries, ownerISN.ID, "owner ISN signal", "1.0.0")
+	_ = createTestSignalType(t, ctx, testEnv.queries, adminISN.ID, "admin ISN signal", "1.0.0")
+	_ = createTestSignalType(t, ctx, testEnv.queries, publicISN.ID, "public ISN signal", "1.0.0")
 
 	// Grant permission to ISNs
 	// note there is no need to  grant permissions to owners (automatically get write access to all isns)
 	// ... or admins (automatically get write access to their own isns)
-	grantPermission(t, ctx, queries, adminISN.ID, memberAccount.ID, "read")
-	grantPermission(t, ctx, queries, publicISN.ID, serviceAccount.ID, "write")
+	grantPermission(t, ctx, testEnv.queries, adminISN.ID, memberAccount.ID, "read")
+	grantPermission(t, ctx, testEnv.queries, publicISN.ID, serviceAccount.ID, "write")
 
 	// Create signal batches
 	// note only service accounts need to create batches explicitly - user accounts automatically create batches when they write to an isn
-	createTestSignalBatch(t, ctx, queries, publicISN.ID, serviceAccount.ID)
+	createTestSignalBatch(t, ctx, testEnv.queries, publicISN.ID, serviceAccount.ID)
 
 	var validSignalTypePaths = make(map[string]string)
 
@@ -79,7 +78,7 @@ func TestPermissions(t *testing.T) {
 			"admin-isn":  "write",
 			"public-isn": "write",
 		}
-		checkPermissions(t, authService, ownerAccount.ID, "user", "owner", expectedPerms, validSignalTypePaths)
+		checkPermissions(t, authService, ownerAccount.ID, "user", "owner", expectedPerms, validSignalTypePaths, testEnv.cfg.SecretKey)
 	})
 
 	t.Run("admin role permissions", func(t *testing.T) {
@@ -88,7 +87,7 @@ func TestPermissions(t *testing.T) {
 			"admin-isn":  "write",
 			"public-isn": "write",
 		}
-		checkPermissions(t, authService, adminAccount.ID, "user", "admin", expectedPerms, validSignalTypePaths)
+		checkPermissions(t, authService, adminAccount.ID, "user", "admin", expectedPerms, validSignalTypePaths, testEnv.cfg.SecretKey)
 	})
 
 	t.Run("member role permissions", func(t *testing.T) {
@@ -96,7 +95,7 @@ func TestPermissions(t *testing.T) {
 		expectedPerms := map[string]string{
 			"admin-isn": "read",
 		}
-		checkPermissions(t, authService, memberAccount.ID, "user", "member", expectedPerms, validSignalTypePaths)
+		checkPermissions(t, authService, memberAccount.ID, "user", "member", expectedPerms, validSignalTypePaths, testEnv.cfg.SecretKey)
 	})
 
 	t.Run("service account permissions", func(t *testing.T) {
@@ -104,7 +103,7 @@ func TestPermissions(t *testing.T) {
 		expectedPerms := map[string]string{
 			"public-isn": "write",
 		}
-		checkPermissions(t, authService, serviceAccount.ID, "service_account", "member", expectedPerms, validSignalTypePaths)
+		checkPermissions(t, authService, serviceAccount.ID, "service_account", "member", expectedPerms, validSignalTypePaths, testEnv.cfg.SecretKey)
 	})
 
 	t.Run("error handling ", func(t *testing.T) {
@@ -133,7 +132,14 @@ func TestPermissions(t *testing.T) {
 
 // checkPermissions is a helper that tests the permissions for a given account
 // tests are done on the struct returned from CreateAccessToken and the parsed JWT token
-func checkPermissions(t *testing.T, authService *auth.AuthService, accountID uuid.UUID, accountType string, expectedRole string, expectedPerms map[string]string, validSignalTypePaths map[string]string) {
+func checkPermissions(t *testing.T,
+	authService *auth.AuthService,
+	accountID uuid.UUID,
+	accountType string,
+	expectedRole string,
+	expectedPerms map[string]string,
+	validSignalTypePaths map[string]string,
+	secretKey string) {
 	t.Helper()
 
 	ctx := auth.ContextWithAccountID(context.Background(), accountID)
@@ -197,7 +203,7 @@ func checkPermissions(t *testing.T, authService *auth.AuthService, accountID uui
 	// parse the claims (confirms signature and structure)
 	claims := &auth.Claims{}
 	_, err = jwt.ParseWithClaims(response.AccessToken, claims, func(token *jwt.Token) (any, error) {
-		return []byte(testServerConfig.secretKey), nil
+		return []byte(secretKey), nil
 	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 	if err != nil {
 		t.Fatalf("Failed to parse JWT token: %v", err)
@@ -295,10 +301,10 @@ func createClientSecret(t *testing.T, ctx context.Context, queries *database.Que
 // note this is a very slow test as it has to hash the passwords for each sub-test
 func TestLoginAuth(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupTestDatabase(t)
+	testEnv := startInProcessServer(t, "")
+	defer testEnv.shutdown()
 
-	queries := database.New(testDB)
-	authService := auth.NewAuthService(testServerConfig.secretKey, testServerConfig.environment, queries)
+	authService := auth.NewAuthService(testEnv.cfg.SecretKey, testEnv.cfg.Environment, testEnv.queries)
 
 	// Create test accounts with real hashed passwords
 
@@ -330,9 +336,9 @@ func TestLoginAuth(t *testing.T) {
 	}
 
 	// Create test users
-	ownerAccount := createTestUserWithPassword(t, ctx, queries, authService, ownerTestLogin.role, ownerTestLogin.email, ownerTestLogin.password)
-	memberAccount := createTestUserWithPassword(t, ctx, queries, authService, memberTestLogin.role, memberTestLogin.email, memberTestLogin.password)
-	adminAccount := createTestUserWithPassword(t, ctx, queries, authService, adminTestLogin.role, adminTestLogin.email, adminTestLogin.password)
+	ownerAccount := createTestUserWithPassword(t, ctx, testEnv.queries, authService, ownerTestLogin.role, ownerTestLogin.email, ownerTestLogin.password)
+	memberAccount := createTestUserWithPassword(t, ctx, testEnv.queries, authService, memberTestLogin.role, memberTestLogin.email, memberTestLogin.password)
+	adminAccount := createTestUserWithPassword(t, ctx, testEnv.queries, authService, adminTestLogin.role, adminTestLogin.email, adminTestLogin.password)
 
 	t.Run("login attempts", func(t *testing.T) {
 		tests := []struct {
@@ -405,7 +411,7 @@ func TestLoginAuth(t *testing.T) {
 
 				ctx = auth.ContextWithAccountID(ctx, tt.expectedAccountID)
 
-				user, err := queries.GetUserByEmail(ctx, tt.email)
+				user, err := testEnv.queries.GetUserByEmail(ctx, tt.email)
 				if err != nil {
 					t.Fatalf("Failed to get user by email: %v", err)
 				}
@@ -452,7 +458,7 @@ func TestLoginAuth(t *testing.T) {
 
 				// check the refresh token is in the database
 				hashedToken := authService.HashToken(refreshToken)
-				refreshTokenRow, err := queries.GetRefreshToken(ctx, hashedToken)
+				refreshTokenRow, err := testEnv.queries.GetRefreshToken(ctx, hashedToken)
 				if err != nil {
 					t.Fatalf("GetRefreshToken failed: %v", err)
 				}
@@ -477,15 +483,14 @@ func TestLoginAuth(t *testing.T) {
 // - Failed authentication with invalid credentials, expired credentials, revoked credentials
 func TestClientCredentialsAuth(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupTestDatabase(t)
-	queries := database.New(testDB)
-	authService := auth.NewAuthService(testServerConfig.secretKey, testServerConfig.environment, queries)
+	testEnv := startInProcessServer(t, "")
+	authService := auth.NewAuthService(testEnv.cfg.SecretKey, testEnv.cfg.Environment, testEnv.queries)
 
 	// Create test service account
-	serviceAccount := createTestAccount(t, ctx, queries, "member", "service_account", "service@client.com")
+	serviceAccount := createTestAccount(t, ctx, testEnv.queries, "member", "service_account", "service@client.com")
 
 	// Create client secret for service account
-	hashedClientSecret, err := createClientSecret(t, ctx, queries, authService, serviceAccount.ID, time.Now().Add(time.Hour))
+	hashedClientSecret, err := createClientSecret(t, ctx, testEnv.queries, authService, serviceAccount.ID, time.Now().Add(time.Hour))
 	if err != nil {
 		t.Fatalf("Failed to create client secret: %v", err)
 	}
@@ -501,7 +506,7 @@ func TestClientCredentialsAuth(t *testing.T) {
 		if accessTokenResponse.AccountID != serviceAccount.ID {
 			t.Errorf("Expected account ID %s, got %s from access token response", serviceAccount.ID, accessTokenResponse.AccountID)
 		}
-		dbClientSecret, err := queries.GetValidClientSecretByServiceAccountAccountId(ctx, serviceAccount.ID)
+		dbClientSecret, err := testEnv.queries.GetValidClientSecretByServiceAccountAccountId(ctx, serviceAccount.ID)
 		if err != nil {
 			t.Fatalf("Failed to get client secret: %v", err)
 		}
@@ -511,22 +516,22 @@ func TestClientCredentialsAuth(t *testing.T) {
 	})
 
 	t.Run("revoked client secret should not authenticate", func(t *testing.T) {
-		_, err := queries.RevokeClientSecret(ctx, hashedClientSecret)
+		_, err := testEnv.queries.RevokeClientSecret(ctx, hashedClientSecret)
 		if err != nil {
 			t.Fatalf("Failed to revoke client secret: %v", err)
 		}
-		_, err = queries.GetValidClientSecretByServiceAccountAccountId(ctx, serviceAccount.ID)
+		_, err = testEnv.queries.GetValidClientSecretByServiceAccountAccountId(ctx, serviceAccount.ID)
 		if err == nil {
 			t.Errorf("Expected error when trying to retrieve revoked client secret, got none")
 		}
 	})
 
 	t.Run("expired client secret fails to authenticate", func(t *testing.T) {
-		_, err := createClientSecret(t, ctx, queries, authService, serviceAccount.ID, time.Now().Add(-time.Hour))
+		_, err := createClientSecret(t, ctx, testEnv.queries, authService, serviceAccount.ID, time.Now().Add(-time.Hour))
 		if err != nil {
 			t.Fatalf("Failed to create client secret: %v", err)
 		}
-		_, err = queries.GetValidClientSecretByServiceAccountAccountId(ctx, serviceAccount.ID)
+		_, err = testEnv.queries.GetValidClientSecretByServiceAccountAccountId(ctx, serviceAccount.ID)
 		if err == nil {
 			t.Error("Expected error when trying to retrieve expired client secret, got none")
 		}
@@ -541,44 +546,43 @@ func TestClientCredentialsAuth(t *testing.T) {
 //     - refresh tokens (users)
 func TestDisabledAccountAuth(t *testing.T) {
 	ctx := context.Background()
-	testDB := setupTestDatabase(t)
 
-	queries := database.New(testDB)
+	testEnv := startInProcessServer(t, "")
 
-	authService := auth.NewAuthService(testServerConfig.secretKey, testServerConfig.environment, queries)
+	authService := auth.NewAuthService(testEnv.cfg.SecretKey, testEnv.cfg.Environment, testEnv.queries)
 
 	// create test data
 	t.Log("Creating test data...")
 
-	ownerAccount := createTestAccount(t, ctx, queries, "owner", "user", "owner@caniuse.com")
+	ownerAccount := createTestAccount(t, ctx, testEnv.queries, "owner", "user", "owner@caniuse.com")
 
-	ownerISN := createTestISN(t, ctx, queries, "owner-correlated-isn", "Owner caniuse ISN", ownerAccount.ID, "private")
+	ownerISN := createTestISN(t, ctx, testEnv.queries, "owner-correlated-isn", "Owner caniuse ISN", ownerAccount.ID, "private")
 
-	memberAccount := createTestAccount(t, ctx, queries, "member", "user", "member@caniuse.com")
+	memberAccount := createTestAccount(t, ctx, testEnv.queries, "member", "user", "member@caniuse.com")
 
-	serviceAccount := createTestAccount(t, ctx, queries, "member", "service_account", "serviceaccount@caniuse.com")
+	serviceAccount := createTestAccount(t, ctx, testEnv.queries, "member", "service_account", "serviceaccount@caniuse.com")
 
 	// Create client secret for service account
-	_, err := createClientSecret(t, ctx, queries, authService, serviceAccount.ID, time.Now().Add(time.Hour))
+	_, err := createClientSecret(t, ctx, testEnv.queries, authService, serviceAccount.ID, time.Now().Add(time.Hour))
 	if err != nil {
 		t.Fatalf("Failed to create client secret: %v", err)
 	}
 
 	// grant members access to the isn
-	grantPermission(t, ctx, queries, ownerISN.ID, memberAccount.ID, "write")
-	grantPermission(t, ctx, queries, ownerISN.ID, serviceAccount.ID, "write")
+	grantPermission(t, ctx, testEnv.queries, ownerISN.ID, memberAccount.ID, "write")
+	grantPermission(t, ctx, testEnv.queries, ownerISN.ID, serviceAccount.ID, "write")
 
 	// note the authservice uses the accountID in the context to determine the account being accessed
 	ctx = auth.ContextWithAccountID(context.Background(), memberAccount.ID)
 	t.Run("disabled web user account access denied", func(t *testing.T) {
-		disableAccount(t, ctx, queries, memberAccount.ID)
+		disableAccount(t, ctx, testEnv.queries, memberAccount.ID)
 		_, err := authService.CreateAccessToken(ctx)
 		if err == nil {
 			t.Errorf("disabled web user account %v was allowed to create an access token ", memberAccount.ID)
 		}
 
 		// check the user's refresh token was revoked
-		count, err := queries.CountActiveRefreshTokens(ctx, memberAccount.ID)
+		count, err := testEnv.queries.CountActiveRefreshTokens(ctx, memberAccount.ID)
 		if err != nil {
 			t.Fatalf("failed to query refresh_tokens for web user: %v", err)
 		}
@@ -590,7 +594,7 @@ func TestDisabledAccountAuth(t *testing.T) {
 
 	t.Run("reinstated web user account allowed to create access token", func(t *testing.T) {
 
-		enableAccount(t, ctx, queries, memberAccount.ID)
+		enableAccount(t, ctx, testEnv.queries, memberAccount.ID)
 		_, err := authService.CreateAccessToken(ctx)
 		if err != nil {
 			t.Errorf("reinstated web user account %v was not allowed to create an access token ", memberAccount.ID)
@@ -601,14 +605,14 @@ func TestDisabledAccountAuth(t *testing.T) {
 	ctx = auth.ContextWithAccountID(context.Background(), serviceAccount.ID)
 
 	t.Run("disabled service account access denied", func(t *testing.T) {
-		disableAccount(t, ctx, queries, serviceAccount.ID)
+		disableAccount(t, ctx, testEnv.queries, serviceAccount.ID)
 		_, err := authService.CreateAccessToken(ctx)
 		if err == nil {
 			t.Errorf("disabled service account %v was allowed to create an access token ", serviceAccount.ID)
 		}
 
 		// check the client secret was revoked
-		count, err := queries.CountActiveClientSecrets(ctx, serviceAccount.ID)
+		count, err := testEnv.queries.CountActiveClientSecrets(ctx, serviceAccount.ID)
 		if err != nil {
 			t.Fatalf("failed to query client_secrets for web user: %v", err)
 		}
