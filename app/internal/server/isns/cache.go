@@ -22,7 +22,7 @@ func NewPublicIsnCache() *PublicIsnCache {
 }
 
 // Load loads public ISN slugs and their signal types from database into memory cache
-// This is called once at server startup
+// This is called at server startup
 func (p *PublicIsnCache) Load(ctx context.Context, queries *database.Queries) error {
 	return p.refresh(ctx, queries)
 }
