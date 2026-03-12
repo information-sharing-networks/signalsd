@@ -115,7 +115,7 @@ func TestRateLimitDisabled(t *testing.T) {
 			})
 
 			// Make 2 requests quickly
-			for i := 0; i < 2; i++ {
+			for i := range 2 {
 				req := httptest.NewRequest("GET", "/test", nil)
 				rr := httptest.NewRecorder()
 				router.ServeHTTP(rr, req)

@@ -83,7 +83,7 @@ func (a *AdminHandler) ResetHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte(fmt.Sprintf("%d accounts deleted", deletedAccountsCount)))
+	_, _ = w.Write(fmt.Appendf(nil, "%d accounts deleted", deletedAccountsCount))
 }
 
 // ReadinessHandler godoc
