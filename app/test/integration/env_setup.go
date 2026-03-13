@@ -277,8 +277,8 @@ func setupTestDatabase(t *testing.T) *pgxpool.Pool {
 		config = config.WithUser("postgres:postgres").
 			WithPort(5432)
 	} else {
-		config = config.WithUser("pint-dev").
-			WithPort(15433)
+		config = config.WithUser("signalsd-dev").
+			WithPort(15432)
 	}
 
 	// Generate a unique test database name
