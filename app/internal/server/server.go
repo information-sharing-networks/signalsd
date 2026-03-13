@@ -22,14 +22,34 @@ import (
 )
 
 type Server struct {
-	pool           *pgxpool.Pool
-	queries        *database.Queries
-	authService    *auth.AuthService
-	config         *signalsd.ServerEnvironment
-	corsConfigs    *signalsd.CORSConfigs
-	logger         *slog.Logger
-	router         *chi.Mux
-	schemaCache    *schemas.SchemaCache
+	// pool is the database connection pool
+	pool *pgxpool.Pool
+
+	// queries is the sqlc generated database queries
+	queries *database.Queries
+
+	// authService provides authentication and authorization services
+	authService *auth.AuthService
+
+	// config is the server environment configuration
+	config *signalsd.ServerEnvironment
+
+	// corsConfigs is the CORS configuration for the server - configured via the ALLOWED_ORIGINS environment variable
+	corsConfigs *signalsd.CORSConfigs
+
+	// logger is the server logger - used for application level logging - http request logging is handled by the RequestLogging middleware
+	logger *slog.Logger
+
+	// router is the HTTP router for the server
+	router *chi.Mux
+
+	// schemaCache is the JSON schema cache for signal types - used to validate incoming signals
+	// this schema cache auto refreshes when a new signal type is created
+	schemaCache *schemas.SchemaCache
+
+	// publicIsnCache is the cache of public ISNs and their signal types - used by the public signal search endpoint
+	// this cache is only initiated when the server is started - it is not dynamically loaded.
+	// use the Refresh method to reload the cache if you need to add a new public ISN while the server is running
 	publicIsnCache *isns.PublicIsnCache
 }
 

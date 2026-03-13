@@ -13,7 +13,7 @@ The integration tests are designed to ensure that signal data is handled correct
 **integration test helper files `app/test/integration/`:**
 
 - `setup_test_env.go` - Test environment setup and server lifecycle management
-- `database.go` - database query test helpers
+- `test_helpers.go` - database query test helpers
 
 ### 1. Authentication & Authorization (`auth_test.go`)
 
