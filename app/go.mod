@@ -5,8 +5,8 @@ go 1.26.1
 require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
-	golang.org/x/crypto v0.48.0
-	golang.org/x/text v0.34.0
+	golang.org/x/crypto v0.49.0
+	golang.org/x/text v0.35.0
 )
 
 require (
@@ -25,7 +25,7 @@ require (
 	github.com/sqlc-dev/sqlc v1.30.0
 	github.com/swaggo/swag v1.16.6
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20250803194717-c247dead11de
-	golang.org/x/time v0.14.0
+	golang.org/x/time v0.15.0
 	golang.org/x/vuln v1.1.4
 	honnef.co/go/tools v0.0.0-20190523083050-ea95bdfd59fc
 )
@@ -148,8 +148,8 @@ require (
 	golang.org/x/exp v0.0.0-20250819193227-8b4c13bb791b // indirect
 	golang.org/x/mod v0.33.0 // indirect
 	golang.org/x/net v0.51.0 // indirect
-	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
+	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/telemetry v0.0.0-20260209163413-e7419c687ee4 // indirect
 	golang.org/x/tools v0.42.0 // indirect
 	google.golang.org/genai v1.47.0 // indirect
