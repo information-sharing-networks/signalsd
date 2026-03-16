@@ -5,10 +5,28 @@
 
 version: 2
 updates:
-  - package-ecosystem: "gomod" # See documentation for possible values
-    directory: "/app" # Location of package manifests
+  - package-ecosystem: "gomod" 
+    directory: "/app" 
     schedule:
       interval: "weekly"
     commit-message:
       prefix: "deps"
       include: "scope"
+    open-pull-requests-limit: 10 
+    groups:
+      tools:
+        patterns:
+          - "golang.org/x/vuln"
+          - "honnef.co/go/tools/*"
+          - "github.com/a-h/templ/*"
+          - "github.com/air-verse/air"
+          - "github.com/pressly/goose/v3"
+          - "github.com/sqlc-dev/sqlc"
+          - "github.com/swaggo/swag"
+          - "github.com/securego/gosec/*"
+      golang-x:
+        patterns:
+          - "golang.org/x/*" 
+      dependencies:
+        patterns:
+          - "*"  
