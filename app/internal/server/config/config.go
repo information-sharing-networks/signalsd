@@ -95,11 +95,6 @@ var ValidAccountTypes = map[string]bool{ // accounts.account_type
 	"service-account": true,
 }
 
-var ValidISNPermissions = map[string]bool{ // isn_accounts.permission
-	"read":  true,
-	"write": true,
-}
-
 var ValidServiceModes = map[string]bool{ // service modes for CLI
 	"all":           true, // signalsd backend + embeded UI
 	"api":           true, // all the api endpoints (no UI)

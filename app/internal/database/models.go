@@ -41,12 +41,13 @@ type Isn struct {
 }
 
 type IsnAccount struct {
-	ID         uuid.UUID `json:"id"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
-	IsnID      uuid.UUID `json:"isn_id"`
-	AccountID  uuid.UUID `json:"account_id"`
-	Permission string    `json:"permission"`
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	IsnID     uuid.UUID `json:"isn_id"`
+	AccountID uuid.UUID `json:"account_id"`
+	CanRead   bool      `json:"can_read"`
+	CanWrite  bool      `json:"can_write"`
 }
 
 type LatestSignalVersion struct {

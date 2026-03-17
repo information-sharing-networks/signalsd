@@ -935,6 +935,28 @@ func (s *SignalsHandler) SearchPrivateSignalsHandler(w http.ResponseWriter, r *h
 		return
 	}
 
+	// Apply permission-based filtering for write-only accounts
+	// Write-only accounts can only see signals they created
+	accountID, _ := auth.ContextAccountID(r.Context())
+	isnPerms := claims.IsnPerms[searchParams.isnSlug]
+	if !isnPerms.CanRead && isnPerms.CanWrite {
+		// Build a set of signal IDs created by this account
+		createdSignalIDs := make(map[uuid.UUID]bool)
+		for _, signal := range returnedSignals {
+			if signal.AccountID == accountID {
+				createdSignalIDs[signal.SignalID] = true
+			}
+		}
+
+		filtered := make([]database.GetSignalsWithOptionalFiltersRow, 0, len(returnedSignals))
+		for _, signal := range returnedSignals {
+			if signal.AccountID == accountID {
+				filtered = append(filtered, signal)
+			}
+		}
+		returnedSignals = filtered
+	}
+
 	response := make([]SearchSignalWithCorrelationsAndVersions, 0, len(returnedSignals))
 
 	// the (optional) signal_versions and correlated_signals fields are populated using separte queries and then merged into the response

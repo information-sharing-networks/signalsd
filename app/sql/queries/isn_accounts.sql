@@ -5,14 +5,16 @@ INSERT INTO isn_accounts (
     updated_at,
     isn_id,
     account_id,
-    permission
-) VALUES (gen_random_uuid(), now(), now(), $1, $2, $3)
+    can_read,
+    can_write
+) VALUES (gen_random_uuid(), now(), now(), $1, $2, $3, $4)
 RETURNING *;
 
 -- name: UpdateIsnAccount :one
-UPDATE isn_accounts SET 
+UPDATE isn_accounts SET
     updated_at = now(),
-    permission = $3
+    can_read = $3,
+    can_write = $4
 WHERE isn_id =  $1
 AND account_id = $2
 RETURNING *;
@@ -46,7 +48,8 @@ SELECT
     ia.updated_at,
     ia.isn_id,
     ia.account_id,
-    ia.permission,
+    ia.can_read,
+    ia.can_write,
     a.account_type,
     a.is_active,
     COALESCE(u.email, sa.client_contact_email) AS email,

@@ -350,10 +350,10 @@ func (a *AuthService) RequireRole(allowedRoles ...string) func(http.Handler) htt
 	}
 }
 
-// RequireIsnPermission checks the access_token claims to ensure the account has one of the supplied permissions (read/write) for the ISN specified in the isn_slug URL parameter
+// RequireIsnPermission checks the access_token claims to ensure the account has one or both of the supplied permissions (read/write) for the ISN specified in the isn_slug URL parameter
 //
 // This middleware should only be used after RequireValidAccessToken middlware, which adds the claims in the context
-func (a *AuthService) RequireIsnPermission(allowedPermissions ...string) func(http.Handler) http.Handler {
+func (a *AuthService) RequireIsnPermission(permissions ...string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -369,18 +369,18 @@ func (a *AuthService) RequireIsnPermission(allowedPermissions ...string) func(ht
 				return
 			}
 
-			reqLogger := logger.ContextRequestLogger(r.Context())
+			perms, ok := claims.IsnPerms[isnSlug]
+			if !ok {
+				responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "account does not have access to this isn")
+				return
+			}
 
-			for _, permission := range allowedPermissions {
-				if claims.IsnPerms[isnSlug].Permission == permission {
-					// Log successful ISN permission check immediately
-					reqLogger.Debug("ISN permission check successful",
-						slog.String("component", "signalsd.RequireIsnPermission"),
-						slog.String("account_id", claims.AccountID.String()),
-						slog.String("permission", permission),
-						slog.String("isn_slug", isnSlug),
-					)
+			for _, permission := range permissions {
 
+				allowed := (permission == "read" && perms.CanRead) ||
+					(permission == "write" && perms.CanWrite)
+
+				if allowed {
 					// Add context for final request log
 					logger.ContextWithLogAttrs(r.Context(),
 						slog.String("isn_permission", permission),
@@ -396,6 +396,8 @@ func (a *AuthService) RequireIsnPermission(allowedPermissions ...string) func(ht
 			logger.ContextWithLogAttrs(r.Context(),
 				slog.String("forbidden_isn_slug", isnSlug),
 				slog.String("error", "account does not have the necessary access permission for this isn"),
+				slog.String("required_permissions", strings.Join(permissions, ", ")),
+				slog.String("has permissions", fmt.Sprintf("read: %v, write: %v", perms.CanRead, perms.CanWrite)),
 			)
 
 			responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you do not have the necessary access permission for this isn")

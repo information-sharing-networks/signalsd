@@ -1012,6 +1012,108 @@ func TestSignalSearch(t *testing.T) {
 	})
 }
 
+// TestWriteOnlyAccountVisibility tests that write-only accounts can only see signals they created
+func TestWriteOnlyAccountVisibility(t *testing.T) {
+	ctx := context.Background()
+
+	testEnv := startInProcessServer(t, "")
+	defer testEnv.shutdown()
+
+	t.Log("Creating test data...")
+
+	// Create two accounts with write-only permission
+	account1 := createTestAccount(t, ctx, testEnv.queries, "member", "user", "account1@writeonly.com")
+	account2 := createTestAccount(t, ctx, testEnv.queries, "member", "user", "account2@writeonly.com")
+
+	// Create a shared ISN
+	sharedISN := createTestISN(t, ctx, testEnv.queries, "shared-writeonly-isn", "Shared Write-Only ISN", account1.ID, "private")
+	signalType := createTestSignalType(t, ctx, testEnv.queries, sharedISN.ID, "shared signal type", "1.0.0")
+
+	// Grant write-only permission to both accounts
+	grantPermission(t, ctx, testEnv.queries, sharedISN.ID, account1.ID, "write")
+	grantPermission(t, ctx, testEnv.queries, sharedISN.ID, account2.ID, "write")
+
+	// Create tokens after granting permissions
+	token1 := testEnv.createAuthToken(t, account1.ID)
+	token2 := testEnv.createAuthToken(t, account2.ID)
+
+	endpoint := testSignalEndpoint{
+		isnSlug:          sharedISN.Slug,
+		signalTypeSlug:   signalType.Slug,
+		signalTypeSemVer: signalType.SemVer,
+	}
+
+	// Account 1 creates a signal
+	payload1 := createValidSignalPayload("account1-signal-001")
+	response1 := submitCreateSignalRequest(t, testEnv.baseURL, payload1, token1, endpoint)
+	defer response1.Body.Close()
+	if response1.StatusCode != http.StatusOK {
+		t.Fatalf("Account 1 failed to submit signal: %d", response1.StatusCode)
+	}
+
+	// Account 2 creates a signal
+	payload2 := createValidSignalPayload("account2-signal-001")
+	response2 := submitCreateSignalRequest(t, testEnv.baseURL, payload2, token2, endpoint)
+	defer response2.Body.Close()
+	if response2.StatusCode != http.StatusOK {
+		t.Fatalf("Account 2 failed to submit signal: %d", response2.StatusCode)
+	}
+
+	t.Run("write-only account can see own signals", func(t *testing.T) {
+		response := searchPrivateSignals(t, testEnv.baseURL, endpoint, token1, false, false, false)
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusOK {
+			t.Fatalf("Search failed: %d", response.StatusCode)
+		}
+
+		var signals []map[string]any
+		if err := json.NewDecoder(response.Body).Decode(&signals); err != nil {
+			t.Fatalf("Failed to decode response: %v", err)
+		}
+
+		// Account 1 should only see their own signal (1), not account 2's signal
+		if len(signals) != 1 {
+			t.Errorf("Expected 1 signal, got %d", len(signals))
+			return
+		}
+
+		// Verify it's the correct signal
+		if localRef, ok := signals[0]["local_ref"].(string); ok {
+			if localRef != "account1-signal-001" {
+				t.Errorf("Expected local_ref 'account1-signal-001', got '%s'", localRef)
+			}
+		}
+	})
+
+	t.Run("write-only account cannot see other accounts' signals", func(t *testing.T) {
+		response := searchPrivateSignals(t, testEnv.baseURL, endpoint, token2, false, false, false)
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusOK {
+			t.Fatalf("Search failed: %d", response.StatusCode)
+		}
+
+		var signals []map[string]any
+		if err := json.NewDecoder(response.Body).Decode(&signals); err != nil {
+			t.Fatalf("Failed to decode response: %v", err)
+		}
+
+		// Account 2 should only see their own signal (1), not account 1's signal
+		if len(signals) != 1 {
+			t.Errorf("Expected 1 signal, got %d", len(signals))
+			return
+		}
+
+		// Verify it's the correct signal
+		if localRef, ok := signals[0]["local_ref"].(string); ok {
+			if localRef != "account2-signal-001" {
+				t.Errorf("Expected local_ref 'account2-signal-001', got '%s'", localRef)
+			}
+		}
+	})
+}
+
 // TestCorrelatedAndPreviousVersionsSearch tests the include_correlated and include_previous_versions functionality
 func TestCorrelatedAndPreviousVersionsSearch(t *testing.T) {
 	ctx := context.Background()

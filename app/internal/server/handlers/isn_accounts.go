@@ -13,7 +13,6 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
-	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
 	"github.com/jackc/pgx/v5"
 )
@@ -27,7 +26,8 @@ func NewIsnAccountHandler(queries *database.Queries) *IsnAccountHandler {
 }
 
 type GrantIsnAccountPermissionRequest struct {
-	Permission string `json:"permission" emuns:"write,read" example:"write"`
+	CanRead  *bool `json:"can_read" example:"true"`
+	CanWrite *bool `json:"can_write" example:"false"`
 }
 
 // Response structs for GET handlers
@@ -37,7 +37,8 @@ type IsnAccount struct {
 	UpdatedAt          time.Time `json:"updated_at" example:"2025-06-03T13:47:47.331787+01:00"`
 	IsnID              uuid.UUID `json:"isn_id" example:"67890684-3b14-42cf-b785-df28ce570400"`
 	AccountID          uuid.UUID `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
-	Permission         string    `json:"permission" example:"write" enums:"read,write"`
+	CanRead            bool      `json:"can_read" example:"true"`
+	CanWrite           bool      `json:"can_write" example:"false"`
 	AccountType        string    `json:"account_type" example:"user" enums:"user,service_account"`
 	IsActive           bool      `json:"is_active" example:"true"`
 	Email              string    `json:"email" example:"user@example.com"`
@@ -67,10 +68,15 @@ type IsnAccount struct {
 //
 //	@Router			/api/isn/{isn_slug}/accounts/{account_id}  [put]
 //
-//	this handler will insert isn_accounts.
+//	You must supply values for both can_read and can_write.  If you want to revoke a permission set it to false.
+//
+//	Notes:
+//
 //	for target accounts that are account.account_type "user" that are granted 'write' to an isn the handler will also start a signals batch for this isn.
 //	the signal batch is used to track any writes done by the user to the isn and is only closed if their permission is revoked
 //	service accounts need to create their own batches at the start of each data loading session.
+//
+//	Accounts with 'write' permission to an isn are also automatically granted 'read' permission for signals they created, plus any signals linked to signals they created.
 //
 //	this handler must use the RequireRole (owner,admin) middleware
 func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *http.Request) {
@@ -157,8 +163,8 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 		return
 	}
 
-	if !signalsd.ValidISNPermissions[req.Permission] {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("%v is not a valid permission", req.Permission))
+	if req.CanRead == nil || req.CanWrite == nil {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must supply values for both can_read and can_write")
 		return
 	}
 
@@ -178,19 +184,19 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 		return
 	}
 
-	// determine if we are swithching an existing permission
+	// determine if we are switching an existing permission
 	updateExisting := false
 
 	if !errors.Is(err, pgx.ErrNoRows) {
 		// user has permission on this isn already
-		if req.Permission == isnAccount.Permission {
+		if req.CanRead == &isnAccount.CanRead && req.CanWrite == &isnAccount.CanWrite {
 
 			logger.ContextWithLogAttrs(r.Context(),
 				slog.String("operation", "grant_isn_account"),
-				slog.String("error", fmt.Sprintf("account already has %v permission on isn %v", req.Permission, isnSlug)),
+				slog.String("error", fmt.Sprintf("account already has the same permissions on isn %v", isnSlug)),
 			)
 
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeResourceAlreadyExists, fmt.Sprintf("account already has %v permission on isn %v", req.Permission, isnSlug))
+			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeResourceAlreadyExists, fmt.Sprintf("account already has the same permissions on isn %v", isnSlug))
 			return
 		}
 		updateExisting = true // flag for update rather than create
@@ -214,15 +220,17 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 
 	if updateExisting {
 		_, err = i.queries.UpdateIsnAccount(r.Context(), database.UpdateIsnAccountParams{
-			IsnID:      isn.ID,
-			AccountID:  targetAccountID,
-			Permission: req.Permission,
+			IsnID:     isn.ID,
+			AccountID: targetAccountID,
+			CanRead:   *req.CanRead,
+			CanWrite:  *req.CanWrite,
 		})
 	} else {
 		_, err = i.queries.CreateIsnAccount(r.Context(), database.CreateIsnAccountParams{
-			IsnID:      isn.ID,
-			AccountID:  targetAccountID,
-			Permission: req.Permission,
+			IsnID:     isn.ID,
+			AccountID: targetAccountID,
+			CanRead:   *req.CanRead,
+			CanWrite:  *req.CanWrite,
 		})
 	}
 	if err != nil {
@@ -236,7 +244,8 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 		return
 	}
 	logger.ContextWithLogAttrs(r.Context(),
-		slog.String("permission", req.Permission),
+		slog.Bool("can_read", *req.CanRead),
+		slog.Bool("can_write", *req.CanWrite),
 		slog.String("target_account_id", targetAccount.ID.String()),
 		slog.String("isn_slug", isnSlug),
 	)
@@ -489,7 +498,8 @@ func (i *IsnAccountHandler) GetIsnAccountsHandler(w http.ResponseWriter, r *http
 			UpdatedAt:          dbAccount.UpdatedAt,
 			IsnID:              dbAccount.IsnID,
 			AccountID:          dbAccount.AccountID,
-			Permission:         dbAccount.Permission,
+			CanRead:            dbAccount.CanRead,
+			CanWrite:           dbAccount.CanWrite,
 			AccountType:        dbAccount.AccountType,
 			IsActive:           dbAccount.IsActive,
 			Email:              dbAccount.Email,

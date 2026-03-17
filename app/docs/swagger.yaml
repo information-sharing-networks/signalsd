@@ -83,16 +83,16 @@ definitions:
     type: object
   auth.IsnPerms:
     properties:
+      can_read:
+        example: true
+        type: boolean
+      can_write:
+        example: false
+        type: boolean
       isn_admin:
         description: true if the account is the owner of the isn or the site owner
         example: false
         type: boolean
-      permission:
-        enum:
-        - read
-        - write
-        example: read
-        type: string
       signal_batch_id:
         example: 967affe9-5628-4fdd-921f-020051344a12
         type: string
@@ -355,9 +355,12 @@ definitions:
     type: object
   handlers.GrantIsnAccountPermissionRequest:
     properties:
-      permission:
-        example: write
-        type: string
+      can_read:
+        example: true
+        type: boolean
+      can_write:
+        example: false
+        type: boolean
     type: object
   handlers.Isn:
     properties:
@@ -410,6 +413,12 @@ definitions:
         - service_account
         example: user
         type: string
+      can_read:
+        example: true
+        type: boolean
+      can_write:
+        example: false
+        type: boolean
       client_id:
         example: sa_exampleorg_k7j2m9x1
         type: string
@@ -430,12 +439,6 @@ definitions:
         type: boolean
       isn_id:
         example: 67890684-3b14-42cf-b785-df28ce570400
-        type: string
-      permission:
-        enum:
-        - read
-        - write
-        example: write
         type: string
       updated_at:
         example: "2025-06-03T13:47:47.331787+01:00"

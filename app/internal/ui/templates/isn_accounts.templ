@@ -11,6 +11,24 @@ templ IsnAccountManagementPage(environment string, isns []types.IsnOption, users
 				<div class="card-header">
 				</div>
 				<div class="card-body">
+                    <p class="card-description text-muted">
+                        Grant or revoke read/write permissions for accounts on ISNs.
+                    </p>
+                    @NoticeAlert() {
+                        Granting permissions:
+                        <ul>
+                        <li>Write-only accounts can only see signals they created.</li>
+                        <li>Read-only accounts cannot create signals but can view any signal on the ISN.</li>
+                        <li>Typically service accounts that are used to load signals should only be granted write access (this prevents them reading data provided by other accounts).</li>
+                        </ul>
+                        Batches:
+                        <ul>
+                            <li>Signal batches are used to track any writes done by the account to the ISN.</li>
+                            <li>When a user account is added to an ISN with write permission a signal batch is automatically created for that account, and they can start posting signals immediately.
+                            The batch is closed when the account's permission to write to the ISN is revoked.</li> 
+                            <li>Service accounts need to explicitly create a batch using the API before they can write to an ISN.</li>
+                        </ul>
+                    }
 					<form 
                         hx-put="/ui-api/isn/accounts/update" 
                         hx-target="#result"

@@ -203,12 +203,16 @@ func createTestSignalType(t *testing.T, ctx context.Context, queries *database.Q
 }
 
 // grantPermission creates a permission grant between an account and ISN
+// permission should be "read" (read-only), "write" (write-only), or "read-write" (both)
 func grantPermission(t *testing.T, ctx context.Context, queries *database.Queries, isnID, accountID uuid.UUID, permission string) {
+	canRead := permission == "read" || permission == "read-write"
+	canWrite := permission == "write" || permission == "read-write"
 
 	_, err := queries.CreateIsnAccount(ctx, database.CreateIsnAccountParams{
-		IsnID:      isnID,
-		AccountID:  accountID,
-		Permission: permission,
+		IsnID:     isnID,
+		AccountID: accountID,
+		CanRead:   canRead,
+		CanWrite:  canWrite,
 	})
 	if err != nil {
 		t.Fatalf("Failed to grant %s permission for ISN %s to account %s: %v",

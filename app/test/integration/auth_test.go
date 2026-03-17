@@ -74,9 +74,9 @@ func TestPermissions(t *testing.T) {
 	t.Run("owner role permissions", func(t *testing.T) {
 		// owner should have write access to all ISNs
 		expectedPerms := map[string]string{
-			"owner-isn":  "write",
-			"admin-isn":  "write",
-			"public-isn": "write",
+			"owner-isn":  "read-write",
+			"admin-isn":  "read-write",
+			"public-isn": "read-write",
 		}
 		checkPermissions(t, authService, ownerAccount.ID, "user", "owner", expectedPerms, validSignalTypePaths, testEnv.cfg.SecretKey)
 	})
@@ -84,14 +84,14 @@ func TestPermissions(t *testing.T) {
 	t.Run("admin role permissions", func(t *testing.T) {
 		// admin should have write access to their own ISN plus the granted write permission on public-isn
 		expectedPerms := map[string]string{
-			"admin-isn":  "write",
-			"public-isn": "write",
+			"admin-isn":  "read-write",
+			"public-isn": "read-write",
 		}
 		checkPermissions(t, authService, adminAccount.ID, "user", "admin", expectedPerms, validSignalTypePaths, testEnv.cfg.SecretKey)
 	})
 
 	t.Run("member role permissions", func(t *testing.T) {
-		// member was granted read access to admin-isn
+		// member was granted read-only access to admin-isn
 		expectedPerms := map[string]string{
 			"admin-isn": "read",
 		}
@@ -99,7 +99,7 @@ func TestPermissions(t *testing.T) {
 	})
 
 	t.Run("service account permissions", func(t *testing.T) {
-		// service account was granted write to the public isn
+		// service account was granted write-only access to the public isn
 		expectedPerms := map[string]string{
 			"public-isn": "write",
 		}
@@ -168,17 +168,32 @@ func checkPermissions(t *testing.T,
 			t.Errorf("missing permission for ISN %s", isnSlug)
 			continue
 		}
-		if perm.Permission != expectedPermission {
-			t.Errorf("expected %s permission for %s, got %s", expectedPermission, isnSlug, perm.Permission)
+
+		// Check permissions based on expected permission string
+		switch expectedPermission {
+		case "read": // read-only
+			if !perm.CanRead || perm.CanWrite {
+				t.Errorf("expected read-only permission for %s, got CanRead=%v CanWrite=%v", isnSlug, perm.CanRead, perm.CanWrite)
+			}
+		case "write": // write-only
+			if !perm.CanWrite || perm.CanRead {
+				t.Errorf("expected write permission for %s, got CanRead=%v CanWrite=%v", isnSlug, perm.CanRead, perm.CanWrite)
+			}
+		case "read-write":
+			if !perm.CanRead || !perm.CanWrite {
+				t.Errorf("expected read-write permission for %s, got CanRead=%v CanWrite=%v", isnSlug, perm.CanRead, perm.CanWrite)
+			}
+		default:
+			t.Errorf("unexpected permission type: %s", expectedPermission)
 		}
 
 		// service account was set up with a batch for the public ISN (which it has write access to)
-		if perm.Permission == "write" && accountType == "service_account" && perm.SignalBatchID == nil {
+		if perm.CanWrite && accountType == "service_account" && perm.SignalBatchID == nil {
 			t.Errorf("expected signal batch ID for %s, got nil", isnSlug)
 		}
 
-		if perm.Permission == "read" && perm.SignalBatchID != nil {
-			t.Errorf("expected signal batch to be nil for %s, got %s", isnSlug, perm.SignalBatchID)
+		if perm.CanRead && !perm.CanWrite && perm.SignalBatchID != nil {
+			t.Errorf("expected signal batch to be nil for read-only %s, got %s", isnSlug, perm.SignalBatchID)
 		}
 
 		// Verify signal type paths are correctly populated
@@ -254,12 +269,17 @@ func checkPermissions(t *testing.T,
 			continue
 		}
 
-		if jwtPerm.Permission != responsePerm.Permission {
-			t.Errorf("ISN %s: JWT permission %s doesn't match response permission %s",
-				isnSlug, jwtPerm.Permission, responsePerm.Permission)
+		// Compare permission flags
+		if jwtPerm.CanRead != responsePerm.CanRead {
+			t.Errorf("ISN %s: JWT CanRead %v doesn't match response CanRead %v",
+				isnSlug, jwtPerm.CanRead, responsePerm.CanRead)
+		}
+		if jwtPerm.CanWrite != responsePerm.CanWrite {
+			t.Errorf("ISN %s: JWT CanWrite %v doesn't match response CanWrite %v",
+				isnSlug, jwtPerm.CanWrite, responsePerm.CanWrite)
 		}
 
-		// Compare signal batch IDs (both should be nil for read permissions, non-nil for write)
+		// Compare signal batch IDs (should be nil for read-only, non-nil for write)
 		if (jwtPerm.SignalBatchID == nil) != (responsePerm.SignalBatchID == nil) {
 			t.Errorf("ISN %s: JWT SignalBatchID nil=%v doesn't match response SignalBatchID nil=%v",
 				isnSlug, jwtPerm.SignalBatchID == nil, responsePerm.SignalBatchID == nil)
