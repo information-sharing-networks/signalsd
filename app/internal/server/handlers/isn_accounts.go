@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -25,7 +24,7 @@ func NewIsnAccountHandler(queries *database.Queries) *IsnAccountHandler {
 	return &IsnAccountHandler{queries: queries}
 }
 
-type GrantIsnAccountPermissionRequest struct {
+type UpdateIsnAccountPermissionRequest struct {
 	CanRead  *bool `json:"can_read" example:"true"`
 	CanWrite *bool `json:"can_write" example:"false"`
 }
@@ -47,19 +46,29 @@ type IsnAccount struct {
 	ClientOrganization *string   `json:"client_organization,omitempty" example:"Example Organization"`
 }
 
-// GrantIsnAccountPermission godocs
+// UpdateIsnAccountPermission godocs
 //
-//	@Summary		Grant ISN access permission
+//	@Summary		Update an account's ISN access permission
 //	@Tags			ISN Permissions
 //
-//	@Description	Grant an account read or write access to an isn.
-//	@Description	This end point can only be used by the site owner or the isn admin account (ISN admins can only grant permissions for ISNs they created).
+//	@Description	Update an account's access permission for an ISN. Set both can_read and can_write to false to revoke all access.
+//	@Description
+//	@Description	This endpoint can only be used by the site owner or the ISN admin account (ISN admins can only update permissions for ISNs they created).
+//	@Description
+//	@Description	- Accounts with 'read' permission can view all signals on the ISN.
+//	@Description	- Accounts with 'write' permission can create signals on the ISN.
+//	@Description	- For accounts that need read/write access to an ISN, you must grant both 'read' and 'write' permissions.
+//	@Description
+//	@Description	Note that accounts with 'write' permission to an ISN are also automatically granted 'read'
+//	@Description	permission for signals they created, but can't view other signals on the ISN.
+//	@Description
+//	@Description	You must supply values for both can_read and can_write.
 //
-//	@Param			request		body	handlers.GrantIsnAccountPermissionRequest	true	"permission details"
+//	@Param			request		body	handlers.UpdateIsnAccountPermissionRequest	true	"permission details"
 //	@Param			isn_slug	path	string										true	"isn slug"		example(sample-isn--example-org)
 //	@Param			account_id	path	string										true	"account id"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
-//	@Success		204
+//	@Success		200
 //	@Failure		400	{object}	responses.ErrorResponse
 //	@Failure		403	{object}	responses.ErrorResponse
 //	@Failure		404	{object}	responses.ErrorResponse
@@ -68,20 +77,10 @@ type IsnAccount struct {
 //
 //	@Router			/api/isn/{isn_slug}/accounts/{account_id}  [put]
 //
-//	You must supply values for both can_read and can_write.  If you want to revoke a permission set it to false.
-//
-//	Notes:
-//
-//	for target accounts that are account.account_type "user" that are granted 'write' to an isn the handler will also start a signals batch for this isn.
-//	the signal batch is used to track any writes done by the user to the isn and is only closed if their permission is revoked
-//	service accounts need to create their own batches at the start of each data loading session.
-//
-//	Accounts with 'write' permission to an isn are also automatically granted 'read' permission for signals they created, plus any signals linked to signals they created.
-//
 //	this handler must use the RequireRole (owner,admin) middleware
-func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *http.Request) {
+func (i *IsnAccountHandler) UpdateIsnAccountPermissionHandler(w http.ResponseWriter, r *http.Request) {
 
-	req := GrantIsnAccountPermissionRequest{}
+	req := UpdateIsnAccountPermissionRequest{}
 
 	// get account id for the account making request
 	accountID, ok := auth.ContextAccountID(r.Context())
@@ -168,11 +167,14 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 		return
 	}
 
-	// check if the target user already has the permission requested
+	// get the current permissions for the target account on the ISN
 	isnAccount, err := i.queries.GetIsnAccountByIsnAndAccountID(r.Context(), database.GetIsnAccountByIsnAndAccountIDParams{
 		AccountID: targetAccountID,
 		IsnID:     isn.ID,
 	})
+
+	isExistingPermissions := err == nil
+
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
@@ -184,25 +186,9 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 		return
 	}
 
-	// determine if we are switching an existing permission
-	updateExisting := false
-
-	if !errors.Is(err, pgx.ErrNoRows) {
-		// user has permission on this isn already
-		if req.CanRead == &isnAccount.CanRead && req.CanWrite == &isnAccount.CanWrite {
-
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("operation", "grant_isn_account"),
-				slog.String("error", fmt.Sprintf("account already has the same permissions on isn %v", isnSlug)),
-			)
-
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeResourceAlreadyExists, fmt.Sprintf("account already has the same permissions on isn %v", isnSlug))
-			return
-		}
-		updateExisting = true // flag for update rather than create
-
-		// remove the previous permission
-		_, err := i.queries.CloseISNSignalBatchByAccountID(r.Context(), database.CloseISNSignalBatchByAccountIDParams{
+	// Handle batch closure when revoking write access - this is just to tidy up the database - it's not an error if there is no batch to close
+	if isExistingPermissions && isnAccount.CanWrite && !*req.CanWrite {
+		_, err = i.queries.CloseISNSignalBatchByAccountID(r.Context(), database.CloseISNSignalBatchByAccountIDParams{
 			IsnID:     isn.ID,
 			AccountID: targetAccountID,
 		})
@@ -218,7 +204,8 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 		}
 	}
 
-	if updateExisting {
+	// Create or update the ISN account permission
+	if isExistingPermissions {
 		_, err = i.queries.UpdateIsnAccount(r.Context(), database.UpdateIsnAccountParams{
 			IsnID:     isn.ID,
 			AccountID: targetAccountID,
@@ -250,172 +237,7 @@ func (i *IsnAccountHandler) GrantIsnAccountHandler(w http.ResponseWriter, r *htt
 		slog.String("isn_slug", isnSlug),
 	)
 
-	responses.RespondWithStatusCodeOnly(w, http.StatusCreated)
-}
-
-// RevokeIsnAccountPermission godocs
-//
-//	@Summary		Revoke ISN access permission
-//	@Tags			ISN Permissions
-//
-//	@Description	Revoke an account read or write access to an isn.
-//	@Description	This end point can only be used by the site owner or the isn admin account (ISN admins can only revoke permissions for ISNs they created)
-//
-//	@Param			isn_slug	path	string	true	"isn slug"		example(sample-isn--example-org)
-//	@Param			account_id	path	string	true	"account id"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
-//
-//	@Success		204
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		403	{object}	responses.ErrorResponse
-//	@Failure		404	{object}	responses.ErrorResponse
-//
-//	@Security		BearerAccessToken
-//
-//	@Router			/isn/{isn_slug}/accounts/{account_id}  [delete]
-//
-//	this handler must use the RequireRole (owner,admin) middlewar
-func (i *IsnAccountHandler) RevokeIsnAccountHandler(w http.ResponseWriter, r *http.Request) {
-
-	// get user account id for user making request
-	accountID, ok := auth.ContextAccountID(r.Context())
-	if !ok {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", "did not receive userAccountID from middleware"),
-		)
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
-		return
-	}
-
-	// check isn exists and is owned by user making the request
-	isnSlug := r.PathValue("isn_slug")
-
-	isn, err := i.queries.GetIsnBySlug(r.Context(), isnSlug)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
-			return
-		}
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-			slog.String("isn_slug", isnSlug),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
-	}
-	// check if user is either the ISN owner or a site owner
-	claims, ok := auth.ContextClaims(r.Context())
-	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
-		return
-	}
-
-	isIsnOwner := isn.UserAccountID == accountID
-	isSiteOwner := claims.Role == "owner"
-
-	if !isIsnOwner && !isSiteOwner {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you must be either the ISN owner or a site owner to revoke permissions")
-		return
-	}
-
-	// get target account
-	targetAccountIDString := r.PathValue("account_id")
-	targetAccountID, err := uuid.Parse(targetAccountIDString)
-	if err != nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "invalid account ID format")
-		return
-	}
-
-	targetAccount, err := i.queries.GetAccountByID(r.Context(), targetAccountID)
-	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-			slog.String("target_account_id", targetAccountID.String()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
-	}
-
-	if targetAccount.AccountRole == "owner" {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "the site owner account permissions cannot be updated")
-		return
-	}
-
-	// deny users making uncessary attempts to revoke perms to themeselves
-	if accountID == targetAccountID {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", "accounts cannot revoke ISN permissions for themselves"),
-		)
-
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "accounts cannot revoke ISN permissions for themselves")
-		return
-	}
-
-	// check if the target user has an ISN permission to revoke
-	_, err = i.queries.GetIsnAccountByIsnAndAccountID(r.Context(), database.GetIsnAccountByIsnAndAccountIDParams{
-		AccountID: targetAccountID,
-		IsnID:     isn.ID,
-	})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", "account does not have permission on this ISN"),
-				slog.String("target_account_id", targetAccountID.String()),
-				slog.String("isn_slug", isnSlug),
-			)
-
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "can't revoke access - account does not have permission on this ISN")
-			return
-		}
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-			slog.String("target_account_id", targetAccountID.String()),
-			slog.String("isn_slug", isnSlug),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
-	}
-
-	// close any signal batches
-	_, err = i.queries.CloseISNSignalBatchByAccountID(r.Context(), database.CloseISNSignalBatchByAccountIDParams{
-		IsnID:     isn.ID,
-		AccountID: targetAccountID,
-	})
-	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-			slog.String("target_account_id", targetAccountID.String()),
-			slog.String("isn_slug", isnSlug),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
-	}
-
-	// remove isn account permission
-	rowsDeleted, err := i.queries.DeleteIsnAccount(r.Context(), database.DeleteIsnAccountParams{
-		IsnID:     isn.ID,
-		AccountID: targetAccountID,
-	})
-	if err != nil || rowsDeleted == 0 {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-			slog.String("target_account_id", targetAccountID.String()),
-			slog.String("isn_slug", isnSlug),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
-	}
-
-	logger.ContextWithLogAttrs(r.Context(),
-		slog.String("revoking_account_id", accountID.String()),
-		slog.String("isn_slug", isnSlug),
-		slog.String("target_account_id", targetAccount.ID.String()))
-
-	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
+	responses.RespondWithStatusCodeOnly(w, http.StatusOK)
 }
 
 // GetIsnAccountsHandler godoc

@@ -63,7 +63,7 @@ func IsnAccountManagementPage(environment string, isns []types.IsnOption, users 
 					}()
 				}
 				ctx = templ.InitializeContext(ctx)
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "Granting permissions:<ul><li>Write-only accounts can only see signals they created.</li><li>Read-only accounts cannot create signals but can view any signal on the ISN.</li><li>Typically service accounts that are used to load signals should only be granted write access (this prevents them reading data provided by other accounts).</li></ul>Batches:<ul><li>Signal batches are used to track any writes done by the account to the ISN.</li><li>When a user account is added to an ISN with write permission a signal batch is automatically created for that account, and they can start posting signals immediately. The batch is closed when the account's permission to write to the ISN is revoked.</li><li>Service accounts need to explicitly create a batch using the API before they can write to an ISN.</li></ul>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "Granting permissions:<ul><li>Write-only accounts can only see signals they created.</li><li>Read-only accounts cannot create signals but can view any signal on the ISN.</li><li>Typically service accounts that are used to load signals should only be granted write access (this prevents them reading data provided by other accounts).</li></ul>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

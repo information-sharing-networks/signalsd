@@ -55,6 +55,10 @@ func TestSignalSubmission(t *testing.T) {
 
 	grantPermission(t, ctx, testEnv.queries, adminISN.ID, memberAccount.ID, "read")
 
+	createTestSignalBatch(t, ctx, testEnv.queries, ownerISN.ID, ownerAccount.ID)
+	createTestSignalBatch(t, ctx, testEnv.queries, adminISN.ID, ownerAccount.ID)
+	createTestSignalBatch(t, ctx, testEnv.queries, adminISN.ID, adminAccount.ID)
+
 	ownerEndpoint := testSignalEndpoint{
 		isnSlug:          ownerISN.Slug,
 		signalTypeSlug:   ownerSignalType.Slug,
@@ -476,6 +480,9 @@ func TestIsInUseStatus(t *testing.T) {
 	grantPermission(t, ctx, testEnv.queries, adminISN.ID, memberAccount.ID, "read")
 	grantPermission(t, ctx, testEnv.queries, ownerISN.ID, memberAccount.ID, "write")
 
+	createTestSignalBatch(t, ctx, testEnv.queries, ownerISN.ID, adminAccount.ID)
+	createTestSignalBatch(t, ctx, testEnv.queries, adminISN.ID, adminAccount.ID)
+
 	ownerEndpoint := testSignalEndpoint{
 		isnSlug:          ownerISN.Slug,
 		signalTypeSlug:   ownerSignalType.Slug,
@@ -706,6 +713,11 @@ func TestSignalSearch(t *testing.T) {
 
 	// Grant read permission to member for admin ISN
 	grantPermission(t, ctx, testEnv.queries, adminISN.ID, memberAccount.ID, "read")
+
+	// create batches
+	createTestSignalBatch(t, ctx, testEnv.queries, ownerISN.ID, ownerAccount.ID)
+	createTestSignalBatch(t, ctx, testEnv.queries, adminISN.ID, adminAccount.ID)
+	createTestSignalBatch(t, ctx, testEnv.queries, publicISN.ID, adminAccount.ID)
 
 	// Create tokens after granting permissions so they include the ISN permissions in claims
 	ownerToken := testEnv.createAuthToken(t, ownerAccount.ID)
@@ -1033,6 +1045,10 @@ func TestWriteOnlyAccountVisibility(t *testing.T) {
 	grantPermission(t, ctx, testEnv.queries, sharedISN.ID, account1.ID, "write")
 	grantPermission(t, ctx, testEnv.queries, sharedISN.ID, account2.ID, "write")
 
+	// create batches
+	createTestSignalBatch(t, ctx, testEnv.queries, sharedISN.ID, account1.ID)
+	createTestSignalBatch(t, ctx, testEnv.queries, sharedISN.ID, account2.ID)
+
 	// Create tokens after granting permissions
 	token1 := testEnv.createAuthToken(t, account1.ID)
 	token2 := testEnv.createAuthToken(t, account2.ID)
@@ -1130,6 +1146,8 @@ func TestCorrelatedAndPreviousVersionsSearch(t *testing.T) {
 
 	ownerSignalType := createTestSignalType(t, ctx, testEnv.queries, ownerISN.ID, "Owner correlated signal", "1.0.0")
 
+	// create batch
+	createTestSignalBatch(t, ctx, testEnv.queries, ownerISN.ID, ownerAccount.ID)
 	ownerAuthToken := testEnv.createAuthToken(t, ownerAccount.ID)
 
 	ownerEndpoint := testSignalEndpoint{

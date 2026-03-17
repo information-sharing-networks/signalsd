@@ -65,7 +65,7 @@ func (c *Client) UpdateIsnAccounts(accessToken, isnSlug, accountType, accountIde
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode != http.StatusCreated {
+	if res.StatusCode != http.StatusOK {
 		return NewClientApiError(res)
 	}
 

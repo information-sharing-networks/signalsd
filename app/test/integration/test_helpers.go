@@ -235,6 +235,7 @@ func enableAccount(t *testing.T, ctx context.Context, queries *database.Queries,
 }
 
 // createTestSignalBatch creates a signal batch for an account and ISN
+// note: in production this is done automatically when an account writes to an isn for the first time
 func createTestSignalBatch(t *testing.T, ctx context.Context, queries *database.Queries, isnID, accountID uuid.UUID) database.SignalBatch {
 
 	batch, err := queries.CreateSignalBatch(ctx, database.CreateSignalBatchParams{

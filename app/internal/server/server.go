@@ -275,8 +275,7 @@ func (s *Server) registerAdminRoutes() {
 						r.Delete("/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}", signalTypes.DeleteSignalTypeHandler)
 
 						// ISN account permissions
-						r.Put("/{isn_slug}/accounts/{account_id}", isnAccount.GrantIsnAccountHandler)
-						r.Delete("/{isn_slug}/accounts/{account_id}", isnAccount.RevokeIsnAccountHandler)
+						r.Put("/{isn_slug}/accounts/{account_id}", isnAccount.UpdateIsnAccountPermissionHandler)
 						r.Get("/{isn_slug}/accounts", isnAccount.GetIsnAccountsHandler)
 
 					})
