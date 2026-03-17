@@ -19,19 +19,26 @@ INSERT INTO isn_accounts (
     updated_at,
     isn_id,
     account_id,
-    permission
-) VALUES (gen_random_uuid(), now(), now(), $1, $2, $3)
-RETURNING id, created_at, updated_at, isn_id, account_id, permission
+    can_read,
+    can_write
+) VALUES (gen_random_uuid(), now(), now(), $1, $2, $3, $4)
+RETURNING id, created_at, updated_at, isn_id, account_id, can_read, can_write
 `
 
 type CreateIsnAccountParams struct {
-	IsnID      uuid.UUID `json:"isn_id"`
-	AccountID  uuid.UUID `json:"account_id"`
-	Permission string    `json:"permission"`
+	IsnID     uuid.UUID `json:"isn_id"`
+	AccountID uuid.UUID `json:"account_id"`
+	CanRead   bool      `json:"can_read"`
+	CanWrite  bool      `json:"can_write"`
 }
 
 func (q *Queries) CreateIsnAccount(ctx context.Context, arg CreateIsnAccountParams) (IsnAccount, error) {
-	row := q.db.QueryRow(ctx, CreateIsnAccount, arg.IsnID, arg.AccountID, arg.Permission)
+	row := q.db.QueryRow(ctx, CreateIsnAccount,
+		arg.IsnID,
+		arg.AccountID,
+		arg.CanRead,
+		arg.CanWrite,
+	)
 	var i IsnAccount
 	err := row.Scan(
 		&i.ID,
@@ -39,7 +46,8 @@ func (q *Queries) CreateIsnAccount(ctx context.Context, arg CreateIsnAccountPara
 		&i.UpdatedAt,
 		&i.IsnID,
 		&i.AccountID,
-		&i.Permission,
+		&i.CanRead,
+		&i.CanWrite,
 	)
 	return i, err
 }
@@ -70,7 +78,8 @@ SELECT
     ia.updated_at,
     ia.isn_id,
     ia.account_id,
-    ia.permission,
+    ia.can_read,
+    ia.can_write,
     a.account_type,
     a.is_active,
     COALESCE(u.email, sa.client_contact_email) AS email,
@@ -91,7 +100,8 @@ type GetAccountsByIsnIDRow struct {
 	UpdatedAt          time.Time `json:"updated_at"`
 	IsnID              uuid.UUID `json:"isn_id"`
 	AccountID          uuid.UUID `json:"account_id"`
-	Permission         string    `json:"permission"`
+	CanRead            bool      `json:"can_read"`
+	CanWrite           bool      `json:"can_write"`
 	AccountType        string    `json:"account_type"`
 	IsActive           bool      `json:"is_active"`
 	Email              string    `json:"email"`
@@ -116,7 +126,8 @@ func (q *Queries) GetAccountsByIsnID(ctx context.Context, isnID uuid.UUID) ([]Ge
 			&i.UpdatedAt,
 			&i.IsnID,
 			&i.AccountID,
-			&i.Permission,
+			&i.CanRead,
+			&i.CanWrite,
 			&i.AccountType,
 			&i.IsActive,
 			&i.Email,
@@ -135,7 +146,7 @@ func (q *Queries) GetAccountsByIsnID(ctx context.Context, isnID uuid.UUID) ([]Ge
 }
 
 const GetActiveIsnAccountsByAccountID = `-- name: GetActiveIsnAccountsByAccountID :many
-SELECT ia.id, ia.created_at, ia.updated_at, ia.isn_id, ia.account_id, ia.permission, i.slug as isn_slug FROM isn_accounts ia
+SELECT ia.id, ia.created_at, ia.updated_at, ia.isn_id, ia.account_id, ia.can_read, ia.can_write, i.slug as isn_slug FROM isn_accounts ia
 JOIN isn i
 ON i.id = ia.isn_id
 WHERE ia.account_id = $1
@@ -143,13 +154,14 @@ and i.is_in_use = true
 `
 
 type GetActiveIsnAccountsByAccountIDRow struct {
-	ID         uuid.UUID `json:"id"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
-	IsnID      uuid.UUID `json:"isn_id"`
-	AccountID  uuid.UUID `json:"account_id"`
-	Permission string    `json:"permission"`
-	IsnSlug    string    `json:"isn_slug"`
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	IsnID     uuid.UUID `json:"isn_id"`
+	AccountID uuid.UUID `json:"account_id"`
+	CanRead   bool      `json:"can_read"`
+	CanWrite  bool      `json:"can_write"`
+	IsnSlug   string    `json:"isn_slug"`
 }
 
 // get all the active isns an account has access to.
@@ -168,7 +180,8 @@ func (q *Queries) GetActiveIsnAccountsByAccountID(ctx context.Context, accountID
 			&i.UpdatedAt,
 			&i.IsnID,
 			&i.AccountID,
-			&i.Permission,
+			&i.CanRead,
+			&i.CanWrite,
 			&i.IsnSlug,
 		); err != nil {
 			return nil, err
@@ -182,7 +195,7 @@ func (q *Queries) GetActiveIsnAccountsByAccountID(ctx context.Context, accountID
 }
 
 const GetIsnAccountByIsnAndAccountID = `-- name: GetIsnAccountByIsnAndAccountID :one
-SELECT ia.id, ia.created_at, ia.updated_at, ia.isn_id, ia.account_id, ia.permission, i.slug as isn_slug FROM isn_accounts ia
+SELECT ia.id, ia.created_at, ia.updated_at, ia.isn_id, ia.account_id, ia.can_read, ia.can_write, i.slug as isn_slug FROM isn_accounts ia
 JOIN isn i 
 ON i.id = ia.isn_id
 WHERE ia.isn_id = $1 
@@ -195,13 +208,14 @@ type GetIsnAccountByIsnAndAccountIDParams struct {
 }
 
 type GetIsnAccountByIsnAndAccountIDRow struct {
-	ID         uuid.UUID `json:"id"`
-	CreatedAt  time.Time `json:"created_at"`
-	UpdatedAt  time.Time `json:"updated_at"`
-	IsnID      uuid.UUID `json:"isn_id"`
-	AccountID  uuid.UUID `json:"account_id"`
-	Permission string    `json:"permission"`
-	IsnSlug    string    `json:"isn_slug"`
+	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	IsnID     uuid.UUID `json:"isn_id"`
+	AccountID uuid.UUID `json:"account_id"`
+	CanRead   bool      `json:"can_read"`
+	CanWrite  bool      `json:"can_write"`
+	IsnSlug   string    `json:"isn_slug"`
 }
 
 func (q *Queries) GetIsnAccountByIsnAndAccountID(ctx context.Context, arg GetIsnAccountByIsnAndAccountIDParams) (GetIsnAccountByIsnAndAccountIDRow, error) {
@@ -213,29 +227,37 @@ func (q *Queries) GetIsnAccountByIsnAndAccountID(ctx context.Context, arg GetIsn
 		&i.UpdatedAt,
 		&i.IsnID,
 		&i.AccountID,
-		&i.Permission,
+		&i.CanRead,
+		&i.CanWrite,
 		&i.IsnSlug,
 	)
 	return i, err
 }
 
 const UpdateIsnAccount = `-- name: UpdateIsnAccount :one
-UPDATE isn_accounts SET 
+UPDATE isn_accounts SET
     updated_at = now(),
-    permission = $3
+    can_read = $3,
+    can_write = $4
 WHERE isn_id =  $1
 AND account_id = $2
-RETURNING id, created_at, updated_at, isn_id, account_id, permission
+RETURNING id, created_at, updated_at, isn_id, account_id, can_read, can_write
 `
 
 type UpdateIsnAccountParams struct {
-	IsnID      uuid.UUID `json:"isn_id"`
-	AccountID  uuid.UUID `json:"account_id"`
-	Permission string    `json:"permission"`
+	IsnID     uuid.UUID `json:"isn_id"`
+	AccountID uuid.UUID `json:"account_id"`
+	CanRead   bool      `json:"can_read"`
+	CanWrite  bool      `json:"can_write"`
 }
 
 func (q *Queries) UpdateIsnAccount(ctx context.Context, arg UpdateIsnAccountParams) (IsnAccount, error) {
-	row := q.db.QueryRow(ctx, UpdateIsnAccount, arg.IsnID, arg.AccountID, arg.Permission)
+	row := q.db.QueryRow(ctx, UpdateIsnAccount,
+		arg.IsnID,
+		arg.AccountID,
+		arg.CanRead,
+		arg.CanWrite,
+	)
 	var i IsnAccount
 	err := row.Scan(
 		&i.ID,
@@ -243,7 +265,8 @@ func (q *Queries) UpdateIsnAccount(ctx context.Context, arg UpdateIsnAccountPara
 		&i.UpdatedAt,
 		&i.IsnID,
 		&i.AccountID,
-		&i.Permission,
+		&i.CanRead,
+		&i.CanWrite,
 	)
 	return i, err
 }

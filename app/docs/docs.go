@@ -2318,18 +2318,18 @@ const docTemplate = `{
         "auth.IsnPerms": {
             "type": "object",
             "properties": {
+                "can_read": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "can_write": {
+                    "type": "boolean",
+                    "example": false
+                },
                 "isn_admin": {
                     "description": "true if the account is the owner of the isn or the site owner",
                     "type": "boolean",
                     "example": false
-                },
-                "permission": {
-                    "type": "string",
-                    "enum": [
-                        "read",
-                        "write"
-                    ],
-                    "example": "read"
                 },
                 "signal_batch_id": {
                     "type": "string",
@@ -2702,9 +2702,13 @@ const docTemplate = `{
         "handlers.GrantIsnAccountPermissionRequest": {
             "type": "object",
             "properties": {
-                "permission": {
-                    "type": "string",
-                    "example": "write"
+                "can_read": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "can_write": {
+                    "type": "boolean",
+                    "example": false
                 }
             }
         },
@@ -2777,6 +2781,14 @@ const docTemplate = `{
                     ],
                     "example": "user"
                 },
+                "can_read": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "can_write": {
+                    "type": "boolean",
+                    "example": false
+                },
                 "client_id": {
                     "type": "string",
                     "example": "sa_exampleorg_k7j2m9x1"
@@ -2804,14 +2816,6 @@ const docTemplate = `{
                 "isn_id": {
                     "type": "string",
                     "example": "67890684-3b14-42cf-b785-df28ce570400"
-                },
-                "permission": {
-                    "type": "string",
-                    "enum": [
-                        "read",
-                        "write"
-                    ],
-                    "example": "write"
                 },
                 "updated_at": {
                     "type": "string",

@@ -17,7 +17,7 @@ type HandlerService struct {
 	Environment string
 }
 
-// getIsnOptions is a helper that returns a list of ISNs for the dropdown list. The list is used as a parater on several pages,
+// getIsnOptions is a helper that returns a list of ISNs for the dropdown list. The list is used as a parameter on several pages,
 // Optionally the selected value can be use to trigger a cascading update of the signal type dropdown list (see SignalTypeOptionsHandler)
 //
 // If filterByIsnAdmin is true, only ISNs where the user is an admin are returned.
@@ -28,7 +28,7 @@ func (h *HandlerService) getIsnOptions(isnPerms map[string]types.IsnPerm, filter
 		if filterByIsnAdmin && !perm.IsnAdmin {
 			continue
 		}
-		if filterByWritePerm && perm.Permission != "write" {
+		if filterByWritePerm && !perm.CanWrite {
 			continue
 		}
 		isns = append(isns, types.IsnOption{

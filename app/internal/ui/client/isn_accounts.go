@@ -12,7 +12,8 @@ type TransferIsnOwnershipRequest struct {
 	NewOwnerAccountID string `json:"new_owner_account_id"`
 }
 
-// UpdateIsnAccounts grants or revokes an permissions to access an ISN
+// UpdateIsnAccounts grants or revokes permissions to access an ISN
+// permission should be "read", "write", or "read-write"
 func (c *Client) UpdateIsnAccounts(accessToken, isnSlug, accountType, accountIdentifier, permission string) error {
 	var accountID string
 
@@ -35,30 +36,14 @@ func (c *Client) UpdateIsnAccounts(accessToken, isnSlug, accountType, accountIde
 
 	url := fmt.Sprintf("%s/api/isn/%s/accounts/%s", c.baseURL, isnSlug, accountID)
 
-	// Revoke access
-	if permission == "none" {
-		req, err := http.NewRequest("DELETE", url, nil)
-		if err != nil {
-			return NewClientInternalError(err, "revoke isn account access")
-		}
+	// Convert permission string to boolean flags
+	// "none" = revoke all permissions (both false), "read" = read-only, "write" = write-only, "read-write" = both
+	canRead := permission == "read" || permission == "read-write"
+	canWrite := permission == "write" || permission == "read-write"
 
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
-
-		res, err := c.httpClient.Do(req)
-		if err != nil {
-			return NewClientConnectionError(err)
-		}
-		defer res.Body.Close()
-		if res.StatusCode != http.StatusNoContent {
-			return NewClientApiError(res)
-		}
-
-		return nil
-	}
-
-	// Grant Access
-	requestBody := map[string]string{
-		"permission": permission,
+	requestBody := map[string]bool{
+		"can_read":  canRead,
+		"can_write": canWrite,
 	}
 
 	jsonData, err := json.Marshal(requestBody)

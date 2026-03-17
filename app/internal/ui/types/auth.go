@@ -2,9 +2,6 @@ package types
 
 import "github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 
-// =============================================================================
-// AUTHENTICATION & AUTHORIZATION TYPES
-// =============================================================================
 // These types are shared to avoid circular imports between auth ↔ client ↔ handlers
 
 // AccessTokenDetails represents the response from the signalsd login and refresh token APIs
@@ -19,7 +16,8 @@ type AccessTokenDetails struct {
 }
 
 type IsnPerm struct {
-	Permission      string   `json:"permission"`
+	CanRead         bool     `json:"can_read"`
+	CanWrite        bool     `json:"can_write"`
 	SignalBatchID   string   `json:"signal_batch_id"`
 	SignalTypePaths []string `json:"signal_types"`
 	Visibility      string   `json:"visibility"` // "public" or "private"

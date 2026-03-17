@@ -33,11 +33,12 @@ func TestBatchLifecycle(t *testing.T) {
 	// Create service account
 	serviceAccount := createTestAccount(t, ctx, testEnv.queries, "member", "service_account", "service@batch-test.com")
 
-	// Grant ISN permission
+	// Grant ISN permission (write access)
 	_, err := testEnv.queries.CreateIsnAccount(ctx, database.CreateIsnAccountParams{
-		IsnID:      testISN.ID,
-		AccountID:  serviceAccount.ID,
-		Permission: "write",
+		IsnID:     testISN.ID,
+		AccountID: serviceAccount.ID,
+		CanRead:   true,
+		CanWrite:  true,
 	})
 	if err != nil {
 		t.Fatalf("Failed to grant ISN permission: %v", err)
@@ -70,8 +71,9 @@ func TestBatchLifecycle(t *testing.T) {
 		}
 
 		// Verify that the service account has write permission but no batch ID
-		if tokenResponse.Perms[testISN.Slug].Permission != "write" {
-			t.Errorf("Expected write permission, got %v", tokenResponse.Perms[testISN.Slug].Permission)
+		perm := tokenResponse.Perms[testISN.Slug]
+		if !perm.CanWrite {
+			t.Errorf("Expected write permission, got CanRead=%v CanWrite=%v", perm.CanRead, perm.CanWrite)
 		}
 
 		if tokenResponse.Perms[testISN.Slug].SignalBatchID != nil {

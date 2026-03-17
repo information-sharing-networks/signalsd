@@ -45,7 +45,8 @@ type AccessTokenResponse struct {
 }
 
 type IsnPerms struct {
-	Permission      string     `json:"permission" enums:"read,write" example:"read"`
+	CanRead         bool       `json:"can_read" example:"true"`
+	CanWrite        bool       `json:"can_write" example:"false"`
 	SignalBatchID   *uuid.UUID `json:"signal_batch_id,omitempty" example:"967affe9-5628-4fdd-921f-020051344a12"`
 	SignalTypePaths []string   `json:"signal_types,omitempty" example:"signal-type-1/v0.0.1,signal-type-2/v1.0.0"` // list of available signal types for the isn
 	Visibility      string     `json:"visibility" enums:"public,private" example:"private"`                        // ISN visibility setting
@@ -191,10 +192,11 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 	// set up isnPerms map for claims
 	switch account.AccountRole {
 	case "owner":
-		// owner has write and admin access to all ISNs
+		// owner has read and write access to all ISNs
 		for _, siteIsn := range inUseIsns {
 			isnPerms[siteIsn.Slug] = IsnPerms{
-				Permission:      "write",
+				CanRead:         true,
+				CanWrite:        true,
 				SignalBatchID:   latestSignalBatchIDs[siteIsn.Slug],
 				SignalTypePaths: isnSignalTypePaths[siteIsn.Slug],
 				Visibility:      isnVisibility[siteIsn.Slug],
@@ -203,11 +205,12 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 		}
 
 	case "admin":
-		// Admin can write to any ISN they created but can only admin sites they created
+		// Admin can read, write and administrate any ISN they created
 		for _, siteIsn := range inUseIsns {
 			if account.ID == siteIsn.UserAccountID {
 				isnPerms[siteIsn.Slug] = IsnPerms{
-					Permission:      "write",
+					CanRead:         true,
+					CanWrite:        true,
 					SignalBatchID:   latestSignalBatchIDs[siteIsn.Slug],
 					SignalTypePaths: isnSignalTypePaths[siteIsn.Slug],
 					Visibility:      isnVisibility[siteIsn.Slug],
@@ -215,11 +218,11 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 				}
 			}
 		}
-		//.. and access any ISN where they were granted read or write permission by another admin or owner
-
+		//.. and access any ISN where they were granted read or write permission by another admin or the owner
 		for _, accessibleIsn := range isnsAccessibleByAccount {
 			isnPerms[accessibleIsn.IsnSlug] = IsnPerms{
-				Permission:      accessibleIsn.Permission,
+				CanRead:         accessibleIsn.CanRead,
+				CanWrite:        accessibleIsn.CanWrite,
 				SignalBatchID:   latestSignalBatchIDs[accessibleIsn.IsnSlug],
 				SignalTypePaths: isnSignalTypePaths[accessibleIsn.IsnSlug],
 				Visibility:      isnVisibility[accessibleIsn.IsnSlug],
@@ -230,7 +233,8 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 		// Member only has granted permissions (not service identites are always treated as members)
 		for _, accessibleIsn := range isnsAccessibleByAccount {
 			isnPerms[accessibleIsn.IsnSlug] = IsnPerms{
-				Permission:      accessibleIsn.Permission,
+				CanRead:         accessibleIsn.CanRead,
+				CanWrite:        accessibleIsn.CanWrite,
 				SignalBatchID:   latestSignalBatchIDs[accessibleIsn.IsnSlug],
 				SignalTypePaths: isnSignalTypePaths[accessibleIsn.IsnSlug],
 				Visibility:      isnVisibility[accessibleIsn.IsnSlug],
