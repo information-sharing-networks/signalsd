@@ -14,8 +14,8 @@ import (
 )
 
 // TestBatchLifecycle tests the complete batch lifecycle for service accounts including:
-// - Service account signal submission without batch fails with expected error
-// - Service accounts can create initial batches successfully
+// - account signal submission without batch fails with expected error
+// - accounts can create initial batches successfully
 // - Creating a second batch closes the previous batch
 //
 // Each test creates an empty temporary database and applies all the migrations so the schema reflects the latest code. The database is dropped after each test.
@@ -81,20 +81,14 @@ func TestBatchLifecycle(t *testing.T) {
 		}
 
 		// This validates the condition that would trigger the error in CreateSignalsHandler:
-		// "Service accounts must create a signal batch for this ISN before posting signals"
+		// accounts must have a signal batch for this ISN before posting signals
 		if tokenResponse.AccountType == "service_account" && tokenResponse.Perms[testISN.Slug].SignalBatchID != nil {
 			t.Error("Expected service account without batch to have nil SignalBatchID")
 		}
 	})
 
-	t.Run("service account can create initial batch", func(t *testing.T) {
-		// Verify no batch exists initially
-		initialBatch := getLatestBatchForAccountAndISN(t, ctx, testEnv.queries, serviceAccount.ID, testISN.Slug)
-		if initialBatch != nil {
-			t.Errorf("Expected no initial batch, got batch ID %v", initialBatch.ID)
-		}
-
-		// Create first batch
+	t.Run("account can create batch", func(t *testing.T) {
+		// Create batch
 		batch1, err := testEnv.queries.CreateSignalBatch(ctx, database.CreateSignalBatchParams{
 			IsnID:     testISN.ID,
 			AccountID: serviceAccount.ID,

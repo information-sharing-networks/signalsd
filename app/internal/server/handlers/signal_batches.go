@@ -77,7 +77,8 @@ type BatchSearchParams struct {
 // CreateSignalsBatchHandler godoc
 //
 //	@Summary		Create a new signal batch
-//	@Description	This endpoint is used by service accounts to create a new batch. Batches are used to track signals sent by an account to the specified ISN.
+//	@Description	This endpoint is used create a new batch for an account on the specified ISN.
+//	@Description	Batches are used to track signals sent by an account to the specified ISN (accounts can only have one open batch at a time on an ISN)
 //	@Description
 //	@Description	Opening a batch closes the previous batch (the client app can decide how long to keep a batch open)
 //	@Description
@@ -86,7 +87,8 @@ type BatchSearchParams struct {
 //	@Description	Authentication is based on the supplied access token:
 //	@Description	the site owner, the isn admin and members with an isn_perm=write can create a batch for the ISN.
 //	@Description
-//	@Description	Note this endpoint is not needed for web users (a batch is automatically created when they first write to an isn and is only closed if their permission to write to the ISN is revoked)
+//	@Description	Note: Batches are automatically created when accounts first write to an ISN,
+//	@Description	so you only need to explicitly create a batch using this endpoint if you want to track signals in separate batches.
 //	@Description
 //	@Tags		Signal Exchange
 //

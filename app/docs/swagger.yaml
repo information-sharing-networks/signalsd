@@ -353,15 +353,6 @@ definitions:
         example: user@example.com
         type: string
     type: object
-  handlers.GrantIsnAccountPermissionRequest:
-    properties:
-      can_read:
-        example: true
-        type: boolean
-      can_write:
-        example: false
-        type: boolean
-    type: object
   handlers.Isn:
     properties:
       created_at:
@@ -749,6 +740,15 @@ definitions:
       new_owner_account_id:
         example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
         type: string
+    type: object
+  handlers.UpdateIsnAccountPermissionRequest:
+    properties:
+      can_read:
+        example: true
+        type: boolean
+      can_write:
+        example: false
+        type: boolean
     type: object
   handlers.UpdateIsnRequest:
     properties:
@@ -1754,15 +1754,25 @@ paths:
   /api/isn/{isn_slug}/accounts/{account_id}:
     put:
       description: |-
-        Grant an account read or write access to an isn.
-        This end point can only be used by the site owner or the isn admin account (ISN admins can only grant permissions for ISNs they created).
+        Update an account's access permission for an ISN. Set both can_read and can_write to false to revoke all access.
+
+        This endpoint can only be used by the site owner or the ISN admin account (ISN admins can only update permissions for ISNs they created).
+
+        - Accounts with 'read' permission can view all signals on the ISN.
+        - Accounts with 'write' permission can create signals on the ISN.
+        - For accounts that need read/write access to an ISN, you must grant both 'read' and 'write' permissions.
+
+        Note that accounts with 'write' permission to an ISN are also automatically granted 'read'
+        permission for signals they created, but can't view other signals on the ISN.
+
+        You must supply values for both can_read and can_write.
       parameters:
       - description: permission details
         in: body
         name: request
         required: true
         schema:
-          $ref: '#/definitions/handlers.GrantIsnAccountPermissionRequest'
+          $ref: '#/definitions/handlers.UpdateIsnAccountPermissionRequest'
       - description: isn slug
         example: sample-isn--example-org
         in: path
@@ -1776,8 +1786,8 @@ paths:
         required: true
         type: string
       responses:
-        "204":
-          description: No Content
+        "200":
+          description: OK
         "400":
           description: Bad Request
           schema:
@@ -1792,13 +1802,14 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Grant ISN access permission
+      summary: Update an account's ISN access permission
       tags:
       - ISN Permissions
   /api/isn/{isn_slug}/batches:
     post:
       description: |
-        This endpoint is used by service accounts to create a new batch. Batches are used to track signals sent by an account to the specified ISN.
+        This endpoint is used create a new batch for an account on the specified ISN.
+        Batches are used to track signals sent by an account to the specified ISN (accounts can only have one open batch at a time on an ISN)
 
         Opening a batch closes the previous batch (the client app can decide how long to keep a batch open)
 
@@ -1807,7 +1818,8 @@ paths:
         Authentication is based on the supplied access token:
         the site owner, the isn admin and members with an isn_perm=write can create a batch for the ISN.
 
-        Note this endpoint is not needed for web users (a batch is automatically created when they first write to an isn and is only closed if their permission to write to the ISN is revoked)
+        Note: Batches are automatically created when accounts first write to an ISN,
+        so you only need to explicitly create a batch using this endpoint if you want to track signals in separate batches.
       responses:
         "201":
           description: Created
@@ -2079,8 +2091,14 @@ paths:
         - The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.
         - If a local reference is received more than once from an account for the specified signal_type a new version of the signal will be stored with a incremented version number.
         - Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.
-        - you need an open batch to submit signals on the ISN (service accounts need to manually create a new batch on the ISN before posting any signals,
-        web users have a batch automatically created when they first write to an ISN).
+
+        **Batches**
+
+        Batches group separate loads for reporting and tracking purposes.
+        - There is no need to explicitly create a batch before loading - a new batch is automatically created when an account first starts sending signals to an ISN.
+        - Accounts that wish to start a new batch for tracking purposes can do so using the /api/isn/{isn_slug}/batches endpoint.
+        - Each account can only have a single ISN batch open at a time. Opening a new batch will automatically close the previous batch.
+        - Signals are always stored in the context of the account's currently open batch.
 
         **Authentication**
 
@@ -2359,17 +2377,6 @@ paths:
       summary: Signal Search (public ISNs)
       tags:
       - Signal Exchange
-  /api/webhooks:
-    post:
-      description: register a webhook to recieve signals batch status updates
-      responses:
-        "204":
-          description: Not implemented
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      summary: Register webhook (TODO)
-      tags:
-      - Service Accounts
   /health/live:
     get:
       description: Check if the signalsd http service is alive and responding.
@@ -2400,44 +2407,6 @@ paths:
       summary: Readiness Check
       tags:
       - Health
-  /isn/{isn_slug}/accounts/{account_id}:
-    delete:
-      description: |-
-        Revoke an account read or write access to an isn.
-        This end point can only be used by the site owner or the isn admin account (ISN admins can only revoke permissions for ISNs they created)
-      parameters:
-      - description: isn slug
-        example: sample-isn--example-org
-        in: path
-        name: isn_slug
-        required: true
-        type: string
-      - description: account id
-        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
-        in: path
-        name: account_id
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Revoke ISN access permission
-      tags:
-      - ISN Permissions
   /isn/{isn_slug}/batches/{batch_id}/status:
     get:
       description: |

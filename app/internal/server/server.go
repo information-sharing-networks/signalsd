@@ -275,8 +275,7 @@ func (s *Server) registerAdminRoutes() {
 						r.Delete("/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}", signalTypes.DeleteSignalTypeHandler)
 
 						// ISN account permissions
-						r.Put("/{isn_slug}/accounts/{account_id}", isnAccount.GrantIsnAccountHandler)
-						r.Delete("/{isn_slug}/accounts/{account_id}", isnAccount.RevokeIsnAccountHandler)
+						r.Put("/{isn_slug}/accounts/{account_id}", isnAccount.UpdateIsnAccountPermissionHandler)
 						r.Get("/{isn_slug}/accounts", isnAccount.GetIsnAccountsHandler)
 
 					})
@@ -345,7 +344,6 @@ func (s *Server) registerAdminRoutes() {
 
 // registerSignalWriteRoutes registers signal write routes
 func (s *Server) registerSignalWriteRoutes() {
-	webhooks := handlers.NewWebhookHandler(s.queries)
 	signals := handlers.NewSignalsHandler(s.queries, s.pool, s.schemaCache, s.publicIsnCache)
 
 	s.router.Group(func(r chi.Router) {
@@ -360,8 +358,6 @@ func (s *Server) registerSignalWriteRoutes() {
 		// signal withdrawal
 		r.Put("/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/withdraw", signals.WithdrawSignalHandler)
 
-		// webhooks - todo
-		r.Post("/api/webhooks", webhooks.HandlerWebhooks)
 	})
 }
 

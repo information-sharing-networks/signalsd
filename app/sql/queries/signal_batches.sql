@@ -16,45 +16,19 @@ INSERT INTO signal_batches (
 )
 RETURNING *;
 
--- name: CreateOrGetWebUserSignalBatch :one
-WITH isn_record AS (
-    SELECT id
-    FROM isn
-    WHERE isn.slug = $1
-),
-inserted AS (
-    INSERT INTO signal_batches (
-        id,
-        created_at,
-        updated_at,
-        isn_id,
-        account_id,
-        is_latest
-    )
-    SELECT
-        gen_random_uuid(),
-        now(),
-        now(),
-        isn_record.id,
-        $2, -- account_id
-        TRUE
-    FROM isn_record
-    ON CONFLICT (account_id, isn_id) WHERE is_latest = TRUE
-    DO NOTHING
-    RETURNING id
-)
-SELECT id as batch_id FROM inserted
-UNION ALL
-SELECT sb.id as batch_id FROM signal_batches sb
-JOIN isn ON sb.isn_id = isn.id
-WHERE sb.account_id = $2 AND sb.is_latest = TRUE
-  AND NOT EXISTS (SELECT 1 FROM inserted);
-
-
 -- name: CloseISNSignalBatchByAccountID :execrows
 UPDATE signal_batches 
 SET is_latest = FALSE
 WHERE isn_id = $1 and account_id = $2;
+
+-- name: ExistsSignalBatchForAccountAndIsnId :one
+SELECT EXISTS(
+    SELECT 1
+    FROM signal_batches
+    WHERE isn_id = $1
+    AND account_id = $2
+    AND is_latest = TRUE
+) AS exists;
 
 -- name: GetLatestIsnSignalBatchesByAccountID :many
 SELECT sb.*, i.slug as isn_slug FROM signal_batches sb 
@@ -69,6 +43,12 @@ JOIN isn i
 ON i.id = sb.isn_id
 WHERE sb.account_id = $1
 AND i.slug = $2
+AND sb.is_latest = TRUE;
+
+-- name: GetLatestBatchByAccountAndIsnID :one
+SELECT sb.* FROM signal_batches sb
+WHERE sb.account_id = $1
+AND sb.isn_id = $2
 AND sb.is_latest = TRUE;
 
 -- name: GetLatestSignalBatchByIsnSlugAndBatchID :one

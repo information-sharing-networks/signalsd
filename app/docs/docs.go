@@ -1108,11 +1108,11 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Grant an account read or write access to an isn.\nThis end point can only be used by the site owner or the isn admin account (ISN admins can only grant permissions for ISNs they created).",
+                "description": "Update an account's access permission for an ISN. Set both can_read and can_write to false to revoke all access.\n\nThis endpoint can only be used by the site owner or the ISN admin account (ISN admins can only update permissions for ISNs they created).\n\n- Accounts with 'read' permission can view all signals on the ISN.\n- Accounts with 'write' permission can create signals on the ISN.\n- For accounts that need read/write access to an ISN, you must grant both 'read' and 'write' permissions.\n\nNote that accounts with 'write' permission to an ISN are also automatically granted 'read'\npermission for signals they created, but can't view other signals on the ISN.\n\nYou must supply values for both can_read and can_write.",
                 "tags": [
                     "ISN Permissions"
                 ],
-                "summary": "Grant ISN access permission",
+                "summary": "Update an account's ISN access permission",
                 "parameters": [
                     {
                         "description": "permission details",
@@ -1120,7 +1120,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.GrantIsnAccountPermissionRequest"
+                            "$ref": "#/definitions/handlers.UpdateIsnAccountPermissionRequest"
                         }
                     },
                     {
@@ -1141,8 +1141,8 @@ const docTemplate = `{
                     }
                 ],
                 "responses": {
-                    "204": {
-                        "description": "No Content"
+                    "200": {
+                        "description": "OK"
                     },
                     "400": {
                         "description": "Bad Request",
@@ -1172,7 +1172,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "This endpoint is used by service accounts to create a new batch. Batches are used to track signals sent by an account to the specified ISN.\n\nOpening a batch closes the previous batch (the client app can decide how long to keep a batch open)\n\nSignals can only be sent to open batches.\n\nAuthentication is based on the supplied access token:\nthe site owner, the isn admin and members with an isn_perm=write can create a batch for the ISN.\n\nNote this endpoint is not needed for web users (a batch is automatically created when they first write to an isn and is only closed if their permission to write to the ISN is revoked)\n",
+                "description": "This endpoint is used create a new batch for an account on the specified ISN.\nBatches are used to track signals sent by an account to the specified ISN (accounts can only have one open batch at a time on an ISN)\n\nOpening a batch closes the previous batch (the client app can decide how long to keep a batch open)\n\nSignals can only be sent to open batches.\n\nAuthentication is based on the supplied access token:\nthe site owner, the isn admin and members with an isn_perm=write can create a batch for the ISN.\n\nNote: Batches are automatically created when accounts first write to an ISN,\nso you only need to explicitly create a batch using this endpoint if you want to track signals in separate batches.\n",
                 "tags": [
                     "Signal Exchange"
                 ],
@@ -1536,7 +1536,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Submit an array of signals for storage on the ISN\n- payloads must not mix signals of different types and are subject to the size limits defined on the site.\n- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.\n- If a local reference is received more than once from an account for the specified signal_type a new version of the signal will be stored with a incremented version number.\n- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.\n- you need an open batch to submit signals on the ISN (service accounts need to manually create a new batch on the ISN before posting any signals,\nweb users have a batch automatically created when they first write to an ISN).\n\n**Authentication**\n\nRequires a valid access token.\nThe claims in the access token list the ISNs and signal_types that the account is permitted to use.\n\n**Error handling**\n\nif the request is a vaild format but individual signals contain errors (validation errors, incorrect correlation ids, database errors) the errors are recorded in the response but do not prevent other signals from being processed.\nIndividual failures are logged and can be tracked using the signals_batch_id returned in the response - see the batch status endpoint.\n\nErrors that relate to the entire request  - e.g invalid json, authentication, permission and server errors (400, 401, 403, 500) - are not recorded and should be handled by the client immediately.\n\n**JSON Schema Validation**\n\nSignals are validated against the JSON schema specified for the signal type unless validation is disabled on the type definition.\n\nWhen validation is disabled, basic checks are still done on the incoming data and the following issues create a 400 error and cause the entire payload to be rejected:\n- invalid json format\n- missing fields (the array of signals must be in a json object called signals, and content and local_ref must be present for each record).\n\n**Signal versions**\n\nMultiple versions are created when signals are resupplied using the same local_ref, e.g. because the client wants to correct a previously publsihed signal.\nBy default search will return the latest version of the signal.\nIf a signal has been withdrawn it will be reactivated if you resubmit it using the same local_ref.\n\n**Correlating signals**\n\nCorrelation IDs can be used to link signals together.  Signals can only be correlated within the same ISN.\nIf the supplied correlation_id is not found in the same ISN as the signal being submitted, the response will contain a 422 or 207 status code and the error_code for the failed signal will be ` + "`" + `invalid_correlation_id` + "`" + `.\n\nrequest level errors (e.g. invalid json, authentication failure etc) return a simple error_code/error_message response rather than a detailed audit log",
+                "description": "Submit an array of signals for storage on the ISN\n- payloads must not mix signals of different types and are subject to the size limits defined on the site.\n- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.\n- If a local reference is received more than once from an account for the specified signal_type a new version of the signal will be stored with a incremented version number.\n- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.\n\n**Batches**\n\nBatches group separate loads for reporting and tracking purposes.\n- There is no need to explicitly create a batch before loading - a new batch is automatically created when an account first starts sending signals to an ISN.\n- Accounts that wish to start a new batch for tracking purposes can do so using the /api/isn/{isn_slug}/batches endpoint.\n- Each account can only have a single ISN batch open at a time. Opening a new batch will automatically close the previous batch.\n- Signals are always stored in the context of the account's currently open batch.\n\n**Authentication**\n\nRequires a valid access token.\nThe claims in the access token list the ISNs and signal_types that the account is permitted to use.\n\n**Error handling**\n\nif the request is a vaild format but individual signals contain errors (validation errors, incorrect correlation ids, database errors) the errors are recorded in the response but do not prevent other signals from being processed.\nIndividual failures are logged and can be tracked using the signals_batch_id returned in the response - see the batch status endpoint.\n\nErrors that relate to the entire request  - e.g invalid json, authentication, permission and server errors (400, 401, 403, 500) - are not recorded and should be handled by the client immediately.\n\n**JSON Schema Validation**\n\nSignals are validated against the JSON schema specified for the signal type unless validation is disabled on the type definition.\n\nWhen validation is disabled, basic checks are still done on the incoming data and the following issues create a 400 error and cause the entire payload to be rejected:\n- invalid json format\n- missing fields (the array of signals must be in a json object called signals, and content and local_ref must be present for each record).\n\n**Signal versions**\n\nMultiple versions are created when signals are resupplied using the same local_ref, e.g. because the client wants to correct a previously publsihed signal.\nBy default search will return the latest version of the signal.\nIf a signal has been withdrawn it will be reactivated if you resubmit it using the same local_ref.\n\n**Correlating signals**\n\nCorrelation IDs can be used to link signals together.  Signals can only be correlated within the same ISN.\nIf the supplied correlation_id is not found in the same ISN as the signal being submitted, the response will contain a 422 or 207 status code and the error_code for the failed signal will be ` + "`" + `invalid_correlation_id` + "`" + `.\n\nrequest level errors (e.g. invalid json, authentication failure etc) return a simple error_code/error_message response rather than a detailed audit log",
                 "tags": [
                     "Signal Exchange"
                 ],
@@ -1873,23 +1873,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/webhooks": {
-            "post": {
-                "description": "register a webhook to recieve signals batch status updates",
-                "tags": [
-                    "Service Accounts"
-                ],
-                "summary": "Register webhook (TODO)",
-                "responses": {
-                    "204": {
-                        "description": "Not implemented",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/health/live": {
             "get": {
                 "description": "Check if the signalsd http service is alive and responding.",
@@ -1931,61 +1914,6 @@ const docTemplate = `{
                         "description": "Service Unavailable - Database connection failed",
                         "schema": {
                             "type": "string"
-                        }
-                    }
-                }
-            }
-        },
-        "/isn/{isn_slug}/accounts/{account_id}": {
-            "delete": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "Revoke an account read or write access to an isn.\nThis end point can only be used by the site owner or the isn admin account (ISN admins can only revoke permissions for ISNs they created)",
-                "tags": [
-                    "ISN Permissions"
-                ],
-                "summary": "Revoke ISN access permission",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "sample-isn--example-org",
-                        "description": "isn slug",
-                        "name": "isn_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
-                        "description": "account id",
-                        "name": "account_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -2699,19 +2627,6 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.GrantIsnAccountPermissionRequest": {
-            "type": "object",
-            "properties": {
-                "can_read": {
-                    "type": "boolean",
-                    "example": true
-                },
-                "can_write": {
-                    "type": "boolean",
-                    "example": false
-                }
-            }
-        },
         "handlers.Isn": {
             "type": "object",
             "properties": {
@@ -3254,6 +3169,19 @@ const docTemplate = `{
                 "new_owner_account_id": {
                     "type": "string",
                     "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3"
+                }
+            }
+        },
+        "handlers.UpdateIsnAccountPermissionRequest": {
+            "type": "object",
+            "properties": {
+                "can_read": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "can_write": {
+                    "type": "boolean",
+                    "example": false
                 }
             }
         },

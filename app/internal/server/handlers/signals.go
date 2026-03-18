@@ -314,8 +314,14 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 //	@Description	- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.
 //	@Description	- If a local reference is received more than once from an account for the specified signal_type a new version of the signal will be stored with a incremented version number.
 //	@Description	- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.
-//	@Description	- you need an open batch to submit signals on the ISN (service accounts need to manually create a new batch on the ISN before posting any signals,
-//	@Description	web users have a batch automatically created when they first write to an ISN).
+//	@Description
+//	@Description	**Batches**
+//	@Description
+//	@Description	Batches group separate loads for reporting and tracking purposes.
+//	@Description	- There is no need to explicitly create a batch before loading - a new batch is automatically created when an account first starts sending signals to an ISN.
+//	@Description	- Accounts that wish to start a new batch for tracking purposes can do so using the /api/isn/{isn_slug}/batches endpoint.
+//	@Description	- Each account can only have a single ISN batch open at a time. Opening a new batch will automatically close the previous batch.
+//	@Description	- Signals are always stored in the context of the account's currently open batch.
 //	@Description
 //	@Description	**Authentication**
 //	@Description
@@ -447,40 +453,66 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	// Ensure signal batch exists
-	// The code below will automatically create batches for web users, assuming the don't already have one.
-	// Note: when a new batch is created for a web user, the batch ID contained in the claims will not be updated until the next access token is issued -
-	// consequently, we need continue to check the database for the latest batch while the session is open.
-	// This is not ideal, but the alternative (ensuring user batches are always created in advance) is messy as it involves creating new user batches at multiple points in the code.
-	//
-	// Service accounts are expected to explicitly start batches.
-
+	// Create a signal batch if needed
 	var signalBatchID uuid.UUID
 
-	if claims.IsnPerms[isnSlug].SignalBatchID == nil {
-		if claims.AccountType == "service_account" {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "Service accounts must create a signal batch for this ISN before posting signals")
-			return
-		} else {
-			// create a new batch for the user if this is first time writing to the isn (the query below returns the initial batch ID for all subsequent requests in this session)
-			signalBatchID, err = s.queries.CreateOrGetWebUserSignalBatch(r.Context(), database.CreateOrGetWebUserSignalBatchParams{
-				Slug:      isnSlug,
-				AccountID: accountID,
-			})
-			if err != nil {
-				logger.ContextWithLogAttrs(r.Context(),
-					slog.String("error", err.Error()),
-					slog.String("isn_slug", isnSlug),
-				)
-
-				responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-				return
-			}
-		}
-	} else {
+	if claims.IsnPerms[isnSlug].SignalBatchID != nil {
 		signalBatchID = *claims.IsnPerms[isnSlug].SignalBatchID
+
+	} else {
+
+		// get isn ID
+		isn, err := s.queries.GetIsnBySlug(r.Context(), isnSlug)
+		if err != nil {
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("error", err.Error()),
+			)
+
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+			return
+		}
+
+		// check batch database table for an existing batch for this account and ISN
+		exists, err := s.queries.ExistsSignalBatchForAccountAndIsnId(r.Context(), database.ExistsSignalBatchForAccountAndIsnIdParams{
+			AccountID: accountID,
+			IsnID:     isn.ID,
+		})
+		if err != nil {
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("error", err.Error()),
+			)
+
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+			return
+		}
+
+		// if exists - internal error - the batch id should have been in the claims
+		if exists {
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("error", "batch exists but no batch id in claims"),
+			)
+
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "internal error - batch exists but no batch id in claims")
+			return
+		}
+		// create a new batch
+		batch, err := s.queries.CreateSignalBatch(r.Context(), database.CreateSignalBatchParams{
+			IsnID:     isn.ID,
+			AccountID: accountID,
+		})
+		if err != nil {
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("error", err.Error()),
+			)
+
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+			return
+		}
+
+		signalBatchID = batch.ID
 	}
 
+	// prepare response
 	createSignalsResponse := CreateSignalsResponse{
 		IsnSlug:        isnSlug,
 		SignalTypePath: signalTypePath,

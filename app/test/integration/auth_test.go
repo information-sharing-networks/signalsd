@@ -62,7 +62,6 @@ func TestPermissions(t *testing.T) {
 	grantPermission(t, ctx, testEnv.queries, publicISN.ID, serviceAccount.ID, "write")
 
 	// Create signal batches
-	// note only service accounts need to create batches explicitly - user accounts automatically create batches when they write to an isn
 	createTestSignalBatch(t, ctx, testEnv.queries, publicISN.ID, serviceAccount.ID)
 
 	var validSignalTypePaths = make(map[string]string)
