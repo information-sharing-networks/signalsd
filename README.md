@@ -46,16 +46,15 @@ This repo contains the second version of the service, which develops the ISN adm
 
 There are three components:
 - an [API](https://signalsd.corridorone.uk/docs) used to configure ISNs, register participants and deploy the data sharing infrastructure
-- an associated [framework agreement](https://github.com/information-sharing-networks/Framework) that establishes the responsibilities of the participants in an ISN
 - a demonstration [UI](app/internal/ui/README.md)
+- an associated [framework agreement](https://github.com/information-sharing-networks/Framework) that establishes the responsibilities of the participants in an ISN
 
 ## Credits
 Many thanks to [Ross McDonald](https://github.com/rossajmcd) who came up with the concept and created the initial reference implementation.
 
 # Developer Guide
 
-## Quick Start (Docker Development Environment)
-the simplest approach to get a dev environment is to to use the included Docker configuration.
+## Quick Start (Docker)
 
 **Prerequisites**:
 
@@ -63,15 +62,13 @@ to run the service you need [Docker Desktop](https://docs.docker.com/get-docker)
 
 If you are planning to change the software you will also need to install [Go](https://go.dev/doc/install)
 
-**Clone the repo**:
+**Running the app**:
 ```bash
+# Clone the repo
 git clone https://github.com/information-sharing-networks/signalsd.git
-cd signalsd
-```
 
-### Using the Docker Environment
-```bash
 # Start the service and database
+cd signalsd
 make docker-up
 ```
 The service starts on [http://localhost:8080](http://localhost:8080) by default.
@@ -86,13 +83,16 @@ the `make` commands below are a shortcut for the corresponding `docker compose` 
 # you can override default environment variables by setting them in your shell before running the command, for example:
 PORT=8081 make docker-up
 
-make docker-up-db # start the database container only
-make docker-up-app # start the app container only
+# start the database container only
+make docker-up-db 
+
+# start the app container only
+make docker-up-app 
 
 # Rebuild the image when there is a change to:
 # - Dockerfile
 # - go.mod/go.sum (new dependencies)
-docker compose up --build app
+make docker-build
 
 # Stop the service and database
 make docker-down
@@ -104,22 +104,31 @@ make help
 The API documentation is hosted as part of the service or you can refer to the [docs](https://signals.corridorone.uk/docs) for the current release.
 
 ## Environment Variables
-The service has sensible defaults for all configuration values. You only need to set environment variables to override the defaults.
+The service has sensible defaults for all configuration values when running locally.
+You only need to set environment variables to override the defaults.
 A sample config is below:
 
 ```bash
-# Required (for production and local dev environments)
-DATABASE_URL=postgres://user:password@host:port/database?sslmode=disable # note production urls must use ssl.
-SECRET_KEY=your-random-secret-key-here # Generate with: openssl rand -base64 64
-PUBLIC_BASE_URL=https://yourdomain.com # Base URL for user facing links(e.g one-time password links (default: http://localhost:8080)
+# **Required in production**
+#
+# Database URL - note production urls must use ssl.
+DATABASE_URL=postgres://user:password@host:port/database?sslmode=require
+# Secret key used by the server to sign JWT tokens
+SECRET_KEY=your-random-secret-key
+# Base URL for user facing links, e.g one-time password links (default: http://localhost:8080)
+PUBLIC_BASE_URL=https://your-server-domain.com 
+# CORS origins - list sites that are allowed to use the API
+ALLOWED_ORIGINS=https://your-ui-domain.com  #  use a pipe seperated list for multiple sites
 
-# Server Configuration (all optional - defaults shown)
-HOST=0.0.0.0                          # Bind address (default: 0.0.0.0)
-PORT=8080                             # Server port (default: 8080)
+# **Optional configuration - defaults shown**
+#
+# Server Configuration 
+HOST=0.0.0.0                          #  Bind address (default: 0.0.0.0)
+PORT=8080                             #  Server port (default: 8080)
 ENVIRONMENT=dev                       #  Options: dev, prod, test, perf, staging (default: dev)
 LOG_LEVEL=debug                       #  Options: debug, info, warn, error (default: debug)
 
-# Performance Tuning (all optional - defaults shown)
+# Performance Tuning 
 READ_TIMEOUT=15s                      #  HTTP read timeout 
 WRITE_TIMEOUT=15s                     #  HTTP write timeout 
 IDLE_TIMEOUT=60s                      #  HTTP idle timeout 
@@ -128,9 +137,6 @@ RATE_LIMIT_BURST=5000                 #  Burst allowance
 MAX_SIGNAL_PAYLOAD_SIZE=5242880       #  Max payload size (default: 5MB)
 MAX_API_REQUEST_SIZE=65536            #  Max API request size (default: 64KB)
 
-# Security - list sites that are allowed to use the service
-ALLOWED_ORIGINS=https://mydomain.com  #  CORS origins (use a pipe seperated list for multiple sites)
-
 # Database Connection Pool (the default used are the same as those used by pgx )
 DB_MAX_CONNECTIONS=4
 DB_MIN_CONNECTIONS=0                  #  Allow scaling to zero (Cloud Run)
@@ -138,15 +144,15 @@ DB_MAX_CONN_LIFETIME=60m
 DB_MAX_CONN_IDLE_TIME=30m
 DB_CONNECT_TIMEOUT=5s
 ```
-
-**Note**: In the Docker development environment, DATABASE_URL and SECRET_KEY are automatically configured with development-appropriate defaults. In production you should use a secret management service to supply these two settings.
+**Note**
+DATABASE_URL and SECRET_KEY contain sensitive information - production versions should be managed via a secrets management system (for local docker environments these values are set in `docker-compose.yml`)
 
 ### Development Tools
 
-The app uses the following external tools:
+The app uses the following go tools:
 - goose - database migrations
 - sqlc - type safe SQL queries
-- swag - generates OpenAPI from go comments
+- swag - OpenAPI from go comments
 - staticcheck - linter
 - gosec - security analysis
 - templ - ui templates
@@ -183,15 +189,6 @@ Schema changes are made by adding files to `app/sql/schema`:
 ```
 For docker users the migration are applied automatically whenever you restart the app container (use `make migrate` to run mannually). 
 
-If you are developing locally, run the goose `up` command after pulling code from the GitHub repo or adding new migration files:
-```bash
-# Update the database to the current version (this command applies any new migrations):
-goose -dir app/sql/schema postgres $DATABASE_URL up # if goose is installed locally
-
-# to reset the database to the initial state, dropping all database objects with
-goose -dir app/sql/schema postgres $DATABASE_URL down-to 0
-```
-
 ## API Documentation
 To generate the OpenAPI docs:
 ```bash
@@ -202,9 +199,11 @@ For docker users, the docs are automatically created when Air live reload restar
 ## SQL Queries
 SQL queries are kept in `app/sql/queries`.
 
-Run `sqlc generate` from the root of the project to regenerate the type safe Go code after adding or altering any queries (runs automatically for docker users)
+Run `make sqlc` to regenerate the type safe Go code after adding or altering any queries (runs automatically for docker users)
 
 ## Testing
+`make test` will run the unit and integration tests.
+
 `make check` will run all the security, linting, unit and integration tests.
 
 For information about the testing strategy and how to run indvidual tests, see the [Integration Testing Documentation](app/test/integration/README.md).
@@ -216,7 +215,7 @@ By default the signalsd service starts with a basic web interface. If you want t
 
 ## Getting Help
 - Check the [API documentation](https://signalsd.corridorone.uk/docs)
-- Review logs: `docker compose logs -f`
+- Review logs: `make logs`
 - Open an [issue](https://github.com/information-sharing-networks/signalsd/issues) on GitHub
 
 
@@ -251,7 +250,7 @@ See GitHub Actions workflows in `.github/workflows/`
 ```bash
 # 1. Test and prepare
 git checkout main && git pull origin main
-cd app && go test ./... && cd ..
+make check
 
 # 2. Create and push version tag; build locally with version info
 build.sh -t patch|minor|major
@@ -286,7 +285,6 @@ PORT=8082 go run cmd/signalsd/main.go run signals-write
 The simplest configuration is to run containers that serve all endpoints.  This is the configuration used by the github actions CD pipeline but - although fine for testing - it is not recommended for production use.
 
 ![deploy.0.2.0](https://github.com/user-attachments/assets/942384a7-ccd7-4abb-b2a7-a9e293e23a10)
-
 
 ### Separate Admin vs Signals containers config
 It is a good idea to separate the admin api container from the signals exchange containers: although they still share a common database, it will ensure that admin requests are not blocked when there are a large number of concurrent signal processing requests.
@@ -424,11 +422,3 @@ READ_TIMEOUT=30s
 WRITE_TIMEOUT=30s
 IDLE_TIMEOUT=120s
 ```
-
-### 7. Cost Considerations
-Note that at the time of writing this service operates within the free-tiers offered by Google and Neon.Tech, but you should check the current rules to be sure.
-
-That's it!
-
-
-
