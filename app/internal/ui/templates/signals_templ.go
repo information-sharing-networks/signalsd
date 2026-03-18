@@ -288,7 +288,7 @@ func SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions, par
 					return templ_7745c5c3_Err
 				}
 				if params.IncludeCorrelated {
-					endpoint := fmt.Sprintf("/ui-api/isn/%s/signal_types/%s/v%s/signals/%s/correlated-count/%d", params.IsnSlug, params.SignalTypeSlug, params.SemVer, signal.SignalID, len(signal.CorrelatedSignals))
+					endpoint := fmt.Sprintf("/ui-api/isn/%s/signal-types/%s/v%s/signals/%s/correlated-count/%d", params.IsnSlug, params.SignalTypeSlug, params.SemVer, signal.SignalID, len(signal.CorrelatedSignals))
 					tableTarget := fmt.Sprintf("#correlated-signals-table-%s", signal.SignalID)
 					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "<div hx-get=\"")
 					if templ_7745c5c3_Err != nil {

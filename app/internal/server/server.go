@@ -269,10 +269,10 @@ func (s *Server) registerAdminRoutes() {
 						r.Put("/{isn_slug}", isn.UpdateIsnHandler)
 
 						// signal types managment
-						r.Post("/{isn_slug}/signal_types", signalTypes.CreateSignalTypeHandler)
-						r.Post("/{isn_slug}/signal_types/{signal_type_slug}/schemas", signalTypes.RegisterNewSignalTypeSchemaHandler)
-						r.Put("/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}", signalTypes.UpdateSignalTypeHandler)
-						r.Delete("/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}", signalTypes.DeleteSignalTypeHandler)
+						r.Post("/{isn_slug}/signal-types", signalTypes.CreateSignalTypeHandler)
+						r.Post("/{isn_slug}/signal-types/{signal_type_slug}/schemas", signalTypes.RegisterNewSignalTypeSchemaHandler)
+						r.Put("/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}", signalTypes.UpdateSignalTypeHandler)
+						r.Delete("/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}", signalTypes.DeleteSignalTypeHandler)
 
 						// ISN account permissions
 						r.Put("/{isn_slug}/accounts/{account_id}", isnAccount.UpdateIsnAccountPermissionHandler)
@@ -293,8 +293,8 @@ func (s *Server) registerAdminRoutes() {
 					// view ISN and signal type details
 					r.Get("/", isn.GetIsnsHandler)
 					r.Get("/{isn_slug}", isn.GetIsnHandler)
-					r.Get("/{isn_slug}/signal_types", signalTypes.GetSignalTypesHandler)
-					r.Get("/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}", signalTypes.GetSignalTypeHandler)
+					r.Get("/{isn_slug}/signal-types", signalTypes.GetSignalTypesHandler)
+					r.Get("/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}", signalTypes.GetSignalTypeHandler)
 				})
 
 			})
@@ -353,10 +353,10 @@ func (s *Server) registerSignalWriteRoutes() {
 		r.Use(s.authService.RequireIsnPermission("write"))
 
 		// signals post
-		r.Post("/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals", signals.CreateSignalsHandler)
+		r.Post("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals", signals.CreateSignalsHandler)
 
 		// signal withdrawal
-		r.Put("/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/withdraw", signals.WithdrawSignalHandler)
+		r.Put("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/withdraw", signals.WithdrawSignalHandler)
 
 	})
 }
@@ -368,7 +368,7 @@ func (s *Server) registerSignalReadRoutes() {
 	// Public ISN signal search - no authentication required
 	s.router.Group(func(r chi.Router) {
 		r.Use(middleware.CORS(s.corsConfigs.Public))
-		r.Get("/api/public/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search", signals.SearchPublicSignalsHandler)
+		r.Get("/api/public/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search", signals.SearchPublicSignalsHandler)
 	})
 
 	// Private ISN signal search - authentication required
@@ -376,7 +376,7 @@ func (s *Server) registerSignalReadRoutes() {
 		r.Use(middleware.CORS(s.corsConfigs.Protected))
 		r.Use(s.authService.RequireValidAccessToken)
 		r.Use(s.authService.RequireIsnPermission("read", "write"))
-		r.Get("/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search", signals.SearchPrivateSignalsHandler)
+		r.Get("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search", signals.SearchPrivateSignalsHandler)
 	})
 
 }

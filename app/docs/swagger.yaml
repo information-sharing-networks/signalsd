@@ -1830,7 +1830,7 @@ paths:
       summary: Create a new signal batch
       tags:
       - Signal Exchange
-  /api/isn/{isn_slug}/signal_types:
+  /api/isn/{isn_slug}/signal-types:
     get:
       description: Get details for all the signal types defined on the ISN
       parameters:
@@ -1876,7 +1876,7 @@ paths:
 
         To register a new schema for an existing signal type, use the RegisterRegisterNewSignalTypeSchema endpoint
 
-        Signal type definitions are referred to like this: /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver} (e.g., /api/isn/sample-isn--example-org/signal_types/sample-signal--example-org/v0.0.1)
+        Signal type definitions are referred to like this: /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver} (e.g., /api/isn/sample-isn--example-org/signal-types/sample-signal--example-org/v0.0.1)
       parameters:
       - description: signal type details
         in: body
@@ -1906,7 +1906,7 @@ paths:
       summary: Create signal type
       tags:
       - Signal Type Definitions
-  /api/isn/{isn_slug}/signal_types/{signal_type_slug}/schemas:
+  /api/isn/{isn_slug}/signal-types/{signal_type_slug}/schemas:
     post:
       description: |-
         You must specify a schema_url that has not been previously registered for this signal type.
@@ -1941,7 +1941,7 @@ paths:
       summary: Registe a new schema for an existing signal type
       tags:
       - Signal Type Definitions
-  /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}:
+  /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}:
     delete:
       description: Only signal types that have never been referenced by signals can
         be deleted
@@ -2083,7 +2083,7 @@ paths:
       summary: Update signal type
       tags:
       - Signal Type Definitions
-  /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals:
+  /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals:
     post:
       description: |-
         Submit an array of signals for storage on the ISN
@@ -2192,7 +2192,7 @@ paths:
       summary: Create signals
       tags:
       - Signal Exchange
-  /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search:
+  /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search:
     get:
       description: |-
         Search for signals by date or account in private ISNs (authentication required - only accounts with read or write permissions to the ISN can access signals).
@@ -2257,7 +2257,7 @@ paths:
       summary: Signal Search (private ISNs)
       tags:
       - Signal Exchange
-  /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/withdraw:
+  /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/withdraw:
     put:
       description: |-
         Withdraw a signal by local reference
@@ -2314,7 +2314,7 @@ paths:
       summary: Withdraw a signal
       tags:
       - Signal Exchange
-  /api/public/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver}/signals/search:
+  /api/public/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search:
     get:
       description: |-
         Search for signals in public ISNs (no authentication required).
