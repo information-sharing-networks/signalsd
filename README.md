@@ -30,7 +30,7 @@ The service makes it easy to establish new networks and to control the data that
 
 Many data sharing initiatives encounter difficulties because they attempt to anticipate every possible need across multiple organisations, requiring extensive planning, complex agreements, and data models designed to cover scenarios that may never materialise.
 
-ISNs work differently: a network is set up for a specific business purpose - such as tracking shipments, sharing compliance data, or coordinating approvals - and only the necessary signals for that purpose are defined. As new requirements emerge, additional signal types can be introduced without disrupting existing processes.
+ISNs are different: a network is set up for a specific business purpose - such as tracking shipments, sharing compliance data, or coordinating approvals - and only the necessary signals for that purpose are defined. As new requirements emerge, additional signal types can be introduced without disrupting existing processes.
 
 This approach enables rapid implementation of effective data sharing, while maintaining flexibility as business relationships evolve.
 
@@ -42,7 +42,7 @@ Signal types are defined as JSON schemas and the service can (optionally) valida
 ## Reference Implementations
 The [initial implementation](https://github.com/information-sharing-networks/isn-ref-impl) was a proof of concept used as part of the UK government's Border Trade Demonstrator (BTD) initiative. The BTDs established ISNs that were used by several government agencies and industry groups to improve processes at the border by sharing supply chain information.
 
-This repo contains the second version (work in progress) - it develops the ISN administration facilities and is designed to scale to higher volumes of data.
+This repo contains the second version of the service, which develops the ISN administration facilities and is designed to scale to higher volumes of data.
 
 There are three components:
 - an [API](https://signalsd.corridorone.uk/docs) used to configure ISNs, register participants and deploy the data sharing infrastructure
@@ -54,8 +54,58 @@ Many thanks to [Ross McDonald](https://github.com/rossajmcd) who came up with th
 
 # Developer Guide
 
+## Quick Start (Docker Development Environment)
+the simplest approach to get a dev environment is to to use the included Docker configuration.
+
+**Prerequisites**:
+
+to run the service you need [Docker Desktop](https://docs.docker.com/get-docker)
+
+If you are planning to change the software you will also need to install [Go](https://go.dev/doc/install)
+
+**Clone the repo**:
+```bash
+git clone https://github.com/information-sharing-networks/signalsd.git
+cd signalsd
+```
+
+### Using the Docker Environment
+```bash
+# Start the service and database
+make docker-up
+```
+The service starts on [http://localhost:8080](http://localhost:8080) by default.
+
+The docker compose file in the root of the repo (`docker-compose.yml`) starts the service and a PostgreSQL database (the containers are called `app` and `db` respectively).
+
+The docker compose file mounts the local repo directory into the app container, so you can edit code locally and see the changes in the container.  The app container has all the tools you need to test and run the service.
+
+the `make` commands below are a shortcut for the corresponding `docker compose` commands.  They are defined in the `Makefile` in the root of the repo.  If you prefer you can use `docker compose` directly.
+
+```bash
+# you can override default environment variables by setting them in your shell before running the command, for example:
+PORT=8081 make docker-up
+
+make docker-up-db # start the database container only
+make docker-up-app # start the app container only
+
+# Rebuild the image when there is a change to:
+# - Dockerfile
+# - go.mod/go.sum (new dependencies)
+docker compose up --build app
+
+# Stop the service and database
+make docker-down
+
+# see all available make targets
+make help
+```
+
+The API documentation is hosted as part of the service or you can refer to the [docs](https://signals.corridorone.uk/docs) for the current release.
+
 ## Environment Variables
 The service has sensible defaults for all configuration values. You only need to set environment variables to override the defaults.
+A sample config is below:
 
 ```bash
 # Required (for production and local dev environments)
@@ -91,64 +141,6 @@ DB_CONNECT_TIMEOUT=5s
 
 **Note**: In the Docker development environment, DATABASE_URL and SECRET_KEY are automatically configured with development-appropriate defaults. In production you should use a secret management service to supply these two settings.
 
-
-## Quick Start (Docker Development Environment)
-the simplest approach to get a dev environment is to to use the included Docker configuration (If you want to install the software, database and tools locally then see the [local develppment setup](#local-development-setup-macos) section below).
-
-**Prerequisites**:
-The following must be installed on your system
-- [Docker Desktop](https://docs.docker.com/get-docker)
-- [Go](https://go.dev/doc/install)
-
-Clone the repo:
-```bash
-git clone https://github.com/information-sharing-networks/signalsd.git
-cd signalsd
-```
-
-### Using the Docker Environment
-the docker compose file in the root of the repo (`docker-compose.yml`) starts the service and a PostgreSQL database (the containers are called `app` and `db` respectively)
-
-the docker compose file mounts the local repo directory into the app container, so you can edit code locally and see the changes in the container.  The app container has all the tools you need to test and run the service.
-```bash
-# Start the service and database
-docker compose up
-
-# Stop the service and database
-docker compose down
-
-# Restart the app container to compile and run the latest code
-# Note: This will build the app and rerun sqlc code generation, swag docs generation and goose migrations
-docker compose restart app
-
-# restart the database container
-docker compose restart db
-
-# For environment variable changes use "up" to recreate the container with the new env vars, for example:
-
-# start the http server on a different port:
-PORT=8081 docker compose up app
-
-# Performance testing configuration
-ENVIRONMENT=perf DB_MAX_CONNECTIONS=50 DB_MIN_CONNECTIONS=5 RATE_LIMIT_RPS=0 docker compose up app
-
-# Production-like configuration
-ENVIRONMENT=prod PUBLIC_BASE_URL=https://yourdomain.com ALLOWED_ORIGINS=https://yourdomain.com DB_MAX_CONNECTIONS=25 DB_CONNECT_TIMEOUT=10s RATE_LIMIT_RPS=200 docker compose up app
-
-# Rebuild the image when you change:
-# - dockerfile_inline content
-# - go.mod/go.sum (new dependencies)
-# - Go tool versions (goose, sqlc, swag etc)
-docker compose up --build app
-
-# start a shell in the app container
-docker exec -it signalsd-app /bin/bash
-```
-
-The service starts on [http://localhost:8080](http://localhost:8080) by default.
-
-The API documentation is hosted as part of the service or you can refer to the [docs](https://signals.corridorone.uk/docs) for the current release.
-
 ### Development Tools
 
 The app uses the following external tools:
@@ -158,52 +150,26 @@ The app uses the following external tools:
 - staticcheck - linter
 - gosec - security analysis
 - templ - ui templates
+- govulncheck - vulnerability scanner
 - Air - live reload
 
-All these tools are installed as part of the docker image.
+These tools are defined in `app/tools.go` and installed as part of the docker image.
 
-The Docker app is started with Air which will restart the service whenever you save changes to the code.  Air is configured to automatically run sqlc and swag after each change.  Database migrations are applied when you restart the docker app container (if you ar running locally, you will need to run the migrations manually - see the section on goose below)
+The Docker app is started with Air which will restart the service whenever you save changes to the code. 
+Air is configured to automatically run code generation (templ, sqlc and swag) and applies any pending database migrations before restarting the signalsd server.
+You can customise the air config by editing `.air.toml` (see the [air docs](https://github.com/cosmtrek/air) for more information).
 
 If you need to run these tools individually, you can use the Makefile for common tasks:
 
 ```bash
 # Start containers first
-docker compose up -d
+make docker-up
 
 # Then...
-make help     # See available commands
 make check    # Run all pre-commit checks and generate sqlc code and api docs
 make generate # Generate sqlc code and api docs
 make migrate  # Run database migrations
 ...
-```
-
-alternatively, you can use docker compose to run the same commands inside the app container:
-
-```bash
-# Generate API docs
-docker compose exec app sh -c "cd /signalsd/app && swag init -g ./cmd/signalsd/main.go"
-
-# Run database migrations
-docker compose exec app bash -c 'cd /signalsd/app && goose -dir sql/schema postgres "$DATABASE_URL" up'
-
-# Generate type-safe SQL code
-docker compose exec app sh -c "cd /signalsd/app && sqlc generate"
-
-# run the linter
-docker compose exec app sh -c "cd /signalsd/app && staticcheck ./..."
-
-# run the security scan 
-docker compose exec app sh -c "cd /signalsd/app && gosec -exclude-generated ./..."
-
-# Connect to the postgres database
-docker compose exec -it db psql -U signalsd-dev -d signalsd_admin
-
-# run the go app locally and use the docker postgres database
-DATABASE_URL="postgres://signalsd-dev@localhost:15432/signalsd_admin?sslmode=disable" SECRET_KEY="mysecretkey" go run cmd/signalsd/main.go run all
-
-# Stop and remove the environment completely
-docker compose down --rmi local -v
 ```
 
 ## Database Schema Management
@@ -229,7 +195,7 @@ goose -dir app/sql/schema postgres $DATABASE_URL down-to 0
 ## API Documentation
 To generate the OpenAPI docs:
 ```bash
-swag init -g cmd/signalsd/main.go
+make docs
 ```
 For docker users, the docs are automatically created when Air live reload restarts the app container.
 
@@ -239,78 +205,11 @@ SQL queries are kept in `app/sql/queries`.
 Run `sqlc generate` from the root of the project to regenerate the type safe Go code after adding or altering any queries (runs automatically for docker users)
 
 ## Testing
-
 `make check` will run all the security, linting, unit and integration tests.
 
 For information about the testing strategy and how to run indvidual tests, see the [Integration Testing Documentation](app/test/integration/README.md).
 
 details on performance testing are in [Performance Testing Documentation](test/perf/README.md).
-
-## Local Development Setup (macOS)
-
-if you do not want to use Docker, you need to install the following dependencies:
-
-### Prerequisites
-Install the following:
-- Go (latest version)
-- PostgreSQL@17 or above
-
-### Go Development tools
-the following go tools are used in the dev environment
-```bash
-go install github.com/pressly/goose/v3/cmd/goose@latest     # database migrations
-go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest         # type safe code for SQL queries
-go install github.com/swaggo/swag/cmd/swag@latest           # generates OpenAPI specs from go comments
-go install honnef.co/go/tools/cmd/staticcheck@latest        # linter
-go install github.com/securego/gosec/v2/cmd/gosec@latest    # security analysis
-go install github.com/a-h/templ/cmd/templ@latest            # UI templates
-go install github.com/air-verse/air@latest                  # live reload
-```
-
-### Local Development Environment Variables
-```bash
-# local dev service config
-DATABASE_URL="postgres://username:@localhost:5432/signalsd_admin?sslmode=disable"  # On macOS, username is your login username
-SECRET_KEY=your_random_secret_key_here  # Generate with: openssl rand -base64 64
-HOST=127.0.0.1
-```
-
-The secret key is used to sign the JWT access tokens used by the service.
-
-### PostgreSQL Database Setup (macOS)
-```bash
-# 1. Install and start PostgreSQL server
-brew install postgresql@17
-brew services start postgresql@17  # Use "start" to register the service to start at login (use "run" to start without registring)
-
-# 2. Connect to PostgreSQL server
-psql postgres
-
-# 3. Create the service database
-CREATE DATABASE signalsd_admin;
-
-# 4. Configure your connection
-export DATABASE_URL="postgres://$(whoami):@localhost:5432/signalsd_admin?sslmode=disable"
-```
-
-### Build and Run locally
-```bash
-cd app
-go build ./cmd/signalsd/
-./signalsd run all
-
-# Or run directly
-go run cmd/signalsd/main.go run all
-
-# Configure the service environment
-PORT=8081 go run cmd/signalsd/main.go run all
-
-# Performance testing with custom database pool settings
-ENVIRONMENT=perf DB_MAX_CONNECTIONS=50 DB_MIN_CONNECTIONS=5 RATE_LIMIT_RPS=0 go run cmd/signalsd/main.go run all
-
-# Production-like settings
-PUBLIC_BASE_URL=https://yourdomain.com ALLOWED_ORIGINS=https://yourdomain.com ENVIRONMENT=prod DB_MAX_CONNECTIONS=25 DB_CONNECT_TIMEOUT=10s go run cmd/signalsd/main.go run all
-```
 
 ## User Interface
 By default the signalsd service starts with a basic web interface. If you want to modify, replace or disable the UI see the [UI Documentation](app/internal/ui/README.md).
@@ -323,14 +222,14 @@ By default the signalsd service starts with a basic web interface. If you want t
 
 # Technical overview
 ## Auth
-![auth.0.4.0](https://github.com/user-attachments/assets/643ec71a-f037-4a7e-9497-6023d9100e69)
+![Auth-2026-03-18](https://github.com/user-attachments/assets/7eff5976-25c8-4b7b-972b-fbe3d261a1ab)
 
 ## ISN config
 ![ISN config v0 5 0](https://github.com/user-attachments/assets/2be326f2-f4d0-485e-aeed-28076383cd8e)
 
 
-## Signals
-![signals](https://github.com/user-attachments/assets/49efaa13-d25a-4ce6-8829-990bd8038716)
+## Signal Load
+![SignalsLoad-2026-03-18](https://github.com/user-attachments/assets/130eede1-5b6a-4ca6-97fc-28ce0e8fb194)
 
 ## Rate Limits
 The service includes a shared rate limiter for all traffic regardless of source IP or user identity and protects all endpoints including auth, API, and admin routes.
