@@ -79,7 +79,7 @@ func main() {
 	}
 
 	fmt.Printf("Starting performance test [%s] with %d batches of %d signals each\n", testInstanceID, numBatches, batchSize)
-	fmt.Printf("Target: %s/api/isn/%s/signal_types/%s/v%s/signals\n", baseURL, isnSlug, signalType, semVer)
+	fmt.Printf("Target: %s/api/isn/%s/signal-types/%s/v%s/signals\n", baseURL, isnSlug, signalType, semVer)
 
 	metrics := runPerformanceTest(baseURL, authToken, isnSlug, signalType, semVer, batchSize, numBatches)
 	reportMetrics(metrics)
@@ -238,7 +238,7 @@ func sendSignalBatch(baseURL, authToken, isnSlug, signalType, semVer string, sig
 	}
 
 	// Create HTTP request
-	url := fmt.Sprintf("%s/api/isn/%s/signal_types/%s/v%s/signals",
+	url := fmt.Sprintf("%s/api/isn/%s/signal-types/%s/v%s/signals",
 		baseURL, isnSlug, signalType, semVer)
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))

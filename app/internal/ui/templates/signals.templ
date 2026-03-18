@@ -107,7 +107,7 @@ templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions,  p
 							</button>
 						</div>
 						if params.IncludeCorrelated {
-							{{ endpoint := fmt.Sprintf("/ui-api/isn/%s/signal_types/%s/v%s/signals/%s/correlated-count/%d", params.IsnSlug, params.SignalTypeSlug, params.SemVer, signal.SignalID, len(signal.CorrelatedSignals)) }}
+							{{ endpoint := fmt.Sprintf("/ui-api/isn/%s/signal-types/%s/v%s/signals/%s/correlated-count/%d", params.IsnSlug, params.SignalTypeSlug, params.SemVer, signal.SignalID, len(signal.CorrelatedSignals)) }}
 							{{ tableTarget := fmt.Sprintf("#correlated-signals-table-%s",signal.SignalID) }}
 							<div
 								hx-get={ endpoint }

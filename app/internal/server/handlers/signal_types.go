@@ -92,7 +92,7 @@ type SignalTypeDetail struct {
 //	@Description
 //	@Description	To register a new schema for an existing signal type, use the RegisterRegisterNewSignalTypeSchema endpoint
 //	@Description
-//	@Description	Signal type definitions are referred to like this: /api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver} (e.g., /api/isn/sample-isn--example-org/signal_types/sample-signal--example-org/v0.0.1)
+//	@Description	Signal type definitions are referred to like this: /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver} (e.g., /api/isn/sample-isn--example-org/signal-types/sample-signal--example-org/v0.0.1)
 //	@Description
 //
 //	@Tags		Signal Type Definitions
@@ -106,7 +106,7 @@ type SignalTypeDetail struct {
 //
 //	@Security	BearerAccessToken
 //
-//	@Router		/api/isn/{isn_slug}/signal_types [post]
+//	@Router		/api/isn/{isn_slug}/signal-types [post]
 //
 // Should only be used with RequiresRole (admin,owner) middleware
 func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *http.Request) {
@@ -349,7 +349,7 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/api/isn/{isn_slug}/signal_types/{signal_type_slug}/schemas [post]
+//	@Router			/api/isn/{isn_slug}/signal-types/{signal_type_slug}/schemas [post]
 //
 // Should only be used with RequiresRole (admin,owner) middleware
 func (s *SignalTypeHandler) RegisterNewSignalTypeSchemaHandler(w http.ResponseWriter, r *http.Request) {
@@ -602,7 +602,7 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchemaHandler(w http.ResponseWr
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver} [put]
+//	@Router			/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver} [put]
 func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *http.Request) {
 
 	var req = UpdateSignalTypeRequest{}
@@ -771,7 +771,7 @@ func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *ht
 //	@Failure		404	{object}	responses.ErrorResponse
 //	@Failure		500	{object}	responses.ErrorResponse
 //
-//	@Router			/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver} [get]
+//	@Router			/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver} [get]
 func (s *SignalTypeHandler) GetSignalTypeHandler(w http.ResponseWriter, r *http.Request) {
 
 	isnSlug := r.PathValue("isn_slug")
@@ -839,7 +839,7 @@ func (s *SignalTypeHandler) GetSignalTypeHandler(w http.ResponseWriter, r *http.
 //
 //	@Success		200	{array}	handlers.SignalTypeDetail
 //
-//	@Router			/api/isn/{isn_slug}/signal_types [get]
+//	@Router			/api/isn/{isn_slug}/signal-types [get]
 func (s *SignalTypeHandler) GetSignalTypesHandler(w http.ResponseWriter, r *http.Request) {
 
 	isnSlug := r.PathValue("isn_slug")
@@ -915,7 +915,7 @@ func (s *SignalTypeHandler) GetSignalTypesHandler(w http.ResponseWriter, r *http
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/api/isn/{isn_slug}/signal_types/{signal_type_slug}/v{sem_ver} [delete]
+//	@Router			/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver} [delete]
 func (s *SignalTypeHandler) DeleteSignalTypeHandler(w http.ResponseWriter, r *http.Request) {
 
 	signalTypeSlug := r.PathValue("signal_type_slug")

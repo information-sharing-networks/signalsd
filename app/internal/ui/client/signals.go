@@ -64,10 +64,10 @@ func (c *Client) SearchSignals(accessToken string, params SignalSearchParams, vi
 	// Build URL based on ISN visibility (public ISNs use /api/public/, private use /api/)
 	var url string
 	if visibility == "public" {
-		url = fmt.Sprintf("%s/api/public/isn/%s/signal_types/%s/v%s/signals/search",
+		url = fmt.Sprintf("%s/api/public/isn/%s/signal-types/%s/v%s/signals/search",
 			c.baseURL, params.IsnSlug, params.SignalTypeSlug, params.SemVer)
 	} else {
-		url = fmt.Sprintf("%s/api/isn/%s/signal_types/%s/v%s/signals/search",
+		url = fmt.Sprintf("%s/api/isn/%s/signal-types/%s/v%s/signals/search",
 			c.baseURL, params.IsnSlug, params.SignalTypeSlug, params.SemVer)
 	}
 

@@ -52,7 +52,7 @@ type UpdateSignalTypeStatusRequest struct {
 
 // CreateSignalType creates a new signal type using the signalsd API
 func (c *Client) CreateSignalType(accessToken string, req CreateSignalTypeRequest) (*NewSignalTypeResponse, error) {
-	url := fmt.Sprintf("%s/api/isn/%s/signal_types", c.baseURL, req.IsnSlug)
+	url := fmt.Sprintf("%s/api/isn/%s/signal-types", c.baseURL, req.IsnSlug)
 
 	jsonData, err := json.Marshal(req)
 	if err != nil {
@@ -87,7 +87,7 @@ func (c *Client) CreateSignalType(accessToken string, req CreateSignalTypeReques
 
 // CreateSignalType creates a new signal type using the signalsd API
 func (c *Client) RegisterNewSignalTypeSchema(accessToken string, req RegisterNewSignalTypeSchemaRequest) (*NewSignalTypeResponse, error) {
-	url := fmt.Sprintf("%s/api/isn/%s/signal_types/%s/schemas", c.baseURL, req.IsnSlug, req.Slug)
+	url := fmt.Sprintf("%s/api/isn/%s/signal-types/%s/schemas", c.baseURL, req.IsnSlug, req.Slug)
 
 	jsonData, err := json.Marshal(req)
 	if err != nil {
@@ -122,7 +122,7 @@ func (c *Client) RegisterNewSignalTypeSchema(accessToken string, req RegisterNew
 
 // GetSignalTypes gets the signal types for the specified ISN using the signalsd API
 func (c *Client) GetSignalTypes(accessToken, isnSlug string, includeInactive bool) ([]SignalTypeDetail, error) {
-	url := fmt.Sprintf("%s/api/isn/%s/signal_types", c.baseURL, isnSlug)
+	url := fmt.Sprintf("%s/api/isn/%s/signal-types", c.baseURL, isnSlug)
 
 	if includeInactive {
 		url += "?include_inactive=true"
@@ -156,7 +156,7 @@ func (c *Client) GetSignalTypes(accessToken, isnSlug string, includeInactive boo
 
 // UpdateSignalTypeStatus updates the is_in_use status of a signal type
 func (c *Client) UpdateSignalTypeStatus(accessToken, isnSlug, slug, semVer string, isInUse bool) error {
-	url := fmt.Sprintf("%s/api/isn/%s/signal_types/%s/v%s", c.baseURL, isnSlug, slug, semVer)
+	url := fmt.Sprintf("%s/api/isn/%s/signal-types/%s/v%s", c.baseURL, isnSlug, slug, semVer)
 
 	req := UpdateSignalTypeStatusRequest{
 		IsInUse: isInUse,

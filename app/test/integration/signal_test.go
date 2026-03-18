@@ -1483,7 +1483,7 @@ func submitCreateSignalRequest(t *testing.T, baseURL string, payload map[string]
 		t.Fatalf("Failed to marshal payload: %v", err)
 	}
 
-	url := fmt.Sprintf("%s/api/isn/%s/signal_types/%s/v%s/signals",
+	url := fmt.Sprintf("%s/api/isn/%s/signal-types/%s/v%s/signals",
 		baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
 
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonPayload))
@@ -1513,7 +1513,7 @@ func submitCreateSignalRequest(t *testing.T, baseURL string, payload map[string]
 
 // searchPublicSignals searches for signals on public ISNs (no authentication required)
 func searchPublicSignals(t *testing.T, baseURL string, endpoint testSignalEndpoint) *http.Response {
-	url := fmt.Sprintf("%s/api/public/isn/%s/signal_types/%s/v%s/signals/search",
+	url := fmt.Sprintf("%s/api/public/isn/%s/signal-types/%s/v%s/signals/search",
 		baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -1546,7 +1546,7 @@ func searchPublicSignals(t *testing.T, baseURL string, endpoint testSignalEndpoi
 
 // searchPrivateSignals searches for signals on private ISNs with optional correlated signals
 func searchPrivateSignals(t *testing.T, baseURL string, endpoint testSignalEndpoint, token string, includeWithdrawn bool, includeCorrelated bool, includePrevious bool) *http.Response {
-	url := fmt.Sprintf("%s/api/isn/%s/signal_types/%s/v%s/signals/search",
+	url := fmt.Sprintf("%s/api/isn/%s/signal-types/%s/v%s/signals/search",
 		baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -1596,7 +1596,7 @@ func searchPrivateSignals(t *testing.T, baseURL string, endpoint testSignalEndpo
 
 // withdrawSignal withdraws a signal by local reference
 func withdrawSignal(t *testing.T, baseURL string, endpoint testSignalEndpoint, token, localRef string) *http.Response {
-	url := fmt.Sprintf("%s/api/isn/%s/signal_types/%s/v%s/signals/withdraw",
+	url := fmt.Sprintf("%s/api/isn/%s/signal-types/%s/v%s/signals/withdraw",
 		baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
 
 	withdrawRequest := map[string]string{

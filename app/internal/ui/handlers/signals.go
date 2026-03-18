@@ -45,11 +45,11 @@ func (h *HandlerService) SearchSignalsPage(w http.ResponseWriter, r *http.Reques
 func (h *HandlerService) GetLatestCorrelatedSignals(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
-	signalID := chi.URLParam(r, "signalID")
+	signalID := chi.URLParam(r, "signal_id")
 	countString := chi.URLParam(r, "count")
-	isnSlug := chi.URLParam(r, "isnSlug")
-	signalTypeSlug := chi.URLParam(r, "signalTypeSlug")
-	semVer := chi.URLParam(r, "semVer")
+	isnSlug := chi.URLParam(r, "isn_slug")
+	signalTypeSlug := chi.URLParam(r, "signal_type_slug")
+	semVer := chi.URLParam(r, "sem_ver")
 	params := client.SignalSearchParams{
 		IsnSlug:           isnSlug,
 		SignalTypeSlug:    signalTypeSlug,

@@ -298,7 +298,7 @@ To use this configuration, set up Google Cloud Load Balancer with path-based rou
 ```yaml
 - match:
     path:
-      regex: "^/api/isn/.*/signal_types/.*/signals.*"
+      regex: "^/api/isn/.*/signal-types/.*/signals.*"
   route:
     cluster: signalsd-signals
 
@@ -316,7 +316,7 @@ A more advanced configuration is to separate read and write operations. This wou
 # Write operations
 - match:
     path:
-      regex: "^/api/isn/.*/signal_types/.*/signals$"
+      regex: "^/api/isn/.*/signal-types/.*/signals$"
     method: "POST"
   route:
     cluster: signalsd-signals-write
@@ -324,7 +324,7 @@ A more advanced configuration is to separate read and write operations. This wou
 # Read operations
 - match:
     path:
-      regex: "^/api/isn/.*/signal_types/.*/signals/.*"
+      regex: "^/api/isn/.*/signal-types/.*/signals/.*"
     method: "GET"
   route:
     cluster: signalsd-signals-read

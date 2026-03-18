@@ -69,7 +69,7 @@ SIGNAL_TYPE_RESPONSE=$(curl -s -X POST \
         "detail": "Performance test signal type with validation disabled for maximum throughput",
         "bump_type": "major"
     }' \
-    "${BASE_URL}/api/isn/${ISN_SLUG}/signal_types")
+    "${BASE_URL}/api/isn/${ISN_SLUG}/signal-types")
 SIGNAL_TYPE_SLUG=$(echo "$SIGNAL_TYPE_RESPONSE" | grep -o '"slug":"[^"]*"' | cut -d'"' -f4)
 SIGNAL_TYPE_VERSION=$(echo "$SIGNAL_TYPE_RESPONSE" | grep -o '"sem_ver":"[^"]*"' | cut -d'"' -f4)
 
@@ -86,7 +86,7 @@ SIGNAL_TYPE_RESPONSE=$(curl -s -X POST \
         "detail": "Performance test signal type with validation",
         "bump_type": "major"
     }' \
-    "${BASE_URL}/api/isn/${ISN_SLUG}/signal_types")
+    "${BASE_URL}/api/isn/${ISN_SLUG}/signal-types")
 SIGNAL_TYPE_SLUG=$(echo "$SIGNAL_TYPE_RESPONSE" | grep -o '"slug":"[^"]*"' | cut -d'"' -f4)
 SIGNAL_TYPE_VERSION=$(echo "$SIGNAL_TYPE_RESPONSE" | grep -o '"sem_ver":"[^"]*"' | cut -d'"' -f4)
 
