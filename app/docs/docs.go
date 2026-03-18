@@ -1873,23 +1873,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/webhooks": {
-            "post": {
-                "description": "register a webhook to recieve signals batch status updates",
-                "tags": [
-                    "Service Accounts"
-                ],
-                "summary": "Register webhook (TODO)",
-                "responses": {
-                    "204": {
-                        "description": "Not implemented",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/health/live": {
             "get": {
                 "description": "Check if the signalsd http service is alive and responding.",
