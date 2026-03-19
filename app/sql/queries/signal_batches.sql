@@ -16,10 +16,17 @@ INSERT INTO signal_batches (
 )
 RETURNING *;
 
--- name: CloseISNSignalBatchByAccountID :execrows
+-- name: CloseSignalBatchByIsnIdAndAccountID :execrows
+-- close the open batch for an account on a specific ISN (use when creating a new batch or revoking write access)
 UPDATE signal_batches 
 SET is_latest = FALSE
 WHERE isn_id = $1 and account_id = $2;
+
+-- name: CloseSignalBatchesByAccountID :execrows
+-- close any open batches for an account (use when disabling an account)
+UPDATE signal_batches 
+SET is_latest = FALSE
+WHERE account_id = $1;
 
 -- name: ExistsSignalBatchForAccountAndIsnId :one
 SELECT EXISTS(

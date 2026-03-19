@@ -122,7 +122,7 @@ func TestBatchLifecycle(t *testing.T) {
 		firstBatchID := currentBatch.ID
 
 		// Close any existing batches (simulating the CreateSignalsBatchHandler behavior)
-		_, err := testEnv.queries.CloseISNSignalBatchByAccountID(ctx, database.CloseISNSignalBatchByAccountIDParams{
+		_, err := testEnv.queries.CloseSignalBatchByIsnIdAndAccountID(ctx, database.CloseSignalBatchByIsnIdAndAccountIDParams{
 			IsnID:     testISN.ID,
 			AccountID: serviceAccount.ID,
 		})

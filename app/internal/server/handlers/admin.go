@@ -304,6 +304,16 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 
 	}
 
+	// close any open batches
+	_, err = txQueries.CloseSignalBatchesByAccountID(r.Context(), accountID)
+	if err != nil {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+		return
+	}
 	// Commit transaction
 	if err := tx.Commit(r.Context()); err != nil {
 		logger.ContextWithLogAttrs(r.Context(),

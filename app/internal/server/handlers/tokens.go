@@ -84,7 +84,7 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, p
 // RefreshAccessTokenHandler handles requests for both service accounts and web users.
 // For web users, a new refresh tokens is sent as http-only cookies whenever the client uses this endpoint.
 //
-// Must be called with the AuthenticateByGrantType middleware.
+// Must be called with the AuthenticateByGrantTypAuthenticateByGrantTypee middleware.
 // This calls the appropriate authentication middleware for the grant_type (client_credentials or refresh_token)) and adds the authenticated accountID to the context
 func (a *TokenHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.Request) {
 

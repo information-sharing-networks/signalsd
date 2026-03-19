@@ -188,7 +188,7 @@ func (i *IsnAccountHandler) UpdateIsnAccountPermissionHandler(w http.ResponseWri
 
 	// Handle batch closure when revoking write access - this is just to tidy up the database - it's not an error if there is no batch to close
 	if isExistingPermissions && isnAccount.CanWrite && !*req.CanWrite {
-		_, err = i.queries.CloseISNSignalBatchByAccountID(r.Context(), database.CloseISNSignalBatchByAccountIDParams{
+		_, err = i.queries.CloseSignalBatchByIsnIdAndAccountID(r.Context(), database.CloseSignalBatchByIsnIdAndAccountIDParams{
 			IsnID:     isn.ID,
 			AccountID: targetAccountID,
 		})

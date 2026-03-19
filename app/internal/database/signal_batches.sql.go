@@ -12,19 +12,35 @@ import (
 	"github.com/google/uuid"
 )
 
-const CloseISNSignalBatchByAccountID = `-- name: CloseISNSignalBatchByAccountID :execrows
+const CloseSignalBatchByIsnIdAndAccountID = `-- name: CloseSignalBatchByIsnIdAndAccountID :execrows
 UPDATE signal_batches 
 SET is_latest = FALSE
 WHERE isn_id = $1 and account_id = $2
 `
 
-type CloseISNSignalBatchByAccountIDParams struct {
+type CloseSignalBatchByIsnIdAndAccountIDParams struct {
 	IsnID     uuid.UUID `json:"isn_id"`
 	AccountID uuid.UUID `json:"account_id"`
 }
 
-func (q *Queries) CloseISNSignalBatchByAccountID(ctx context.Context, arg CloseISNSignalBatchByAccountIDParams) (int64, error) {
-	result, err := q.db.Exec(ctx, CloseISNSignalBatchByAccountID, arg.IsnID, arg.AccountID)
+// close the open batch for an account on a specific ISN (use when creating a new batch or revoking write access)
+func (q *Queries) CloseSignalBatchByIsnIdAndAccountID(ctx context.Context, arg CloseSignalBatchByIsnIdAndAccountIDParams) (int64, error) {
+	result, err := q.db.Exec(ctx, CloseSignalBatchByIsnIdAndAccountID, arg.IsnID, arg.AccountID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const CloseSignalBatchesByAccountID = `-- name: CloseSignalBatchesByAccountID :execrows
+UPDATE signal_batches 
+SET is_latest = FALSE
+WHERE account_id = $1
+`
+
+// close any open batches for an account (use when disabling an account)
+func (q *Queries) CloseSignalBatchesByAccountID(ctx context.Context, accountID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, CloseSignalBatchesByAccountID, accountID)
 	if err != nil {
 		return 0, err
 	}

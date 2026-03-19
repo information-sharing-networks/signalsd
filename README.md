@@ -177,7 +177,6 @@ make generate # Generate sqlc code and api docs
 make migrate  # Run database migrations
 ...
 ```
-
 ## Database Schema Management
 database schema migration is managed using [goose](https://github.com/pressly/goose).  
 
@@ -221,11 +220,10 @@ By default the signalsd service starts with a basic web interface. If you want t
 
 # Technical overview
 ## Auth
-![Auth-2026-03-18](https://github.com/user-attachments/assets/7eff5976-25c8-4b7b-972b-fbe3d261a1ab)
+![Auth-2026-03-19](https://github.com/user-attachments/assets/14ec0c90-448e-4860-81e9-69bf929f89b8)
 
 ## ISN config
 ![ISN config v0 5 0](https://github.com/user-attachments/assets/2be326f2-f4d0-485e-aeed-28076383cd8e)
-
 
 ## Signal Load
 ![SignalsLoad-2026-03-18](https://github.com/user-attachments/assets/130eede1-5b6a-4ca6-97fc-28ce0e8fb194)
@@ -240,21 +238,11 @@ Github actions are used to automate checks and deployments.
 
 CI checks are run whenever there is a push to main.
 
-The service is deployed to staging whenever there is a push to main and depolyed to production whenever a new version tag (e.g v1.0.0) is pushed. See below for details on using the build script to trigger a new production release.
+The service is deployed to staging whenever there is a push to main and depolyed to production whenever a new version tag (e.g v1.0.0) is pushed.
 
 ![CI:CD (v0 11)](https://github.com/user-attachments/assets/6e39cd4b-1fc5-441f-a875-e51c814525ad)
 
 See GitHub Actions workflows in `.github/workflows/`
-
-### Creating a Release
-```bash
-# 1. Test and prepare
-git checkout main && git pull origin main
-make check
-
-# 2. Create and push version tag; build locally with version info
-build.sh -t patch|minor|major
-```
 
 ## Cloud Deployment
 

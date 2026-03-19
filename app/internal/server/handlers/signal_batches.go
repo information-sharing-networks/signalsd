@@ -141,7 +141,7 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 		return
 	}
 
-	_, err = s.queries.CloseISNSignalBatchByAccountID(r.Context(), database.CloseISNSignalBatchByAccountIDParams{
+	_, err = s.queries.CloseSignalBatchByIsnIdAndAccountID(r.Context(), database.CloseSignalBatchByIsnIdAndAccountIDParams{
 		IsnID:     isn.ID,
 		AccountID: accountID,
 	})
