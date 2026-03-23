@@ -20,7 +20,7 @@ require (
 	github.com/lmittmann/tint v1.1.3
 	github.com/pressly/goose/v3 v3.27.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
-	github.com/securego/gosec/v2 v2.25.0
+	github.com/securego/gosec/v2 v2.24.7
 	github.com/spf13/cobra v1.10.2
 	github.com/sqlc-dev/sqlc v1.30.0
 	github.com/swaggo/swag v1.16.6
