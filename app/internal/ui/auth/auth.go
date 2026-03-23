@@ -153,6 +153,7 @@ func (a *AuthService) SetAuthCookies(w http.ResponseWriter, accessTokenDetails *
 	// Base64 encode to avoid cookie encoding issues
 	encodedAccessTokenDetails := base64.StdEncoding.EncodeToString(accessTokenDetailsJSON)
 
+	// #nosec G124 - Secure flag is conditionally true on prod/staging
 	http.SetCookie(w, &http.Cookie{
 		Name:     config.AccessTokenDetailsCookieName,
 		Value:    encodedAccessTokenDetails,
@@ -163,6 +164,7 @@ func (a *AuthService) SetAuthCookies(w http.ResponseWriter, accessTokenDetails *
 		MaxAge:   accessTokenDetails.ExpiresIn,
 	})
 
+	// #nosec G124 - Secure flag is conditionally true on prod/staging
 	http.SetCookie(w, &http.Cookie{
 		Name:     config.RefreshTokenCookieName,
 		Value:    refreshTokenCookie.Value,
@@ -180,6 +182,7 @@ func (a *AuthService) SetAuthCookies(w http.ResponseWriter, accessTokenDetails *
 func (a *AuthService) ClearAuthCookies(w http.ResponseWriter) {
 	isProdOrStaging := a.environment == "prod" || a.environment == "staging" //secure flag only true on prod and staging
 
+	// #nosec G124 - Secure flag is conditionally true on prod/staging
 	http.SetCookie(w, &http.Cookie{
 		Name:     config.AccessTokenDetailsCookieName,
 		Value:    "",
@@ -190,6 +193,7 @@ func (a *AuthService) ClearAuthCookies(w http.ResponseWriter) {
 		SameSite: http.SameSiteStrictMode,
 	})
 
+	// #nosec G124 - Secure flag is conditionally true on prod/staging
 	http.SetCookie(w, &http.Cookie{
 		Name:     config.RefreshTokenCookieName,
 		Value:    "",

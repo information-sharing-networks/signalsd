@@ -330,6 +330,7 @@ func (a *AuthService) NewRefreshTokenCookie(refreshToken string) *http.Cookie {
 
 	isProdOrStaging := a.environment == "prod" || a.environment == "staging" //secure flag only true on prod and staging
 
+	// #nosec G124 - Secure flag is conditionally true on prod/staging
 	newCookie := &http.Cookie{
 		Name:     signalsd.RefreshTokenCookieName,
 		Value:    refreshToken,
