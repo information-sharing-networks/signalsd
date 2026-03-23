@@ -88,7 +88,7 @@ jobs:
         run: go vet ./... || exit 1
 
       - name: Install staticcheck
-        run: go install honnef.co/go/tools/cmd/staticcheck@latest
+        run: go install honnef.co/go/tools/cmd/staticcheck
 
       - name: Run staticcheck
         run: staticcheck ./... || exit 1
@@ -116,12 +116,12 @@ jobs:
         run: go mod download
 
       - name: Install gosec
-        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+        run: go install github.com/securego/gosec/v2/cmd/gosec
 
       # exclude G120 - FormValue is used extensively in the UI handlers
       # and the size is limited by MaxBytesReader middleware (not detected by gosec)
       - name: Run gosec
-        run: gosec -exclude-generated -exclude=G120 ./... 
+        run: gosec -exclude-generated -exclude=G120 ./...
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
