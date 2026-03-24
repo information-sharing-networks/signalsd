@@ -107,15 +107,6 @@ templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions,  p
 							</button>
 						</div>
 						if params.IncludeCorrelated {
-							{{ endpoint := fmt.Sprintf("/ui-api/isn/%s/signal-types/%s/v%s/signals/%s/correlated-count/%d", params.IsnSlug, params.SignalTypeSlug, params.SemVer, signal.SignalID, len(signal.CorrelatedSignals)) }}
-							{{ tableTarget := fmt.Sprintf("#correlated-signals-table-%s",signal.SignalID) }}
-							<div
-								hx-get={ endpoint }
-								hx-target={ tableTarget }
-								hx-trigger="every 15s[document.getElementById('monitor-btn').classList.contains('monitoring') && !document.querySelector('dialog:modal')]"
-								hx-swap="outerHTML"
-							>
-							</div>
 							@CorrelatedSignalsTable(signal, len(signal.CorrelatedSignals))
 						}
 
@@ -159,8 +150,7 @@ templ MonitorButton() {
 		hx-get="/ui-api/signals/search"
 		hx-target="#search-results"
 		hx-include="form"
-		hx-trigger="every 15s[document.getElementById('monitor-btn').classList.contains('monitoring') && !document.querySelector('dialog:modal')]"
-		style="display: none;"
+		style="display: none"
 	/>
 }
 

@@ -33,18 +33,26 @@ document.addEventListener('click', function(e) {
 		return;
 	}
 
-	// Monitor button toggle
+	// note that because htmx trigger uses unsafe-eval when adding filters to a periodic poll, and this is blocked by our CSP policy, we need
+	// to handle the toggle of polling manually
 	const monitorBtn = e.target.closest('.monitor-btn');
-	if (monitorBtn) {
-		monitorBtn.classList.toggle('monitoring');
-		monitorBtn.textContent = monitorBtn.classList.contains('monitoring') ? 'Stop Monitoring' : 'Monitor';
+    if (monitorBtn) {
+        monitorBtn.classList.toggle('monitoring');
+        const isMonitoring = monitorBtn.classList.contains('monitoring');
 
-		// Trigger the monitor timer to start/stop polling
-		const monitorTimer = document.getElementById('monitor-timer');
-		if (monitorTimer) {
-			htmx.trigger(monitorTimer, 'every 15s');
-		}
-	}
+        monitorBtn.textContent = isMonitoring ? 'Stop Monitoring' : 'Monitor';
+
+		// do not poll if there is a modal open
+		const isModalOpen = document.querySelector('dialog:modal') !== null;
+
+        const timerDiv = document.getElementById('monitor-timer');
+        if (isMonitoring && !isModalOpen) {
+            timerDiv.setAttribute('hx-trigger', 'every 10s');
+        } else {
+            timerDiv.removeAttribute('hx-trigger');
+        }
+        htmx.process(timerDiv); // re-initialise without eval
+    }
 });
 
 function togglePrettyPrint(signalId) {
