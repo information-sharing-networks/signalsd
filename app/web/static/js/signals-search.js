@@ -45,8 +45,10 @@ document.addEventListener('click', function(e) {
 		// do not poll if there is a modal open
 		const isModalOpen = document.querySelector('dialog:modal') !== null;
 
+		// do not poll if the pretty print is open
+		const isPrettyPrintOpen = document.querySelector('.json-content.pretty-printed[style*="display: block"]') !== null;
         const timerDiv = document.getElementById('monitor-timer');
-        if (isMonitoring && !isModalOpen) {
+        if (isMonitoring && !isModalOpen && !isPrettyPrintOpen) {
             timerDiv.setAttribute('hx-trigger', 'every 10s');
         } else {
             timerDiv.removeAttribute('hx-trigger');
