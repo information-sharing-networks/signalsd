@@ -127,6 +127,25 @@ type SignalProcessingFailure struct {
 	ErrorMessage     string    `json:"error_message"`
 }
 
+type SignalRoutingMapping struct {
+	ID                  uuid.UUID `json:"id"`
+	SignalRoutingRuleID uuid.UUID `json:"signal_routing_rule_id"`
+	MatchPattern        string    `json:"match_pattern"`
+	Notes               string    `json:"notes"`
+	IsnID               uuid.UUID `json:"isn_id"`
+	RuleSequence        int32     `json:"rule_sequence"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
+}
+
+type SignalRoutingRule struct {
+	ID           uuid.UUID `json:"id"`
+	SignalTypeID uuid.UUID `json:"signal_type_id"`
+	RoutingField string    `json:"routing_field"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
 type SignalType struct {
 	ID            uuid.UUID `json:"id"`
 	CreatedAt     time.Time `json:"created_at"`
