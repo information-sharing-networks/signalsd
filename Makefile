@@ -1,7 +1,7 @@
 # Docker-based Makefile for signalsd
 # Uses tools installed in Docker containers instead of local installations
 
-.PHONY: help psql check generate docs swag-fmt sqlc fmt vet lint security vuln test clean docker-up docker-down templ go-api go-ui db-migrate db-migrate-down check-containers go-all
+.PHONY: help psql check generate docs swag-fmt sqlc fmt vet lint security vuln test clean docker-up docker-down docker-reset templ go-api go-ui db-migrate-up db-migrate-down check-containers go-all
 
 export GO_VERSION := $(shell grep '^go ' app/go.mod | awk '{print $$2}')
 
@@ -19,11 +19,14 @@ help:
 	@echo "Available targets:"
 	@echo "  make docker-up       - Start Docker containers"
 	@echo "  make docker-down     - Stop Docker containers"
+	@echo "  make docker-reset    - Drop the database and restart the containers"
 	@echo "  make docker-build    - Build the app container"
 	@echo "  make docker-up-db    - Start the database container (detached mode)"
 	@echo "  make docker-down-db  - Stop the database container"
 	@echo "  make docker-up-app   - Start the app container (detached mode)"
 	@echo "  make docker-down-app - Stop the app container"
+	@echo "  make db-migrate-up      - Run database migrations (up)"
+	@echo "  make db-migrate-down        - Reset database and reapply migrations (goose down-to 0 > up)"
 	@echo "  make go-all          - Start signalsd backend and integrated ui locally (expects docker db to be running)"
 	@echo "  make go-api          - Start signalsd backend locally (expects docker db to be running)"
 	@echo "  make go-ui           - Start ui in standalone mode (expects signalsd to be running on 8080)"
@@ -38,7 +41,7 @@ help:
 	@echo "  make vet             - Run go vet"
 	@echo "  make lint            - Run staticcheck"
 	@echo "  make security        - Run gosec security analysis"
-	@echo "  make db-migrate      - Run database migrations (up)"
+	@echo "  make vuln            - Run govulncheck vulnerability scan"
 	@echo "  make restart         - restart the docker app"
 	@echo "  make logs            - follow docker logs"
 	@echo "  make psql            - run psql agaist the dev database"
@@ -69,6 +72,17 @@ docker-down-db:
 docker-down-app:
 	@echo "🐳 Stopping app container..."
 	@docker compose down app
+
+
+# drop the db volume, restart the app container with latest dependencies, restart the containers
+docker-reset:
+	@echo "🔄 Resetting database..."
+	$(MAKE) docker-down
+	@docker volume rm signalsd_db-data-dev || true
+	@echo "🐳 Rebuilding app container..."
+	@echo "Using Go version: $(GO_VERSION)"
+	@GO_VERSION=$(GO_VERSION) docker compose build app
+	@GO_VERSION=$(GO_VERSION) docker compose up
 
 docker-build:
 	@echo "🐳 Building app container..."
@@ -140,13 +154,16 @@ clean:
 	@sh -c "cd app && rm ./signalsd"
 
 # Database migrations (bonus commands using Docker)
-db-migrate:
+db-migrate-up:
 	@echo "🔄 Running database migrations..."
 	@docker compose exec $(APP_SERVICE) bash -c 'cd /signalsd/app && goose -dir sql/schema postgres "$$DATABASE_URL" up'
 
+
+# Reset database and reapply migrations
 db-migrate-down:
-	@echo "🔄 Rolling back database migrations..."
-	@docker compose exec $(APP_SERVICE) bash -c 'cd /signalsd/app && goose -dir sql/schema postgres "$$DATABASE_URL" down'
+	@echo "🔄 Resetting database..."
+	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && goose -dir sql/schema postgres \$$DATABASE_URL -env=none down-to 0"
+	@$(MAKE) db-migrate-up
 
 # Check if containers are running
 check-containers:
