@@ -10,8 +10,8 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import "github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 
-// SignalTypeStatusPage renders the admin signal type enable/disable page
-func SignalTypeStatusPage(environment string, isns []types.IsnOption) templ.Component {
+// IsnSignalTypeStatusPage renders the ISN-level signal type enable/disable page
+func IsnSignalTypeStatusPage(environment string, isns []types.IsnOption) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -48,7 +48,7 @@ func SignalTypeStatusPage(environment string, isns []types.IsnOption) templ.Comp
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Signal Type Status Management</h1><div class=\"card\"><div class=\"card-body\"><p class=\"card-description text-muted\">Enable or disable signal types. Disabled signal types cannot receive new signals and are not returned in signal searches.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">ISN Signal Type Status Management</h1><div class=\"card\"><div class=\"card-body\"><p class=\"card-description text-muted\">Enable or disable signal types for a specific Information Sharing Network. </p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -64,7 +64,7 @@ func SignalTypeStatusPage(environment string, isns []types.IsnOption) templ.Comp
 					}()
 				}
 				ctx = templ.InitializeContext(ctx)
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "Disabling a signal type will prevent new signals from being submitted to it. Existing signals will remain archived but inaccessible.")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "Disabling a signal type for this ISN will prevent new signals from being submitted to it through this network. Existing signals will remain archived but inaccessible. The signal type remains enabled globally for other ISNs.")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -74,21 +74,21 @@ func SignalTypeStatusPage(environment string, isns []types.IsnOption) templ.Comp
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<form hx-put=\"/ui-api/signal-types/status\" hx-target=\"#status-result\" hx-swap=\"innerHTML\" class=\"margin-top-4\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<form hx-put=\"/ui-api/isn-signal-types/status\" hx-target=\"#status-result\" hx-swap=\"innerHTML\" class=\"margin-top-4\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = SignalTypeSelectorFields(isns, true).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = SignalTypeSelectorFieldsWithISN(isns, true).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"form-group\"><label for=\"action\" class=\"form-label\">Action</label> <select id=\"action\" name=\"action\" required class=\"form-select\"><option value=\"\">Select Action...</option> <option value=\"disable\">Disable</option> <option value=\"enable\">Enable</option></select></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Update Signal Type Status</button></div></form></div></div><div id=\"status-result\"><!-- Results will appear here --></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"form-group\"><label for=\"action\" class=\"form-label\">Action</label> <select id=\"action\" name=\"action\" required class=\"form-select\"><option value=\"\">Select Action...</option> <option value=\"disable\">Disable</option> <option value=\"enable\">Enable</option></select></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Update ISN Signal Type Status</button></div></form></div></div><div id=\"status-result\"><!-- Results will appear here --></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = BaseLayout("Signal Type Status Management").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = BaseLayout("ISN Signal Type Status Management").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

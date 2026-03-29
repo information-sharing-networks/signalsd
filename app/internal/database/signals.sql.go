@@ -15,12 +15,17 @@ import (
 
 const CreateOrUpdateSignalWithCorrelationID = `-- name: CreateOrUpdateSignalWithCorrelationID :one
 WITH ids AS (
-    SELECT 
-        st.id AS signal_type_id,
-        st.isn_id
-    FROM signal_types st 
-    WHERE st.slug = $4
-        AND st.sem_ver = $5
+    SELECT st.id AS signal_type_id,
+        i.id AS isn_id,
+        gen_random_uuid() AS signal_id
+    FROM signal_types st
+    JOIN isn_signal_types ist ON st.id = ist.signal_type_id
+    JOIN isn i ON i.id = ist.isn_id
+    WHERE i.slug = $4
+        AND st.slug = $5
+        AND st.sem_ver = $6
+        AND i.is_in_use = true
+        AND ist.is_in_use = true
 )
 INSERT INTO signals (
     id,
@@ -63,18 +68,21 @@ type CreateOrUpdateSignalWithCorrelationIDParams struct {
 	AccountID      uuid.UUID `json:"account_id"`
 	LocalRef       string    `json:"local_ref"`
 	CorrelationID  uuid.UUID `json:"correlation_id"`
+	IsnSlug        string    `json:"isn_slug"`
 	SignalTypeSlug string    `json:"signal_type_slug"`
 	SemVer         string    `json:"sem_ver"`
 }
 
 // note if there is already a master record for this local_ref, then:
 // 1. correlation_id is updated with the supplied value (assuming it is different to the existing value)
-// 2. if the signal was withdrawn it is reactivated (is_withdrawn = false)
+// 2. if the signal was withdrawn it is reactivated (is_withdrawn = false).
+// Only creates/updates signals if ISN and signal type are in use (this is a defence against stale access tokens).
 func (q *Queries) CreateOrUpdateSignalWithCorrelationID(ctx context.Context, arg CreateOrUpdateSignalWithCorrelationIDParams) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, CreateOrUpdateSignalWithCorrelationID,
 		arg.AccountID,
 		arg.LocalRef,
 		arg.CorrelationID,
+		arg.IsnSlug,
 		arg.SignalTypeSlug,
 		arg.SemVer,
 	)
@@ -85,12 +93,17 @@ func (q *Queries) CreateOrUpdateSignalWithCorrelationID(ctx context.Context, arg
 
 const CreateSignal = `-- name: CreateSignal :one
 WITH ids AS (
-    SELECT st.id AS signal_type_id, 
-        st.isn_id,
+    SELECT st.id AS signal_type_id,
+        i.id AS isn_id,
         gen_random_uuid() AS signal_id
-    FROM signal_types st 
-    WHERE st.slug = $3
-        AND st.sem_ver = $4
+    FROM signal_types st
+    JOIN isn_signal_types ist ON st.id = ist.signal_type_id
+    JOIN isn i ON i.id = ist.isn_id
+    WHERE i.slug = $3
+        AND st.slug = $4
+        AND st.sem_ver = $5
+        AND i.is_in_use = true
+        AND ist.is_in_use = true
 )
 INSERT INTO signals (
     id,
@@ -128,19 +141,22 @@ RETURNING id
 type CreateSignalParams struct {
 	AccountID      uuid.UUID `json:"account_id"`
 	LocalRef       string    `json:"local_ref"`
+	IsnSlug        string    `json:"isn_slug"`
 	SignalTypeSlug string    `json:"signal_type_slug"`
 	SemVer         string    `json:"sem_ver"`
 }
 
-// this query creates one row in the signals table for every new combination of account_id, signal_type_id, local_ref.
-// if a withdrawn signal is received again it is reactivated (is_withdrawn = false).
-// returns the signal_id.
+// This query creates one row in the signals table for every new combination of account_id, signal_type_id, local_ref.
+// If a withdrawn signal is received again it is reactivated (is_withdrawn = false).
+// Only creates signals if ISN and signal type are in use (this is a defence against stale access tokens).
+// Returns the new signal_id.
 // deactivated records (is_withdrawn = true) are reactivated by resubmitting them - the update below ensures the updated_at timestamp is only changed if the record is reactivated
 // the only other signals field that can be updated is the correlation_id (handled by CreateOrUpdateSignalWithCorrelationID)
 func (q *Queries) CreateSignal(ctx context.Context, arg CreateSignalParams) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, CreateSignal,
 		arg.AccountID,
 		arg.LocalRef,
+		arg.IsnSlug,
 		arg.SignalTypeSlug,
 		arg.SemVer,
 	)
@@ -403,7 +419,9 @@ JOIN
 JOIN
     signal_types st on st.id = s.signal_type_id
 JOIN
-    isn i ON i.id = st.isn_id
+    isn_signal_types ist ON ist.signal_type_id = st.id
+JOIN
+    isn i ON i.id = ist.isn_id
 LEFT OUTER JOIN
     users u ON u.account_id = a.id
 LEFT OUTER JOIN
@@ -412,7 +430,7 @@ WHERE
     s.correlation_id = ANY($1)
     AND s.correlation_id != s.id  -- exclude self-referencing signals
     AND i.is_in_use = true
-    AND st.is_in_use = true
+    AND ist.is_in_use = true
     AND ($2::boolean = true OR s.is_withdrawn = false)
 ORDER BY
     s.correlation_id,
@@ -498,8 +516,10 @@ JOIN
     accounts a ON a.id = s.account_id
 JOIN
     signal_types st on st.id = s.signal_type_id
+join
+    isn_signal_types ist ON ist.signal_type_id = st.id
 JOIN
-    isn i ON i.id = st.isn_id
+    isn i ON i.id = ist.isn_id
 LEFT OUTER JOIN
     users u ON u.account_id = a.id
 LEFT OUTER JOIN
@@ -509,7 +529,7 @@ WHERE
     AND st.slug = $2
     AND st.sem_ver = $3
     AND i.is_in_use = true
-    AND st.is_in_use = true
+    AND ist.is_in_use = true
     AND ($4::boolean = true OR s.is_withdrawn = false)
     AND ($5::uuid IS NULL OR a.id = $5::uuid)
     AND ($6::uuid IS NULL OR s.id = $6::uuid)
@@ -597,7 +617,8 @@ SELECT EXISTS(
     SELECT 1
     FROM signals s
     JOIN signal_types st ON st.id = s.signal_type_id
-    JOIN isn i ON i.id = st.isn_id
+    JOIN isn_signal_types ist ON ist.signal_type_id = st.id
+    JOIN isn i ON i.id = ist.isn_id
     WHERE s.id = $1
         AND i.slug = $2
 ) AS is_valid
@@ -636,23 +657,33 @@ WHERE account_id = $1
     AND signal_type_id = (
         SELECT st.id
         FROM signal_types st
-        WHERE st.slug = $2 AND st.sem_ver = $3
+        JOIN isn_signal_types ist ON ist.signal_type_id = st.id
+        JOIN isn i ON i.id = ist.isn_id
+        WHERE st.slug = $2
+            AND st.sem_ver = $3
+            AND i.slug = $4
+            AND i.is_in_use = true
+            AND ist.is_in_use = true
     )
-    AND local_ref = $4
+    AND local_ref = $5
 `
 
 type WithdrawSignalByLocalRefParams struct {
 	AccountID uuid.UUID `json:"account_id"`
 	Slug      string    `json:"slug"`
 	SemVer    string    `json:"sem_ver"`
+	IsnSlug   string    `json:"isn_slug"`
 	LocalRef  string    `json:"local_ref"`
 }
 
+// only withdraws if the ISN and signal type are in use
+// Only withdraws signals if ISN and signal type are in use (this is a defence against stale access tokens).
 func (q *Queries) WithdrawSignalByLocalRef(ctx context.Context, arg WithdrawSignalByLocalRefParams) (int64, error) {
 	result, err := q.db.Exec(ctx, WithdrawSignalByLocalRef,
 		arg.AccountID,
 		arg.Slug,
 		arg.SemVer,
+		arg.IsnSlug,
 		arg.LocalRef,
 	)
 	if err != nil {

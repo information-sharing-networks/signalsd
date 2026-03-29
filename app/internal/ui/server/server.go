@@ -94,6 +94,7 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 
 		// HTMX endpoints for cascading signal type dropdowns
 		r.Get("/ui-api/options/signal-type-slugs", handlerService.RenderSignalTypeSlugOptions)
+		r.Get("/ui-api/options/signal-type-slugs-for-isn", handlerService.RenderSignalTypeSlugsForIsnOptions)
 		r.Get("/ui-api/options/signal-type-versions", handlerService.RenderSignalTypeVersionOptions)
 
 		// checkbox toggles
@@ -148,10 +149,12 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 				// signal types
 				r.Get("/admin/signal-types/create", handlerService.CreateSignalTypePage)
 				r.Get("/admin/signal-types/register-new-schema", handlerService.RegisterNewSignalTypeSchemaPage)
+				r.Get("/admin/signal-types/add", handlerService.AddSignalTypeToIsnPage)
 				r.Post("/ui-api/signal-types/create", handlerService.CreateSignalType)
 				r.Put("/ui-api/signal-types/register-new-schema", handlerService.RegisterNewSignalTypeSchema)
-				r.Get("/admin/signal-types/status", handlerService.SignalTypeStatusPage)
-				r.Put("/ui-api/signal-types/status", handlerService.AdminSignalTypeStatus)
+				r.Post("/ui-api/signal-types/add", handlerService.AddSignalTypeToIsn)
+				r.Get("/admin/signal-types/isn-status", handlerService.IsnSignalTypeStatusPage)
+				r.Put("/ui-api/isn-signal-types/status", handlerService.AdminIsnSignalTypeStatus)
 
 				// isn account permissions
 				r.Get("/admin/isn/accounts/update", handlerService.UpdateIsnAccountsPage)

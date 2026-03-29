@@ -1,14 +1,20 @@
 -- name: CreateSignal :one
--- this query creates one row in the signals table for every new combination of account_id, signal_type_id, local_ref.
--- if a withdrawn signal is received again it is reactivated (is_withdrawn = false).
--- returns the signal_id.
+-- This query creates one row in the signals table for every new combination of account_id, signal_type_id, local_ref.
+-- If a withdrawn signal is received again it is reactivated (is_withdrawn = false).
+-- Only creates signals if ISN and signal type are in use (this is a defence against stale access tokens).
+-- Returns the new signal_id.
 WITH ids AS (
-    SELECT st.id AS signal_type_id, 
-        st.isn_id,
+    SELECT st.id AS signal_type_id,
+        i.id AS isn_id,
         gen_random_uuid() AS signal_id
-    FROM signal_types st 
-    WHERE st.slug = sqlc.arg(signal_type_slug)
+    FROM signal_types st
+    JOIN isn_signal_types ist ON st.id = ist.signal_type_id
+    JOIN isn i ON i.id = ist.isn_id
+    WHERE i.slug = sqlc.arg(isn_slug)
+        AND st.slug = sqlc.arg(signal_type_slug)
         AND st.sem_ver = sqlc.arg(sem_ver)
+        AND i.is_in_use = true
+        AND ist.is_in_use = true
 )
 INSERT INTO signals (
     id,
@@ -47,14 +53,20 @@ RETURNING id;
 -- name: CreateOrUpdateSignalWithCorrelationID :one
 -- note if there is already a master record for this local_ref, then:
 -- 1. correlation_id is updated with the supplied value (assuming it is different to the existing value)
--- 2. if the signal was withdrawn it is reactivated (is_withdrawn = false)
+-- 2. if the signal was withdrawn it is reactivated (is_withdrawn = false).
+-- Only creates/updates signals if ISN and signal type are in use (this is a defence against stale access tokens).
 WITH ids AS (
-    SELECT 
-        st.id AS signal_type_id,
-        st.isn_id
-    FROM signal_types st 
-    WHERE st.slug = sqlc.arg(signal_type_slug)
+    SELECT st.id AS signal_type_id,
+        i.id AS isn_id,
+        gen_random_uuid() AS signal_id
+    FROM signal_types st
+    JOIN isn_signal_types ist ON st.id = ist.signal_type_id
+    JOIN isn i ON i.id = ist.isn_id
+    WHERE i.slug = sqlc.arg(isn_slug)
+        AND st.slug = sqlc.arg(signal_type_slug)
         AND st.sem_ver = sqlc.arg(sem_ver)
+        AND i.is_in_use = true
+        AND ist.is_in_use = true
 )
 INSERT INTO signals (
     id,
@@ -138,13 +150,21 @@ SET is_withdrawn = true, updated_at = NOW()
 WHERE id = sqlc.arg(id);
 
 -- name: WithdrawSignalByLocalRef :execrows
+-- only withdraws if the ISN and signal type are in use 
+-- Only withdraws signals if ISN and signal type are in use (this is a defence against stale access tokens).
 UPDATE signals
 SET is_withdrawn = true, updated_at = NOW()
 WHERE account_id = sqlc.arg(account_id)
     AND signal_type_id = (
         SELECT st.id
         FROM signal_types st
-        WHERE st.slug = sqlc.arg(slug) AND st.sem_ver = sqlc.arg(sem_ver)
+        JOIN isn_signal_types ist ON ist.signal_type_id = st.id
+        JOIN isn i ON i.id = ist.isn_id
+        WHERE st.slug = sqlc.arg(slug)
+            AND st.sem_ver = sqlc.arg(sem_ver)
+            AND i.slug = sqlc.arg(isn_slug)
+            AND i.is_in_use = true
+            AND ist.is_in_use = true
     )
     AND local_ref = sqlc.arg(local_ref);
 
@@ -172,8 +192,10 @@ JOIN
     accounts a ON a.id = s.account_id
 JOIN
     signal_types st on st.id = s.signal_type_id
+join
+    isn_signal_types ist ON ist.signal_type_id = st.id
 JOIN
-    isn i ON i.id = st.isn_id
+    isn i ON i.id = ist.isn_id
 LEFT OUTER JOIN
     users u ON u.account_id = a.id
 LEFT OUTER JOIN
@@ -183,7 +205,7 @@ WHERE
     AND st.slug = sqlc.arg(signal_type_slug)
     AND st.sem_ver = sqlc.arg(sem_ver)
     AND i.is_in_use = true
-    AND st.is_in_use = true
+    AND ist.is_in_use = true
     AND (sqlc.narg('include_withdrawn')::boolean = true OR s.is_withdrawn = false)
     AND (sqlc.narg('account_id')::uuid IS NULL OR a.id = sqlc.narg('account_id')::uuid)
     AND (sqlc.narg('signal_id')::uuid IS NULL OR s.id = sqlc.narg('signal_id')::uuid)
@@ -208,7 +230,8 @@ SELECT EXISTS(
     SELECT 1
     FROM signals s
     JOIN signal_types st ON st.id = s.signal_type_id
-    JOIN isn i ON i.id = st.isn_id
+    JOIN isn_signal_types ist ON ist.signal_type_id = st.id
+    JOIN isn i ON i.id = ist.isn_id
     WHERE s.id = sqlc.arg(correlation_id)
         AND i.slug = sqlc.arg(isn_slug)
 ) AS is_valid;
@@ -257,7 +280,9 @@ JOIN
 JOIN
     signal_types st on st.id = s.signal_type_id
 JOIN
-    isn i ON i.id = st.isn_id
+    isn_signal_types ist ON ist.signal_type_id = st.id
+JOIN
+    isn i ON i.id = ist.isn_id
 LEFT OUTER JOIN
     users u ON u.account_id = a.id
 LEFT OUTER JOIN
@@ -266,7 +291,7 @@ WHERE
     s.correlation_id = ANY(sqlc.slice(correlation_ids))
     AND s.correlation_id != s.id  -- exclude self-referencing signals
     AND i.is_in_use = true
-    AND st.is_in_use = true
+    AND ist.is_in_use = true
     AND (sqlc.narg('include_withdrawn')::boolean = true OR s.is_withdrawn = false)
 ORDER BY
     s.correlation_id,

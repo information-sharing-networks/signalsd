@@ -1187,151 +1187,18 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/isn/{isn_slug}/signal-types": {
-            "get": {
-                "description": "Get details for all the signal types defined on the ISN",
-                "tags": [
-                    "Signal Type Definitions"
-                ],
-                "summary": "Get Signal types",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "sample-isn--example-org",
-                        "description": "ISN slug",
-                        "name": "isn_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "boolean",
-                        "default": false,
-                        "description": "Include inactive signal types",
-                        "name": "include_inactive",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/handlers.SignalTypeDetail"
-                            }
-                        }
-                    }
-                }
-            },
+        "/api/isn/{isn_slug}/signal-types/add": {
             "post": {
                 "security": [
                     {
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Signal types specify a record that can be shared over the ISN\n- Each type has a unique title and this is used to create a URL-friendly slug\n- The title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.\n- The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading\n\nSchema URL Requirements\n- Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)\n- To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json\n\nReadme URL requirements\n- Must be a link to a file ending .md on a public github repo.\n- Use the special URL: https://github.com/skip/readme/main/readme.md to indicate there is no readme\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas\n- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)\n\nTo register a new schema for an existing signal type, use the RegisterRegisterNewSignalTypeSchema endpoint\n\nSignal type definitions are referred to like this: /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver} (e.g., /api/isn/sample-isn--example-org/signal-types/sample-signal--example-org/v0.0.1)\n",
+                "description": "Link an existing signal type to an ISN",
                 "tags": [
                     "Signal Type Definitions"
                 ],
-                "summary": "Create signal type",
-                "parameters": [
-                    {
-                        "description": "signal type details",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateSignalTypeRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.NewSignalTypeResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/isn/{isn_slug}/signal-types/{signal_type_slug}/schemas": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "You must specify a schema_url that has not been previously registered for this signal type.\n\nUse the bump_type (major/minor/patch) parameter to determine how the version number should be incremented.",
-                "tags": [
-                    "Signal Type Definitions"
-                ],
-                "summary": "Registe a new schema for an existing signal type",
-                "parameters": [
-                    {
-                        "description": "signal type details",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.RegisterNewSignalTypeSchemaRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.NewSignalTypeResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}": {
-            "get": {
-                "description": "Returns details about the signal type",
-                "tags": [
-                    "Signal Type Definitions",
-                    "Signal Type Definitions"
-                ],
-                "summary": "Get signal type",
+                "summary": "Add signal type to an ISN",
                 "parameters": [
                     {
                         "type": "string",
@@ -1342,92 +1209,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "type": "string",
-                        "example": "sample-signal--example-org",
-                        "description": "signal type slug",
-                        "name": "signal_type_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "example": "0.0.1",
-                        "description": "version to be recieved",
-                        "name": "sem_ver",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.SignalTypeDetail"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "users can mark the signal type as *in use/not in use* and update the description or link to the readme file\nSignal types marked as 'not in use' are not returned in signal searches and can not receive new signals",
-                "tags": [
-                    "Signal Type Definitions"
-                ],
-                "summary": "Update signal type",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "sample-isn--example-org",
-                        "description": "ISN slug",
-                        "name": "isn_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "example": "sample-signal--example-org",
-                        "description": "signal type slug",
-                        "name": "signal_type_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "example": "0.0.1",
-                        "description": "Sem ver",
-                        "name": "sem_ver",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "signal type details to be updated",
+                        "description": "signal type details",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.UpdateSignalTypeRequest"
+                            "$ref": "#/definitions/handlers.AddSignalTypeToIsnRequest"
                         }
                     }
                 ],
@@ -1460,18 +1247,20 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
-            "delete": {
+            }
+        },
+        "/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}": {
+            "put": {
                 "security": [
                     {
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Only signal types that have never been referenced by signals can be deleted",
+                "description": "Enable or disable a signal type for a specific ISN",
                 "tags": [
                     "Signal Type Definitions"
                 ],
-                "summary": "Delete signal type",
+                "summary": "Update ISN signal type status",
                 "parameters": [
                     {
                         "type": "string",
@@ -1492,10 +1281,19 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "example": "0.0.1",
-                        "description": "version to be deleted",
+                        "description": "Sem ver",
                         "name": "sem_ver",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "description": "status update request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdateSignalTypeRequest"
+                        }
                     }
                 ],
                 "responses": {
@@ -1508,20 +1306,20 @@ const docTemplate = `{
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1873,6 +1671,315 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/signal-types": {
+            "get": {
+                "description": "Get details for all the signal types defined on the ISN",
+                "tags": [
+                    "Signal Type Definitions"
+                ],
+                "summary": "Get Signal Types",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handlers.SignalTypeDetail"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Signal types specify a record that can be shared over the ISN\n- Each type has a unique title and this is used to create a URL-friendly slug\n- The title and slug fields can't be changed and must be unique for the site\n- The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading\n\nSchema URL Requirements\n- Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)\n- To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json\n\nReadme URL requirements\n- Must be a link to a file ending .md on a public github repo.\n- Use the special URL: https://github.com/skip/readme/main/readme.md to indicate there is no readme\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas\n- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)\n\nAfter creating a signal type, use the AddSignalTypeToIsn endpoint to link it to an ISN.\n\nSignal type definitions are referred to like this: /api/signal-types/{signal_type_slug}/v{sem_ver}\n",
+                "tags": [
+                    "Signal Type Definitions"
+                ],
+                "summary": "Create signal type",
+                "parameters": [
+                    {
+                        "description": "signal type details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateSignalTypeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.NewSignalTypeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/signal-types/{signal_type_slug}/schemas": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "You must specify a schema_url that has not been previously registered for this signal type.\n\nUse the bump_type (major/minor/patch) parameter to determine how the version number should be incremented.",
+                "tags": [
+                    "Signal Type Definitions"
+                ],
+                "summary": "Registe a new schema for an existing signal type",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-signal--example-org",
+                        "description": "signal type slug",
+                        "name": "signal_type_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "signal type details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.RegisterNewSignalTypeSchemaRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.NewSignalTypeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/signal-types/{signal_type_slug}/v{sem_ver}": {
+            "get": {
+                "description": "Returns details about the signal type",
+                "tags": [
+                    "Signal Type Definitions",
+                    "Signal Type Definitions"
+                ],
+                "summary": "Get Signal Type",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-signal--example-org",
+                        "description": "signal type slug",
+                        "name": "signal_type_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "0.0.1",
+                        "description": "version to be recieved",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.SignalTypeDetail"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "users can mark the signal type as *in use/not in use* and update the description or link to the readme file\nSignal types marked as 'not in use' are not returned in signal searches and can not receive new signals",
+                "tags": [
+                    "Signal Type Definitions"
+                ],
+                "summary": "Update signal type",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-signal--example-org",
+                        "description": "signal type slug",
+                        "name": "signal_type_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "0.0.1",
+                        "description": "Sem ver",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "signal type details to be updated",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdateSignalTypeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Only signal types that have never been referenced by signals can be deleted",
+                "tags": [
+                    "Signal Type Definitions"
+                ],
+                "summary": "Delete signal type",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-signal--example-org",
+                        "description": "signal type slug",
+                        "name": "signal_type_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "0.0.1",
+                        "description": "version to be deleted",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/health/live": {
             "get": {
                 "description": "Check if the signalsd http service is alive and responding.",
@@ -2203,14 +2310,17 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "access_token": {
+                    "description": "AccessToken is a JWT access token containing claims about the account and its permissions (see Claims struct)",
                     "type": "string",
                     "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxzZCIsInN1YiI6ImMxMjQ1Yjc0LTMyMTQtNDUzOS04YTgyLTY2NDNkMzllNjk5YiIsImV4cCI6MTc0ODU4ODE2MiwiaWF0IjoxNzQ4NTg2MzYyLCJhY2NvdW50X2lkIjoiYzEyNDViNzQtMzIxNC00NTM5LThhODItNjY0M2QzOWU2OTliIiwiYWNjb3VudF90eXBlIjoidXNlciIsInJvbGUiOiJvd25lciIsImlzbl9wZXJtcyI6eyJzYW1wbGUtaXNuLS1leGFtcGxlLW9yZyI6eyJwZXJtaXNzaW9uIjoid3JpdGUiLCJzaWduYWxfdHlwZXMiOlsic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4xIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4yIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4zIiwic2FtcGxlLXNpZ25hbG5ldy0tZXhhbXBsZS1vcmcvdjAuMC4xIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC40Il19LCJzYW1wbGUtaXNuLS1zYXVsLW9yZyI6eyJwZXJtaXNzaW9uIjoid3JpdGUiLCJzaWduYWxfdHlwZXMiOlsic2FtcGxlLXNpZ25hbC0tc2F1bC1vcmcvdjAuMC4xIl19fX0.33ANor7XHWkB87npB4RWsJUjBnJHdYZce-lT8w_IN_s"
                 },
                 "account_id": {
+                    "description": "AccountID is the account id of the user making the request",
                     "type": "string",
                     "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3"
                 },
                 "account_type": {
+                    "description": "AccountType is the account type of the user making the request (user or service_account)",
                     "type": "string",
                     "enum": [
                         "user",
@@ -2218,17 +2328,19 @@ const docTemplate = `{
                     ]
                 },
                 "expires_in": {
-                    "description": "seconds",
+                    "description": "ExpiresIn is the token expiry in seconds",
                     "type": "integer",
                     "example": 1800
                 },
                 "isn_perms": {
+                    "description": "Perms is a map of the ISNs the account has access to and the permissions granted (the map key is the isn_slug)",
                     "type": "object",
                     "additionalProperties": {
                         "$ref": "#/definitions/auth.IsnPerms"
                     }
                 },
                 "role": {
+                    "description": "Role is the role of the user making the request (owner, admin, member)",
                     "type": "string",
                     "enum": [
                         "owner",
@@ -2238,6 +2350,7 @@ const docTemplate = `{
                     "example": "admin"
                 },
                 "token_type": {
+                    "description": "TokenType (Bearer) - used as a prompt for the client to use the Bearer token type when making requests",
                     "type": "string",
                     "example": "Bearer"
                 }
@@ -2246,42 +2359,86 @@ const docTemplate = `{
         "auth.IsnPerms": {
             "type": "object",
             "properties": {
+                "account_is_isn_admin": {
+                    "description": "AccountIsIsnAdmin is true if the account is the owner of the isn or the site owner",
+                    "type": "boolean",
+                    "example": false
+                },
                 "can_read": {
+                    "description": "CanRead is true if the account has read access to the isn",
                     "type": "boolean",
                     "example": true
                 },
                 "can_write": {
+                    "description": "CanWrite is true if the account has write access to the isn",
                     "type": "boolean",
                     "example": false
                 },
-                "isn_admin": {
-                    "description": "true if the account is the owner of the isn or the site owner",
+                "in_use": {
+                    "description": "InUse is true if the isn is active",
                     "type": "boolean",
-                    "example": false
+                    "example": true
                 },
                 "signal_batch_id": {
+                    "description": "SignalBatchID is the ID of the current signal batch for the ISN (use when writing to the isn)",
                     "type": "string",
                     "example": "967affe9-5628-4fdd-921f-020051344a12"
                 },
                 "signal_types": {
-                    "description": "list of available signal types for the isn",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "signal-type-1/v0.0.1",
-                        "signal-type-2/v1.0.0"
-                    ]
+                    "description": "SignalTypes is a map of the signal type paths to the signal type details (key is the signal type path)",
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/auth.SignalType"
+                    }
                 },
                 "visibility": {
-                    "description": "ISN visibility setting",
+                    "description": "Visibility is the ISN visibility setting (public or private)",
                     "type": "string",
                     "enum": [
                         "public",
                         "private"
                     ],
                     "example": "private"
+                }
+            }
+        },
+        "auth.SignalType": {
+            "type": "object",
+            "properties": {
+                "in_use": {
+                    "description": "InUse is true if the signal type is active",
+                    "type": "boolean",
+                    "example": true
+                },
+                "path": {
+                    "description": "Path is the signal type path in the format \"slug/v{version}\"\nThis is the key used in the SignalTypes map in IsnPerms",
+                    "type": "string",
+                    "example": "sample-signal--example-org/v0.0.1"
+                },
+                "sem_ver": {
+                    "description": "SemVer is the signal type version (e.g. 0.0.1)",
+                    "type": "string",
+                    "example": "0.0.1"
+                },
+                "slug": {
+                    "description": "Slug is the signal type slug (unique per site)",
+                    "type": "string",
+                    "example": "sample-signal--example-org"
+                }
+            }
+        },
+        "handlers.AddSignalTypeToIsnRequest": {
+            "type": "object",
+            "properties": {
+                "sem_ver": {
+                    "description": "signal type version",
+                    "type": "string",
+                    "example": "0.0.1"
+                },
+                "signal_type_slug": {
+                    "description": "signal type slug",
+                    "type": "string",
+                    "example": "sample-signal--example-org"
                 }
             }
         },
@@ -2835,11 +2992,6 @@ const docTemplate = `{
                     "description": "JSON schema URL: must be a GitHub URL ending in .json, OR use https://github.com/skip/validation/main/schema.json to disable validation",
                     "type": "string",
                     "example": "https://github.com/user/project/blob/2025.01.01/schema.json"
-                },
-                "slug": {
-                    "description": "unique title",
-                    "type": "string",
-                    "example": "sample_signal_@example.org"
                 }
             }
         },
@@ -3111,10 +3263,6 @@ const docTemplate = `{
                 "id": {
                     "type": "string",
                     "example": "67890684-3b14-42cf-b785-df28ce570400"
-                },
-                "is_in_use": {
-                    "type": "boolean",
-                    "example": true
                 },
                 "readme_url": {
                     "type": "string",

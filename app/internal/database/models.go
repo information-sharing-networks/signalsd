@@ -50,6 +50,15 @@ type IsnAccount struct {
 	CanWrite  bool      `json:"can_write"`
 }
 
+type IsnSignalType struct {
+	ID           int64     `json:"id"`
+	IsnID        uuid.UUID `json:"isn_id"`
+	SignalTypeID uuid.UUID `json:"signal_type_id"`
+	IsInUse      bool      `json:"is_in_use"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
 type LatestSignalVersion struct {
 	ID            uuid.UUID       `json:"id"`
 	CreatedAt     time.Time       `json:"created_at"`
@@ -150,14 +159,12 @@ type SignalType struct {
 	ID            uuid.UUID `json:"id"`
 	CreatedAt     time.Time `json:"created_at"`
 	UpdatedAt     time.Time `json:"updated_at"`
-	IsnID         uuid.UUID `json:"isn_id"`
 	Slug          string    `json:"slug"`
 	SchemaURL     string    `json:"schema_url"`
 	ReadmeURL     string    `json:"readme_url"`
 	Title         string    `json:"title"`
 	Detail        string    `json:"detail"`
 	SemVer        string    `json:"sem_ver"`
-	IsInUse       bool      `json:"is_in_use"`
 	SchemaContent string    `json:"schema_content"`
 }
 

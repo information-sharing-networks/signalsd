@@ -457,7 +457,7 @@ func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var signalTypes *[]SignalType
-	dbSignalTypes, err := s.queries.GetSignalTypeByIsnID(r.Context(), dbIsn.ID)
+	dbSignalTypes, err := s.queries.GetSignalTypesByIsnID(r.Context(), dbIsn.ID)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			logger.ContextWithLogAttrs(r.Context(),

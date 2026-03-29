@@ -45,8 +45,7 @@ func TestBatchLifecycle(t *testing.T) {
 	}
 
 	// Create signal type for testing
-	_, err = testEnv.queries.CreateSignalType(ctx, database.CreateSignalTypeParams{
-		IsnID:         testISN.ID,
+	signalType, err := testEnv.queries.CreateSignalType(ctx, database.CreateSignalTypeParams{
 		Slug:          "batch-test-signal",
 		SchemaURL:     testSchemaURL,
 		ReadmeURL:     testReadmeURL,
@@ -57,6 +56,15 @@ func TestBatchLifecycle(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("Failed to create signal type: %v", err)
+	}
+
+	// add signal type to the ISN
+	err = testEnv.queries.AddSignalTypeToIsn(ctx, database.AddSignalTypeToIsnParams{
+		IsnID:        testISN.ID,
+		SignalTypeID: signalType.ID,
+	})
+	if err != nil {
+		t.Fatalf("Failed to associate signal type with ISN: %v", err)
 	}
 
 	t.Run("service account signal submission without batch fails", func(t *testing.T) {

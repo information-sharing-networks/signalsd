@@ -252,6 +252,18 @@ func (s *Server) registerAdminRoutes() {
 				r.Post("/password-reset/{token_id}", users.PasswordResetTokenHandler)
 			})
 
+			// Global signal types management
+			r.Group(func(r chi.Router) {
+				r.Use(s.authService.RequireValidAccessToken)
+				r.Use(s.authService.RequireRole("owner", "admin"))
+
+				r.Get("/signal-types", signalTypes.GetSignalTypesHandler)
+				r.Post("/signal-types", signalTypes.CreateSignalTypeHandler)
+				r.Post("/signal-types/{signal_type_slug}/schemas", signalTypes.RegisterNewSignalTypeSchemaHandler)
+				r.Put("/signal-types/{signal_type_slug}/v{sem_ver}", signalTypes.UpdateSignalTypeHandler)
+				r.Delete("/signal-types/{signal_type_slug}/v{sem_ver}", signalTypes.DeleteSignalTypeHandler)
+			})
+
 			// isn admin endpoints
 			r.Route("/isn", func(r chi.Router) {
 				r.Use(s.authService.RequireValidAccessToken)
@@ -268,11 +280,11 @@ func (s *Server) registerAdminRoutes() {
 						r.Post("/", isn.CreateIsnHandler)
 						r.Put("/{isn_slug}", isn.UpdateIsnHandler)
 
-						// signal types managment
-						r.Post("/{isn_slug}/signal-types", signalTypes.CreateSignalTypeHandler)
-						r.Post("/{isn_slug}/signal-types/{signal_type_slug}/schemas", signalTypes.RegisterNewSignalTypeSchemaHandler)
-						r.Put("/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}", signalTypes.UpdateSignalTypeHandler)
-						r.Delete("/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}", signalTypes.DeleteSignalTypeHandler)
+						// add signal types to an ISN
+						r.Post("/{isn_slug}/signal-types/add", signalTypes.AddSignalTypeToISNHandler)
+
+						// ISN signal type status management
+						r.Put("/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}", signalTypes.UpdateIsnSignalTypeStatusHandler)
 
 						// ISN account permissions
 						r.Put("/{isn_slug}/accounts/{account_id}", isnAccount.UpdateIsnAccountPermissionHandler)
@@ -283,7 +295,7 @@ func (s *Server) registerAdminRoutes() {
 					// create new signal batches
 					r.Group(func(r chi.Router) {
 						// accounts must have write permission to the isn to create or read batches
-						r.Use(s.authService.RequireIsnPermission("write"))
+						r.Use(s.authService.RequireAccessPermission("write"))
 
 						r.Post("/{isn_slug}/batches", signalBatches.CreateSignalsBatchHandler)
 						r.Get("/{isn_slug}/batches/{batch_id}/status", signalBatches.GetSignalBatchStatusHandler)
@@ -350,7 +362,7 @@ func (s *Server) registerSignalWriteRoutes() {
 		r.Use(middleware.CORS(s.corsConfigs.Protected))
 		r.Use(middleware.RequestSizeLimit(s.config.MaxSignalPayloadSize))
 		r.Use(s.authService.RequireValidAccessToken)
-		r.Use(s.authService.RequireIsnPermission("write"))
+		r.Use(s.authService.RequireAccessPermission("write"))
 
 		// signals post
 		r.Post("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals", signals.CreateSignalsHandler)
@@ -371,11 +383,12 @@ func (s *Server) registerSignalReadRoutes() {
 		r.Get("/api/public/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search", signals.SearchPublicSignalsHandler)
 	})
 
-	// Private ISN signal search - authentication required
+	// Private ISN signal search - any ISN member (read or write) may call this endpoint.
+	// Write-only accounts receive only the signals they created; visibility filtering is applied in the handler.
 	s.router.Group(func(r chi.Router) {
 		r.Use(middleware.CORS(s.corsConfigs.Protected))
 		r.Use(s.authService.RequireValidAccessToken)
-		r.Use(s.authService.RequireIsnPermission("read", "write"))
+		r.Use(s.authService.RequireIsnMembership)
 		r.Get("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search", signals.SearchPrivateSignalsHandler)
 	})
 

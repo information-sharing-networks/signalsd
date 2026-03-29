@@ -350,10 +350,15 @@ func (a *AuthService) RequireRole(allowedRoles ...string) func(http.Handler) htt
 	}
 }
 
-// RequireIsnPermission checks the access_token claims to ensure the account has one or both of the supplied permissions (read/write) for the ISN specified in the isn_slug URL parameter
+// RequireAccessPermission checks the access token claims to ensure the account has permission to access the data in the ISN.
+//
+// To use the ISN the account must have the specified permissions (read and/or write) supplied in the function call for the
+// ISN specified in the isn_slug URL parameter. The ISN must also be in use.
+//
+// Where the middleware is used to protect signal type specific endpoints, it also validates that the signal type is in use.
 //
 // This middleware should only be used after RequireValidAccessToken middlware, which adds the claims in the context
-func (a *AuthService) RequireIsnPermission(permissions ...string) func(http.Handler) http.Handler {
+func (a *AuthService) RequireAccessPermission(permissions ...string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -375,21 +380,53 @@ func (a *AuthService) RequireIsnPermission(permissions ...string) func(http.Hand
 				return
 			}
 
+			// Check ISN is in use
+			if !perms.InUse {
+				logger.ContextWithLogAttrs(r.Context(),
+					slog.String("isn_slug", isnSlug),
+				)
+				responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not in use")
+				return
+			}
+
+			// check the account has the specified read/write permission(s)
+			hasPermission := false
 			for _, permission := range permissions {
 
 				allowed := (permission == "read" && perms.CanRead) ||
 					(permission == "write" && perms.CanWrite)
 
 				if allowed {
-					// Add context for final request log
-					logger.ContextWithLogAttrs(r.Context(),
-						slog.String("isn_permission", permission),
-						slog.String("isn_slug", isnSlug),
-					)
-
-					next.ServeHTTP(w, r)
-					return
+					hasPermission = true
+					break
 				}
+			}
+
+			if hasPermission {
+				signalTypeSlug := r.PathValue("signal_type_slug")
+				semVer := r.PathValue("sem_ver")
+
+				if signalTypeSlug != "" && semVer != "" {
+					// check signal type is valid and in use
+					signalTypePath := fmt.Sprintf("%s/v%s", signalTypeSlug, semVer)
+					signalType, found := perms.SignalTypes[signalTypePath]
+					if !found {
+						responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "signal type not found on this ISN")
+						return
+					}
+
+					if !signalType.InUse {
+						responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "signal type not in use")
+						return
+					}
+				}
+
+				logger.ContextWithLogAttrs(r.Context(),
+					slog.String("isn_permission", strings.Join(permissions, ",")),
+					slog.String("isn_slug", isnSlug),
+				)
+				next.ServeHTTP(w, r)
+				return
 			}
 
 			// Add context for final request log
@@ -403,6 +440,67 @@ func (a *AuthService) RequireIsnPermission(permissions ...string) func(http.Hand
 			responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you do not have the necessary access permission for this isn")
 		})
 	}
+}
+
+// RequireIsnMembership checks that the account has any permission (read or write) on the ISN and that
+// the ISN is in use. Where signal_type_slug and sem_ver are present in the URL it also checks the signal type is in use.
+//
+// Use this instead of RequireAccessPermission for endpoints where write-only accounts are valid callers.
+// Write-only accounts have restricted read access (their own signals only); visibility filtering is handled in the handler.
+//
+// This middleware should only be used after RequireValidAccessToken middleware, which adds the claims in the context.
+func (a *AuthService) RequireIsnMembership(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		claims, ok := ContextClaims(r.Context())
+		if !ok {
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
+			return
+		}
+
+		isnSlug := r.PathValue("isn_slug")
+		if isnSlug == "" {
+			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInvalidRequest, "no isn_slug parameter")
+			return
+		}
+
+		perms, ok := claims.IsnPerms[isnSlug]
+		if !ok {
+			responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "account does not have access to this isn")
+			return
+		}
+
+		if !perms.CanRead && !perms.CanWrite {
+			responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "account does not have access to this isn")
+			return
+		}
+
+		if !perms.InUse {
+			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not in use")
+			return
+		}
+
+		signalTypeSlug := r.PathValue("signal_type_slug")
+		semVer := r.PathValue("sem_ver")
+
+		if signalTypeSlug != "" && semVer != "" {
+			signalTypePath := fmt.Sprintf("%s/v%s", signalTypeSlug, semVer)
+			signalType, found := perms.SignalTypes[signalTypePath]
+			if !found {
+				responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "signal type not found on this ISN")
+				return
+			}
+			if !signalType.InUse {
+				responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "signal type not in use")
+				return
+			}
+		}
+
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("isn_slug", isnSlug),
+		)
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (a *AuthService) RequireDevEnv(next http.Handler) http.Handler {

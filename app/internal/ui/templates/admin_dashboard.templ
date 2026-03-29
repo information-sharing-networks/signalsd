@@ -29,6 +29,8 @@ templ AdminDashboardPage(environment string) {
 						<a href="/admin/isn/create" class="btn btn-primary">Create an ISN</a>
 						<a href="/admin/isn/accounts/update" class="btn btn-primary">Manage ISN Access</a>
 						<a href="/admin/isn/status" class="btn btn-primary">Enable/Disable ISNs</a>
+						<a href="/admin/signal-types/associate" class="btn btn-primary">Associate Signal Types</a>
+						<a href="/admin/signal-types/isn-status" class="btn btn-primary">Enable/Disable Signal Type</a>
 					</div>
 				</div>
 
@@ -36,10 +38,9 @@ templ AdminDashboardPage(environment string) {
 				<div class="card">
 					<div class="card-body">
 						<h3 class="card-title">Signal Types</h3>
-						<p class="card-description text-muted">Register the types of signal used in an ISN.</p>
+						<p class="card-description text-muted">Register the types of signal available on this site.</p>
 						<a href="/admin/signal-types/create" class="btn btn-primary">Create Signal Types</a>
 						<a href="/admin/signal-types/register-new-schema" class="btn btn-primary">Register a New Schema</a>
-						<a href="/admin/signal-types/status" class="btn btn-primary">Enable/Disable Signal Types</a>
 					</div>
 				</div>
 

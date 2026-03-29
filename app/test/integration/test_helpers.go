@@ -180,13 +180,12 @@ func assertBatchState(t *testing.T, ctx context.Context, queries *database.Queri
 	}
 }
 
-// createTestSignalType creates a signal type associated with an ISN
+// createTestSignalType creates a signal type and associates it with an ISN
 func createTestSignalType(t *testing.T, ctx context.Context, queries *database.Queries, isnID uuid.UUID, title string, version string) database.SignalType {
 
 	slug, _ := utils.GenerateSlug(title)
 
 	signalType, err := queries.CreateSignalType(ctx, database.CreateSignalTypeParams{
-		IsnID:         isnID,
 		Slug:          slug,
 		SchemaURL:     testSchemaURL,
 		ReadmeURL:     testReadmeURL,
@@ -197,6 +196,15 @@ func createTestSignalType(t *testing.T, ctx context.Context, queries *database.Q
 	})
 	if err != nil {
 		t.Fatalf("Failed to create signal type %s/%s: %v", slug, version, err)
+	}
+
+	// add the signal type to the ISN
+	err = queries.AddSignalTypeToIsn(ctx, database.AddSignalTypeToIsnParams{
+		IsnID:        isnID,
+		SignalTypeID: signalType.ID,
+	})
+	if err != nil {
+		t.Fatalf("Failed to associate signal type %s/%s with ISN: %v", slug, version, err)
 	}
 
 	return signalType

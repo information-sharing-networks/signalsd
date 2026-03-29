@@ -52,25 +52,34 @@ definitions:
   auth.AccessTokenResponse:
     properties:
       access_token:
+        description: AccessToken is a JWT access token containing claims about the
+          account and its permissions (see Claims struct)
         example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxzZCIsInN1YiI6ImMxMjQ1Yjc0LTMyMTQtNDUzOS04YTgyLTY2NDNkMzllNjk5YiIsImV4cCI6MTc0ODU4ODE2MiwiaWF0IjoxNzQ4NTg2MzYyLCJhY2NvdW50X2lkIjoiYzEyNDViNzQtMzIxNC00NTM5LThhODItNjY0M2QzOWU2OTliIiwiYWNjb3VudF90eXBlIjoidXNlciIsInJvbGUiOiJvd25lciIsImlzbl9wZXJtcyI6eyJzYW1wbGUtaXNuLS1leGFtcGxlLW9yZyI6eyJwZXJtaXNzaW9uIjoid3JpdGUiLCJzaWduYWxfdHlwZXMiOlsic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4xIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4yIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4zIiwic2FtcGxlLXNpZ25hbG5ldy0tZXhhbXBsZS1vcmcvdjAuMC4xIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC40Il19LCJzYW1wbGUtaXNuLS1zYXVsLW9yZyI6eyJwZXJtaXNzaW9uIjoid3JpdGUiLCJzaWduYWxfdHlwZXMiOlsic2FtcGxlLXNpZ25hbC0tc2F1bC1vcmcvdjAuMC4xIl19fX0.33ANor7XHWkB87npB4RWsJUjBnJHdYZce-lT8w_IN_s
         type: string
       account_id:
+        description: AccountID is the account id of the user making the request
         example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
         type: string
       account_type:
+        description: AccountType is the account type of the user making the request
+          (user or service_account)
         enum:
         - user
         - service_account
         type: string
       expires_in:
-        description: seconds
+        description: ExpiresIn is the token expiry in seconds
         example: 1800
         type: integer
       isn_perms:
         additionalProperties:
           $ref: '#/definitions/auth.IsnPerms'
+        description: Perms is a map of the ISNs the account has access to and the
+          permissions granted (the map key is the isn_slug)
         type: object
       role:
+        description: Role is the role of the user making the request (owner, admin,
+          member)
         enum:
         - owner
         - admin
@@ -78,38 +87,79 @@ definitions:
         example: admin
         type: string
       token_type:
+        description: TokenType (Bearer) - used as a prompt for the client to use the
+          Bearer token type when making requests
         example: Bearer
         type: string
     type: object
   auth.IsnPerms:
     properties:
+      account_is_isn_admin:
+        description: AccountIsIsnAdmin is true if the account is the owner of the
+          isn or the site owner
+        example: false
+        type: boolean
       can_read:
+        description: CanRead is true if the account has read access to the isn
         example: true
         type: boolean
       can_write:
+        description: CanWrite is true if the account has write access to the isn
         example: false
         type: boolean
-      isn_admin:
-        description: true if the account is the owner of the isn or the site owner
-        example: false
+      in_use:
+        description: InUse is true if the isn is active
+        example: true
         type: boolean
       signal_batch_id:
+        description: SignalBatchID is the ID of the current signal batch for the ISN
+          (use when writing to the isn)
         example: 967affe9-5628-4fdd-921f-020051344a12
         type: string
       signal_types:
-        description: list of available signal types for the isn
-        example:
-        - signal-type-1/v0.0.1
-        - signal-type-2/v1.0.0
-        items:
-          type: string
-        type: array
+        additionalProperties:
+          $ref: '#/definitions/auth.SignalType'
+        description: SignalTypes is a map of the signal type paths to the signal type
+          details (key is the signal type path)
+        type: object
       visibility:
-        description: ISN visibility setting
+        description: Visibility is the ISN visibility setting (public or private)
         enum:
         - public
         - private
         example: private
+        type: string
+    type: object
+  auth.SignalType:
+    properties:
+      in_use:
+        description: InUse is true if the signal type is active
+        example: true
+        type: boolean
+      path:
+        description: |-
+          Path is the signal type path in the format "slug/v{version}"
+          This is the key used in the SignalTypes map in IsnPerms
+        example: sample-signal--example-org/v0.0.1
+        type: string
+      sem_ver:
+        description: SemVer is the signal type version (e.g. 0.0.1)
+        example: 0.0.1
+        type: string
+      slug:
+        description: Slug is the signal type slug (unique per site)
+        example: sample-signal--example-org
+        type: string
+    type: object
+  handlers.AddSignalTypeToIsnRequest:
+    properties:
+      sem_ver:
+        description: signal type version
+        example: 0.0.1
+        type: string
+      signal_type_slug:
+        description: signal type slug
+        example: sample-signal--example-org
         type: string
     type: object
   handlers.BatchStatus:
@@ -505,10 +555,6 @@ definitions:
           https://github.com/skip/validation/main/schema.json to disable validation'
         example: https://github.com/user/project/blob/2025.01.01/schema.json
         type: string
-      slug:
-        description: unique title
-        example: sample_signal_@example.org
-        type: string
     type: object
   handlers.ReissueServiceAccountCredentialsRequest:
     properties:
@@ -698,9 +744,6 @@ definitions:
       id:
         example: 67890684-3b14-42cf-b785-df28ce570400
         type: string
-      is_in_use:
-        example: true
-        type: boolean
       readme_url:
         example: https://github.com/user/project/blob/2025.01.01/readme.md
         type: string
@@ -1830,210 +1873,9 @@ paths:
       summary: Create a new signal batch
       tags:
       - Signal Exchange
-  /api/isn/{isn_slug}/signal-types:
-    get:
-      description: Get details for all the signal types defined on the ISN
-      parameters:
-      - description: ISN slug
-        example: sample-isn--example-org
-        in: path
-        name: isn_slug
-        required: true
-        type: string
-      - default: false
-        description: Include inactive signal types
-        in: query
-        name: include_inactive
-        type: boolean
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/handlers.SignalTypeDetail'
-            type: array
-      summary: Get Signal types
-      tags:
-      - Signal Type Definitions
-    post:
-      description: |
-        Signal types specify a record that can be shared over the ISN
-        - Each type has a unique title and this is used to create a URL-friendly slug
-        - The title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.
-        - The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading
-
-        Schema URL Requirements
-        - Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)
-        - To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json
-
-        Readme URL requirements
-        - Must be a link to a file ending .md on a public github repo.
-        - Use the special URL: https://github.com/skip/readme/main/readme.md to indicate there is no readme
-
-        Versions
-        - A signal type can have multiple versions - these share the same title/slug but have different JSON schemas
-        - Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)
-
-        To register a new schema for an existing signal type, use the RegisterRegisterNewSignalTypeSchema endpoint
-
-        Signal type definitions are referred to like this: /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver} (e.g., /api/isn/sample-isn--example-org/signal-types/sample-signal--example-org/v0.0.1)
-      parameters:
-      - description: signal type details
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.CreateSignalTypeRequest'
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/handlers.NewSignalTypeResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Create signal type
-      tags:
-      - Signal Type Definitions
-  /api/isn/{isn_slug}/signal-types/{signal_type_slug}/schemas:
-    post:
-      description: |-
-        You must specify a schema_url that has not been previously registered for this signal type.
-
-        Use the bump_type (major/minor/patch) parameter to determine how the version number should be incremented.
-      parameters:
-      - description: signal type details
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.RegisterNewSignalTypeSchemaRequest'
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/handlers.NewSignalTypeResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Registe a new schema for an existing signal type
-      tags:
-      - Signal Type Definitions
   /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}:
-    delete:
-      description: Only signal types that have never been referenced by signals can
-        be deleted
-      parameters:
-      - description: ISN slug
-        example: sample-isn--example-org
-        in: path
-        name: isn_slug
-        required: true
-        type: string
-      - description: signal type slug
-        example: sample-signal--example-org
-        in: path
-        name: signal_type_slug
-        required: true
-        type: string
-      - description: version to be deleted
-        example: 0.0.1
-        in: path
-        name: sem_ver
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Delete signal type
-      tags:
-      - Signal Type Definitions
-    get:
-      description: Returns details about the signal type
-      parameters:
-      - description: ISN slug
-        example: sample-isn--example-org
-        in: path
-        name: isn_slug
-        required: true
-        type: string
-      - description: signal type slug
-        example: sample-signal--example-org
-        in: path
-        name: signal_type_slug
-        required: true
-        type: string
-      - description: version to be recieved
-        example: 0.0.1
-        in: path
-        name: sem_ver
-        required: true
-        type: string
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.SignalTypeDetail'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      summary: Get signal type
-      tags:
-      - Signal Type Definitions
-      - Signal Type Definitions
     put:
-      description: |-
-        users can mark the signal type as *in use/not in use* and update the description or link to the readme file
-        Signal types marked as 'not in use' are not returned in signal searches and can not receive new signals
+      description: Enable or disable a signal type for a specific ISN
       parameters:
       - description: ISN slug
         example: sample-isn--example-org
@@ -2053,7 +1895,7 @@ paths:
         name: sem_ver
         required: true
         type: string
-      - description: signal type details to be updated
+      - description: status update request
         in: body
         name: request
         required: true
@@ -2080,7 +1922,7 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Update signal type
+      summary: Update ISN signal type status
       tags:
       - Signal Type Definitions
   /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals:
@@ -2314,6 +2156,46 @@ paths:
       summary: Withdraw a signal
       tags:
       - Signal Exchange
+  /api/isn/{isn_slug}/signal-types/add:
+    post:
+      description: Link an existing signal type to an ISN
+      parameters:
+      - description: ISN slug
+        example: sample-isn--example-org
+        in: path
+        name: isn_slug
+        required: true
+        type: string
+      - description: signal type details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.AddSignalTypeToIsnRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Add signal type to an ISN
+      tags:
+      - Signal Type Definitions
   /api/public/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search:
     get:
       description: |-
@@ -2377,6 +2259,235 @@ paths:
       summary: Signal Search (public ISNs)
       tags:
       - Signal Exchange
+  /api/signal-types:
+    get:
+      description: Get details for all the signal types defined on the ISN
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.SignalTypeDetail'
+            type: array
+      summary: Get Signal Types
+      tags:
+      - Signal Type Definitions
+    post:
+      description: |
+        Signal types specify a record that can be shared over the ISN
+        - Each type has a unique title and this is used to create a URL-friendly slug
+        - The title and slug fields can't be changed and must be unique for the site
+        - The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading
+
+        Schema URL Requirements
+        - Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)
+        - To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json
+
+        Readme URL requirements
+        - Must be a link to a file ending .md on a public github repo.
+        - Use the special URL: https://github.com/skip/readme/main/readme.md to indicate there is no readme
+
+        Versions
+        - A signal type can have multiple versions - these share the same title/slug but have different JSON schemas
+        - Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)
+
+        After creating a signal type, use the AddSignalTypeToIsn endpoint to link it to an ISN.
+
+        Signal type definitions are referred to like this: /api/signal-types/{signal_type_slug}/v{sem_ver}
+      parameters:
+      - description: signal type details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateSignalTypeRequest'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.NewSignalTypeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Create signal type
+      tags:
+      - Signal Type Definitions
+  /api/signal-types/{signal_type_slug}/schemas:
+    post:
+      description: |-
+        You must specify a schema_url that has not been previously registered for this signal type.
+
+        Use the bump_type (major/minor/patch) parameter to determine how the version number should be incremented.
+      parameters:
+      - description: signal type slug
+        example: sample-signal--example-org
+        in: path
+        name: signal_type_slug
+        required: true
+        type: string
+      - description: signal type details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RegisterNewSignalTypeSchemaRequest'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.NewSignalTypeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Registe a new schema for an existing signal type
+      tags:
+      - Signal Type Definitions
+  /api/signal-types/{signal_type_slug}/v{sem_ver}:
+    delete:
+      description: Only signal types that have never been referenced by signals can
+        be deleted
+      parameters:
+      - description: signal type slug
+        example: sample-signal--example-org
+        in: path
+        name: signal_type_slug
+        required: true
+        type: string
+      - description: version to be deleted
+        example: 0.0.1
+        in: path
+        name: sem_ver
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Delete signal type
+      tags:
+      - Signal Type Definitions
+    get:
+      description: Returns details about the signal type
+      parameters:
+      - description: signal type slug
+        example: sample-signal--example-org
+        in: path
+        name: signal_type_slug
+        required: true
+        type: string
+      - description: version to be recieved
+        example: 0.0.1
+        in: path
+        name: sem_ver
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.SignalTypeDetail'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      summary: Get Signal Type
+      tags:
+      - Signal Type Definitions
+      - Signal Type Definitions
+    put:
+      description: |-
+        users can mark the signal type as *in use/not in use* and update the description or link to the readme file
+        Signal types marked as 'not in use' are not returned in signal searches and can not receive new signals
+      parameters:
+      - description: signal type slug
+        example: sample-signal--example-org
+        in: path
+        name: signal_type_slug
+        required: true
+        type: string
+      - description: Sem ver
+        example: 0.0.1
+        in: path
+        name: sem_ver
+        required: true
+        type: string
+      - description: signal type details to be updated
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateSignalTypeRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Update signal type
+      tags:
+      - Signal Type Definitions
   /health/live:
     get:
       description: Check if the signalsd http service is alive and responding.

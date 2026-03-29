@@ -5,8 +5,7 @@ package integration
 // Tests signal creation, search, and security controls via HTTP requests.
 //
 // Signal submission (successful and failed scenarios)
-// Schema validation and correlation handling
-// Multi-signal payload processing
+// "In use" status controls
 // Signal search with authorization controls
 // Public vs private ISN access
 // Withdrawn signal handling
@@ -18,7 +17,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -70,7 +71,7 @@ func TestSignalSubmission(t *testing.T) {
 		signalTypeSemVer: adminSignalType.SemVer,
 	}
 
-	// run the first tests
+	// run the signal submission tests
 	t.Run("signal submission", func(t *testing.T) {
 
 		tests := []struct {
@@ -449,7 +450,10 @@ func TestSignalSubmission(t *testing.T) {
 
 }
 
-// check that isns/signal types marked as is_in_use = false can't be read or written.
+// TestIsInUseStatus checks that read/write is disabled when either
+// 1. isn.is_in_use is false (should prevent using this ISN entirely)
+// 2. signal_types.is_in_use (should prevent using this sigal type on any ISN)
+// 3. isn_signal_types.is_in_use (should prevent using this sigal type on this ISN)
 func TestIsInUseStatus(t *testing.T) {
 
 	ctx := context.Background()
@@ -459,26 +463,26 @@ func TestIsInUseStatus(t *testing.T) {
 
 	t.Log("Creating test data...")
 
-	// admin automatically has write permission for adminISN
-
-	// granted pemissions:
-	// admin > write access to ownerISN
-	// member > write access to admin isn
-	// member > write access to owner isn
 	ownerAccount := createTestAccount(t, ctx, testEnv.queries, "owner", "user", "owner@isinuse.com")
 	adminAccount := createTestAccount(t, ctx, testEnv.queries, "admin", "user", "admin@isinuse.com")
 	memberAccount := createTestAccount(t, ctx, testEnv.queries, "member", "user", "member@isinuse.com")
 
-	ownerISN := createTestISN(t, ctx, testEnv.queries, "owner-isinuse-isn", "Owner ISN", ownerAccount.ID, "private")
-	adminISN := createTestISN(t, ctx, testEnv.queries, "admin-isnotinuse-isn", "Admin ISN", adminAccount.ID, "private")
+	ownerISN := createTestISN(t, ctx, testEnv.queries, "owner-isn", "Owner ISN", ownerAccount.ID, "private")
+	adminISN := createTestISN(t, ctx, testEnv.queries, "admin-isn", "Admin ISN", adminAccount.ID, "private")
 
-	ownerSignalType := createTestSignalType(t, ctx, testEnv.queries, ownerISN.ID, "owner isinuse ISN signal", "1.0.0")
-	adminSignalType := createTestSignalType(t, ctx, testEnv.queries, adminISN.ID, "admin isnotinuse ISN signal", "1.0.0")
-	disabledSignalType := createTestSignalType(t, ctx, testEnv.queries, ownerISN.ID, "owner isinuse ISN signal (inactive)", "1.0.0")
+	ownerSignalType := createTestSignalType(t, ctx, testEnv.queries, ownerISN.ID, "owner ISN signal", "1.0.0")
+	adminSignalType := createTestSignalType(t, ctx, testEnv.queries, adminISN.ID, "admin ISN signal", "1.0.0")
 
-	grantPermission(t, ctx, testEnv.queries, ownerISN.ID, adminAccount.ID, "write")
-	grantPermission(t, ctx, testEnv.queries, adminISN.ID, memberAccount.ID, "read")
-	grantPermission(t, ctx, testEnv.queries, ownerISN.ID, memberAccount.ID, "write")
+	// all accounts need read/write to all ISNs to make the test work
+
+	// owner has read/write to all ISNs automatically)
+
+	// admin has access to own isn automatically - grant read/write to owner iSN
+	grantPermission(t, ctx, testEnv.queries, ownerISN.ID, adminAccount.ID, "read-write")
+
+	// grant member read/write to owner ISN and admin ISN
+	grantPermission(t, ctx, testEnv.queries, adminISN.ID, memberAccount.ID, "read-write")
+	grantPermission(t, ctx, testEnv.queries, ownerISN.ID, memberAccount.ID, "read-write")
 
 	createTestSignalBatch(t, ctx, testEnv.queries, ownerISN.ID, adminAccount.ID)
 	createTestSignalBatch(t, ctx, testEnv.queries, adminISN.ID, adminAccount.ID)
@@ -488,188 +492,162 @@ func TestIsInUseStatus(t *testing.T) {
 		signalTypeSlug:   ownerSignalType.Slug,
 		signalTypeSemVer: ownerSignalType.SemVer,
 	}
+
 	adminEndpoint := testSignalEndpoint{
 		isnSlug:          adminISN.Slug,
 		signalTypeSlug:   adminSignalType.Slug,
 		signalTypeSemVer: adminSignalType.SemVer,
 	}
-	disabledEndpoint := testSignalEndpoint{
-		isnSlug:          ownerISN.Slug,
-		signalTypeSlug:   disabledSignalType.Slug,
-		signalTypeSemVer: disabledSignalType.SemVer,
+
+	scenarios := []struct {
+		name           string
+		expectedStatus int
+		errorContains  string
+	}{
+		{
+			name:           "disabled_admin_isn",
+			expectedStatus: http.StatusNotFound,
+			errorContains:  "ISN not in use",
+		},
+		{
+			name:           "disabled_admin_isn_signal_type",
+			expectedStatus: http.StatusNotFound,
+			errorContains:  "signal type not in use",
+		},
 	}
 
-	//disable the admin.ISN
-	_, err := testEnv.queries.UpdateIsn(ctx, database.UpdateIsnParams{
-		ID:         adminISN.ID,
-		Detail:     adminISN.Detail,
-		IsInUse:    false,
-		Visibility: adminISN.Visibility,
-	})
-	if err != nil {
-		t.Fatalf("could not mark ISN %v as not in use", err)
-	}
+	for _, scenario := range scenarios {
 
-	// create and disable a new signal type in the owner isn
-	_, err = testEnv.queries.UpdateSignalTypeDetails(ctx, database.UpdateSignalTypeDetailsParams{
-		ID:        disabledSignalType.ID,
-		ReadmeURL: disabledSignalType.ReadmeURL,
-		Detail:    disabledSignalType.Detail,
-		IsInUse:   false,
-	})
-	if err != nil {
-		t.Fatalf("could not set is_in_use field on signal_types reccord: %v", err)
-		return
-	}
-	t.Run("read write tests", func(t *testing.T) {
-
-		tests := []struct {
-			name           string
-			accountID      uuid.UUID
-			endpoint       testSignalEndpoint
-			action         string
-			expectedStatus int
-		}{
-			// note the status code returned when an ISN is marked "not in use" is 'forbidden' and for Signal Types it is "not found"
-			{
-				name:           "disabled isn is not writeable by the isn owner",
-				accountID:      adminAccount.ID,
-				action:         "write",
-				endpoint:       adminEndpoint,
-				expectedStatus: http.StatusForbidden,
-			},
-			{
-				name:           "disabled isn is not writeable by the site owner",
-				accountID:      ownerAccount.ID,
-				action:         "write",
-				endpoint:       adminEndpoint,
-				expectedStatus: http.StatusForbidden,
-			},
-			{
-				name:           "disabled isn is not writeable by a member granted access",
-				accountID:      memberAccount.ID,
-				action:         "write",
-				endpoint:       adminEndpoint,
-				expectedStatus: http.StatusForbidden,
-			},
-			{
-				name:           "disabling an isn does not prevent writes to other isns",
-				accountID:      adminAccount.ID,
-				action:         "write",
-				endpoint:       ownerEndpoint,
-				expectedStatus: http.StatusOK,
-			},
-			{
-				name:           "disabled isn is not readable by the isn owner",
-				accountID:      adminAccount.ID,
-				action:         "read",
-				endpoint:       adminEndpoint,
-				expectedStatus: http.StatusForbidden,
-			},
-			{
-				name:           "disabled isn is not readable by the site owner",
-				accountID:      ownerAccount.ID,
-				action:         "read",
-				endpoint:       adminEndpoint,
-				expectedStatus: http.StatusForbidden,
-			},
-			{
-				name:           "disabled isn is not readable by a member granted access",
-				accountID:      memberAccount.ID,
-				action:         "read",
-				endpoint:       adminEndpoint,
-				expectedStatus: http.StatusForbidden,
-			},
-			{
-				name:           "disabled signal type not writeble by isn owner",
-				accountID:      adminAccount.ID,
-				action:         "write",
-				endpoint:       disabledEndpoint,
-				expectedStatus: http.StatusNotFound,
-			},
-			{
-				name:           "disabled signal type not writeble by site owner",
-				accountID:      ownerAccount.ID,
-				action:         "write",
-				endpoint:       disabledEndpoint,
-				expectedStatus: http.StatusNotFound,
-			},
-			{
-				name:           "disabled signal type not writeble by member granted access",
-				accountID:      memberAccount.ID,
-				action:         "write",
-				endpoint:       disabledEndpoint,
-				expectedStatus: http.StatusNotFound,
-			},
-			{
-				name:           "disabled signal type not readable by isn owner",
-				accountID:      adminAccount.ID,
-				action:         "read",
-				endpoint:       disabledEndpoint,
-				expectedStatus: http.StatusNotFound,
-			},
-			{
-				name:           "disabled signal type not readable by site owner",
-				accountID:      ownerAccount.ID,
-				action:         "read",
-				endpoint:       disabledEndpoint,
-				expectedStatus: http.StatusNotFound,
-			},
-			{
-				name:           "disabled signal type not readable by member granted access",
-				accountID:      memberAccount.ID,
-				action:         "read",
-				endpoint:       disabledEndpoint,
-				expectedStatus: http.StatusNotFound,
-			},
-			{
-				name:           "disabling one signal type does not prevent writing another",
-				accountID:      adminAccount.ID,
-				action:         "write",
-				endpoint:       ownerEndpoint,
-				expectedStatus: http.StatusOK,
-			},
-			{
-				name:           "disabling one signal type does not prevent reading another",
-				accountID:      adminAccount.ID,
-				action:         "read",
-				endpoint:       ownerEndpoint,
-				expectedStatus: http.StatusOK,
-			},
-		}
-		for _, tt := range tests {
-			t.Run(tt.name, func(t *testing.T) {
-
-				authToken := testEnv.createAuthToken(t, tt.accountID)
-
-				switch tt.action {
-				case "write":
-
-					payload := createValidSignalPayload("isinuse-isn-001")
-					response := submitCreateSignalRequest(t, testEnv.baseURL, payload, authToken, tt.endpoint)
-					defer response.Body.Close()
-
-					// Verify response status
-					if response.StatusCode != tt.expectedStatus {
-						t.Errorf("Expected status %d, got %d", tt.expectedStatus, response.StatusCode)
-						return
-					}
-				case "read":
-					response := searchPrivateSignals(t, testEnv.baseURL, tt.endpoint, authToken, false, false, false)
-					defer response.Body.Close()
-
-					// Verify response status
-					if response.StatusCode != tt.expectedStatus {
-						t.Errorf("Expected status %d, got %d. %s", tt.expectedStatus, response.StatusCode, tt.name)
-						return
-					}
-				default:
-					t.Fatalf("invalid action received in test %v", tt.action)
-				}
+		switch scenario.name {
+		case "disabled_admin_isn":
+			_, err := testEnv.queries.UpdateIsn(ctx, database.UpdateIsnParams{
+				ID:         adminISN.ID,
+				Detail:     adminISN.Detail,
+				IsInUse:    false,
+				Visibility: adminISN.Visibility,
 			})
+			if err != nil {
+				t.Fatalf("could not mark ISN %v as not in use", err)
+			}
+		case "disabled_admin_isn_signal_type":
+			// enable the isn
+			_, err := testEnv.queries.UpdateIsn(ctx, database.UpdateIsnParams{
+				ID:         adminISN.ID,
+				Detail:     adminISN.Detail,
+				IsInUse:    true,
+				Visibility: adminISN.Visibility,
+			})
+
+			// disable signal type for the isn
+			_, err = testEnv.queries.UpdateIsnSignalTypeStatus(ctx, database.UpdateIsnSignalTypeStatusParams{
+				IsnID:        adminISN.ID,
+				SignalTypeID: adminSignalType.ID,
+				IsInUse:      false,
+			})
+			if err != nil {
+				t.Fatalf("could not set is_in_use field on isn_signal_types reccord: %v", err)
+			}
 		}
 
-	})
+		t.Run(scenario.name, func(t *testing.T) {
+			tests := []struct {
+				name           string
+				accountID      uuid.UUID
+				endpoint       testSignalEndpoint
+				action         string
+				expectedStatus int
+				errorContains  string
+			}{
+				// disabling one signal type should not affect other signal types
+				{
+					name:           fmt.Sprintf("%s - write to enabled signal type should succeed", scenario.name),
+					action:         "write",
+					endpoint:       ownerEndpoint,
+					expectedStatus: http.StatusOK,
+				},
+				{
+					name:           fmt.Sprintf("%s - read on enabled signal type should succeed", scenario.name),
+					action:         "read",
+					endpoint:       ownerEndpoint,
+					expectedStatus: http.StatusOK,
+				},
+				// no account can read/write to disabled signal type or isn
+				{
+					name:           fmt.Sprintf("%s - write to disabled signal type should fail", scenario.name),
+					action:         "read",
+					endpoint:       adminEndpoint,
+					expectedStatus: scenario.expectedStatus,
+					errorContains:  scenario.errorContains,
+				},
+				{
+					name:           fmt.Sprintf("%s - write to disabled signal type should fail", scenario.name),
+					action:         "write",
+					endpoint:       adminEndpoint,
+					expectedStatus: scenario.expectedStatus,
+					errorContains:  scenario.errorContains,
+				},
+			}
+			for _, tt := range tests {
+				// run the test for each account
+				for _, account := range []database.GetAccountByIDRow{ownerAccount, adminAccount, memberAccount} {
+					name := fmt.Sprintf("%s - %s", tt.name, account.AccountRole)
+					t.Run(name, func(t *testing.T) {
+
+						authToken := testEnv.createAuthToken(t, account.ID)
+
+						t.Logf("access token %v", authToken)
+
+						switch tt.action {
+						case "write":
+
+							payload := createValidSignalPayload("signal-001")
+							response := submitCreateSignalRequest(t, testEnv.baseURL, payload, authToken, tt.endpoint)
+							defer response.Body.Close()
+
+							// Verify response status
+							if response.StatusCode != tt.expectedStatus {
+								t.Errorf("Expected status %d, got %d", tt.expectedStatus, response.StatusCode)
+								return
+							}
+
+							if tt.errorContains != "" {
+								body, err := io.ReadAll(response.Body)
+								if err != nil {
+									t.Fatalf("Failed to read response body: %v", err)
+								}
+
+								if !strings.Contains(string(body), tt.errorContains) {
+									t.Errorf("Expected error message to contain '%s', got '%s'", tt.errorContains, string(body))
+								}
+							}
+						case "read":
+							response := searchPrivateSignals(t, testEnv.baseURL, tt.endpoint, authToken, false, false, false)
+							defer response.Body.Close()
+
+							// Verify response status
+							if response.StatusCode != tt.expectedStatus {
+								t.Errorf("Expected status %d, got %d. %s", tt.expectedStatus, response.StatusCode, tt.name)
+								return
+							}
+							if tt.errorContains != "" {
+								body, err := io.ReadAll(response.Body)
+								if err != nil {
+									t.Fatalf("Failed to read response body: %v", err)
+								}
+
+								if !strings.Contains(string(body), tt.errorContains) {
+									t.Errorf("Expected error message to contain '%s', got '%s'", tt.errorContains, string(body))
+								}
+							}
+						default:
+							t.Fatalf("invalid action received in test %v", tt.action)
+						}
+					})
+				}
+
+			}
+		})
+	}
 
 }
 
@@ -1041,7 +1019,7 @@ func TestWriteOnlyAccountVisibility(t *testing.T) {
 	sharedISN := createTestISN(t, ctx, testEnv.queries, "shared-writeonly-isn", "Shared Write-Only ISN", account1.ID, "private")
 	signalType := createTestSignalType(t, ctx, testEnv.queries, sharedISN.ID, "shared signal type", "1.0.0")
 
-	// Grant write-only permission to both accounts
+	// Grant write-only permission to both accounts - they can search but only see their own signals
 	grantPermission(t, ctx, testEnv.queries, sharedISN.ID, account1.ID, "write")
 	grantPermission(t, ctx, testEnv.queries, sharedISN.ID, account2.ID, "write")
 

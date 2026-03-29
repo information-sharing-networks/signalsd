@@ -196,14 +196,13 @@ func checkPermissions(t *testing.T,
 		}
 
 		// Verify signal type paths are correctly populated
-		if len(perm.SignalTypePaths) != 1 {
-			t.Errorf("expected 1 signal type path for %s, got %d", isnSlug, len(perm.SignalTypePaths))
+		if len(perm.SignalTypes) != 1 {
+			t.Errorf("expected 1 signal type for %s, got %d", isnSlug, len(perm.SignalTypes))
 			continue
 		}
-		signalTypePath := perm.SignalTypePaths[0]
 		if expectedPath, exists := validSignalTypePaths[isnSlug]; exists {
-			if signalTypePath != expectedPath {
-				t.Errorf("expected signal type path %s for %s, got %s", expectedPath, isnSlug, signalTypePath)
+			if _, found := perm.SignalTypes[expectedPath]; !found {
+				t.Errorf("expected signal type path %s for %s, not found in signal types", expectedPath, isnSlug)
 			}
 		}
 	}
@@ -284,10 +283,10 @@ func checkPermissions(t *testing.T,
 				isnSlug, jwtPerm.SignalBatchID == nil, responsePerm.SignalBatchID == nil)
 		}
 
-		// Compare signal type paths
-		if len(jwtPerm.SignalTypePaths) != len(responsePerm.SignalTypePaths) {
-			t.Errorf("ISN %s: JWT has %d signal type paths, response has %d",
-				isnSlug, len(jwtPerm.SignalTypePaths), len(responsePerm.SignalTypePaths))
+		// Compare signal types
+		if len(jwtPerm.SignalTypes) != len(responsePerm.SignalTypes) {
+			t.Errorf("ISN %s: JWT has %d signal types, response has %d",
+				isnSlug, len(jwtPerm.SignalTypes), len(responsePerm.SignalTypes))
 		}
 	}
 }

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -9,32 +10,18 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
 // CreateSignalTypePage renders the create signal type page.
 //
-// Use with RequireAdminOrOwnerRole and RequireIsnAdmin middleware
+// Use with RequireAdminOrOwnerRole middleware
 func (h *HandlerService) CreateSignalTypePage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
-	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
-	if !ok {
-		reqLogger.Error("failed to read accessTokenDetails from context")
-		return
-	}
-
-	isnPerms := accessTokenDetails.IsnPerms
-
-	if len(isnPerms) == 0 {
-		reqLogger.Error("user does not have permission to access any ISNs")
-		return
-	}
-	// populate the isn dropdown list with ISNs where the user is an admin
-	isns := h.getIsnOptions(isnPerms, true, false)
-
-	component := templates.CreateSignalTypePage(h.Environment, isns)
+	component := templates.CreateSignalTypePage(h.Environment, make([]types.IsnOption, 0))
 	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render signal type management page", slog.String("error", err.Error()))
+		reqLogger.Error("Failed to render create signal type page", slog.String("error", err.Error()))
 	}
 }
 
@@ -47,32 +34,44 @@ func (h *HandlerService) RegisterNewSignalTypeSchemaPage(w http.ResponseWriter, 
 		return
 	}
 
-	isnPerms := accessTokenDetails.IsnPerms
-
-	if len(isnPerms) == 0 {
-		reqLogger.Error("user does not have permission to access any ISNs")
+	// Get all signal types (include inactive for schema registration)
+	signalTypes, err := h.ApiClient.GetSignalTypes(accessTokenDetails.AccessToken, true)
+	if err != nil {
+		reqLogger.Error("Failed to get signal types", slog.String("error", err.Error()))
+		component := templates.ErrorAlert("Failed to load signal types. Please try again.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
 		return
 	}
-	// populate the isn dropdown list with ISNs where the user is an admin
-	isns := h.getIsnOptions(isnPerms, true, false)
 
-	// Render signal type management page
-	component := templates.RegisterNewSignalTypeSchemaPage(h.Environment, isns)
+	// Deduplicate by slug to show each signal type once
+	signalTypeSlugs := make([]types.SignalTypeSlugOption, 0, len(signalTypes))
+	seen := make(map[string]bool)
+
+	for _, signalType := range signalTypes {
+		if !seen[signalType.Slug] {
+			seen[signalType.Slug] = true
+			signalTypeSlugs = append(signalTypeSlugs, types.SignalTypeSlugOption{
+				Slug: signalType.Slug,
+			})
+		}
+	}
+
+	component := templates.RegisterNewSignalTypeSchemaPageWithOptions(h.Environment, signalTypeSlugs)
 	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render signal type management page", slog.String("error", err.Error()))
+		reqLogger.Error("Failed to render register new schema page", slog.String("error", err.Error()))
 	}
 }
 
 // CreateSignalType handles the form submission to create a new signal type
-// Use with RequireAdminOrOwnerRole and RequireIsnAdmin middleware
+// Use with RequireAdminOrOwnerRole middleware
 func (h *HandlerService) CreateSignalType(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Parse form data
-	isnSlug := r.FormValue("isn-slug")
 	title := r.FormValue("title")
 	schemaURL := r.FormValue("schema-url")
-	bumpType := r.FormValue("bump-type")
 	readmeURL := r.FormValue("readme-url")
 	detail := r.FormValue("detail")
 	skipValidation := r.FormValue("skip-validation") == "true"
@@ -86,7 +85,7 @@ func (h *HandlerService) CreateSignalType(w http.ResponseWriter, r *http.Request
 	}
 
 	// Validate required fields
-	if isnSlug == "" || title == "" || schemaURL == "" || bumpType == "" || readmeURL == "" || detail == "" {
+	if title == "" || schemaURL == "" || readmeURL == "" || detail == "" {
 		component := templates.ErrorAlert("Please fill in all required fields.")
 		if err := component.Render(r.Context(), w); err != nil {
 			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
@@ -104,14 +103,13 @@ func (h *HandlerService) CreateSignalType(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Prepare request
+	// Prepare request - create signal type with initial version 1.0.0
 	createReq := client.CreateSignalTypeRequest{
-		IsnSlug:   isnSlug,
 		SchemaURL: schemaURL,
 		Title:     title,
-		BumpType:  bumpType,
 		ReadmeURL: readmeURL,
 		Detail:    detail,
+		BumpType:  "major", // Initial version is always 1.0.0
 	}
 
 	// Call the API to create the signal type
@@ -140,20 +138,19 @@ func (h *HandlerService) CreateSignalType(w http.ResponseWriter, r *http.Request
 	}
 }
 
-// RegisterNewSignalTypeSchema handles the form submission to register a new schema for an existing signal type
-// Use with RequireAdminOrOwnerRole and RequireIsnAdmin middleware
+// RegisterNewSignalTypeSchema handles the form submission to create a new version of an existing signal type
+// Use with RequireAdminOrOwnerRole middleware
 func (h *HandlerService) RegisterNewSignalTypeSchema(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Parse form data
-	isnSlug := r.FormValue("isn-slug")
 	slug := r.FormValue("signal-type-slug")
 	schemaURL := r.FormValue("schema-url")
 	bumpType := r.FormValue("bump-type")
 	readmeURL := r.FormValue("readme-url")
 	detail := r.FormValue("detail")
 
-	if isnSlug == "" || slug == "" || schemaURL == "" || bumpType == "" || readmeURL == "" || detail == "" {
+	if slug == "" || schemaURL == "" || bumpType == "" || readmeURL == "" || detail == "" {
 		component := templates.ErrorAlert("Please fill in all required fields.")
 		if err := component.Render(r.Context(), w); err != nil {
 			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
@@ -171,9 +168,8 @@ func (h *HandlerService) RegisterNewSignalTypeSchema(w http.ResponseWriter, r *h
 		return
 	}
 
-	// Prepare request
+	// Prepare request - create new version of signal type globally
 	createReq := client.RegisterNewSignalTypeSchemaRequest{
-		IsnSlug:   isnSlug,
 		SchemaURL: schemaURL,
 		Slug:      slug,
 		BumpType:  bumpType,
@@ -181,7 +177,7 @@ func (h *HandlerService) RegisterNewSignalTypeSchema(w http.ResponseWriter, r *h
 		Detail:    detail,
 	}
 
-	// Call the API to create the signal type
+	// Call the API to create the new version
 	response, err := h.ApiClient.RegisterNewSignalTypeSchema(accessTokenDetails.AccessToken, createReq)
 	if err != nil {
 		reqLogger.Error("Failed to register new schema for signal type", slog.String("error", err.Error()))
@@ -207,8 +203,95 @@ func (h *HandlerService) RegisterNewSignalTypeSchema(w http.ResponseWriter, r *h
 	}
 }
 
-// SignalTypeStatusPage renders the signal type status management page
-func (h *HandlerService) SignalTypeStatusPage(w http.ResponseWriter, r *http.Request) {
+// AddSignalTypeToIsn handles the form submission to add a signal type to an ISN
+// Use with RequireAdminOrOwnerRole and RequireIsnAdmin middleware
+func (h *HandlerService) AddSignalTypeToIsn(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	// Parse form data
+	isnSlug := r.FormValue("isn-slug")
+	signalTypeSlug := r.FormValue("signal-type-slug")
+	semVer := r.FormValue("sem-ver")
+
+	// Validate required fields
+	if isnSlug == "" || signalTypeSlug == "" || semVer == "" {
+		component := templates.ErrorAlert("Please fill in all required fields.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	// Get access token from context
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
+	if !ok {
+		component := templates.ErrorAlert("Authentication required. Please log in again.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	// Prepare request
+	associateReq := client.AddSignalTypeToIsnRequest{
+		SignalTypeSlug: signalTypeSlug,
+		SemVer:         semVer,
+	}
+
+	// Call the API to add the signal type to the ISN
+	err := h.ApiClient.AddSignalTypeToIsn(accessTokenDetails.AccessToken, isnSlug, associateReq)
+	if err != nil {
+		reqLogger.Error("Failed to add signal type to the ISN", slog.String("error", err.Error()))
+
+		var msg string
+		if ce, ok := err.(*client.ClientError); ok {
+			msg = ce.UserError()
+		} else {
+			msg = "An error occurred. Please try again."
+		}
+
+		component := templates.ErrorAlert(msg)
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	// Success response
+	component := templates.SuccessAlert(fmt.Sprintf("Signal type %s/v%s associated with ISN successfully", signalTypeSlug, semVer))
+	if err := component.Render(r.Context(), w); err != nil {
+		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
+	}
+}
+
+// AddSignalTypeToIsnPage renders the page to add a signal type to an ISN
+// Use with RequireAdminOrOwnerRole and RequireIsnAdmin middleware
+func (h *HandlerService) AddSignalTypeToIsnPage(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
+	if !ok {
+		reqLogger.Error("failed to read accessTokenDetails from context")
+		return
+	}
+
+	isnPerms := accessTokenDetails.IsnPerms
+
+	if len(isnPerms) == 0 {
+		reqLogger.Error("user does not have permission to access any ISNs")
+		return
+	}
+	// populate the isn dropdown list with ISNs where the user is an admin
+	isns := h.getIsnOptions(isnPerms, true, false)
+
+	component := templates.AddSignalTypeToIsnPage(h.Environment, isns)
+	if err := component.Render(r.Context(), w); err != nil {
+		reqLogger.Error("Failed to render add signal type page", slog.String("error", err.Error()))
+	}
+}
+
+// IsnSignalTypeStatusPage renders the ISN-level signal type status management page
+func (h *HandlerService) IsnSignalTypeStatusPage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
@@ -230,25 +313,25 @@ func (h *HandlerService) SignalTypeStatusPage(w http.ResponseWriter, r *http.Req
 	// Convert permissions to ISN list for dropdown (only ISNs where user has admin rights)
 	isns := h.getIsnOptions(isnPerms, true, false)
 
-	// Render signal type status management page
-	component := templates.SignalTypeStatusPage(h.Environment, isns)
+	// Render ISN signal type status management page
+	component := templates.IsnSignalTypeStatusPage(h.Environment, isns)
 	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render signal type status management page", slog.String("error", err.Error()))
+		reqLogger.Error("Failed to render ISN signal type status management page", slog.String("error", err.Error()))
 	}
 }
 
-// AdminSignalTypeStatus handles the form submission to enable or disable signal types
-func (h *HandlerService) AdminSignalTypeStatus(w http.ResponseWriter, r *http.Request) {
+// AdminIsnSignalTypeStatus handles the form submission to enable or disable signal types for an ISN
+func (h *HandlerService) AdminIsnSignalTypeStatus(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Parse form data
 	isnSlug := r.FormValue("isn-slug")
-	slug := r.FormValue("signal-type-slug")
+	signalTypeSlug := r.FormValue("signal-type-slug")
 	semVer := r.FormValue("sem-ver")
 	action := r.FormValue("action")
 
 	// Validate required fields
-	if isnSlug == "" || slug == "" || semVer == "" || action == "" {
+	if isnSlug == "" || signalTypeSlug == "" || semVer == "" || action == "" {
 		component := templates.ErrorAlert("Please fill in all fields.")
 		if err := component.Render(r.Context(), w); err != nil {
 			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
@@ -259,7 +342,7 @@ func (h *HandlerService) AdminSignalTypeStatus(w http.ResponseWriter, r *http.Re
 	// Get access token from context
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
-		reqLogger.Error("Failed to read access token from context", slog.String("component", "handlers.AdminSignalTypeStatus"))
+		reqLogger.Error("Failed to read access token from context", slog.String("component", "handlers.AdminIsnSignalTypeStatus"))
 
 		component := templates.ErrorAlert("Authentication required. Please log in again.")
 		if err := component.Render(r.Context(), w); err != nil {
@@ -275,10 +358,10 @@ func (h *HandlerService) AdminSignalTypeStatus(w http.ResponseWriter, r *http.Re
 	switch action {
 	case "disable":
 		isInUse = false
-		successMsg = "Signal type disabled successfully"
+		successMsg = fmt.Sprintf("Signal type %s/v%s disabled for this ISN successfully", signalTypeSlug, semVer)
 	case "enable":
 		isInUse = true
-		successMsg = "Signal type enabled successfully"
+		successMsg = fmt.Sprintf("Signal type %s/v%s enabled for this ISN successfully", signalTypeSlug, semVer)
 	default:
 		component := templates.ErrorAlert("Invalid action. Please select a valid action.")
 		if err := component.Render(r.Context(), w); err != nil {
@@ -287,10 +370,10 @@ func (h *HandlerService) AdminSignalTypeStatus(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Call the API to update signal type status
-	err := h.ApiClient.UpdateSignalTypeStatus(accessTokenDetails.AccessToken, isnSlug, slug, semVer, isInUse)
+	// Call the API to update ISN signal type status
+	err := h.ApiClient.UpdateIsnSignalTypeStatus(accessTokenDetails.AccessToken, isnSlug, signalTypeSlug, semVer, isInUse)
 	if err != nil {
-		reqLogger.Error("Failed to update signal type status", slog.String("error", err.Error()))
+		reqLogger.Error("Failed to update ISN signal type status", slog.String("error", err.Error()))
 
 		var msg string
 		if ce, ok := err.(*client.ClientError); ok {

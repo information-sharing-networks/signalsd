@@ -9,7 +9,6 @@ import (
 
 // CreateSignalTypeRequest represents the request body for creating a signal type
 type CreateSignalTypeRequest struct {
-	IsnSlug   string `json:"isn_slug"`
 	SchemaURL string `json:"schema_url"`
 	Title     string `json:"title"`
 	BumpType  string `json:"bump_type"`
@@ -19,7 +18,6 @@ type CreateSignalTypeRequest struct {
 
 // CreateSignalTypeRequest represents the request body for creating a signal type
 type RegisterNewSignalTypeSchemaRequest struct {
-	IsnSlug   string `json:"isn_slug"`
 	SchemaURL string `json:"schema_url"`
 	Slug      string `json:"slug"`
 	BumpType  string `json:"bump_type"`
@@ -50,9 +48,9 @@ type UpdateSignalTypeStatusRequest struct {
 	IsInUse bool `json:"is_in_use"`
 }
 
-// CreateSignalType creates a new signal type using the signalsd API
+// CreateSignalType creates a new signal type globally using the signalsd API
 func (c *Client) CreateSignalType(accessToken string, req CreateSignalTypeRequest) (*NewSignalTypeResponse, error) {
-	url := fmt.Sprintf("%s/api/isn/%s/signal-types", c.baseURL, req.IsnSlug)
+	url := fmt.Sprintf("%s/api/signal-types", c.baseURL)
 
 	jsonData, err := json.Marshal(req)
 	if err != nil {
@@ -85,18 +83,18 @@ func (c *Client) CreateSignalType(accessToken string, req CreateSignalTypeReques
 	return &createResp, nil
 }
 
-// CreateSignalType creates a new signal type using the signalsd API
+// RegisterNewSignalTypeSchema creates a new version of a signal type globally using the signalsd API
 func (c *Client) RegisterNewSignalTypeSchema(accessToken string, req RegisterNewSignalTypeSchemaRequest) (*NewSignalTypeResponse, error) {
-	url := fmt.Sprintf("%s/api/isn/%s/signal-types/%s/schemas", c.baseURL, req.IsnSlug, req.Slug)
+	url := fmt.Sprintf("%s/api/signal-types/%s/schemas", c.baseURL, req.Slug)
 
 	jsonData, err := json.Marshal(req)
 	if err != nil {
-		return nil, NewClientInternalError(err, "marshaling create signal type request")
+		return nil, NewClientInternalError(err, "marshaling register new schema request")
 	}
 
 	httpReq, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, NewClientInternalError(err, "creating signal type request")
+		return nil, NewClientInternalError(err, "creating register new schema request")
 	}
 
 	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
@@ -114,15 +112,15 @@ func (c *Client) RegisterNewSignalTypeSchema(accessToken string, req RegisterNew
 
 	var createResp NewSignalTypeResponse
 	if err := json.NewDecoder(res.Body).Decode(&createResp); err != nil {
-		return nil, NewClientInternalError(err, "decoding create signal type response")
+		return nil, NewClientInternalError(err, "decoding register new schema response")
 	}
 
 	return &createResp, nil
 }
 
-// GetSignalTypes gets the signal types for the specified ISN using the signalsd API
-func (c *Client) GetSignalTypes(accessToken, isnSlug string, includeInactive bool) ([]SignalTypeDetail, error) {
-	url := fmt.Sprintf("%s/api/isn/%s/signal-types", c.baseURL, isnSlug)
+// GetSignalTypes gets all signal types using the signalsd API
+func (c *Client) GetSignalTypes(accessToken string, includeInactive bool) ([]SignalTypeDetail, error) {
+	url := fmt.Sprintf("%s/api/signal-types", c.baseURL)
 
 	if includeInactive {
 		url += "?include_inactive=true"
@@ -130,7 +128,7 @@ func (c *Client) GetSignalTypes(accessToken, isnSlug string, includeInactive boo
 
 	httpReq, err := http.NewRequest("GET", url, nil)
 	if err != nil {
-		return nil, NewClientInternalError(err, "creating signal type request")
+		return nil, NewClientInternalError(err, "creating get signal types request")
 	}
 
 	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
@@ -154,9 +152,79 @@ func (c *Client) GetSignalTypes(accessToken, isnSlug string, includeInactive boo
 	return signalTypes, nil
 }
 
-// UpdateSignalTypeStatus updates the is_in_use status of a signal type
-func (c *Client) UpdateSignalTypeStatus(accessToken, isnSlug, slug, semVer string, isInUse bool) error {
-	url := fmt.Sprintf("%s/api/isn/%s/signal-types/%s/v%s", c.baseURL, isnSlug, slug, semVer)
+// GetSignalTypesForISN gets signal types available with a specific ISN
+func (c *Client) GetSignalTypesForISN(accessToken, isnSlug string, includeInactive bool) ([]SignalTypeDetail, error) {
+	url := fmt.Sprintf("%s/api/isn/%s/signal-types", c.baseURL, isnSlug)
+
+	if includeInactive {
+		url += "?include_inactive=true"
+	}
+
+	httpReq, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, NewClientInternalError(err, "creating get signal types for ISN request")
+	}
+
+	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	res, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, NewClientConnectionError(err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return nil, NewClientApiError(res)
+	}
+
+	var signalTypes []SignalTypeDetail
+	if err := json.NewDecoder(res.Body).Decode(&signalTypes); err != nil {
+		return nil, NewClientInternalError(err, "decoding get signal types for ISN response")
+	}
+
+	return signalTypes, nil
+}
+
+// AddSignalTypeToIsnRequest represents the request body for associating a signal type with an ISN
+type AddSignalTypeToIsnRequest struct {
+	SignalTypeSlug string `json:"signal_type_slug"`
+	SemVer         string `json:"sem_ver"`
+}
+
+// AddSignalTypeToIsn adds a signal type to an ISN
+func (c *Client) AddSignalTypeToIsn(accessToken, isnSlug string, req AddSignalTypeToIsnRequest) error {
+	url := fmt.Sprintf("%s/api/isn/%s/signal-types/add", c.baseURL, isnSlug)
+
+	jsonData, err := json.Marshal(req)
+	if err != nil {
+		return NewClientInternalError(err, "marshaling add signal type request")
+	}
+
+	httpReq, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return NewClientInternalError(err, "creating add signal type request")
+	}
+
+	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	res, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return NewClientConnectionError(err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusNoContent {
+		return NewClientApiError(res)
+	}
+
+	return nil
+}
+
+// UpdateIsnSignalTypeStatus updates the is_in_use status of a signal type for a specific ISN
+func (c *Client) UpdateIsnSignalTypeStatus(accessToken, isnSlug, signalTypeSlug, semVer string, isInUse bool) error {
+	url := fmt.Sprintf("%s/api/isn/%s/signal-types/%s/v%s", c.baseURL, isnSlug, signalTypeSlug, semVer)
 
 	req := UpdateSignalTypeStatusRequest{
 		IsInUse: isInUse,
@@ -164,12 +232,12 @@ func (c *Client) UpdateSignalTypeStatus(accessToken, isnSlug, slug, semVer strin
 
 	jsonData, err := json.Marshal(req)
 	if err != nil {
-		return NewClientInternalError(err, "marshaling update signal type status request")
+		return NewClientInternalError(err, "marshaling update isn signal type status request")
 	}
 
 	httpReq, err := http.NewRequest("PUT", url, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return NewClientInternalError(err, "creating update signal type status request")
+		return NewClientInternalError(err, "creating update isn signal type status request")
 	}
 
 	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))

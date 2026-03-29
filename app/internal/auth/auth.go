@@ -21,9 +21,14 @@ import (
 )
 
 type AuthService struct {
-	secretKey   string
+	// secretKey is the key used to sign access tokens (set by the SECRET_KEY environment variable)
+	secretKey string
+
+	// environment is the server environment ( prod, test etc - set by the ENVIRONMENT environment variable)
 	environment string
-	queries     *database.Queries
+
+	// queries is the sqlc generated database queries
+	queries *database.Queries
 }
 
 func NewAuthService(secretKey string, environment string, queries *database.Queries) *AuthService {
@@ -34,64 +39,120 @@ func NewAuthService(secretKey string, environment string, queries *database.Quer
 	}
 }
 
+// toSignalTypes converts internal signalTypeDetails to a map of SignalType structs keyed by path
+func toSignalTypes(details []signalTypeDetails) map[string]SignalType {
+	result := make(map[string]SignalType, len(details))
+	for _, st := range details {
+		result[st.path] = SignalType{
+			Path:   st.path,
+			Slug:   st.slug,
+			SemVer: st.semVer,
+			InUse:  st.inUse,
+		}
+	}
+	return result
+}
+
+// AccessTokenResponse is the data returned in the response from the signalsd login and refresh token APIs
 type AccessTokenResponse struct {
-	AccessToken string              `json:"access_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxzZCIsInN1YiI6ImMxMjQ1Yjc0LTMyMTQtNDUzOS04YTgyLTY2NDNkMzllNjk5YiIsImV4cCI6MTc0ODU4ODE2MiwiaWF0IjoxNzQ4NTg2MzYyLCJhY2NvdW50X2lkIjoiYzEyNDViNzQtMzIxNC00NTM5LThhODItNjY0M2QzOWU2OTliIiwiYWNjb3VudF90eXBlIjoidXNlciIsInJvbGUiOiJvd25lciIsImlzbl9wZXJtcyI6eyJzYW1wbGUtaXNuLS1leGFtcGxlLW9yZyI6eyJwZXJtaXNzaW9uIjoid3JpdGUiLCJzaWduYWxfdHlwZXMiOlsic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4xIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4yIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4zIiwic2FtcGxlLXNpZ25hbG5ldy0tZXhhbXBsZS1vcmcvdjAuMC4xIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC40Il19LCJzYW1wbGUtaXNuLS1zYXVsLW9yZyI6eyJwZXJtaXNzaW9uIjoid3JpdGUiLCJzaWduYWxfdHlwZXMiOlsic2FtcGxlLXNpZ25hbC0tc2F1bC1vcmcvdjAuMC4xIl19fX0.33ANor7XHWkB87npB4RWsJUjBnJHdYZce-lT8w_IN_s"`
-	TokenType   string              `json:"token_type" example:"Bearer"`
-	ExpiresIn   int                 `json:"expires_in" example:"1800"` //seconds
-	AccountID   uuid.UUID           `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
-	AccountType string              `json:"account_type" enums:"user,service_account"`
-	Role        string              `json:"role" enums:"owner,admin,member" example:"admin"`
-	Perms       map[string]IsnPerms `json:"isn_perms,omitempty"`
+
+	// AccessToken is a JWT access token containing claims about the account and its permissions (see Claims struct)
+	AccessToken string `json:"access_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxzZCIsInN1YiI6ImMxMjQ1Yjc0LTMyMTQtNDUzOS04YTgyLTY2NDNkMzllNjk5YiIsImV4cCI6MTc0ODU4ODE2MiwiaWF0IjoxNzQ4NTg2MzYyLCJhY2NvdW50X2lkIjoiYzEyNDViNzQtMzIxNC00NTM5LThhODItNjY0M2QzOWU2OTliIiwiYWNjb3VudF90eXBlIjoidXNlciIsInJvbGUiOiJvd25lciIsImlzbl9wZXJtcyI6eyJzYW1wbGUtaXNuLS1leGFtcGxlLW9yZyI6eyJwZXJtaXNzaW9uIjoid3JpdGUiLCJzaWduYWxfdHlwZXMiOlsic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4xIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4yIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4zIiwic2FtcGxlLXNpZ25hbG5ldy0tZXhhbXBsZS1vcmcvdjAuMC4xIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC40Il19LCJzYW1wbGUtaXNuLS1zYXVsLW9yZyI6eyJwZXJtaXNzaW9uIjoid3JpdGUiLCJzaWduYWxfdHlwZXMiOlsic2FtcGxlLXNpZ25hbC0tc2F1bC1vcmcvdjAuMC4xIl19fX0.33ANor7XHWkB87npB4RWsJUjBnJHdYZce-lT8w_IN_s"`
+
+	// TokenType (Bearer) - used as a prompt for the client to use the Bearer token type when making requests
+	TokenType string `json:"token_type" example:"Bearer"`
+
+	// ExpiresIn is the token expiry in seconds
+	ExpiresIn int `json:"expires_in" example:"1800"` //seconds
+
+	// AccountID is the account id of the user making the request
+	AccountID uuid.UUID `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
+
+	// AccountType is the account type of the user making the request (user or service_account)
+	AccountType string `json:"account_type" enums:"user,service_account"`
+
+	// Role is the role of the user making the request (owner, admin, member)
+	Role string `json:"role" enums:"owner,admin,member" example:"admin"`
+
+	// Perms is a map of the ISNs the account has access to and the permissions granted (the map key is the isn_slug)
+	Perms map[string]IsnPerms `json:"isn_perms,omitempty"`
+}
+
+type SignalType struct {
+	// Path is the signal type path in the format "slug/v{version}"
+	// This is the key used in the SignalTypes map in IsnPerms
+	Path string `json:"path" example:"sample-signal--example-org/v0.0.1"`
+
+	// Slug is the signal type slug (unique per site)
+	Slug string `json:"slug" example:"sample-signal--example-org"`
+
+	// SemVer is the signal type version (e.g. 0.0.1)
+	SemVer string `json:"sem_ver" example:"0.0.1"`
+
+	// InUse is true if the signal type is active
+	InUse bool `json:"in_use" example:"true"`
 }
 
 type IsnPerms struct {
-	CanRead         bool       `json:"can_read" example:"true"`
-	CanWrite        bool       `json:"can_write" example:"false"`
-	SignalBatchID   *uuid.UUID `json:"signal_batch_id,omitempty" example:"967affe9-5628-4fdd-921f-020051344a12"`
-	SignalTypePaths []string   `json:"signal_types,omitempty" example:"signal-type-1/v0.0.1,signal-type-2/v1.0.0"` // list of available signal types for the isn
-	Visibility      string     `json:"visibility" enums:"public,private" example:"private"`                        // ISN visibility setting
-	IsnAdmin        bool       `json:"isn_admin" example:"false"`                                                  // true if the account is the owner of the isn or the site owner
+
+	// CanRead is true if the account has read access to the isn
+	CanRead bool `json:"can_read" example:"true"`
+
+	// CanWrite is true if the account has write access to the isn
+	CanWrite bool `json:"can_write" example:"false"`
+
+	// SignalBatchID is the ID of the current signal batch for the ISN (use when writing to the isn)
+	SignalBatchID *uuid.UUID `json:"signal_batch_id,omitempty" example:"967affe9-5628-4fdd-921f-020051344a12"`
+
+	// SignalTypes is a map of the signal type paths to the signal type details (key is the signal type path)
+	SignalTypes map[string]SignalType `json:"signal_types,omitempty"`
+
+	// Visibility is the ISN visibility setting (public or private)
+	Visibility string `json:"visibility" enums:"public,private" example:"private"`
+
+	// AccountIsIsnAdmin is true if the account is the owner of the isn or the site owner
+	AccountIsIsnAdmin bool `json:"account_is_isn_admin" example:"false"`
+
+	// InUse is true if the isn is active
+	InUse bool `json:"in_use" example:"true"`
 }
 
+// Claims are the claims included in the access token
 type Claims struct {
+
+	// RegisteredClaims are the standard JWT claims
 	jwt.RegisteredClaims
-	AccountID   uuid.UUID           `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
-	AccountType string              `json:"account_type" enums:"user,service_account"`
-	Role        string              `json:"role" enums:"owner,admin,member" example:"admin"`
-	IsnPerms    map[string]IsnPerms `json:"isn_perms,omitempty" example:"isn1"`
+
+	// AccountID is the account id of the user making the request
+	AccountID uuid.UUID `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
+
+	// AccountType is the account type of the user making the request (user or service_account)
+	AccountType string `json:"account_type" enums:"user,service_account"`
+
+	// Role is the role of the user making the request (owner, admin, member)
+	Role string `json:"role" enums:"owner,admin,member" example:"admin"`
+
+	// IsnPerms is a map of the ISNs and signal types the account has access to and the permissions they have been granted (the map key is the isn slug)
+	IsnPerms map[string]IsnPerms `json:"isn_perms,omitempty" example:"isn1"`
 }
 
-func (a *AuthService) HashPassword(password string) (string, error) {
-	dat, err := bcrypt.GenerateFromPassword([]byte(password), signalsd.BcryptCost)
-	if err != nil {
-		return "", err
-	}
-	return string(dat), nil
+// stucts to hold the full list of isns and signal types - used when generating the access token claims
+// the items are filtered by the claims builder to only include the items the account has access to
+type isnDetails struct {
+	userAccountID uuid.UUID
+	inUse         bool
+	visibility    string
+	signalTypes   []signalTypeDetails
 }
 
-// CheckPasswordHash compares a bcrypt hashed password with its possible plaintext equivalent.
-func (a *AuthService) CheckPasswordHash(hash, password string) error {
-	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+type signalTypeDetails struct {
+	path   string
+	slug   string
+	semVer string
+	inUse  bool
 }
 
-// GenerateSecureToken
-// Returns the token as a base64-URL-encoded string for safe transmission/storage
-func (a *AuthService) GenerateSecureToken(byteLength int) (string, error) {
-	tokenBytes := make([]byte, byteLength)
-	_, err := io.ReadFull(rand.Reader, tokenBytes)
-	if err != nil {
-		return "", fmt.Errorf("error generating secure random bytes: %v", err)
-	}
-
-	return base64.URLEncoding.EncodeToString(tokenBytes), nil
-}
-
-// hash a token using sha512
-func (a *AuthService) HashToken(token string) string {
-	hasher := sha512.New()
-	hasher.Write([]byte(token))
-	return base64.URLEncoding.EncodeToString(hasher.Sum(nil))
-}
+type isnList map[string]*isnDetails // key is the isn slug
 
 // create a JWT access token signed with HS256 using the app's secret key.
 //
@@ -102,15 +163,18 @@ func (a *AuthService) HashToken(token string) string {
 //   - account ID
 //   - account type (user or service_account)
 //   - account role (owner, admin, member)
-//   - A list of all the isns the account has access to and the permission granted (read or write) - note inactive isns/signal_types are not included
+//   - A list of all the isns the account has access to and the permission granted (read or write)
 //   - the list of available signal_types in the isn
+//
+// note inactive isns/signal_types are included - an is_in_use flag is included in the claims so the client can make access decisions
 //
 // The function returns the token inside a AccessTokenResponse that can be returned to the client.
 //
 // if this function generates an error, it is unexpected and the calling handler should produce a 500 status code
 //
-//	this function is only used when the user logs-in or when an account refreshes an access token.
-//	Since the calling functions authenticate using secrets that (should) only be known by the client, the claims in the token can be trusted by the handler without rechecking the database
+//		this function is only used when the user logs-in or when an account refreshes an access token.
+//		Since the calling functions authenticate using secrets that (should) only be known by the client,
+//	 the claims in the token can be trusted by the handler without rechecking the database
 //
 // Caveat:
 //
@@ -120,7 +184,7 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 
 	issuedAt := time.Now()
 	expiresAt := issuedAt.Add(signalsd.AccessTokenExpiry)
-	isnPerms := make(map[string]IsnPerms)
+	isnPerms := make(map[string]IsnPerms) // key is the isn slug
 
 	accountID, ok := ContextAccountID(ctx)
 	if !ok {
@@ -145,35 +209,44 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 		return AccessTokenResponse{}, fmt.Errorf("invalid user role %v for user %v", account.AccountRole, accountID)
 	}
 
-	// get all the active ISNs on this site
-	inUseIsns, err := a.queries.GetInUseIsns(ctx)
+	// get all the isns on the site
+	dbIsnList, err := a.queries.GetIsns(ctx)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return AccessTokenResponse{}, fmt.Errorf("database error getting ISNs: %w", err)
 	}
 
-	// create a map of theIsns with their available signal_type paths (sample-signal--example-org/0.0.1 etc)
-	// this list is included in the claims assuming the user has permission for the isn
-	isnSignalTypePaths := make(map[string][]string)
-	isnVisibility := make(map[string]string)
-	for _, isn := range inUseIsns {
+	isnList := make(isnList)
 
-		signalTypeRows, err := a.queries.GetInUseSignalTypesByIsnID(ctx, isn.ID)
+	for _, dbIsn := range dbIsnList {
+
+		isnList[dbIsn.Slug] = &isnDetails{
+			userAccountID: dbIsn.UserAccountID,
+			inUse:         dbIsn.IsInUse,
+			visibility:    dbIsn.Visibility,
+		}
+
+		// get the signal types for this isn
+		dbSignalTypes, err := a.queries.GetSignalTypesByIsnID(ctx, dbIsn.ID)
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 			return AccessTokenResponse{}, fmt.Errorf("database error getting signal_types: %w", err)
 		}
 
-		signalTypePaths := make([]string, 0)
-		for _, signalType := range signalTypeRows {
-			ver := fmt.Sprintf("%s/v%s", signalType.Slug, signalType.SemVer)
-			signalTypePaths = append(signalTypePaths, ver)
-		}
+		signalTypes := make([]signalTypeDetails, 0)
+		for _, dbSignalType := range dbSignalTypes {
 
-		isnSignalTypePaths[isn.Slug] = signalTypePaths
-		isnVisibility[isn.Slug] = isn.Visibility
+			signalTypes = append(signalTypes, signalTypeDetails{
+				path:   fmt.Sprintf("%s/v%s", dbSignalType.Slug, dbSignalType.SemVer),
+				slug:   dbSignalType.Slug,
+				semVer: dbSignalType.SemVer,
+				inUse:  dbSignalType.IsInUse,
+			})
+		}
+		isnList[dbIsn.Slug].signalTypes = signalTypes
+
 	}
 
-	// get the active isns this account's has been granted access to.
-	isnsAccessibleByAccount, err := a.queries.GetActiveIsnAccountsByAccountID(ctx, accountID)
+	// get the isns this account's has been granted access to.
+	isnsAccessibleByAccount, err := a.queries.GetIsnAccountsByAccountID(ctx, accountID)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return AccessTokenResponse{}, fmt.Errorf("database error getting ISN accounts: %w", err)
 	}
@@ -193,54 +266,64 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 	switch account.AccountRole {
 	case "owner":
 		// owner has read and write access to all ISNs
-		for _, siteIsn := range inUseIsns {
-			isnPerms[siteIsn.Slug] = IsnPerms{
-				CanRead:         true,
-				CanWrite:        true,
-				SignalBatchID:   latestSignalBatchIDs[siteIsn.Slug],
-				SignalTypePaths: isnSignalTypePaths[siteIsn.Slug],
-				Visibility:      isnVisibility[siteIsn.Slug],
-				IsnAdmin:        true,
+		for isnSlug, siteIsn := range isnList {
+			isnPerms[isnSlug] = IsnPerms{
+				CanRead:           true,
+				CanWrite:          true,
+				SignalBatchID:     latestSignalBatchIDs[isnSlug],
+				SignalTypes:       toSignalTypes(siteIsn.signalTypes),
+				Visibility:        siteIsn.visibility,
+				InUse:             siteIsn.inUse,
+				AccountIsIsnAdmin: true,
 			}
 		}
 
 	case "admin":
 		// Admin can read, write and administrate any ISN they created
-		for _, siteIsn := range inUseIsns {
-			if account.ID == siteIsn.UserAccountID {
-				isnPerms[siteIsn.Slug] = IsnPerms{
-					CanRead:         true,
-					CanWrite:        true,
-					SignalBatchID:   latestSignalBatchIDs[siteIsn.Slug],
-					SignalTypePaths: isnSignalTypePaths[siteIsn.Slug],
-					Visibility:      isnVisibility[siteIsn.Slug],
-					IsnAdmin:        true,
+		for isnSlug, siteIsn := range isnList {
+			if account.ID == siteIsn.userAccountID {
+				isnPerms[isnSlug] = IsnPerms{
+					CanRead:           true,
+					CanWrite:          true,
+					SignalBatchID:     latestSignalBatchIDs[isnSlug],
+					SignalTypes:       toSignalTypes(siteIsn.signalTypes),
+					Visibility:        siteIsn.visibility,
+					InUse:             siteIsn.inUse,
+					AccountIsIsnAdmin: true,
 				}
 			}
 		}
-		//.. and access any ISN where they were granted read or write permission by another admin or the owner
+		// and access any ISN where they were granted read or write permission by another admin or the owner
 		for _, accessibleIsn := range isnsAccessibleByAccount {
-			isnPerms[accessibleIsn.IsnSlug] = IsnPerms{
-				CanRead:         accessibleIsn.CanRead,
-				CanWrite:        accessibleIsn.CanWrite,
-				SignalBatchID:   latestSignalBatchIDs[accessibleIsn.IsnSlug],
-				SignalTypePaths: isnSignalTypePaths[accessibleIsn.IsnSlug],
-				Visibility:      isnVisibility[accessibleIsn.IsnSlug],
-				IsnAdmin:        false,
+			isnSlug := accessibleIsn.IsnSlug
+			if _, ok := isnPerms[isnSlug]; !ok {
+				isnPerms[isnSlug] = IsnPerms{
+					CanRead:           accessibleIsn.CanRead,
+					CanWrite:          accessibleIsn.CanWrite,
+					SignalBatchID:     latestSignalBatchIDs[isnSlug],
+					SignalTypes:       toSignalTypes(isnList[isnSlug].signalTypes),
+					Visibility:        isnList[isnSlug].visibility,
+					InUse:             isnList[isnSlug].inUse,
+					AccountIsIsnAdmin: false,
+				}
 			}
 		}
+
 	case "member":
-		// Member only has granted permissions (not service identites are always treated as members)
+		// Member only has granted permissions (service accounts are always treated as members)
 		for _, accessibleIsn := range isnsAccessibleByAccount {
-			isnPerms[accessibleIsn.IsnSlug] = IsnPerms{
-				CanRead:         accessibleIsn.CanRead,
-				CanWrite:        accessibleIsn.CanWrite,
-				SignalBatchID:   latestSignalBatchIDs[accessibleIsn.IsnSlug],
-				SignalTypePaths: isnSignalTypePaths[accessibleIsn.IsnSlug],
-				Visibility:      isnVisibility[accessibleIsn.IsnSlug],
-				IsnAdmin:        false,
+			isnSlug := accessibleIsn.IsnSlug
+			isnPerms[isnSlug] = IsnPerms{
+				CanRead:           accessibleIsn.CanRead,
+				CanWrite:          accessibleIsn.CanWrite,
+				SignalBatchID:     latestSignalBatchIDs[isnSlug],
+				SignalTypes:       toSignalTypes(isnList[isnSlug].signalTypes),
+				Visibility:        isnList[isnSlug].visibility,
+				InUse:             isnList[isnSlug].inUse,
+				AccountIsIsnAdmin: false,
 			}
 		}
+
 	default:
 		return AccessTokenResponse{}, fmt.Errorf("unexpected role : %v", account.AccountRole)
 	}
@@ -342,4 +425,36 @@ func (a *AuthService) NewRefreshTokenCookie(refreshToken string) *http.Cookie {
 	}
 
 	return newCookie
+}
+
+func (a *AuthService) HashPassword(password string) (string, error) {
+	dat, err := bcrypt.GenerateFromPassword([]byte(password), signalsd.BcryptCost)
+	if err != nil {
+		return "", err
+	}
+	return string(dat), nil
+}
+
+// CheckPasswordHash compares a bcrypt hashed password with its possible plaintext equivalent.
+func (a *AuthService) CheckPasswordHash(hash, password string) error {
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+}
+
+// GenerateSecureToken
+// Returns the token as a base64-URL-encoded string for safe transmission/storage
+func (a *AuthService) GenerateSecureToken(byteLength int) (string, error) {
+	tokenBytes := make([]byte, byteLength)
+	_, err := io.ReadFull(rand.Reader, tokenBytes)
+	if err != nil {
+		return "", fmt.Errorf("error generating secure random bytes: %v", err)
+	}
+
+	return base64.URLEncoding.EncodeToString(tokenBytes), nil
+}
+
+// hash a token using sha512
+func (a *AuthService) HashToken(token string) string {
+	hasher := sha512.New()
+	hasher.Write([]byte(token))
+	return base64.URLEncoding.EncodeToString(hasher.Sum(nil))
 }

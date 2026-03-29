@@ -39,19 +39,10 @@ func (h *HandlerService) getIsnOptions(isnPerms map[string]types.IsnPerm, filter
 	return isns
 }
 
-// RenderSignalTypeSlugOptions gets the signal types for the selected ISN and renders the dropdown options
+// RenderSignalTypeSlugOptions gets all signal types and renders the dropdown options
 // optionally the calling form can specify include_inactive=true to include signal types that are not in use
 func (h *HandlerService) RenderSignalTypeSlugOptions(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
-
-	isnSlug := r.FormValue("isn-slug")
-	if isnSlug == "" {
-		component := templates.ErrorAlert("Please select an ISN first")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
-		return
-	}
 
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
@@ -62,15 +53,15 @@ func (h *HandlerService) RenderSignalTypeSlugOptions(w http.ResponseWriter, r *h
 
 	includeInactive := r.FormValue("include_inactive") == "true"
 
-	// Get signal types for the selected ISN
-	signalTypes, err := h.ApiClient.GetSignalTypes(accessTokenDetails.AccessToken, isnSlug, includeInactive)
+	// Get all signal types
+	signalTypes, err := h.ApiClient.GetSignalTypes(accessTokenDetails.AccessToken, includeInactive)
 	if err != nil {
 		reqLogger.Error("Failed to get signal types", slog.String("error", err.Error()))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	// create a slice of signalTypeSlugOptions - note we are not interested in the signal type version at this stage so return a deduplicated list of slugs
+	// create a slice of signalTypeSlugOptions - deduplicate by slug to show each signal type once
 	signalTypeSlugs := make([]types.SignalTypeSlugOption, 0, len(signalTypes))
 	seen := make(map[string]bool)
 
@@ -94,9 +85,8 @@ func (h *HandlerService) RenderSignalTypeSlugOptions(w http.ResponseWriter, r *h
 func (h *HandlerService) RenderSignalTypeVersionOptions(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
-	isnSlug := r.FormValue("isn-slug")
 	signalTypeSlug := r.FormValue("signal-type-slug")
-	if isnSlug == "" || signalTypeSlug == "" {
+	if signalTypeSlug == "" {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
@@ -110,8 +100,8 @@ func (h *HandlerService) RenderSignalTypeVersionOptions(w http.ResponseWriter, r
 		return
 	}
 
-	// Get signal types for the selected ISN
-	signalTypes, err := h.ApiClient.GetSignalTypes(accessTokenDetails.AccessToken, isnSlug, includeInactive)
+	// Get all signal types
+	signalTypes, err := h.ApiClient.GetSignalTypes(accessTokenDetails.AccessToken, includeInactive)
 	if err != nil {
 		reqLogger.Error("Failed to get signal types", slog.String("error", err.Error()))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -132,5 +122,53 @@ func (h *HandlerService) RenderSignalTypeVersionOptions(w http.ResponseWriter, r
 	component := templates.SignalTypeVersionOptions(versions)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render version options", slog.String("error", err.Error()))
+	}
+}
+
+// RenderSignalTypeSlugsForIsnOptions gets signal types associated with a specific ISN and renders dropdown options
+// Used for the 3-stage dropdown: ISN → Signal Type → Version
+func (h *HandlerService) RenderSignalTypeSlugsForIsnOptions(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	isnSlug := r.FormValue("isn-slug")
+	if isnSlug == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	includeInactive := r.FormValue("include_inactive") == "true"
+
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
+	if !ok {
+		reqLogger.Error("Failed to get accessTokenDetails from context")
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	// Get signal types for the specific ISN
+	signalTypes, err := h.ApiClient.GetSignalTypesForISN(accessTokenDetails.AccessToken, isnSlug, includeInactive)
+	if err != nil {
+		reqLogger.Error("Failed to get signal types for ISN", slog.String("error", err.Error()), slog.String("isn_slug", isnSlug))
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Deduplicate by slug to show each signal type once
+	signalTypeSlugs := make([]types.SignalTypeSlugOption, 0, len(signalTypes))
+	seen := make(map[string]bool)
+
+	for _, signalType := range signalTypes {
+		if !seen[signalType.Slug] {
+			seen[signalType.Slug] = true
+			signalTypeSlugs = append(signalTypeSlugs, types.SignalTypeSlugOption{
+				Slug: signalType.Slug,
+			})
+		}
+	}
+
+	// Render signal types dropdown options
+	component := templates.SignalTypeSlugOptions(signalTypeSlugs, includeInactive)
+	if err := component.Render(r.Context(), w); err != nil {
+		reqLogger.Error("Failed to render signal type options", slog.String("error", err.Error()))
 	}
 }
