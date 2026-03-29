@@ -94,6 +94,7 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 
 		// HTMX endpoints for cascading signal type dropdowns
 		r.Get("/ui-api/options/signal-type-slugs", handlerService.RenderSignalTypeSlugOptions)
+		r.Get("/ui-api/options/signal-type-slugs-for-isn", handlerService.RenderSignalTypeSlugsForIsnOptions)
 		r.Get("/ui-api/options/signal-type-versions", handlerService.RenderSignalTypeVersionOptions)
 
 		// checkbox toggles
@@ -112,8 +113,8 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 
 		r.Group(func(r chi.Router) {
 
-			// ISN Admin routes (require admin/owner role)
-			r.Use(s.authService.RequireRole("admin", "owner"))
+			// ISN Admin routes
+			r.Use(s.authService.RequireRole("isnadmin", "siteadmin"))
 			r.Use(s.authService.AddAccountIDToLogContext)
 
 			//dashboard
@@ -148,10 +149,13 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 				// signal types
 				r.Get("/admin/signal-types/create", handlerService.CreateSignalTypePage)
 				r.Get("/admin/signal-types/register-new-schema", handlerService.RegisterNewSignalTypeSchemaPage)
+				r.Get("/admin/signal-types/add", handlerService.AddSignalTypeToIsnPage)
+				r.Get("/admin/signal-types/config", handlerService.SignalTypesConfigPage)
 				r.Post("/ui-api/signal-types/create", handlerService.CreateSignalType)
 				r.Put("/ui-api/signal-types/register-new-schema", handlerService.RegisterNewSignalTypeSchema)
-				r.Get("/admin/signal-types/status", handlerService.SignalTypeStatusPage)
-				r.Put("/ui-api/signal-types/status", handlerService.AdminSignalTypeStatus)
+				r.Post("/ui-api/signal-types/add", handlerService.AddSignalTypeToIsn)
+				r.Get("/admin/signal-types/isn-status", handlerService.IsnSignalTypeStatusPage)
+				r.Put("/ui-api/isn-signal-types/status", handlerService.AdminIsnSignalTypeStatus)
 
 				// isn account permissions
 				r.Get("/admin/isn/accounts/update", handlerService.UpdateIsnAccountsPage)
@@ -159,16 +163,20 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 			})
 
 			r.Group(func(r chi.Router) {
-				// Owner-only features
-				r.Use(s.authService.RequireRole("owner"))
+				// site admin only
+				r.Use(s.authService.RequireRole("siteadmin"))
 
 				// ISN ownership transfer
 				r.Get("/admin/isn/transfer-ownership", handlerService.TransferOwnershipPage)
 				r.Put("/ui-api/isn/transfer-ownership", handlerService.TransferOwnership)
 
-				// Admin role management
-				r.Get("/admin/accounts/admin-role", handlerService.AdminRoleManagementPage)
-				r.Put("/ui-api/admin/accounts/admin-role", handlerService.AdminRoleManagement)
+				// ISN Admin role management
+				r.Get("/admin/accounts/isn-admin-role", handlerService.IsnAdminRoleManagementPage)
+				r.Put("/ui-api/admin/accounts/isn-admin-role", handlerService.AdminRoleManagement)
+
+				// Site Admin role management
+				r.Get("/admin/accounts/site-admin-role", handlerService.SiteAdminRoleManagementPage)
+				r.Put("/ui-api/admin/accounts/site-admin-role", handlerService.SiteAdminRoleManagement)
 			})
 		})
 	})

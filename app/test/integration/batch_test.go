@@ -26,9 +26,9 @@ func TestBatchLifecycle(t *testing.T) {
 	// Create test data
 	t.Log("Creating test data...")
 
-	// Create owner account and ISN
-	ownerAccount := createTestAccount(t, ctx, testEnv.queries, "owner", "user", "owner@batch-test.com")
-	testISN := createTestISN(t, ctx, testEnv.queries, "batch-test-isn", "Batch Test ISN", ownerAccount.ID, "private")
+	// Create site owner account and ISN
+	siteAdminAccount := createTestAccount(t, ctx, testEnv.queries, "siteadmin", "user", "siteadmin@batch-test.com")
+	testISN := createTestISN(t, ctx, testEnv.queries, "batch-test-isn", "Batch Test ISN", siteAdminAccount.ID, "private")
 
 	// Create service account
 	serviceAccount := createTestAccount(t, ctx, testEnv.queries, "member", "service_account", "service@batch-test.com")
@@ -45,8 +45,7 @@ func TestBatchLifecycle(t *testing.T) {
 	}
 
 	// Create signal type for testing
-	_, err = testEnv.queries.CreateSignalType(ctx, database.CreateSignalTypeParams{
-		IsnID:         testISN.ID,
+	signalType, err := testEnv.queries.CreateSignalType(ctx, database.CreateSignalTypeParams{
 		Slug:          "batch-test-signal",
 		SchemaURL:     testSchemaURL,
 		ReadmeURL:     testReadmeURL,
@@ -57,6 +56,15 @@ func TestBatchLifecycle(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("Failed to create signal type: %v", err)
+	}
+
+	// add signal type to the ISN
+	err = testEnv.queries.AddSignalTypeToIsn(ctx, database.AddSignalTypeToIsnParams{
+		IsnID:        testISN.ID,
+		SignalTypeID: signalType.ID,
+	})
+	if err != nil {
+		t.Fatalf("Failed to associate signal type with ISN: %v", err)
 	}
 
 	t.Run("service account signal submission without batch fails", func(t *testing.T) {
@@ -71,18 +79,18 @@ func TestBatchLifecycle(t *testing.T) {
 		}
 
 		// Verify that the service account has write permission but no batch ID
-		perm := tokenResponse.Perms[testISN.Slug]
+		perm := tokenResponse.IsnPerms[testISN.Slug]
 		if !perm.CanWrite {
 			t.Errorf("Expected write permission, got CanRead=%v CanWrite=%v", perm.CanRead, perm.CanWrite)
 		}
 
-		if tokenResponse.Perms[testISN.Slug].SignalBatchID != nil {
-			t.Errorf("Expected no batch ID for service account without batch, got %v", *tokenResponse.Perms[testISN.Slug].SignalBatchID)
+		if tokenResponse.IsnPerms[testISN.Slug].SignalBatchID != nil {
+			t.Errorf("Expected no batch ID for service account without batch, got %v", *tokenResponse.IsnPerms[testISN.Slug].SignalBatchID)
 		}
 
 		// This validates the condition that would trigger the error in CreateSignalsHandler:
 		// accounts must have a signal batch for this ISN before posting signals
-		if tokenResponse.AccountType == "service_account" && tokenResponse.Perms[testISN.Slug].SignalBatchID != nil {
+		if tokenResponse.AccountType == "service_account" && tokenResponse.IsnPerms[testISN.Slug].SignalBatchID != nil {
 			t.Error("Expected service account without batch to have nil SignalBatchID")
 		}
 	})

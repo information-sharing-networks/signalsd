@@ -78,10 +78,9 @@ type SetupPageData struct {
 //	@Description
 //	@Description	Note that where an organization needs more than one service account they must supply unique contact emails for each account.
 //	@Description
-//	@Description
 //	@Description	To reissue credentials for an existing service account, use the **Reissue Service Account Credentials** endpoint.
 //	@Description
-//	@Description	You have to be an admin or the site owner to use this endpoint
+//	@Description	You have to be an admin to use this end point
 //	@Description
 //	@Tags		Service Accounts
 //
@@ -269,7 +268,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 //	@Description
 //	@Description	The client_id will remain the same, but a new client_secret will be generated.
 //	@Description
-//	@Description	You have to be an admin or the site owner to use this endpoint
+//	@Description	You have to be an site or ISN admin to use this endpoint
 //	@Description
 //	@Tags		Service Accounts
 //

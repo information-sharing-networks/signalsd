@@ -124,10 +124,10 @@ import (
 //	@tag.description	Authentication and authorization endpoints.
 
 //	@tag.name			Site Admin
-//	@tag.description	Site adminstration tools. These endpoints can only be used by the site owner or an admin.
+//	@tag.description	Site adminstration tools. These endpoints can only be used by the accounts that have a siteadmin or isnadmin role
 
 //	@tag.name			ISN Configuration
-//	@tag.description	Create and manage Information Sharing Networks (ISNs) - these endpoints can only be used by the site owner or an admin. Note that ISN admins can only view or update details for ISNs they created.
+//	@tag.description	Create and manage Information Sharing Networks (ISNs) - these endpoints can only be used by the accounts that have a siteadmin or isnadmin role Note that ISN admins can only view or update details for ISNs they created.
 
 //	@tag.name			ISN Permissions
 //	@tag.description	Grant accounts read or write access to an ISN

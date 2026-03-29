@@ -56,7 +56,6 @@ func (q *Queries) CreateIsn(ctx context.Context, arg CreateIsnParams) (CreateIsn
 }
 
 const ExistsIsnWithSlug = `-- name: ExistsIsnWithSlug :one
-
 SELECT EXISTS
   (SELECT 1
    FROM isn
@@ -97,45 +96,6 @@ func (q *Queries) GetInUseIsns(ctx context.Context) ([]Isn, error) {
 			&i.IsInUse,
 			&i.Visibility,
 		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const GetInUsePublicIsnSignalTypes = `-- name: GetInUsePublicIsnSignalTypes :many
-SELECT
-    i.slug as isn_slug,
-    st.slug as signal_type_slug,
-    st.sem_ver
-FROM isn i
-JOIN signal_types st ON st.isn_id = i.id
-WHERE i.visibility = 'public'
-AND i.is_in_use = true
-AND st.is_in_use = true
-`
-
-type GetInUsePublicIsnSignalTypesRow struct {
-	IsnSlug        string `json:"isn_slug"`
-	SignalTypeSlug string `json:"signal_type_slug"`
-	SemVer         string `json:"sem_ver"`
-}
-
-// only returns active ISNs and signal types (is_in_use = true)
-func (q *Queries) GetInUsePublicIsnSignalTypes(ctx context.Context) ([]GetInUsePublicIsnSignalTypesRow, error) {
-	rows, err := q.db.Query(ctx, GetInUsePublicIsnSignalTypes)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetInUsePublicIsnSignalTypesRow
-	for rows.Next() {
-		var i GetInUsePublicIsnSignalTypesRow
-		if err := rows.Scan(&i.IsnSlug, &i.SignalTypeSlug, &i.SemVer); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

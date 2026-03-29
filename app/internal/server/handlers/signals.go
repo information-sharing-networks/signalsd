@@ -9,8 +9,6 @@ import (
 	"net/http"
 	"time"
 
-	"slices"
-
 	"github.com/google/uuid"
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
@@ -376,6 +374,9 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 // CreateSignal Handler inserts signals and signal_versions records - signals are the master records containing
 // the local_ref and correlation_id, signal_versions contains the content and links back to the signal.
 // the handler will record errors encountered when processing individual signals (see the signal_processing_failures table).
+//
+// this function should be called after the RequireAccessPermission middleware has checked the account has write permission for the ISN
+// (the middleware also checks the isn and signal type are in use)
 func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Request) {
 
 	isnSlug := r.PathValue("isn_slug")
@@ -392,18 +393,6 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 	accountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get accountID from context")
-		return
-	}
-
-	// check that the user is requesting a valid signal type/sem_ver for this isn
-	found := slices.Contains(claims.IsnPerms[isnSlug].SignalTypePaths, signalTypePath)
-	if !found {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("signal_type", signalTypePath),
-			slog.String("isn_slug", isnSlug),
-		)
-
-		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "signal type not available on this ISN")
 		return
 	}
 
@@ -532,11 +521,12 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 	for _, signal := range createSignalsRequest.Signals {
 		err = s.schemaCache.ValidateSignal(r.Context(), s.queries, signalTypePath, signal.Content)
 		if err != nil {
+			errMsg := fmt.Sprintf("validation failed: %v", err)
 			// Add to failed signals list
 			createSignalsResponse.Results.FailedSignals = append(createSignalsResponse.Results.FailedSignals, FailedSignal{
 				LocalRef:     signal.LocalRef,
 				ErrorCode:    string(apperrors.ErrCodeMalformedBody),
-				ErrorMessage: fmt.Sprintf("validation failed: %v", err),
+				ErrorMessage: errMsg,
 			})
 		} else {
 			// Add to valid signals for processing
@@ -565,6 +555,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 			signalID, signalErr = s.queries.WithTx(tx).CreateSignal(r.Context(), database.CreateSignalParams{
 				AccountID:      claims.AccountID,
 				LocalRef:       signal.LocalRef,
+				IsnSlug:        isnSlug,
 				SignalTypeSlug: signalTypeSlug,
 				SemVer:         semVer,
 			})
@@ -610,13 +601,14 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 				AccountID:      claims.AccountID,
 				LocalRef:       signal.LocalRef,
 				CorrelationID:  *signal.CorrelationId,
+				IsnSlug:        isnSlug,
 				SignalTypeSlug: signalTypeSlug,
 				SemVer:         semVer,
 			})
 		}
 
 		// unexpected error creating signals master record
-		if signalErr != nil && !errors.Is(signalErr, pgx.ErrNoRows) {
+		if signalErr != nil {
 			// Rollback this transaction
 			if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 				// Log the error but don't try to respond since the request may have already timed out
@@ -627,11 +619,17 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 				continue
 			}
 
+			// The insert checks that the signal type is enabled for the ISN - if not it returns ErrNoRows
+			errMsg := fmt.Sprintf("failed to create signal master record: %v", signalErr)
+			if errors.Is(signalErr, pgx.ErrNoRows) {
+				errMsg = "failed to create signal master record - no rows affected (possibly the signal type was disabled afer the acccess token was issued)"
+			}
+
 			// record database errors in the failed signals array
 			createSignalsResponse.Results.FailedSignals = append(createSignalsResponse.Results.FailedSignals, FailedSignal{
 				LocalRef:     signal.LocalRef,
 				ErrorCode:    string(apperrors.ErrCodeMalformedBody),
-				ErrorMessage: fmt.Sprintf("database error: %v", signalErr),
+				ErrorMessage: errMsg,
 			})
 			continue
 		}
@@ -686,6 +684,26 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 	// Update summary counts
 	createSignalsResponse.Summary.StoredCount = len(createSignalsResponse.Results.StoredSignals)
 	createSignalsResponse.Summary.FailedCount = len(createSignalsResponse.Results.FailedSignals)
+
+	// Log signal processing summary with failure details for debugging
+	if createSignalsResponse.Summary.FailedCount > 0 {
+		reqLogger := logger.ContextRequestLogger(r.Context())
+		failureErrors := make(map[string]int) // Track error types for summary
+		for _, failed := range createSignalsResponse.Results.FailedSignals {
+			failureErrors[failed.ErrorMessage]++
+		}
+		reqLogger.Warn("Signal processing failures",
+			slog.Int("stored_count", createSignalsResponse.Summary.StoredCount),
+			slog.Int("failed_count", createSignalsResponse.Summary.FailedCount),
+			slog.Int("unique_errors", len(failureErrors)),
+		)
+		for errMsg, count := range failureErrors {
+			reqLogger.Warn("Failure type",
+				slog.String("error_message", errMsg),
+				slog.Int("count", count),
+			)
+		}
+	}
 
 	// Log individual failures for batch tracking
 	if len(createSignalsResponse.Results.FailedSignals) > 0 {
@@ -747,6 +765,8 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 //	@Failure		400							{object}	responses.ErrorResponse
 //
 //	@Router			/api/public/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search [get]
+//
+// This function can be called without authentication. It will only return signals from public ISNs.
 func (s *SignalsHandler) SearchPublicSignalsHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Parse all search parameters
@@ -903,6 +923,9 @@ func (s *SignalsHandler) SearchPublicSignalsHandler(w http.ResponseWriter, r *ht
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search [get]
+//
+// This function should be called after the RequireAccessPermission middleware has checked the account has read permission for the ISN
+// (the middleware also checks the isn and signal type are in use)
 func (s *SignalsHandler) SearchPrivateSignalsHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Parse all search parameters
@@ -916,25 +939,13 @@ func (s *SignalsHandler) SearchPrivateSignalsHandler(w http.ResponseWriter, r *h
 		return
 	}
 
-	signalTypePath := fmt.Sprintf("%v/v%v", searchParams.signalTypeSlug, searchParams.semVer)
-
-	// Validate authenticated access to private ISN
-	claims, hasAuth := auth.ContextClaims(r.Context())
-	if !hasAuth {
+	claims, ok := auth.ContextClaims(r.Context())
+	if !ok {
 		responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "authentication required for private ISN access")
 		return
 	}
 
-	// Check if user has access to this signal type
-	if !slices.Contains(claims.IsnPerms[searchParams.isnSlug].SignalTypePaths, signalTypePath) {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("signal_type", signalTypePath),
-			slog.String("isn_slug", searchParams.isnSlug),
-		)
-
-		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "signal type not found on ISN")
-		return
-	}
+	// ISN and signal type in-use checks are now performed by RequireIsnPermission middleware
 
 	// Validate search parameters
 	if err := validateSearchParams(searchParams); err != nil {
@@ -1094,29 +1105,10 @@ func (s *SignalsHandler) WithdrawSignalHandler(w http.ResponseWriter, r *http.Re
 	isnSlug := r.PathValue("isn_slug")
 	signalTypeSlug := r.PathValue("signal_type_slug")
 	semVer := r.PathValue("sem_ver")
-	signalTypePath := fmt.Sprintf("%v/v%v", signalTypeSlug, semVer)
-
-	claims, ok := auth.ContextClaims(r.Context())
-	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
-		return
-	}
 
 	accountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get accountID from context")
-		return
-	}
-
-	// check that the user is requesting a valid signal type/sem_ver for this isn
-	found := slices.Contains(claims.IsnPerms[isnSlug].SignalTypePaths, signalTypePath)
-	if !found {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("signal_type", signalTypePath),
-			slog.String("isn_slug", isnSlug),
-		)
-
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeResourceNotFound, "signal type not available on this ISN")
 		return
 	}
 
@@ -1164,11 +1156,12 @@ func (s *SignalsHandler) WithdrawSignalHandler(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Withdraw the signal
+	// Withdraw the signal - query enforces is_in_use at ISN and signal type level as defence against stale claims
 	rowsAffected, err := s.queries.WithdrawSignalByLocalRef(r.Context(), database.WithdrawSignalByLocalRefParams{
 		AccountID: accountID,
 		Slug:      signalTypeSlug,
 		SemVer:    semVer,
+		IsnSlug:   isnSlug,
 		LocalRef:  *req.LocalRef,
 	})
 
@@ -1183,7 +1176,7 @@ func (s *SignalsHandler) WithdrawSignalHandler(w http.ResponseWriter, r *http.Re
 	}
 
 	if rowsAffected == 0 {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "attempt to withdraw signal failed - no rows updated")
+		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "signal not found or ISN/signal type no longer active")
 		return
 	}
 

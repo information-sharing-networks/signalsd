@@ -12,20 +12,21 @@ import (
 	"github.com/google/uuid"
 )
 
-const CreateOwnerUser = `-- name: CreateOwnerUser :one
+const CreateSiteAdminUser = `-- name: CreateSiteAdminUser :one
 INSERT INTO users (account_id, created_at, updated_at, email, hashed_password, user_role)
-VALUES ( $1, NOW(), NOW(), $2, $3, 'owner')
+VALUES ( $1, NOW(), NOW(), $2, $3, 'siteadmin')
 RETURNING account_id, created_at, updated_at, email, hashed_password, user_role
 `
 
-type CreateOwnerUserParams struct {
+type CreateSiteAdminUserParams struct {
 	AccountID      uuid.UUID `json:"account_id"`
 	Email          string    `json:"email"`
 	HashedPassword string    `json:"hashed_password"`
 }
 
-func (q *Queries) CreateOwnerUser(ctx context.Context, arg CreateOwnerUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, CreateOwnerUser, arg.AccountID, arg.Email, arg.HashedPassword)
+// first user is always a site admin
+func (q *Queries) CreateSiteAdminUser(ctx context.Context, arg CreateSiteAdminUserParams) (User, error) {
+	row := q.db.QueryRow(ctx, CreateSiteAdminUser, arg.AccountID, arg.Email, arg.HashedPassword)
 	var i User
 	err := row.Scan(
 		&i.AccountID,
@@ -226,16 +227,16 @@ func (q *Queries) UpdatePassword(ctx context.Context, arg UpdatePasswordParams) 
 	return result.RowsAffected(), nil
 }
 
-const UpdateUserAccountToAdmin = `-- name: UpdateUserAccountToAdmin :execrows
+const UpdateUserAccountToIsnAdmin = `-- name: UpdateUserAccountToIsnAdmin :execrows
 UPDATE users 
 SET 
-    user_role = 'admin'
+    user_role = 'isnadmin'
 WHERE 
     account_id = $1
 `
 
-func (q *Queries) UpdateUserAccountToAdmin(ctx context.Context, accountID uuid.UUID) (int64, error) {
-	result, err := q.db.Exec(ctx, UpdateUserAccountToAdmin, accountID)
+func (q *Queries) UpdateUserAccountToIsnAdmin(ctx context.Context, accountID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, UpdateUserAccountToIsnAdmin, accountID)
 	if err != nil {
 		return 0, err
 	}
@@ -243,15 +244,31 @@ func (q *Queries) UpdateUserAccountToAdmin(ctx context.Context, accountID uuid.U
 }
 
 const UpdateUserAccountToMember = `-- name: UpdateUserAccountToMember :execrows
-UPDATE users 
-SET 
+UPDATE users
+SET
     user_role = 'member'
-WHERE 
+WHERE
     account_id = $1
 `
 
 func (q *Queries) UpdateUserAccountToMember(ctx context.Context, accountID uuid.UUID) (int64, error) {
 	result, err := q.db.Exec(ctx, UpdateUserAccountToMember, accountID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const UpdateUserAccountToSiteAdmin = `-- name: UpdateUserAccountToSiteAdmin :execrows
+UPDATE users
+SET
+    user_role = 'siteadmin'
+WHERE
+    account_id = $1
+`
+
+func (q *Queries) UpdateUserAccountToSiteAdmin(ctx context.Context, accountID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, UpdateUserAccountToSiteAdmin, accountID)
 	if err != nil {
 		return 0, err
 	}

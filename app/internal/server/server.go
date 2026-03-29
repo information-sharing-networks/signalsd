@@ -90,7 +90,7 @@ func NewServer(
 		server.registerSignalReadRoutes()
 		server.registerSignalWriteRoutes()
 		server.registerApiDocoRoutes()
-	case "admin":
+	case "isnadmin":
 		server.registerAdminRoutes()
 		server.registerApiDocoRoutes()
 	case "signals":
@@ -232,7 +232,7 @@ func (s *Server) registerAdminRoutes() {
 
 				r.Group(func(r chi.Router) {
 					r.Use(s.authService.RequireValidAccessToken)
-					r.Use(s.authService.RequireRole("owner", "admin"))
+					r.Use(s.authService.RequireRole("siteadmin", "isnadmin"))
 
 					r.Post("/service-accounts/register", serviceAccounts.RegisterServiceAccountHandler)
 					r.Post("/service-accounts/reissue-credentials", serviceAccounts.ReissueServiceAccountCredentialsHandler)
@@ -261,18 +261,18 @@ func (s *Server) registerAdminRoutes() {
 					// ISN configuration
 					r.Group(func(r chi.Router) {
 
-						// Accounts must be eiter owner or admin to use these endponts
-						r.Use(s.authService.RequireRole("owner", "admin"))
+						// Accounts must be either site admin or isn admin to use these endponts
+						r.Use(s.authService.RequireRole("siteadmin", "isnadmin"))
 
 						// ISN management
 						r.Post("/", isn.CreateIsnHandler)
 						r.Put("/{isn_slug}", isn.UpdateIsnHandler)
 
-						// signal types managment
-						r.Post("/{isn_slug}/signal-types", signalTypes.CreateSignalTypeHandler)
-						r.Post("/{isn_slug}/signal-types/{signal_type_slug}/schemas", signalTypes.RegisterNewSignalTypeSchemaHandler)
-						r.Put("/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}", signalTypes.UpdateSignalTypeHandler)
-						r.Delete("/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}", signalTypes.DeleteSignalTypeHandler)
+						// add signal types to an ISN
+						r.Post("/{isn_slug}/signal-types/add", signalTypes.AddSignalTypeToISNHandler)
+
+						// ISN signal type status management
+						r.Put("/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}", signalTypes.UpdateIsnSignalTypeStatusHandler)
 
 						// ISN account permissions
 						r.Put("/{isn_slug}/accounts/{account_id}", isnAccount.UpdateIsnAccountPermissionHandler)
@@ -283,7 +283,7 @@ func (s *Server) registerAdminRoutes() {
 					// create new signal batches
 					r.Group(func(r chi.Router) {
 						// accounts must have write permission to the isn to create or read batches
-						r.Use(s.authService.RequireIsnPermission("write"))
+						r.Use(s.authService.RequireAccessPermission("write"))
 
 						r.Post("/{isn_slug}/batches", signalBatches.CreateSignalsBatchHandler)
 						r.Get("/{isn_slug}/batches/{batch_id}/status", signalBatches.GetSignalBatchStatusHandler)
@@ -311,25 +311,36 @@ func (s *Server) registerAdminRoutes() {
 				r.Post("/reset", admin.ResetHandler)
 			})
 
-			// Owner-only operations
+			// siteadmin operations
 			r.Group(func(r chi.Router) {
 
 				r.Use(s.authService.RequireValidAccessToken)
-				r.Use(s.authService.RequireRole("owner"))
+				r.Use(s.authService.RequireRole("siteadmin"))
 
-				// Admin role management
-				r.Put("/accounts/{account_id}/admin-role", users.GrantUserAdminRoleHandler)
-				r.Delete("/accounts/{account_id}/admin-role", users.RevokeUserAdminRoleHandler)
+				// ISN admin role management
+				r.Put("/accounts/{account_id}/isn-admin-role", users.GrantUserIsnAdminRoleHandler)
+				r.Delete("/accounts/{account_id}/isn-admin-role", users.RevokeUserIsnAdminRoleHandler)
 
-				// ISN ownership transfer (owner only)
+				// Site admin role management
+				r.Put("/accounts/{account_id}/site-admin-role", users.GrantUserSiteAdminRoleHandler)
+				r.Delete("/accounts/{account_id}/site-admin-role", users.RevokeUserSiteAdminRoleHandler)
+
+				// ISN ownership transfer
 				r.Put("/isn/{isn_slug}/transfer-ownership", isn.TransferIsnOwnershipHandler)
+
+				// signal types management
+				r.Get("/signal-types", signalTypes.GetSignalTypesHandler)
+				r.Post("/signal-types", signalTypes.CreateSignalTypeHandler)
+				r.Post("/signal-types/{signal_type_slug}/schemas", signalTypes.RegisterNewSignalTypeSchemaHandler)
+				r.Put("/signal-types/{signal_type_slug}/v{sem_ver}", signalTypes.UpdateSignalTypeHandler)
+				r.Delete("/signal-types/{signal_type_slug}/v{sem_ver}", signalTypes.DeleteSignalTypeHandler)
 			})
 
-			// Admin and owner operations
+			// shared site-admin and isn-admin operations
 			r.Group(func(r chi.Router) {
 
 				r.Use(s.authService.RequireValidAccessToken)
-				r.Use(s.authService.RequireRole("owner", "admin"))
+				r.Use(s.authService.RequireRole("siteadmin", "isnadmin"))
 
 				// Account management
 				r.Post("/accounts/{account_id}/disable", admin.DisableAccountHandler)
@@ -350,7 +361,7 @@ func (s *Server) registerSignalWriteRoutes() {
 		r.Use(middleware.CORS(s.corsConfigs.Protected))
 		r.Use(middleware.RequestSizeLimit(s.config.MaxSignalPayloadSize))
 		r.Use(s.authService.RequireValidAccessToken)
-		r.Use(s.authService.RequireIsnPermission("write"))
+		r.Use(s.authService.RequireAccessPermission("write"))
 
 		// signals post
 		r.Post("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals", signals.CreateSignalsHandler)
@@ -371,11 +382,12 @@ func (s *Server) registerSignalReadRoutes() {
 		r.Get("/api/public/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search", signals.SearchPublicSignalsHandler)
 	})
 
-	// Private ISN signal search - authentication required
+	// Private ISN signal search - any ISN member (read or write) may call this endpoint.
+	// Write-only accounts receive only the signals they created; visibility filtering is applied in the handler.
 	s.router.Group(func(r chi.Router) {
 		r.Use(middleware.CORS(s.corsConfigs.Protected))
 		r.Use(s.authService.RequireValidAccessToken)
-		r.Use(s.authService.RequireIsnPermission("read", "write"))
+		r.Use(s.authService.RequireIsnMembership)
 		r.Get("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search", signals.SearchPrivateSignalsHandler)
 	})
 

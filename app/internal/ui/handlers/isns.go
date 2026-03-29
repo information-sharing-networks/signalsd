@@ -84,7 +84,7 @@ func (h *HandlerService) CreateIsn(w http.ResponseWriter, r *http.Request) {
 }
 
 // IsnStatusPage renders the admin ISN enable/disable page.
-// note this page only shows ISNs that the user has admin rights for (i.e. they created it or they are the site owner)
+// note this page only shows ISNs that the user has admin rights for (i.e. they created it or they a site admin)
 func (h *HandlerService) IsnStatusPage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
@@ -108,7 +108,7 @@ func (h *HandlerService) IsnStatusPage(w http.ResponseWriter, r *http.Request) {
 	// Filter to only ISNs where user has admin rights
 	var adminIsns []types.IsnOption
 	for _, isn := range isns {
-		if accessTokenDetails.AccountID == isn.UserAccountID || accessTokenDetails.Role == "owner" {
+		if accessTokenDetails.AccountID == isn.UserAccountID || accessTokenDetails.Role == "siteadmin" {
 			adminIsns = append(adminIsns, types.IsnOption{
 				Slug:          isn.Slug,
 				IsInUse:       isn.IsInUse,

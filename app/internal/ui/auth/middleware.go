@@ -176,7 +176,8 @@ func (a *AuthService) RequireIsnAdmin(next http.Handler) http.Handler {
 		}
 
 		for perm := range accessTokenDetails.IsnPerms {
-			if accessTokenDetails.IsnPerms[perm].IsnAdmin {
+
+			if accessTokenDetails.IsnPerms[perm].CanAdminister {
 				reqLogger.Debug("ISN admin check successful", slog.String("component", "ui.RequireIsnAdmin"))
 				next.ServeHTTP(w, r)
 				return

@@ -101,10 +101,7 @@ type IsnAndLinkedInfo struct {
 //	@Description
 //	@Description	visibility = "private" means that signalsd on the network can only be seen by network participants.
 //	@Description
-//	@Description	ISN admins automatically get write permission for their own ISNs.
-//	@Description	Site owners automatically get write permission on all ISNs.
-//	@Description
-//	@Description	This endpoint can only be used by the site owner or an admin
+//	@Description	This endpoint can only be used by ISN admins and site admins
 //	@Description
 //	@Description	Note there is a cache of public ISNs that is used by the search endpoints. This cache is not dynamically loaded, so adding public ISNs requires a restart of the service
 //
@@ -121,7 +118,7 @@ type IsnAndLinkedInfo struct {
 //
 //	@Router			/api/isn/ [post]
 //
-// Use with RequireRole (admin,owner)
+// Use with RequireRole (isnadmin,siteadmin)
 func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 	var req CreateIsnRequest
 
@@ -240,7 +237,9 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 //
 //	@Summary		Update an ISN
 //	@Description	Update the ISN configuration
-//	@Description	This endpoint can only be used by the site owner or the ISN admin
+//	@Description	This endpoint can only be used by admin accounts
+//	@Description	ISN admins can only update ISNs they created
+//	@Description	Site admins can update any ISN
 //
 //	@Tags			ISN Configuration
 //
@@ -257,7 +256,7 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 //
 //	@Router			/api/isn/{isn_slug} [put]
 //
-// Use with RequireRole (admin,owner)
+// Use with RequireRole (isnadmin,siteadmin) middleware
 func (i *IsnHandler) UpdateIsnHandler(w http.ResponseWriter, r *http.Request) {
 	var req UpdateIsnRequest
 
@@ -269,7 +268,7 @@ func (i *IsnHandler) UpdateIsnHandler(w http.ResponseWriter, r *http.Request) {
 
 	isnSlug := r.PathValue("isn_slug")
 
-	// check ISN exists and is owned by user
+	// get the isn
 	isn, err := i.queries.GetIsnBySlug(r.Context(), isnSlug)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -285,18 +284,15 @@ func (i *IsnHandler) UpdateIsnHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// check if user is either the ISN owner or a site owner
+	// If the requester is an ISN admin, they must own this ISN.
 	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
 		return
 	}
 
-	isIsnOwner := isn.UserAccountID == userAccountID
-	isSiteOwner := claims.Role == "owner"
-
-	if !isIsnOwner && !isSiteOwner {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you must be either the ISN owner or a site owner to update this ISN")
+	if claims.Role == "isnadmin" && isn.UserAccountID != userAccountID {
+		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you must be the ISN owner to update this ISN")
 		return
 	}
 
@@ -457,7 +453,7 @@ func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var signalTypes *[]SignalType
-	dbSignalTypes, err := s.queries.GetSignalTypeByIsnID(r.Context(), dbIsn.ID)
+	dbSignalTypes, err := s.queries.GetSignalTypesByIsnID(r.Context(), dbIsn.ID)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
 			logger.ContextWithLogAttrs(r.Context(),
@@ -502,7 +498,7 @@ func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 //	@Summary		Transfer ISN ownership
 //	@Description	Transfer ownership of an ISN to another admin account.
 //	@Description	This can be used when an admin leaves or when reorganizing responsibilities.
-//	@Description	Only the site owner can transfer ISN ownership.
+//	@Description	Only site admins can transfer ISN ownership.
 //	@Tags			ISN Configuration
 //
 //	@Param			isn_slug	path	string									true	"ISN slug"
@@ -518,7 +514,7 @@ func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 //
 //	@Router			/api/admin/isn/{isn_slug}/transfer-ownership [put]
 //
-// Use with RequireRole (owner)
+// Use with RequireRole (siteadmin)
 func (i *IsnHandler) TransferIsnOwnershipHandler(w http.ResponseWriter, r *http.Request) {
 	var req TransferIsnOwnershipRequest
 
@@ -578,14 +574,14 @@ func (i *IsnHandler) TransferIsnOwnershipHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// verify new owner is an admin or owner
+	// verify new owner is an isn admin or owner
 	if newAdminAccount.AccountType != "user" {
 		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "new owner must be a user account")
 		return
 	}
 
-	if newAdminAccount.AccountRole != "admin" && newAdminAccount.AccountRole != "owner" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "new owner must be an admin or owner")
+	if newAdminAccount.AccountRole != "isnadmin" && newAdminAccount.AccountRole != "siteadmin" {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "new owner must be an admin")
 		return
 	}
 

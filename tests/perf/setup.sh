@@ -8,7 +8,7 @@ export PASSWORD=${PASSWORD:-12345678901}
 export BASE_URL=${BASE_URL:-http://localhost:8080}
 
 echo "🔧 Setting up performance test environment..."
-echo "Owner: ${OWNER}"
+echo "SiteAdmin: ${OWNER}"
 echo "Base URL: ${BASE_URL}"
 
 echo "👤 Creating owner account: ${OWNER}"

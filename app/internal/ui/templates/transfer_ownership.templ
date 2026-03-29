@@ -12,7 +12,7 @@ templ TransferOwnershipPage(environment string, isns []types.IsnOption, users []
 				<div class="card-body">
 					<p class="card-description text-muted">
 						Transfer ownership of an Information Sharing Network to another admin account. 
-						This action can only be performed by the site owner and cannot be undone.
+						This action can only be performed by a site admin and cannot be undone.
 					</p>
 					@NoticeAlert() {
 						This action will transfer ownership of the selected ISN to the chosen admin account.
@@ -42,7 +42,7 @@ templ TransferOwnershipPage(environment string, isns []types.IsnOption, users []
 									<option value="">Select New Owner...</option>
 									if users != nil {
 										for _, user := range users {
-											if user.UserRole == "admin" {
+											if user.UserRole == "isnadmin" {
 												<option value={ user.Email }>{ user.Email } (Admin)</option>
 											}
 										}

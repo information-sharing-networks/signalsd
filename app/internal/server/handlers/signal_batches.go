@@ -85,7 +85,7 @@ type BatchSearchParams struct {
 //	@Description	Signals can only be sent to open batches.
 //	@Description
 //	@Description	Authentication is based on the supplied access token:
-//	@Description	the site owner, the isn admin and members with an isn_perm=write can create a batch for the ISN.
+//	@Description	site admins, the isn owner and members with an isn_perm=write can create a batch for the ISN.
 //	@Description
 //	@Description	Note: Batches are automatically created when accounts first write to an ISN,
 //	@Description	so you only need to explicitly create a batch using this endpoint if you want to track signals in separate batches.
@@ -233,7 +233,7 @@ func (s *SignalsBatchHandler) GetSignalBatchStatusHandler(w http.ResponseWriter,
 	// Access control rules:
 	// - Member accounts can only see batches they have created
 	// - ISN Admins can see batches for ISNs they administer
-	// - Site owner can see all batches
+	// - Site admins can see all batches
 	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
@@ -255,9 +255,9 @@ func (s *SignalsBatchHandler) GetSignalBatchStatusHandler(w http.ResponseWriter,
 	// Check access permissions
 	isBatchCreator := signalBatch.AccountID == claims.AccountID
 	isIsnAdmin := isn.UserAccountID == claims.AccountID
-	isSiteOwner := claims.Role == "owner"
+	isSiteAdmin := claims.Role == "siteadmin"
 
-	if !isBatchCreator && !isIsnAdmin && !isSiteOwner {
+	if !isBatchCreator && !isIsnAdmin && !isSiteAdmin {
 		responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeForbidden, "you do not have permission to view this batch")
 		return
 	}
@@ -509,10 +509,10 @@ func (s *SignalsBatchHandler) SearchBatchesHandler(w http.ResponseWriter, r *htt
 	}
 
 	// Access control rules:
-	// - the site owner can see all batches
+	// - site admins can see all batches
 	// - ISN Admins can see any batches created in ISNs that they own
 	// - Member accounts can only see batches they created
-	isOwnerOrAdmin := claims.Role == "owner" || isn.UserAccountID == claims.AccountID
+	isOwnerOrAdmin := claims.Role == "siteadmin" || isn.UserAccountID == claims.AccountID
 	var requestingAccountID *uuid.UUID
 	if !isOwnerOrAdmin {
 		requestingAccountID = &claims.AccountID

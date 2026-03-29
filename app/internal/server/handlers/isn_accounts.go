@@ -41,7 +41,7 @@ type IsnAccount struct {
 	AccountType        string    `json:"account_type" example:"user" enums:"user,service_account"`
 	IsActive           bool      `json:"is_active" example:"true"`
 	Email              string    `json:"email" example:"user@example.com"`
-	AccountRole        string    `json:"account_role" example:"admin" enums:"owner,admin,member"`
+	AccountRole        string    `json:"account_role" example:"isnadmin" enums:"siteadmin,isnadmin,member"`
 	ClientID           *string   `json:"client_id,omitempty" example:"sa_exampleorg_k7j2m9x1"`
 	ClientOrganization *string   `json:"client_organization,omitempty" example:"Example Organization"`
 }
@@ -53,8 +53,11 @@ type IsnAccount struct {
 //
 //	@Description	Update an account's access permission for an ISN. Set both can_read and can_write to false to revoke all access.
 //	@Description
-//	@Description	This endpoint can only be used by the site owner or the ISN admin account (ISN admins can only update permissions for ISNs they created).
+//	@Description	This endpoint can only be used by admin accounts:
+//	@Description	- ISN admins can only update permissions for ISNs they created).
+//	@Description	- Site admins can update permissions for any ISN
 //	@Description
+//	@Description	Permissions:
 //	@Description	- Accounts with 'read' permission can view all signals on the ISN.
 //	@Description	- Accounts with 'write' permission can create signals on the ISN.
 //	@Description	- For accounts that need read/write access to an ISN, you must grant both 'read' and 'write' permissions.
@@ -77,13 +80,13 @@ type IsnAccount struct {
 //
 //	@Router			/api/isn/{isn_slug}/accounts/{account_id}  [put]
 //
-//	this handler must use the RequireRole (owner,admin) middleware
+//	this handler must use the RequireRole (siteadmin,admin) middleware
 func (i *IsnAccountHandler) UpdateIsnAccountPermissionHandler(w http.ResponseWriter, r *http.Request) {
 
 	req := UpdateIsnAccountPermissionRequest{}
 
 	// get account id for the account making request
-	accountID, ok := auth.ContextAccountID(r.Context())
+	userAccountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
 		return
@@ -107,18 +110,15 @@ func (i *IsnAccountHandler) UpdateIsnAccountPermissionHandler(w http.ResponseWri
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
-	// check if user is either the ISN owner or a site owner
+	// If the requester is an ISN admin, they must own this ISN.
 	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
 		return
 	}
 
-	isIsnOwner := isn.UserAccountID == accountID
-	isSiteOwner := claims.Role == "owner"
-
-	if !isIsnOwner && !isSiteOwner {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you must be either the ISN owner or a site owner to grant permissions")
+	if claims.Role == "isnadmin" && isn.UserAccountID != userAccountID {
+		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you must be the ISN owner to grant permissions")
 		return
 	}
 
@@ -142,7 +142,7 @@ func (i *IsnAccountHandler) UpdateIsnAccountPermissionHandler(w http.ResponseWri
 	}
 
 	// deny users making uncessary attempts to grant perms to themeselves
-	if accountID == targetAccountID {
+	if userAccountID == targetAccountID {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("operation", "grant_isn_account"),
 			slog.String("error", "accounts cannot grant ISN permissions to themselves"),
@@ -257,6 +257,8 @@ func (i *IsnAccountHandler) UpdateIsnAccountPermissionHandler(w http.ResponseWri
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/isn/{isn_slug}/accounts [get]
+//
+// this handler must use the RequireRole (siteadmin,admin) middleware
 func (i *IsnAccountHandler) GetIsnAccountsHandler(w http.ResponseWriter, r *http.Request) {
 
 	// get user account id for user making request
@@ -284,18 +286,15 @@ func (i *IsnAccountHandler) GetIsnAccountsHandler(w http.ResponseWriter, r *http
 		return
 	}
 
-	// check if user is either the ISN owner or a site owner
+	// If the requester is an ISN admin, they must own this ISN.
 	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
 		return
 	}
 
-	isIsnOwner := isn.UserAccountID == userAccountID
-	isSiteOwner := claims.Role == "owner"
-
-	if !isIsnOwner && !isSiteOwner {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you must be either the ISN owner or a site owner to access this resource")
+	if claims.Role == "isnadmin" && isn.UserAccountID != userAccountID {
+		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you must be the ISN owner to access this resource")
 		return
 	}
 

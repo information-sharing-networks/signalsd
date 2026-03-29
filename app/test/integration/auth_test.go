@@ -8,7 +8,7 @@ package integration
 // tests:
 //
 // JWT token structure and claims validation
-// Role-based permissions (owner, admin, member)
+// Role-based permissions (siteadmin, admin, member)
 // Explicit permission grants and ISN access control
 // Service account batch handling and client credentials
 // Login flows and refresh token rotation
@@ -40,18 +40,18 @@ func TestPermissions(t *testing.T) {
 	authService := auth.NewAuthService(testEnv.cfg.SecretKey, testEnv.cfg.Environment, testEnv.queries)
 
 	// Create test accounts
-	ownerAccount := createTestAccount(t, ctx, testEnv.queries, "owner", "user", "owner@gmail.com")
-	adminAccount := createTestAccount(t, ctx, testEnv.queries, "admin", "user", "admin@gmail.com")
+	siteAdminAccount := createTestAccount(t, ctx, testEnv.queries, "siteadmin", "user", "siteadmin@gmail.com")
+	adminAccount := createTestAccount(t, ctx, testEnv.queries, "isnadmin", "user", "admin@gmail.com")
 	memberAccount := createTestAccount(t, ctx, testEnv.queries, "member", "user", "member@gmail.com")
 	serviceAccount := createTestAccount(t, ctx, testEnv.queries, "member", "service_account", "service@gmail.com")
 
 	// Create ISNs
-	ownerISN := createTestISN(t, ctx, testEnv.queries, "owner-isn", "Owner ISN", ownerAccount.ID, "private")
+	siteAdminISN := createTestISN(t, ctx, testEnv.queries, "siteadmin-isn", "SiteAdmin ISN", siteAdminAccount.ID, "private")
 	adminISN := createTestISN(t, ctx, testEnv.queries, "admin-isn", "Admin ISN", adminAccount.ID, "private")
 	publicISN := createTestISN(t, ctx, testEnv.queries, "public-isn", "Public ISN", adminAccount.ID, "public")
 
 	// Create signal types
-	_ = createTestSignalType(t, ctx, testEnv.queries, ownerISN.ID, "owner ISN signal", "1.0.0")
+	_ = createTestSignalType(t, ctx, testEnv.queries, siteAdminISN.ID, "siteadmin ISN signal", "1.0.0")
 	_ = createTestSignalType(t, ctx, testEnv.queries, adminISN.ID, "admin ISN signal", "1.0.0")
 	_ = createTestSignalType(t, ctx, testEnv.queries, publicISN.ID, "public ISN signal", "1.0.0")
 
@@ -66,18 +66,18 @@ func TestPermissions(t *testing.T) {
 
 	var validSignalTypePaths = make(map[string]string)
 
-	validSignalTypePaths["owner-isn"] = "owner-isn-signal/v1.0.0"
+	validSignalTypePaths["siteadmin-isn"] = "siteadmin-isn-signal/v1.0.0"
 	validSignalTypePaths["admin-isn"] = "admin-isn-signal/v1.0.0"
 	validSignalTypePaths["public-isn"] = "public-isn-signal/v1.0.0"
 
-	t.Run("owner role permissions", func(t *testing.T) {
-		// owner should have write access to all ISNs
+	t.Run("siteadmin role permissions", func(t *testing.T) {
+		// siteadmin should have write access to all ISNs
 		expectedPerms := map[string]string{
-			"owner-isn":  "read-write",
-			"admin-isn":  "read-write",
-			"public-isn": "read-write",
+			"siteadmin-isn": "read-write",
+			"admin-isn":     "read-write",
+			"public-isn":    "read-write",
 		}
-		checkPermissions(t, authService, ownerAccount.ID, "user", "owner", expectedPerms, validSignalTypePaths, testEnv.cfg.SecretKey)
+		checkPermissions(t, authService, siteAdminAccount.ID, "user", "siteadmin", expectedPerms, validSignalTypePaths, testEnv.cfg.SecretKey)
 	})
 
 	t.Run("admin role permissions", func(t *testing.T) {
@@ -86,7 +86,7 @@ func TestPermissions(t *testing.T) {
 			"admin-isn":  "read-write",
 			"public-isn": "read-write",
 		}
-		checkPermissions(t, authService, adminAccount.ID, "user", "admin", expectedPerms, validSignalTypePaths, testEnv.cfg.SecretKey)
+		checkPermissions(t, authService, adminAccount.ID, "user", "isnadmin", expectedPerms, validSignalTypePaths, testEnv.cfg.SecretKey)
 	})
 
 	t.Run("member role permissions", func(t *testing.T) {
@@ -157,12 +157,12 @@ func checkPermissions(t *testing.T,
 
 	// checks that the response contains expected ISN permissions
 
-	if len(response.Perms) != len(expectedPerms) {
-		t.Fatalf("expected %d ISN permissions, got %d", len(expectedPerms), len(response.Perms))
+	if len(response.IsnPerms) != len(expectedPerms) {
+		t.Fatalf("expected %d ISN permissions, got %d", len(expectedPerms), len(response.IsnPerms))
 	}
 
 	for isnSlug, expectedPermission := range expectedPerms {
-		perm, exists := response.Perms[isnSlug]
+		perm, exists := response.IsnPerms[isnSlug]
 		if !exists {
 			t.Errorf("missing permission for ISN %s", isnSlug)
 			continue
@@ -196,14 +196,13 @@ func checkPermissions(t *testing.T,
 		}
 
 		// Verify signal type paths are correctly populated
-		if len(perm.SignalTypePaths) != 1 {
-			t.Errorf("expected 1 signal type path for %s, got %d", isnSlug, len(perm.SignalTypePaths))
+		if len(perm.SignalTypes) != 1 {
+			t.Errorf("expected 1 signal type for %s, got %d", isnSlug, len(perm.SignalTypes))
 			continue
 		}
-		signalTypePath := perm.SignalTypePaths[0]
 		if expectedPath, exists := validSignalTypePaths[isnSlug]; exists {
-			if signalTypePath != expectedPath {
-				t.Errorf("expected signal type path %s for %s, got %s", expectedPath, isnSlug, signalTypePath)
+			if _, found := perm.SignalTypes[expectedPath]; !found {
+				t.Errorf("expected signal type path %s for %s, not found in signal types", expectedPath, isnSlug)
 			}
 		}
 	}
@@ -257,11 +256,11 @@ func checkPermissions(t *testing.T,
 		t.Errorf("JWT account type %s doesn't match response account type %s", claims.AccountType, response.AccountType)
 	}
 
-	if len(claims.IsnPerms) != len(response.Perms) {
-		t.Errorf("JWT has %d ISN permissions, response has %d", len(claims.IsnPerms), len(response.Perms))
+	if len(claims.IsnPerms) != len(response.IsnPerms) {
+		t.Errorf("JWT has %d ISN permissions, response has %d", len(claims.IsnPerms), len(response.IsnPerms))
 	}
 
-	for isnSlug, responsePerm := range response.Perms {
+	for isnSlug, responsePerm := range response.IsnPerms {
 		jwtPerm, exists := claims.IsnPerms[isnSlug]
 		if !exists {
 			t.Errorf("ISN %s missing from JWT claims but present in response", isnSlug)
@@ -284,10 +283,10 @@ func checkPermissions(t *testing.T,
 				isnSlug, jwtPerm.SignalBatchID == nil, responsePerm.SignalBatchID == nil)
 		}
 
-		// Compare signal type paths
-		if len(jwtPerm.SignalTypePaths) != len(responsePerm.SignalTypePaths) {
-			t.Errorf("ISN %s: JWT has %d signal type paths, response has %d",
-				isnSlug, len(jwtPerm.SignalTypePaths), len(responsePerm.SignalTypePaths))
+		// Compare signal types
+		if len(jwtPerm.SignalTypes) != len(responsePerm.SignalTypes) {
+			t.Errorf("ISN %s: JWT has %d signal types, response has %d",
+				isnSlug, len(jwtPerm.SignalTypes), len(responsePerm.SignalTypes))
 		}
 	}
 }
@@ -336,9 +335,9 @@ func TestLoginAuth(t *testing.T) {
 	}
 
 	ownerTestLogin := testLogin{
-		email:       "owner@login.com",
+		email:       "siteadmin@login.com",
 		password:    "ownerpassword",
-		role:        "owner",
+		role:        "siteadmin",
 		accountType: "user",
 	}
 	memberTestLogin := testLogin{
@@ -355,7 +354,7 @@ func TestLoginAuth(t *testing.T) {
 	}
 
 	// Create test users
-	ownerAccount := createTestUserWithPassword(t, ctx, testEnv.queries, authService, ownerTestLogin.role, ownerTestLogin.email, ownerTestLogin.password)
+	siteAdminAccount := createTestUserWithPassword(t, ctx, testEnv.queries, authService, ownerTestLogin.role, ownerTestLogin.email, ownerTestLogin.password)
 	memberAccount := createTestUserWithPassword(t, ctx, testEnv.queries, authService, memberTestLogin.role, memberTestLogin.email, memberTestLogin.password)
 	adminAccount := createTestUserWithPassword(t, ctx, testEnv.queries, authService, adminTestLogin.role, adminTestLogin.email, adminTestLogin.password)
 
@@ -370,20 +369,20 @@ func TestLoginAuth(t *testing.T) {
 			wantErr             bool
 		}{
 			{
-				name:                "owner can login with correct password",
+				name:                "siteadmin can login with correct password",
 				email:               ownerTestLogin.email,
 				password:            ownerTestLogin.password,
 				expectedRole:        ownerTestLogin.role,
-				expectedAccountID:   ownerAccount.ID,
+				expectedAccountID:   siteAdminAccount.ID,
 				expectedAccountType: ownerTestLogin.accountType,
 				wantErr:             false,
 			},
 			{
-				name:                "owner can't login with incorrect password",
+				name:                "siteadmin can't login with incorrect password",
 				email:               ownerTestLogin.email,
 				password:            "wrongpassword",
 				expectedRole:        ownerTestLogin.role,
-				expectedAccountID:   ownerAccount.ID,
+				expectedAccountID:   siteAdminAccount.ID,
 				expectedAccountType: ownerTestLogin.accountType,
 				wantErr:             true,
 			},
@@ -573,9 +572,9 @@ func TestDisabledAccountAuth(t *testing.T) {
 	// create test data
 	t.Log("Creating test data...")
 
-	ownerAccount := createTestAccount(t, ctx, testEnv.queries, "owner", "user", "owner@caniuse.com")
+	siteAdminAccount := createTestAccount(t, ctx, testEnv.queries, "siteadmin", "user", "siteadmin@caniuse.com")
 
-	ownerISN := createTestISN(t, ctx, testEnv.queries, "owner-correlated-isn", "Owner caniuse ISN", ownerAccount.ID, "private")
+	siteAdminISN := createTestISN(t, ctx, testEnv.queries, "siteadmin-correlated-isn", "SiteAdmin caniuse ISN", siteAdminAccount.ID, "private")
 
 	memberAccount := createTestAccount(t, ctx, testEnv.queries, "member", "user", "member@caniuse.com")
 
@@ -588,8 +587,8 @@ func TestDisabledAccountAuth(t *testing.T) {
 	}
 
 	// grant members access to the isn
-	grantPermission(t, ctx, testEnv.queries, ownerISN.ID, memberAccount.ID, "write")
-	grantPermission(t, ctx, testEnv.queries, ownerISN.ID, serviceAccount.ID, "write")
+	grantPermission(t, ctx, testEnv.queries, siteAdminISN.ID, memberAccount.ID, "write")
+	grantPermission(t, ctx, testEnv.queries, siteAdminISN.ID, serviceAccount.ID, "write")
 
 	// note the authservice uses the accountID in the context to determine the account being accessed
 	ctx = auth.ContextWithAccountID(context.Background(), memberAccount.ID)

@@ -3,9 +3,10 @@ INSERT INTO users (account_id, created_at, updated_at, email, hashed_password, u
 VALUES ( $1, NOW(), NOW(), $2, $3, 'member')
 RETURNING *;
 
--- name: CreateOwnerUser :one
+-- name: CreateSiteAdminUser :one
+-- first user is always a site admin
 INSERT INTO users (account_id, created_at, updated_at, email, hashed_password, user_role)
-VALUES ( $1, NOW(), NOW(), $2, $3, 'owner')
+VALUES ( $1, NOW(), NOW(), $2, $3, 'siteadmin')
 RETURNING *;
 
 -- name: UpdatePassword :execrows
@@ -30,19 +31,26 @@ FROM users u
 JOIN isn i ON u.account_id = i.user_account_id 
 WHERE i.id = $1;
 
--- name: UpdateUserAccountToAdmin :execrows 
+-- name: UpdateUserAccountToIsnAdmin :execrows 
 UPDATE users 
 SET 
-    user_role = 'admin'
+    user_role = 'isnadmin'
 WHERE 
     account_id = $1;
 
 
--- name: UpdateUserAccountToMember :execrows 
-UPDATE users 
-SET 
+-- name: UpdateUserAccountToMember :execrows
+UPDATE users
+SET
     user_role = 'member'
-WHERE 
+WHERE
+    account_id = $1;
+
+-- name: UpdateUserAccountToSiteAdmin :execrows
+UPDATE users
+SET
+    user_role = 'siteadmin'
+WHERE
     account_id = $1;
 
 -- name: ExistsUserWithEmail :one

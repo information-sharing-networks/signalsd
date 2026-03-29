@@ -24,86 +24,6 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/api/admin/accounts/{account_id}/admin-role": {
-            "put": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "This endpoint grants the admin role to a site member\n\nAn admin can:\n- Create an ISN\n- Define the signal_types used in the ISN\n- read/write to their own ISNs\n- Grant other accounts read or write access to their ISNs\n\nNote that admins can't change ISNs they don't own (the site owner must use the ` + "`" + `transfer ownership` + "`" + ` endpoint if this is requred)\n\nAn admin also has access to the following site admin functions:\n- Create service accounts\n- Disable/Enable accounts\n- View all users and their email addresses\n- Reset user passwords\n\n**This endpoint can only be used by the site owner account**",
-                "tags": [
-                    "Site Admin"
-                ],
-                "summary": "Grant admin role",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
-                        "description": "account id",
-                        "name": "account_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "delete": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "**This endpoint can only be used by the site owner account**",
-                "tags": [
-                    "Site Admin"
-                ],
-                "summary": "Revoke admin role",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
-                        "description": "account id",
-                        "name": "account_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "204": {
-                        "description": "No Content"
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/api/admin/accounts/{account_id}/disable": {
             "post": {
                 "security": [
@@ -111,7 +31,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "**Use Cases:**\n- **Security Incident**: Compromised account needs immediate lockout\n- **Employee Departure**: Remove access for departed staff\n\n**Actions Performed:**\n- Sets ` + "`" + `is_active = false` + "`" + ` (account becomes unusable)\n- Revokes all client secrets/one-time secrets (service accounts)\n- Revokes all refresh tokens (web users)\n\n**Recovery:** Account must be re-enabled by admin via ` + "`" + `/admin/accounts/{id}/enable` + "`" + `\nService accounts will also need a new client secret via ` + "`" + `/api/auth/service-accounts/reissue-credentials` + "`" + `\n\n**Note:** The site owner account cannot be disabled to prevent system lockout.\nOnly owners and admins can disable accounts.",
+                "description": "**Use Cases:**\n- **Security Incident**: Compromised account needs immediate lockout\n- **Employee Departure**: Remove access for departed staff\n\n**Actions Performed:**\n- Sets ` + "`" + `is_active = false` + "`" + ` (account becomes unusable)\n- Revokes all client secrets/one-time secrets (service accounts)\n- Revokes all refresh tokens (web users)\n\n**Recovery:** Account must be re-enabled by admin via ` + "`" + `/admin/accounts/{id}/enable` + "`" + `\nService accounts will also need a new client secret via ` + "`" + `/api/auth/service-accounts/reissue-credentials` + "`" + `\n\nOnly admins can disable accounts.",
                 "tags": [
                     "Site Admin"
                 ],
@@ -138,12 +58,6 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Authentication failed ",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Cannot disable site owner account",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -210,6 +124,166 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/admin/accounts/{account_id}/isn-admin-role": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "This endpoint grants the ISN admin role to a site member\n\nAn ISN admin can:\n- Create an ISN\n- Add signal_types to their own ISNs\n- read/write to their own ISNs\n- Grant other accounts read or write access to their ISNs\n\nNote that ISN admins can't change ISNs they don't own (a site admin must use the ` + "`" + `transfer ownership` + "`" + ` endpoint if this is requred)\n\nAn ISN admin also has access to the following site-level functions:\n- Create service accounts\n- Disable/Enable accounts\n- View all users and their email addresses\n- Reset user passwords\n\n**This endpoint can only be used by site admin accounts**",
+                "tags": [
+                    "Site Admin"
+                ],
+                "summary": "Grant ISN admin role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
+                        "description": "account id",
+                        "name": "account_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "**This endpoint can only be used by site admin accounts**",
+                "tags": [
+                    "Site Admin"
+                ],
+                "summary": "Revoke admin role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
+                        "description": "account id",
+                        "name": "account_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/accounts/{account_id}/site-admin-role": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "This endpoint grants the site admin role to a user.\n\nA site admin can create and manage any ISN and adminster acounts on the site.\n\nThe following tasks can only be performed by site admins:\n- Create new signal types on the site\n- Register new signal type schemas\n- Transfer ISN ownership between accounts\n- Assign the site admin role to other users\n\n**This endpoint can only be used by site admin accounts**",
+                "tags": [
+                    "Site Admin"
+                ],
+                "summary": "Grant site admin role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
+                        "description": "account id",
+                        "name": "account_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "**This endpoint can only be used by site admin accounts**",
+                "tags": [
+                    "Site Admin"
+                ],
+                "summary": "Revoke site admin role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
+                        "description": "account id",
+                        "name": "account_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/admin/isn/{isn_slug}/transfer-ownership": {
             "put": {
                 "security": [
@@ -220,7 +294,7 @@ const docTemplate = `{
                         "RefreshTokenCookieAuth": []
                     }
                 ],
-                "description": "Transfer ownership of an ISN to another admin account.\nThis can be used when an admin leaves or when reorganizing responsibilities.\nOnly the site owner can transfer ISN ownership.",
+                "description": "Transfer ownership of an ISN to another admin account.\nThis can be used when an admin leaves or when reorganizing responsibilities.\nOnly site admins can transfer ISN ownership.",
                 "tags": [
                     "ISN Configuration"
                 ],
@@ -355,6 +429,315 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/admin/signal-types": {
+            "get": {
+                "description": "Get details for all the signal types defined on the ISN.\nThis endpoint can only be used by any account registered with the site",
+                "tags": [
+                    "Signal Type Definitions"
+                ],
+                "summary": "Get Signal Types",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handlers.SignalTypeDetail"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Signal types specify a record that can be shared over the ISN\n- Each type has a unique title and this is used to create a URL-friendly slug\n- The title and slug fields can't be changed and must be unique for the site\n- The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading\n\nSchema URL Requirements\n- Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)\n- To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json\n\nReadme URL requirements\n- Must be a link to a file ending .md on a public github repo.\n- Use the special URL: https://github.com/skip/readme/main/readme.md to indicate there is no readme\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas\n- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)\n\nAfter creating a signal type, use the AddSignalTypeToIsn endpoint to link it to an ISN.\n\nSignal type definitions are referred to like this: /api/signal-types/{signal_type_slug}/v{sem_ver}\n\nNote: this endpoint can only be used by site admins",
+                "tags": [
+                    "Signal Type Definitions"
+                ],
+                "summary": "Create signal type",
+                "parameters": [
+                    {
+                        "description": "signal type details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateSignalTypeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.NewSignalTypeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/signal-types/{signal_type_slug}/schemas": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "You must specify a schema_url that has not been previously registered for this signal type.\n\nUse the bump_type (major/minor/patch) parameter to determine how the version number should be incremented.\n\nNote: this endpoint can only be used by site admins",
+                "tags": [
+                    "Signal Type Definitions"
+                ],
+                "summary": "Registe a new schema for an existing signal type",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-signal--example-org",
+                        "description": "signal type slug",
+                        "name": "signal_type_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "signal type details",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.RegisterNewSignalTypeSchemaRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.NewSignalTypeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/signal-types/{signal_type_slug}/v{sem_ver}": {
+            "get": {
+                "description": "Returns the signal type details.\nThis endpoint can be used by anyone registered with the site",
+                "tags": [
+                    "Signal Type Definitions",
+                    "Signal Type Definitions"
+                ],
+                "summary": "Get Signal Type",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-signal--example-org",
+                        "description": "signal type slug",
+                        "name": "signal_type_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "0.0.1",
+                        "description": "version to be recieved",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.SignalTypeDetail"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "users can mark the signal type as *in use/not in use* and update the description or link to the readme file\nSignal types marked as 'not in use' are not returned in signal searches and can not receive new signals\n\nNote: this endpoint can only be used by site admins",
+                "tags": [
+                    "Signal Type Definitions"
+                ],
+                "summary": "Update signal type",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-signal--example-org",
+                        "description": "signal type slug",
+                        "name": "signal_type_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "0.0.1",
+                        "description": "Sem ver",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "signal type details to be updated",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdateSignalTypeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Only signal types that have never been referenced by signals can be deleted",
+                "tags": [
+                    "Signal Type Definitions"
+                ],
+                "summary": "Delete signal type",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-signal--example-org",
+                        "description": "signal type slug",
+                        "name": "signal_type_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "0.0.1",
+                        "description": "version to be deleted",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/admin/users": {
             "get": {
                 "security": [
@@ -362,7 +745,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "This api displays site users and their email addresses (can only be used by owner and admin accounts)\n\n- No query parameters = return all users\n- to return a specific user supply one of the following query parameters: ` + "`" + `?id=uuid` + "`" + ` or ` + "`" + `?email=address` + "`" + `",
+                "description": "This api displays site users and their email addresses (can only be used by admin accounts)\n\n- No query parameters = return all users\n- to return a specific user supply one of the following query parameters: ` + "`" + `?id=uuid` + "`" + ` or ` + "`" + `?email=address` + "`" + `",
                 "tags": [
                     "Site Admin"
                 ],
@@ -424,7 +807,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Allows admins or the site owner to generate a one-time password reset link for a user (use this endpoint when a user has forgotten their password)\n\nThe generated link can be used to reset the password of the associated account using the page rendered by the PasswordResetTokenPageHandler.\nThe generated link expires in 30 minutes and can only be used once.\n\nAdmins can create links on behalf of users with a member role.  The site owner role can create links for admins and members.\n\n**Note:** anyone in possession of the link can reset the password of the associated account. The link should be treated as sensitive and handled accordingly.",
+                "description": "Allows admins to generate a one-time password reset link for a user (use this endpoint when a user has forgotten their password)\n\nThe generated link can be used to reset the password of the associated account using the page rendered by the PasswordResetTokenPageHandler.\nThe generated link expires in 30 minutes and can only be used once.\n\nISN Admins can create links on behalf of users with a member role.  Accounts with the site admin role can create links for ISN admins and members.\n\n**Note:** anyone in possession of the link can reset the password of the associated account. The link should be treated as sensitive and handled accordingly.",
                 "tags": [
                     "Site Admin"
                 ],
@@ -561,7 +944,7 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "Endpoint to handle password requests received from the PasswordResetTokenPageHandler (do not call the endpoint directly)\nThe handler validates the token, updates the user password, and consumes the one-time-use token.\nAny user in possession of the token can use it to reset the password of the associated account\nOne time tokens can only be issued by admins or the site owner.",
+                "description": "Endpoint to handle password requests received from the PasswordResetTokenPageHandler (do not call the endpoint directly)\nThe handler validates the token, updates the user password, and consumes the one-time-use token.\nAny user in possession of the token can use it to reset the password of the associated account\nOne time tokens can only be issued by admins.",
                 "tags": [
                     "auth"
                 ],
@@ -654,7 +1037,7 @@ const docTemplate = `{
         },
         "/api/auth/register": {
             "post": {
-                "description": "The first user created is granted the \"owner\" role and has super-user access to the site.\n\nWeb users can register directly and default to standard member roles.\nNew members can't access any information beyond the public data on the site until an admin grants them access to an ISN.\n\nThe site owner can grant other users the admin role.\nAdmins can create ISNs and service accounts and grant other accounts permissions to read or write to ISNs they created.",
+                "description": "The first user created is granted the \"siteadmin\" role and has super-user access to the site.\n\nWeb users can register directly and default to standard member roles.\nNew members can't access any information beyond the public data on the site until an admin grants them access to an ISN.\n\nThe site owner can grant other users the admin role.\nAdmins can create ISNs and service accounts and grant other accounts permissions to read or write to ISNs they created.",
                 "tags": [
                     "auth"
                 ],
@@ -696,7 +1079,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Registring a new service account creates a one-time link with the client credentials in it - this must be used by the client within 48 hrs.\n\nNote that where an organization needs more than one service account they must supply unique contact emails for each account.\n\n\nTo reissue credentials for an existing service account, use the **Reissue Service Account Credentials** endpoint.\n\nYou have to be an admin or the site owner to use this endpoint\n",
+                "description": "Registring a new service account creates a one-time link with the client credentials in it - this must be used by the client within 48 hrs.\n\nNote that where an organization needs more than one service account they must supply unique contact emails for each account.\n\nTo reissue credentials for an existing service account, use the **Reissue Service Account Credentials** endpoint.\n\nYou have to be an admin to use this end point\n",
                 "tags": [
                     "Service Accounts"
                 ],
@@ -747,7 +1130,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Reissue credentials for an existing service account.\nThis creates a new one-time link with fresh client credentials - this must be used by the client within 48 hrs.\n\nThis endpoint revokes all existing client secrets and one-time setup URLs for the service account, then generates new credentials.\n\nThe client_id will remain the same, but a new client_secret will be generated.\n\nYou have to be an admin or the site owner to use this endpoint\n",
+                "description": "Reissue credentials for an existing service account.\nThis creates a new one-time link with fresh client credentials - this must be used by the client within 48 hrs.\n\nThis endpoint revokes all existing client secrets and one-time setup URLs for the service account, then generates new credentials.\n\nThe client_id will remain the same, but a new client_secret will be generated.\n\nYou have to be an site or ISN admin to use this endpoint\n",
                 "tags": [
                     "Service Accounts"
                 ],
@@ -911,7 +1294,7 @@ const docTemplate = `{
                         "RefreshTokenCookieAuth": []
                     }
                 ],
-                "description": "Create an Information Sharing Network (ISN)\n\nvisibility = \"private\" means that signalsd on the network can only be seen by network participants.\n\nISN admins automatically get write permission for their own ISNs.\nSite owners automatically get write permission on all ISNs.\n\nThis endpoint can only be used by the site owner or an admin\n\nNote there is a cache of public ISNs that is used by the search endpoints. This cache is not dynamically loaded, so adding public ISNs requires a restart of the service",
+                "description": "Create an Information Sharing Network (ISN)\n\nvisibility = \"private\" means that signalsd on the network can only be seen by network participants.\n\nThis endpoint can only be used by ISN admins and site admins\n\nNote there is a cache of public ISNs that is used by the search endpoints. This cache is not dynamically loaded, so adding public ISNs requires a restart of the service",
                 "tags": [
                     "ISN Configuration"
                 ],
@@ -993,7 +1376,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Update the ISN configuration\nThis endpoint can only be used by the site owner or the ISN admin",
+                "description": "Update the ISN configuration\nThis endpoint can only be used by admin accounts\nISN admins can only update ISNs they created\nSite admins can update any ISN",
                 "tags": [
                     "ISN Configuration"
                 ],
@@ -1108,7 +1491,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Update an account's access permission for an ISN. Set both can_read and can_write to false to revoke all access.\n\nThis endpoint can only be used by the site owner or the ISN admin account (ISN admins can only update permissions for ISNs they created).\n\n- Accounts with 'read' permission can view all signals on the ISN.\n- Accounts with 'write' permission can create signals on the ISN.\n- For accounts that need read/write access to an ISN, you must grant both 'read' and 'write' permissions.\n\nNote that accounts with 'write' permission to an ISN are also automatically granted 'read'\npermission for signals they created, but can't view other signals on the ISN.\n\nYou must supply values for both can_read and can_write.",
+                "description": "Update an account's access permission for an ISN. Set both can_read and can_write to false to revoke all access.\n\nThis endpoint can only be used by admin accounts:\n- ISN admins can only update permissions for ISNs they created).\n- Site admins can update permissions for any ISN\n\nPermissions:\n- Accounts with 'read' permission can view all signals on the ISN.\n- Accounts with 'write' permission can create signals on the ISN.\n- For accounts that need read/write access to an ISN, you must grant both 'read' and 'write' permissions.\n\nNote that accounts with 'write' permission to an ISN are also automatically granted 'read'\npermission for signals they created, but can't view other signals on the ISN.\n\nYou must supply values for both can_read and can_write.",
                 "tags": [
                     "ISN Permissions"
                 ],
@@ -1172,7 +1555,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "This endpoint is used create a new batch for an account on the specified ISN.\nBatches are used to track signals sent by an account to the specified ISN (accounts can only have one open batch at a time on an ISN)\n\nOpening a batch closes the previous batch (the client app can decide how long to keep a batch open)\n\nSignals can only be sent to open batches.\n\nAuthentication is based on the supplied access token:\nthe site owner, the isn admin and members with an isn_perm=write can create a batch for the ISN.\n\nNote: Batches are automatically created when accounts first write to an ISN,\nso you only need to explicitly create a batch using this endpoint if you want to track signals in separate batches.\n",
+                "description": "This endpoint is used create a new batch for an account on the specified ISN.\nBatches are used to track signals sent by an account to the specified ISN (accounts can only have one open batch at a time on an ISN)\n\nOpening a batch closes the previous batch (the client app can decide how long to keep a batch open)\n\nSignals can only be sent to open batches.\n\nAuthentication is based on the supplied access token:\nsite admins, the isn owner and members with an isn_perm=write can create a batch for the ISN.\n\nNote: Batches are automatically created when accounts first write to an ISN,\nso you only need to explicitly create a batch using this endpoint if you want to track signals in separate batches.\n",
                 "tags": [
                     "Signal Exchange"
                 ],
@@ -1187,151 +1570,18 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/isn/{isn_slug}/signal-types": {
-            "get": {
-                "description": "Get details for all the signal types defined on the ISN",
-                "tags": [
-                    "Signal Type Definitions"
-                ],
-                "summary": "Get Signal types",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "sample-isn--example-org",
-                        "description": "ISN slug",
-                        "name": "isn_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "boolean",
-                        "default": false,
-                        "description": "Include inactive signal types",
-                        "name": "include_inactive",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/handlers.SignalTypeDetail"
-                            }
-                        }
-                    }
-                }
-            },
+        "/api/isn/{isn_slug}/signal-types/add": {
             "post": {
                 "security": [
                     {
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Signal types specify a record that can be shared over the ISN\n- Each type has a unique title and this is used to create a URL-friendly slug\n- The title and slug fields can't be changed and it is not allowed to reuse a slug that was created by another account.\n- The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading\n\nSchema URL Requirements\n- Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)\n- To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json\n\nReadme URL requirements\n- Must be a link to a file ending .md on a public github repo.\n- Use the special URL: https://github.com/skip/readme/main/readme.md to indicate there is no readme\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas\n- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)\n\nTo register a new schema for an existing signal type, use the RegisterRegisterNewSignalTypeSchema endpoint\n\nSignal type definitions are referred to like this: /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver} (e.g., /api/isn/sample-isn--example-org/signal-types/sample-signal--example-org/v0.0.1)\n",
+                "description": "Link an existing signal type to an ISN\n\nNote: this endpoint can only be used by site admins and ISN admins.\nISN admins can only add signal types to ISNs they own.",
                 "tags": [
                     "Signal Type Definitions"
                 ],
-                "summary": "Create signal type",
-                "parameters": [
-                    {
-                        "description": "signal type details",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateSignalTypeRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.NewSignalTypeResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/isn/{isn_slug}/signal-types/{signal_type_slug}/schemas": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "You must specify a schema_url that has not been previously registered for this signal type.\n\nUse the bump_type (major/minor/patch) parameter to determine how the version number should be incremented.",
-                "tags": [
-                    "Signal Type Definitions"
-                ],
-                "summary": "Registe a new schema for an existing signal type",
-                "parameters": [
-                    {
-                        "description": "signal type details",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/handlers.RegisterNewSignalTypeSchemaRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.NewSignalTypeResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "Forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}": {
-            "get": {
-                "description": "Returns details about the signal type",
-                "tags": [
-                    "Signal Type Definitions",
-                    "Signal Type Definitions"
-                ],
-                "summary": "Get signal type",
+                "summary": "Add signal type to an ISN",
                 "parameters": [
                     {
                         "type": "string",
@@ -1342,92 +1592,12 @@ const docTemplate = `{
                         "required": true
                     },
                     {
-                        "type": "string",
-                        "example": "sample-signal--example-org",
-                        "description": "signal type slug",
-                        "name": "signal_type_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "example": "0.0.1",
-                        "description": "version to be recieved",
-                        "name": "sem_ver",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.SignalTypeDetail"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            },
-            "put": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "users can mark the signal type as *in use/not in use* and update the description or link to the readme file\nSignal types marked as 'not in use' are not returned in signal searches and can not receive new signals",
-                "tags": [
-                    "Signal Type Definitions"
-                ],
-                "summary": "Update signal type",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "sample-isn--example-org",
-                        "description": "ISN slug",
-                        "name": "isn_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "example": "sample-signal--example-org",
-                        "description": "signal type slug",
-                        "name": "signal_type_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "example": "0.0.1",
-                        "description": "Sem ver",
-                        "name": "sem_ver",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "signal type details to be updated",
+                        "description": "signal type details",
                         "name": "request",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.UpdateSignalTypeRequest"
+                            "$ref": "#/definitions/handlers.AddSignalTypeToIsnRequest"
                         }
                     }
                 ],
@@ -1460,18 +1630,20 @@ const docTemplate = `{
                         }
                     }
                 }
-            },
-            "delete": {
+            }
+        },
+        "/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}": {
+            "put": {
                 "security": [
                     {
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Only signal types that have never been referenced by signals can be deleted",
+                "description": "Enable or disable a signal type for a specific ISN\n\nWhen a signal type is disabled for an ISN, signals of this type can no longer be read or written to the ISN.\n\nNote: this endpoint can only be used by site admins and ISN admins.\nISN admins can only update signal types for ISNs they own.",
                 "tags": [
                     "Signal Type Definitions"
                 ],
-                "summary": "Delete signal type",
+                "summary": "Update ISN signal type status",
                 "parameters": [
                     {
                         "type": "string",
@@ -1492,10 +1664,19 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "example": "0.0.1",
-                        "description": "version to be deleted",
+                        "description": "Sem ver",
                         "name": "sem_ver",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "description": "status update request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdateSignalTypeRequest"
+                        }
                     }
                 ],
                 "responses": {
@@ -1508,20 +1689,20 @@ const docTemplate = `{
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -2203,14 +2384,17 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "access_token": {
+                    "description": "AccessToken is a JWT access token containing claims about the account and its permissions (see Claims struct)",
                     "type": "string",
                     "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxzZCIsInN1YiI6ImMxMjQ1Yjc0LTMyMTQtNDUzOS04YTgyLTY2NDNkMzllNjk5YiIsImV4cCI6MTc0ODU4ODE2MiwiaWF0IjoxNzQ4NTg2MzYyLCJhY2NvdW50X2lkIjoiYzEyNDViNzQtMzIxNC00NTM5LThhODItNjY0M2QzOWU2OTliIiwiYWNjb3VudF90eXBlIjoidXNlciIsInJvbGUiOiJvd25lciIsImlzbl9wZXJtcyI6eyJzYW1wbGUtaXNuLS1leGFtcGxlLW9yZyI6eyJwZXJtaXNzaW9uIjoid3JpdGUiLCJzaWduYWxfdHlwZXMiOlsic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4xIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4yIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4zIiwic2FtcGxlLXNpZ25hbG5ldy0tZXhhbXBsZS1vcmcvdjAuMC4xIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC40Il19LCJzYW1wbGUtaXNuLS1zYXVsLW9yZyI6eyJwZXJtaXNzaW9uIjoid3JpdGUiLCJzaWduYWxfdHlwZXMiOlsic2FtcGxlLXNpZ25hbC0tc2F1bC1vcmcvdjAuMC4xIl19fX0.33ANor7XHWkB87npB4RWsJUjBnJHdYZce-lT8w_IN_s"
                 },
                 "account_id": {
+                    "description": "AccountID is the account id of the user making the request",
                     "type": "string",
                     "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3"
                 },
                 "account_type": {
+                    "description": "AccountType is the account type of the user making the request (user or service_account)",
                     "type": "string",
                     "enum": [
                         "user",
@@ -2218,26 +2402,29 @@ const docTemplate = `{
                     ]
                 },
                 "expires_in": {
-                    "description": "seconds",
+                    "description": "ExpiresIn is the token expiry in seconds",
                     "type": "integer",
                     "example": 1800
                 },
                 "isn_perms": {
+                    "description": "IsnPerms is a map of the ISNs the account has access to and the permissions granted (the map key is the isn_slug)",
                     "type": "object",
                     "additionalProperties": {
                         "$ref": "#/definitions/auth.IsnPerms"
                     }
                 },
                 "role": {
+                    "description": "Role is the role of the user making the request (siteadmin, isnadmin, member)",
                     "type": "string",
                     "enum": [
-                        "owner",
-                        "admin",
+                        "siteadmin",
+                        "isnadmin",
                         "member"
                     ],
-                    "example": "admin"
+                    "example": "isnadmin"
                 },
                 "token_type": {
+                    "description": "TokenType (Bearer) - used as a prompt for the client to use the Bearer token type when making requests",
                     "type": "string",
                     "example": "Bearer"
                 }
@@ -2246,42 +2433,96 @@ const docTemplate = `{
         "auth.IsnPerms": {
             "type": "object",
             "properties": {
+                "can_administer": {
+                    "description": "CanAdminister is true if the account is the owner of the isn or a site admin",
+                    "type": "boolean",
+                    "example": false
+                },
                 "can_read": {
+                    "description": "CanRead is true if the account has read access to the isn",
                     "type": "boolean",
                     "example": true
                 },
                 "can_write": {
+                    "description": "CanWrite is true if the account has write access to the isn",
                     "type": "boolean",
                     "example": false
                 },
-                "isn_admin": {
-                    "description": "true if the account is the owner of the isn or the site owner",
+                "in_use": {
+                    "description": "InUse is true if the isn is active",
                     "type": "boolean",
-                    "example": false
+                    "example": true
                 },
                 "signal_batch_id": {
+                    "description": "SignalBatchID is the ID of the current signal batch for the ISN (used for tracking signals when writing to the isn)",
                     "type": "string",
                     "example": "967affe9-5628-4fdd-921f-020051344a12"
                 },
                 "signal_types": {
-                    "description": "list of available signal types for the isn",
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "signal-type-1/v0.0.1",
-                        "signal-type-2/v1.0.0"
-                    ]
+                    "description": "SignalTypes is a map of the signal type paths to the signal type details (key is the signal type path)",
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/auth.SignalType"
+                    }
                 },
                 "visibility": {
-                    "description": "ISN visibility setting",
+                    "description": "Visibility is the ISN visibility setting (public or private)",
                     "type": "string",
                     "enum": [
                         "public",
                         "private"
                     ],
                     "example": "private"
+                }
+            }
+        },
+        "auth.SignalType": {
+            "type": "object",
+            "properties": {
+                "in_use": {
+                    "description": "InUse is true if the signal type is active",
+                    "type": "boolean",
+                    "example": true
+                },
+                "path": {
+                    "description": "Path is the signal type path in the format \"slug/v{version}\"\nThis is the key used in the SignalTypes map in IsnPerms",
+                    "type": "string",
+                    "example": "sample-signal--example-org/v0.0.1"
+                },
+                "readme_url": {
+                    "description": "ReadmeURL is the URL of the signal type readme",
+                    "type": "string",
+                    "example": "https://github.com/user/project/blob/2025.01.01/readme.md"
+                },
+                "schema_url": {
+                    "description": "SchemaURL is the URL of the signal type schema",
+                    "type": "string",
+                    "example": "https://github.com/user/project/blob/2025.01.01/schema.json"
+                },
+                "sem_ver": {
+                    "description": "SemVer is the signal type version (e.g. 0.0.1)",
+                    "type": "string",
+                    "example": "0.0.1"
+                },
+                "slug": {
+                    "description": "Slug is the signal type slug (unique per site)",
+                    "type": "string",
+                    "example": "sample-signal--example-org"
+                }
+            }
+        },
+        "handlers.AddSignalTypeToIsnRequest": {
+            "type": "object",
+            "properties": {
+                "sem_ver": {
+                    "description": "signal type version",
+                    "type": "string",
+                    "example": "0.0.1"
+                },
+                "signal_type_slug": {
+                    "description": "signal type slug",
+                    "type": "string",
+                    "example": "sample-signal--example-org"
                 }
             }
         },
@@ -2682,11 +2923,11 @@ const docTemplate = `{
                 "account_role": {
                     "type": "string",
                     "enum": [
-                        "owner",
-                        "admin",
+                        "siteadmin",
+                        "isnadmin",
                         "member"
                     ],
-                    "example": "admin"
+                    "example": "isnadmin"
                 },
                 "account_type": {
                     "type": "string",
@@ -2835,11 +3076,6 @@ const docTemplate = `{
                     "description": "JSON schema URL: must be a GitHub URL ending in .json, OR use https://github.com/skip/validation/main/schema.json to disable validation",
                     "type": "string",
                     "example": "https://github.com/user/project/blob/2025.01.01/schema.json"
-                },
-                "slug": {
-                    "description": "unique title",
-                    "type": "string",
-                    "example": "sample_signal_@example.org"
                 }
             }
         },
@@ -3112,10 +3348,6 @@ const docTemplate = `{
                     "type": "string",
                     "example": "67890684-3b14-42cf-b785-df28ce570400"
                 },
-                "is_in_use": {
-                    "type": "boolean",
-                    "example": true
-                },
                 "readme_url": {
                     "type": "string",
                     "example": "https://github.com/user/project/blob/2025.01.01/readme.md"
@@ -3278,11 +3510,11 @@ const docTemplate = `{
                 "user_role": {
                     "type": "string",
                     "enum": [
-                        "owner",
-                        "admin",
+                        "siteadmin",
+                        "isnadmin",
                         "member"
                     ],
-                    "example": "admin"
+                    "example": "isnadmin"
                 }
             }
         },
@@ -3344,11 +3576,11 @@ const docTemplate = `{
             "name": "auth"
         },
         {
-            "description": "Site adminstration tools. These endpoints can only be used by the site owner or an admin.",
+            "description": "Site adminstration tools. These endpoints can only be used by the accounts that have a siteadmin or isnadmin role",
             "name": "Site Admin"
         },
         {
-            "description": "Create and manage Information Sharing Networks (ISNs) - these endpoints can only be used by the site owner or an admin. Note that ISN admins can only view or update details for ISNs they created.",
+            "description": "Create and manage Information Sharing Networks (ISNs) - these endpoints can only be used by the accounts that have a siteadmin or isnadmin role Note that ISN admins can only view or update details for ISNs they created.",
             "name": "ISN Configuration"
         },
         {

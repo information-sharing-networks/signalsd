@@ -20,7 +20,7 @@ The integration tests are designed to ensure that signal data is handled correct
 These tests verify the authentication and authorization system by running database queries directly and inspecting generated tokens.
 
 - ✅ JWT token structure and claims validation
-- ✅ Role-based permissions (owner, admin, member)
+- ✅ Role-based permissions (siteadmin, isnadmin, member)
 - ✅ Explicit permission grants and ISN access control
 - ✅ Service account batch handling and client credentials
 - ✅ Login flows and refresh token rotation

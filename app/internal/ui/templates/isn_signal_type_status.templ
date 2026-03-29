@@ -2,28 +2,30 @@ package templates
 
 import "github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 
-// SignalTypeStatusPage renders the admin signal type enable/disable page
-templ SignalTypeStatusPage(environment string, isns []types.IsnOption) {
-	@BaseLayout("Signal Type Status Management") {
+// IsnSignalTypeStatusPage renders the ISN-level signal type enable/disable page
+templ IsnSignalTypeStatusPage(environment string, isns []types.IsnOption) {
+	@BaseLayout("ISN Signal Type Status Management") {
 		@Navigation(environment)
 		<div class="page-container">
-			<h1 class="page-title">Signal Type Status Management</h1>
+			<h1 class="page-title">ISN Signal Type Status Management</h1>
 			<div class="card">
 				<div class="card-body">
 					<p class="card-description text-muted">
-						Enable or disable signal types. Disabled signal types cannot receive new signals and are not returned in signal searches.
+						Enable or disable signal types for a specific Information Sharing Network. 
 					</p>
 					@NoticeAlert() {
-						Disabling a signal type will prevent new signals from being submitted to it. Existing signals will remain archived but inaccessible.
+						Disabling a signal type for this ISN prevents new signals of this type from being submitted to the ISN.
+				
+						Existing signals will remain archived but inaccessible. The signal type remains enabled for other ISNs.
 					}
 
 					<form
-						hx-put="/ui-api/signal-types/status"
+						hx-put="/ui-api/isn-signal-types/status"
 						hx-target="#status-result"
 						hx-swap="innerHTML"
 						class="margin-top-4">
 
-						@SignalTypeSelectorFields(isns, true)
+						@SignalTypeSelectorFieldsWithISN(isns, true)
 
 						<div class="form-group">
 							<label for="action" class="form-label">Action</label>
@@ -41,7 +43,7 @@ templ SignalTypeStatusPage(environment string, isns []types.IsnOption) {
 
 						<div class="form-group">
 							<button type="submit" class="btn btn-primary">
-								Update Signal Type Status
+								Update Status
 							</button>
 						</div>
 					</form>
