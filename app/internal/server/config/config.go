@@ -63,10 +63,11 @@ const (
 	// CORS settings
 	CORSMaxAgeInSeconds = 86400 // 24 hours
 
-	// Signal Type file validation
-	SkipValidationURL = "https://github.com/skip/validation/main/schema.json" // URL used to indicate JSON schema validation should be skipped
-	SkipReadmeURL     = "https://github.com/skip/readme/main/readme.md"       // URL used to indicate there is no readme for the signal type
+	// SkipValidationURL is used to indicate schema validation should be skipped
+	SkipValidationURL = "https://github.com/skip/validation/main/schema.json"
 
+	// SkipReadmeURL is used to indicate there is no readme for the signal type
+	SkipReadmeURL = "https://github.com/skip/readme/main/readme.md"
 )
 
 // common maps - used to validate enum values

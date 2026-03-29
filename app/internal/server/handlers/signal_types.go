@@ -714,14 +714,23 @@ func (s *SignalTypeHandler) GetSignalTypeHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
+	schemaURL := dbSignalType.SchemaURL
+	if schemaURL == signalsd.SkipValidationURL {
+		schemaURL = ""
+	}
+	readmeURL := dbSignalType.ReadmeURL
+	if readmeURL == signalsd.SkipReadmeURL {
+		readmeURL = ""
+	}
+
 	// Convert database structs to our response structs
 	signalType := SignalTypeDetail{
 		ID:        dbSignalType.ID,
 		CreatedAt: dbSignalType.CreatedAt,
 		UpdatedAt: dbSignalType.UpdatedAt,
 		Slug:      dbSignalType.Slug,
-		SchemaURL: dbSignalType.SchemaURL,
-		ReadmeURL: dbSignalType.ReadmeURL,
+		SchemaURL: schemaURL,
+		ReadmeURL: readmeURL,
 		Title:     dbSignalType.Title,
 		Detail:    dbSignalType.Detail,
 		SemVer:    dbSignalType.SemVer,
@@ -757,13 +766,22 @@ func (s *SignalTypeHandler) GetSignalTypesHandler(w http.ResponseWriter, r *http
 
 	signalTypes := make([]SignalTypeDetail, len(dbSignalTypes))
 	for i, dbSignalType := range dbSignalTypes {
+
+		schemaURL := dbSignalType.SchemaURL
+		if schemaURL == signalsd.SkipValidationURL {
+			schemaURL = ""
+		}
+		readmeURL := dbSignalType.ReadmeURL
+		if readmeURL == signalsd.SkipReadmeURL {
+			readmeURL = ""
+		}
 		signalTypes[i] = SignalTypeDetail{
 			ID:        dbSignalType.ID,
 			CreatedAt: dbSignalType.CreatedAt,
 			UpdatedAt: dbSignalType.UpdatedAt,
 			Slug:      dbSignalType.Slug,
-			SchemaURL: dbSignalType.SchemaURL,
-			ReadmeURL: dbSignalType.ReadmeURL,
+			SchemaURL: schemaURL,
+			ReadmeURL: readmeURL,
 			Title:     dbSignalType.Title,
 			Detail:    dbSignalType.Detail,
 			SemVer:    dbSignalType.SemVer,

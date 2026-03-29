@@ -150,6 +150,7 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 				r.Get("/admin/signal-types/create", handlerService.CreateSignalTypePage)
 				r.Get("/admin/signal-types/register-new-schema", handlerService.RegisterNewSignalTypeSchemaPage)
 				r.Get("/admin/signal-types/add", handlerService.AddSignalTypeToIsnPage)
+				r.Get("/admin/signal-types/config", handlerService.SignalTypesConfigPage)
 				r.Post("/ui-api/signal-types/create", handlerService.CreateSignalType)
 				r.Put("/ui-api/signal-types/register-new-schema", handlerService.RegisterNewSignalTypeSchema)
 				r.Post("/ui-api/signal-types/add", handlerService.AddSignalTypeToIsn)

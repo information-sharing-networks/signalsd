@@ -396,6 +396,33 @@ func (h *HandlerService) AdminIsnSignalTypeStatus(w http.ResponseWriter, r *http
 	}
 }
 
+// SignalTypesConfigPage renders a read-only config report of all registered signal types
+func (h *HandlerService) SignalTypesConfigPage(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
+	if !ok {
+		reqLogger.Error("failed to read accessTokenDetails from context")
+		return
+	}
+
+	// Fetch all signal types for the report
+	signalTypes, err := h.ApiClient.GetSignalTypes(accessTokenDetails.AccessToken, false)
+	if err != nil {
+		reqLogger.Error("Failed to get signal types", slog.String("error", err.Error()))
+		component := templates.ErrorAlert("Failed to load signal types. Please try again.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	component := templates.SignalTypesConfigPage(h.Environment, signalTypes)
+	if err := component.Render(r.Context(), w); err != nil {
+		reqLogger.Error("Failed to render signal types config page", slog.String("error", err.Error()))
+	}
+}
+
 func (h *HandlerService) ToggleSkipValidation(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
