@@ -204,6 +204,86 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/admin/accounts/{account_id}/site-admin-role": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "This endpoint grants the site admin role to a user.\n\nA site admin can create and manage any ISN and adminster acounts on the site.\n\nThe following tasks can only be performed by site admins:\n- Create new signal types on the site\n- Register new signal type schemas\n- Transfer ISN ownership between accounts\n- Assign the site admin role to other users\n\n**This endpoint can only be used by site admin accounts**",
+                "tags": [
+                    "Site Admin"
+                ],
+                "summary": "Grant site admin role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
+                        "description": "account id",
+                        "name": "account_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "**This endpoint can only be used by site admin accounts**",
+                "tags": [
+                    "Site Admin"
+                ],
+                "summary": "Revoke site admin role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3",
+                        "description": "account id",
+                        "name": "account_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/admin/isn/{isn_slug}/transfer-ownership": {
             "put": {
                 "security": [

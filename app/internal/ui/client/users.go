@@ -113,7 +113,7 @@ func (c *Client) GrantAdminRole(accessToken, userEmail string) error {
 	return nil
 }
 
-// RevokeAdminRole revokes admin role from a user account
+// RevokeAdminRole revokes ISN admin role from a user account
 func (c *Client) RevokeAdminRole(accessToken, userEmail string) error {
 	user, err := c.LookupUserByEmail(accessToken, userEmail)
 	if err != nil {
@@ -125,6 +125,64 @@ func (c *Client) RevokeAdminRole(accessToken, userEmail string) error {
 	httpReq, err := http.NewRequest("DELETE", url, nil)
 	if err != nil {
 		return NewClientInternalError(err, "creating revoke admin role request")
+	}
+
+	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+
+	res, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return NewClientConnectionError(err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusNoContent {
+		return NewClientApiError(res)
+	}
+
+	return nil
+}
+
+// GrantSiteAdminRole grants site admin role to a user account
+func (c *Client) GrantSiteAdminRole(accessToken, userEmail string) error {
+	user, err := c.LookupUserByEmail(accessToken, userEmail)
+	if err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf("%s/api/admin/accounts/%s/site-admin-role", c.baseURL, user.AccountID)
+
+	httpReq, err := http.NewRequest("PUT", url, nil)
+	if err != nil {
+		return NewClientInternalError(err, "creating grant site admin role request")
+	}
+
+	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+
+	res, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return NewClientConnectionError(err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusNoContent {
+		return NewClientApiError(res)
+	}
+
+	return nil
+}
+
+// RevokeSiteAdminRole revokes site admin role from a user account
+func (c *Client) RevokeSiteAdminRole(accessToken, userEmail string) error {
+	user, err := c.LookupUserByEmail(accessToken, userEmail)
+	if err != nil {
+		return err
+	}
+
+	url := fmt.Sprintf("%s/api/admin/accounts/%s/site-admin-role", c.baseURL, user.AccountID)
+
+	httpReq, err := http.NewRequest("DELETE", url, nil)
+	if err != nil {
+		return NewClientInternalError(err, "creating revoke site admin role request")
 	}
 
 	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))

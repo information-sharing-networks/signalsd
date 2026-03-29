@@ -2,34 +2,34 @@ package templates
 
 import "github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 
-// AdminRoleManagementPage renders the admin role management page
-templ AdminRoleManagementPage(environment string, users []types.UserOption) {
-	@BaseLayout("Admin Role Management") {
+// IsnAdminRoleManagementPage renders the admin role management page
+templ IsnAdminRoleManagementPage(environment string, users []types.UserOption) {
+	@BaseLayout("ISN Admin Role Management") {
 		@Navigation(environment)
 		<div class="page-container">
-			<h1 class="page-title">Admin Role Management</h1>
+			<h1 class="page-title">ISN Admin Role Management</h1>
 			<div class="card">
 				<div class="card-body">
 					<p class="card-description text-muted">
-						Grant or revoke admin roles for user accounts. 
+						Grant or revoke ISN admin roles for user accounts. 
 					</p>
 					@NoticeAlert() {
-						Granting the admin role will give the user access to:
+						Granting the ISN admin role will give the user access to:
                         <ul>
                             <li>Create an ISN</li>
-                            <li>Define the Signal Types used in the ISN</li>
-                            <li>read/write to their own ISNs</li>   
+                            <li>Add signal types to their own ISNs</li>
+                            <li>Read/write to their own ISNs</li>   
                             <li>Grant other accounts read or write access to their ISNs</li>
                             <li>Manage service accounts</li>
                             <li>Disable/Enable accounts</li>
                             <li>View all users and their email addresses</li>
                             <li>Reset user passwords</li>
                         </ul>
-                        Note that admins can't change ISNs they don't own (a site admin must use the <em>transfer ownership</em> feature if this is requred)
+                        Note that ISN admins can't change ISNs they don't own (a site admin must use the <em>transfer ownership</em> feature if this is requred)
 					}
 					
 					<form 
-						hx-put="/ui-api/admin/accounts/admin-role"
+						hx-put="/ui-api/admin/accounts/isn-admin-role"
 						hx-target="#role-result"
 						hx-swap="innerHTML"
 						class="margin-top-4">
@@ -70,7 +70,7 @@ templ AdminRoleManagementPage(environment string, users []types.UserOption) {
 						
 						<div class="form-group">
 							<button type="submit" class="btn btn-primary">
-								Update Admin Role
+								Update Role
 							</button>
 						</div>
 					</form>

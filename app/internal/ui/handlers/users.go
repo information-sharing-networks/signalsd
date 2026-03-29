@@ -170,8 +170,8 @@ func (h *HandlerService) GeneratePasswordResetLink(w http.ResponseWriter, r *htt
 	}
 }
 
-// AdminRoleManagementPage renders the admin role management page
-func (h *HandlerService) AdminRoleManagementPage(w http.ResponseWriter, r *http.Request) {
+// IsnAdminRoleManagementPage renders the isn admin role management page
+func (h *HandlerService) IsnAdminRoleManagementPage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
@@ -191,10 +191,10 @@ func (h *HandlerService) AdminRoleManagementPage(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Render admin role management page
-	component := templates.AdminRoleManagementPage(h.Environment, users)
+	// Render isn admin role management page
+	component := templates.IsnAdminRoleManagementPage(h.Environment, users)
 	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render admin role management page", slog.String("error", err.Error()))
+		reqLogger.Error("Failed to render isn admin role management page", slog.String("error", err.Error()))
 	}
 }
 
@@ -347,7 +347,35 @@ func (h *HandlerService) AdminAccountStatus(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-// AdminRoleManagement handles the form submission to grant or revoke admin roles
+// SiteAdminRoleManagementPage renders the site admin role management page
+func (h *HandlerService) SiteAdminRoleManagementPage(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
+	if !ok {
+		reqLogger.Error("failed to read accessTokenDetails from context")
+		return
+	}
+
+	// Fetch users for dropdown
+	users, err := h.ApiClient.GetUserOptionsList(accessTokenDetails.AccessToken)
+	if err != nil {
+		reqLogger.Error("Failed to get users list", slog.String("error", err.Error()))
+		component := templates.ErrorAlert("Failed to load users. Please try again.")
+		if renderErr := component.Render(r.Context(), w); renderErr != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", renderErr.Error()))
+		}
+		return
+	}
+
+	// Render site admin role management page
+	component := templates.SiteAdminRoleManagementPage(h.Environment, users)
+	if err := component.Render(r.Context(), w); err != nil {
+		reqLogger.Error("Failed to render site admin role management page", slog.String("error", err.Error()))
+	}
+}
+
+// AdminRoleManagement handles the form submission to grant or revoke ISN admin roles
 func (h *HandlerService) AdminRoleManagement(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
@@ -394,6 +422,69 @@ func (h *HandlerService) AdminRoleManagement(w http.ResponseWriter, r *http.Requ
 
 	if err != nil {
 		reqLogger.Error("Failed to update admin role", slog.String("error", err.Error()), slog.String("action", action), slog.String("user_email", userEmail))
+
+		var msg string
+		if ce, ok := err.(*client.ClientError); ok {
+			msg = ce.UserError()
+		} else {
+			msg = "An error occurred. Please try again."
+		}
+
+		component := templates.ErrorAlert(msg)
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	// Success response
+	component := templates.SuccessAlert(successMsg)
+	if err := component.Render(r.Context(), w); err != nil {
+		reqLogger.Error("Failed to render success alert", slog.String("error", err.Error()))
+	}
+}
+
+// SiteAdminRoleManagement handles the form submission to grant or revoke site admin roles
+func (h *HandlerService) SiteAdminRoleManagement(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	// Parse form data
+	userEmail := r.FormValue("user-email")
+	action := r.FormValue("action")
+
+	// Validate required fields
+	if userEmail == "" || action == "" {
+		component := templates.ErrorAlert("Please fill in all fields.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
+	if !ok {
+		reqLogger.Error("failed to read accessTokenDetails from context")
+		component := templates.ErrorAlert("An error occurred. Please try again.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+
+	// Call the appropriate API method
+	var err error
+	var successMsg string
+
+	if action == "grant" {
+		err = h.ApiClient.GrantSiteAdminRole(accessTokenDetails.AccessToken, userEmail)
+		successMsg = "Site admin role granted successfully to " + userEmail
+	} else {
+		err = h.ApiClient.RevokeSiteAdminRole(accessTokenDetails.AccessToken, userEmail)
+		successMsg = "Site admin role revoked successfully from " + userEmail
+	}
+
+	if err != nil {
+		reqLogger.Error("Failed to update site admin role", slog.String("error", err.Error()), slog.String("action", action), slog.String("user_email", userEmail))
 
 		var msg string
 		if ce, ok := err.(*client.ClientError); ok {

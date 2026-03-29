@@ -1130,6 +1130,68 @@ paths:
       summary: Grant ISN admin role
       tags:
       - Site Admin
+  /api/admin/accounts/{account_id}/site-admin-role:
+    delete:
+      description: '**This endpoint can only be used by site admin accounts**'
+      parameters:
+      - description: account id
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+        in: path
+        name: account_id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Revoke site admin role
+      tags:
+      - Site Admin
+    put:
+      description: |-
+        This endpoint grants the site admin role to a user.
+
+        A site admin can create and manage any ISN and adminster acounts on the site.
+
+        The following tasks can only be performed by site admins:
+        - Create new signal types on the site
+        - Register new signal type schemas
+        - Transfer ISN ownership between accounts
+        - Assign the site admin role to other users
+
+        **This endpoint can only be used by site admin accounts**
+      parameters:
+      - description: account id
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+        in: path
+        name: account_id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Grant site admin role
+      tags:
+      - Site Admin
   /api/admin/isn/{isn_slug}/transfer-ownership:
     put:
       description: |-

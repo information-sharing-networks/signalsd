@@ -39,11 +39,18 @@ WHERE
     account_id = $1;
 
 
--- name: UpdateUserAccountToMember :execrows 
-UPDATE users 
-SET 
+-- name: UpdateUserAccountToMember :execrows
+UPDATE users
+SET
     user_role = 'member'
-WHERE 
+WHERE
+    account_id = $1;
+
+-- name: UpdateUserAccountToSiteAdmin :execrows
+UPDATE users
+SET
+    user_role = 'siteadmin'
+WHERE
     account_id = $1;
 
 -- name: ExistsUserWithEmail :one

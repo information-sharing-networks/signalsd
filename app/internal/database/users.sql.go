@@ -244,15 +244,31 @@ func (q *Queries) UpdateUserAccountToIsnAdmin(ctx context.Context, accountID uui
 }
 
 const UpdateUserAccountToMember = `-- name: UpdateUserAccountToMember :execrows
-UPDATE users 
-SET 
+UPDATE users
+SET
     user_role = 'member'
-WHERE 
+WHERE
     account_id = $1
 `
 
 func (q *Queries) UpdateUserAccountToMember(ctx context.Context, accountID uuid.UUID) (int64, error) {
 	result, err := q.db.Exec(ctx, UpdateUserAccountToMember, accountID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const UpdateUserAccountToSiteAdmin = `-- name: UpdateUserAccountToSiteAdmin :execrows
+UPDATE users
+SET
+    user_role = 'siteadmin'
+WHERE
+    account_id = $1
+`
+
+func (q *Queries) UpdateUserAccountToSiteAdmin(ctx context.Context, accountID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, UpdateUserAccountToSiteAdmin, accountID)
 	if err != nil {
 		return 0, err
 	}

@@ -170,8 +170,12 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 				r.Put("/ui-api/isn/transfer-ownership", handlerService.TransferOwnership)
 
 				// ISN Admin role management
-				r.Get("/admin/accounts/isn-admin-role", handlerService.AdminRoleManagementPage)
+				r.Get("/admin/accounts/isn-admin-role", handlerService.IsnAdminRoleManagementPage)
 				r.Put("/ui-api/admin/accounts/isn-admin-role", handlerService.AdminRoleManagement)
+
+				// Site Admin role management
+				r.Get("/admin/accounts/site-admin-role", handlerService.SiteAdminRoleManagementPage)
+				r.Put("/ui-api/admin/accounts/site-admin-role", handlerService.SiteAdminRoleManagement)
 			})
 		})
 	})

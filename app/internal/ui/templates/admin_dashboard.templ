@@ -14,10 +14,13 @@ templ AdminDashboardPage(environment string) {
 				<div class="card">
 					<div class="card-body">
 						<h3 class="card-title"> Site access controls</h3>
-						<p class="card-description text-muted">Site-wide account management.</p>
-						<a href="/admin/accounts/status" class="btn btn-primary">Enable/Disable Accounts</a>
-						<a href="/admin/isn/transfer-ownership" class="btn btn-primary">Transfer ISN Ownership</a>
-						<a href="/admin/accounts/admin-role" class="btn btn-primary">Manage Admin Roles</a>
+						<p class="card-description text-muted">Site-wide account and role management.</p>
+						<div class="buttons grid grid-cols-1 md:grid-cols-2 gap-4" >
+							<a href="/admin/accounts/status" class="btn btn-primary">Enable/Disable Accounts</a>
+							<a href="/admin/accounts/site-admin-role" class="btn btn-primary">Manage Site Admin Roles</a>
+							<a href="/admin/accounts/isn-admin-role" class="btn btn-primary">Manage ISN Admin Roles</a>
+							<a href="/admin/isn/transfer-ownership" class="btn btn-primary">Transfer ISN Ownership</a>
+						</div>
 					</div>
 				</div>
 
@@ -26,11 +29,13 @@ templ AdminDashboardPage(environment string) {
 					<div class="card-body">
 						<h3 class="card-title">ISN Configuration</h3>
 						<p class="card-description text-muted">Manage Information Sharing Networks.</p>
-						<a href="/admin/isn/create" class="btn btn-primary">Create an ISN</a>
-						<a href="/admin/isn/accounts/update" class="btn btn-primary">Manage ISN Access</a>
-						<a href="/admin/isn/status" class="btn btn-primary">Enable/Disable ISNs</a>
-						<a href="/admin/signal-types/add" class="btn btn-primary">Add Signal Types</a>
-						<a href="/admin/signal-types/isn-status" class="btn btn-primary">Enable/Disable Signal Type</a>
+						<div class="buttons grid grid-cols-1 md:grid-cols-2 gap-4" >
+							<a href="/admin/isn/create" class="btn btn-primary">Create an ISN</a>
+							<a href="/admin/isn/accounts/update" class="btn btn-primary">Manage ISN Access</a>
+							<a href="/admin/isn/status" class="btn btn-primary">Enable/Disable ISNs</a>
+							<a href="/admin/signal-types/add" class="btn btn-primary">Add Signal Types</a>
+							<a href="/admin/signal-types/isn-status" class="btn btn-primary">Enable/Disable Signal Type</a>
+						</div>
 					</div>
 				</div>
 

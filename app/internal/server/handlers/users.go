@@ -369,7 +369,7 @@ func (u *UserHandler) GrantUserIsnAdminRoleHandler(w http.ResponseWriter, r *htt
 	}
 
 	if targetAccount.AccountType != "user" {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "this end point should not be used for service accounts")
+		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "Service accounts can't be granted admin rights")
 		return
 	}
 
@@ -452,7 +452,7 @@ func (u *UserHandler) RevokeUserIsnAdminRoleHandler(w http.ResponseWriter, r *ht
 	}
 
 	if targetAccount.AccountType != "user" {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "this end point should not be used for service accounts")
+		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "Service accounts can't be granted admin rights")
 		return
 	}
 
@@ -472,6 +472,185 @@ func (u *UserHandler) RevokeUserIsnAdminRoleHandler(w http.ResponseWriter, r *ht
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
+	logger.ContextWithLogAttrs(r.Context(),
+		slog.String("target_account_id", targetAccountID.String()),
+	)
+
+	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
+}
+
+// GrantUserSiteAdminRoleHandler godocs
+//
+//	@Summary		Grant site admin role
+//	@Tags			Site Admin
+//
+//	@Description	This endpoint grants the site admin role to a user.
+//	@Description
+//	@Description	A site admin can create and manage any ISN and adminster acounts on the site.
+//	@Description
+//	@Description	The following tasks can only be performed by site admins:
+//	@Description	- Create new signal types on the site
+//	@Description	- Register new signal type schemas
+//	@Description	- Transfer ISN ownership between accounts
+//	@Description	- Assign the site admin role to other users
+//	@Description
+//	@Description	**This endpoint can only be used by site admin accounts**
+//
+//	@Param			account_id	path	string	true	"account id"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
+//
+//	@Success		204
+//	@Failure		400	{object}	responses.ErrorResponse
+//	@Failure		403	{object}	responses.ErrorResponse
+//
+//	@Security		BearerAccessToken
+//
+//	@Router			/api/admin/accounts/{account_id}/site-admin-role [put]
+//
+//	this handler must use the RequireRole (siteadmin) middleware
+func (u *UserHandler) GrantUserSiteAdminRoleHandler(w http.ResponseWriter, r *http.Request) {
+
+	// get user account id for user making request
+	userAccountID, ok := auth.ContextAccountID(r.Context())
+	if !ok {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
+		return
+	}
+
+	// get target account
+	targetAccountIDString := r.PathValue("account_id")
+	targetAccountID, err := uuid.Parse(targetAccountIDString)
+	if err != nil {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "invalid account ID format")
+		return
+	}
+
+	targetAccount, err := u.queries.GetAccountByID(r.Context(), targetAccountID)
+	if err != nil {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("target_account_id", targetAccountID.String()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+		return
+	}
+
+	// prevent accounts trying to update their own role
+	if userAccountID == targetAccountID {
+		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "accounts are not permitted to change their own role")
+		return
+	}
+
+	if targetAccount.AccountType != "user" {
+		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "this end point should not be used by service accounts")
+		return
+	}
+
+	if targetAccount.AccountRole == "siteadmin" {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "this account is already a site admin")
+		return
+	}
+
+	//update user role
+	rowsUpdated, err := u.queries.UpdateUserAccountToSiteAdmin(r.Context(), targetAccountID)
+	if err != nil || rowsUpdated == 0 {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("target_account_id", targetAccountID.String()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+		return
+	}
+	logger.ContextWithLogAttrs(r.Context(),
+		slog.String("target_account_id", targetAccountID.String()),
+	)
+
+	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
+}
+
+// RevokeUserSiteAdminRoleHandler godocs
+//
+//	@Summary		Revoke site admin role
+//	@Tags			Site Admin
+//
+//	@Description	**This endpoint can only be used by site admin accounts**
+//
+//	@Param			account_id	path	string	true	"account id"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
+//
+//	@Success		204
+//	@Failure		400	{object}	responses.ErrorResponse
+//	@Failure		403	{object}	responses.ErrorResponse
+//
+//	@Security		BearerAccessToken
+//
+//	@Router			/api/admin/accounts/{account_id}/site-admin-role [delete]
+//
+//	this handler must use the RequireRole (siteadmin) middleware
+func (u *UserHandler) RevokeUserSiteAdminRoleHandler(w http.ResponseWriter, r *http.Request) {
+
+	// get user account id for user making request
+	userAccountID, ok := auth.ContextAccountID(r.Context())
+	if !ok {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
+		return
+	}
+
+	// get target account
+	targetAccountIDString := r.PathValue("account_id")
+	targetAccountID, err := uuid.Parse(targetAccountIDString)
+	if err != nil {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "invalid account ID format")
+		return
+	}
+
+	targetAccount, err := u.queries.GetAccountByID(r.Context(), targetAccountID)
+	if err != nil {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("target_account_id", targetAccountID.String()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+		return
+	}
+
+	// prevent site admins trying to revoke their own role
+	if userAccountID == targetAccountID {
+		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "site admin accounts are not permitted to change their own role")
+		return
+	}
+
+	if targetAccount.AccountType != "user" {
+		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "Service accounts can't be granted admin rights")
+		return
+	}
+
+	if targetAccount.AccountRole != "siteadmin" {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "this account is not a site admin")
+		return
+	}
+
+	//update user role to member
+	rowsUpdated, err := u.queries.UpdateUserAccountToMember(r.Context(), targetAccountID)
+	if err != nil || rowsUpdated == 0 {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("target_account_id", targetAccountID.String()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+		return
+	}
+
 	logger.ContextWithLogAttrs(r.Context(),
 		slog.String("target_account_id", targetAccountID.String()),
 	)

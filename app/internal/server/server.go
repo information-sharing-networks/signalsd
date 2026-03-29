@@ -317,9 +317,13 @@ func (s *Server) registerAdminRoutes() {
 				r.Use(s.authService.RequireValidAccessToken)
 				r.Use(s.authService.RequireRole("siteadmin"))
 
-				// Admin role management
+				// ISN admin role management
 				r.Put("/accounts/{account_id}/isn-admin-role", users.GrantUserIsnAdminRoleHandler)
 				r.Delete("/accounts/{account_id}/isn-admin-role", users.RevokeUserIsnAdminRoleHandler)
+
+				// Site admin role management
+				r.Put("/accounts/{account_id}/site-admin-role", users.GrantUserSiteAdminRoleHandler)
+				r.Delete("/accounts/{account_id}/site-admin-role", users.RevokeUserSiteAdminRoleHandler)
 
 				// ISN ownership transfer
 				r.Put("/isn/{isn_slug}/transfer-ownership", isn.TransferIsnOwnershipHandler)
