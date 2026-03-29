@@ -143,12 +143,12 @@ func TestServiceAccountRegistration(t *testing.T) {
 	t.Log("Creating test data...")
 
 	// Create test accounts with different roles
-	ownerAccount := createTestAccount(t, ctx, testEnv.queries, "owner", "user", "owner@test.com")
-	adminAccount := createTestAccount(t, ctx, testEnv.queries, "admin", "user", "admin@test.com")
+	siteAdminAccount := createTestAccount(t, ctx, testEnv.queries, "siteadmin", "user", "siteadmin@test.com")
+	adminAccount := createTestAccount(t, ctx, testEnv.queries, "isnadmin", "user", "admin@test.com")
 	memberAccount := createTestAccount(t, ctx, testEnv.queries, "member", "user", "member@test.com")
 
 	// Get access tokens
-	ownerToken := getAccessToken(t, testEnv.authService, ownerAccount.ID)
+	ownerToken := getAccessToken(t, testEnv.authService, siteAdminAccount.ID)
 	adminToken := getAccessToken(t, testEnv.authService, adminAccount.ID)
 	memberToken := getAccessToken(t, testEnv.authService, memberAccount.ID)
 
@@ -161,7 +161,7 @@ func TestServiceAccountRegistration(t *testing.T) {
 		}{
 			{
 				name:           "owner_can_register",
-				requestBody:    serviceAccountDetails{"Owner Organization", "owner@example.com"},
+				requestBody:    serviceAccountDetails{"SiteAdmin Organization", "siteadmin@example.com"},
 				token:          ownerToken,
 				expectedStatus: http.StatusCreated,
 			},
@@ -253,19 +253,19 @@ func TestServiceAccountRegistration(t *testing.T) {
 		}{
 			{
 				name:           "cannot_register_duplicate_email/org",
-				requestBody:    serviceAccountDetails{"Owner Organization", "owner@example.com"},
+				requestBody:    serviceAccountDetails{"SiteAdmin Organization", "siteadmin@example.com"},
 				token:          ownerToken,
 				expectedStatus: http.StatusConflict,
 			},
 			{
 				name:           "cannot_register_duplicate_email/email_mixed_case",
-				requestBody:    serviceAccountDetails{"Owner Organization", "Owner@example.com"},
+				requestBody:    serviceAccountDetails{"SiteAdmin Organization", "SiteAdmin@example.com"},
 				token:          ownerToken,
 				expectedStatus: http.StatusConflict,
 			},
 			{
 				name:           "cannot_register_duplicate_email/org_case_insensitive",
-				requestBody:    serviceAccountDetails{"OWNER ORGANIZATION", "owner@example.com"},
+				requestBody:    serviceAccountDetails{"SITEADMIN ORGANIZATION", "siteadmin@example.com"},
 				token:          ownerToken,
 				expectedStatus: http.StatusConflict,
 			},
@@ -291,25 +291,25 @@ func TestServiceAccountRegistration(t *testing.T) {
 		}{
 			{
 				name:           "missing organization",
-				requestBody:    serviceAccountDetails{Email: "owner@example.com"},
+				requestBody:    serviceAccountDetails{Email: "siteadmin@example.com"},
 				token:          ownerToken,
 				expectedStatus: http.StatusBadRequest,
 			},
 			{
 				name:           "missing email",
-				requestBody:    serviceAccountDetails{Organization: "Owner Organization"},
+				requestBody:    serviceAccountDetails{Organization: "SiteAdmin Organization"},
 				token:          ownerToken,
 				expectedStatus: http.StatusBadRequest,
 			},
 			{
 				name:           "empty organization",
-				requestBody:    serviceAccountDetails{Email: "owner@example.com", Organization: ""},
+				requestBody:    serviceAccountDetails{Email: "siteadmin@example.com", Organization: ""},
 				token:          ownerToken,
 				expectedStatus: http.StatusBadRequest,
 			},
 			{
 				name:           "empty email",
-				requestBody:    serviceAccountDetails{Email: "", Organization: "Owner Organization"},
+				requestBody:    serviceAccountDetails{Email: "", Organization: "SiteAdmin Organization"},
 				token:          ownerToken,
 				expectedStatus: http.StatusBadRequest,
 			},
@@ -351,12 +351,12 @@ func TestServiceAccountReissue(t *testing.T) {
 	t.Log("Creating test data...")
 
 	// Create test accounts with different roles
-	ownerAccount := createTestAccount(t, ctx, testEnv.queries, "owner", "user", "owner@test.com")
-	adminAccount := createTestAccount(t, ctx, testEnv.queries, "admin", "user", "admin@test.com")
+	siteAdminAccount := createTestAccount(t, ctx, testEnv.queries, "siteadmin", "user", "siteadmin@test.com")
+	adminAccount := createTestAccount(t, ctx, testEnv.queries, "isnadmin", "user", "admin@test.com")
 	memberAccount := createTestAccount(t, ctx, testEnv.queries, "member", "user", "member@test.com")
 
 	// Get access tokens
-	ownerToken := getAccessToken(t, testEnv.authService, ownerAccount.ID)
+	ownerToken := getAccessToken(t, testEnv.authService, siteAdminAccount.ID)
 	adminToken := getAccessToken(t, testEnv.authService, adminAccount.ID)
 	memberToken := getAccessToken(t, testEnv.authService, memberAccount.ID)
 
@@ -509,8 +509,8 @@ func TestUserLogin(t *testing.T) {
 	adminPassword := "adminpassword123"
 	memberPassword := "memberpassword123"
 
-	ownerAccount := createTestUserWithPassword(t, ctx, testEnv.queries, testEnv.authService, "owner", "owner@login.test", ownerPassword)
-	adminAccount := createTestUserWithPassword(t, ctx, testEnv.queries, testEnv.authService, "admin", "admin@login.test", adminPassword)
+	siteAdminAccount := createTestUserWithPassword(t, ctx, testEnv.queries, testEnv.authService, "siteadmin", "siteadmin@login.test", ownerPassword)
+	adminAccount := createTestUserWithPassword(t, ctx, testEnv.queries, testEnv.authService, "isnadmin", "admin@login.test", adminPassword)
 	memberAccount := createTestUserWithPassword(t, ctx, testEnv.queries, testEnv.authService, "member", "member@login.test", memberPassword)
 
 	t.Run("successful login tests", func(t *testing.T) {
@@ -523,16 +523,16 @@ func TestUserLogin(t *testing.T) {
 		}{
 			{
 				name:            "owner_can_login",
-				requestBody:     loginDetails{"owner@login.test", ownerPassword},
+				requestBody:     loginDetails{"siteadmin@login.test", ownerPassword},
 				expectedStatus:  http.StatusOK,
-				expectedRole:    "owner",
-				expectedAccount: ownerAccount.ID,
+				expectedRole:    "siteadmin",
+				expectedAccount: siteAdminAccount.ID,
 			},
 			{
 				name:            "admin_can_login",
 				requestBody:     loginDetails{"admin@login.test", adminPassword},
 				expectedStatus:  http.StatusOK,
-				expectedRole:    "admin",
+				expectedRole:    "isnadmin",
 				expectedAccount: adminAccount.ID,
 			},
 			{
@@ -643,7 +643,7 @@ func TestUserLogin(t *testing.T) {
 		}{
 			{
 				name:           "wrong_password",
-				requestBody:    loginDetails{"owner@login.test", "wrongpassword"},
+				requestBody:    loginDetails{"siteadmin@login.test", "wrongpassword"},
 				expectedStatus: http.StatusUnauthorized,
 			},
 			{
@@ -653,7 +653,7 @@ func TestUserLogin(t *testing.T) {
 			},
 			{
 				name:           "case_insensitive_email_match",
-				requestBody:    loginDetails{"Owner@login.test", ownerPassword}, // Should work - emails are case insensitive
+				requestBody:    loginDetails{"SiteAdmin@login.test", ownerPassword}, // Should work - emails are case insensitive
 				expectedStatus: http.StatusOK,
 			},
 		}
@@ -697,7 +697,7 @@ func TestUserLogin(t *testing.T) {
 			},
 			{
 				name:           "missing_password",
-				requestBody:    loginDetails{Email: "owner@login.test"},
+				requestBody:    loginDetails{Email: "siteadmin@login.test"},
 				expectedStatus: http.StatusUnauthorized,
 			},
 			{
@@ -707,7 +707,7 @@ func TestUserLogin(t *testing.T) {
 			},
 			{
 				name:           "empty_password",
-				requestBody:    loginDetails{Email: "owner@login.test", Password: ""},
+				requestBody:    loginDetails{Email: "siteadmin@login.test", Password: ""},
 				expectedStatus: http.StatusUnauthorized,
 			},
 		}
@@ -792,9 +792,9 @@ func TestUserRegistration(t *testing.T) {
 		}{
 			{
 				name:           "first_user_becomes_owner",
-				requestBody:    userDetails{"owner@register.test", "validpassword123"},
+				requestBody:    userDetails{"siteadmin@register.test", "validpassword123"},
 				expectedStatus: http.StatusCreated,
-				expectedRole:   "owner",
+				expectedRole:   "siteadmin",
 				isFirstUser:    true,
 			},
 			{
@@ -1048,7 +1048,7 @@ func TestPasswordResetFlow(t *testing.T) {
 	defer testEnv.shutdown()
 
 	// Create test accounts
-	adminAccount := createTestAccount(t, ctx, testEnv.queries, "admin", "user", "admin@example.com")
+	adminAccount := createTestAccount(t, ctx, testEnv.queries, "isnadmin", "user", "admin@example.com")
 	userAccount := createTestAccount(t, ctx, testEnv.queries, "member", "user", "user@example.com")
 
 	t.Run("non admin cannot generate reset link", func(t *testing.T) {

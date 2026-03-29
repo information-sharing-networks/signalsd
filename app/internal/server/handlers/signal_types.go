@@ -76,6 +76,7 @@ type SignalTypeDetail struct {
 // CreateSignalTypeHandler godoc
 //
 //	@Summary		Create signal type
+//
 //	@Description	Signal types specify a record that can be shared over the ISN
 //	@Description	- Each type has a unique title and this is used to create a URL-friendly slug
 //	@Description	- The title and slug fields can't be changed and must be unique for the site
@@ -97,6 +98,7 @@ type SignalTypeDetail struct {
 //	@Description
 //	@Description	Signal type definitions are referred to like this: /api/signal-types/{signal_type_slug}/v{sem_ver}
 //	@Description
+//	@Description	Note: this endpoint can only be used by site admins
 //
 //	@Tags		Signal Type Definitions
 //
@@ -109,9 +111,9 @@ type SignalTypeDetail struct {
 //
 //	@Security	BearerAccessToken
 //
-//	@Router		/api/signal-types [post]
+//	@Router		/api/admin/signal-types [post]
 //
-// Should only be used with RequireValidAccessToken middleware
+// Should only be used with RequireRole (siteadmin) middleware
 func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *http.Request) {
 	var req CreateSignalTypeRequest
 	var slug string
@@ -278,6 +280,8 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 //	@Description	You must specify a schema_url that has not been previously registered for this signal type.
 //	@Description
 //	@Description	Use the bump_type (major/minor/patch) parameter to determine how the version number should be incremented.
+//	@Description
+//	@Description	Note: this endpoint can only be used by site admins
 //
 //	@Tags			Signal Type Definitions
 //
@@ -291,10 +295,9 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/api/signal-types/{signal_type_slug}/schemas [post]
+//	@Router			/api/admin/signal-types/{signal_type_slug}/schemas [post]
 //
-// todo	- add site-admin role
-// Should only be used with RequiresRole (admin,owner) middleware
+// Should only be used with RequiresRole (siteadmin) middleware
 func (s *SignalTypeHandler) RegisterNewSignalTypeSchemaHandler(w http.ResponseWriter, r *http.Request) {
 
 	slug := r.PathValue("signal_type_slug")
@@ -303,20 +306,6 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchemaHandler(w http.ResponseWr
 
 	var semVer string
 
-	// TODO - new site-admin role needed here
-	// check if user is either the ISN owner
-	claims, ok := auth.ContextClaims(r.Context())
-	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
-		return
-	}
-
-	isSiteOwner := claims.Role == "owner"
-
-	if !isSiteOwner {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you must be either the ISN owner or a site owner to create signal types")
-		return
-	}
 	defer r.Body.Close()
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -481,6 +470,8 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchemaHandler(w http.ResponseWr
 //	@Summary		Update signal type
 //	@Description	users can mark the signal type as *in use/not in use* and update the description or link to the readme file
 //	@Description	Signal types marked as 'not in use' are not returned in signal searches and can not receive new signals
+//	@Description
+//	@Description	Note: this endpoint can only be used by site admins
 //
 //	@Param			signal_type_slug	path	string								true	"signal type slug"	example(sample-signal--example-org)
 //	@Param			sem_ver				path	string								true	"Sem ver"			example(0.0.1)
@@ -496,7 +487,9 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchemaHandler(w http.ResponseWr
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/api/signal-types/{signal_type_slug}/v{sem_ver} [put]
+//	@Router			/api/admin/signal-types/{signal_type_slug}/v{sem_ver} [put]
+//
+// Should only be used with RequiresRole (siteadmin) middleware
 func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *http.Request) {
 
 	var req = UpdateSignalTypeRequest{}
@@ -520,21 +513,6 @@ func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *ht
 		)
 
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
-	}
-
-	// check if user is either the ISN owner or a site owner
-	claims, ok := auth.ContextClaims(r.Context())
-	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
-		return
-	}
-
-	// TODO - new site-admin role needed here
-	isSiteOwner := claims.Role == "owner"
-
-	if !isSiteOwner {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you must be either the ISN owner or a site owner to update signal types")
 		return
 	}
 
@@ -611,105 +589,6 @@ func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *ht
 	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
 }
 
-// GetSignalTypeHandler godoc
-//
-//	@Summary		Get Signal Type
-//	@Description	Returns details about the signal type
-//	@Tags			Signal Type Definitions
-//
-//	@Param			signal_type_slug	path	string	true	"signal type slug"			example(sample-signal--example-org)
-//	@Param			sem_ver				path	string	true	"version to be recieved"	example(0.0.1)
-//
-//	@Tags			Signal Type Definitions
-//
-//	@Success		200	{object}	handlers.SignalTypeDetail
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		404	{object}	responses.ErrorResponse
-//	@Failure		500	{object}	responses.ErrorResponse
-//
-//	@Router			/api/signal-types/{signal_type_slug}/v{sem_ver} [get]
-func (s *SignalTypeHandler) GetSignalTypeHandler(w http.ResponseWriter, r *http.Request) {
-
-	signalTypeSlug := r.PathValue("signal_type_slug")
-	semVer := r.PathValue("sem_ver")
-
-	// check signal def exists
-	dbSignalType, err := s.queries.GetSignalTypeBySlugAndVersion(r.Context(), database.GetSignalTypeBySlugAndVersionParams{
-		Slug:   signalTypeSlug,
-		SemVer: semVer,
-	})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No signal type found for %s/v%s", signalTypeSlug, semVer))
-			return
-		}
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-			slog.String("signal_type_slug", signalTypeSlug),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
-	}
-
-	// Convert database structs to our response structs
-	signalType := SignalTypeDetail{
-		ID:        dbSignalType.ID,
-		CreatedAt: dbSignalType.CreatedAt,
-		UpdatedAt: dbSignalType.UpdatedAt,
-		Slug:      dbSignalType.Slug,
-		SchemaURL: dbSignalType.SchemaURL,
-		ReadmeURL: dbSignalType.ReadmeURL,
-		Title:     dbSignalType.Title,
-		Detail:    dbSignalType.Detail,
-		SemVer:    dbSignalType.SemVer,
-	}
-	responses.RespondWithJSON(w, http.StatusOK, signalType)
-}
-
-// GetSignalTypesHandler godoc
-//
-//	@Summary		Get Signal Types
-//	@Description	Get details for all the signal types defined on the ISN
-//
-//	@Tags			Signal Type Definitions
-//
-//	@Success		200	{array}	handlers.SignalTypeDetail
-//
-//	@Router			/api/signal-types [get]
-func (s *SignalTypeHandler) GetSignalTypesHandler(w http.ResponseWriter, r *http.Request) {
-
-	var dbSignalTypes []database.SignalType
-	var err error
-
-	dbSignalTypes, err = s.queries.GetSignalTypes(r.Context())
-	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
-	}
-
-	signalTypes := make([]SignalTypeDetail, len(dbSignalTypes))
-	for i, dbSignalType := range dbSignalTypes {
-		signalTypes[i] = SignalTypeDetail{
-			ID:        dbSignalType.ID,
-			CreatedAt: dbSignalType.CreatedAt,
-			UpdatedAt: dbSignalType.UpdatedAt,
-			Slug:      dbSignalType.Slug,
-			SchemaURL: dbSignalType.SchemaURL,
-			ReadmeURL: dbSignalType.ReadmeURL,
-			Title:     dbSignalType.Title,
-			Detail:    dbSignalType.Detail,
-			SemVer:    dbSignalType.SemVer,
-		}
-	}
-
-	responses.RespondWithJSON(w, http.StatusOK, signalTypes)
-}
-
 // DeleteSignalTypeHandler godoc
 //
 //	@Summary		Delete signal type
@@ -728,26 +607,13 @@ func (s *SignalTypeHandler) GetSignalTypesHandler(w http.ResponseWriter, r *http
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/api/signal-types/{signal_type_slug}/v{sem_ver} [delete]
+//	@Router			/api/admin/signal-types/{signal_type_slug}/v{sem_ver} [delete]
+//
+// Should only be used with RequireRole (siteadmin) middleware
 func (s *SignalTypeHandler) DeleteSignalTypeHandler(w http.ResponseWriter, r *http.Request) {
 
 	signalTypeSlug := r.PathValue("signal_type_slug")
 	semVer := r.PathValue("sem_ver")
-
-	// check if user is either the ISN owner or a site owner
-	claims, ok := auth.ContextClaims(r.Context())
-	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
-		return
-	}
-
-	// TODO - new site-admin role needed here
-	isSiteOwner := claims.Role == "owner"
-
-	if !isSiteOwner {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you must be either the ISN owner or a site owner to delete signal types")
-		return
-	}
 
 	// check signal type exists
 	signalType, err := s.queries.GetSignalTypeBySlugAndVersion(r.Context(), database.GetSignalTypeBySlugAndVersionParams{
@@ -805,10 +671,115 @@ func (s *SignalTypeHandler) DeleteSignalTypeHandler(w http.ResponseWriter, r *ht
 	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
 }
 
+// GetSignalTypeHandler godoc
+//
+//	@Summary		Get Signal Type
+//	@Description	Returns the signal type details.
+//	@Description	This endpoint can be used by anyone registered with the site
+//
+//	@Tags			Signal Type Definitions
+//
+//	@Param			signal_type_slug	path	string	true	"signal type slug"			example(sample-signal--example-org)
+//	@Param			sem_ver				path	string	true	"version to be recieved"	example(0.0.1)
+//
+//	@Tags			Signal Type Definitions
+//
+//	@Success		200	{object}	handlers.SignalTypeDetail
+//	@Failure		400	{object}	responses.ErrorResponse
+//	@Failure		404	{object}	responses.ErrorResponse
+//	@Failure		500	{object}	responses.ErrorResponse
+//
+//	@Router			/api/admin/signal-types/{signal_type_slug}/v{sem_ver} [get]
+func (s *SignalTypeHandler) GetSignalTypeHandler(w http.ResponseWriter, r *http.Request) {
+
+	signalTypeSlug := r.PathValue("signal_type_slug")
+	semVer := r.PathValue("sem_ver")
+
+	// check signal def exists
+	dbSignalType, err := s.queries.GetSignalTypeBySlugAndVersion(r.Context(), database.GetSignalTypeBySlugAndVersionParams{
+		Slug:   signalTypeSlug,
+		SemVer: semVer,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No signal type found for %s/v%s", signalTypeSlug, semVer))
+			return
+		}
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+			slog.String("signal_type_slug", signalTypeSlug),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+		return
+	}
+
+	// Convert database structs to our response structs
+	signalType := SignalTypeDetail{
+		ID:        dbSignalType.ID,
+		CreatedAt: dbSignalType.CreatedAt,
+		UpdatedAt: dbSignalType.UpdatedAt,
+		Slug:      dbSignalType.Slug,
+		SchemaURL: dbSignalType.SchemaURL,
+		ReadmeURL: dbSignalType.ReadmeURL,
+		Title:     dbSignalType.Title,
+		Detail:    dbSignalType.Detail,
+		SemVer:    dbSignalType.SemVer,
+	}
+	responses.RespondWithJSON(w, http.StatusOK, signalType)
+}
+
+// GetSignalTypesHandler godoc
+//
+//	@Summary		Get Signal Types
+//	@Description	Get details for all the signal types defined on the ISN.
+//	@Description	This endpoint can only be used by any account registered with the site
+//
+//	@Tags			Signal Type Definitions
+//
+//	@Success		200	{array}	handlers.SignalTypeDetail
+//
+//	@Router			/api/admin/signal-types [get]
+func (s *SignalTypeHandler) GetSignalTypesHandler(w http.ResponseWriter, r *http.Request) {
+
+	var dbSignalTypes []database.SignalType
+	var err error
+
+	dbSignalTypes, err = s.queries.GetSignalTypes(r.Context())
+	if err != nil {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+		return
+	}
+
+	signalTypes := make([]SignalTypeDetail, len(dbSignalTypes))
+	for i, dbSignalType := range dbSignalTypes {
+		signalTypes[i] = SignalTypeDetail{
+			ID:        dbSignalType.ID,
+			CreatedAt: dbSignalType.CreatedAt,
+			UpdatedAt: dbSignalType.UpdatedAt,
+			Slug:      dbSignalType.Slug,
+			SchemaURL: dbSignalType.SchemaURL,
+			ReadmeURL: dbSignalType.ReadmeURL,
+			Title:     dbSignalType.Title,
+			Detail:    dbSignalType.Detail,
+			SemVer:    dbSignalType.SemVer,
+		}
+	}
+
+	responses.RespondWithJSON(w, http.StatusOK, signalTypes)
+}
+
 // AddSignalTypeToISNHandler godoc
 //
 //	@Summary		Add signal type to an ISN
 //	@Description	Link an existing signal type to an ISN
+//	@Description
+//	@Description	Note: this endpoint can only be used by site admins and ISN admins.
+//	@Description	ISN admins can only add signal types to ISNs they own.
 //
 //	@Tags			Signal Type Definitions
 //
@@ -825,9 +796,10 @@ func (s *SignalTypeHandler) DeleteSignalTypeHandler(w http.ResponseWriter, r *ht
 //
 //	@Router			/api/isn/{isn_slug}/signal-types/add [post]
 //
-// Should only be used with RequireValidAccessToken middleware
+// Should only be used with RequireRole (siteadmin, isnadmin) middleware
 func (s *SignalTypeHandler) AddSignalTypeToISNHandler(w http.ResponseWriter, r *http.Request) {
 	var req AddSignalTypeToIsnRequest
+
 	defer r.Body.Close()
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -861,6 +833,23 @@ func (s *SignalTypeHandler) AddSignalTypeToISNHandler(w http.ResponseWriter, r *
 		return
 	}
 
+	// If the requester is an ISN admin, they must own this ISN.
+	claims, ok := auth.ContextClaims(r.Context())
+	if !ok {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
+		return
+	}
+
+	userAccountID, ok := auth.ContextAccountID(r.Context())
+	if !ok {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
+		return
+	}
+
+	if claims.Role == "isnadmin" && isn.UserAccountID != userAccountID {
+		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you must be the ISN owner to add signal types")
+		return
+	}
 	// Get signal type by slug and version (globally)
 	signalType, err := s.queries.GetSignalTypeBySlugAndVersion(r.Context(), database.GetSignalTypeBySlugAndVersionParams{
 		Slug:   req.SignalTypeSlug,
@@ -902,6 +891,11 @@ func (s *SignalTypeHandler) AddSignalTypeToISNHandler(w http.ResponseWriter, r *
 //
 //	@Summary		Update ISN signal type status
 //	@Description	Enable or disable a signal type for a specific ISN
+//	@Description
+//	@Description	When a signal type is disabled for an ISN, signals of this type can no longer be read or written to the ISN.
+//	@Description
+//	@Description	Note: this endpoint can only be used by site admins and ISN admins.
+//	@Description	ISN admins can only update signal types for ISNs they own.
 //
 //	@Param			isn_slug			path	string								true	"ISN slug"			example(sample-isn--example-org)
 //	@Param			signal_type_slug	path	string								true	"signal type slug"	example(sample-signal--example-org)
@@ -919,6 +913,8 @@ func (s *SignalTypeHandler) AddSignalTypeToISNHandler(w http.ResponseWriter, r *
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver} [put]
+//
+// Should only be used with RequireRole (isnadmin,siteadmin) middleware
 func (s *SignalTypeHandler) UpdateIsnSignalTypeStatusHandler(w http.ResponseWriter, r *http.Request) {
 	var req = UpdateSignalTypeRequest{}
 
@@ -941,6 +937,24 @@ func (s *SignalTypeHandler) UpdateIsnSignalTypeStatusHandler(w http.ResponseWrit
 		return
 	}
 
+	// If the requester is an ISN admin, they must own this ISN.
+	claims, ok := auth.ContextClaims(r.Context())
+	if !ok {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
+		return
+	}
+
+	userAccountID, ok := auth.ContextAccountID(r.Context())
+	if !ok {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
+		return
+	}
+
+	if claims.Role == "isnadmin" && isn.UserAccountID != userAccountID {
+		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you must be the ISN owner to update signal types")
+		return
+	}
+
 	// Get signal type by slug and version
 	signalType, err := s.queries.GetSignalTypeBySlugAndVersion(r.Context(), database.GetSignalTypeBySlugAndVersionParams{
 		Slug:   signalTypeSlug,
@@ -957,21 +971,6 @@ func (s *SignalTypeHandler) UpdateIsnSignalTypeStatusHandler(w http.ResponseWrit
 			slog.String("sem_ver", semVer),
 		)
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
-	}
-
-	// Check claims
-	claims, ok := auth.ContextClaims(r.Context())
-	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
-		return
-	}
-
-	// TODO - new site-admin role needed here
-	isSiteOwner := claims.Role == "owner"
-
-	if !isSiteOwner {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you must be either the ISN owner or a site owner to update signal types")
 		return
 	}
 

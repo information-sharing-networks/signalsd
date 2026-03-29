@@ -91,7 +91,7 @@ func (c *Client) GrantAdminRole(accessToken, userEmail string) error {
 		return err
 	}
 
-	url := fmt.Sprintf("%s/api/admin/accounts/%s/admin-role", c.baseURL, user.AccountID)
+	url := fmt.Sprintf("%s/api/admin/accounts/%s/isn-admin-role", c.baseURL, user.AccountID)
 
 	httpReq, err := http.NewRequest("PUT", url, nil)
 	if err != nil {
@@ -120,7 +120,7 @@ func (c *Client) RevokeAdminRole(accessToken, userEmail string) error {
 		return err
 	}
 
-	url := fmt.Sprintf("%s/api/admin/accounts/%s/admin-role", c.baseURL, user.AccountID)
+	url := fmt.Sprintf("%s/api/admin/accounts/%s/isn-admin-role", c.baseURL, user.AccountID)
 
 	httpReq, err := http.NewRequest("DELETE", url, nil)
 	if err != nil {

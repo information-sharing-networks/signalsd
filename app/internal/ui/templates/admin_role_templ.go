@@ -64,7 +64,7 @@ func AdminRoleManagementPage(environment string, users []types.UserOption) templ
 					}()
 				}
 				ctx = templ.InitializeContext(ctx)
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "Granting the admin role will give the user access to:<ul><li>Create an ISN</li><li>Define the Signal Types used in the ISN</li><li>read/write to their own ISNs</li><li>Grant other accounts read or write access to their ISNs</li><li>Manage service accounts</li><li>Disable/Enable accounts</li><li>View all users and their email addresses</li><li>Reset user passwords</li></ul>Note that admins can't change ISNs they don't own (the site owner must use the <em>transfer ownership</em> feature if this is requred)")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "Granting the admin role will give the user access to:<ul><li>Create an ISN</li><li>Define the Signal Types used in the ISN</li><li>read/write to their own ISNs</li><li>Grant other accounts read or write access to their ISNs</li><li>Manage service accounts</li><li>Disable/Enable accounts</li><li>View all users and their email addresses</li><li>Reset user passwords</li></ul>Note that admins can't change ISNs they don't own (a site admin must use the <em>transfer ownership</em> feature if this is requred)")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

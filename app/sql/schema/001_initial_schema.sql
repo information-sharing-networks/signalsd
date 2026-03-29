@@ -15,7 +15,7 @@ CREATE TABLE accounts (
 );
 
 -- users: human users of the system
--- the first user registered is automatically granted the site-admin role
+-- the first user registered is automatically granted the siteadmin role
 CREATE TABLE users (
     account_id UUID PRIMARY KEY,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -23,7 +23,7 @@ CREATE TABLE users (
     email TEXT NOT NULL,
     hashed_password TEXT NOT NULL,
     user_role TEXT NOT NULL,
-    CONSTRAINT user_role_check CHECK (user_role IN ('owner', 'admin', 'member')),
+    CONSTRAINT user_role_check CHECK (user_role IN ('siteadmin', 'isnadmin', 'member')),
     CONSTRAINT fk_user_account FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
 );
 
@@ -97,7 +97,7 @@ CREATE INDEX idx_password_reset_tokens_expires_at ON password_reset_tokens (expi
 -- Signal types
 -- -------------------------------------------------------------------------
 
--- signal_types: globally defined signal schemas (managed by site-admin)
+-- signal_types: globally defined signal schemas (managed by siteadmin)
 CREATE TABLE signal_types (
     id UUID PRIMARY KEY,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,

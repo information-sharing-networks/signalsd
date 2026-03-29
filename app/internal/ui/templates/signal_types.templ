@@ -155,15 +155,15 @@ templ RegisterNewSignalTypeSchemaPageWithOptions(environment string, signalTypes
 // AddSignalTypeToIsnPage renders the page to associate a signal type with an ISN
 // Uses cascading dropdowns: ISN → Signal Type → Version
 templ AddSignalTypeToIsnPage(environment string, isns []types.IsnOption) {
-	@BaseLayout("Associate Signal Type with ISN") {
+	@BaseLayout("Add Signal Type with ISN") {
 		@Navigation(environment)
 		<div class="page-container">
-			<h1 class="page-title">Associate Signal Type with ISN</h1>
+			<h1 class="page-title">Add Signal Type with ISN</h1>
 			<div class="card">
 				<div class="card-body">
 					<p class="card-description text-muted">Link an existing signal type to an Information Sharing Network by selecting the ISN, signal type, and version.</p>
 					<form
-						hx-post="/ui-api/signal-types/associate"
+						hx-post="/ui-api/signal-types/add"
 						hx-target="#associate-result"
 						hx-swap="innerHTML"
 						class="margin-top-4"
@@ -227,7 +227,7 @@ templ AddSignalTypeToIsnPage(environment string, isns []types.IsnOption) {
 						</div>
 						<div class="form-group" id="associate-result"></div>
 						<div class="form-group">
-							<button type="submit" class="btn btn-primary">Associate Signal Type</button>
+							<button type="submit" class="btn btn-primary">Add Signal Type</button>
 						</div>
 					</form>
 				</div>

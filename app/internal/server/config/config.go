@@ -85,9 +85,9 @@ var ValidVisibilities = map[string]bool{ // isn.visibility
 }
 
 var ValidRoles = map[string]bool{ // users.user_role
-	"owner":  true,
-	"admin":  true,
-	"member": true,
+	"siteadmin": true,
+	"isnadmin":  true,
+	"member":    true,
 }
 
 var ValidAccountTypes = map[string]bool{ // accounts.account_type

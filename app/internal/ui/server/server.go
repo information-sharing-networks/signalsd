@@ -113,8 +113,8 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 
 		r.Group(func(r chi.Router) {
 
-			// ISN Admin routes (require admin/owner role)
-			r.Use(s.authService.RequireRole("admin", "owner"))
+			// ISN Admin routes
+			r.Use(s.authService.RequireRole("isnadmin", "siteadmin"))
 			r.Use(s.authService.AddAccountIDToLogContext)
 
 			//dashboard
@@ -162,16 +162,16 @@ func (s *Server) RegisterRoutes(router *chi.Mux) {
 			})
 
 			r.Group(func(r chi.Router) {
-				// Owner-only features
-				r.Use(s.authService.RequireRole("owner"))
+				// site admin only
+				r.Use(s.authService.RequireRole("siteadmin"))
 
 				// ISN ownership transfer
 				r.Get("/admin/isn/transfer-ownership", handlerService.TransferOwnershipPage)
 				r.Put("/ui-api/isn/transfer-ownership", handlerService.TransferOwnership)
 
-				// Admin role management
-				r.Get("/admin/accounts/admin-role", handlerService.AdminRoleManagementPage)
-				r.Put("/ui-api/admin/accounts/admin-role", handlerService.AdminRoleManagement)
+				// ISN Admin role management
+				r.Get("/admin/accounts/isn-admin-role", handlerService.AdminRoleManagementPage)
+				r.Put("/ui-api/admin/accounts/isn-admin-role", handlerService.AdminRoleManagement)
 			})
 		})
 	})

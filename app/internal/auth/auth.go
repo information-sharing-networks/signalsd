@@ -71,11 +71,11 @@ type AccessTokenResponse struct {
 	// AccountType is the account type of the user making the request (user or service_account)
 	AccountType string `json:"account_type" enums:"user,service_account"`
 
-	// Role is the role of the user making the request (owner, admin, member)
-	Role string `json:"role" enums:"owner,admin,member" example:"admin"`
+	// Role is the role of the user making the request (siteadmin, isnadmin, member)
+	Role string `json:"role" enums:"siteadmin,isnadmin,member" example:"isnadmin"`
 
-	// Perms is a map of the ISNs the account has access to and the permissions granted (the map key is the isn_slug)
-	Perms map[string]IsnPerms `json:"isn_perms,omitempty"`
+	// IsnPerms is a map of the ISNs the account has access to and the permissions granted (the map key is the isn_slug)
+	IsnPerms map[string]IsnPerms `json:"isn_perms,omitempty"`
 }
 
 type SignalType struct {
@@ -101,8 +101,8 @@ type IsnPerms struct {
 	// CanWrite is true if the account has write access to the isn
 	CanWrite bool `json:"can_write" example:"false"`
 
-	// SignalBatchID is the ID of the current signal batch for the ISN (use when writing to the isn)
-	SignalBatchID *uuid.UUID `json:"signal_batch_id,omitempty" example:"967affe9-5628-4fdd-921f-020051344a12"`
+	// CanAdminister is true if the account is the owner of the isn or a site admin
+	CanAdminister bool `json:"can_administer" example:"false"`
 
 	// SignalTypes is a map of the signal type paths to the signal type details (key is the signal type path)
 	SignalTypes map[string]SignalType `json:"signal_types,omitempty"`
@@ -110,8 +110,8 @@ type IsnPerms struct {
 	// Visibility is the ISN visibility setting (public or private)
 	Visibility string `json:"visibility" enums:"public,private" example:"private"`
 
-	// AccountIsIsnAdmin is true if the account is the owner of the isn or the site owner
-	AccountIsIsnAdmin bool `json:"account_is_isn_admin" example:"false"`
+	// SignalBatchID is the ID of the current signal batch for the ISN (used for tracking signals when writing to the isn)
+	SignalBatchID *uuid.UUID `json:"signal_batch_id,omitempty" example:"967affe9-5628-4fdd-921f-020051344a12"`
 
 	// InUse is true if the isn is active
 	InUse bool `json:"in_use" example:"true"`
@@ -129,8 +129,8 @@ type Claims struct {
 	// AccountType is the account type of the user making the request (user or service_account)
 	AccountType string `json:"account_type" enums:"user,service_account"`
 
-	// Role is the role of the user making the request (owner, admin, member)
-	Role string `json:"role" enums:"owner,admin,member" example:"admin"`
+	// Role is the role of the user making the request (siteadmin, isnadmin, member)
+	Role string `json:"role" enums:"siteadmin,isnadmin,member" example:"isnadmin"`
 
 	// IsnPerms is a map of the ISNs and signal types the account has access to and the permissions they have been granted (the map key is the isn slug)
 	IsnPerms map[string]IsnPerms `json:"isn_perms,omitempty" example:"isn1"`
@@ -162,8 +162,8 @@ type isnList map[string]*isnDetails // key is the isn slug
 //   - standard jwt registerd claims(sub, exp, iat)
 //   - account ID
 //   - account type (user or service_account)
-//   - account role (owner, admin, member)
-//   - A list of all the isns the account has access to and the permission granted (read or write)
+//   - account role (siteadmin, isnadmin, member)
+//   - a list of all the isns the account has access to and the permission granted (read or write)
 //   - the list of available signal_types in the isn
 //
 // note inactive isns/signal_types are included - an is_in_use flag is included in the claims so the client can make access decisions
@@ -264,47 +264,47 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 
 	// set up isnPerms map for claims
 	switch account.AccountRole {
-	case "owner":
-		// owner has read and write access to all ISNs
+	case "siteadmin":
+		// site admins have read and write access to all ISNs
 		for isnSlug, siteIsn := range isnList {
 			isnPerms[isnSlug] = IsnPerms{
-				CanRead:           true,
-				CanWrite:          true,
-				SignalBatchID:     latestSignalBatchIDs[isnSlug],
-				SignalTypes:       toSignalTypes(siteIsn.signalTypes),
-				Visibility:        siteIsn.visibility,
-				InUse:             siteIsn.inUse,
-				AccountIsIsnAdmin: true,
+				CanRead:       true,
+				CanWrite:      true,
+				SignalBatchID: latestSignalBatchIDs[isnSlug],
+				SignalTypes:   toSignalTypes(siteIsn.signalTypes),
+				Visibility:    siteIsn.visibility,
+				InUse:         siteIsn.inUse,
+				CanAdminister: true,
 			}
 		}
 
-	case "admin":
+	case "isnadmin":
 		// Admin can read, write and administrate any ISN they created
 		for isnSlug, siteIsn := range isnList {
 			if account.ID == siteIsn.userAccountID {
 				isnPerms[isnSlug] = IsnPerms{
-					CanRead:           true,
-					CanWrite:          true,
-					SignalBatchID:     latestSignalBatchIDs[isnSlug],
-					SignalTypes:       toSignalTypes(siteIsn.signalTypes),
-					Visibility:        siteIsn.visibility,
-					InUse:             siteIsn.inUse,
-					AccountIsIsnAdmin: true,
+					CanRead:       true,
+					CanWrite:      true,
+					SignalBatchID: latestSignalBatchIDs[isnSlug],
+					SignalTypes:   toSignalTypes(siteIsn.signalTypes),
+					Visibility:    siteIsn.visibility,
+					InUse:         siteIsn.inUse,
+					CanAdminister: true,
 				}
 			}
 		}
-		// and access any ISN where they were granted read or write permission by another admin or the owner
+		// and access any ISN where they were granted read or write permission by an admin
 		for _, accessibleIsn := range isnsAccessibleByAccount {
 			isnSlug := accessibleIsn.IsnSlug
 			if _, ok := isnPerms[isnSlug]; !ok {
 				isnPerms[isnSlug] = IsnPerms{
-					CanRead:           accessibleIsn.CanRead,
-					CanWrite:          accessibleIsn.CanWrite,
-					SignalBatchID:     latestSignalBatchIDs[isnSlug],
-					SignalTypes:       toSignalTypes(isnList[isnSlug].signalTypes),
-					Visibility:        isnList[isnSlug].visibility,
-					InUse:             isnList[isnSlug].inUse,
-					AccountIsIsnAdmin: false,
+					CanRead:       accessibleIsn.CanRead,
+					CanWrite:      accessibleIsn.CanWrite,
+					SignalBatchID: latestSignalBatchIDs[isnSlug],
+					SignalTypes:   toSignalTypes(isnList[isnSlug].signalTypes),
+					Visibility:    isnList[isnSlug].visibility,
+					InUse:         isnList[isnSlug].inUse,
+					CanAdminister: false,
 				}
 			}
 		}
@@ -314,13 +314,13 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 		for _, accessibleIsn := range isnsAccessibleByAccount {
 			isnSlug := accessibleIsn.IsnSlug
 			isnPerms[isnSlug] = IsnPerms{
-				CanRead:           accessibleIsn.CanRead,
-				CanWrite:          accessibleIsn.CanWrite,
-				SignalBatchID:     latestSignalBatchIDs[isnSlug],
-				SignalTypes:       toSignalTypes(isnList[isnSlug].signalTypes),
-				Visibility:        isnList[isnSlug].visibility,
-				InUse:             isnList[isnSlug].inUse,
-				AccountIsIsnAdmin: false,
+				CanRead:       accessibleIsn.CanRead,
+				CanWrite:      accessibleIsn.CanWrite,
+				SignalBatchID: latestSignalBatchIDs[isnSlug],
+				SignalTypes:   toSignalTypes(isnList[isnSlug].signalTypes),
+				Visibility:    isnList[isnSlug].visibility,
+				InUse:         isnList[isnSlug].inUse,
+				CanAdminister: false,
 			}
 		}
 
@@ -349,6 +349,7 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 	if err != nil {
 		return AccessTokenResponse{}, fmt.Errorf("failed to sign JWT: %w", err)
 	}
+
 	return AccessTokenResponse{
 		AccessToken: signedAccessToken,
 		TokenType:   "Bearer",
@@ -356,7 +357,7 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 		AccountID:   account.ID,
 		AccountType: account.AccountType,
 		Role:        account.AccountRole,
-		Perms:       isnPerms,
+		IsnPerms:    isnPerms,
 	}, nil
 }
 

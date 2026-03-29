@@ -53,7 +53,7 @@ type UpdatePasswordRequest struct {
 //	@Tags			auth
 //
 //	@Param			request	body	handlers.CreateUserRequest	true	"user details"
-//	@Description	The first user created is granted the "owner" role and has super-user access to the site.
+//	@Description	The first user created is granted the "siteadmin" role and has super-user access to the site.
 //	@Description
 //	@Description	Web users can register directly and default to standard member roles.
 //	@Description	New members can't access any information beyond the public data on the site until an admin grants them access to an ISN.
@@ -158,7 +158,7 @@ func (u *UserHandler) RegisterUserHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if isFirstUser {
-		_, err = txQueries.CreateOwnerUser(r.Context(), database.CreateOwnerUserParams{
+		_, err = txQueries.CreateSiteAdminUser(r.Context(), database.CreateSiteAdminUserParams{
 			AccountID:      account.ID,
 			HashedPassword: hashedPassword,
 			Email:          strings.ToLower(req.Email),
@@ -297,28 +297,28 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 
 }
 
-// GrantUserAdminRoleHandler godocs
+// GrantUserIsnAdminRoleHandler godocs
 //
-//	@Summary		Grant admin role
+//	@Summary		Grant ISN admin role
 //	@Tags			Site Admin
 //
-//	@Description	This endpoint grants the admin role to a site member
+//	@Description	This endpoint grants the ISN admin role to a site member
 //	@Description
-//	@Description	An admin can:
+//	@Description	An ISN admin can:
 //	@Description	- Create an ISN
-//	@Description	- Define the signal_types used in the ISN
+//	@Description	- Add signal_types to their own ISNs
 //	@Description	- read/write to their own ISNs
 //	@Description	- Grant other accounts read or write access to their ISNs
 //	@Description
-//	@Description	Note that admins can't change ISNs they don't own (the site owner must use the `transfer ownership` endpoint if this is requred)
+//	@Description	Note that ISN admins can't change ISNs they don't own (a site admin must use the `transfer ownership` endpoint if this is requred)
 //	@Description
-//	@Description	An admin also has access to the following site admin functions:
+//	@Description	An ISN admin also has access to the following site-level functions:
 //	@Description	- Create service accounts
 //	@Description	- Disable/Enable accounts
 //	@Description	- View all users and their email addresses
 //	@Description	- Reset user passwords
 //	@Description
-//	@Description	**This endpoint can only be used by the site owner account**
+//	@Description	**This endpoint can only be used by site admin accounts**
 //
 //	@Param			account_id	path	string	true	"account id"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
@@ -328,10 +328,10 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/api/admin/accounts/{account_id}/admin-role [put]
+//	@Router			/api/admin/accounts/{account_id}/isn-admin-role [put]
 //
-//	this handler must use the RequireRole (owner) middleware
-func (u *UserHandler) GrantUserAdminRoleHandler(w http.ResponseWriter, r *http.Request) {
+//	this handler must use the RequireRole (siteadmin) middleware
+func (u *UserHandler) GrantUserIsnAdminRoleHandler(w http.ResponseWriter, r *http.Request) {
 
 	// get user account id for user making request
 	userAccountID, ok := auth.ContextAccountID(r.Context())
@@ -373,13 +373,13 @@ func (u *UserHandler) GrantUserAdminRoleHandler(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	if targetAccount.AccountRole == "admin" {
+	if targetAccount.AccountRole == "isnadmin" {
 		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "this account is already an admin")
 		return
 	}
 
 	//update user role
-	rowsUpdated, err := u.queries.UpdateUserAccountToAdmin(r.Context(), targetAccountID)
+	rowsUpdated, err := u.queries.UpdateUserAccountToIsnAdmin(r.Context(), targetAccountID)
 	if err != nil || rowsUpdated == 0 {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
@@ -401,7 +401,7 @@ func (u *UserHandler) GrantUserAdminRoleHandler(w http.ResponseWriter, r *http.R
 //	@Summary		Revoke admin role
 //	@Tags			Site Admin
 //
-//	@Description	**This endpoint can only be used by the site owner account**
+//	@Description	**This endpoint can only be used by site admin accounts**
 //
 //	@Param			account_id	path	string	true	"account id"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
@@ -411,10 +411,10 @@ func (u *UserHandler) GrantUserAdminRoleHandler(w http.ResponseWriter, r *http.R
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/api/admin/accounts/{account_id}/admin-role [delete]
+//	@Router			/api/admin/accounts/{account_id}/isn-admin-role [delete]
 //
-//	this handler must use the RequireRole (owner) middleware
-func (u *UserHandler) RevokeUserAdminRoleHandler(w http.ResponseWriter, r *http.Request) {
+//	this handler must use the RequireRole (siteadmin) middleware
+func (u *UserHandler) RevokeUserIsnAdminRoleHandler(w http.ResponseWriter, r *http.Request) {
 
 	// get user account id for user making request
 	userAccountID, ok := auth.ContextAccountID(r.Context())
@@ -445,9 +445,9 @@ func (u *UserHandler) RevokeUserAdminRoleHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// prevent owners trying to make themselves admin
+	// prevent admins trying to update their own role
 	if userAccountID == targetAccountID {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "the owner account is not permitted to change its own role")
+		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "admin accounts are not permitted to change their own role")
 		return
 	}
 
@@ -456,8 +456,8 @@ func (u *UserHandler) RevokeUserAdminRoleHandler(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if targetAccount.AccountRole != "admin" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "this account is not an admin")
+	if targetAccount.AccountRole != "siteadmin" {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "this account is not an site admin")
 		return
 	}
 
@@ -590,7 +590,7 @@ func (u *UserHandler) PasswordResetTokenPageHandler(w http.ResponseWriter, r *ht
 //	@Description	Endpoint to handle password requests received from the PasswordResetTokenPageHandler (do not call the endpoint directly)
 //	@Description	The handler validates the token, updates the user password, and consumes the one-time-use token.
 //	@Description	Any user in possession of the token can use it to reset the password of the associated account
-//	@Description	One time tokens can only be issued by admins or the site owner.
+//	@Description	One time tokens can only be issued by admins.
 //
 //	@Tags			auth
 //

@@ -74,17 +74,17 @@ definitions:
       isn_perms:
         additionalProperties:
           $ref: '#/definitions/auth.IsnPerms'
-        description: Perms is a map of the ISNs the account has access to and the
+        description: IsnPerms is a map of the ISNs the account has access to and the
           permissions granted (the map key is the isn_slug)
         type: object
       role:
-        description: Role is the role of the user making the request (owner, admin,
+        description: Role is the role of the user making the request (siteadmin, isnadmin,
           member)
         enum:
-        - owner
-        - admin
+        - siteadmin
+        - isnadmin
         - member
-        example: admin
+        example: isnadmin
         type: string
       token_type:
         description: TokenType (Bearer) - used as a prompt for the client to use the
@@ -94,9 +94,9 @@ definitions:
     type: object
   auth.IsnPerms:
     properties:
-      account_is_isn_admin:
-        description: AccountIsIsnAdmin is true if the account is the owner of the
-          isn or the site owner
+      can_administer:
+        description: CanAdminister is true if the account is the owner of the isn
+          or a site admin
         example: false
         type: boolean
       can_read:
@@ -113,7 +113,7 @@ definitions:
         type: boolean
       signal_batch_id:
         description: SignalBatchID is the ID of the current signal batch for the ISN
-          (use when writing to the isn)
+          (used for tracking signals when writing to the isn)
         example: 967affe9-5628-4fdd-921f-020051344a12
         type: string
       signal_types:
@@ -443,10 +443,10 @@ definitions:
         type: string
       account_role:
         enum:
-        - owner
-        - admin
+        - siteadmin
+        - isnadmin
         - member
-        example: admin
+        example: isnadmin
         type: string
       account_type:
         enum:
@@ -860,10 +860,10 @@ definitions:
         type: string
       user_role:
         enum:
-        - owner
-        - admin
+        - siteadmin
+        - isnadmin
         - member
-        example: admin
+        example: isnadmin
         type: string
     type: object
   handlers.WithdrawSignalRequest:
@@ -977,74 +977,6 @@ info:
     name: MIT
   title: Signals ISN API
 paths:
-  /api/admin/accounts/{account_id}/admin-role:
-    delete:
-      description: '**This endpoint can only be used by the site owner account**'
-      parameters:
-      - description: account id
-        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
-        in: path
-        name: account_id
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Revoke admin role
-      tags:
-      - Site Admin
-    put:
-      description: |-
-        This endpoint grants the admin role to a site member
-
-        An admin can:
-        - Create an ISN
-        - Define the signal_types used in the ISN
-        - read/write to their own ISNs
-        - Grant other accounts read or write access to their ISNs
-
-        Note that admins can't change ISNs they don't own (the site owner must use the `transfer ownership` endpoint if this is requred)
-
-        An admin also has access to the following site admin functions:
-        - Create service accounts
-        - Disable/Enable accounts
-        - View all users and their email addresses
-        - Reset user passwords
-
-        **This endpoint can only be used by the site owner account**
-      parameters:
-      - description: account id
-        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
-        in: path
-        name: account_id
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Grant admin role
-      tags:
-      - Site Admin
   /api/admin/accounts/{account_id}/disable:
     post:
       description: |-
@@ -1060,8 +992,7 @@ paths:
         **Recovery:** Account must be re-enabled by admin via `/admin/accounts/{id}/enable`
         Service accounts will also need a new client secret via `/api/auth/service-accounts/reissue-credentials`
 
-        **Note:** The site owner account cannot be disabled to prevent system lockout.
-        Only owners and admins can disable accounts.
+        Only admins can disable accounts.
       parameters:
       - description: Account ID to disable
         example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
@@ -1078,10 +1009,6 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
           description: 'Authentication failed '
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "403":
-          description: Cannot disable site owner account
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
@@ -1135,12 +1062,80 @@ paths:
       summary: Enable an account
       tags:
       - Site Admin
+  /api/admin/accounts/{account_id}/isn-admin-role:
+    delete:
+      description: '**This endpoint can only be used by site admin accounts**'
+      parameters:
+      - description: account id
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+        in: path
+        name: account_id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Revoke admin role
+      tags:
+      - Site Admin
+    put:
+      description: |-
+        This endpoint grants the ISN admin role to a site member
+
+        An ISN admin can:
+        - Create an ISN
+        - Add signal_types to their own ISNs
+        - read/write to their own ISNs
+        - Grant other accounts read or write access to their ISNs
+
+        Note that ISN admins can't change ISNs they don't own (a site admin must use the `transfer ownership` endpoint if this is requred)
+
+        An ISN admin also has access to the following site-level functions:
+        - Create service accounts
+        - Disable/Enable accounts
+        - View all users and their email addresses
+        - Reset user passwords
+
+        **This endpoint can only be used by site admin accounts**
+      parameters:
+      - description: account id
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+        in: path
+        name: account_id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Grant ISN admin role
+      tags:
+      - Site Admin
   /api/admin/isn/{isn_slug}/transfer-ownership:
     put:
       description: |-
         Transfer ownership of an ISN to another admin account.
         This can be used when an admin leaves or when reorganizing responsibilities.
-        Only the site owner can transfer ISN ownership.
+        Only site admins can transfer ISN ownership.
       parameters:
       - description: ISN slug
         in: path
@@ -1236,10 +1231,249 @@ paths:
       summary: Get service accounts
       tags:
       - Site Admin
+  /api/admin/signal-types:
+    get:
+      description: |-
+        Get details for all the signal types defined on the ISN.
+        This endpoint can only be used by any account registered with the site
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.SignalTypeDetail'
+            type: array
+      summary: Get Signal Types
+      tags:
+      - Signal Type Definitions
+    post:
+      description: |-
+        Signal types specify a record that can be shared over the ISN
+        - Each type has a unique title and this is used to create a URL-friendly slug
+        - The title and slug fields can't be changed and must be unique for the site
+        - The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading
+
+        Schema URL Requirements
+        - Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)
+        - To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json
+
+        Readme URL requirements
+        - Must be a link to a file ending .md on a public github repo.
+        - Use the special URL: https://github.com/skip/readme/main/readme.md to indicate there is no readme
+
+        Versions
+        - A signal type can have multiple versions - these share the same title/slug but have different JSON schemas
+        - Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)
+
+        After creating a signal type, use the AddSignalTypeToIsn endpoint to link it to an ISN.
+
+        Signal type definitions are referred to like this: /api/signal-types/{signal_type_slug}/v{sem_ver}
+
+        Note: this endpoint can only be used by site admins
+      parameters:
+      - description: signal type details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.CreateSignalTypeRequest'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.NewSignalTypeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Create signal type
+      tags:
+      - Signal Type Definitions
+  /api/admin/signal-types/{signal_type_slug}/schemas:
+    post:
+      description: |-
+        You must specify a schema_url that has not been previously registered for this signal type.
+
+        Use the bump_type (major/minor/patch) parameter to determine how the version number should be incremented.
+
+        Note: this endpoint can only be used by site admins
+      parameters:
+      - description: signal type slug
+        example: sample-signal--example-org
+        in: path
+        name: signal_type_slug
+        required: true
+        type: string
+      - description: signal type details
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.RegisterNewSignalTypeSchemaRequest'
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/handlers.NewSignalTypeResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Registe a new schema for an existing signal type
+      tags:
+      - Signal Type Definitions
+  /api/admin/signal-types/{signal_type_slug}/v{sem_ver}:
+    delete:
+      description: Only signal types that have never been referenced by signals can
+        be deleted
+      parameters:
+      - description: signal type slug
+        example: sample-signal--example-org
+        in: path
+        name: signal_type_slug
+        required: true
+        type: string
+      - description: version to be deleted
+        example: 0.0.1
+        in: path
+        name: sem_ver
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Delete signal type
+      tags:
+      - Signal Type Definitions
+    get:
+      description: |-
+        Returns the signal type details.
+        This endpoint can be used by anyone registered with the site
+      parameters:
+      - description: signal type slug
+        example: sample-signal--example-org
+        in: path
+        name: signal_type_slug
+        required: true
+        type: string
+      - description: version to be recieved
+        example: 0.0.1
+        in: path
+        name: sem_ver
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.SignalTypeDetail'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      summary: Get Signal Type
+      tags:
+      - Signal Type Definitions
+      - Signal Type Definitions
+    put:
+      description: |-
+        users can mark the signal type as *in use/not in use* and update the description or link to the readme file
+        Signal types marked as 'not in use' are not returned in signal searches and can not receive new signals
+
+        Note: this endpoint can only be used by site admins
+      parameters:
+      - description: signal type slug
+        example: sample-signal--example-org
+        in: path
+        name: signal_type_slug
+        required: true
+        type: string
+      - description: Sem ver
+        example: 0.0.1
+        in: path
+        name: sem_ver
+        required: true
+        type: string
+      - description: signal type details to be updated
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handlers.UpdateSignalTypeRequest'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Update signal type
+      tags:
+      - Signal Type Definitions
   /api/admin/users:
     get:
       description: |-
-        This api displays site users and their email addresses (can only be used by owner and admin accounts)
+        This api displays site users and their email addresses (can only be used by admin accounts)
 
         - No query parameters = return all users
         - to return a specific user supply one of the following query parameters: `?id=uuid` or `?email=address`
@@ -1283,12 +1517,12 @@ paths:
   /api/admin/users/{user_id}/generate-password-reset-link:
     post:
       description: |-
-        Allows admins or the site owner to generate a one-time password reset link for a user (use this endpoint when a user has forgotten their password)
+        Allows admins to generate a one-time password reset link for a user (use this endpoint when a user has forgotten their password)
 
         The generated link can be used to reset the password of the associated account using the page rendered by the PasswordResetTokenPageHandler.
         The generated link expires in 30 minutes and can only be used once.
 
-        Admins can create links on behalf of users with a member role.  The site owner role can create links for admins and members.
+        ISN Admins can create links on behalf of users with a member role.  Accounts with the site admin role can create links for ISN admins and members.
 
         **Note:** anyone in possession of the link can reset the password of the associated account. The link should be treated as sensitive and handled accordingly.
       parameters:
@@ -1400,7 +1634,7 @@ paths:
         Endpoint to handle password requests received from the PasswordResetTokenPageHandler (do not call the endpoint directly)
         The handler validates the token, updates the user password, and consumes the one-time-use token.
         Any user in possession of the token can use it to reset the password of the associated account
-        One time tokens can only be issued by admins or the site owner.
+        One time tokens can only be issued by admins.
       parameters:
       - description: Password reset token ID
         example: 550e8400-e29b-41d4-a716-446655440000
@@ -1462,7 +1696,7 @@ paths:
   /api/auth/register:
     post:
       description: |-
-        The first user created is granted the "owner" role and has super-user access to the site.
+        The first user created is granted the "siteadmin" role and has super-user access to the site.
 
         Web users can register directly and default to standard member roles.
         New members can't access any information beyond the public data on the site until an admin grants them access to an ISN.
@@ -1497,10 +1731,9 @@ paths:
 
         Note that where an organization needs more than one service account they must supply unique contact emails for each account.
 
-
         To reissue credentials for an existing service account, use the **Reissue Service Account Credentials** endpoint.
 
-        You have to be an admin or the site owner to use this endpoint
+        You have to be an admin to use this end point
       parameters:
       - description: service account details
         in: body
@@ -1540,7 +1773,7 @@ paths:
 
         The client_id will remain the same, but a new client_secret will be generated.
 
-        You have to be an admin or the site owner to use this endpoint
+        You have to be an site or ISN admin to use this endpoint
       parameters:
       - description: service account details
         in: body
@@ -1659,10 +1892,7 @@ paths:
 
         visibility = "private" means that signalsd on the network can only be seen by network participants.
 
-        ISN admins automatically get write permission for their own ISNs.
-        Site owners automatically get write permission on all ISNs.
-
-        This endpoint can only be used by the site owner or an admin
+        This endpoint can only be used by ISN admins and site admins
 
         Note there is a cache of public ISNs that is used by the search endpoints. This cache is not dynamically loaded, so adding public ISNs requires a restart of the service
       parameters:
@@ -1720,7 +1950,9 @@ paths:
     put:
       description: |-
         Update the ISN configuration
-        This endpoint can only be used by the site owner or the ISN admin
+        This endpoint can only be used by admin accounts
+        ISN admins can only update ISNs they created
+        Site admins can update any ISN
       parameters:
       - description: isn slug
         example: sample-isn--example-org
@@ -1799,8 +2031,11 @@ paths:
       description: |-
         Update an account's access permission for an ISN. Set both can_read and can_write to false to revoke all access.
 
-        This endpoint can only be used by the site owner or the ISN admin account (ISN admins can only update permissions for ISNs they created).
+        This endpoint can only be used by admin accounts:
+        - ISN admins can only update permissions for ISNs they created).
+        - Site admins can update permissions for any ISN
 
+        Permissions:
         - Accounts with 'read' permission can view all signals on the ISN.
         - Accounts with 'write' permission can create signals on the ISN.
         - For accounts that need read/write access to an ISN, you must grant both 'read' and 'write' permissions.
@@ -1859,7 +2094,7 @@ paths:
         Signals can only be sent to open batches.
 
         Authentication is based on the supplied access token:
-        the site owner, the isn admin and members with an isn_perm=write can create a batch for the ISN.
+        site admins, the isn owner and members with an isn_perm=write can create a batch for the ISN.
 
         Note: Batches are automatically created when accounts first write to an ISN,
         so you only need to explicitly create a batch using this endpoint if you want to track signals in separate batches.
@@ -1875,7 +2110,13 @@ paths:
       - Signal Exchange
   /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}:
     put:
-      description: Enable or disable a signal type for a specific ISN
+      description: |-
+        Enable or disable a signal type for a specific ISN
+
+        When a signal type is disabled for an ISN, signals of this type can no longer be read or written to the ISN.
+
+        Note: this endpoint can only be used by site admins and ISN admins.
+        ISN admins can only update signal types for ISNs they own.
       parameters:
       - description: ISN slug
         example: sample-isn--example-org
@@ -2158,7 +2399,11 @@ paths:
       - Signal Exchange
   /api/isn/{isn_slug}/signal-types/add:
     post:
-      description: Link an existing signal type to an ISN
+      description: |-
+        Link an existing signal type to an ISN
+
+        Note: this endpoint can only be used by site admins and ISN admins.
+        ISN admins can only add signal types to ISNs they own.
       parameters:
       - description: ISN slug
         example: sample-isn--example-org
@@ -2259,235 +2504,6 @@ paths:
       summary: Signal Search (public ISNs)
       tags:
       - Signal Exchange
-  /api/signal-types:
-    get:
-      description: Get details for all the signal types defined on the ISN
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/handlers.SignalTypeDetail'
-            type: array
-      summary: Get Signal Types
-      tags:
-      - Signal Type Definitions
-    post:
-      description: |
-        Signal types specify a record that can be shared over the ISN
-        - Each type has a unique title and this is used to create a URL-friendly slug
-        - The title and slug fields can't be changed and must be unique for the site
-        - The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading
-
-        Schema URL Requirements
-        - Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)
-        - To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json
-
-        Readme URL requirements
-        - Must be a link to a file ending .md on a public github repo.
-        - Use the special URL: https://github.com/skip/readme/main/readme.md to indicate there is no readme
-
-        Versions
-        - A signal type can have multiple versions - these share the same title/slug but have different JSON schemas
-        - Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)
-
-        After creating a signal type, use the AddSignalTypeToIsn endpoint to link it to an ISN.
-
-        Signal type definitions are referred to like this: /api/signal-types/{signal_type_slug}/v{sem_ver}
-      parameters:
-      - description: signal type details
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.CreateSignalTypeRequest'
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/handlers.NewSignalTypeResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Create signal type
-      tags:
-      - Signal Type Definitions
-  /api/signal-types/{signal_type_slug}/schemas:
-    post:
-      description: |-
-        You must specify a schema_url that has not been previously registered for this signal type.
-
-        Use the bump_type (major/minor/patch) parameter to determine how the version number should be incremented.
-      parameters:
-      - description: signal type slug
-        example: sample-signal--example-org
-        in: path
-        name: signal_type_slug
-        required: true
-        type: string
-      - description: signal type details
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.RegisterNewSignalTypeSchemaRequest'
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/handlers.NewSignalTypeResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Registe a new schema for an existing signal type
-      tags:
-      - Signal Type Definitions
-  /api/signal-types/{signal_type_slug}/v{sem_ver}:
-    delete:
-      description: Only signal types that have never been referenced by signals can
-        be deleted
-      parameters:
-      - description: signal type slug
-        example: sample-signal--example-org
-        in: path
-        name: signal_type_slug
-        required: true
-        type: string
-      - description: version to be deleted
-        example: 0.0.1
-        in: path
-        name: sem_ver
-        required: true
-        type: string
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Delete signal type
-      tags:
-      - Signal Type Definitions
-    get:
-      description: Returns details about the signal type
-      parameters:
-      - description: signal type slug
-        example: sample-signal--example-org
-        in: path
-        name: signal_type_slug
-        required: true
-        type: string
-      - description: version to be recieved
-        example: 0.0.1
-        in: path
-        name: sem_ver
-        required: true
-        type: string
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.SignalTypeDetail'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      summary: Get Signal Type
-      tags:
-      - Signal Type Definitions
-      - Signal Type Definitions
-    put:
-      description: |-
-        users can mark the signal type as *in use/not in use* and update the description or link to the readme file
-        Signal types marked as 'not in use' are not returned in signal searches and can not receive new signals
-      parameters:
-      - description: signal type slug
-        example: sample-signal--example-org
-        in: path
-        name: signal_type_slug
-        required: true
-        type: string
-      - description: Sem ver
-        example: 0.0.1
-        in: path
-        name: sem_ver
-        required: true
-        type: string
-      - description: signal type details to be updated
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/handlers.UpdateSignalTypeRequest'
-      responses:
-        "204":
-          description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "403":
-          description: Forbidden
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Update signal type
-      tags:
-      - Signal Type Definitions
   /health/live:
     get:
       description: Check if the signalsd http service is alive and responding.
@@ -2749,12 +2765,12 @@ swagger: "2.0"
 tags:
 - description: Authentication and authorization endpoints.
   name: auth
-- description: Site adminstration tools. These endpoints can only be used by the site
-    owner or an admin.
+- description: Site adminstration tools. These endpoints can only be used by the accounts
+    that have a siteadmin or isnadmin role
   name: Site Admin
 - description: Create and manage Information Sharing Networks (ISNs) - these endpoints
-    can only be used by the site owner or an admin. Note that ISN admins can only
-    view or update details for ISNs they created.
+    can only be used by the accounts that have a siteadmin or isnadmin role Note that
+    ISN admins can only view or update details for ISNs they created.
   name: ISN Configuration
 - description: Grant accounts read or write access to an ISN
   name: ISN Permissions

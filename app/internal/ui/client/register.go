@@ -49,7 +49,7 @@ type UserLookupResponse struct {
 }
 
 // LookupUserByEmail looks up a user by email address using the admin endpoint
-// Note: This requires admin/owner permissions
+// Note: This requires admin permissions
 func (c *Client) LookupUserByEmail(accessToken, email string) (*UserLookupResponse, error) {
 	url := fmt.Sprintf("%s/api/admin/users?email=%s", c.baseURL, email)
 
@@ -92,7 +92,7 @@ type ServiceAccountLookupResponse struct {
 }
 
 // LookupServiceAccountByClientID looks up a service account by client ID using the admin endpoint
-// Note: This requires admin/owner permissions
+// Note: This requires admin permissions
 func (c *Client) LookupServiceAccountByClientID(accessToken, clientID string) (*ServiceAccountLookupResponse, error) {
 	// Use the admin service accounts endpoint to get all service accounts, then filter by client_id
 	// This is similar to how the user lookup works but for service accounts

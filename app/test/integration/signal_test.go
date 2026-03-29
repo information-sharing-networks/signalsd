@@ -44,26 +44,26 @@ func TestSignalSubmission(t *testing.T) {
 	// create test data (take care if updating as used by multiple test below)
 	t.Log("Creating test data...")
 
-	ownerAccount := createTestAccount(t, ctx, testEnv.queries, "owner", "user", "owner@gmail.com")
-	adminAccount := createTestAccount(t, ctx, testEnv.queries, "admin", "user", "admin@gmail.com")
+	siteAdminAccount := createTestAccount(t, ctx, testEnv.queries, "siteadmin", "user", "siteadmin@gmail.com")
+	adminAccount := createTestAccount(t, ctx, testEnv.queries, "isnadmin", "user", "admin@gmail.com")
 	memberAccount := createTestAccount(t, ctx, testEnv.queries, "member", "user", "member@gmail.com")
 
-	ownerISN := createTestISN(t, ctx, testEnv.queries, "owner-isn", "Owner ISN", ownerAccount.ID, "private")
+	siteAdminISN := createTestISN(t, ctx, testEnv.queries, "siteadmin-isn", "SiteAdmin ISN", siteAdminAccount.ID, "private")
 	adminISN := createTestISN(t, ctx, testEnv.queries, "admin-isn", "Admin ISN", adminAccount.ID, "private")
 
-	ownerSignalType := createTestSignalType(t, ctx, testEnv.queries, ownerISN.ID, "owner ISN signal", "1.0.0")
+	siteAdminSignalType := createTestSignalType(t, ctx, testEnv.queries, siteAdminISN.ID, "siteadmin ISN signal", "1.0.0")
 	adminSignalType := createTestSignalType(t, ctx, testEnv.queries, adminISN.ID, "admin ISN signal", "1.0.0")
 
 	grantPermission(t, ctx, testEnv.queries, adminISN.ID, memberAccount.ID, "read")
 
-	createTestSignalBatch(t, ctx, testEnv.queries, ownerISN.ID, ownerAccount.ID)
-	createTestSignalBatch(t, ctx, testEnv.queries, adminISN.ID, ownerAccount.ID)
+	createTestSignalBatch(t, ctx, testEnv.queries, siteAdminISN.ID, siteAdminAccount.ID)
+	createTestSignalBatch(t, ctx, testEnv.queries, adminISN.ID, siteAdminAccount.ID)
 	createTestSignalBatch(t, ctx, testEnv.queries, adminISN.ID, adminAccount.ID)
 
 	ownerEndpoint := testSignalEndpoint{
-		isnSlug:          ownerISN.Slug,
-		signalTypeSlug:   ownerSignalType.Slug,
-		signalTypeSemVer: ownerSignalType.SemVer,
+		isnSlug:          siteAdminISN.Slug,
+		signalTypeSlug:   siteAdminSignalType.Slug,
+		signalTypeSemVer: siteAdminSignalType.SemVer,
 	}
 	adminEndpoint := testSignalEndpoint{
 		isnSlug:          adminISN.Slug,
@@ -98,9 +98,9 @@ func TestSignalSubmission(t *testing.T) {
 			},
 			{
 				name:           "successful_signal_submission_by_owner",
-				accountID:      ownerAccount.ID,
+				accountID:      siteAdminAccount.ID,
 				endpoint:       adminEndpoint,
-				payloadFunc:    func() map[string]any { return createValidSignalPayload("owner-test-001") },
+				payloadFunc:    func() map[string]any { return createValidSignalPayload("siteadmin-test-001") },
 				expectedStatus: http.StatusOK,
 				expectedStored: 1,
 				expectedFailed: 0,
@@ -260,7 +260,7 @@ func TestSignalSubmission(t *testing.T) {
 	// run the correlated signal tests
 	t.Run("correlated signal submission", func(t *testing.T) {
 
-		ownerToken := testEnv.createAuthToken(t, ownerAccount.ID)
+		ownerToken := testEnv.createAuthToken(t, siteAdminAccount.ID)
 		adminToken := testEnv.createAuthToken(t, adminAccount.ID)
 
 		// create a signal in the admin isn
@@ -279,8 +279,8 @@ func TestSignalSubmission(t *testing.T) {
 			t.Fatalf("Failed to decode response: %v", err)
 		}
 
-		// create a signal in the owner isn
-		ownerPayload := createValidSignalPayload("owner-correlation-test-signal-001")
+		// create a signal in the siteadmin isn
+		ownerPayload := createValidSignalPayload("siteadmin-correlation-test-signal-001")
 
 		ownerSignalResponse := submitCreateSignalRequest(t, testEnv.baseURL, ownerPayload, ownerToken, ownerEndpoint)
 		defer ownerSignalResponse.Body.Close()
@@ -300,7 +300,7 @@ func TestSignalSubmission(t *testing.T) {
 		adminSignalID := getSignalIDFromCreateSignalResponse(t, adminResponseBody)
 		ownerSignalID := getSignalIDFromCreateSignalResponse(t, ownerResponseBody)
 
-		// tests run as admin - can write to their own isn but not to the owner isn
+		// tests run as admin - can write to their own isn but not to the siteadmin isn
 		tests := []struct {
 			name              string
 			correlatedID      string
@@ -463,34 +463,34 @@ func TestIsInUseStatus(t *testing.T) {
 
 	t.Log("Creating test data...")
 
-	ownerAccount := createTestAccount(t, ctx, testEnv.queries, "owner", "user", "owner@isinuse.com")
-	adminAccount := createTestAccount(t, ctx, testEnv.queries, "admin", "user", "admin@isinuse.com")
+	siteAdminAccount := createTestAccount(t, ctx, testEnv.queries, "siteadmin", "user", "siteadmin@isinuse.com")
+	adminAccount := createTestAccount(t, ctx, testEnv.queries, "isnadmin", "user", "admin@isinuse.com")
 	memberAccount := createTestAccount(t, ctx, testEnv.queries, "member", "user", "member@isinuse.com")
 
-	ownerISN := createTestISN(t, ctx, testEnv.queries, "owner-isn", "Owner ISN", ownerAccount.ID, "private")
+	siteAdminISN := createTestISN(t, ctx, testEnv.queries, "siteadmin-isn", "SiteAdmin ISN", siteAdminAccount.ID, "private")
 	adminISN := createTestISN(t, ctx, testEnv.queries, "admin-isn", "Admin ISN", adminAccount.ID, "private")
 
-	ownerSignalType := createTestSignalType(t, ctx, testEnv.queries, ownerISN.ID, "owner ISN signal", "1.0.0")
+	siteAdminSignalType := createTestSignalType(t, ctx, testEnv.queries, siteAdminISN.ID, "siteadmin ISN signal", "1.0.0")
 	adminSignalType := createTestSignalType(t, ctx, testEnv.queries, adminISN.ID, "admin ISN signal", "1.0.0")
 
 	// all accounts need read/write to all ISNs to make the test work
 
-	// owner has read/write to all ISNs automatically)
+	// siteadmin has read/write to all ISNs automatically)
 
-	// admin has access to own isn automatically - grant read/write to owner iSN
-	grantPermission(t, ctx, testEnv.queries, ownerISN.ID, adminAccount.ID, "read-write")
+	// admin has access to own isn automatically - grant read/write to siteadmin iSN
+	grantPermission(t, ctx, testEnv.queries, siteAdminISN.ID, adminAccount.ID, "read-write")
 
-	// grant member read/write to owner ISN and admin ISN
+	// grant member read/write to siteadmin ISN and admin ISN
 	grantPermission(t, ctx, testEnv.queries, adminISN.ID, memberAccount.ID, "read-write")
-	grantPermission(t, ctx, testEnv.queries, ownerISN.ID, memberAccount.ID, "read-write")
+	grantPermission(t, ctx, testEnv.queries, siteAdminISN.ID, memberAccount.ID, "read-write")
 
-	createTestSignalBatch(t, ctx, testEnv.queries, ownerISN.ID, adminAccount.ID)
+	createTestSignalBatch(t, ctx, testEnv.queries, siteAdminISN.ID, adminAccount.ID)
 	createTestSignalBatch(t, ctx, testEnv.queries, adminISN.ID, adminAccount.ID)
 
 	ownerEndpoint := testSignalEndpoint{
-		isnSlug:          ownerISN.Slug,
-		signalTypeSlug:   ownerSignalType.Slug,
-		signalTypeSemVer: ownerSignalType.SemVer,
+		isnSlug:          siteAdminISN.Slug,
+		signalTypeSlug:   siteAdminSignalType.Slug,
+		signalTypeSemVer: siteAdminSignalType.SemVer,
 	}
 
 	adminEndpoint := testSignalEndpoint{
@@ -589,7 +589,7 @@ func TestIsInUseStatus(t *testing.T) {
 			}
 			for _, tt := range tests {
 				// run the test for each account
-				for _, account := range []database.GetAccountByIDRow{ownerAccount, adminAccount, memberAccount} {
+				for _, account := range []database.GetAccountByIDRow{siteAdminAccount, adminAccount, memberAccount} {
 					name := fmt.Sprintf("%s - %s", tt.name, account.AccountRole)
 					t.Run(name, func(t *testing.T) {
 
@@ -663,29 +663,29 @@ func TestSignalSearch(t *testing.T) {
 
 	// create test data:
 	//
-	// there are two private ISNs (owner and admin) with 1 signal each
-	// owner can see all signals
-	// admin can see the signal on the admin ISN, since they created it, and can't see the owner signal (auth error)
-	// member is granted access to the admin ISN and can see the admin signal but can't see the owner signal (auth error)
+	// there are two private ISNs (siteadmin and admin) with 1 signal each
+	// siteadmin can see all signals
+	// admin can see the signal on the admin ISN, since they created it, and can't see the siteadmin signal (auth error)
+	// member is granted access to the admin ISN and can see the admin signal but can't see the siteadmin signal (auth error)
 	//
 	// there is 1 pulic ISN with 1 signal -- all accounts can see this signal without auth
 
 	t.Log("Creating test data...")
 
-	ownerAccount := createTestAccount(t, ctx, testEnv.queries, "owner", "user", "owner@search.com")
-	adminAccount := createTestAccount(t, ctx, testEnv.queries, "admin", "user", "admin@search.com")
+	siteAdminAccount := createTestAccount(t, ctx, testEnv.queries, "siteadmin", "user", "siteadmin@search.com")
+	adminAccount := createTestAccount(t, ctx, testEnv.queries, "isnadmin", "user", "admin@search.com")
 	memberAccount := createTestAccount(t, ctx, testEnv.queries, "member", "user", "member@search.com")
 
-	ownerISN := createTestISN(t, ctx, testEnv.queries, "owner-search-isn", "Owner search ISN", ownerAccount.ID, "private")
+	siteAdminISN := createTestISN(t, ctx, testEnv.queries, "siteadmin-search-isn", "SiteAdmin search ISN", siteAdminAccount.ID, "private")
 	adminISN := createTestISN(t, ctx, testEnv.queries, "admin-search-isn", "Admin search ISN", adminAccount.ID, "private")
 	publicISN := createTestISN(t, ctx, testEnv.queries, "public-search-isn", "Public search ISN", adminAccount.ID, "public")
 
-	ownerSignalType := createTestSignalType(t, ctx, testEnv.queries, ownerISN.ID, "owner ISN search signal", "1.0.0")
+	siteAdminSignalType := createTestSignalType(t, ctx, testEnv.queries, siteAdminISN.ID, "siteadmin ISN search signal", "1.0.0")
 	adminSignalType := createTestSignalType(t, ctx, testEnv.queries, adminISN.ID, "admin ISN search signal", "1.0.0")
 	publicSignalType := createTestSignalType(t, ctx, testEnv.queries, publicISN.ID, "public ISN search signal", "1.0.0")
 
 	// Grant write permissions to ISN owners so they can submit signals
-	grantPermission(t, ctx, testEnv.queries, ownerISN.ID, ownerAccount.ID, "write")
+	grantPermission(t, ctx, testEnv.queries, siteAdminISN.ID, siteAdminAccount.ID, "write")
 	grantPermission(t, ctx, testEnv.queries, adminISN.ID, adminAccount.ID, "write")
 	grantPermission(t, ctx, testEnv.queries, publicISN.ID, adminAccount.ID, "write")
 
@@ -693,20 +693,20 @@ func TestSignalSearch(t *testing.T) {
 	grantPermission(t, ctx, testEnv.queries, adminISN.ID, memberAccount.ID, "read")
 
 	// create batches
-	createTestSignalBatch(t, ctx, testEnv.queries, ownerISN.ID, ownerAccount.ID)
+	createTestSignalBatch(t, ctx, testEnv.queries, siteAdminISN.ID, siteAdminAccount.ID)
 	createTestSignalBatch(t, ctx, testEnv.queries, adminISN.ID, adminAccount.ID)
 	createTestSignalBatch(t, ctx, testEnv.queries, publicISN.ID, adminAccount.ID)
 
 	// Create tokens after granting permissions so they include the ISN permissions in claims
-	ownerToken := testEnv.createAuthToken(t, ownerAccount.ID)
+	ownerToken := testEnv.createAuthToken(t, siteAdminAccount.ID)
 	adminToken := testEnv.createAuthToken(t, adminAccount.ID)
 	memberToken := testEnv.createAuthToken(t, memberAccount.ID)
 
 	// end point configs
 	ownerEndpoint := testSignalEndpoint{
-		isnSlug:          ownerISN.Slug,
-		signalTypeSlug:   ownerSignalType.Slug,
-		signalTypeSemVer: ownerSignalType.SemVer,
+		isnSlug:          siteAdminISN.Slug,
+		signalTypeSlug:   siteAdminSignalType.Slug,
+		signalTypeSemVer: siteAdminSignalType.SemVer,
 	}
 
 	adminEndpoint := testSignalEndpoint{
@@ -726,12 +726,12 @@ func TestSignalSearch(t *testing.T) {
 		t.Fatalf("Failed to refresh public ISN cache: %v", err)
 	}
 
-	// create owner ISN signal
-	payload := createValidSignalPayload("owner-search-signal-001")
+	// create siteadmin ISN signal
+	payload := createValidSignalPayload("siteadmin-search-signal-001")
 	ownerResponse := submitCreateSignalRequest(t, testEnv.baseURL, payload, ownerToken, ownerEndpoint)
 	defer ownerResponse.Body.Close()
 	if ownerResponse.StatusCode != http.StatusOK {
-		t.Fatalf("Failed to submit signal to owner ISN: %d", ownerResponse.StatusCode)
+		t.Fatalf("Failed to submit signal to siteadmin ISN: %d", ownerResponse.StatusCode)
 	}
 
 	// create admin ISN signal
@@ -809,7 +809,7 @@ func TestSignalSearch(t *testing.T) {
 			expectedStatus:  http.StatusOK,
 			expectedSignals: 1,
 			shouldSeeData:   true,
-			description:     "Owner should access their own ISN",
+			description:     "SiteAdmin should access their own ISN",
 		},
 		{
 			name:            "owner_can_access_admin_isn",
@@ -818,7 +818,7 @@ func TestSignalSearch(t *testing.T) {
 			expectedStatus:  http.StatusOK,
 			expectedSignals: 1,
 			shouldSeeData:   true,
-			description:     "Owner should access admin ISN",
+			description:     "SiteAdmin should access admin ISN",
 		},
 		{
 			name:            "admin_can_access_admin_isn",
@@ -836,7 +836,7 @@ func TestSignalSearch(t *testing.T) {
 			expectedStatus:  http.StatusForbidden,
 			expectedSignals: 1,
 			shouldSeeData:   false,
-			description:     "Admin should not access owner's ISN",
+			description:     "Admin should not access siteadmin's ISN",
 		},
 		{
 			name:            "member_can_access_admin_isn",
@@ -854,7 +854,7 @@ func TestSignalSearch(t *testing.T) {
 			expectedStatus:  http.StatusForbidden,
 			expectedSignals: 1,
 			shouldSeeData:   false,
-			description:     "Member should not access owner's ISN",
+			description:     "Member should not access siteadmin's ISN",
 		},
 		{
 			name:            "expired_token_rejected",
@@ -1118,20 +1118,20 @@ func TestCorrelatedAndPreviousVersionsSearch(t *testing.T) {
 	// create test data
 	t.Log("Creating test data...")
 
-	ownerAccount := createTestAccount(t, ctx, testEnv.queries, "owner", "user", "owner@correlated.com")
+	siteAdminAccount := createTestAccount(t, ctx, testEnv.queries, "siteadmin", "user", "siteadmin@correlated.com")
 
-	ownerISN := createTestISN(t, ctx, testEnv.queries, "owner-correlated-isn", "Owner correlated ISN", ownerAccount.ID, "private")
+	siteAdminISN := createTestISN(t, ctx, testEnv.queries, "siteadmin-correlated-isn", "SiteAdmin correlated ISN", siteAdminAccount.ID, "private")
 
-	ownerSignalType := createTestSignalType(t, ctx, testEnv.queries, ownerISN.ID, "Owner correlated signal", "1.0.0")
+	siteAdminSignalType := createTestSignalType(t, ctx, testEnv.queries, siteAdminISN.ID, "SiteAdmin correlated signal", "1.0.0")
 
 	// create batch
-	createTestSignalBatch(t, ctx, testEnv.queries, ownerISN.ID, ownerAccount.ID)
-	ownerAuthToken := testEnv.createAuthToken(t, ownerAccount.ID)
+	createTestSignalBatch(t, ctx, testEnv.queries, siteAdminISN.ID, siteAdminAccount.ID)
+	ownerAuthToken := testEnv.createAuthToken(t, siteAdminAccount.ID)
 
 	ownerEndpoint := testSignalEndpoint{
-		isnSlug:          ownerISN.Slug,
-		signalTypeSlug:   ownerSignalType.Slug,
-		signalTypeSemVer: ownerSignalType.SemVer,
+		isnSlug:          siteAdminISN.Slug,
+		signalTypeSlug:   siteAdminSignalType.Slug,
+		signalTypeSemVer: siteAdminSignalType.SemVer,
 	}
 
 	// create master-001 signal (will have two correlated signals)
@@ -1142,7 +1142,7 @@ func TestCorrelatedAndPreviousVersionsSearch(t *testing.T) {
 	defer master001SignalResponse.Body.Close()
 
 	if master001SignalResponse.StatusCode != http.StatusOK {
-		t.Fatalf("Failed to submit signal %v to owner ISN: %d", master001LocalRef, master001SignalResponse.StatusCode)
+		t.Fatalf("Failed to submit signal %v to siteadmin ISN: %d", master001LocalRef, master001SignalResponse.StatusCode)
 	}
 
 	// create master-002 (no correlated signals)
@@ -1152,14 +1152,14 @@ func TestCorrelatedAndPreviousVersionsSearch(t *testing.T) {
 	master002SignalResponse := submitCreateSignalRequest(t, testEnv.baseURL, payload, ownerAuthToken, ownerEndpoint)
 	defer master002SignalResponse.Body.Close()
 	if master002SignalResponse.StatusCode != http.StatusOK {
-		t.Fatalf("Failed to submit signal %v to owner ISN: %d", master002LocalRef, master002SignalResponse.StatusCode)
+		t.Fatalf("Failed to submit signal %v to siteadmin ISN: %d", master002LocalRef, master002SignalResponse.StatusCode)
 	}
 
 	// create a second version of master-002
 	master002SignalResponseV2 := submitCreateSignalRequest(t, testEnv.baseURL, payload, ownerAuthToken, ownerEndpoint)
 	defer master002SignalResponseV2.Body.Close()
 	if master002SignalResponseV2.StatusCode != http.StatusOK {
-		t.Fatalf("Failed to submit version 2 of signal %v to owner ISN: %d", master002LocalRef, master002SignalResponse.StatusCode)
+		t.Fatalf("Failed to submit version 2 of signal %v to siteadmin ISN: %d", master002LocalRef, master002SignalResponse.StatusCode)
 	}
 
 	// get signal ID from master 1
@@ -1177,7 +1177,7 @@ func TestCorrelatedAndPreviousVersionsSearch(t *testing.T) {
 	correlated001SignalResponse := submitCreateSignalRequest(t, testEnv.baseURL, payload, ownerAuthToken, ownerEndpoint)
 	defer correlated001SignalResponse.Body.Close()
 	if correlated001SignalResponse.StatusCode != http.StatusOK {
-		t.Fatalf("Failed to submit signal to owner ISN: %d", correlated001SignalResponse.StatusCode)
+		t.Fatalf("Failed to submit signal to siteadmin ISN: %d", correlated001SignalResponse.StatusCode)
 	}
 
 	correlated002LocalRef := "item-003>master-001"
@@ -1186,7 +1186,7 @@ func TestCorrelatedAndPreviousVersionsSearch(t *testing.T) {
 	correlated002SignalResponse := submitCreateSignalRequest(t, testEnv.baseURL, payload, ownerAuthToken, ownerEndpoint)
 	defer correlated002SignalResponse.Body.Close()
 	if correlated002SignalResponse.StatusCode != http.StatusOK {
-		t.Fatalf("Failed to submit signal to owner ISN: %d", correlated002SignalResponse.StatusCode)
+		t.Fatalf("Failed to submit signal to siteadmin ISN: %d", correlated002SignalResponse.StatusCode)
 	}
 
 	t.Run("search without correlated signals", func(t *testing.T) {

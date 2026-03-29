@@ -48,7 +48,7 @@ func TransferOwnershipPage(environment string, isns []types.IsnOption, users []t
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Transfer ISN Ownership</h1><div class=\"card\"><div class=\"card-body\"><p class=\"card-description text-muted\">Transfer ownership of an Information Sharing Network to another admin account.  This action can only be performed by the site owner and cannot be undone.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Transfer ISN Ownership</h1><div class=\"card\"><div class=\"card-body\"><p class=\"card-description text-muted\">Transfer ownership of an Information Sharing Network to another admin account.  This action can only be performed by a site admin and cannot be undone.</p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -88,7 +88,7 @@ func TransferOwnershipPage(environment string, isns []types.IsnOption, users []t
 			}
 			if users != nil {
 				for _, user := range users {
-					if user.UserRole == "admin" {
+					if user.UserRole == "isnadmin" {
 						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<option value=\"")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err

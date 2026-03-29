@@ -144,7 +144,7 @@ WITH RankedBatches AS (
     FROM signal_batches sb
     JOIN isn i ON i.id = sb.isn_id
     WHERE i.slug = sqlc.arg(isn_slug)
-        -- Account permission: users see own batches, owner or ISN admin role sees all
+        -- Account permission: users see own batches, site admin or ISN owner sees all
         AND (sb.account_id = sqlc.narg('requesting_account_id')::uuid
              OR sqlc.narg('is_owner_or_admin')::boolean = true)
         AND (sqlc.narg('created_after')::timestamptz IS NULL OR sb.created_at >= sqlc.narg('created_after')::timestamptz)

@@ -14,8 +14,9 @@ templ IsnSignalTypeStatusPage(environment string, isns []types.IsnOption) {
 						Enable or disable signal types for a specific Information Sharing Network. 
 					</p>
 					@NoticeAlert() {
-						Disabling a signal type for this ISN will prevent new signals from being submitted to it through this network.
-						Existing signals will remain archived but inaccessible. The signal type remains enabled globally for other ISNs.
+						Disabling a signal type for this ISN prevents new signals of this type from being submitted to the ISN.
+				
+						Existing signals will remain archived but inaccessible. The signal type remains enabled for other ISNs.
 					}
 
 					<form
@@ -42,7 +43,7 @@ templ IsnSignalTypeStatusPage(environment string, isns []types.IsnOption) {
 
 						<div class="form-group">
 							<button type="submit" class="btn btn-primary">
-								Update ISN Signal Type Status
+								Update Status
 							</button>
 						</div>
 					</form>

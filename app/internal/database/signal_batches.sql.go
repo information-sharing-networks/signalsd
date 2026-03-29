@@ -120,7 +120,7 @@ WITH RankedBatches AS (
     FROM signal_batches sb
     JOIN isn i ON i.id = sb.isn_id
     WHERE i.slug = $4
-        -- Account permission: users see own batches, owner or ISN admin role sees all
+        -- Account permission: users see own batches, site admin or ISN owner sees all
         AND (sb.account_id = $5::uuid
              OR $6::boolean = true)
         AND ($7::timestamptz IS NULL OR sb.created_at >= $7::timestamptz)

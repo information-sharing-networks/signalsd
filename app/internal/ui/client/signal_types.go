@@ -50,7 +50,7 @@ type UpdateSignalTypeStatusRequest struct {
 
 // CreateSignalType creates a new signal type globally using the signalsd API
 func (c *Client) CreateSignalType(accessToken string, req CreateSignalTypeRequest) (*NewSignalTypeResponse, error) {
-	url := fmt.Sprintf("%s/api/signal-types", c.baseURL)
+	url := fmt.Sprintf("%s/api/admin/signal-types", c.baseURL)
 
 	jsonData, err := json.Marshal(req)
 	if err != nil {
@@ -85,7 +85,7 @@ func (c *Client) CreateSignalType(accessToken string, req CreateSignalTypeReques
 
 // RegisterNewSignalTypeSchema creates a new version of a signal type globally using the signalsd API
 func (c *Client) RegisterNewSignalTypeSchema(accessToken string, req RegisterNewSignalTypeSchemaRequest) (*NewSignalTypeResponse, error) {
-	url := fmt.Sprintf("%s/api/signal-types/%s/schemas", c.baseURL, req.Slug)
+	url := fmt.Sprintf("%s/api/admin/signal-types/%s/schemas", c.baseURL, req.Slug)
 
 	jsonData, err := json.Marshal(req)
 	if err != nil {
@@ -120,7 +120,7 @@ func (c *Client) RegisterNewSignalTypeSchema(accessToken string, req RegisterNew
 
 // GetSignalTypes gets all signal types using the signalsd API
 func (c *Client) GetSignalTypes(accessToken string, includeInactive bool) ([]SignalTypeDetail, error) {
-	url := fmt.Sprintf("%s/api/signal-types", c.baseURL)
+	url := fmt.Sprintf("%s/api/admin/signal-types", c.baseURL)
 
 	if includeInactive {
 		url += "?include_inactive=true"

@@ -25,15 +25,16 @@ type HandlerService struct {
 func (h *HandlerService) getIsnOptions(isnPerms map[string]types.IsnPerm, filterByIsnAdmin bool, filterByWritePerm bool) []types.IsnOption {
 	isns := make([]types.IsnOption, 0, len(isnPerms))
 	for isnSlug, perm := range isnPerms {
-		if filterByIsnAdmin && !perm.IsnAdmin {
+		if filterByIsnAdmin && !perm.CanAdminister {
 			continue
 		}
 		if filterByWritePerm && !perm.CanWrite {
 			continue
 		}
 		isns = append(isns, types.IsnOption{
-			Slug:    isnSlug,
-			IsInUse: true,
+			Slug:       isnSlug,
+			IsInUse:    perm.InUse,
+			Visibility: perm.Visibility,
 		})
 	}
 	return isns

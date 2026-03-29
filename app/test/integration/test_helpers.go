@@ -71,8 +71,8 @@ func createTestAccount(t *testing.T, ctx context.Context, queries *database.Quer
 
 	switch accountType {
 	case "user":
-		if role == "owner" { // first user is always the owner
-			_, err = queries.CreateOwnerUser(ctx, database.CreateOwnerUserParams{
+		if role == "siteadmin" { // first user is always a site admin
+			_, err = queries.CreateSiteAdminUser(ctx, database.CreateSiteAdminUserParams{
 				AccountID:      account.ID,
 				Email:          email,
 				HashedPassword: "hashed_password_placeholder",
@@ -88,8 +88,8 @@ func createTestAccount(t *testing.T, ctx context.Context, queries *database.Quer
 			t.Fatalf("Failed to create user: %v", err)
 		}
 
-		if role == "admin" {
-			_, err = queries.UpdateUserAccountToAdmin(ctx, account.ID)
+		if role == "isnadmin" {
+			_, err = queries.UpdateUserAccountToIsnAdmin(ctx, account.ID)
 			if err != nil {
 				t.Fatalf("Failed to update user to admin: %v", err)
 			}
@@ -123,10 +123,10 @@ func createTestAccount(t *testing.T, ctx context.Context, queries *database.Quer
 }
 
 // createTestISN creates a test ISN with specified owner and visibility
-func createTestISN(t *testing.T, ctx context.Context, queries *database.Queries, slug, title string, ownerID uuid.UUID, visibility string) database.Isn {
+func createTestISN(t *testing.T, ctx context.Context, queries *database.Queries, slug, title string, siteAdminID uuid.UUID, visibility string) database.Isn {
 
 	result, err := queries.CreateIsn(ctx, database.CreateIsnParams{
-		UserAccountID: ownerID,
+		UserAccountID: siteAdminID,
 		Title:         title,
 		Slug:          slug,
 		Detail:        fmt.Sprintf("Test ISN: %s", title),
@@ -140,7 +140,7 @@ func createTestISN(t *testing.T, ctx context.Context, queries *database.Queries,
 	return database.Isn{
 		ID:            result.ID,
 		Slug:          result.Slug,
-		UserAccountID: ownerID,
+		UserAccountID: siteAdminID,
 		Title:         title,
 		IsInUse:       true,
 		Visibility:    visibility,
@@ -204,7 +204,7 @@ func createTestSignalType(t *testing.T, ctx context.Context, queries *database.Q
 		SignalTypeID: signalType.ID,
 	})
 	if err != nil {
-		t.Fatalf("Failed to associate signal type %s/%s with ISN: %v", slug, version, err)
+		t.Fatalf("Failed to add signal type %s/%s with ISN: %v", slug, version, err)
 	}
 
 	return signalType
@@ -273,8 +273,8 @@ func createTestUserWithPassword(t *testing.T, ctx context.Context, queries *data
 		t.Fatalf("Failed to create account: %v", err)
 	}
 
-	if role == "owner" { // first user is always the owner
-		_, err = queries.CreateOwnerUser(ctx, database.CreateOwnerUserParams{
+	if role == "siteadmin" { // first user is always site admin
+		_, err = queries.CreateSiteAdminUser(ctx, database.CreateSiteAdminUserParams{
 			AccountID:      account.ID,
 			Email:          email,
 			HashedPassword: hashedPassword,
@@ -290,8 +290,8 @@ func createTestUserWithPassword(t *testing.T, ctx context.Context, queries *data
 		t.Fatalf("Failed to create user: %v", err)
 	}
 
-	if role == "admin" {
-		_, err = queries.UpdateUserAccountToAdmin(ctx, account.ID)
+	if role == "isnadmin" {
+		_, err = queries.UpdateUserAccountToIsnAdmin(ctx, account.ID)
 		if err != nil {
 			t.Fatalf("Failed to update user to admin: %v", err)
 		}

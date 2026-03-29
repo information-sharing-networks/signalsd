@@ -64,7 +64,7 @@ func IsnSignalTypeStatusPage(environment string, isns []types.IsnOption) templ.C
 					}()
 				}
 				ctx = templ.InitializeContext(ctx)
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "Disabling a signal type for this ISN will prevent new signals from being submitted to it through this network. Existing signals will remain archived but inaccessible. The signal type remains enabled globally for other ISNs.")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "Disabling a signal type for this ISN prevents new signals of this type from being submitted to the ISN. Existing signals will remain archived but inaccessible. The signal type remains enabled for other ISNs.")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -82,7 +82,7 @@ func IsnSignalTypeStatusPage(environment string, isns []types.IsnOption) templ.C
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"form-group\"><label for=\"action\" class=\"form-label\">Action</label> <select id=\"action\" name=\"action\" required class=\"form-select\"><option value=\"\">Select Action...</option> <option value=\"disable\">Disable</option> <option value=\"enable\">Enable</option></select></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Update ISN Signal Type Status</button></div></form></div></div><div id=\"status-result\"><!-- Results will appear here --></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"form-group\"><label for=\"action\" class=\"form-label\">Action</label> <select id=\"action\" name=\"action\" required class=\"form-select\"><option value=\"\">Select Action...</option> <option value=\"disable\">Disable</option> <option value=\"enable\">Enable</option></select></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Update Status</button></div></form></div></div><div id=\"status-result\"><!-- Results will appear here --></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

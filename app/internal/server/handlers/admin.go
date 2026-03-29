@@ -40,7 +40,7 @@ func NewAdminHandler(queries *database.Queries, pool *pgxpool.Pool, authService 
 type UserDetails struct {
 	AccountID uuid.UUID `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
 	Email     string    `json:"email" example:"user@example.com"`
-	UserRole  string    `json:"user_role" example:"admin" enums:"owner,admin,member"`
+	UserRole  string    `json:"user_role" example:"isnadmin" enums:"siteadmin,isnadmin,member"`
 	CreatedAt time.Time `json:"created_at" example:"2025-06-03T13:47:47.331787+01:00"`
 	UpdatedAt time.Time `json:"updated_at" example:"2025-06-03T13:47:47.331787+01:00"`
 }
@@ -158,8 +158,7 @@ func (a *AdminHandler) VersionHandler(w http.ResponseWriter, r *http.Request) {
 //	@Description	**Recovery:** Account must be re-enabled by admin via `/admin/accounts/{id}/enable`
 //	@Description	Service accounts will also need a new client secret via `/api/auth/service-accounts/reissue-credentials`
 //	@Description
-//	@Description	**Note:** The site owner account cannot be disabled to prevent system lockout.
-//	@Description	Only owners and admins can disable accounts.
+//	@Description	Only admins can disable accounts.
 //	@Tags			Site Admin
 //
 //	@Param			account_id	path	string	true	"Account ID to disable"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
@@ -167,7 +166,6 @@ func (a *AdminHandler) VersionHandler(w http.ResponseWriter, r *http.Request) {
 //	@Success		200
 //	@Failure		400	{object}	responses.ErrorResponse	"Invalid account ID format"
 //	@Failure		401	{object}	responses.ErrorResponse	"Authentication failed "
-//	@Failure		403	{object}	responses.ErrorResponse	"Cannot disable site owner account"
 //	@Failure		404	{object}	responses.ErrorResponse	"Account not found"
 //
 //	@Security		BearerAccessToken
@@ -219,16 +217,6 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 		)
 
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
-	}
-
-	// Prevent disabling the site owner account
-	if account.AccountRole == "owner" {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", "cannot disable the site owner account"),
-		)
-
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "cannot disable the site owner account")
 		return
 	}
 
@@ -419,7 +407,7 @@ func (a *AdminHandler) EnableAccountHandler(w http.ResponseWriter, r *http.Reque
 // GetUsersHandler godoc
 //
 //	@Summary		Get users
-//	@Description	This api displays site users and their email addresses (can only be used by owner and admin accounts)
+//	@Description	This api displays site users and their email addresses (can only be used by admin accounts)
 //	@Description
 //	@Description	- No query parameters = return all users
 //	@Description	- to return a specific user supply one of the following query parameters: `?id=uuid` or `?email=address`
@@ -734,12 +722,12 @@ type GeneratePasswordResetLinkResponse struct {
 // GeneratePasswordResetLinkHandler godoc
 //
 //	@Summary		Generate password reset link
-//	@Description	Allows admins or the site owner to generate a one-time password reset link for a user (use this endpoint when a user has forgotten their password)
+//	@Description	Allows admins to generate a one-time password reset link for a user (use this endpoint when a user has forgotten their password)
 //	@Description
 //	@Description	The generated link can be used to reset the password of the associated account using the page rendered by the PasswordResetTokenPageHandler.
 //	@Description	The generated link expires in 30 minutes and can only be used once.
 //	@Description
-//	@Description	Admins can create links on behalf of users with a member role.  The site owner role can create links for admins and members.
+//	@Description	ISN Admins can create links on behalf of users with a member role.  Accounts with the site admin role can create links for ISN admins and members.
 //	@Description
 //	@Description	**Note:** anyone in possession of the link can reset the password of the associated account. The link should be treated as sensitive and handled accordingly.
 //	@Tags			Site Admin
@@ -756,7 +744,7 @@ type GeneratePasswordResetLinkResponse struct {
 //
 //	@Router			/api/admin/users/{user_id}/generate-password-reset-link [post]
 //
-//	this handler must use the RequireRole (admin/owner) middleware
+//	this handler must use the RequireRole (isnadmin/siteadmin) middleware
 func (a *AdminHandler) GeneratePasswordResetLinkHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Get account ID from context (set by middleware)
@@ -766,14 +754,14 @@ func (a *AdminHandler) GeneratePasswordResetLinkHandler(w http.ResponseWriter, r
 		return
 	}
 
-	// verify the account generating the request is an admin or owner
+	// verify the account generating the request is an admin
 	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
 		return
 	}
 
-	if claims.Role != "owner" && claims.Role != "admin" {
+	if claims.Role != "siteadmin" && claims.Role != "isnadmin" {
 		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you do not have permission to generate password reset links")
 		return
 	}
@@ -808,8 +796,8 @@ func (a *AdminHandler) GeneratePasswordResetLinkHandler(w http.ResponseWriter, r
 	}
 
 	// admins can only update members
-	if claims.Role == "admin" && targetUser.UserRole != "member" {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "admins cannot generate password reset for other admins or site owners")
+	if claims.Role == "isnadmin" && targetUser.UserRole != "member" {
+		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "ISN admins cannot generate password reset for other admins")
 		return
 	}
 
