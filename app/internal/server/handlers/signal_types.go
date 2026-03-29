@@ -100,18 +100,18 @@ type SignalTypeDetail struct {
 //	@Description
 //	@Description	Note: this endpoint can only be used by site admins
 //
-//	@Tags		Signal Type Definitions
+//	@Tags			Signal Type Definitions
 //
-//	@Param		request	body		handlers.CreateSignalTypeRequest	true	"signal type details"
+//	@Param			request	body		handlers.CreateSignalTypeRequest	true	"signal type details"
 //
-//	@Success	201		{object}	handlers.NewSignalTypeResponse
-//	@Failure	400		{object}	responses.ErrorResponse
-//	@Failure	403		{object}	responses.ErrorResponse
-//	@Failure	409		{object}	responses.ErrorResponse
+//	@Success		201		{object}	handlers.NewSignalTypeResponse
+//	@Failure		400		{object}	responses.ErrorResponse
+//	@Failure		403		{object}	responses.ErrorResponse
+//	@Failure		409		{object}	responses.ErrorResponse
 //
-//	@Security	BearerAccessToken
+//	@Security		BearerAccessToken
 //
-//	@Router		/api/admin/signal-types [post]
+//	@Router			/api/admin/signal-types [post]
 //
 // Should only be used with RequireRole (siteadmin) middleware
 func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *http.Request) {
@@ -801,7 +801,7 @@ func (s *SignalTypeHandler) GetSignalTypesHandler(w http.ResponseWriter, r *http
 //
 //	@Tags			Signal Type Definitions
 //
-//	@Param			isn_slug	path	string										true	"ISN slug"	example(sample-isn--example-org)
+//	@Param			isn_slug	path	string								true	"ISN slug"	example(sample-isn--example-org)
 //	@Param			request		body	handlers.AddSignalTypeToIsnRequest	true	"signal type details"
 //
 //	@Success		204

@@ -57,7 +57,7 @@ type IsnAccount struct {
 //	@Description	- ISN admins can only update permissions for ISNs they created).
 //	@Description	- Site admins can update permissions for any ISN
 //	@Description
-//	@Description 	Permissions:
+//	@Description	Permissions:
 //	@Description	- Accounts with 'read' permission can view all signals on the ISN.
 //	@Description	- Accounts with 'write' permission can create signals on the ISN.
 //	@Description	- For accounts that need read/write access to an ISN, you must grant both 'read' and 'write' permissions.
