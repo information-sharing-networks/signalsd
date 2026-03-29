@@ -44,10 +44,12 @@ func toSignalTypes(details []signalTypeDetails) map[string]SignalType {
 	result := make(map[string]SignalType, len(details))
 	for _, st := range details {
 		result[st.path] = SignalType{
-			Path:   st.path,
-			Slug:   st.slug,
-			SemVer: st.semVer,
-			InUse:  st.inUse,
+			Path:      st.path,
+			Slug:      st.slug,
+			SemVer:    st.semVer,
+			SchemaURL: st.schemaURL,
+			ReadmeURL: st.readmeURL,
+			InUse:     st.inUse,
 		}
 	}
 	return result
@@ -88,6 +90,12 @@ type SignalType struct {
 
 	// SemVer is the signal type version (e.g. 0.0.1)
 	SemVer string `json:"sem_ver" example:"0.0.1"`
+
+	// SchemaURL is the URL of the signal type schema
+	SchemaURL string `json:"schema_url" example:"https://github.com/user/project/blob/2025.01.01/schema.json"`
+
+	// ReadmeURL is the URL of the signal type readme
+	ReadmeURL string `json:"readme_url" example:"https://github.com/user/project/blob/2025.01.01/readme.md"`
 
 	// InUse is true if the signal type is active
 	InUse bool `json:"in_use" example:"true"`
@@ -146,10 +154,12 @@ type isnDetails struct {
 }
 
 type signalTypeDetails struct {
-	path   string
-	slug   string
-	semVer string
-	inUse  bool
+	path      string
+	slug      string
+	semVer    string
+	schemaURL string
+	readmeURL string
+	inUse     bool
 }
 
 type isnList map[string]*isnDetails // key is the isn slug
@@ -234,11 +244,23 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 		signalTypes := make([]signalTypeDetails, 0)
 		for _, dbSignalType := range dbSignalTypes {
 
+			schemaURL := dbSignalType.SchemaURL
+			if schemaURL == signalsd.SkipValidationURL {
+				schemaURL = "schema not provided (data is not validated)"
+			}
+
+			readmeURL := dbSignalType.ReadmeURL
+			if readmeURL == signalsd.SkipReadmeURL {
+				readmeURL = "readme not provided"
+			}
+
 			signalTypes = append(signalTypes, signalTypeDetails{
-				path:   fmt.Sprintf("%s/v%s", dbSignalType.Slug, dbSignalType.SemVer),
-				slug:   dbSignalType.Slug,
-				semVer: dbSignalType.SemVer,
-				inUse:  dbSignalType.IsInUse,
+				path:      fmt.Sprintf("%s/v%s", dbSignalType.Slug, dbSignalType.SemVer),
+				slug:      dbSignalType.Slug,
+				semVer:    dbSignalType.SemVer,
+				inUse:     dbSignalType.IsInUse,
+				schemaURL: schemaURL,
+				readmeURL: readmeURL,
 			})
 		}
 		isnList[dbIsn.Slug].signalTypes = signalTypes

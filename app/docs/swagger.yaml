@@ -142,6 +142,14 @@ definitions:
           This is the key used in the SignalTypes map in IsnPerms
         example: sample-signal--example-org/v0.0.1
         type: string
+      readme_url:
+        description: ReadmeURL is the URL of the signal type readme
+        example: https://github.com/user/project/blob/2025.01.01/readme.md
+        type: string
+      schema_url:
+        description: SchemaURL is the URL of the signal type schema
+        example: https://github.com/user/project/blob/2025.01.01/schema.json
+        type: string
       sem_ver:
         description: SemVer is the signal type version (e.g. 0.0.1)
         example: 0.0.1

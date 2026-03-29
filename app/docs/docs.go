@@ -2489,6 +2489,16 @@ const docTemplate = `{
                     "type": "string",
                     "example": "sample-signal--example-org/v0.0.1"
                 },
+                "readme_url": {
+                    "description": "ReadmeURL is the URL of the signal type readme",
+                    "type": "string",
+                    "example": "https://github.com/user/project/blob/2025.01.01/readme.md"
+                },
+                "schema_url": {
+                    "description": "SchemaURL is the URL of the signal type schema",
+                    "type": "string",
+                    "example": "https://github.com/user/project/blob/2025.01.01/schema.json"
+                },
                 "sem_ver": {
                     "description": "SemVer is the signal type version (e.g. 0.0.1)",
                     "type": "string",

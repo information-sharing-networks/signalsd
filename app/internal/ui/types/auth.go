@@ -40,6 +40,12 @@ type SignalType struct {
 	// SemVer is the signal type version (e.g. 0.0.1)
 	SemVer string `json:"sem_ver"`
 
+	// SchemaURL is the URL of the signal type schema
+	SchemaURL string `json:"schema_url"`
+
+	// ReadmeURL is the URL of the signal type readme
+	ReadmeURL string `json:"readme_url"`
+
 	// InUse is true if the signal type is active for the ISN
 	InUse bool `json:"in_use"`
 }
