@@ -159,7 +159,7 @@ The app uses the following go tools:
 - govulncheck - vulnerability scanner
 - Air - live reload
 
-These tools are defined in `app/tools.go` and installed as part of the docker image.
+These tools are defined in the tools section of `mod.go` and installed as part of the docker image.
 
 The Docker app is started with Air which will restart the service whenever you save changes to the code. 
 Air is configured to automatically run code generation (templ, sqlc and swag) and applies any pending database migrations before restarting the signalsd server.

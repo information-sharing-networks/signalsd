@@ -100,22 +100,22 @@ logs:
 # Generate swagger documentation
 docs:
 	@echo "🔄 Generating swagger documentation..."
-	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && swag init -g ./cmd/signalsd/main.go"
+	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && go tool swag init -g ./cmd/signalsd/main.go"
 
 # Generate swagger documentation
 swag-fmt:
 	@echo "🔄 Formatting swag comments..."
-	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && swag fmt"
+	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && go tool swag fmt"
 
 # Generate type-safe SQL code
 sqlc:
 	@echo "🔄 Generating sqlc code..."
-	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && sqlc generate"
+	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && go tool sqlc generate"
 
 # Generate templ templates
 templ:
 	@echo "🔄 Generating templ templates..."
-	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && templ generate"
+	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && go tool templ generate"
 
 # Format code
 fmt:
@@ -130,21 +130,20 @@ vet:
 # Run staticcheck linter
 lint:
 	@echo "🔄 Running staticcheck..."
-	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && staticcheck ./..."
+	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && go tool staticcheck ./..."
 
 # Run security analysis
 # exclude G120 - FormValue is used extensively in the UI handlers
 # and the size is limited by MaxBytesReader middleware (not detected by gosec)
 security:
-security:
 	@echo "🔄 Running security analysis..."
-	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && gosec -exclude-generated -exclude=G120 ./..."
+	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && go tool gosec -exclude-generated -exclude=G120 ./..."
 
 
 # Run vulnerability scan
 vuln:
 	@echo "🔍 Running vulnerability scan..."
-	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && govulncheck ./..."
+	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && go tool govulncheck ./..."
 
 
 # Clean build artifacts
@@ -156,13 +155,13 @@ clean:
 # Database migrations (bonus commands using Docker)
 db-migrate-up:
 	@echo "🔄 Running database migrations..."
-	@docker compose exec $(APP_SERVICE) bash -c 'cd /signalsd/app && goose -dir sql/schema postgres "$$DATABASE_URL" up'
+	@docker compose exec $(APP_SERVICE) bash -c 'cd /signalsd/app && go tool goose -dir sql/schema postgres "$$DATABASE_URL" up'
 
 
 # Reset database and reapply migrations
 db-migrate-down:
 	@echo "🔄 Resetting database..."
-	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && goose -dir sql/schema postgres \$$DATABASE_URL -env=none down-to 0"
+	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && go tool goose -dir sql/schema postgres \$$DATABASE_URL -env=none down-to 0"
 	@$(MAKE) db-migrate-up
 
 # Check if containers are running
