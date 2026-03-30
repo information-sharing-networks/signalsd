@@ -40,29 +40,13 @@ The default integrated mode (`signalsd run all`) is the simplest way to run the 
 The integrated UI is built into the signalsd binary and available on the same port as the API (default: 8080).  The integrated UI runs automatically when using docker:
 
 ```bash
-# start database
-docker compose up db
-
-# start app (including integrated ui)
-docker compose up app
+make docker-up
 ```
 
 Login using `http://localhost:8080/login`
 
 When using docker, the app runs with a live reload server (air) so you can develop the UI locally and see changes immediately. 
 
-if you want to run the app locally (not in docker) you can use the below.  Note there is no live reload so you will need to regenerate the templates and stop and start the app after making changes.
-
-
-```bash
-
-# start the app locally
-make go-all # note expects the docker database to be running
-
-# or specify your own local database
-SECRET_KEY=your-secret DATABASE_URL="postgres://signalsd-dev:@localhost:5432/signalsd_admin?sslmode=disable" signalsd run all
-
-```
 
 Switch to standalone mode when you need container separation or want to replace the UI
 
@@ -91,9 +75,33 @@ The standalone mode requires a reverse proxy so that the client sees a single do
 
 ⚠️ If you run the UI in standalone mode in dev, the login will work but automatic token refresh will fail because the refresh token cookie cannot be sent cross-port. Users will be logged out after 30 minutes.
 
-***Production Setup***
+### Standalone UI Configuration
+When running as a separate service, the UI has its own configuration:
 
-**Prod and staging deployment** these environments currently run the integrated ui/signalsd service.
+- `PORT`: UI server port (default: 3000)
+- `HOST`: Server host (default: 0.0.0.0)
+- `ENVIRONMENT`: Environment mode (dev/test/perf/staging/prod, default: dev)
+- `LOG_LEVEL`: Logging level (default: debug)
+- `API_BASE_URL`: Base URL of the signalsd API (default: http://localhost:8080)
+- `READ_TIMEOUT`: HTTP read timeout (default: 15s)
+- `WRITE_TIMEOUT`: HTTP write timeout (default: 15s)
+- `IDLE_TIMEOUT`: HTTP idle timeout (default: 60s)
+
+**No database or secret configuration required** - the UI calls the signalsd API for all data operations.
+
+
+## Auth
+All authentication and authorization is handled by the signalsd API.  
+
+Authorization is via the server supplied JWT access tokens.  The UI does not read the claims in the token, it just decodes the token to establish the expiry time so that it can refresh the token before it expires. 
+
+The UI uses the AccessTokenDetails struct that is returned by the signalsd login and refresh token APIs.  The struct contains information about the user's role and permissions so that the UI can improve the UX (e.g., hiding pages that the user does not have access to). This struct is a more detailed version of the claims contained in the token.
+
+The UI does not need to create its own tokens and does not need to know the SECRET_KEY used by the server (the key never leaves the server - it is only used to verify the token was not tampered with)
+
+## Production Setup
+
+the **prod and staging deployment** defined in the github actions CD pipelines run the integrated ui/signalsd service.
 
 To deploy a standalone UI you will need to build and deploy two containers:
 
@@ -129,63 +137,4 @@ server {
         proxy_pass http://api-container:8080;
     }
 }
-```
-## Configuration
-
-### Integrated Mode (Default)
-When running as integrated UI (`signalsd run all`), the UI uses signalsd's configuration. No separate configuration needed.
-
-### Standalone Mode (Development/Custom Deployments)
-
-When running as a separate service, the UI has its own configuration:
-
-- `PORT`: UI server port (default: 3000)
-- `HOST`: Server host (default: 0.0.0.0)
-- `ENVIRONMENT`: Environment mode (dev/test/perf/staging/prod, default: dev)
-- `LOG_LEVEL`: Logging level (default: debug)
-- `API_BASE_URL`: Base URL of the signalsd API (default: http://localhost:8080)
-- `READ_TIMEOUT`: HTTP read timeout (default: 15s)
-- `WRITE_TIMEOUT`: HTTP write timeout (default: 15s)
-- `IDLE_TIMEOUT`: HTTP idle timeout (default: 60s)
-
-**No database or secret configuration required** - the UI calls the signalsd API for all data operations.
-
-
-# Auth
-All authentication and authorization is handled by the signalsd API.  
-
-Authorization is via the server supplied JWT access tokens.  The UI decodes the tokens to:
-1. determine the user's role and permissions so that it can improve the UX (e.g., hiding pages that the user does not have access to)
-2. to establish the expiry time so that it can refresh the token before it expires. 
-
-The UI does not need create tokens and does not need to know the SECRET_KEY used by the server.
-
-# Development
-
-## Prerequisites
-
-1. Have Go 1.25+ installed
-2. Set up database (see main signalsd README)
-
-## Template Development
-if developing locally, install templ and air (live reload): 
-```bash
-go install github.com/a-h/templ/cmd/templ@latest
-go install github.com/air-verse/air@latest
-```
-you can then run the app locally with live reload (the below command is using the docker signalsd database)
-```bash
-cd app
-DATABASE_URL="postgres://signalsd-dev@localhost:15432/signalsd_admin?sslmode=disable" SECRET_KEY="mysecretkey" air
-```
-
-the easiest approach is to use docker for both the app and db.  Air will handle live reloads when you change the templates - just `docker compose up` to get going. 
-
-You can manually generate the templates code with:
-```bash
-#For docker users
-make templ 
-
-# For local users
-cd app && templ generate
 ```

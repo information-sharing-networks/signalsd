@@ -85,12 +85,9 @@ jobs:
           -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest \
           .
       
-      - name: Install goose
-        run: cd app && go install github.com/pressly/goose/v3/cmd/goose
-
       - name: Run migrations
         working-directory: app
-        run: goose -dir sql/schema postgres "${{ env.DATABASE_URL }}" up
+        run: go tool goose -dir sql/schema postgres "${{ env.DATABASE_URL }}" up
 
       - name: Deploy to Cloud Run
         run: |
