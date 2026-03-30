@@ -1,5 +1,7 @@
 package client
 
+// these functions call the signalsd API to manage ISN account membership (add, remove) and handles the API calls to transfer ownership of ISNs
+
 import (
 	"bytes"
 	"encoding/json"

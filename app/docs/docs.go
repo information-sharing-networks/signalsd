@@ -24,6 +24,34 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/admin/service-accounts/create": {
+            "get": {
+                "description": "Renders the create service account form. Requires isnadmin or siteadmin role.",
+                "tags": [
+                    "UI Page"
+                ],
+                "summary": "Create service account page",
+                "responses": {
+                    "200": {
+                        "description": "HTML page"
+                    }
+                }
+            }
+        },
+        "/admin/service-accounts/reissue-credentials": {
+            "get": {
+                "description": "Renders the reissue credentials form. Requires isnadmin or siteadmin role.",
+                "tags": [
+                    "UI Page"
+                ],
+                "summary": "Reissue service account credentials page",
+                "responses": {
+                    "200": {
+                        "description": "HTML page"
+                    }
+                }
+            }
+        },
         "/api/admin/accounts/{account_id}/disable": {
             "post": {
                 "security": [
@@ -1441,7 +1469,7 @@ const docTemplate = `{
                 "tags": [
                     "ISN Configuration"
                 ],
-                "summary": "Get ISN account membership",
+                "summary": "Get ISN Account Membership",
                 "parameters": [
                     {
                         "type": "string",
@@ -2305,6 +2333,43 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
+                    }
+                }
+            }
+        },
+        "/register": {
+            "post": {
+                "description": "Creates a new user account.",
+                "tags": [
+                    "HTMX Action"
+                ],
+                "summary": "Register new user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User email",
+                        "name": "email",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Password",
+                        "name": "password",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Confirm password",
+                        "name": "confirm-password",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
                     }
                 }
             }
@@ -3608,7 +3673,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "",
 	Schemes:          []string{},
 	Title:            "Signals ISN API",
-	Description:      "Signals ISN service API for managing Information Sharing Networks\n\n## Common Error Responses\nAll endpoints may return:\n- `400` Malformed request (invalid json, missing required fields, etc.)\n- `401` Unauthorized (invalid credentials)\n- `403` Forbidden (insufficient permissions)\n- `413` Request body exceeds size limit\n- `429` Rate limit exceeded\n- `500` Internal server error\n\nIndividual endpoints document their specific business logic errors.\n\n## Request Limits\nAll endpoints are protected by:\n- **Rate limiting**: Configurable requests per second\n- **Request size limits**: 64KB for admin/auth endpoints, 5MB for signal ingestion\n\nCheck the Signalsd-Max-Request-Body response header for the configured limit on signals payload.\n\nThe rate limit is set globaly and prevents abuse of the service.\nIn production there will be additional protections in place such as per-IP rate limiting provided by the load balancer/reverse proxy.\n\n## Authentication & Authorization\n\n### OAuth\nThe signalsd backend service acts as an OAuth 2.0 Authorization Server and supports web users and service accounts.\n\n### Authentication Flows\n- **Web users**: (Refresh Token Grant Type) Authentication via /auth/login → receive JWT access token + HTTP-only refresh cookie → use bearer tokens for API calls\n- **Service accounts**: Clients implement OAuth Client Credentials flow → receive JWT access token → use bearer tokens for API calls\n\n### Token Usage\nAll protected API endpoints require a valid JWT access token in the Authorization header:\n```\nAuthorization: Bearer <jwt-access-token>\n```\n\n**Token Refresh (Web Users):**\n- Client calls `/oauth/token?grant_type=refresh_token` with HTTP-only refresh token cookie\n- API validates refresh token and issues new access token + rotated refresh cookie\n- Client receives new bearer token for subsequent API calls\n\n**Token Refresh (Service Accounts):**\n- Client calls `/oauth/token?grant_type=client_credentials` with client ID/secret\n- API validates credentials and issues new access token\n- Client receives new bearer token for subsequent API calls\n\n**Token Lifetimes:**\n- Access tokens: 30 minutes\n- Refresh tokens: 30 days (web users only)\n\n### CSRF Protection\nThe refresh token used by the /oauth API endpoints is stored in an HttpOnly cookie (to prevent access by JavaScript)\nand marked with SameSite=Strict (to prevent it from being sent in cross-site requests, mitigating CSRF).\n\n### CORS Protection\n\nCORS is used to control which browser-based clients can make cross-origin requests to the API and read responses.\n\nthe `ALLOWED_ORIGINS` environment variable is used to configure the CORS rules.\n\nIn production, you should restrict ALLOWED_ORIGINS to trusted client origins (the server will not start if it is not set)\n\n## Date/Time Handling:\n\n**URL Parameters**: The following ISO 8601 formats are accepted in URL query parameters:\n- 2006-01-02T15:04:05Z (UTC)\n- 2006-01-02T15:04:05+07:00 (with offset)\n- 2006-01-02T15:04:05.999999999Z (nano precision)\n- 2006-01-02 (date only, treated as start of day UTC: 2006-01-02T00:00:00Z)\n\nNote: When including a timestamp with a timezone offset in a query parameter, encode the + sign as %2B (e.g. 2025-08-31T12:00:00%2B07:00). Otherwise, + may be interpreted as a space.\n\n**Response Bodies**: All date/time fields in JSON responses use RFC3339 format (ISO 8601):\n- Example: \"2025-06-03T13:47:47.331787+01:00\"",
+	Description:      "Signals ISN service API for managing Information Sharing Networks\n\n## Common Error Responses\nAll endpoints may return:\n- `400` Malformed request (invalid json, missing required fields, etc.)\n- `401` Unauthorized (invalid credentials)\n- `403` Forbidden (insufficient permissions)\n- `413` Request body exceeds size limit\n- `429` Rate limit exceeded\n- `500` Internal server error\n\nIndividual endpoints document their specific business logic errors.\n\n## Request Limits\nAll endpoints are protected by:\n- **Rate limiting**: Configurable requests per second\n- **Request size limits**: 64KB for admin/auth endpoints, 5MB for signal ingestion\n\nCheck the Signalsd-Max-Request-Body response header for the configured limit on signals payload.\n\nThe rate limit is set globaly and prevents abuse of the service.\nIn production there will be additional protections in place such as per-IP rate limiting provided by the load balancer/reverse proxy.\n\n## Authentication & Authorization\n\n### OAuth\nThe signalsd backend service acts as an OAuth 2.0 Authorization Server and supports web users and service accounts.\n\n### Authentication Flows\n- **Web users**: (Refresh Token Grant Type) Authentication via /auth/login → receive JWT access token + HTTP-only refresh cookie → use bearer tokens for API calls\n- **Service accounts**: Clients implement OAuth Client Credentials flow → receive JWT access token → use bearer tokens for API calls\n\n### Token Usage\nAll protected API endpoints require a valid JWT access token in the Authorization header:\n```\nAuthorization: Bearer <jwt-access-token>\n```\n\n**Token Refresh (Web Users):**\n- Client calls `/oauth/token?grant_type=refresh_token` with HTTP-only refresh token cookie\n- API validates refresh token and issues new access token + rotated refresh cookie\n- Client receives new bearer token for subsequent API calls\n\n**Token Refresh (Service Accounts):**\n- Client calls `/oauth/token?grant_type=client_credentials` with client ID/secret\n- API validates credentials and issues new access token\n- Client receives new bearer token for subsequent API calls\n\n**Token Lifetimes:**\n- Access tokens: 30 minutes\n- Refresh tokens: 30 days (web users only)\n\n### CSRF Protection\nThe refresh token used by the /oauth API endpoints is stored in an HttpOnly cookie (to prevent access by JavaScript)\nand marked with SameSite=Strict (to prevent it from being sent in cross-site requests, mitigating CSRF).\n\n### CORS Protection\n\nCORS is used to control which browser-based clients can make cross-origin requests to the API and read responses.\n\nthe `ALLOWED_ORIGINS` environment variable is used to configure the CORS rules.\n\nIn production, you should restrict ALLOWED_ORIGINS to trusted client origins (the server will not start if it is not set)\n\n## Date/Time Handling:\n\n**URL Parameters**: The following ISO 8601 formats are accepted in URL query parameters:\n- 2006-01-02T15:04:05Z (UTC)\n- 2006-01-02T15:04:05+07:00 (with offset)\n- 2006-01-02T15:04:05.999999999Z (nano precision)\n- 2006-01-02 (date only, treated as start of day UTC: 2006-01-02T00:00:00Z)\n\nNote: When including a timestamp with a timezone offset in a query parameter, encode the + sign as %2B (e.g. 2025-08-31T12:00:00%2B07:00). Otherwise, + may be interpreted as a space.\n\n**Response Bodies**: All date/time fields in JSON responses use RFC3339 format (ISO 8601):\n- Example: \"2025-06-03T13:47:47.331787+01:00\"\n\n# UI Endpoints\n\nUI endpoints serve the browser-based management interface.\n\n## Route types\n- **Page handlers** (`GET /admin/*`, `/search`, etc.): return a full HTML page (`200`)\n- **HTMX action handlers** (`PUT`/`POST` to `/ui-api/*`): return an HTML partial (`200`) — either a success or error alert fragment\n\n- see /ui-docs for more information\n\n## Auth\nAll protected routes require a valid session (cookie-based). Unauthenticated requests redirect to `/login`.\nRequests with insufficient role are redirected to `/access-denied`.\n\n## Role requirements\n- **Public** (`/login`, `/register`): no authentication required\n- **Authenticated**: any logged-in user (`/dashboard`, `/search`, `/settings`)\n- **`isnadmin` or `siteadmin`**: ISN account and signal type management\n- **`siteadmin` only**: ISN creation and ownership transfer, role management, signal type creation",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

@@ -10,8 +10,8 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import "github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 
-// AccountStatusPage renders the admin account disable/enable page
-func AccountStatusPage(environment string, users []types.UserOption, serviceAccounts []types.ServiceAccountOption) templ.Component {
+// ManageIsnSignalTypesStatusPage renders the ISN-level signal type enable/disable page
+func ManageIsnSignalTypesStatusPage(environment string, isns []types.IsnOption) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -48,7 +48,7 @@ func AccountStatusPage(environment string, users []types.UserOption, serviceAcco
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Account Status Management</h1><div class=\"card\"><div class=\"card-body\"><p class=\"card-description text-muted\">Enable or disable user and service accounts.</p>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">ISN Signal Type Status Management</h1><div class=\"card\"><div class=\"card-body\"><p class=\"card-description text-muted\">Enable or disable signal types for a specific Information Sharing Network. </p>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -64,7 +64,7 @@ func AccountStatusPage(environment string, users []types.UserOption, serviceAcco
 					}()
 				}
 				ctx = templ.InitializeContext(ctx)
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<u>Disabling</u> an account revokes:<ul><li>all client secrets/one-time secrets for service accounts</li><li>all refresh tokens for web users</li></ul>Disabled accounts will be unable to use the system until they are re-enabled.<br><br><u>Enabling</u> a disabled account automatically restores access for web users.  Service accounts will need a new client secret via the <em>Reissue Credentials</em> feature.")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "Disabling a signal type for this ISN prevents new signals of this type from being submitted to the ISN. Existing signals will remain archived but inaccessible. The signal type remains enabled for other ISNs.")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -74,37 +74,21 @@ func AccountStatusPage(environment string, users []types.UserOption, serviceAcco
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<form hx-put=\"/ui-api/admin/accounts/status\" hx-target=\"#status-result\" hx-swap=\"innerHTML\" class=\"margin-top-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<form hx-put=\"/ui-api/isn/signal-types/manage\" hx-target=\"#status-result\" hx-swap=\"innerHTML\" class=\"margin-top-4\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = AccountTypeSelector().Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = SignalTypeSelectorFieldsWithISN(isns, true).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</div><div class=\"form-group\">")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = AccountSelector(users, serviceAccounts).Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</div><div class=\"form-group\"><label for=\"action\" class=\"form-label\">Action</label> <select id=\"action\" name=\"action\" required class=\"form-select\"><option value=\"\">Select Action...</option> <option value=\"disable\">Disable Account</option> <option value=\"enable\">Enable Account</option></select><p class=\"text-muted text-sm mt-1\">Choose whether to enable or disable the account.</p></div></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Update Account Status</button></div></form></div></div><div id=\"status-result\"><!-- Results will appear here --></div>")
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = AccountTypeSelectorScript().Render(ctx, templ_7745c5c3_Buffer)
-			if templ_7745c5c3_Err != nil {
-				return templ_7745c5c3_Err
-			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"form-group\"><label for=\"action\" class=\"form-label\">Action</label> <select id=\"action\" name=\"action\" required class=\"form-select\"><option value=\"\">Select Action...</option> <option value=\"disable\">Disable</option> <option value=\"enable\">Enable</option></select></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Update Status</button></div></form></div></div><div id=\"status-result\"><!-- Results will appear here --></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = BaseLayout("Account Status Management").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = BaseLayout("ISN Signal Type Status Management").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

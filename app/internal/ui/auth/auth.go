@@ -1,5 +1,7 @@
 package auth
 
+// AuthService provides authentication and authorization services for the UI (sets browser cookies, refreshes tokens)
+
 import (
 	"encoding/base64"
 	"encoding/json"

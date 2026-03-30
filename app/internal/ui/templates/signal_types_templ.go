@@ -198,7 +198,7 @@ func RegisterNewSignalTypeSchemaPage(environment string, isns []types.IsnOption)
 
 // RegisterNewSignalTypeSchemaPageWithOptions renders the register new schema page with pre-populated signal type options
 // Used when we want to populate the dropdown server-side (admin operations)
-func RegisterNewSignalTypeSchemaPageWithOptions(environment string, signalTypes []types.SignalTypeSlugOption) templ.Component {
+func RegisterNewSignalTypeSchemaPageWithOptions(environment string, signalTypes []types.SignalTypeSlug) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -356,7 +356,7 @@ func AddSignalTypeToIsnPage(environment string, isns []types.IsnOption) templ.Co
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, " <div class=\"page-container\"><h1 class=\"page-title\">Add Signal Type with ISN</h1><div class=\"card\"><div class=\"card-body\"><p class=\"card-description text-muted\">Link an existing signal type to an Information Sharing Network by selecting the ISN, signal type, and version.</p><form hx-post=\"/ui-api/signal-types/add\" hx-target=\"#associate-result\" hx-swap=\"innerHTML\" class=\"margin-top-4\"><div class=\"grid grid-cols-1 md:grid-cols-3 gap-4\"><div class=\"form-group\"><label for=\"isn-slug\" class=\"form-label\">ISN</label><div class=\"relative\"><select id=\"isn-slug\" name=\"isn-slug\" required hx-get=\"/ui-api/options/signal-type-slugs-for-isn?include_inactive=false\" hx-target=\"#signal-type-slug\" hx-swap=\"outerHTML\" hx-trigger=\"change\" hx-indicator=\"#isn-loading\" class=\"form-select\"><option value=\"\">Select ISN...</option> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, " <div class=\"page-container\"><h1 class=\"page-title\">Add Signal Type with ISN</h1><div class=\"card\"><div class=\"card-body\"><p class=\"card-description text-muted\">Link an existing signal type to an Information Sharing Network by selecting the ISN, signal type, and version.</p><form hx-post=\"/ui-api/isn/signal-types/add\" hx-target=\"#associate-result\" hx-swap=\"innerHTML\" class=\"margin-top-4\"><div class=\"grid grid-cols-1 md:grid-cols-3 gap-4\"><div class=\"form-group\"><label for=\"isn-slug\" class=\"form-label\">ISN</label><div class=\"relative\"><select id=\"isn-slug\" name=\"isn-slug\" required hx-get=\"/ui-api/options/signal-type-slugs\" hx-target=\"#signal-type-slug\" hx-swap=\"outerHTML\" hx-trigger=\"change\" hx-indicator=\"#isn-loading\" class=\"form-select\"><option value=\"\">Select ISN...</option> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -406,8 +406,7 @@ func AddSignalTypeToIsnPage(environment string, isns []types.IsnOption) templ.Co
 	})
 }
 
-// SignalTypeCreationSuccess renders a success message after signal type creation
-func SignalTypeCreationSuccess(response client.NewSignalTypeResponse) templ.Component {
+func ListSignalTypesPage(environment string, signalTypes []client.SignalTypeDetail) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -428,37 +427,235 @@ func SignalTypeCreationSuccess(response client.NewSignalTypeResponse) templ.Comp
 			templ_7745c5c3_Var13 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Var14 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = Navigation(environment).Render(ctx, templ_7745c5c3_Buffer)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, " <div class=\"page-container\"><h1 class=\"page-title\">Signal Types Configuration</h1><div class=\"card\"><div class=\"card-body\"><p class=\"card-description text-muted\">Registered signal types available on this site.</p>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if len(signalTypes) == 0 {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "<div class=\"alert alert-info mt-4\"><p>No signal types have been registered yet.</p></div>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			} else {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "<div class=\"margin-top-4\"><table class=\"table table-striped\"><thead><tr><th>Title</th><th>Slug</th><th>Version</th><th>Description</th><th>Schema URL</th><th>README URL</th><th>Created At</th></tr></thead> <tbody>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				for _, st := range signalTypes {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<tr><td class=\"font-semibold\">")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var15 string
+					templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(st.Title)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/signal_types.templ`, Line: 271, Col: 47}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "</td><td><code class=\"bg-gray-100 px-2 py-1 rounded text-sm\">")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var16 string
+					templ_7745c5c3_Var16, templ_7745c5c3_Err = templ.JoinStringErrs(st.Slug)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/signal_types.templ`, Line: 272, Col: 76}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var16))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "</code></td><td><code class=\"bg-gray-100 px-2 py-1 rounded text-sm\">")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var17 string
+					templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(st.SemVer)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/signal_types.templ`, Line: 273, Col: 78}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "</code></td><td class=\"text-sm text-muted\">")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var18 string
+					templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(st.Detail)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/signal_types.templ`, Line: 274, Col: 53}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "</td><td class=\"text-sm\">")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					if st.SchemaURL == "" {
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<p class=\"text-muted\">Not provided</p>")
+						if templ_7745c5c3_Err != nil {
+							return templ_7745c5c3_Err
+						}
+					} else {
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<a href=\"")
+						if templ_7745c5c3_Err != nil {
+							return templ_7745c5c3_Err
+						}
+						var templ_7745c5c3_Var19 templ.SafeURL
+						templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(st.SchemaURL))
+						if templ_7745c5c3_Err != nil {
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/signal_types.templ`, Line: 280, Col: 50}
+						}
+						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
+						if templ_7745c5c3_Err != nil {
+							return templ_7745c5c3_Err
+						}
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"text-blue-600 hover:underline\">View</a>")
+						if templ_7745c5c3_Err != nil {
+							return templ_7745c5c3_Err
+						}
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "</td><td class=\"text-sm\">")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					if st.ReadmeURL == "" {
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 39, "<p class=\"text-muted\">Not provided</p>")
+						if templ_7745c5c3_Err != nil {
+							return templ_7745c5c3_Err
+						}
+					} else {
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 40, "<a href=\"")
+						if templ_7745c5c3_Err != nil {
+							return templ_7745c5c3_Err
+						}
+						var templ_7745c5c3_Var20 templ.SafeURL
+						templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL(st.ReadmeURL))
+						if templ_7745c5c3_Err != nil {
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/signal_types.templ`, Line: 289, Col: 50}
+						}
+						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
+						if templ_7745c5c3_Err != nil {
+							return templ_7745c5c3_Err
+						}
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 41, "\" target=\"_blank\" rel=\"noopener noreferrer\" class=\"text-blue-600 hover:underline\">View</a>")
+						if templ_7745c5c3_Err != nil {
+							return templ_7745c5c3_Err
+						}
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "</td><td class=\"text-sm text-muted\">")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var21 string
+					templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(st.CreatedAt)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/signal_types.templ`, Line: 294, Col: 56}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "</td></tr>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 44, "</tbody></table></div>")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 45, "</div></div></div>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = BaseLayout("Signal Types Configuration").Render(templ.WithChildren(ctx, templ_7745c5c3_Var14), templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
+// SignalTypeCreationSuccess renders a success message after signal type creation
+func SignalTypeCreationSuccess(response client.NewSignalTypeResponse) templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var22 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var22 == nil {
+			templ_7745c5c3_Var22 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
 		templ_7745c5c3_Err = SuccessAlert("Signal type created successfully!").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "<div class=\"margin-top-4\"><p><strong>Slug:</strong> <code class=\"text-sm\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 46, "<div class=\"margin-top-4\"><p><strong>Slug:</strong> <code class=\"text-sm\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var14 string
-		templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs(response.Slug)
+		var templ_7745c5c3_Var23 string
+		templ_7745c5c3_Var23, templ_7745c5c3_Err = templ.JoinStringErrs(response.Slug)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/signal_types.templ`, Line: 243, Col: 65}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/signal_types.templ`, Line: 312, Col: 65}
 		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "</code></p><p><strong>Version:</strong> <code class=\"text-sm\">")
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var23))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		var templ_7745c5c3_Var15 string
-		templ_7745c5c3_Var15, templ_7745c5c3_Err = templ.JoinStringErrs(response.SemVer)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/signal_types.templ`, Line: 244, Col: 70}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var15))
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 47, "</code></p><p><strong>Version:</strong> <code class=\"text-sm\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "</code></p></div>")
+		var templ_7745c5c3_Var24 string
+		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.JoinStringErrs(response.SemVer)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/signal_types.templ`, Line: 313, Col: 70}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var24))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 48, "</code></p></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -482,12 +679,12 @@ func TitleInput() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var16 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var16 == nil {
-			templ_7745c5c3_Var16 = templ.NopComponent
+		templ_7745c5c3_Var25 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var25 == nil {
+			templ_7745c5c3_Var25 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 30, "<label for=\"title\" class=\"form-label\">Title</label> <input id=\"title\" name=\"title\" type=\"text\" required class=\"form-input\" placeholder=\"unique title for the signal type\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 49, "<label for=\"title\" class=\"form-label\">Title</label> <input id=\"title\" name=\"title\" type=\"text\" required class=\"form-input\" placeholder=\"unique title for the signal type\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -511,12 +708,12 @@ func VersionNumberSelector() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var17 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var17 == nil {
-			templ_7745c5c3_Var17 = templ.NopComponent
+		templ_7745c5c3_Var26 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var26 == nil {
+			templ_7745c5c3_Var26 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 31, "<label for=\"bump-type\" class=\"form-label\">Version No.</label> <select id=\"bump-type\" name=\"bump-type\" required class=\"form-select\"><option value=\"\">Select version</option> <option value=\"patch\">Patch (0.0.1)</option> <option value=\"minor\">Minor (0.1.0)</option> <option value=\"major\">Major (1.0.0)</option></select>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 50, "<label for=\"bump-type\" class=\"form-label\">Version No.</label> <select id=\"bump-type\" name=\"bump-type\" required class=\"form-select\"><option value=\"\">Select version</option> <option value=\"patch\">Patch (0.0.1)</option> <option value=\"minor\">Minor (0.1.0)</option> <option value=\"major\">Major (1.0.0)</option></select>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -540,18 +737,18 @@ func SchemaURLInput(skipValidation bool) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var18 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var18 == nil {
-			templ_7745c5c3_Var18 = templ.NopComponent
+		templ_7745c5c3_Var27 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var27 == nil {
+			templ_7745c5c3_Var27 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
 		if skipValidation {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 32, "<div id=\"schema-url-container\"></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 51, "<div id=\"schema-url-container\"></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 33, "<div id=\"schema-url-container\" class=\"form-group\"><label for=\"schema-url\" class=\"form-label\">Schema Validation URL</label> <input id=\"schema-url\" name=\"schema-url\" type=\"url\" required class=\"form-input\" placeholder=\"enter a GitHub URL for the JSON schema\"></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 52, "<div id=\"schema-url-container\" class=\"form-group\"><label for=\"schema-url\" class=\"form-label\">Schema Validation URL</label> <input id=\"schema-url\" name=\"schema-url\" type=\"url\" required class=\"form-input\" placeholder=\"enter a GitHub URL for the JSON schema\"></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -576,18 +773,18 @@ func ReadmeURLInput(skipReadme bool) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var19 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var19 == nil {
-			templ_7745c5c3_Var19 = templ.NopComponent
+		templ_7745c5c3_Var28 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var28 == nil {
+			templ_7745c5c3_Var28 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
 		if skipReadme {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 34, "<div id=\"readme-url-container\"></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 53, "<div id=\"readme-url-container\"></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 35, "<div id=\"readme-url-container\" class=\"form-group\"><label for=\"readme-url\" class=\"form-label\">README URL</label> <input id=\"readme-url\" name=\"readme-url\" type=\"url\" required class=\"form-input\" placeholder=\"enter a GitHub URL for the README file\"></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 54, "<div id=\"readme-url-container\" class=\"form-group\"><label for=\"readme-url\" class=\"form-label\">README URL</label> <input id=\"readme-url\" name=\"readme-url\" type=\"url\" required class=\"form-input\" placeholder=\"enter a GitHub URL for the README file\"></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -612,12 +809,12 @@ func DescriptionInput() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var20 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var20 == nil {
-			templ_7745c5c3_Var20 = templ.NopComponent
+		templ_7745c5c3_Var29 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var29 == nil {
+			templ_7745c5c3_Var29 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<label for=\"detail\" class=\"form-label\">Description</label> <textarea id=\"detail\" name=\"detail\" rows=\"3\" required class=\"form-input\" placeholder=\"Description of the signal type\"></textarea>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 55, "<label for=\"detail\" class=\"form-label\">Description</label> <textarea id=\"detail\" name=\"detail\" rows=\"3\" required class=\"form-input\" placeholder=\"Description of the signal type\"></textarea>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -641,12 +838,12 @@ func SkipReadmeCheckbox() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var21 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var21 == nil {
-			templ_7745c5c3_Var21 = templ.NopComponent
+		templ_7745c5c3_Var30 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var30 == nil {
+			templ_7745c5c3_Var30 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 37, "<input type=\"checkbox\" name=\"skip-readme\" id=\"skip-readme\" value=\"true\" class=\"checkbox-input\" hx-get=\"/ui-api/toggles/skip-readme\" hx-target=\"#readme-url-container\" hx-swap=\"outerHTML\"> <label for=\"skip-readme\">Skip Readme</label>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "<input type=\"checkbox\" name=\"skip-readme\" id=\"skip-readme\" value=\"true\" class=\"checkbox-input\" hx-get=\"/ui-api/toggles/skip-readme\" hx-target=\"#readme-url-container\" hx-swap=\"outerHTML\"> <label for=\"skip-readme\">Skip Readme</label>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -670,12 +867,12 @@ func SkipValidationCheckbox() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var22 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var22 == nil {
-			templ_7745c5c3_Var22 = templ.NopComponent
+		templ_7745c5c3_Var31 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var31 == nil {
+			templ_7745c5c3_Var31 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 38, "<input type=\"checkbox\" name=\"skip-validation\" id=\"skip-validation\" value=\"true\" class=\"checkbox-input\" hx-get=\"/ui-api/toggles/skip-validation\" hx-target=\"#schema-url-container\" hx-swap=\"outerHTML\"> <label for=\"skip-validation\">Skip JSON Schema Validation</label>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 57, "<input type=\"checkbox\" name=\"skip-validation\" id=\"skip-validation\" value=\"true\" class=\"checkbox-input\" hx-get=\"/ui-api/toggles/skip-validation\" hx-target=\"#schema-url-container\" hx-swap=\"outerHTML\"> <label for=\"skip-validation\">Skip JSON Schema Validation</label>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

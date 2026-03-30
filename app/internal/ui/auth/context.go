@@ -1,5 +1,7 @@
 package auth
 
+// context functions for adding/retrieving the access token details from the context
+
 import (
 	"context"
 

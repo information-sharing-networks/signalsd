@@ -10,7 +10,7 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import "github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 
-func IsnAccountManagementPage(environment string, isns []types.IsnOption, users []types.UserOption, serviceAccounts []types.ServiceAccountOption) templ.Component {
+func ManageIsnAccountsPage(environment string, isns []types.IsnOption, users []types.UserOption, serviceAccounts []types.ServiceAccountOption) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -73,7 +73,7 @@ func IsnAccountManagementPage(environment string, isns []types.IsnOption, users 
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<form hx-put=\"/ui-api/isn/accounts/update\" hx-target=\"#result\" class=\"margin-top-4\"><div class=\"grid grid-cols-1 md:grid-cols-3 gap-4\"><div class=\"form-group\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<form hx-put=\"/ui-api/isn/accounts/manage\" hx-target=\"#result\" class=\"margin-top-4\"><div class=\"grid grid-cols-1 md:grid-cols-3 gap-4\"><div class=\"form-group\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

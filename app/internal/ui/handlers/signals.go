@@ -33,10 +33,10 @@ func (h *HandlerService) SearchSignalsPage(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Convert permissions to ISN list for dropdown
-	isns := h.getIsnOptions(insPerms, false, false)
+	isns := getIsnOptions(insPerms, false, false)
 
 	// Render search page
-	component := templates.SignalSearchPage(h.Environment, isns, insPerms, nil)
+	component := templates.SearchSignalsPage(h.Environment, isns, insPerms, nil)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render signal search page", slog.String("error", err.Error()))
 	}

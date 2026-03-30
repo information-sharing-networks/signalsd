@@ -9,6 +9,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
 // SettingsPage renders the user account settings page
@@ -93,10 +94,14 @@ func (h *HandlerService) GeneratePasswordResetLinkPage(w http.ResponseWriter, r 
 	}
 
 	// Get users from API
-	users, err := h.ApiClient.GetUserOptionsList(accessTokenDetails.AccessToken)
+	rawUsers, err := h.ApiClient.GetUsers(accessTokenDetails.AccessToken)
 	if err != nil {
 		h.renderErrorAlert(w, r, "Failed to load users. Please try again.", "Failed to get users: "+err.Error())
 		return
+	}
+	users := make([]types.UserOption, len(rawUsers))
+	for i, u := range rawUsers {
+		users[i] = types.UserOption{Email: u.Email, UserRole: u.UserRole}
 	}
 
 	if err := templates.GeneratePasswordResetLinkPage(h.Environment, users).Render(r.Context(), w); err != nil {
@@ -170,8 +175,8 @@ func (h *HandlerService) GeneratePasswordResetLink(w http.ResponseWriter, r *htt
 	}
 }
 
-// IsnAdminRoleManagementPage renders the isn admin role management page
-func (h *HandlerService) IsnAdminRoleManagementPage(w http.ResponseWriter, r *http.Request) {
+// ManageIsnAdminRolesPage renders the isn admin role management page
+func (h *HandlerService) ManageIsnAdminRolesPage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
@@ -181,7 +186,7 @@ func (h *HandlerService) IsnAdminRoleManagementPage(w http.ResponseWriter, r *ht
 	}
 
 	// Fetch users for dropdown
-	users, err := h.ApiClient.GetUserOptionsList(accessTokenDetails.AccessToken)
+	rawUsers, err := h.ApiClient.GetUsers(accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get users list", slog.String("error", err.Error()))
 		component := templates.ErrorAlert("Failed to load users. Please try again.")
@@ -190,16 +195,20 @@ func (h *HandlerService) IsnAdminRoleManagementPage(w http.ResponseWriter, r *ht
 		}
 		return
 	}
+	users := make([]types.UserOption, len(rawUsers))
+	for i, u := range rawUsers {
+		users[i] = types.UserOption{Email: u.Email, UserRole: u.UserRole}
+	}
 
 	// Render isn admin role management page
-	component := templates.IsnAdminRoleManagementPage(h.Environment, users)
+	component := templates.ManageIsnAdminRolesPage(h.Environment, users)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render isn admin role management page", slog.String("error", err.Error()))
 	}
 }
 
-// AccountStatusPage renders the account status management page
-func (h *HandlerService) AccountStatusPage(w http.ResponseWriter, r *http.Request) {
+// ManageAccountStatusPage renders the account status management page (enable or disable users and service accounts)
+func (h *HandlerService) ManageAccountStatusPage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
@@ -209,7 +218,7 @@ func (h *HandlerService) AccountStatusPage(w http.ResponseWriter, r *http.Reques
 	}
 
 	// Fetch users for dropdown
-	users, err := h.ApiClient.GetUserOptionsList(accessTokenDetails.AccessToken)
+	rawUsers, err := h.ApiClient.GetUsers(accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get users list", slog.String("error", err.Error()))
 		component := templates.ErrorAlert("Failed to load users. Please try again.")
@@ -218,9 +227,13 @@ func (h *HandlerService) AccountStatusPage(w http.ResponseWriter, r *http.Reques
 		}
 		return
 	}
+	users := make([]types.UserOption, len(rawUsers))
+	for i, u := range rawUsers {
+		users[i] = types.UserOption{Email: u.Email, UserRole: u.UserRole}
+	}
 
 	// Fetch service accounts for dropdown
-	serviceAccounts, err := h.ApiClient.GetServiceAccountOptionsList(accessTokenDetails.AccessToken)
+	rawServiceAccounts, err := h.ApiClient.GetServiceAccounts(accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get service accounts list", slog.String("error", err.Error()))
 		component := templates.ErrorAlert("Failed to load service accounts. Please try again.")
@@ -229,16 +242,24 @@ func (h *HandlerService) AccountStatusPage(w http.ResponseWriter, r *http.Reques
 		}
 		return
 	}
+	serviceAccounts := make([]types.ServiceAccountOption, len(rawServiceAccounts))
+	for i, sa := range rawServiceAccounts {
+		serviceAccounts[i] = types.ServiceAccountOption{
+			ClientOrganization: sa.ClientOrganization,
+			ClientContactEmail: sa.ClientContactEmail,
+			ClientID:           sa.ClientID,
+		}
+	}
 
 	// Render account status management page
-	component := templates.AccountStatusPage(h.Environment, users, serviceAccounts)
+	component := templates.ManageAccountStatusPage(h.Environment, users, serviceAccounts)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render account status management page", slog.String("error", err.Error()))
 	}
 }
 
-// AdminAccountStatus handles the form submission to enable or disable accounts
-func (h *HandlerService) AdminAccountStatus(w http.ResponseWriter, r *http.Request) {
+// ManageAccountStatus handles the form submission to enable or disable accounts
+func (h *HandlerService) ManageAccountStatus(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Parse form data
@@ -347,8 +368,8 @@ func (h *HandlerService) AdminAccountStatus(w http.ResponseWriter, r *http.Reque
 	}
 }
 
-// SiteAdminRoleManagementPage renders the site admin role management page
-func (h *HandlerService) SiteAdminRoleManagementPage(w http.ResponseWriter, r *http.Request) {
+// MangeSiteAdminRolesPage renders the site admin role management page
+func (h *HandlerService) MangeSiteAdminRolesPage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
@@ -358,7 +379,7 @@ func (h *HandlerService) SiteAdminRoleManagementPage(w http.ResponseWriter, r *h
 	}
 
 	// Fetch users for dropdown
-	users, err := h.ApiClient.GetUserOptionsList(accessTokenDetails.AccessToken)
+	rawUsers, err := h.ApiClient.GetUsers(accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get users list", slog.String("error", err.Error()))
 		component := templates.ErrorAlert("Failed to load users. Please try again.")
@@ -367,16 +388,20 @@ func (h *HandlerService) SiteAdminRoleManagementPage(w http.ResponseWriter, r *h
 		}
 		return
 	}
+	users := make([]types.UserOption, len(rawUsers))
+	for i, u := range rawUsers {
+		users[i] = types.UserOption{Email: u.Email, UserRole: u.UserRole}
+	}
 
 	// Render site admin role management page
-	component := templates.SiteAdminRoleManagementPage(h.Environment, users)
+	component := templates.MangeSiteAdminRolesPage(h.Environment, users)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render site admin role management page", slog.String("error", err.Error()))
 	}
 }
 
-// AdminRoleManagement handles the form submission to grant or revoke ISN admin roles
-func (h *HandlerService) AdminRoleManagement(w http.ResponseWriter, r *http.Request) {
+// ManageAdminRoles handles the form submission to grant or revoke ISN admin roles
+func (h *HandlerService) ManageAdminRoles(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Parse form data
@@ -444,8 +469,8 @@ func (h *HandlerService) AdminRoleManagement(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-// SiteAdminRoleManagement handles the form submission to grant or revoke site admin roles
-func (h *HandlerService) SiteAdminRoleManagement(w http.ResponseWriter, r *http.Request) {
+// ManageSiteAdminRoles handles the form submission to grant or revoke site admin roles
+func (h *HandlerService) ManageSiteAdminRoles(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Parse form data

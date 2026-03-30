@@ -13,7 +13,6 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/config"
-	"github.com/information-sharing-networks/signalsd/app/internal/ui/handlers"
 )
 
 const (
@@ -26,6 +25,7 @@ type Server struct {
 	config      *config.Config
 	logger      *slog.Logger
 	authService *auth.AuthService
+	apiClient   *client.Client
 }
 
 // NewStandaloneServer creates a UI server that can run independently of the API
@@ -35,10 +35,11 @@ func NewStandaloneServer(cfg *config.Config, logger *slog.Logger) *Server {
 		config:      cfg,
 		logger:      logger,
 		authService: auth.NewAuthService(cfg.APIBaseURL, cfg.Environment),
+		apiClient:   client.NewClient(cfg.APIBaseURL),
 	}
 
 	s.setupMiddleware()
-	s.RegisterRoutes(s.router)
+	s.RegisterRoutes()
 	return s
 }
 
@@ -51,134 +52,137 @@ func NewIntegratedServer(router *chi.Mux, cfg *config.Config, logger *slog.Logge
 		config:      cfg,
 		logger:      logger,
 		authService: auth.NewAuthService(cfg.APIBaseURL, cfg.Environment),
+		apiClient:   client.NewClient(cfg.APIBaseURL),
 	}
 
-	s.RegisterRoutes(s.router)
+	s.RegisterRoutes()
 	return s
 }
 
-// RegisterRoutes registers UI routes on the signalsd router - use when running the integrated ui.
+// RegisterRoutes registers UI routes on the server's router.
 // note: dynamic HMTX handlers are registered with routes starting /ui-api
-func (s *Server) RegisterRoutes(router *chi.Mux) {
-
-	handlerService := &handlers.HandlerService{
-		AuthService: auth.NewAuthService(s.config.APIBaseURL, s.config.Environment),
-		ApiClient:   client.NewClient(s.config.APIBaseURL),
-		Environment: s.config.Environment,
-	}
+func (s *Server) RegisterRoutes() {
 	// Public routes (no auth required)
-	router.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("./web/static/"))))
-	router.Get("/login", handlerService.LoginPage)
-	router.Post("/login", handlerService.Login)
-	router.Post("/logout", handlerService.Logout)
-	router.Get("/register", handlerService.RegisterPage)
-	router.Post("/register", handlerService.Register)
+	s.router.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("./web/static/"))))
+	s.router.Get("/login", s.LoginPage)
+	s.router.Post("/login", s.Login)
+	s.router.Post("/logout", s.Logout)
+	s.router.Get("/register", s.RegisterPage)
+	s.router.Post("/register", s.Register)
 
 	// redirects to dashboard if authenticated, login if not
-	router.Get("/", handlerService.HomePage)
+	s.router.Get("/", s.HomePage)
 
-	router.Group(func(r chi.Router) {
-		// Protected routes - require valid access token
+	// Protected routes - require valid access token
+	s.router.Group(func(r chi.Router) {
 		r.Use(s.authService.RequireAuth)
 		r.Use(s.authService.AddAccountIDToLogContext)
 
 		// entry point after login
-		r.Get("/dashboard", handlerService.DashboardPage)
+		r.Get("/dashboard", s.DashboardPage)
 
 		// account settings
-		r.Get("/settings", handlerService.SettingsPage)
-		r.Put("/ui-api/account/password", handlerService.UpdatePassword)
+		r.Get("/settings", s.SettingsPage)
+		r.Put("/ui-api/account/password", s.UpdatePassword)
 
 		// auth
-		r.Get("/access-denied", handlerService.AccessDeniedPage)
+		r.Get("/access-denied", s.AccessDeniedPage)
 
 		// HTMX endpoints for cascading signal type dropdowns
-		r.Get("/ui-api/options/signal-type-slugs", handlerService.RenderSignalTypeSlugOptions)
-		r.Get("/ui-api/options/signal-type-slugs-for-isn", handlerService.RenderSignalTypeSlugsForIsnOptions)
-		r.Get("/ui-api/options/signal-type-versions", handlerService.RenderSignalTypeVersionOptions)
+		r.Get("/ui-api/options/signal-type-slugs", s.APISignalTypeSlugs)
+		r.Get("/ui-api/options/signal-type-versions", s.APISignalTypeVersions)
+		r.Get("/ui-api/options/isn/signal-type-slugs", s.TokenSignalTypeSlugs)
+		r.Get("/ui-api/options/isn/signal-type-versions", s.TokenSignalTypeVersions)
 
 		// checkbox toggles
-		r.Get("/ui-api/toggles/skip-validation", handlerService.ToggleSkipValidation)
-		r.Get("/ui-api/toggles/skip-readme", handlerService.ToggleSkipReadme)
+		r.Get("/ui-api/toggles/skip-validation", s.ToggleSkipValidation)
+		r.Get("/ui-api/toggles/skip-readme", s.ToggleSkipReadme)
 
+		// these routes are only relevant where accounts have been granted access to one or more ISNs
 		r.Group(func(r chi.Router) {
-			// these routes are only relevant where accounts have been granted access to one or more ISNs
 			r.Use(s.authService.RequireIsnAccess)
 
 			// search signals
-			r.Get("/search", handlerService.SearchSignalsPage)
-			r.Get("/ui-api/signals/search", handlerService.SearchSignals)
-			r.Get("/ui-api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}/correlated-count/{count}", handlerService.GetLatestCorrelatedSignals)
+			r.Get("/search", s.SearchSignalsPage)
+			r.Get("/ui-api/signals/search", s.SearchSignals)
+			r.Get("/ui-api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}/correlated-count/{count}", s.GetLatestCorrelatedSignals)
 		})
 
+		// admin routes (isnadmin or siteadmin)
 		r.Group(func(r chi.Router) {
 
-			// ISN Admin routes
 			r.Use(s.authService.RequireRole("isnadmin", "siteadmin"))
 			r.Use(s.authService.AddAccountIDToLogContext)
 
 			//dashboard
-			r.Get("/admin", handlerService.IsnAdminDashboardPage)
+			r.Get("/admin", s.IsnAdminDashboardPage)
 
 			// user management
-			r.Get("/admin/users/generate-password-reset-link", handlerService.GeneratePasswordResetLinkPage)
-			r.Put("/ui-api/users/generate-password-reset-link", handlerService.GeneratePasswordResetLink)
+			r.Get("/admin/users/generate-password-reset-link", s.GeneratePasswordResetLinkPage)
+			r.Put("/ui-api/users/generate-password-reset-link", s.GeneratePasswordResetLink)
 
 			//isn creation
-			r.Get("/admin/isn/create", handlerService.CreateIsnPage)
-			r.Post("/ui-api/isn/create", handlerService.CreateIsn)
+			r.Get("/admin/isn/create", s.CreateIsnPage)
+			r.Post("/ui-api/isn/create", s.CreateIsn)
 
-			// ISN status management
-			r.Get("/admin/isn/status", handlerService.IsnStatusPage)
-			r.Put("/ui-api/isn/status", handlerService.IsnStatus)
+			// ISN status management (enable/disable ISNs)
+			r.Get("/admin/isn/manage", s.ManageIsnStatusPage)
+			r.Put("/ui-api/isn/manage", s.ManageIsnStatus)
 
 			// service accounts
-			r.Get("/admin/service-accounts/create", handlerService.CreateServiceAccountsPage)
-			r.Get("/admin/service-accounts/reissue-credentials", handlerService.ReissueServiceAccountCredentialsPage)
-			r.Post("/ui-api/service-accounts/create", handlerService.CreateServiceAccount)
-			r.Put("/ui-api/service-accounts/reissue-credentials", handlerService.ReissueServiceAccountCredentials)
+			r.Get("/admin/service-accounts/create", s.CreateServiceAccountsPage)
+			r.Post("/ui-api/service-accounts/create", s.CreateServiceAccount)
 
-			// Account enabled/disabled status management
-			r.Get("/admin/accounts/status", handlerService.AccountStatusPage)
-			r.Put("/ui-api/admin/accounts/status", handlerService.AdminAccountStatus)
+			r.Get("/admin/service-accounts/reissue-credentials", s.ReissueServiceAccountCredentialsPage)
+			r.Put("/ui-api/service-accounts/reissue-credentials", s.ReissueServiceAccountCredentials)
 
-			r.Group(func(r chi.Router) {
-				// the below features are only relevant to admins that have created one or more ISN
-				r.Use(s.authService.RequireIsnAdmin)
-
-				// signal types
-				r.Get("/admin/signal-types/create", handlerService.CreateSignalTypePage)
-				r.Get("/admin/signal-types/register-new-schema", handlerService.RegisterNewSignalTypeSchemaPage)
-				r.Get("/admin/signal-types/add", handlerService.AddSignalTypeToIsnPage)
-				r.Get("/admin/signal-types/config", handlerService.SignalTypesConfigPage)
-				r.Post("/ui-api/signal-types/create", handlerService.CreateSignalType)
-				r.Put("/ui-api/signal-types/register-new-schema", handlerService.RegisterNewSignalTypeSchema)
-				r.Post("/ui-api/signal-types/add", handlerService.AddSignalTypeToIsn)
-				r.Get("/admin/signal-types/isn-status", handlerService.IsnSignalTypeStatusPage)
-				r.Put("/ui-api/isn-signal-types/status", handlerService.AdminIsnSignalTypeStatus)
-
-				// isn account permissions
-				r.Get("/admin/isn/accounts/update", handlerService.UpdateIsnAccountsPage)
-				r.Put("/ui-api/isn/accounts/update", handlerService.UpdateIsnAccounts)
-			})
-
-			r.Group(func(r chi.Router) {
-				// site admin only
-				r.Use(s.authService.RequireRole("siteadmin"))
-
-				// ISN ownership transfer
-				r.Get("/admin/isn/transfer-ownership", handlerService.TransferOwnershipPage)
-				r.Put("/ui-api/isn/transfer-ownership", handlerService.TransferOwnership)
-
-				// ISN Admin role management
-				r.Get("/admin/accounts/isn-admin-role", handlerService.IsnAdminRoleManagementPage)
-				r.Put("/ui-api/admin/accounts/isn-admin-role", handlerService.AdminRoleManagement)
-
-				// Site Admin role management
-				r.Get("/admin/accounts/site-admin-role", handlerService.SiteAdminRoleManagementPage)
-				r.Put("/ui-api/admin/accounts/site-admin-role", handlerService.SiteAdminRoleManagement)
-			})
+			// Account management (enable/disable accounts)
+			r.Get("/admin/accounts/manage", s.ManageAccountStatusPage)
+			r.Put("/ui-api/accounts/manage", s.ManageAccountStatus)
 		})
+
+		// isn admin routes
+		r.Group(func(r chi.Router) {
+			// the below features are only relevant to admins that have created one or more ISN
+			r.Use(s.authService.RequireIsnAdmin)
+
+			r.Get("/admin/signal-types/list", s.ListSignalTypesPage)
+
+			// isn configuration
+			r.Get("/admin/isn/accounts/manage", s.ManageIsnAccountsPage)
+			r.Put("/ui-api/isn/accounts/manage", s.ManageIsnAccounts)
+
+			r.Get("/admin/isn/signal-types/add", s.AddSignalTypeToIsnPage)
+			r.Post("/ui-api/isn/signal-types/add", s.AddSignalTypeToIsn)
+
+			r.Get("/admin/isn/signal-types/manage", s.ManageIsnSignalTypesStatusPage)
+			r.Put("/ui-api/isn/signal-types/manage", s.ManageIsnSignalTypesStatus)
+		})
+
+		// site admin only
+		r.Group(func(r chi.Router) {
+			r.Use(s.authService.RequireRole("siteadmin"))
+
+			// ISN ownership transfer
+			r.Get("/admin/isn/transfer-ownership", s.TransferOwnershipPage)
+			r.Put("/ui-api/isn/transfer-ownership", s.TransferOwnership)
+
+			// ISN Admin role management
+			r.Get("/admin/accounts/isn-admins/manage", s.ManageIsnAdminRolesPage)
+			r.Put("/ui-api/accounts/isn-admins/manage", s.ManageAdminRoles)
+
+			// Site Admin role management
+			r.Get("/admin/accounts/site-admins/manage", s.MangeSiteAdminRolesPage)
+			r.Put("/ui-api/accounts/site-admins/manage", s.ManageSiteAdminRoles)
+
+			// signal types
+			r.Get("/admin/signal-types/create", s.CreateSignalTypePage)
+			r.Post("/ui-api/signal-types/create", s.CreateSignalType)
+
+			r.Get("/admin/signal-types/register-new-schema", s.RegisterNewSignalTypeSchemaPage)
+			r.Put("/ui-api/signal-types/register-new-schema", s.RegisterNewSignalTypeSchema)
+		})
+
 	})
 }
 

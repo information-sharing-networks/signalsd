@@ -680,13 +680,13 @@ func (s *SignalTypeHandler) DeleteSignalTypeHandler(w http.ResponseWriter, r *ht
 //
 //	@Tags			Signal Types
 //
-//	@Param			signal_type_slug	path	string	true	"signal type slug"			example(sample-signal)
-//	@Param			sem_ver				path	string	true	"version to be recieved"	example(0.0.1)
+//	@Param			signal_type_slug	path		string	true	"signal type slug"			example(sample-signal)
+//	@Param			sem_ver				path		string	true	"version to be recieved"	example(0.0.1)
 //
-//	@Success		200	{object}	handlers.SignalTypeDetail
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		404	{object}	responses.ErrorResponse
-//	@Failure		500	{object}	responses.ErrorResponse
+//	@Success		200					{object}	handlers.SignalTypeDetail
+//	@Failure		400					{object}	responses.ErrorResponse
+//	@Failure		404					{object}	responses.ErrorResponse
+//	@Failure		500					{object}	responses.ErrorResponse
 //
 //	@Router			/api/admin/signal-types/{signal_type_slug}/v{sem_ver} [get]
 func (s *SignalTypeHandler) GetSignalTypeHandler(w http.ResponseWriter, r *http.Request) {

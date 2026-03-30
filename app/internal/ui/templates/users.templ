@@ -20,7 +20,7 @@ templ GeneratePasswordResetLinkPage(environment string, users []types.UserOption
                     <b>Warning</b> anyone in possession of the link can reset the password of the associated account. The link should be treated as sensitive and handled accordingly.
                     }
                     <div class="form-group">
-                        @UserOptionsSelector(users)
+                        @UserSelector(users)
                     </div>
 
 					<div class="form-group margin-top-4">

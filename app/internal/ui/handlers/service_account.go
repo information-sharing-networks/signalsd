@@ -8,6 +8,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
 func (h *HandlerService) CreateServiceAccountsPage(w http.ResponseWriter, r *http.Request) {
@@ -29,13 +30,22 @@ func (h *HandlerService) ReissueServiceAccountCredentialsPage(w http.ResponseWri
 	}
 
 	// Get service accounts from API
-	serviceAccounts, err := h.ApiClient.GetServiceAccountOptionsList(accessTokenDetails.AccessToken)
+	serviceAccounts, err := h.ApiClient.GetServiceAccounts(accessTokenDetails.AccessToken)
 	if err != nil {
 		h.renderErrorAlert(w, r, "Failed to load service accounts. Please try again.", "Failed to get service accounts: "+err.Error())
 		return
 	}
 
-	if err := templates.ReissueServiceAccountCredentialsPage(h.Environment, serviceAccounts).Render(r.Context(), w); err != nil {
+	saOptions := make([]types.ServiceAccountOption, len(serviceAccounts))
+	for i, sa := range serviceAccounts {
+		saOptions[i] = types.ServiceAccountOption{
+			ClientOrganization: sa.ClientOrganization,
+			ClientContactEmail: sa.ClientContactEmail,
+			ClientID:           sa.ClientID,
+		}
+	}
+
+	if err := templates.ReissueServiceAccountCredentialsPage(h.Environment, saOptions).Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render ReissueServiceAccount template", slog.String("error", err.Error()))
 	}
 }

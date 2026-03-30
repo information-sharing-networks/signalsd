@@ -2,8 +2,8 @@ package templates
 
 import "github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 
-// SiteAdminRoleManagementPage renders the site admin role management page
-templ SiteAdminRoleManagementPage(environment string, users []types.UserOption) {
+// MangeSiteAdminRolesPage renders the site admin role management page
+templ MangeSiteAdminRolesPage(environment string, users []types.UserOption) {
 	@BaseLayout("Site Admin Role Management") {
 		@Navigation(environment)
 		<div class="page-container">
@@ -26,7 +26,7 @@ templ SiteAdminRoleManagementPage(environment string, users []types.UserOption) 
 					}
 					
 					<form 
-						hx-put="/ui-api/admin/accounts/site-admin-role"
+						hx-put="/ui-api/accounts/site-admins/manage"
 						hx-target="#role-result"
 						hx-swap="innerHTML"
 						class="margin-top-4">
