@@ -276,7 +276,7 @@ func (a *TokenHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.
 
 // RotateServiceAccountSecretHandler godoc
 //
-//	@Summary		Rotate service account client secret
+//	@Summary		Rotate Service Account Client Secret
 //	@Description	Self-service endpoint for service accounts to rotate their client secret.
 //	@Description	This endpoint requires current valid client_id and client_secret for authentication.
 //	@Description	The old secret remains valid for 5 minutes to prevent race conditions when multiple instances are involved and to stop clients being locked out where network issues prevent them from receiving the new secret immediately.

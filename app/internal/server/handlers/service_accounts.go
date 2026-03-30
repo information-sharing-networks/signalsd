@@ -73,7 +73,7 @@ type SetupPageData struct {
 
 // RegisterServiceAccountHandler godocs
 //
-//	@Summary		Register service account
+//	@Summary		Register Service Account
 //	@Description	Registring a new service account creates a one-time link with the client credentials in it - this must be used by the client within 48 hrs.
 //	@Description
 //	@Description	Note that where an organization needs more than one service account they must supply unique contact emails for each account.
@@ -82,7 +82,7 @@ type SetupPageData struct {
 //	@Description
 //	@Description	You have to be an admin to use this end point
 //	@Description
-//	@Tags		Service Accounts
+//	@Tags		Account Management
 //
 //	@Param		request	body		handlers.CreateServiceAccountRequest	true	"service account details"
 //
@@ -260,7 +260,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 
 // ReissueServiceAccountCredentialsHandler godocs
 //
-//	@Summary		Reissue service account credentials
+//	@Summary		Reissue Service Account Credentials
 //	@Description	Reissue credentials for an existing service account.
 //	@Description	This creates a new one-time link with fresh client credentials - this must be used by the client within 48 hrs.
 //	@Description
@@ -270,7 +270,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 //	@Description
 //	@Description	You have to be an site or ISN admin to use this endpoint
 //	@Description
-//	@Tags		Service Accounts
+//	@Tags		Account Management
 //
 //	@Param		request	body		handlers.ReissueServiceAccountCredentialsRequest	true	"service account details"
 //
@@ -435,12 +435,12 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentialsHandler(w http.R
 
 // SetupServiceAccountHandler godoc
 //
-//	@Summary		Complete service account setup
+//	@Summary		Complete Service Account Setup
 //	@Description	Exchange one-time setup token for permanent client credentials (the one-time request url is created when a new service account is registered).
 //	@Description	the endpoint renders a html page that the user can use to copy their client credentials.
 //	@Description	The setup url is only valid for 48 hours.
 //	@Description
-//	@Tags		Service Accounts
+//	@Tags		Account Management
 //
 //	@Param		setup_id	path	string	true	"One-time setup ID"	example(550e8400-e29b-41d4-a716-446655440000)
 //

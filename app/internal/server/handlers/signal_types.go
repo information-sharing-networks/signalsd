@@ -75,7 +75,7 @@ type SignalTypeDetail struct {
 
 // CreateSignalTypeHandler godoc
 //
-//	@Summary		Create signal type
+//	@Summary		Create Signal Type
 //
 //	@Description	Signal types specify a record that can be shared over the ISN
 //	@Description	- Each type has a unique title and this is used to create a URL-friendly slug
@@ -100,7 +100,7 @@ type SignalTypeDetail struct {
 //	@Description
 //	@Description	Note: this endpoint can only be used by site admins
 //
-//	@Tags			Signal Type Definitions
+//	@Tags			Signal Types
 //
 //	@Param			request	body		handlers.CreateSignalTypeRequest	true	"signal type details"
 //
@@ -276,14 +276,16 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 
 // RegisterNewSignalTypeSchemaHandler godoc
 //
-//	@Summary		Registe a new schema for an existing signal type
+//	@Summary		Register a New Schema
+//	@Description	Registers a new schema for an existing signal type
+//	@Description
 //	@Description	You must specify a schema_url that has not been previously registered for this signal type.
 //	@Description
 //	@Description	Use the bump_type (major/minor/patch) parameter to determine how the version number should be incremented.
 //	@Description
 //	@Description	Note: this endpoint can only be used by site admins
 //
-//	@Tags			Signal Type Definitions
+//	@Tags			Signal Types
 //
 //	@Param			signal_type_slug	path		string										true	"signal type slug"	example(sample-signal)
 //	@Param			request				body		handlers.RegisterNewSignalTypeSchemaRequest	true	"signal type details"
@@ -467,9 +469,8 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchemaHandler(w http.ResponseWr
 
 // UpdateSignalTypeHandler godoc
 //
-//	@Summary		Update signal type
-//	@Description	users can mark the signal type as *in use/not in use* and update the description or link to the readme file
-//	@Description	Signal types marked as 'not in use' are not returned in signal searches and can not receive new signals
+//	@Summary		Update a Signal Type
+//	@Description	Update the description or link to the readme file
 //	@Description
 //	@Description	Note: this endpoint can only be used by site admins
 //
@@ -477,7 +478,7 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchemaHandler(w http.ResponseWr
 //	@Param			sem_ver				path	string								true	"Sem ver"			example(0.0.1)
 //	@Param			request				body	handlers.UpdateSignalTypeRequest	true	"signal type details to be updated"
 //
-//	@Tags			Signal Type Definitions
+//	@Tags			Signal Types
 //
 //	@Success		204
 //	@Failure		400	{object}	responses.ErrorResponse
@@ -591,13 +592,13 @@ func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *ht
 
 // DeleteSignalTypeHandler godoc
 //
-//	@Summary		Delete signal type
+//	@Summary		Delete a Signal Type
 //	@Description	Only signal types that have never been referenced by signals can be deleted
 //
 //	@Param			signal_type_slug	path	string	true	"signal type slug"		example(sample-signal)
 //	@Param			sem_ver				path	string	true	"version to be deleted"	example(0.0.1)
 //
-//	@Tags			Signal Type Definitions
+//	@Tags			Signal Types
 //
 //	@Success		204
 //	@Failure		400	{object}	responses.ErrorResponse
@@ -673,16 +674,14 @@ func (s *SignalTypeHandler) DeleteSignalTypeHandler(w http.ResponseWriter, r *ht
 
 // GetSignalTypeHandler godoc
 //
-//	@Summary		Get Signal Type
+//	@Summary		Get a Signal Type
 //	@Description	Returns the signal type details.
 //	@Description	This endpoint can be used by anyone registered with the site
 //
-//	@Tags			Signal Type Definitions
+//	@Tags			Signal Types
 //
 //	@Param			signal_type_slug	path	string	true	"signal type slug"			example(sample-signal)
 //	@Param			sem_ver				path	string	true	"version to be recieved"	example(0.0.1)
-//
-//	@Tags			Signal Type Definitions
 //
 //	@Success		200	{object}	handlers.SignalTypeDetail
 //	@Failure		400	{object}	responses.ErrorResponse
@@ -744,7 +743,7 @@ func (s *SignalTypeHandler) GetSignalTypeHandler(w http.ResponseWriter, r *http.
 //	@Description	Get details for all the signal types defined on the ISN.
 //	@Description	This endpoint can only be used by any account registered with the site
 //
-//	@Tags			Signal Type Definitions
+//	@Tags			Signal Types
 //
 //	@Success		200	{array}	handlers.SignalTypeDetail
 //
@@ -793,13 +792,13 @@ func (s *SignalTypeHandler) GetSignalTypesHandler(w http.ResponseWriter, r *http
 
 // AddSignalTypeToISNHandler godoc
 //
-//	@Summary		Add signal type to an ISN
+//	@Summary		Add a Signal Type to an ISN
 //	@Description	Link an existing signal type to an ISN
 //	@Description
 //	@Description	Note: this endpoint can only be used by site admins and ISN admins.
 //	@Description	ISN admins can only add signal types to ISNs they own.
 //
-//	@Tags			Signal Type Definitions
+//	@Tags			ISN Configuration
 //
 //	@Param			isn_slug	path	string								true	"ISN slug"	example(sample-isn)
 //	@Param			request		body	handlers.AddSignalTypeToIsnRequest	true	"signal type details"
@@ -907,7 +906,7 @@ func (s *SignalTypeHandler) AddSignalTypeToISNHandler(w http.ResponseWriter, r *
 
 // UpdateIsnSignalTypeStatusHandler godoc
 //
-//	@Summary		Update ISN signal type status
+//	@Summary		Update ISN Signal Type Status
 //	@Description	Enable or disable a signal type for a specific ISN
 //	@Description
 //	@Description	When a signal type is disabled for an ISN, signals of this type can no longer be read or written to the ISN.
@@ -920,7 +919,7 @@ func (s *SignalTypeHandler) AddSignalTypeToISNHandler(w http.ResponseWriter, r *
 //	@Param			sem_ver				path	string								true	"Sem ver"			example(0.0.1)
 //	@Param			request				body	handlers.UpdateSignalTypeRequest	true	"status update request"
 //
-//	@Tags			Signal Type Definitions
+//	@Tags			ISN Configuration
 //
 //	@Success		204
 //	@Failure		400	{object}	responses.ErrorResponse

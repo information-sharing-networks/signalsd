@@ -1025,9 +1025,9 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Disable an account
+      summary: Disable an Account
       tags:
-      - Site Admin
+      - Account Management
   /api/admin/accounts/{account_id}/enable:
     post:
       description: |-
@@ -1067,9 +1067,9 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Enable an account
+      summary: Enable an Account
       tags:
-      - Site Admin
+      - Account Management
   /api/admin/accounts/{account_id}/isn-admin-role:
     delete:
       description: '**This endpoint can only be used by site admin accounts**'
@@ -1093,9 +1093,9 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Revoke admin role
+      summary: Revoke ISN Admin Role
       tags:
-      - Site Admin
+      - Account Management
     put:
       description: |-
         This endpoint grants the ISN admin role to a site member
@@ -1135,9 +1135,9 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Grant ISN admin role
+      summary: Grant ISN Admin Role
       tags:
-      - Site Admin
+      - Account Management
   /api/admin/accounts/{account_id}/site-admin-role:
     delete:
       description: '**This endpoint can only be used by site admin accounts**'
@@ -1161,9 +1161,9 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Revoke site admin role
+      summary: Revoke Site Admin Role
       tags:
-      - Site Admin
+      - Account Management
     put:
       description: |-
         This endpoint grants the site admin role to a user.
@@ -1197,9 +1197,9 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Grant site admin role
+      summary: Grant Site Admin Role
       tags:
-      - Site Admin
+      - Account Management
   /api/admin/isn/{isn_slug}/transfer-ownership:
     put:
       description: |-
@@ -1236,7 +1236,7 @@ paths:
       security:
       - BearerAccessToken: []
       - RefreshTokenCookieAuth: []
-      summary: Transfer ISN ownership
+      summary: Transfer ISN Ownership
       tags:
       - ISN Configuration
   /api/admin/reset:
@@ -1251,7 +1251,7 @@ paths:
           description: Forbidden
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-      summary: reset
+      summary: Site Reset
       tags:
       - Site Admin
   /api/admin/service-accounts:
@@ -1298,9 +1298,9 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Get service accounts
+      summary: Get Service Accounts
       tags:
-      - Site Admin
+      - Account Management
   /api/admin/signal-types:
     get:
       description: |-
@@ -1315,7 +1315,7 @@ paths:
             type: array
       summary: Get Signal Types
       tags:
-      - Signal Type Definitions
+      - Signal Types
     post:
       description: |-
         Signal types specify a record that can be shared over the ISN
@@ -1366,12 +1366,14 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Create signal type
+      summary: Create Signal Type
       tags:
-      - Signal Type Definitions
+      - Signal Types
   /api/admin/signal-types/{signal_type_slug}/schemas:
     post:
       description: |-
+        Registers a new schema for an existing signal type
+
         You must specify a schema_url that has not been previously registered for this signal type.
 
         Use the bump_type (major/minor/patch) parameter to determine how the version number should be incremented.
@@ -1409,9 +1411,9 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Registe a new schema for an existing signal type
+      summary: Register a New Schema
       tags:
-      - Signal Type Definitions
+      - Signal Types
   /api/admin/signal-types/{signal_type_slug}/v{sem_ver}:
     delete:
       description: Only signal types that have never been referenced by signals can
@@ -1450,9 +1452,9 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Delete signal type
+      summary: Delete a Signal Type
       tags:
-      - Signal Type Definitions
+      - Signal Types
     get:
       description: |-
         Returns the signal type details.
@@ -1487,14 +1489,12 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-      summary: Get Signal Type
+      summary: Get a Signal Type
       tags:
-      - Signal Type Definitions
-      - Signal Type Definitions
+      - Signal Types
     put:
       description: |-
-        users can mark the signal type as *in use/not in use* and update the description or link to the readme file
-        Signal types marked as 'not in use' are not returned in signal searches and can not receive new signals
+        Update the description or link to the readme file
 
         Note: this endpoint can only be used by site admins
       parameters:
@@ -1537,9 +1537,9 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Update signal type
+      summary: Update a Signal Type
       tags:
-      - Signal Type Definitions
+      - Signal Types
   /api/admin/users:
     get:
       description: |-
@@ -1581,9 +1581,9 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Get users
+      summary: Get Users
       tags:
-      - Site Admin
+      - Account Management
   /api/admin/users/{user_id}/generate-password-reset-link:
     post:
       description: |-
@@ -1625,9 +1625,9 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Generate password reset link
+      summary: Generate Password Reset Link
       tags:
-      - Site Admin
+      - Account Management
   /api/auth/login:
     post:
       description: |-
@@ -1696,7 +1696,7 @@ paths:
           description: Gone
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-      summary: Display password reset form
+      summary: Display Password Reset Form
       tags:
       - auth
     post:
@@ -1733,7 +1733,7 @@ paths:
           description: Gone
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-      summary: Process password reset token
+      summary: Process Password Reset Token
       tags:
       - auth
   /api/auth/password/reset:
@@ -1760,9 +1760,9 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Password reset (self service)
+      summary: Password Reset (self service)
       tags:
-      - auth
+      - Account Management
   /api/auth/register:
     post:
       description: |-
@@ -1791,7 +1791,7 @@ paths:
           description: 'Conflict with possible error code: resource_already_exists'
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-      summary: Register user
+      summary: Register User
       tags:
       - auth
   /api/auth/service-accounts/register:
@@ -1830,9 +1830,9 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Register service account
+      summary: Register Service Account
       tags:
-      - Service Accounts
+      - Account Management
   /api/auth/service-accounts/reissue-credentials:
     post:
       description: |
@@ -1870,9 +1870,9 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Reissue service account credentials
+      summary: Reissue Service Account Credentials
       tags:
-      - Service Accounts
+      - Account Management
   /api/auth/service-accounts/rotate-secret:
     post:
       description: |
@@ -1902,7 +1902,7 @@ paths:
           description: Internal server error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-      summary: Rotate service account client secret
+      summary: Rotate Service Account Client Secret
       tags:
       - auth
   /api/auth/service-accounts/setup/{setup_id}:
@@ -1933,9 +1933,9 @@ paths:
           description: Gone
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-      summary: Complete service account setup
+      summary: Complete Service Account Setup
       tags:
-      - Service Accounts
+      - Account Management
   /api/isn:
     get:
       description: get a list of the configured ISNs
@@ -2093,17 +2093,17 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Get all accounts with access to an ISN
+      summary: Get ISN account membership
       tags:
-      - ISN Permissions
+      - ISN Configuration
   /api/isn/{isn_slug}/accounts/{account_id}:
     put:
       description: |-
         Update an account's access permission for an ISN. Set both can_read and can_write to false to revoke all access.
 
         This endpoint can only be used by admin accounts:
-        - ISN admins can only update permissions for ISNs they created).
-        - Site admins can update permissions for any ISN
+        - ISN admins can only update membership for ISNs they created).
+        - Site admins can update membership for any ISN
 
         Permissions:
         - Accounts with 'read' permission can view all signals on the ISN.
@@ -2150,9 +2150,9 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Update an account's ISN access permission
+      summary: Grant/Revoke ISN Access
       tags:
-      - ISN Permissions
+      - Account Management
   /api/isn/{isn_slug}/batches:
     post:
       description: |
@@ -2175,7 +2175,7 @@ paths:
             $ref: '#/definitions/handlers.CreateSignalsBatchResponse'
       security:
       - BearerAccessToken: []
-      summary: Create a new signal batch
+      summary: Open a New Signal Batch
       tags:
       - Signal Exchange
   /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}:
@@ -2233,9 +2233,9 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Update ISN signal type status
+      summary: Update ISN Signal Type Status
       tags:
-      - Signal Type Definitions
+      - ISN Configuration
   /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals:
     post:
       description: |-
@@ -2342,7 +2342,7 @@ paths:
             $ref: '#/definitions/handlers.CreateSignalsResponse'
       security:
       - BearerAccessToken: []
-      summary: Create signals
+      summary: Create Signals
       tags:
       - Signal Exchange
   /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search:
@@ -2464,7 +2464,7 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Withdraw a signal
+      summary: Withdraw a Signal
       tags:
       - Signal Exchange
   /api/isn/{isn_slug}/signal-types/add:
@@ -2508,9 +2508,9 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Add signal type to an ISN
+      summary: Add a Signal Type to an ISN
       tags:
-      - Signal Type Definitions
+      - ISN Configuration
   /api/public/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search:
     get:
       description: |-
@@ -2586,7 +2586,7 @@ paths:
             type: string
       summary: Liveness Check
       tags:
-      - Health
+      - Site Admin
   /health/ready:
     get:
       description: Check if the signalsd service is ready to accept traffic.
@@ -2603,7 +2603,7 @@ paths:
             type: string
       summary: Readiness Check
       tags:
-      - Health
+      - Site Admin
   /isn/{isn_slug}/batches/{batch_id}/status:
     get:
       description: |
@@ -2649,7 +2649,7 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-      summary: Get batch processing status
+      summary: Get Batch Status
       tags:
       - Signal Exchange
   /isn/{isn_slug}/batches/search:
@@ -2712,7 +2712,7 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Search for batches
+      summary: Search For Batches
       tags:
       - Signal Exchange
   /oauth/revoke:
@@ -2820,7 +2820,7 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/version.Info'
-      summary: Get API version
+      summary: Get API Version
       tags:
       - Site Admin
 produces:
@@ -2838,6 +2838,8 @@ tags:
 - description: Site adminstration tools. These endpoints can only be used by the accounts
     that have a siteadmin or isnadmin role
   name: Site Admin
+- description: Manage user accounts and service accounts
+  name: Account Management
 - description: Create and manage Information Sharing Networks (ISNs) - these endpoints
     can only be used by the accounts that have a siteadmin or isnadmin role Note that
     ISN admins can only view or update details for ISNs they created.
@@ -2845,6 +2847,6 @@ tags:
 - description: Grant accounts read or write access to an ISN
   name: ISN Permissions
 - description: Define the format of the data being shared in an ISN
-  name: Signal Type Definitions
+  name: Signal Types
 - description: Manage service account end points
   name: Service Accounts

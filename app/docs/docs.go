@@ -33,9 +33,9 @@ const docTemplate = `{
                 ],
                 "description": "**Use Cases:**\n- **Security Incident**: Compromised account needs immediate lockout\n- **Employee Departure**: Remove access for departed staff\n\n**Actions Performed:**\n- Sets ` + "`" + `is_active = false` + "`" + ` (account becomes unusable)\n- Revokes all client secrets/one-time secrets (service accounts)\n- Revokes all refresh tokens (web users)\n\n**Recovery:** Account must be re-enabled by admin via ` + "`" + `/admin/accounts/{id}/enable` + "`" + `\nService accounts will also need a new client secret via ` + "`" + `/api/auth/service-accounts/reissue-credentials` + "`" + `\n\nOnly admins can disable accounts.",
                 "tags": [
-                    "Site Admin"
+                    "Account Management"
                 ],
-                "summary": "Disable an account",
+                "summary": "Disable an Account",
                 "parameters": [
                     {
                         "type": "string",
@@ -80,9 +80,9 @@ const docTemplate = `{
                 ],
                 "description": "**Administrative endpoint to re-enable previously disabled accounts.**\nSets account status to ` + "`" + `is_active = true` + "`" + ` (does not create new tokens).\n\n**Post-Enable Steps Required:**\n- **Service Accounts**: will need a new client secret via ` + "`" + `/api/auth/service-accounts/reissue_credentials` + "`" + `\n- **Web Users**: Can immediately log in again via ` + "`" + `/api/auth/login` + "`" + `\n\nOnly owners and admins can enable accounts.",
                 "tags": [
-                    "Site Admin"
+                    "Account Management"
                 ],
-                "summary": "Enable an account",
+                "summary": "Enable an Account",
                 "parameters": [
                     {
                         "type": "string",
@@ -133,9 +133,9 @@ const docTemplate = `{
                 ],
                 "description": "This endpoint grants the ISN admin role to a site member\n\nAn ISN admin can:\n- Create an ISN\n- Add signal_types to their own ISNs\n- read/write to their own ISNs\n- Grant other accounts read or write access to their ISNs\n\nNote that ISN admins can't change ISNs they don't own (a site admin must use the ` + "`" + `transfer ownership` + "`" + ` endpoint if this is requred)\n\nAn ISN admin also has access to the following site-level functions:\n- Create service accounts\n- Disable/Enable accounts\n- View all users and their email addresses\n- Reset user passwords\n\n**This endpoint can only be used by site admin accounts**",
                 "tags": [
-                    "Site Admin"
+                    "Account Management"
                 ],
-                "summary": "Grant ISN admin role",
+                "summary": "Grant ISN Admin Role",
                 "parameters": [
                     {
                         "type": "string",
@@ -172,9 +172,9 @@ const docTemplate = `{
                 ],
                 "description": "**This endpoint can only be used by site admin accounts**",
                 "tags": [
-                    "Site Admin"
+                    "Account Management"
                 ],
-                "summary": "Revoke admin role",
+                "summary": "Revoke ISN Admin Role",
                 "parameters": [
                     {
                         "type": "string",
@@ -213,9 +213,9 @@ const docTemplate = `{
                 ],
                 "description": "This endpoint grants the site admin role to a user.\n\nA site admin can create and manage any ISN and adminster acounts on the site.\n\nThe following tasks can only be performed by site admins:\n- Create new signal types on the site\n- Register new signal type schemas\n- Transfer ISN ownership between accounts\n- Assign the site admin role to other users\n\n**This endpoint can only be used by site admin accounts**",
                 "tags": [
-                    "Site Admin"
+                    "Account Management"
                 ],
-                "summary": "Grant site admin role",
+                "summary": "Grant Site Admin Role",
                 "parameters": [
                     {
                         "type": "string",
@@ -252,9 +252,9 @@ const docTemplate = `{
                 ],
                 "description": "**This endpoint can only be used by site admin accounts**",
                 "tags": [
-                    "Site Admin"
+                    "Account Management"
                 ],
-                "summary": "Revoke site admin role",
+                "summary": "Revoke Site Admin Role",
                 "parameters": [
                     {
                         "type": "string",
@@ -298,7 +298,7 @@ const docTemplate = `{
                 "tags": [
                     "ISN Configuration"
                 ],
-                "summary": "Transfer ISN ownership",
+                "summary": "Transfer ISN Ownership",
                 "parameters": [
                     {
                         "type": "string",
@@ -348,7 +348,7 @@ const docTemplate = `{
                 "tags": [
                     "Site Admin"
                 ],
-                "summary": "reset",
+                "summary": "Site Reset",
                 "responses": {
                     "200": {
                         "description": "OK"
@@ -371,9 +371,9 @@ const docTemplate = `{
                 ],
                 "description": "Only owners and admins can view service account lists.\n\nTo return a specific service account supply one of the following query parameter combinations:\n-\tid (account ID)\n-\tclient_id\n-\tclient_email \u0026 client_organization\nNo query parameters = return all service accounts\n",
                 "tags": [
-                    "Site Admin"
+                    "Account Management"
                 ],
-                "summary": "Get service accounts",
+                "summary": "Get Service Accounts",
                 "parameters": [
                     {
                         "type": "string",
@@ -433,7 +433,7 @@ const docTemplate = `{
             "get": {
                 "description": "Get details for all the signal types defined on the ISN.\nThis endpoint can only be used by any account registered with the site",
                 "tags": [
-                    "Signal Type Definitions"
+                    "Signal Types"
                 ],
                 "summary": "Get Signal Types",
                 "responses": {
@@ -456,9 +456,9 @@ const docTemplate = `{
                 ],
                 "description": "Signal types specify a record that can be shared over the ISN\n- Each type has a unique title and this is used to create a URL-friendly slug\n- The title and slug fields can't be changed and must be unique for the site\n- The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading\n\nSchema URL Requirements\n- Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)\n- To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json\n\nReadme URL requirements\n- Must be a link to a file ending .md on a public github repo.\n- Use the special URL: https://github.com/skip/readme/main/readme.md to indicate there is no readme\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas\n- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)\n\nAfter creating a signal type, use the AddSignalTypeToIsn endpoint to link it to an ISN.\n\nSignal type definitions are referred to like this: /api/signal-types/{signal_type_slug}/v{sem_ver}\n\nNote: this endpoint can only be used by site admins",
                 "tags": [
-                    "Signal Type Definitions"
+                    "Signal Types"
                 ],
-                "summary": "Create signal type",
+                "summary": "Create Signal Type",
                 "parameters": [
                     {
                         "description": "signal type details",
@@ -505,11 +505,11 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "You must specify a schema_url that has not been previously registered for this signal type.\n\nUse the bump_type (major/minor/patch) parameter to determine how the version number should be incremented.\n\nNote: this endpoint can only be used by site admins",
+                "description": "Registers a new schema for an existing signal type\n\nYou must specify a schema_url that has not been previously registered for this signal type.\n\nUse the bump_type (major/minor/patch) parameter to determine how the version number should be incremented.\n\nNote: this endpoint can only be used by site admins",
                 "tags": [
-                    "Signal Type Definitions"
+                    "Signal Types"
                 ],
-                "summary": "Registe a new schema for an existing signal type",
+                "summary": "Register a New Schema",
                 "parameters": [
                     {
                         "type": "string",
@@ -561,10 +561,9 @@ const docTemplate = `{
             "get": {
                 "description": "Returns the signal type details.\nThis endpoint can be used by anyone registered with the site",
                 "tags": [
-                    "Signal Type Definitions",
-                    "Signal Type Definitions"
+                    "Signal Types"
                 ],
-                "summary": "Get Signal Type",
+                "summary": "Get a Signal Type",
                 "parameters": [
                     {
                         "type": "string",
@@ -616,11 +615,11 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "users can mark the signal type as *in use/not in use* and update the description or link to the readme file\nSignal types marked as 'not in use' are not returned in signal searches and can not receive new signals\n\nNote: this endpoint can only be used by site admins",
+                "description": "Update the description or link to the readme file\n\nNote: this endpoint can only be used by site admins",
                 "tags": [
-                    "Signal Type Definitions"
+                    "Signal Types"
                 ],
-                "summary": "Update signal type",
+                "summary": "Update a Signal Type",
                 "parameters": [
                     {
                         "type": "string",
@@ -686,9 +685,9 @@ const docTemplate = `{
                 ],
                 "description": "Only signal types that have never been referenced by signals can be deleted",
                 "tags": [
-                    "Signal Type Definitions"
+                    "Signal Types"
                 ],
-                "summary": "Delete signal type",
+                "summary": "Delete a Signal Type",
                 "parameters": [
                     {
                         "type": "string",
@@ -747,9 +746,9 @@ const docTemplate = `{
                 ],
                 "description": "This api displays site users and their email addresses (can only be used by admin accounts)\n\n- No query parameters = return all users\n- to return a specific user supply one of the following query parameters: ` + "`" + `?id=uuid` + "`" + ` or ` + "`" + `?email=address` + "`" + `",
                 "tags": [
-                    "Site Admin"
+                    "Account Management"
                 ],
-                "summary": "Get users",
+                "summary": "Get Users",
                 "parameters": [
                     {
                         "type": "string",
@@ -809,9 +808,9 @@ const docTemplate = `{
                 ],
                 "description": "Allows admins to generate a one-time password reset link for a user (use this endpoint when a user has forgotten their password)\n\nThe generated link can be used to reset the password of the associated account using the page rendered by the PasswordResetTokenPageHandler.\nThe generated link expires in 30 minutes and can only be used once.\n\nISN Admins can create links on behalf of users with a member role.  Accounts with the site admin role can create links for ISN admins and members.\n\n**Note:** anyone in possession of the link can reset the password of the associated account. The link should be treated as sensitive and handled accordingly.",
                 "tags": [
-                    "Site Admin"
+                    "Account Management"
                 ],
-                "summary": "Generate password reset link",
+                "summary": "Generate Password Reset Link",
                 "parameters": [
                     {
                         "type": "string",
@@ -908,7 +907,7 @@ const docTemplate = `{
                 "tags": [
                     "auth"
                 ],
-                "summary": "Display password reset form",
+                "summary": "Display Password Reset Form",
                 "parameters": [
                     {
                         "type": "string",
@@ -948,7 +947,7 @@ const docTemplate = `{
                 "tags": [
                     "auth"
                 ],
-                "summary": "Process password reset token",
+                "summary": "Process Password Reset Token",
                 "parameters": [
                     {
                         "type": "string",
@@ -1002,9 +1001,9 @@ const docTemplate = `{
                 ],
                 "description": "Self-service endpoint for users to reset their password.  Requires a valid access token and the current password\n",
                 "tags": [
-                    "auth"
+                    "Account Management"
                 ],
-                "summary": "Password reset (self service)",
+                "summary": "Password Reset (self service)",
                 "parameters": [
                     {
                         "description": "user details",
@@ -1041,7 +1040,7 @@ const docTemplate = `{
                 "tags": [
                     "auth"
                 ],
-                "summary": "Register user",
+                "summary": "Register User",
                 "parameters": [
                     {
                         "description": "user details",
@@ -1081,9 +1080,9 @@ const docTemplate = `{
                 ],
                 "description": "Registring a new service account creates a one-time link with the client credentials in it - this must be used by the client within 48 hrs.\n\nNote that where an organization needs more than one service account they must supply unique contact emails for each account.\n\nTo reissue credentials for an existing service account, use the **Reissue Service Account Credentials** endpoint.\n\nYou have to be an admin to use this end point\n",
                 "tags": [
-                    "Service Accounts"
+                    "Account Management"
                 ],
-                "summary": "Register service account",
+                "summary": "Register Service Account",
                 "parameters": [
                     {
                         "description": "service account details",
@@ -1132,9 +1131,9 @@ const docTemplate = `{
                 ],
                 "description": "Reissue credentials for an existing service account.\nThis creates a new one-time link with fresh client credentials - this must be used by the client within 48 hrs.\n\nThis endpoint revokes all existing client secrets and one-time setup URLs for the service account, then generates new credentials.\n\nThe client_id will remain the same, but a new client_secret will be generated.\n\nYou have to be an site or ISN admin to use this endpoint\n",
                 "tags": [
-                    "Service Accounts"
+                    "Account Management"
                 ],
-                "summary": "Reissue service account credentials",
+                "summary": "Reissue Service Account Credentials",
                 "parameters": [
                     {
                         "description": "service account details",
@@ -1180,7 +1179,7 @@ const docTemplate = `{
                 "tags": [
                     "auth"
                 ],
-                "summary": "Rotate service account client secret",
+                "summary": "Rotate Service Account Client Secret",
                 "parameters": [
                     {
                         "description": "Service account credentials",
@@ -1217,9 +1216,9 @@ const docTemplate = `{
             "get": {
                 "description": "Exchange one-time setup token for permanent client credentials (the one-time request url is created when a new service account is registered).\nthe endpoint renders a html page that the user can use to copy their client credentials.\nThe setup url is only valid for 48 hours.\n",
                 "tags": [
-                    "Service Accounts"
+                    "Account Management"
                 ],
-                "summary": "Complete service account setup",
+                "summary": "Complete Service Account Setup",
                 "parameters": [
                     {
                         "type": "string",
@@ -1440,9 +1439,9 @@ const docTemplate = `{
                 ],
                 "description": "Get a list of all accounts (users and service accounts) that have permissions on the specified ISN.\nOnly ISN admins and site owners can view this information",
                 "tags": [
-                    "ISN Permissions"
+                    "ISN Configuration"
                 ],
-                "summary": "Get all accounts with access to an ISN",
+                "summary": "Get ISN account membership",
                 "parameters": [
                     {
                         "type": "string",
@@ -1491,11 +1490,11 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Update an account's access permission for an ISN. Set both can_read and can_write to false to revoke all access.\n\nThis endpoint can only be used by admin accounts:\n- ISN admins can only update permissions for ISNs they created).\n- Site admins can update permissions for any ISN\n\nPermissions:\n- Accounts with 'read' permission can view all signals on the ISN.\n- Accounts with 'write' permission can create signals on the ISN.\n- For accounts that need read/write access to an ISN, you must grant both 'read' and 'write' permissions.\n\nNote that accounts with 'write' permission to an ISN are also automatically granted 'read'\npermission for signals they created, but can't view other signals on the ISN.\n\nYou must supply values for both can_read and can_write.",
+                "description": "Update an account's access permission for an ISN. Set both can_read and can_write to false to revoke all access.\n\nThis endpoint can only be used by admin accounts:\n- ISN admins can only update membership for ISNs they created).\n- Site admins can update membership for any ISN\n\nPermissions:\n- Accounts with 'read' permission can view all signals on the ISN.\n- Accounts with 'write' permission can create signals on the ISN.\n- For accounts that need read/write access to an ISN, you must grant both 'read' and 'write' permissions.\n\nNote that accounts with 'write' permission to an ISN are also automatically granted 'read'\npermission for signals they created, but can't view other signals on the ISN.\n\nYou must supply values for both can_read and can_write.",
                 "tags": [
-                    "ISN Permissions"
+                    "Account Management"
                 ],
-                "summary": "Update an account's ISN access permission",
+                "summary": "Grant/Revoke ISN Access",
                 "parameters": [
                     {
                         "description": "permission details",
@@ -1559,7 +1558,7 @@ const docTemplate = `{
                 "tags": [
                     "Signal Exchange"
                 ],
-                "summary": "Create a new signal batch",
+                "summary": "Open a New Signal Batch",
                 "responses": {
                     "201": {
                         "description": "Created",
@@ -1579,9 +1578,9 @@ const docTemplate = `{
                 ],
                 "description": "Link an existing signal type to an ISN\n\nNote: this endpoint can only be used by site admins and ISN admins.\nISN admins can only add signal types to ISNs they own.",
                 "tags": [
-                    "Signal Type Definitions"
+                    "ISN Configuration"
                 ],
-                "summary": "Add signal type to an ISN",
+                "summary": "Add a Signal Type to an ISN",
                 "parameters": [
                     {
                         "type": "string",
@@ -1641,9 +1640,9 @@ const docTemplate = `{
                 ],
                 "description": "Enable or disable a signal type for a specific ISN\n\nWhen a signal type is disabled for an ISN, signals of this type can no longer be read or written to the ISN.\n\nNote: this endpoint can only be used by site admins and ISN admins.\nISN admins can only update signal types for ISNs they own.",
                 "tags": [
-                    "Signal Type Definitions"
+                    "ISN Configuration"
                 ],
-                "summary": "Update ISN signal type status",
+                "summary": "Update ISN Signal Type Status",
                 "parameters": [
                     {
                         "type": "string",
@@ -1721,7 +1720,7 @@ const docTemplate = `{
                 "tags": [
                     "Signal Exchange"
                 ],
-                "summary": "Create signals",
+                "summary": "Create Signals",
                 "parameters": [
                     {
                         "type": "string",
@@ -1903,7 +1902,7 @@ const docTemplate = `{
                 "tags": [
                     "Signal Exchange"
                 ],
-                "summary": "Withdraw a signal",
+                "summary": "Withdraw a Signal",
                 "parameters": [
                     {
                         "type": "string",
@@ -2061,7 +2060,7 @@ const docTemplate = `{
                     "text/plain"
                 ],
                 "tags": [
-                    "Health"
+                    "Site Admin"
                 ],
                 "summary": "Liveness Check",
                 "responses": {
@@ -2081,7 +2080,7 @@ const docTemplate = `{
                     "text/plain"
                 ],
                 "tags": [
-                    "Health"
+                    "Site Admin"
                 ],
                 "summary": "Readiness Check",
                 "responses": {
@@ -2111,7 +2110,7 @@ const docTemplate = `{
                 "tags": [
                     "Signal Exchange"
                 ],
-                "summary": "Search for batches",
+                "summary": "Search For Batches",
                 "parameters": [
                     {
                         "type": "boolean",
@@ -2181,7 +2180,7 @@ const docTemplate = `{
                 "tags": [
                     "Signal Exchange"
                 ],
-                "summary": "Get batch processing status",
+                "summary": "Get Batch Status",
                 "parameters": [
                     {
                         "type": "string",
@@ -2316,7 +2315,7 @@ const docTemplate = `{
                 "tags": [
                     "Site Admin"
                 ],
-                "summary": "Get API version",
+                "summary": "Get API Version",
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -3580,6 +3579,10 @@ const docTemplate = `{
             "name": "Site Admin"
         },
         {
+            "description": "Manage user accounts and service accounts",
+            "name": "Account Management"
+        },
+        {
             "description": "Create and manage Information Sharing Networks (ISNs) - these endpoints can only be used by the accounts that have a siteadmin or isnadmin role Note that ISN admins can only view or update details for ISNs they created.",
             "name": "ISN Configuration"
         },
@@ -3589,7 +3592,7 @@ const docTemplate = `{
         },
         {
             "description": "Define the format of the data being shared in an ISN",
-            "name": "Signal Type Definitions"
+            "name": "Signal Types"
         },
         {
             "description": "Manage service account end points",

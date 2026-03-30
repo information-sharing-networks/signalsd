@@ -49,7 +49,7 @@ type UpdatePasswordRequest struct {
 
 // RegisterUserHandler godoc
 //
-//	@Summary		Register user
+//	@Summary		Register User
 //	@Tags			auth
 //
 //	@Param			request	body	handlers.CreateUserRequest	true	"user details"
@@ -198,10 +198,10 @@ func (u *UserHandler) RegisterUserHandler(w http.ResponseWriter, r *http.Request
 
 // UpdatePasswordHandler godoc
 //
-//	@Summary		Password reset (self service)
+//	@Summary		Password Reset (self service)
 //	@Description	Self-service endpoint for users to reset their password.  Requires a valid access token and the current password
 //	@Description
-//	@Tags		auth
+//	@Tags		Account Management
 //
 //	@Param		request	body	handlers.UpdatePasswordRequest	true	"user details"
 //	@Success	204
@@ -299,8 +299,8 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 
 // GrantUserIsnAdminRoleHandler godocs
 //
-//	@Summary		Grant ISN admin role
-//	@Tags			Site Admin
+//	@Summary		Grant ISN Admin Role
+//	@Tags			Account Management
 //
 //	@Description	This endpoint grants the ISN admin role to a site member
 //	@Description
@@ -396,10 +396,10 @@ func (u *UserHandler) GrantUserIsnAdminRoleHandler(w http.ResponseWriter, r *htt
 	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
 }
 
-// RevokeAccountAdmin godocs
+// RevokeUserIsnAdminRoleHandler godocs
 //
-//	@Summary		Revoke admin role
-//	@Tags			Site Admin
+//	@Summary		Revoke ISN Admin Role
+//	@Tags			Account Management
 //
 //	@Description	**This endpoint can only be used by site admin accounts**
 //
@@ -481,8 +481,8 @@ func (u *UserHandler) RevokeUserIsnAdminRoleHandler(w http.ResponseWriter, r *ht
 
 // GrantUserSiteAdminRoleHandler godocs
 //
-//	@Summary		Grant site admin role
-//	@Tags			Site Admin
+//	@Summary		Grant Site Admin Role
+//	@Tags			Account Management
 //
 //	@Description	This endpoint grants the site admin role to a user.
 //	@Description
@@ -575,8 +575,8 @@ func (u *UserHandler) GrantUserSiteAdminRoleHandler(w http.ResponseWriter, r *ht
 
 // RevokeUserSiteAdminRoleHandler godocs
 //
-//	@Summary		Revoke site admin role
-//	@Tags			Site Admin
+//	@Summary		Revoke Site Admin Role
+//	@Tags			Account Management
 //
 //	@Description	**This endpoint can only be used by site admin accounts**
 //
@@ -672,7 +672,7 @@ type PasswordResetPageData struct {
 
 // PasswordResetTokenPageHandler godoc
 //
-//	@Summary		Display password reset form
+//	@Summary		Display Password Reset Form
 //	@Description	Renders a password reset form for users with a valid reset token.
 //	@Description	The reset token is validated and if valid, displays a form for the user to enter a new password.
 //	@Description
@@ -765,7 +765,7 @@ func (u *UserHandler) PasswordResetTokenPageHandler(w http.ResponseWriter, r *ht
 
 // PasswordResetTokenHandler godoc
 //
-//	@Summary		Process password reset token
+//	@Summary		Process Password Reset Token
 //	@Description	Endpoint to handle password requests received from the PasswordResetTokenPageHandler (do not call the endpoint directly)
 //	@Description	The handler validates the token, updates the user password, and consumes the one-time-use token.
 //	@Description	Any user in possession of the token can use it to reset the password of the associated account

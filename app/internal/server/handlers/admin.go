@@ -62,7 +62,7 @@ type AccountStatusResponse struct {
 
 // ResetHandler godoc
 //
-//	@Summary		reset
+//	@Summary		Site Reset
 //	@Description	Delete all registered users and associated data.
 //	@Description	This endpoint only works on environments configured as 'dev'
 //	@Tags			Site Admin
@@ -90,7 +90,7 @@ func (a *AdminHandler) ResetHandler(w http.ResponseWriter, r *http.Request) {
 //
 //	@Summary		Readiness Check
 //	@Description	Check if the signalsd service is ready to accept traffic.
-//	@Tags			Health
+//	@Tags			Site Admin
 //	@Produce		plain
 //
 //	@Success		200	{string}	string	"OK - Service is ready"
@@ -117,7 +117,7 @@ func (a *AdminHandler) ReadinessHandler(w http.ResponseWriter, r *http.Request) 
 //
 //	@Summary		Liveness Check
 //	@Description	Check if the signalsd http service is alive and responding.
-//	@Tags			Health
+//	@Tags			Site Admin
 //	@Produce		plain
 //
 //	@Success		200	{string}	string	"OK - Service is alive"
@@ -131,7 +131,7 @@ func (a *AdminHandler) LivenessHandler(w http.ResponseWriter, r *http.Request) {
 
 // VersionHandler godoc
 //
-//	@Summary		Get API version
+//	@Summary		Get API Version
 //	@Description	Returns the current API version details
 //	@Tags			Site Admin
 //
@@ -144,7 +144,7 @@ func (a *AdminHandler) VersionHandler(w http.ResponseWriter, r *http.Request) {
 
 // DisableAccountHandler godoc
 //
-//	@Summary	Disable an account
+//	@Summary	Disable an Account
 //	@Description
 //	@Description	**Use Cases:**
 //	@Description	- **Security Incident**: Compromised account needs immediate lockout
@@ -159,7 +159,7 @@ func (a *AdminHandler) VersionHandler(w http.ResponseWriter, r *http.Request) {
 //	@Description	Service accounts will also need a new client secret via `/api/auth/service-accounts/reissue-credentials`
 //	@Description
 //	@Description	Only admins can disable accounts.
-//	@Tags			Site Admin
+//	@Tags			Account Management
 //
 //	@Param			account_id	path	string	true	"Account ID to disable"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
@@ -322,7 +322,7 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 
 // EnableAccountHandler godoc
 //
-//	@Summary		Enable an account
+//	@Summary		Enable an Account
 //	@Description	**Administrative endpoint to re-enable previously disabled accounts.**
 //	@Description	Sets account status to `is_active = true` (does not create new tokens).
 //	@Description
@@ -331,7 +331,7 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 //	@Description	- **Web Users**: Can immediately log in again via `/api/auth/login`
 //	@Description
 //	@Description	Only owners and admins can enable accounts.
-//	@Tags			Site Admin
+//	@Tags			Account Management
 //
 //	@Param			account_id	path	string	true	"Account ID to enable"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
@@ -406,12 +406,12 @@ func (a *AdminHandler) EnableAccountHandler(w http.ResponseWriter, r *http.Reque
 
 // GetUsersHandler godoc
 //
-//	@Summary		Get users
+//	@Summary		Get Users
 //	@Description	This api displays site users and their email addresses (can only be used by admin accounts)
 //	@Description
 //	@Description	- No query parameters = return all users
 //	@Description	- to return a specific user supply one of the following query parameters: `?id=uuid` or `?email=address`
-//	@Tags			Site Admin
+//	@Tags			Account Management
 //
 //	@Param			id		query		string					false	"user account ID"		example(68fb5f5b-e3f5-4a96-8d35-cd2203a06f73)
 //	@Param			email	query		string					false	"user email address"	example(user@example.com)
@@ -530,7 +530,7 @@ func (a *AdminHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 
 // GetServiceAccountsHandler godoc
 //
-//	@Summary		Get service accounts
+//	@Summary		Get Service Accounts
 //	@Description	Only owners and admins can view service account lists.
 //	@Description
 //	@Description	To return a specific service account supply one of the following query parameter combinations:
@@ -540,7 +540,7 @@ func (a *AdminHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 //	@Descriotion
 //	@Description	No query parameters = return all service accounts
 //	@Description
-//	@Tags		Site Admin
+//	@Tags		Account Management
 //
 //	@Param		id					query		string	false	"Service Account ID"													example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //	@Param		client_id			query		string	false	"Service Account Client ID"												example(sa_exampleorg_k7j2m9x1)
@@ -721,7 +721,7 @@ type GeneratePasswordResetLinkResponse struct {
 
 // GeneratePasswordResetLinkHandler godoc
 //
-//	@Summary		Generate password reset link
+//	@Summary		Generate Password Reset Link
 //	@Description	Allows admins to generate a one-time password reset link for a user (use this endpoint when a user has forgotten their password)
 //	@Description
 //	@Description	The generated link can be used to reset the password of the associated account using the page rendered by the PasswordResetTokenPageHandler.
@@ -730,7 +730,7 @@ type GeneratePasswordResetLinkResponse struct {
 //	@Description	ISN Admins can create links on behalf of users with a member role.  Accounts with the site admin role can create links for ISN admins and members.
 //	@Description
 //	@Description	**Note:** anyone in possession of the link can reset the password of the associated account. The link should be treated as sensitive and handled accordingly.
-//	@Tags			Site Admin
+//	@Tags			Account Management
 //
 //	@Param			user_id	path		string	true	"User Account ID"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //

@@ -76,7 +76,7 @@ type BatchSearchParams struct {
 
 // CreateSignalsBatchHandler godoc
 //
-//	@Summary		Create a new signal batch
+//	@Summary		Open a New Signal Batch
 //	@Description	This endpoint is used create a new batch for an account on the specified ISN.
 //	@Description	Batches are used to track signals sent by an account to the specified ISN (accounts can only have one open batch at a time on an ISN)
 //	@Description
@@ -179,7 +179,7 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 
 // GetSignalBatchStatusHandler godocs
 //
-//	@Summary		Get batch processing status
+//	@Summary		Get Batch Status
 //	@Description	Returns the status of a batch, including the number of signals loaded and the number of failures for each signal type
 //	@Description
 //	@Description	The endpoint returns the full batch status for the batch
@@ -360,7 +360,7 @@ func (s *SignalsBatchHandler) getBatchStatusDetails(ctx context.Context, batchID
 
 // SearchBatchesHandler godocs
 //
-//	@Summary		Search for batches
+//	@Summary		Search For Batches
 //	@Tags			Signal Exchange
 //
 //	@Description	Search for batches with optional filtering parameters

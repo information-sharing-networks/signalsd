@@ -495,7 +495,7 @@ func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 
 // TransferIsnOwnershipHandler godoc
 //
-//	@Summary		Transfer ISN ownership
+//	@Summary		Transfer ISN Ownership
 //	@Description	Transfer ownership of an ISN to another admin account.
 //	@Description	This can be used when an admin leaves or when reorganizing responsibilities.
 //	@Description	Only site admins can transfer ISN ownership.

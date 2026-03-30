@@ -126,13 +126,16 @@ import (
 //	@tag.name			Site Admin
 //	@tag.description	Site adminstration tools. These endpoints can only be used by the accounts that have a siteadmin or isnadmin role
 
+//	@tag.name			Account Management
+//	@tag.description	Manage user accounts and service accounts
+
 //	@tag.name			ISN Configuration
 //	@tag.description	Create and manage Information Sharing Networks (ISNs) - these endpoints can only be used by the accounts that have a siteadmin or isnadmin role Note that ISN admins can only view or update details for ISNs they created.
 
 //	@tag.name			ISN Permissions
 //	@tag.description	Grant accounts read or write access to an ISN
 
-//	@tag.name			Signal Type Definitions
+//	@tag.name			Signal Types
 //	@tag.description	Define the format of the data being shared in an ISN
 
 // @tag.name			Service Accounts

@@ -304,7 +304,7 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 
 // CreateSignalsHandler godocs
 //
-//	@Summary		Create signals
+//	@Summary		Create Signals
 //	@Tags			Signal Exchange
 //
 //	@Description	Submit an array of signals for storage on the ISN
@@ -1077,7 +1077,7 @@ func (s *SignalsHandler) SearchPrivateSignalsHandler(w http.ResponseWriter, r *h
 
 // WithdrawSignalHandler godoc
 //
-//	@Summary		Withdraw a signal
+//	@Summary		Withdraw a Signal
 //	@Description	Withdraw a signal by local reference
 //	@Description
 //	@Description	Withdrawn signals are hidden from search results by default but remain in the database.

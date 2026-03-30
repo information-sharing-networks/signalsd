@@ -48,14 +48,14 @@ type IsnAccount struct {
 
 // UpdateIsnAccountPermission godocs
 //
-//	@Summary		Update an account's ISN access permission
-//	@Tags			ISN Permissions
+//	@Summary		Grant/Revoke ISN Access
+//	@Tags			Account Management
 //
 //	@Description	Update an account's access permission for an ISN. Set both can_read and can_write to false to revoke all access.
 //	@Description
 //	@Description	This endpoint can only be used by admin accounts:
-//	@Description	- ISN admins can only update permissions for ISNs they created).
-//	@Description	- Site admins can update permissions for any ISN
+//	@Description	- ISN admins can only update membership for ISNs they created).
+//	@Description	- Site admins can update membership for any ISN
 //	@Description
 //	@Description	Permissions:
 //	@Description	- Accounts with 'read' permission can view all signals on the ISN.
@@ -242,8 +242,8 @@ func (i *IsnAccountHandler) UpdateIsnAccountPermissionHandler(w http.ResponseWri
 
 // GetIsnAccountsHandler godoc
 //
-//	@Summary		Get all accounts with access to an ISN
-//	@Tags			ISN Permissions
+//	@Summary		Get ISN account membership
+//	@Tags			ISN Configuration
 //	@Description	Get a list of all accounts (users and service accounts) that have permissions on the specified ISN.
 //	@Description	Only ISN admins and site owners can view this information
 //
