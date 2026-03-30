@@ -207,8 +207,6 @@ Run `make sqlc` to regenerate the type safe Go code after adding or altering any
 
 For information about the testing strategy and how to run indvidual tests, see the [Integration Testing Documentation](app/test/integration/README.md).
 
-details on performance testing are in [Performance Testing Documentation](test/perf/README.md).
-
 ## User Interface
 By default the signalsd service starts with a basic web interface. If you want to modify, replace or disable the UI see the [UI Documentation](app/internal/ui/README.md).
 

@@ -28,9 +28,6 @@ The service runs on http://localhost:8080 with API docs at `/docs`.
 
 Nearly all the testing is done via integration tests that live in `app/test/integration/`.  See the [integration testing guide](app/test/integration/README.md) for more information.
 
-Performance tests are in `test/perf/` - see the [performance testing guide](test/perf/README.md).
-
-
 ## Pull Requests
 
 1. **Keep changes focused** - one logical change per PR
