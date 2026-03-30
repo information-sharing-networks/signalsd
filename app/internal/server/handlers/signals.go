@@ -53,7 +53,7 @@ type CreateSignalsRequest struct {
 
 // structs - partial loads are possible - c.f StoredSignal and FailedSignal
 type CreateSignalsResponse struct {
-	IsnSlug        string               `json:"isn_slug" example:"sample-isn--example-org"`
+	IsnSlug        string               `json:"isn_slug" example:"sample-isn"`
 	SignalTypePath string               `json:"signal_type_path" example:"signal-type-1/v0.0.1"`
 	AccountID      uuid.UUID            `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
 	SignalsBatchID uuid.UUID            `json:"signals_batch_id" example:"b51faf05-aaed-4250-b334-2258ccdf1ff2"`
@@ -354,8 +354,8 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 //	@Description
 //	@Description	request level errors (e.g. invalid json, authentication failure etc) return a simple error_code/error_message response rather than a detailed audit log
 //
-//	@Param			isn_slug			path		string							true	"isn slug"						example(sample-isn--example-org)
-//	@Param			signal_type_slug	path		string							true	"signal type slug"				example(sample-signal--example-org)
+//	@Param			isn_slug			path		string							true	"isn slug"						example(sample-isn)
+//	@Param			signal_type_slug	path		string							true	"signal type slug"				example(sample-signal)
 //	@Param			sem_ver				path		string							true	"signal type sem_ver number"	example(0.0.1)
 //	@Param			request				body		handlers.CreateSignalsRequest	true	"create signals"
 //
@@ -1086,7 +1086,7 @@ func (s *SignalsHandler) SearchPrivateSignalsHandler(w http.ResponseWriter, r *h
 //
 //	@Tags			Signal Exchange
 //
-//	@Param			isn_slug			path	string							true	"ISN slug"				example(sample-isn--example-org)
+//	@Param			isn_slug			path	string							true	"ISN slug"				example(sample-isn)
 //	@Param			signal_type_slug	path	string							true	"Signal type slug"		example(signal-type-1)
 //	@Param			sem_ver				path	string							true	"Signal type version"	example(0.0.1)
 //	@Param			request				body	handlers.WithdrawSignalRequest	true	"Withdrawal request"

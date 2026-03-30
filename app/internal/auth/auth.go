@@ -39,27 +39,11 @@ func NewAuthService(secretKey string, environment string, queries *database.Quer
 	}
 }
 
-// toSignalTypes converts internal signalTypeDetails to a map of SignalType structs keyed by path
-func toSignalTypes(details []signalTypeDetails) map[string]SignalType {
-	result := make(map[string]SignalType, len(details))
-	for _, st := range details {
-		result[st.path] = SignalType{
-			Path:      st.path,
-			Slug:      st.slug,
-			SemVer:    st.semVer,
-			SchemaURL: st.schemaURL,
-			ReadmeURL: st.readmeURL,
-			InUse:     st.inUse,
-		}
-	}
-	return result
-}
-
 // AccessTokenResponse is the data returned in the response from the signalsd login and refresh token APIs
 type AccessTokenResponse struct {
 
 	// AccessToken is a JWT access token containing claims about the account and its permissions (see Claims struct)
-	AccessToken string `json:"access_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxzZCIsInN1YiI6ImMxMjQ1Yjc0LTMyMTQtNDUzOS04YTgyLTY2NDNkMzllNjk5YiIsImV4cCI6MTc0ODU4ODE2MiwiaWF0IjoxNzQ4NTg2MzYyLCJhY2NvdW50X2lkIjoiYzEyNDViNzQtMzIxNC00NTM5LThhODItNjY0M2QzOWU2OTliIiwiYWNjb3VudF90eXBlIjoidXNlciIsInJvbGUiOiJvd25lciIsImlzbl9wZXJtcyI6eyJzYW1wbGUtaXNuLS1leGFtcGxlLW9yZyI6eyJwZXJtaXNzaW9uIjoid3JpdGUiLCJzaWduYWxfdHlwZXMiOlsic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4xIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4yIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4zIiwic2FtcGxlLXNpZ25hbG5ldy0tZXhhbXBsZS1vcmcvdjAuMC4xIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC40Il19LCJzYW1wbGUtaXNuLS1zYXVsLW9yZyI6eyJwZXJtaXNzaW9uIjoid3JpdGUiLCJzaWduYWxfdHlwZXMiOlsic2FtcGxlLXNpZ25hbC0tc2F1bC1vcmcvdjAuMC4xIl19fX0.33ANor7XHWkB87npB4RWsJUjBnJHdYZce-lT8w_IN_s"`
+	AccessToken string `json:"access_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxzZCIsInN1YiI6ImQwODkzODllLTg0Y2MtNDU4MC1hNDBjLTNmMGEyMGU5YWFmMSIsImV4cCI6MTc3NDg1OTg1MywiaWF0IjoxNzc0ODU4MDUzLCJhY2NvdW50X2lkIjoiZDA4OTM4OWUtODRjYy00NTgwLWE0MGMtM2YwYTIwZTlhYWYxIiwiYWNjb3VudF90eXBlIjoidXNlciIsInJvbGUiOiJzaXRlYWRtaW4iLCJpc25fcGVybXMiOnsiYWRtaW4taXNuIjp7ImNhbl9yZWFkIjp0cnVlLCJjYW5fd3JpdGUiOnRydWUsImNhbl9hZG1pbmlzdGVyIjp0cnVlLCJzaWduYWxfdHlwZXMiOnsiYWRtaW4taXNuLXNpZ25hbC92MS4wLjAiOnsiaW5fdXNlIjp0cnVlfX0sInZpc2liaWxpdHkiOiJwcml2YXRlIiwiaW5fdXNlIjpmYWxzZX0sInNpdGVhZG1pbi1pc24iOnsiY2FuX3JlYWQiOnRydWUsImNhbl93cml0ZSI6dHJ1ZSwiY2FuX2FkbWluaXN0ZXIiOnRydWUsInNpZ25hbF90eXBlcyI6eyJzaXRlYWRtaW4taXNuLXNpZ25hbC92MS4wLjAiOnsiaW5fdXNlIjp0cnVlfX0sInZpc2liaWxpdHkiOiJwcml2YXRlIiwiaW5fdXNlIjp0cnVlfX19.03SEhY_tL2dbNjMYTHka_-5DhR5FhNh0CI0etsQiEo8"`
 
 	// TokenType (Bearer) - used as a prompt for the client to use the Bearer token type when making requests
 	TokenType string `json:"token_type" example:"Bearer"`
@@ -77,31 +61,13 @@ type AccessTokenResponse struct {
 	Role string `json:"role" enums:"siteadmin,isnadmin,member" example:"isnadmin"`
 
 	// IsnPerms is a map of the ISNs the account has access to and the permissions granted (the map key is the isn_slug)
-	IsnPerms map[string]IsnPerms `json:"isn_perms,omitempty"`
+	IsnPerms map[string]IsnPerm `json:"isn_perms,omitempty"`
 }
 
-type SignalType struct {
-	// Path is the signal type path in the format "slug/v{version}"
-	// This is the key used in the SignalTypes map in IsnPerms
-	Path string `json:"path" example:"sample-signal--example-org/v0.0.1"`
-
-	// Slug is the signal type slug (unique per site)
-	Slug string `json:"slug" example:"sample-signal--example-org"`
-
-	// SemVer is the signal type version (e.g. 0.0.1)
-	SemVer string `json:"sem_ver" example:"0.0.1"`
-
-	// SchemaURL is the URL of the signal type schema
-	SchemaURL string `json:"schema_url" example:"https://github.com/user/project/blob/2025.01.01/schema.json"`
-
-	// ReadmeURL is the URL of the signal type readme
-	ReadmeURL string `json:"readme_url" example:"https://github.com/user/project/blob/2025.01.01/readme.md"`
-
-	// InUse is true if the signal type is active
-	InUse bool `json:"in_use" example:"true"`
-}
-
-type IsnPerms struct {
+// IsnPerm contains the permissions and signal types available to the account for a specific ISN.
+// A map of these is included in the response from the login and refresh token APIs and
+// is used to build the claims.IsnPerm map in the access token
+type IsnPerm struct {
 
 	// CanRead is true if the account has read access to the isn
 	CanRead bool `json:"can_read" example:"true"`
@@ -125,6 +91,30 @@ type IsnPerms struct {
 	InUse bool `json:"in_use" example:"true"`
 }
 
+// SignalType contains the details of a signal type available to the account for a specific ISN.
+// The struct is returned as part of the IsnPerm struct in the response from the login and refresh token APIs.
+// A simplified version of the struct is also used in the claims.IsnPerm.SignalTypes map (only the InUse field is needed in the claims).
+type SignalType struct {
+	// Path is the signal type path in the format "slug/v{version}"
+	// This is the key used in the SignalTypes map in IsnPerms
+	Path string `json:"path,omitempty" example:"sample-signal/v0.0.1"`
+
+	// Slug is the signal type slug (unique per site)
+	Slug string `json:"slug,omitempty" example:"sample-signal"`
+
+	// SemVer is the signal type version (e.g. 0.0.1)
+	SemVer string `json:"sem_ver,omitempty" example:"0.0.1"`
+
+	// SchemaURL is the URL of the signal type schema
+	SchemaURL string `json:"schema_url,omitempty" example:"https://github.com/user/project/blob/2025.01.01/schema.json"`
+
+	// ReadmeURL is the URL of the signal type readme
+	ReadmeURL string `json:"readme_url,omitempty" example:"https://github.com/user/project/blob/2025.01.01/readme.md"`
+
+	// InUse is true if the signal type is active
+	InUse bool `json:"in_use" example:"true"`
+}
+
 // Claims are the claims included in the access token
 type Claims struct {
 
@@ -141,11 +131,11 @@ type Claims struct {
 	Role string `json:"role" enums:"siteadmin,isnadmin,member" example:"isnadmin"`
 
 	// IsnPerms is a map of the ISNs and signal types the account has access to and the permissions they have been granted (the map key is the isn slug)
-	IsnPerms map[string]IsnPerms `json:"isn_perms,omitempty" example:"isn1"`
+	IsnPerms map[string]IsnPerm `json:"isn_perms,omitempty" example:"isn1"`
 }
 
-// stucts to hold the full list of isns and signal types - used when generating the access token claims
-// the items are filtered by the claims builder to only include the items the account has access to
+// stucts to hold a temporary full list of isns and signal types used when building the AccessTokenResponse.
+// The items are filtered by the claims builder to only include the items the account has access to.
 type isnDetails struct {
 	userAccountID uuid.UUID
 	inUse         bool
@@ -164,6 +154,34 @@ type signalTypeDetails struct {
 
 type isnList map[string]*isnDetails // key is the isn slug
 
+// toSignalTypes converts internal signalTypeDetails to a map of SignalType structs keyed by path
+func toSignalTypes(details []signalTypeDetails) map[string]SignalType {
+	signalTypes := make(map[string]SignalType, len(details))
+	for _, st := range details {
+		signalTypes[st.path] = SignalType{
+			Path:      st.path,
+			Slug:      st.slug,
+			SemVer:    st.semVer,
+			SchemaURL: st.schemaURL,
+			ReadmeURL: st.readmeURL,
+			InUse:     st.inUse,
+		}
+	}
+	return signalTypes
+}
+
+// toSignalTypesClaims converts internal signalTypeDetails to a map of simplified SignalType structs keyed by path
+// this simplified struct is used in the claims
+func toSignalTypesClaims(details []signalTypeDetails) map[string]SignalType {
+	signalType := make(map[string]SignalType, len(details))
+	for _, st := range details {
+		signalType[st.path] = SignalType{
+			InUse: st.inUse,
+		}
+	}
+	return signalType
+}
+
 // create a JWT access token signed with HS256 using the app's secret key.
 //
 // Roles and ISN read/write permissions are retreived from the database and included in the token claims and the response body.
@@ -176,15 +194,15 @@ type isnList map[string]*isnDetails // key is the isn slug
 //   - a list of all the isns the account has access to and the permission granted (read or write)
 //   - the list of available signal_types in the isn
 //
-// note inactive isns/signal_types are included - an is_in_use flag is included in the claims so the client can make access decisions
+// note inactive isns/signal_types are included - an in_use flag is included in the claims so the client can make access decisions.
 //
-// The function returns the token inside a AccessTokenResponse that can be returned to the client.
+// The function returns the token inside an AccessTokenResponse that can be returned to the client.
 //
-// if this function generates an error, it is unexpected and the calling handler should produce a 500 status code
+// If this function generates an error, it is unexpected and the calling handler should produce a 500 status code.
 //
-//		this function is only used when the user logs-in or when an account refreshes an access token.
-//		Since the calling functions authenticate using secrets that (should) only be known by the client,
-//	 the claims in the token can be trusted by the handler without rechecking the database
+// this function is only used when the user logs-in or when an account refreshes an access token.
+// Since the calling functions authenticate using secrets that (should) only be known by the client,
+// the claims in the token can be trusted by the handler without rechecking the database
 //
 // Caveat:
 //
@@ -194,7 +212,12 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 
 	issuedAt := time.Now()
 	expiresAt := issuedAt.Add(signalsd.AccessTokenExpiry)
-	isnPerms := make(map[string]IsnPerms) // key is the isn slug
+
+	// detailed perms list for the response body
+	isnPerms := make(map[string]IsnPerm) // key is the isn slug
+
+	// simplified perms list for the claims
+	isnPermsClaims := make(map[string]IsnPerm) // key is the isn slug
 
 	accountID, ok := ContextAccountID(ctx)
 	if !ok {
@@ -225,6 +248,7 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 		return AccessTokenResponse{}, fmt.Errorf("database error getting ISNs: %w", err)
 	}
 
+	// create a list of all the isns and their signal types
 	isnList := make(isnList)
 
 	for _, dbIsn := range dbIsnList {
@@ -284,70 +308,77 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 		latestSignalBatchIDs[batch.IsnSlug] = &batch.ID
 	}
 
-	// set up isnPerms map for claims
+	// build isnPerms: filter the isnList to the ISNs this account can access, with their permissions
 	switch account.AccountRole {
 	case "siteadmin":
-		// site admins have read and write access to all ISNs
+		// site admins have read, write, and admin access to all ISNs
 		for isnSlug, siteIsn := range isnList {
-			isnPerms[isnSlug] = IsnPerms{
+			isnPerms[isnSlug] = IsnPerm{
 				CanRead:       true,
 				CanWrite:      true,
+				CanAdminister: true,
 				SignalBatchID: latestSignalBatchIDs[isnSlug],
 				SignalTypes:   toSignalTypes(siteIsn.signalTypes),
 				Visibility:    siteIsn.visibility,
 				InUse:         siteIsn.inUse,
-				CanAdminister: true,
 			}
 		}
 
 	case "isnadmin":
-		// Admin can read, write and administrate any ISN they created
+		// ISN admins have full access to ISNs they created
 		for isnSlug, siteIsn := range isnList {
 			if account.ID == siteIsn.userAccountID {
-				isnPerms[isnSlug] = IsnPerms{
+				isnPerms[isnSlug] = IsnPerm{
 					CanRead:       true,
 					CanWrite:      true,
+					CanAdminister: true,
 					SignalBatchID: latestSignalBatchIDs[isnSlug],
 					SignalTypes:   toSignalTypes(siteIsn.signalTypes),
 					Visibility:    siteIsn.visibility,
 					InUse:         siteIsn.inUse,
-					CanAdminister: true,
 				}
 			}
 		}
-		// and access any ISN where they were granted read or write permission by an admin
+		// ... and access any ISN where they were granted read or write permission by an admin
 		for _, accessibleIsn := range isnsAccessibleByAccount {
 			isnSlug := accessibleIsn.IsnSlug
 			if _, ok := isnPerms[isnSlug]; !ok {
-				isnPerms[isnSlug] = IsnPerms{
+				isnPerms[isnSlug] = IsnPerm{
 					CanRead:       accessibleIsn.CanRead,
 					CanWrite:      accessibleIsn.CanWrite,
+					CanAdminister: false,
 					SignalBatchID: latestSignalBatchIDs[isnSlug],
 					SignalTypes:   toSignalTypes(isnList[isnSlug].signalTypes),
 					Visibility:    isnList[isnSlug].visibility,
 					InUse:         isnList[isnSlug].inUse,
-					CanAdminister: false,
 				}
 			}
 		}
 
 	case "member":
-		// Member only has granted permissions (service accounts are always treated as members)
+		// members (including service accounts) only have explicitly granted permissions
 		for _, accessibleIsn := range isnsAccessibleByAccount {
 			isnSlug := accessibleIsn.IsnSlug
-			isnPerms[isnSlug] = IsnPerms{
+			isnPerms[isnSlug] = IsnPerm{
 				CanRead:       accessibleIsn.CanRead,
 				CanWrite:      accessibleIsn.CanWrite,
+				CanAdminister: false,
 				SignalBatchID: latestSignalBatchIDs[isnSlug],
 				SignalTypes:   toSignalTypes(isnList[isnSlug].signalTypes),
 				Visibility:    isnList[isnSlug].visibility,
 				InUse:         isnList[isnSlug].inUse,
-				CanAdminister: false,
 			}
 		}
 
 	default:
-		return AccessTokenResponse{}, fmt.Errorf("unexpected role : %v", account.AccountRole)
+		return AccessTokenResponse{}, fmt.Errorf("unexpected role: %v", account.AccountRole)
+	}
+
+	// build isnPermsClaims from isnPerms — identical fields, but with simplified signal types
+	for slug, perm := range isnPerms {
+		claimPerm := perm
+		claimPerm.SignalTypes = toSignalTypesClaims(isnList[slug].signalTypes)
+		isnPermsClaims[slug] = claimPerm
 	}
 
 	// claims
@@ -361,7 +392,7 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 		AccountID:   account.ID,
 		AccountType: account.AccountType,
 		Role:        account.AccountRole,
-		IsnPerms:    isnPerms,
+		IsnPerms:    isnPermsClaims,
 	}
 
 	// create a new signed token

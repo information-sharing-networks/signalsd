@@ -27,7 +27,7 @@ func NewSignalsBatchHandler(queries *database.Queries) *SignalsBatchHandler {
 }
 
 type CreateSignalsBatchRequest struct {
-	IsnSlug string `json:"isn_slug" example:"sample-isn--example-org"`
+	IsnSlug string `json:"isn_slug" example:"sample-isn"`
 }
 
 type CreateSignalsBatchResponse struct {
@@ -194,7 +194,7 @@ func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r
 //	@Description	The site owner can see the status of any batch on the site.
 //	@Description
 //	@Tags		Signal Exchange
-//	@Param		isn_slug	path		string	true	"ISN slug"	example(sample-isn--example-org)
+//	@Param		isn_slug	path		string	true	"ISN slug"	example(sample-isn)
 //	@Param		batch_id	path		string	true	"Batch ID"	example(67890684-3b14-42cf-b785-df28ce570400)
 //	@Success	200			{object}	BatchStatusResponse
 //	@Failure	400			{object}	responses.ErrorResponse

@@ -513,7 +513,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "example": "sample-signal--example-org",
+                        "example": "sample-signal",
                         "description": "signal type slug",
                         "name": "signal_type_slug",
                         "in": "path",
@@ -568,7 +568,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "example": "sample-signal--example-org",
+                        "example": "sample-signal",
                         "description": "signal type slug",
                         "name": "signal_type_slug",
                         "in": "path",
@@ -624,7 +624,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "example": "sample-signal--example-org",
+                        "example": "sample-signal",
                         "description": "signal type slug",
                         "name": "signal_type_slug",
                         "in": "path",
@@ -692,7 +692,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "example": "sample-signal--example-org",
+                        "example": "sample-signal",
                         "description": "signal type slug",
                         "name": "signal_type_slug",
                         "in": "path",
@@ -1342,7 +1342,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "example": "sample-isn--example-org",
+                        "example": "sample-isn",
                         "description": "isn slug",
                         "name": "isn_slug",
                         "in": "path",
@@ -1384,7 +1384,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "example": "sample-isn--example-org",
+                        "example": "sample-isn",
                         "description": "isn slug",
                         "name": "isn_slug",
                         "in": "path",
@@ -1446,7 +1446,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "example": "sample-isn--example-org",
+                        "example": "sample-isn",
                         "description": "ISN slug",
                         "name": "isn_slug",
                         "in": "path",
@@ -1508,7 +1508,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "example": "sample-isn--example-org",
+                        "example": "sample-isn",
                         "description": "isn slug",
                         "name": "isn_slug",
                         "in": "path",
@@ -1585,7 +1585,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "example": "sample-isn--example-org",
+                        "example": "sample-isn",
                         "description": "ISN slug",
                         "name": "isn_slug",
                         "in": "path",
@@ -1647,7 +1647,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "example": "sample-isn--example-org",
+                        "example": "sample-isn",
                         "description": "ISN slug",
                         "name": "isn_slug",
                         "in": "path",
@@ -1655,7 +1655,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "example": "sample-signal--example-org",
+                        "example": "sample-signal",
                         "description": "signal type slug",
                         "name": "signal_type_slug",
                         "in": "path",
@@ -1725,7 +1725,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "example": "sample-isn--example-org",
+                        "example": "sample-isn",
                         "description": "isn slug",
                         "name": "isn_slug",
                         "in": "path",
@@ -1733,7 +1733,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "example": "sample-signal--example-org",
+                        "example": "sample-signal",
                         "description": "signal type slug",
                         "name": "signal_type_slug",
                         "in": "path",
@@ -1907,7 +1907,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "example": "sample-isn--example-org",
+                        "example": "sample-isn",
                         "description": "ISN slug",
                         "name": "isn_slug",
                         "in": "path",
@@ -2185,7 +2185,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "example": "sample-isn--example-org",
+                        "example": "sample-isn",
                         "description": "ISN slug",
                         "name": "isn_slug",
                         "in": "path",
@@ -2386,7 +2386,7 @@ const docTemplate = `{
                 "access_token": {
                     "description": "AccessToken is a JWT access token containing claims about the account and its permissions (see Claims struct)",
                     "type": "string",
-                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxzZCIsInN1YiI6ImMxMjQ1Yjc0LTMyMTQtNDUzOS04YTgyLTY2NDNkMzllNjk5YiIsImV4cCI6MTc0ODU4ODE2MiwiaWF0IjoxNzQ4NTg2MzYyLCJhY2NvdW50X2lkIjoiYzEyNDViNzQtMzIxNC00NTM5LThhODItNjY0M2QzOWU2OTliIiwiYWNjb3VudF90eXBlIjoidXNlciIsInJvbGUiOiJvd25lciIsImlzbl9wZXJtcyI6eyJzYW1wbGUtaXNuLS1leGFtcGxlLW9yZyI6eyJwZXJtaXNzaW9uIjoid3JpdGUiLCJzaWduYWxfdHlwZXMiOlsic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4xIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4yIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4zIiwic2FtcGxlLXNpZ25hbG5ldy0tZXhhbXBsZS1vcmcvdjAuMC4xIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC40Il19LCJzYW1wbGUtaXNuLS1zYXVsLW9yZyI6eyJwZXJtaXNzaW9uIjoid3JpdGUiLCJzaWduYWxfdHlwZXMiOlsic2FtcGxlLXNpZ25hbC0tc2F1bC1vcmcvdjAuMC4xIl19fX0.33ANor7XHWkB87npB4RWsJUjBnJHdYZce-lT8w_IN_s"
+                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxzZCIsInN1YiI6ImQwODkzODllLTg0Y2MtNDU4MC1hNDBjLTNmMGEyMGU5YWFmMSIsImV4cCI6MTc3NDg1OTg1MywiaWF0IjoxNzc0ODU4MDUzLCJhY2NvdW50X2lkIjoiZDA4OTM4OWUtODRjYy00NTgwLWE0MGMtM2YwYTIwZTlhYWYxIiwiYWNjb3VudF90eXBlIjoidXNlciIsInJvbGUiOiJzaXRlYWRtaW4iLCJpc25fcGVybXMiOnsiYWRtaW4taXNuIjp7ImNhbl9yZWFkIjp0cnVlLCJjYW5fd3JpdGUiOnRydWUsImNhbl9hZG1pbmlzdGVyIjp0cnVlLCJzaWduYWxfdHlwZXMiOnsiYWRtaW4taXNuLXNpZ25hbC92MS4wLjAiOnsiaW5fdXNlIjp0cnVlfX0sInZpc2liaWxpdHkiOiJwcml2YXRlIiwiaW5fdXNlIjpmYWxzZX0sInNpdGVhZG1pbi1pc24iOnsiY2FuX3JlYWQiOnRydWUsImNhbl93cml0ZSI6dHJ1ZSwiY2FuX2FkbWluaXN0ZXIiOnRydWUsInNpZ25hbF90eXBlcyI6eyJzaXRlYWRtaW4taXNuLXNpZ25hbC92MS4wLjAiOnsiaW5fdXNlIjp0cnVlfX0sInZpc2liaWxpdHkiOiJwcml2YXRlIiwiaW5fdXNlIjp0cnVlfX19.03SEhY_tL2dbNjMYTHka_-5DhR5FhNh0CI0etsQiEo8"
                 },
                 "account_id": {
                     "description": "AccountID is the account id of the user making the request",
@@ -2410,7 +2410,7 @@ const docTemplate = `{
                     "description": "IsnPerms is a map of the ISNs the account has access to and the permissions granted (the map key is the isn_slug)",
                     "type": "object",
                     "additionalProperties": {
-                        "$ref": "#/definitions/auth.IsnPerms"
+                        "$ref": "#/definitions/auth.IsnPerm"
                     }
                 },
                 "role": {
@@ -2430,7 +2430,7 @@ const docTemplate = `{
                 }
             }
         },
-        "auth.IsnPerms": {
+        "auth.IsnPerm": {
             "type": "object",
             "properties": {
                 "can_administer": {
@@ -2487,7 +2487,7 @@ const docTemplate = `{
                 "path": {
                     "description": "Path is the signal type path in the format \"slug/v{version}\"\nThis is the key used in the SignalTypes map in IsnPerms",
                     "type": "string",
-                    "example": "sample-signal--example-org/v0.0.1"
+                    "example": "sample-signal/v0.0.1"
                 },
                 "readme_url": {
                     "description": "ReadmeURL is the URL of the signal type readme",
@@ -2507,7 +2507,7 @@ const docTemplate = `{
                 "slug": {
                     "description": "Slug is the signal type slug (unique per site)",
                     "type": "string",
-                    "example": "sample-signal--example-org"
+                    "example": "sample-signal"
                 }
             }
         },
@@ -2522,7 +2522,7 @@ const docTemplate = `{
                 "signal_type_slug": {
                     "description": "signal type slug",
                     "type": "string",
-                    "example": "sample-signal--example-org"
+                    "example": "sample-signal"
                 }
             }
         },
@@ -2615,11 +2615,11 @@ const docTemplate = `{
                 },
                 "resource_url": {
                     "type": "string",
-                    "example": "http://localhost:8080/api/isn/sample-isn--example-org"
+                    "example": "http://localhost:8080/api/isn/sample-isn"
                 },
                 "slug": {
                     "type": "string",
-                    "example": "sample-isn--example-org"
+                    "example": "sample-isn"
                 }
             }
         },
@@ -2746,7 +2746,7 @@ const docTemplate = `{
                 },
                 "isn_slug": {
                     "type": "string",
-                    "example": "sample-isn--example-org"
+                    "example": "sample-isn"
                 },
                 "results": {
                     "$ref": "#/definitions/handlers.CreateSignalsResults"
@@ -2889,7 +2889,7 @@ const docTemplate = `{
                 },
                 "slug": {
                     "type": "string",
-                    "example": "sample-isn--example-org"
+                    "example": "sample-isn"
                 },
                 "title": {
                     "type": "string",
@@ -3019,7 +3019,7 @@ const docTemplate = `{
                 },
                 "slug": {
                     "type": "string",
-                    "example": "sample-signal--example-org"
+                    "example": "sample-signal"
                 }
             }
         },

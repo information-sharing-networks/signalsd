@@ -18,8 +18,8 @@ type CreateIsnRequest struct {
 
 type CreateIsnResponse struct {
 	ID          string `json:"id" example:"67890684-3b14-42cf-b785-df28ce570400"`
-	Slug        string `json:"slug" example:"sample-isn--example-org"`
-	ResourceURL string `json:"resource_url" example:"http://localhost:8080/api/isn/sample-isn--example-org"`
+	Slug        string `json:"slug" example:"sample-isn"`
+	ResourceURL string `json:"resource_url" example:"http://localhost:8080/api/isn/sample-isn"`
 }
 
 // UpdateIsnStatusRequest represents the request body for updating ISN status

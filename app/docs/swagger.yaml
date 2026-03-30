@@ -54,7 +54,7 @@ definitions:
       access_token:
         description: AccessToken is a JWT access token containing claims about the
           account and its permissions (see Claims struct)
-        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxzZCIsInN1YiI6ImMxMjQ1Yjc0LTMyMTQtNDUzOS04YTgyLTY2NDNkMzllNjk5YiIsImV4cCI6MTc0ODU4ODE2MiwiaWF0IjoxNzQ4NTg2MzYyLCJhY2NvdW50X2lkIjoiYzEyNDViNzQtMzIxNC00NTM5LThhODItNjY0M2QzOWU2OTliIiwiYWNjb3VudF90eXBlIjoidXNlciIsInJvbGUiOiJvd25lciIsImlzbl9wZXJtcyI6eyJzYW1wbGUtaXNuLS1leGFtcGxlLW9yZyI6eyJwZXJtaXNzaW9uIjoid3JpdGUiLCJzaWduYWxfdHlwZXMiOlsic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4xIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4yIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC4zIiwic2FtcGxlLXNpZ25hbG5ldy0tZXhhbXBsZS1vcmcvdjAuMC4xIiwic2FtcGxlLXNpZ25hbC0tZXhhbXBsZS1vcmcvdjAuMC40Il19LCJzYW1wbGUtaXNuLS1zYXVsLW9yZyI6eyJwZXJtaXNzaW9uIjoid3JpdGUiLCJzaWduYWxfdHlwZXMiOlsic2FtcGxlLXNpZ25hbC0tc2F1bC1vcmcvdjAuMC4xIl19fX0.33ANor7XHWkB87npB4RWsJUjBnJHdYZce-lT8w_IN_s
+        example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJTaWduYWxzZCIsInN1YiI6ImQwODkzODllLTg0Y2MtNDU4MC1hNDBjLTNmMGEyMGU5YWFmMSIsImV4cCI6MTc3NDg1OTg1MywiaWF0IjoxNzc0ODU4MDUzLCJhY2NvdW50X2lkIjoiZDA4OTM4OWUtODRjYy00NTgwLWE0MGMtM2YwYTIwZTlhYWYxIiwiYWNjb3VudF90eXBlIjoidXNlciIsInJvbGUiOiJzaXRlYWRtaW4iLCJpc25fcGVybXMiOnsiYWRtaW4taXNuIjp7ImNhbl9yZWFkIjp0cnVlLCJjYW5fd3JpdGUiOnRydWUsImNhbl9hZG1pbmlzdGVyIjp0cnVlLCJzaWduYWxfdHlwZXMiOnsiYWRtaW4taXNuLXNpZ25hbC92MS4wLjAiOnsiaW5fdXNlIjp0cnVlfX0sInZpc2liaWxpdHkiOiJwcml2YXRlIiwiaW5fdXNlIjpmYWxzZX0sInNpdGVhZG1pbi1pc24iOnsiY2FuX3JlYWQiOnRydWUsImNhbl93cml0ZSI6dHJ1ZSwiY2FuX2FkbWluaXN0ZXIiOnRydWUsInNpZ25hbF90eXBlcyI6eyJzaXRlYWRtaW4taXNuLXNpZ25hbC92MS4wLjAiOnsiaW5fdXNlIjp0cnVlfX0sInZpc2liaWxpdHkiOiJwcml2YXRlIiwiaW5fdXNlIjp0cnVlfX19.03SEhY_tL2dbNjMYTHka_-5DhR5FhNh0CI0etsQiEo8
         type: string
       account_id:
         description: AccountID is the account id of the user making the request
@@ -73,7 +73,7 @@ definitions:
         type: integer
       isn_perms:
         additionalProperties:
-          $ref: '#/definitions/auth.IsnPerms'
+          $ref: '#/definitions/auth.IsnPerm'
         description: IsnPerms is a map of the ISNs the account has access to and the
           permissions granted (the map key is the isn_slug)
         type: object
@@ -92,7 +92,7 @@ definitions:
         example: Bearer
         type: string
     type: object
-  auth.IsnPerms:
+  auth.IsnPerm:
     properties:
       can_administer:
         description: CanAdminister is true if the account is the owner of the isn
@@ -140,7 +140,7 @@ definitions:
         description: |-
           Path is the signal type path in the format "slug/v{version}"
           This is the key used in the SignalTypes map in IsnPerms
-        example: sample-signal--example-org/v0.0.1
+        example: sample-signal/v0.0.1
         type: string
       readme_url:
         description: ReadmeURL is the URL of the signal type readme
@@ -156,7 +156,7 @@ definitions:
         type: string
       slug:
         description: Slug is the signal type slug (unique per site)
-        example: sample-signal--example-org
+        example: sample-signal
         type: string
     type: object
   handlers.AddSignalTypeToIsnRequest:
@@ -167,7 +167,7 @@ definitions:
         type: string
       signal_type_slug:
         description: signal type slug
-        example: sample-signal--example-org
+        example: sample-signal
         type: string
     type: object
   handlers.BatchStatus:
@@ -230,10 +230,10 @@ definitions:
         example: 67890684-3b14-42cf-b785-df28ce570400
         type: string
       resource_url:
-        example: http://localhost:8080/api/isn/sample-isn--example-org
+        example: http://localhost:8080/api/isn/sample-isn
         type: string
       slug:
-        example: sample-isn--example-org
+        example: sample-isn
         type: string
     type: object
   handlers.CreateServiceAccountRequest:
@@ -326,7 +326,7 @@ definitions:
         example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
         type: string
       isn_slug:
-        example: sample-isn--example-org
+        example: sample-isn
         type: string
       results:
         $ref: '#/definitions/handlers.CreateSignalsResults'
@@ -426,7 +426,7 @@ definitions:
         example: true
         type: boolean
       slug:
-        example: sample-isn--example-org
+        example: sample-isn
         type: string
       title:
         example: Sample ISN @example.org
@@ -520,7 +520,7 @@ definitions:
         example: 0.0.1
         type: string
       slug:
-        example: sample-signal--example-org
+        example: sample-signal
         type: string
     type: object
   handlers.PasswordResetRequest:
@@ -1379,7 +1379,7 @@ paths:
         Note: this endpoint can only be used by site admins
       parameters:
       - description: signal type slug
-        example: sample-signal--example-org
+        example: sample-signal
         in: path
         name: signal_type_slug
         required: true
@@ -1418,7 +1418,7 @@ paths:
         be deleted
       parameters:
       - description: signal type slug
-        example: sample-signal--example-org
+        example: sample-signal
         in: path
         name: signal_type_slug
         required: true
@@ -1459,7 +1459,7 @@ paths:
         This endpoint can be used by anyone registered with the site
       parameters:
       - description: signal type slug
-        example: sample-signal--example-org
+        example: sample-signal
         in: path
         name: signal_type_slug
         required: true
@@ -1499,7 +1499,7 @@ paths:
         Note: this endpoint can only be used by site admins
       parameters:
       - description: signal type slug
-        example: sample-signal--example-org
+        example: sample-signal
         in: path
         name: signal_type_slug
         required: true
@@ -1996,7 +1996,7 @@ paths:
       description: Returns details about the ISN
       parameters:
       - description: isn slug
-        example: sample-isn--example-org
+        example: sample-isn
         in: path
         name: isn_slug
         required: true
@@ -2025,7 +2025,7 @@ paths:
         Site admins can update any ISN
       parameters:
       - description: isn slug
-        example: sample-isn--example-org
+        example: sample-isn
         in: path
         name: isn_slug
         required: true
@@ -2067,7 +2067,7 @@ paths:
         Only ISN admins and site owners can view this information
       parameters:
       - description: ISN slug
-        example: sample-isn--example-org
+        example: sample-isn
         in: path
         name: isn_slug
         required: true
@@ -2122,7 +2122,7 @@ paths:
         schema:
           $ref: '#/definitions/handlers.UpdateIsnAccountPermissionRequest'
       - description: isn slug
-        example: sample-isn--example-org
+        example: sample-isn
         in: path
         name: isn_slug
         required: true
@@ -2189,13 +2189,13 @@ paths:
         ISN admins can only update signal types for ISNs they own.
       parameters:
       - description: ISN slug
-        example: sample-isn--example-org
+        example: sample-isn
         in: path
         name: isn_slug
         required: true
         type: string
       - description: signal type slug
-        example: sample-signal--example-org
+        example: sample-signal
         in: path
         name: signal_type_slug
         required: true
@@ -2287,13 +2287,13 @@ paths:
         request level errors (e.g. invalid json, authentication failure etc) return a simple error_code/error_message response rather than a detailed audit log
       parameters:
       - description: isn slug
-        example: sample-isn--example-org
+        example: sample-isn
         in: path
         name: isn_slug
         required: true
         type: string
       - description: signal type slug
-        example: sample-signal--example-org
+        example: sample-signal
         in: path
         name: signal_type_slug
         required: true
@@ -2420,7 +2420,7 @@ paths:
         To reactivate a signal resupply it with the same local_ref using the 'create signals' end point.
       parameters:
       - description: ISN slug
-        example: sample-isn--example-org
+        example: sample-isn
         in: path
         name: isn_slug
         required: true
@@ -2476,7 +2476,7 @@ paths:
         ISN admins can only add signal types to ISNs they own.
       parameters:
       - description: ISN slug
-        example: sample-isn--example-org
+        example: sample-isn
         in: path
         name: isn_slug
         required: true
@@ -2621,7 +2621,7 @@ paths:
         The site owner can see the status of any batch on the site.
       parameters:
       - description: ISN slug
-        example: sample-isn--example-org
+        example: sample-isn
         in: path
         name: isn_slug
         required: true

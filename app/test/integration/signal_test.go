@@ -595,7 +595,7 @@ func TestIsInUseStatus(t *testing.T) {
 
 						authToken := testEnv.createAuthToken(t, account.ID)
 
-						//t.Logf("access token %v", authToken)
+						t.Logf("access token %v", authToken)
 
 						switch tt.action {
 						case "write":

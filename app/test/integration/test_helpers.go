@@ -45,7 +45,7 @@ func createExpiredAccessToken(t *testing.T, accountID uuid.UUID, secretKey strin
 		AccountID:   accountID,
 		AccountType: "user",
 		Role:        "member",
-		IsnPerms:    make(map[string]auth.IsnPerms),
+		IsnPerms:    make(map[string]auth.IsnPerm),
 	}
 
 	// Create and sign the token using the same secret key as the auth service

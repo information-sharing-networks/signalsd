@@ -68,7 +68,7 @@ type IsnAccount struct {
 //	@Description	You must supply values for both can_read and can_write.
 //
 //	@Param			request		body	handlers.UpdateIsnAccountPermissionRequest	true	"permission details"
-//	@Param			isn_slug	path	string										true	"isn slug"		example(sample-isn--example-org)
+//	@Param			isn_slug	path	string										true	"isn slug"		example(sample-isn)
 //	@Param			account_id	path	string										true	"account id"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
 //	@Success		200
@@ -247,7 +247,7 @@ func (i *IsnAccountHandler) UpdateIsnAccountPermissionHandler(w http.ResponseWri
 //	@Description	Get a list of all accounts (users and service accounts) that have permissions on the specified ISN.
 //	@Description	Only ISN admins and site owners can view this information
 //
-//	@Param			isn_slug	path		string	true	"ISN slug"	example(sample-isn--example-org)
+//	@Param			isn_slug	path		string	true	"ISN slug"	example(sample-isn)
 //
 //	@Success		200			{array}		handlers.IsnAccount
 //	@Failure		400			{object}	responses.ErrorResponse

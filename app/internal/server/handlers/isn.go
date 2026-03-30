@@ -52,8 +52,8 @@ type TransferIsnOwnershipRequest struct {
 
 type CreateIsnResponse struct {
 	ID          uuid.UUID `json:"id" example:"67890684-3b14-42cf-b785-df28ce570400"`
-	Slug        string    `json:"slug" example:"sample-isn--example-org"`
-	ResourceURL string    `json:"resource_url" example:"http://localhost:8080/api/isn/sample-isn--example-org"`
+	Slug        string    `json:"slug" example:"sample-isn"`
+	ResourceURL string    `json:"resource_url" example:"http://localhost:8080/api/isn/sample-isn"`
 }
 
 // Response structs for GET handlers
@@ -63,7 +63,7 @@ type Isn struct {
 	UpdatedAt     time.Time `json:"updated_at" example:"2025-06-03T13:47:47.331787+01:00"`
 	UserAccountID uuid.UUID `json:"user_account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
 	Title         string    `json:"title" example:"Sample ISN @example.org"`
-	Slug          string    `json:"slug" example:"sample-isn--example-org"`
+	Slug          string    `json:"slug" example:"sample-isn"`
 	Detail        string    `json:"detail" example:"Sample ISN description"`
 	IsInUse       bool      `json:"is_in_use" example:"true"`
 	Visibility    string    `json:"visibility" example:"private" enums:"public,private"`
@@ -243,7 +243,7 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 //
 //	@Tags			ISN Configuration
 //
-//	@Param			isn_slug	path	string						true	"isn slug"	example(sample-isn--example-org)
+//	@Param			isn_slug	path	string						true	"isn slug"	example(sample-isn)
 //	@Param			request		body	handlers.UpdateIsnRequest	true	"ISN configuration"
 //
 //	@Success		204
@@ -393,7 +393,7 @@ func (s *IsnHandler) GetIsnsHandler(w http.ResponseWriter, r *http.Request) {
 //
 //	@Summary		Get an ISN configuration
 //	@Description	Returns details about the ISN
-//	@Param			isn_slug	path	string	true	"isn slug"	example(sample-isn--example-org)
+//	@Param			isn_slug	path	string	true	"isn slug"	example(sample-isn)
 //
 //	@Tags			ISN Configuration
 //

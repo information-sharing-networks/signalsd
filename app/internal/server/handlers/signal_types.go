@@ -45,13 +45,13 @@ type RegisterNewSignalTypeSchemaRequest struct {
 }
 
 type NewSignalTypeResponse struct {
-	Slug   string `json:"slug" example:"sample-signal--example-org"`
+	Slug   string `json:"slug" example:"sample-signal"`
 	SemVer string `json:"sem_ver" example:"0.0.1"`
 }
 
 type AddSignalTypeToIsnRequest struct {
-	SignalTypeSlug string `json:"signal_type_slug" example:"sample-signal--example-org"` // signal type slug
-	SemVer         string `json:"sem_ver" example:"0.0.1"`                               // signal type version
+	SignalTypeSlug string `json:"signal_type_slug" example:"sample-signal"` // signal type slug
+	SemVer         string `json:"sem_ver" example:"0.0.1"`                  // signal type version
 }
 
 type UpdateSignalTypeRequest struct {
@@ -285,7 +285,7 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 //
 //	@Tags			Signal Type Definitions
 //
-//	@Param			signal_type_slug	path		string										true	"signal type slug"	example(sample-signal--example-org)
+//	@Param			signal_type_slug	path		string										true	"signal type slug"	example(sample-signal)
 //	@Param			request				body		handlers.RegisterNewSignalTypeSchemaRequest	true	"signal type details"
 //
 //	@Success		201					{object}	handlers.NewSignalTypeResponse
@@ -473,7 +473,7 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchemaHandler(w http.ResponseWr
 //	@Description
 //	@Description	Note: this endpoint can only be used by site admins
 //
-//	@Param			signal_type_slug	path	string								true	"signal type slug"	example(sample-signal--example-org)
+//	@Param			signal_type_slug	path	string								true	"signal type slug"	example(sample-signal)
 //	@Param			sem_ver				path	string								true	"Sem ver"			example(0.0.1)
 //	@Param			request				body	handlers.UpdateSignalTypeRequest	true	"signal type details to be updated"
 //
@@ -594,7 +594,7 @@ func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *ht
 //	@Summary		Delete signal type
 //	@Description	Only signal types that have never been referenced by signals can be deleted
 //
-//	@Param			signal_type_slug	path	string	true	"signal type slug"		example(sample-signal--example-org)
+//	@Param			signal_type_slug	path	string	true	"signal type slug"		example(sample-signal)
 //	@Param			sem_ver				path	string	true	"version to be deleted"	example(0.0.1)
 //
 //	@Tags			Signal Type Definitions
@@ -679,7 +679,7 @@ func (s *SignalTypeHandler) DeleteSignalTypeHandler(w http.ResponseWriter, r *ht
 //
 //	@Tags			Signal Type Definitions
 //
-//	@Param			signal_type_slug	path	string	true	"signal type slug"			example(sample-signal--example-org)
+//	@Param			signal_type_slug	path	string	true	"signal type slug"			example(sample-signal)
 //	@Param			sem_ver				path	string	true	"version to be recieved"	example(0.0.1)
 //
 //	@Tags			Signal Type Definitions
@@ -801,7 +801,7 @@ func (s *SignalTypeHandler) GetSignalTypesHandler(w http.ResponseWriter, r *http
 //
 //	@Tags			Signal Type Definitions
 //
-//	@Param			isn_slug	path	string								true	"ISN slug"	example(sample-isn--example-org)
+//	@Param			isn_slug	path	string								true	"ISN slug"	example(sample-isn)
 //	@Param			request		body	handlers.AddSignalTypeToIsnRequest	true	"signal type details"
 //
 //	@Success		204
@@ -915,8 +915,8 @@ func (s *SignalTypeHandler) AddSignalTypeToISNHandler(w http.ResponseWriter, r *
 //	@Description	Note: this endpoint can only be used by site admins and ISN admins.
 //	@Description	ISN admins can only update signal types for ISNs they own.
 //
-//	@Param			isn_slug			path	string								true	"ISN slug"			example(sample-isn--example-org)
-//	@Param			signal_type_slug	path	string								true	"signal type slug"	example(sample-signal--example-org)
+//	@Param			isn_slug			path	string								true	"ISN slug"			example(sample-isn)
+//	@Param			signal_type_slug	path	string								true	"signal type slug"	example(sample-signal)
 //	@Param			sem_ver				path	string								true	"Sem ver"			example(0.0.1)
 //	@Param			request				body	handlers.UpdateSignalTypeRequest	true	"status update request"
 //
