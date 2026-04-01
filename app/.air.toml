@@ -4,7 +4,7 @@ tmp_dir = "tmp"
 [build]
   args_bin = ["run", "all"]
   bin = "./bin/signalsd"
-  cmd = "swag init -g ./cmd/signalsd/main.go --tags '!HTMX Actions,!UI Pages' && go tool swag init -g ./cmd/signalsd/main.go --tags 'HTMX Actions,UI Pages'   -o ./docs/ui  && sqlc generate && templ generate && go build -o ./bin/signalsd ./cmd/signalsd/main.go"
+  cmd = "swag init -g ./cmd/signalsd/main.go --tags '!HTMX Actions,!UI Pages' && go tool swag init -g ./cmd/signalsd/main.go --tags 'HTMX Actions,UI Pages' -o ./docs/ui  && sqlc generate && templ generate && go build -o ./bin/signalsd ./cmd/signalsd/main.go"
   delay = 1000
   exclude_dir = ["tmp", "internal/database", "docs"]
   exclude_file = []
