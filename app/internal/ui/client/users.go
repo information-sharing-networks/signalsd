@@ -19,7 +19,7 @@ type User struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// GetUsers returns all user accounts.
+// GetUsers returns all user accounts
 func (c *Client) GetUsers(accessToken string) ([]User, error) {
 	url := fmt.Sprintf("%s/api/admin/users", c.baseURL)
 

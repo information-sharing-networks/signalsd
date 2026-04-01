@@ -9,7 +9,6 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
-	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
 // SettingsPage godoc
@@ -129,11 +128,8 @@ func (s *Server) GeneratePasswordResetLinkPage(w http.ResponseWriter, r *http.Re
 		s.renderErrorAlert(w, r, "Failed to load users. Please try again.", "Failed to get users: "+err.Error())
 		return
 	}
-	users := make([]types.UserOption, len(rawUsers))
-	for i, u := range rawUsers {
-		users[i] = types.UserOption{Email: u.Email, UserRole: u.UserRole}
-	}
 
+	users := getUserOptions(rawUsers, "")
 	if err := templates.GeneratePasswordResetLinkPage(s.config.Environment, users).Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render manage users page", slog.String("error", err.Error()))
 	}
@@ -239,13 +235,9 @@ func (s *Server) ManageIsnAdminRolesPage(w http.ResponseWriter, r *http.Request)
 		}
 		return
 	}
-	users := make([]types.UserOption, len(rawUsers))
-	for i, u := range rawUsers {
-		users[i] = types.UserOption{Email: u.Email, UserRole: u.UserRole}
-	}
 
 	// Render isn admin role management page
-	component := templates.ManageIsnAdminRolesPage(s.config.Environment, users)
+	component := templates.ManageIsnAdminRolesPage(s.config.Environment, getUserOptions(rawUsers, accessTokenDetails.Email))
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render isn admin role management page", slog.String("error", err.Error()))
 	}
@@ -277,10 +269,6 @@ func (s *Server) ManageAccountStatusPage(w http.ResponseWriter, r *http.Request)
 		}
 		return
 	}
-	users := make([]types.UserOption, len(rawUsers))
-	for i, u := range rawUsers {
-		users[i] = types.UserOption{Email: u.Email, UserRole: u.UserRole}
-	}
 
 	// Fetch service accounts for dropdown
 	rawServiceAccounts, err := s.apiClient.GetServiceAccounts(accessTokenDetails.AccessToken)
@@ -292,17 +280,9 @@ func (s *Server) ManageAccountStatusPage(w http.ResponseWriter, r *http.Request)
 		}
 		return
 	}
-	serviceAccounts := make([]types.ServiceAccountOption, len(rawServiceAccounts))
-	for i, sa := range rawServiceAccounts {
-		serviceAccounts[i] = types.ServiceAccountOption{
-			ClientOrganization: sa.ClientOrganization,
-			ClientContactEmail: sa.ClientContactEmail,
-			ClientID:           sa.ClientID,
-		}
-	}
 
 	// Render account status management page
-	component := templates.ManageAccountStatusPage(s.config.Environment, users, serviceAccounts)
+	component := templates.ManageAccountStatusPage(s.config.Environment, getUserOptions(rawUsers, accessTokenDetails.Email), getServiceAccountOptions(rawServiceAccounts))
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render account status management page", slog.String("error", err.Error()))
 	}
@@ -454,13 +434,9 @@ func (s *Server) MangeSiteAdminRolesPage(w http.ResponseWriter, r *http.Request)
 		}
 		return
 	}
-	users := make([]types.UserOption, len(rawUsers))
-	for i, u := range rawUsers {
-		users[i] = types.UserOption{Email: u.Email, UserRole: u.UserRole}
-	}
 
 	// Render site admin role management page
-	component := templates.MangeSiteAdminRolesPage(s.config.Environment, users)
+	component := templates.MangeSiteAdminRolesPage(s.config.Environment, getUserOptions(rawUsers, accessTokenDetails.Email))
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render site admin role management page", slog.String("error", err.Error()))
 	}

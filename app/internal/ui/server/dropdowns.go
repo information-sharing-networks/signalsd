@@ -7,6 +7,7 @@ import (
 
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
@@ -204,4 +205,32 @@ func getIsnOptions(isnPerms map[string]types.IsnPerm, filterByIsnAdmin bool, fil
 		isns = append(isns, types.IsnOption{Slug: isnSlug})
 	}
 	return isns
+}
+
+// getUserOptions converts raw user data to UserOption items,
+// excluding the user with the specified email address.
+// This is used in forms where a user should not be able to operate on themselves
+// (e.g., changing their own role, disabling their own account, transferring ISN to themselves).
+func getUserOptions(rawUsers []client.User, currentEmail string) []types.UserOption {
+	options := make([]types.UserOption, 0, len(rawUsers))
+	for _, u := range rawUsers {
+		if u.Email == currentEmail {
+			continue
+		}
+		options = append(options, types.UserOption{Email: u.Email, UserRole: u.UserRole})
+	}
+	return options
+}
+
+// getServiceAccountOptions converts raw service account data to ServiceAccountOption items.
+func getServiceAccountOptions(rawAccounts []client.ServiceAccount) []types.ServiceAccountOption {
+	options := make([]types.ServiceAccountOption, 0, len(rawAccounts))
+	for _, sa := range rawAccounts {
+		options = append(options, types.ServiceAccountOption{
+			ClientOrganization: sa.ClientOrganization,
+			ClientContactEmail: sa.ClientContactEmail,
+			ClientID:           sa.ClientID,
+		})
+	}
+	return options
 }

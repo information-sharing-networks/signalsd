@@ -10,7 +10,6 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
-	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
 // ManageIsnAccountsPage godoc
@@ -51,10 +50,6 @@ func (s *Server) ManageIsnAccountsPage(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	users := make([]types.UserOption, len(rawUsers))
-	for i, u := range rawUsers {
-		users[i] = types.UserOption{Email: u.Email, UserRole: u.UserRole}
-	}
 
 	// Fetch service accounts for dropdown
 	rawServiceAccounts, err := s.apiClient.GetServiceAccounts(accessTokenDetails.AccessToken)
@@ -66,17 +61,9 @@ func (s *Server) ManageIsnAccountsPage(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	serviceAccounts := make([]types.ServiceAccountOption, len(rawServiceAccounts))
-	for i, sa := range rawServiceAccounts {
-		serviceAccounts[i] = types.ServiceAccountOption{
-			ClientOrganization: sa.ClientOrganization,
-			ClientContactEmail: sa.ClientContactEmail,
-			ClientID:           sa.ClientID,
-		}
-	}
 
 	// Render admin page
-	component := templates.ManageIsnAccountsPage(s.config.Environment, isns, users, serviceAccounts)
+	component := templates.ManageIsnAccountsPage(s.config.Environment, isns, getUserOptions(rawUsers, accessTokenDetails.Email), getServiceAccountOptions(rawServiceAccounts))
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render ISN accounts admin page", slog.String("error", err.Error()))
 	}
@@ -214,13 +201,9 @@ func (s *Server) TransferOwnershipPage(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	users := make([]types.UserOption, len(rawUsers))
-	for i, u := range rawUsers {
-		users[i] = types.UserOption{Email: u.Email, UserRole: u.UserRole}
-	}
 
 	// Render transfer ownership page
-	component := templates.TransferOwnershipPage(s.config.Environment, isns, users)
+	component := templates.TransferOwnershipPage(s.config.Environment, isns, getUserOptions(rawUsers, accessTokenDetails.Email))
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render transfer ownership page", slog.String("error", err.Error()))
 	}

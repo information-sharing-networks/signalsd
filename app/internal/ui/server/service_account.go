@@ -8,7 +8,6 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
-	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
 // CreateServiceAccountsPage godoc
@@ -49,16 +48,7 @@ func (s *Server) ReissueServiceAccountCredentialsPage(w http.ResponseWriter, r *
 		return
 	}
 
-	saOptions := make([]types.ServiceAccountOption, len(serviceAccounts))
-	for i, sa := range serviceAccounts {
-		saOptions[i] = types.ServiceAccountOption{
-			ClientOrganization: sa.ClientOrganization,
-			ClientContactEmail: sa.ClientContactEmail,
-			ClientID:           sa.ClientID,
-		}
-	}
-
-	if err := templates.ReissueServiceAccountCredentialsPage(s.config.Environment, saOptions).Render(r.Context(), w); err != nil {
+	if err := templates.ReissueServiceAccountCredentialsPage(s.config.Environment, getServiceAccountOptions(serviceAccounts)).Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render ReissueServiceAccount template", slog.String("error", err.Error()))
 	}
 }
