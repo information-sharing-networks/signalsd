@@ -15,7 +15,7 @@ require (
 	github.com/alecthomas/chroma/v2 v2.23.1
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/jackc/pgx/v5 v5.9.1
-	github.com/jub0bs/cors v0.13.5
+	github.com/jub0bs/cors v0.13.6
 	github.com/lmittmann/tint v1.1.3
 	github.com/pressly/goose/v3 v3.27.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
