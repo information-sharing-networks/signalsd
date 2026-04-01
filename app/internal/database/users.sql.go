@@ -78,6 +78,23 @@ func (q *Queries) ExistsUserWithEmail(ctx context.Context, email string) (bool, 
 	return exists, err
 }
 
+const GetEmailByAccountID = `-- name: GetEmailByAccountID :one
+SELECT COALESCE(u.email, sa.client_contact_email) AS email 
+FROM accounts a
+LEFT OUTER JOIN service_accounts sa
+    ON sa.account_id = a.id
+LEFT OUTER JOIN users u
+    ON u.account_id = a.id
+WHERE a.id = $1
+`
+
+func (q *Queries) GetEmailByAccountID(ctx context.Context, id uuid.UUID) (string, error) {
+	row := q.db.QueryRow(ctx, GetEmailByAccountID, id)
+	var email string
+	err := row.Scan(&email)
+	return email, err
+}
+
 const GetUserByEmail = `-- name: GetUserByEmail :one
 SELECT account_id, created_at, updated_at, email, hashed_password, user_role FROM users WHERE LOWER(email) = LOWER($1)
 `

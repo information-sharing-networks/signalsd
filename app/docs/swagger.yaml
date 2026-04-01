@@ -67,6 +67,9 @@ definitions:
         - user
         - service_account
         type: string
+      email:
+        description: email is the contact email for the account
+        type: string
       expires_in:
         description: ExpiresIn is the token expiry in seconds
         example: 1800

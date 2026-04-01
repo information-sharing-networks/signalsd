@@ -1,18 +1,18 @@
 package templates
 
 // SettingsPage renders the user account settings page
-templ SettingsPage(environment string) {
+templ SettingsPage(environment string, email string) {
 	@BaseLayout("Account Settings") {
 		@Navigation(environment)
 		<div class="page-container">
-			<h1 class="page-title">Account Settings</h1>
+			<h1 class="page-title">Account Settings </h1>
 			<p class="card-description text-muted">Manage your account settings and security.</p>
 
 			<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
 				<!-- Change Password Card -->
 				<div class="card">
 					<div class="card-body">
-						<h3 class="card-title">Change Password</h3>
+						<h3 class="card-title">Change Password - { email }</h3>
 						<p class="card-description text-muted">Use this form to change your login password.</p>
 						<form
 							hx-put="/ui-api/account/password"

@@ -19,6 +19,9 @@ type AccessTokenDetails struct {
 	// AccountID is the account id of the user making the request
 	AccountID string `json:"account_id"`
 
+	// email is the contact email for the account
+	Email string `json:"email"`
+
 	// AccountType is the account type of the user making the request (user or service_account)
 	AccountType string `json:"account_type"`
 

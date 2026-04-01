@@ -2465,6 +2465,10 @@ const docTemplate = `{
                         "service_account"
                     ]
                 },
+                "email": {
+                    "description": "email is the contact email for the account",
+                    "type": "string"
+                },
                 "expires_in": {
                     "description": "ExpiresIn is the token expiry in seconds",
                     "type": "integer",

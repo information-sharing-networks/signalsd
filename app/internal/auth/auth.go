@@ -54,6 +54,9 @@ type AccessTokenResponse struct {
 	// AccountID is the account id of the user making the request
 	AccountID uuid.UUID `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
 
+	// email is the contact email for the account
+	Email string `json:"email"`
+
 	// AccountType is the account type of the user making the request (user or service_account)
 	AccountType string `json:"account_type" enums:"user,service_account"`
 
@@ -395,6 +398,11 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 		IsnPerms:    isnPermsClaims,
 	}
 
+	email, err := a.queries.GetEmailByAccountID(ctx, accountID)
+	if err != nil {
+		return AccessTokenResponse{}, fmt.Errorf("database error getting email for the account: %w", err)
+	}
+
 	// create a new signed token
 	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
@@ -408,6 +416,7 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 		TokenType:   "Bearer",
 		ExpiresIn:   int(signalsd.AccessTokenExpiry.Seconds()),
 		AccountID:   account.ID,
+		Email:       email,
 		AccountType: account.AccountType,
 		Role:        account.AccountRole,
 		IsnPerms:    isnPerms,

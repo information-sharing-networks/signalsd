@@ -22,7 +22,15 @@ import (
 func (s *Server) SettingsPage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
-	component := templates.SettingsPage(s.config.Environment)
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
+	if !ok {
+		component := templates.ErrorAlert("Authentication required. Please log in again.")
+		if err := component.Render(r.Context(), w); err != nil {
+			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
+		}
+		return
+	}
+	component := templates.SettingsPage(s.config.Environment, accessTokenDetails.Email)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render settings page", slog.String("error", err.Error()))
 	}

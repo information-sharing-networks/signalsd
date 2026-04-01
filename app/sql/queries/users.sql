@@ -61,3 +61,13 @@ SELECT exists (
 -- name: IsFirstUser :one
 SELECT COUNT(*) = 0 AS is_empty
 FROM users;
+
+
+-- name: GetEmailByAccountID :one
+SELECT COALESCE(u.email, sa.client_contact_email) AS email 
+FROM accounts a
+LEFT OUTER JOIN service_accounts sa
+    ON sa.account_id = a.id
+LEFT OUTER JOIN users u
+    ON u.account_id = a.id
+WHERE a.id = $1;

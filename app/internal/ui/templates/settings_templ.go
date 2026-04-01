@@ -9,7 +9,7 @@ import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
 // SettingsPage renders the user account settings page
-func SettingsPage(environment string) templ.Component {
+func SettingsPage(environment string, email string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -46,7 +46,20 @@ func SettingsPage(environment string) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Account Settings</h1><p class=\"card-description text-muted\">Manage your account settings and security.</p><div class=\"grid grid-cols-1 md:grid-cols-2 gap-6\"><!-- Change Password Card --><div class=\"card\"><div class=\"card-body\"><h3 class=\"card-title\">Change Password</h3><p class=\"card-description text-muted\">Use this form to change your login password.</p><form hx-put=\"/ui-api/account/password\" hx-target=\"#password-result\" hx-swap=\"innerHTML\" class=\"margin-top-4\"><div class=\"form-group\"><label for=\"current-password\" class=\"form-label\">Current Password</label> <input id=\"current-password\" name=\"current-password\" type=\"password\" required class=\"form-input\" placeholder=\"Enter your current password\"><p class=\"text-muted text-sm mt-1\">We need your current password to verify your identity.</p></div><div class=\"form-group\"><label for=\"new-password\" class=\"form-label\">New Password</label> <input id=\"new-password\" name=\"new-password\" type=\"password\" required minlength=\"11\" class=\"form-input\" placeholder=\"Enter your new password (minimum 11 characters)\"><p class=\"text-muted text-sm mt-1\">Password must be at least 11 characters long.</p></div><div class=\"form-group\"><label for=\"confirm-password\" class=\"form-label\">Confirm New Password</label> <input id=\"confirm-password\" name=\"confirm-password\" type=\"password\" required minlength=\"11\" class=\"form-input\" placeholder=\"Confirm your new password\"></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Update Password</button></div></form></div></div></div><div id=\"password-result\"><!-- Results will appear here --></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Account Settings </h1><p class=\"card-description text-muted\">Manage your account settings and security.</p><div class=\"grid grid-cols-1 md:grid-cols-2 gap-6\"><!-- Change Password Card --><div class=\"card\"><div class=\"card-body\"><h3 class=\"card-title\">Change Password - ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var3 string
+			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(email)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/settings.templ`, Line: 15, Col: 54}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</h3><p class=\"card-description text-muted\">Use this form to change your login password.</p><form hx-put=\"/ui-api/account/password\" hx-target=\"#password-result\" hx-swap=\"innerHTML\" class=\"margin-top-4\"><div class=\"form-group\"><label for=\"current-password\" class=\"form-label\">Current Password</label> <input id=\"current-password\" name=\"current-password\" type=\"password\" required class=\"form-input\" placeholder=\"Enter your current password\"><p class=\"text-muted text-sm mt-1\">We need your current password to verify your identity.</p></div><div class=\"form-group\"><label for=\"new-password\" class=\"form-label\">New Password</label> <input id=\"new-password\" name=\"new-password\" type=\"password\" required minlength=\"11\" class=\"form-input\" placeholder=\"Enter your new password (minimum 11 characters)\"><p class=\"text-muted text-sm mt-1\">Password must be at least 11 characters long.</p></div><div class=\"form-group\"><label for=\"confirm-password\" class=\"form-label\">Confirm New Password</label> <input id=\"confirm-password\" name=\"confirm-password\" type=\"password\" required minlength=\"11\" class=\"form-input\" placeholder=\"Confirm your new password\"></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary\">Update Password</button></div></form></div></div></div><div id=\"password-result\"><!-- Results will appear here --></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
