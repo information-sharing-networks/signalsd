@@ -92,7 +92,7 @@ func (i *IsnAccountHandler) UpdateIsnAccountPermissionHandler(w http.ResponseWri
 		return
 	}
 
-	// check isn exists and is owned by user making the request
+	// get isn
 	isnSlug := r.PathValue("isn_slug")
 
 	isn, err := i.queries.GetIsnBySlug(r.Context(), isnSlug)
@@ -167,59 +167,12 @@ func (i *IsnAccountHandler) UpdateIsnAccountPermissionHandler(w http.ResponseWri
 		return
 	}
 
-	// get the current permissions for the target account on the ISN
-	isnAccount, err := i.queries.GetIsnAccountByIsnAndAccountID(r.Context(), database.GetIsnAccountByIsnAndAccountIDParams{
-		AccountID: targetAccountID,
+	_, err = i.queries.UpsertIsnAccount(r.Context(), database.UpsertIsnAccountParams{
 		IsnID:     isn.ID,
+		AccountID: targetAccountID,
+		CanRead:   *req.CanRead,
+		CanWrite:  *req.CanWrite,
 	})
-
-	isExistingPermissions := err == nil
-
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-			slog.String("target_account_id", targetAccountID.String()),
-			slog.String("isn_slug", isnSlug),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
-	}
-
-	// Handle batch closure when revoking write access - this is just to tidy up the database - it's not an error if there is no batch to close
-	if isExistingPermissions && isnAccount.CanWrite && !*req.CanWrite {
-		_, err = i.queries.CloseSignalBatchByIsnIdAndAccountID(r.Context(), database.CloseSignalBatchByIsnIdAndAccountIDParams{
-			IsnID:     isn.ID,
-			AccountID: targetAccountID,
-		})
-		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
-				slog.String("target_account_id", targetAccountID.String()),
-				slog.String("isn_slug", isnSlug),
-			)
-
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-			return
-		}
-	}
-
-	// Create or update the ISN account permission
-	if isExistingPermissions {
-		_, err = i.queries.UpdateIsnAccount(r.Context(), database.UpdateIsnAccountParams{
-			IsnID:     isn.ID,
-			AccountID: targetAccountID,
-			CanRead:   *req.CanRead,
-			CanWrite:  *req.CanWrite,
-		})
-	} else {
-		_, err = i.queries.CreateIsnAccount(r.Context(), database.CreateIsnAccountParams{
-			IsnID:     isn.ID,
-			AccountID: targetAccountID,
-			CanRead:   *req.CanRead,
-			CanWrite:  *req.CanWrite,
-		})
-	}
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),

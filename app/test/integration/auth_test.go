@@ -61,8 +61,8 @@ func TestPermissions(t *testing.T) {
 	grantPermission(t, ctx, testEnv.queries, adminISN.ID, memberAccount.ID, "read")
 	grantPermission(t, ctx, testEnv.queries, publicISN.ID, serviceAccount.ID, "write")
 
-	// Create signal batches
-	createTestSignalBatch(t, ctx, testEnv.queries, publicISN.ID, serviceAccount.ID)
+	// Create signal batch for the service account
+	createTestSignalBatch(t, ctx, testEnv.queries, serviceAccount.ID, "auth-test-batch")
 
 	var validSignalTypePaths = make(map[string]string)
 
@@ -77,7 +77,7 @@ func TestPermissions(t *testing.T) {
 			"admin-isn":     "read-write",
 			"public-isn":    "read-write",
 		}
-		checkPermissions(t, authService, siteAdminAccount.ID, "user", "siteadmin", expectedPerms, validSignalTypePaths, testEnv.cfg.SecretKey)
+		checkPermissions(t, authService, siteAdminAccount.ID, "siteadmin", expectedPerms, validSignalTypePaths, testEnv.cfg.SecretKey)
 	})
 
 	t.Run("admin role permissions", func(t *testing.T) {
@@ -86,7 +86,7 @@ func TestPermissions(t *testing.T) {
 			"admin-isn":  "read-write",
 			"public-isn": "read-write",
 		}
-		checkPermissions(t, authService, adminAccount.ID, "user", "isnadmin", expectedPerms, validSignalTypePaths, testEnv.cfg.SecretKey)
+		checkPermissions(t, authService, adminAccount.ID, "isnadmin", expectedPerms, validSignalTypePaths, testEnv.cfg.SecretKey)
 	})
 
 	t.Run("member role permissions", func(t *testing.T) {
@@ -94,7 +94,7 @@ func TestPermissions(t *testing.T) {
 		expectedPerms := map[string]string{
 			"admin-isn": "read",
 		}
-		checkPermissions(t, authService, memberAccount.ID, "user", "member", expectedPerms, validSignalTypePaths, testEnv.cfg.SecretKey)
+		checkPermissions(t, authService, memberAccount.ID, "member", expectedPerms, validSignalTypePaths, testEnv.cfg.SecretKey)
 	})
 
 	t.Run("service account permissions", func(t *testing.T) {
@@ -102,7 +102,7 @@ func TestPermissions(t *testing.T) {
 		expectedPerms := map[string]string{
 			"public-isn": "write",
 		}
-		checkPermissions(t, authService, serviceAccount.ID, "service_account", "member", expectedPerms, validSignalTypePaths, testEnv.cfg.SecretKey)
+		checkPermissions(t, authService, serviceAccount.ID, "member", expectedPerms, validSignalTypePaths, testEnv.cfg.SecretKey)
 	})
 
 	t.Run("error handling ", func(t *testing.T) {
@@ -134,7 +134,6 @@ func TestPermissions(t *testing.T) {
 func checkPermissions(t *testing.T,
 	authService *auth.AuthService,
 	accountID uuid.UUID,
-	accountType string,
 	expectedRole string,
 	expectedPerms map[string]string,
 	validSignalTypePaths map[string]string,
@@ -184,15 +183,6 @@ func checkPermissions(t *testing.T,
 			}
 		default:
 			t.Errorf("unexpected permission type: %s", expectedPermission)
-		}
-
-		// service account was set up with a batch for the public ISN (which it has write access to)
-		if perm.CanWrite && accountType == "service_account" && perm.SignalBatchID == nil {
-			t.Errorf("expected signal batch ID for %s, got nil", isnSlug)
-		}
-
-		if perm.CanRead && !perm.CanWrite && perm.SignalBatchID != nil {
-			t.Errorf("expected signal batch to be nil for read-only %s, got %s", isnSlug, perm.SignalBatchID)
 		}
 
 		// Verify signal type paths are correctly populated
@@ -275,12 +265,6 @@ func checkPermissions(t *testing.T,
 		if jwtPerm.CanWrite != responsePerm.CanWrite {
 			t.Errorf("ISN %s: JWT CanWrite %v doesn't match response CanWrite %v",
 				isnSlug, jwtPerm.CanWrite, responsePerm.CanWrite)
-		}
-
-		// Compare signal batch IDs (should be nil for read-only, non-nil for write)
-		if (jwtPerm.SignalBatchID == nil) != (responsePerm.SignalBatchID == nil) {
-			t.Errorf("ISN %s: JWT SignalBatchID nil=%v doesn't match response SignalBatchID nil=%v",
-				isnSlug, jwtPerm.SignalBatchID == nil, responsePerm.SignalBatchID == nil)
 		}
 
 		// Compare signal types

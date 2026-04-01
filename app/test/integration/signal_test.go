@@ -56,9 +56,9 @@ func TestSignalSubmission(t *testing.T) {
 
 	grantPermission(t, ctx, testEnv.queries, adminISN.ID, memberAccount.ID, "read")
 
-	createTestSignalBatch(t, ctx, testEnv.queries, siteAdminISN.ID, siteAdminAccount.ID)
-	createTestSignalBatch(t, ctx, testEnv.queries, adminISN.ID, siteAdminAccount.ID)
-	createTestSignalBatch(t, ctx, testEnv.queries, adminISN.ID, adminAccount.ID)
+	createTestSignalBatch(t, ctx, testEnv.queries, siteAdminAccount.ID, "test-batch-siteadmin")
+	createTestSignalBatch(t, ctx, testEnv.queries, siteAdminAccount.ID, "test-batch-siteadmin-admin-isn")
+	createTestSignalBatch(t, ctx, testEnv.queries, adminAccount.ID, "test-batch-admin")
 
 	ownerEndpoint := testSignalEndpoint{
 		isnSlug:          siteAdminISN.Slug,
@@ -484,8 +484,8 @@ func TestIsInUseStatus(t *testing.T) {
 	grantPermission(t, ctx, testEnv.queries, adminISN.ID, memberAccount.ID, "read-write")
 	grantPermission(t, ctx, testEnv.queries, siteAdminISN.ID, memberAccount.ID, "read-write")
 
-	createTestSignalBatch(t, ctx, testEnv.queries, siteAdminISN.ID, adminAccount.ID)
-	createTestSignalBatch(t, ctx, testEnv.queries, adminISN.ID, adminAccount.ID)
+	createTestSignalBatch(t, ctx, testEnv.queries, adminAccount.ID, "test-batch-admin-siteadmin-isn")
+	createTestSignalBatch(t, ctx, testEnv.queries, adminAccount.ID, "test-batch-admin-admin-isn")
 
 	ownerEndpoint := testSignalEndpoint{
 		isnSlug:          siteAdminISN.Slug,
@@ -693,9 +693,9 @@ func TestSignalSearch(t *testing.T) {
 	grantPermission(t, ctx, testEnv.queries, adminISN.ID, memberAccount.ID, "read")
 
 	// create batches
-	createTestSignalBatch(t, ctx, testEnv.queries, siteAdminISN.ID, siteAdminAccount.ID)
-	createTestSignalBatch(t, ctx, testEnv.queries, adminISN.ID, adminAccount.ID)
-	createTestSignalBatch(t, ctx, testEnv.queries, publicISN.ID, adminAccount.ID)
+	createTestSignalBatch(t, ctx, testEnv.queries, siteAdminAccount.ID, "test-batch-siteadmin")
+	createTestSignalBatch(t, ctx, testEnv.queries, adminAccount.ID, "test-batch-admin")
+	createTestSignalBatch(t, ctx, testEnv.queries, adminAccount.ID, "test-batch-admin-public")
 
 	// Create tokens after granting permissions so they include the ISN permissions in claims
 	ownerToken := testEnv.createAuthToken(t, siteAdminAccount.ID)
@@ -1024,8 +1024,8 @@ func TestWriteOnlyAccountVisibility(t *testing.T) {
 	grantPermission(t, ctx, testEnv.queries, sharedISN.ID, account2.ID, "write")
 
 	// create batches
-	createTestSignalBatch(t, ctx, testEnv.queries, sharedISN.ID, account1.ID)
-	createTestSignalBatch(t, ctx, testEnv.queries, sharedISN.ID, account2.ID)
+	createTestSignalBatch(t, ctx, testEnv.queries, account1.ID, "test-batch-account1")
+	createTestSignalBatch(t, ctx, testEnv.queries, account2.ID, "test-batch-account2")
 
 	// Create tokens after granting permissions
 	token1 := testEnv.createAuthToken(t, account1.ID)
@@ -1125,7 +1125,7 @@ func TestCorrelatedAndPreviousVersionsSearch(t *testing.T) {
 	siteAdminSignalType := createTestSignalType(t, ctx, testEnv.queries, siteAdminISN.ID, "SiteAdmin correlated signal", "1.0.0")
 
 	// create batch
-	createTestSignalBatch(t, ctx, testEnv.queries, siteAdminISN.ID, siteAdminAccount.ID)
+	createTestSignalBatch(t, ctx, testEnv.queries, siteAdminAccount.ID, "test-batch-correlated")
 	ownerAuthToken := testEnv.createAuthToken(t, siteAdminAccount.ID)
 
 	ownerEndpoint := testSignalEndpoint{
@@ -1310,6 +1310,7 @@ type testSignalEndpoint struct {
 // createValidSignalPayload creates json valid for https://github.com/information-sharing-networks/signalsd_test_schemas/blob/main/2025.05.13/integration-test-schema.json
 func createValidSignalPayload(localRef string) map[string]any {
 	return map[string]any{
+		"batch_ref": "test-batch",
 		"signals": []map[string]any{
 			{
 				"local_ref": localRef,
@@ -1323,6 +1324,7 @@ func createValidSignalPayload(localRef string) map[string]any {
 
 func createValidSignalPayloadWithCorrelatedID(localRef string, correlationID string) map[string]any {
 	return map[string]any{
+		"batch_ref": "test-batch",
 		"signals": []map[string]any{
 			{
 				"local_ref":      localRef,
@@ -1337,6 +1339,7 @@ func createValidSignalPayloadWithCorrelatedID(localRef string, correlationID str
 
 func createInvalidSignalPayload(localRef string) map[string]any {
 	return map[string]any{
+		"batch_ref": "test-batch",
 		"signals": []map[string]any{
 			{
 				"local_ref": localRef,
@@ -1361,7 +1364,8 @@ func createMultipleSignalsPayload(localRefs []string) map[string]any {
 		}
 	}
 	return map[string]any{
-		"signals": signals,
+		"batch_ref": "test-batch",
+		"signals":   signals,
 	}
 }
 
@@ -1388,14 +1392,16 @@ func createMultipleSignalsPayloadPartialFailure(localRefs []string) map[string]a
 		}
 	}
 	return map[string]any{
-		"signals": signals,
+		"batch_ref": "test-batch",
+		"signals":   signals,
 	}
 }
 
 // createEmptySignalsPayload creates a payload with empty signals array
 func createEmptySignalsPayload() map[string]any {
 	return map[string]any{
-		"signals": []map[string]any{},
+		"batch_ref": "test-batch",
+		"signals":   []map[string]any{},
 	}
 }
 

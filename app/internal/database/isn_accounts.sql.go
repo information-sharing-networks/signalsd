@@ -12,46 +12,6 @@ import (
 	"github.com/google/uuid"
 )
 
-const CreateIsnAccount = `-- name: CreateIsnAccount :one
-INSERT INTO isn_accounts (
-    id,
-    created_at,
-    updated_at,
-    isn_id,
-    account_id,
-    can_read,
-    can_write
-) VALUES (gen_random_uuid(), now(), now(), $1, $2, $3, $4)
-RETURNING id, created_at, updated_at, isn_id, account_id, can_read, can_write
-`
-
-type CreateIsnAccountParams struct {
-	IsnID     uuid.UUID `json:"isn_id"`
-	AccountID uuid.UUID `json:"account_id"`
-	CanRead   bool      `json:"can_read"`
-	CanWrite  bool      `json:"can_write"`
-}
-
-func (q *Queries) CreateIsnAccount(ctx context.Context, arg CreateIsnAccountParams) (IsnAccount, error) {
-	row := q.db.QueryRow(ctx, CreateIsnAccount,
-		arg.IsnID,
-		arg.AccountID,
-		arg.CanRead,
-		arg.CanWrite,
-	)
-	var i IsnAccount
-	err := row.Scan(
-		&i.ID,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.IsnID,
-		&i.AccountID,
-		&i.CanRead,
-		&i.CanWrite,
-	)
-	return i, err
-}
-
 const DeleteIsnAccount = `-- name: DeleteIsnAccount :execrows
 DELETE FROM isn_accounts
 WHERE isn_id =  $1
@@ -233,25 +193,32 @@ func (q *Queries) GetIsnAccountsByAccountID(ctx context.Context, accountID uuid.
 	return items, nil
 }
 
-const UpdateIsnAccount = `-- name: UpdateIsnAccount :one
-UPDATE isn_accounts SET
-    updated_at = now(),
-    can_read = $3,
-    can_write = $4
-WHERE isn_id =  $1
-AND account_id = $2
+const UpsertIsnAccount = `-- name: UpsertIsnAccount :one
+INSERT INTO isn_accounts (
+    id,
+    created_at,
+    updated_at,
+    isn_id,
+    account_id,
+    can_read,
+    can_write
+) VALUES (gen_random_uuid(), now(), now(), $1, $2, $3, $4)
+ON CONFLICT (isn_id, account_id) DO UPDATE
+    SET updated_at = now(),
+        can_read = EXCLUDED.can_read,
+        can_write = EXCLUDED.can_write
 RETURNING id, created_at, updated_at, isn_id, account_id, can_read, can_write
 `
 
-type UpdateIsnAccountParams struct {
+type UpsertIsnAccountParams struct {
 	IsnID     uuid.UUID `json:"isn_id"`
 	AccountID uuid.UUID `json:"account_id"`
 	CanRead   bool      `json:"can_read"`
 	CanWrite  bool      `json:"can_write"`
 }
 
-func (q *Queries) UpdateIsnAccount(ctx context.Context, arg UpdateIsnAccountParams) (IsnAccount, error) {
-	row := q.db.QueryRow(ctx, UpdateIsnAccount,
+func (q *Queries) UpsertIsnAccount(ctx context.Context, arg UpsertIsnAccountParams) (IsnAccount, error) {
+	row := q.db.QueryRow(ctx, UpsertIsnAccount,
 		arg.IsnID,
 		arg.AccountID,
 		arg.CanRead,

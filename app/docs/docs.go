@@ -1282,6 +1282,121 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/batches/search": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Returns the full status for all matching batches. Members see their own batches; site admins see all.\nAt least one date filter must be provided.",
+                "tags": [
+                    "Signal Exchange"
+                ],
+                "summary": "Search For Batches",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "2006-01-02T15:04:05Z",
+                        "description": "Earliest batch creation time",
+                        "name": "created_after",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "2006-01-02T16:00:00Z",
+                        "description": "Latest batch creation time",
+                        "name": "created_before",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handlers.BatchStatusResponse"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/batches/{batch_ref}/status": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Returns the status of a batch identified by batch_ref, scoped to the authenticated account.\n\nThe response shows stored and failed signal counts broken down by ISN and signal type.\nFailures listed are unresolved: the signal failed in this batch and has not been successfully resubmitted since.\n\nMembers can view their own batches. Site admins can supply ?account_id= to view another account's batch.\n",
+                "tags": [
+                    "Signal Exchange"
+                ],
+                "summary": "Get Batch Status",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "daily-sync-2026-04-02",
+                        "description": "Batch reference",
+                        "name": "batch_ref",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Account ID (site admins only)",
+                        "name": "account_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.BatchStatusResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/isn": {
             "get": {
                 "description": "get a list of the configured ISNs",
@@ -1570,28 +1685,6 @@ const docTemplate = `{
                         "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/isn/{isn_slug}/batches": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "This endpoint is used create a new batch for an account on the specified ISN.\nBatches are used to track signals sent by an account to the specified ISN (accounts can only have one open batch at a time on an ISN)\n\nOpening a batch closes the previous batch (the client app can decide how long to keep a batch open)\n\nSignals can only be sent to open batches.\n\nAuthentication is based on the supplied access token:\nsite admins, the isn owner and members with an isn_perm=write can create a batch for the ISN.\n\nNote: Batches are automatically created when accounts first write to an ISN,\nso you only need to explicitly create a batch using this endpoint if you want to track signals in separate batches.\n",
-                "tags": [
-                    "Signal Exchange"
-                ],
-                "summary": "Open a New Signal Batch",
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.CreateSignalsBatchResponse"
                         }
                     }
                 }
@@ -2127,134 +2220,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/isn/{isn_slug}/batches/search": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "Search for batches with optional filtering parameters\n\nThe search endpoint returns the full batch status for each batch.\n\nWhere a signal has failed to load as part of the batch and not subsequently been loaded, the failure is considered unresolved and listed as a failure in the batch status\n\nMember accounts can only see batches they have created. ISN Admins can see batches for ISNs they administer. The site owner can see all batches.\n\nAt least one search criteria must be provided:\n- latest=true (get the latest batch)\n- previous=true (get the previous batch)\n- created date range\n- closed date range\n",
-                "tags": [
-                    "Signal Exchange"
-                ],
-                "summary": "Search For Batches",
-                "parameters": [
-                    {
-                        "type": "boolean",
-                        "example": true,
-                        "description": "Get the latest batch",
-                        "name": "latest",
-                        "in": "query"
-                    },
-                    {
-                        "type": "boolean",
-                        "example": true,
-                        "description": "Get the previous batch",
-                        "name": "previous",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "example": "2006-01-02T15:04:05Z",
-                        "description": "Start date for batch creation filtering",
-                        "name": "created_after",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "example": "2006-01-02T16:00:00Z",
-                        "description": "End date for batch creation filtering",
-                        "name": "created_before",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "example": "2006-01-02T15:04:05Z",
-                        "description": "Start date for batch closure filtering",
-                        "name": "closed_after",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "example": "2006-01-02T16:00:00Z",
-                        "description": "End date for batch closure filtering",
-                        "name": "closed_before",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/handlers.BatchStatusResponse"
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/isn/{isn_slug}/batches/{batch_id}/status": {
-            "get": {
-                "description": "Returns the status of a batch, including the number of signals loaded and the number of failures for each signal type\n\nThe endpoint returns the full batch status for the batch\n\nWhere a signal has failed to load as part of the batch and not subsequently been loaded, the failure is considered unresolved and listed as a failure in the batch status\n\nNote:  Unresolved failures are signals that failed to load in this batch and have not been successfully loaded since the failure occurred.\nIf a signal is fixed but subsequently fails again in a later batch, it will be recorded as a new failure, and this new failure will appear in that batch's status.\n\nMember accounts can see the status of batches that they created.\nISN Admins can see the status of any batch created for ISNs they administer.\nThe site owner can see the status of any batch on the site.\n",
-                "tags": [
-                    "Signal Exchange"
-                ],
-                "summary": "Get Batch Status",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "sample-isn",
-                        "description": "ISN slug",
-                        "name": "isn_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "example": "67890684-3b14-42cf-b785-df28ce570400",
-                        "description": "Batch ID",
-                        "name": "batch_id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.BatchStatusResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/oauth/revoke": {
             "post": {
                 "description": "Revoke a refresh token or client secret to prevent it being used to create new access tokens (self-service)\n\n**Use Cases:**\n- **Web User Logout**: User wants to log out of their session\n- **Service Account Security**: Account no longer being used/compromised secret\n\n**Service Accounts:**\nYou must supply your ` + "`" + `client ID` + "`" + ` and ` + "`" + `client secret` + "`" + ` in the request body.\nThis revokes all client secrets for the service account, effectively disabling it.\n\n**IMPORTANT - Service Account Reinstatement:**\n- This endpoint does not permanently disable the service account itself (use ` + "`" + `POST /admin/accounts/{account_id}/disable` + "`" + ` for that)\n- To restore access, an admin must call ` + "`" + `/api/auth/service-accounts/reissue_credentials` + "`" + ` with the same organization and email\n- This will generate a new setup URL and client secret while preserving the same client_id\n- If the account was disabled by an admin, it must first be re-enabled via ` + "`" + `POST /admin/accounts/{account_id}/enable` + "`" + `\n\n**Web Users (Logout):**\nThis endpoint expects a refresh token in an ` + "`" + `http-only cookie` + "`" + `.\nThis revokes the user's refresh token, effectively logging them out.\n\nIf the refresh token has expired or been revoked, the user must login again to get a new one.\n\n**Note:** Any unexpired access tokens issued for the account will continue to work until they expire.\n",
@@ -2484,11 +2449,6 @@ const docTemplate = `{
                     "type": "boolean",
                     "example": true
                 },
-                "signal_batch_id": {
-                    "description": "SignalBatchID is the ID of the current signal batch for the ISN (used for tracking signals when writing to the isn)",
-                    "type": "string",
-                    "example": "967affe9-5628-4fdd-921f-020051344a12"
-                },
                 "signal_types": {
                     "description": "SignalTypes is a map of the signal type paths to the signal type details (key is the signal type path)",
                     "type": "object",
@@ -2563,6 +2523,9 @@ const docTemplate = `{
                 "failed_count": {
                     "type": "integer"
                 },
+                "isn_slug": {
+                    "type": "string"
+                },
                 "signal_type_slug": {
                     "type": "string"
                 },
@@ -2589,25 +2552,19 @@ const docTemplate = `{
                 "batch_id": {
                     "type": "string"
                 },
+                "batch_ref": {
+                    "type": "string"
+                },
                 "batch_status": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/handlers.BatchStatus"
                     }
                 },
-                "closed_at": {
-                    "type": "string"
-                },
                 "contains_failures": {
                     "type": "boolean"
                 },
                 "created_at": {
-                    "type": "string"
-                },
-                "is_latest": {
-                    "type": "boolean"
-                },
-                "isn_slug": {
                     "type": "string"
                 }
             }
@@ -2744,22 +2701,14 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.CreateSignalsBatchResponse": {
-            "type": "object",
-            "properties": {
-                "account_id": {
-                    "type": "string",
-                    "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3"
-                },
-                "signals_batch_id": {
-                    "type": "string",
-                    "example": "b51faf05-aaed-4250-b334-2258ccdf1ff2"
-                }
-            }
-        },
         "handlers.CreateSignalsRequest": {
             "type": "object",
             "properties": {
+                "batch_ref": {
+                    "description": "BatchRef groups signals under a sender-chosen label\nReuse the same batch_ref across requests to add signals to an existing batch.\nAllowed characters: alphanumeric, hyphens, underscores. Max length 128.",
+                    "type": "string",
+                    "example": "daily-sync-2026-04-02"
+                },
                 "signals": {
                     "type": "array",
                     "items": {
@@ -2775,6 +2724,10 @@ const docTemplate = `{
                     "type": "string",
                     "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3"
                 },
+                "batch_ref": {
+                    "type": "string",
+                    "example": "daily-sync-2026-04-02"
+                },
                 "isn_slug": {
                     "type": "string",
                     "example": "sample-isn"
@@ -2785,10 +2738,6 @@ const docTemplate = `{
                 "signal_type_path": {
                     "type": "string",
                     "example": "signal-type-1/v0.0.1"
-                },
-                "signals_batch_id": {
-                    "type": "string",
-                    "example": "b51faf05-aaed-4250-b334-2258ccdf1ff2"
                 },
                 "summary": {
                     "$ref": "#/definitions/handlers.CreateSignalsSummary"

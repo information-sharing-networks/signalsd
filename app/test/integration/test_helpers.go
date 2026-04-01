@@ -147,37 +147,21 @@ func createTestISN(t *testing.T, ctx context.Context, queries *database.Queries,
 	}
 }
 
-// getLatestBatchForAccountAndISN returns the latest batch for a specific account and ISN, or nil if none exists
-func getLatestBatchForAccountAndISN(t *testing.T, ctx context.Context, queries *database.Queries, accountID uuid.UUID, isnSlug string) *database.GetLatestBatchByAccountAndIsnSlugRow {
+// getBatchByRef returns a batch by account and batch_ref, or nil if none exists
+func getBatchByRef(t *testing.T, ctx context.Context, queries *database.Queries, accountID uuid.UUID, batchRef string) *database.SignalBatch {
 	t.Helper()
 
-	// Use the dedicated query that returns exactly what we need: 0 or 1 batch
-	batch, err := queries.GetLatestBatchByAccountAndIsnSlug(ctx, database.GetLatestBatchByAccountAndIsnSlugParams{
+	batch, err := queries.GetSignalBatchByRefAndAccountID(ctx, database.GetSignalBatchByRefAndAccountIDParams{
 		AccountID: accountID,
-		Slug:      isnSlug,
+		BatchRef:  batchRef,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return nil // No batch found
+			return nil
 		}
-		t.Fatalf("Failed to get latest batch: %v", err)
+		t.Fatalf("Failed to get batch %q: %v", batchRef, err)
 	}
-
 	return &batch
-}
-
-// assertBatchState verifies the state of a batch
-func assertBatchState(t *testing.T, ctx context.Context, queries *database.Queries, batchID uuid.UUID, expectedIsLatest bool) {
-	t.Helper()
-
-	batch, err := queries.GetSignalBatchByID(ctx, batchID)
-	if err != nil {
-		t.Fatalf("Failed to get batch %v: %v", batchID, err)
-	}
-
-	if batch.IsLatest != expectedIsLatest {
-		t.Errorf("Expected batch %v is_latest to be %v, got %v", batchID, expectedIsLatest, batch.IsLatest)
-	}
 }
 
 // createTestSignalType creates a signal type and associates it with an ISN
@@ -216,7 +200,7 @@ func grantPermission(t *testing.T, ctx context.Context, queries *database.Querie
 	canRead := permission == "read" || permission == "read-write"
 	canWrite := permission == "write" || permission == "read-write"
 
-	_, err := queries.CreateIsnAccount(ctx, database.CreateIsnAccountParams{
+	_, err := queries.UpsertIsnAccount(ctx, database.UpsertIsnAccountParams{
 		IsnID:     isnID,
 		AccountID: accountID,
 		CanRead:   canRead,
@@ -242,17 +226,17 @@ func enableAccount(t *testing.T, ctx context.Context, queries *database.Queries,
 	}
 }
 
-// createTestSignalBatch creates a signal batch for an account and ISN
-// note: in production this is done automatically when an account writes to an isn for the first time
-func createTestSignalBatch(t *testing.T, ctx context.Context, queries *database.Queries, isnID, accountID uuid.UUID) database.SignalBatch {
+// createTestSignalBatch creates or retrieves a signal batch for an account using the given batch_ref.
+// In production this happens automatically when a signal is written.
+func createTestSignalBatch(t *testing.T, ctx context.Context, queries *database.Queries, accountID uuid.UUID, batchRef string) database.SignalBatch {
+	t.Helper()
 
-	batch, err := queries.CreateSignalBatch(ctx, database.CreateSignalBatchParams{
-		IsnID:     isnID,
+	batch, err := queries.UpsertSignalBatch(ctx, database.UpsertSignalBatchParams{
+		BatchRef:  batchRef,
 		AccountID: accountID,
 	})
 	if err != nil {
-		t.Fatalf("Failed to create signal batch for ISN %s and account %s: %v",
-			isnID, accountID, err)
+		t.Fatalf("Failed to get or create signal batch (ref=%q, account=%s): %v", batchRef, accountID, err)
 	}
 
 	return batch

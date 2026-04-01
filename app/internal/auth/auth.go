@@ -87,9 +87,6 @@ type IsnPerm struct {
 	// Visibility is the ISN visibility setting (public or private)
 	Visibility string `json:"visibility" enums:"public,private" example:"private"`
 
-	// SignalBatchID is the ID of the current signal batch for the ISN (used for tracking signals when writing to the isn)
-	SignalBatchID *uuid.UUID `json:"signal_batch_id,omitempty" example:"967affe9-5628-4fdd-921f-020051344a12"`
-
 	// InUse is true if the isn is active
 	InUse bool `json:"in_use" example:"true"`
 }
@@ -300,17 +297,6 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 		return AccessTokenResponse{}, fmt.Errorf("database error getting ISN accounts: %w", err)
 	}
 
-	//create a map of isn_slug to the account's open batch for the isn
-	latestSignalBatches, err := a.queries.GetLatestIsnSignalBatchesByAccountID(ctx, accountID)
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return AccessTokenResponse{}, fmt.Errorf("database error %w", err)
-	}
-
-	latestSignalBatchIDs := make(map[string]*uuid.UUID)
-	for _, batch := range latestSignalBatches {
-		latestSignalBatchIDs[batch.IsnSlug] = &batch.ID
-	}
-
 	// build isnPerms: filter the isnList to the ISNs this account can access, with their permissions
 	switch account.AccountRole {
 	case "siteadmin":
@@ -320,7 +306,6 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 				CanRead:       true,
 				CanWrite:      true,
 				CanAdminister: true,
-				SignalBatchID: latestSignalBatchIDs[isnSlug],
 				SignalTypes:   toSignalTypes(siteIsn.signalTypes),
 				Visibility:    siteIsn.visibility,
 				InUse:         siteIsn.inUse,
@@ -335,7 +320,6 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 					CanRead:       true,
 					CanWrite:      true,
 					CanAdminister: true,
-					SignalBatchID: latestSignalBatchIDs[isnSlug],
 					SignalTypes:   toSignalTypes(siteIsn.signalTypes),
 					Visibility:    siteIsn.visibility,
 					InUse:         siteIsn.inUse,
@@ -350,7 +334,6 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 					CanRead:       accessibleIsn.CanRead,
 					CanWrite:      accessibleIsn.CanWrite,
 					CanAdminister: false,
-					SignalBatchID: latestSignalBatchIDs[isnSlug],
 					SignalTypes:   toSignalTypes(isnList[isnSlug].signalTypes),
 					Visibility:    isnList[isnSlug].visibility,
 					InUse:         isnList[isnSlug].inUse,
@@ -366,7 +349,6 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 				CanRead:       accessibleIsn.CanRead,
 				CanWrite:      accessibleIsn.CanWrite,
 				CanAdminister: false,
-				SignalBatchID: latestSignalBatchIDs[isnSlug],
 				SignalTypes:   toSignalTypes(isnList[isnSlug].signalTypes),
 				Visibility:    isnList[isnSlug].visibility,
 				InUse:         isnList[isnSlug].inUse,

@@ -2,165 +2,122 @@
 
 package integration
 
-// Integration tests for signal batch functionality
-// Tests service account batch creation, validation, and lifecycle management
+// Integration tests for signal batch functionality.
+// Batches are now account-scoped and identified by a sender-supplied batch_ref.
+// There is no server-managed lifecycle (no is_latest, no explicit close).
 
 import (
 	"context"
 	"testing"
 
-	"github.com/information-sharing-networks/signalsd/app/internal/auth"
+	"github.com/google/uuid"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 )
 
-// TestBatchLifecycle tests the complete batch lifecycle for service accounts including:
-// - account signal submission without batch fails with expected error
-// - accounts can create initial batches successfully
-// - Creating a second batch closes the previous batch
-//
-// Each test creates an empty temporary database and applies all the migrations so the schema reflects the latest code. The database is dropped after each test.
-
-func TestBatchLifecycle(t *testing.T) {
+func TestBatchGetOrCreate(t *testing.T) {
 	ctx := context.Background()
 	testEnv := startInProcessServer(t, "")
-	// Create test data
-	t.Log("Creating test data...")
 
-	// Create site owner account and ISN
 	siteAdminAccount := createTestAccount(t, ctx, testEnv.queries, "siteadmin", "user", "siteadmin@batch-test.com")
-	testISN := createTestISN(t, ctx, testEnv.queries, "batch-test-isn", "Batch Test ISN", siteAdminAccount.ID, "private")
-
-	// Create service account
 	serviceAccount := createTestAccount(t, ctx, testEnv.queries, "member", "service_account", "service@batch-test.com")
 
-	// Grant ISN permission (write access)
-	_, err := testEnv.queries.CreateIsnAccount(ctx, database.CreateIsnAccountParams{
-		IsnID:     testISN.ID,
-		AccountID: serviceAccount.ID,
-		CanRead:   true,
-		CanWrite:  true,
-	})
-	if err != nil {
-		t.Fatalf("Failed to grant ISN permission: %v", err)
-	}
+	t.Run("get or create returns same batch for same ref", func(t *testing.T) {
+		ref := "daily-sync-2026-04-02"
 
-	// Create signal type for testing
-	signalType, err := testEnv.queries.CreateSignalType(ctx, database.CreateSignalTypeParams{
-		Slug:          "batch-test-signal",
-		SchemaURL:     testSchemaURL,
-		ReadmeURL:     testReadmeURL,
-		Title:         "Batch Test Signal",
-		Detail:        "Signal type for batch testing",
-		SemVer:        "1.0.0",
-		SchemaContent: testSchemaContent,
-	})
-	if err != nil {
-		t.Fatalf("Failed to create signal type: %v", err)
-	}
-
-	// add signal type to the ISN
-	err = testEnv.queries.AddSignalTypeToIsn(ctx, database.AddSignalTypeToIsnParams{
-		IsnID:        testISN.ID,
-		SignalTypeID: signalType.ID,
-	})
-	if err != nil {
-		t.Fatalf("Failed to associate signal type with ISN: %v", err)
-	}
-
-	t.Run("service account signal submission without batch fails", func(t *testing.T) {
-		// Create auth service
-		authService := auth.NewAuthService(testEnv.cfg.SecretKey, testEnv.cfg.Environment, testEnv.queries)
-
-		// Create access token for service account (should have no batch ID)
-		ctx := auth.ContextWithAccountID(context.Background(), serviceAccount.ID)
-		tokenResponse, err := authService.CreateAccessToken(ctx)
-		if err != nil {
-			t.Fatalf("Failed to create access token: %v", err)
-		}
-
-		// Verify that the service account has write permission but no batch ID
-		perm := tokenResponse.IsnPerms[testISN.Slug]
-		if !perm.CanWrite {
-			t.Errorf("Expected write permission, got CanRead=%v CanWrite=%v", perm.CanRead, perm.CanWrite)
-		}
-
-		if tokenResponse.IsnPerms[testISN.Slug].SignalBatchID != nil {
-			t.Errorf("Expected no batch ID for service account without batch, got %v", *tokenResponse.IsnPerms[testISN.Slug].SignalBatchID)
-		}
-
-		// This validates the condition that would trigger the error in CreateSignalsHandler:
-		// accounts must have a signal batch for this ISN before posting signals
-		if tokenResponse.AccountType == "service_account" && tokenResponse.IsnPerms[testISN.Slug].SignalBatchID != nil {
-			t.Error("Expected service account without batch to have nil SignalBatchID")
-		}
-	})
-
-	t.Run("account can create batch", func(t *testing.T) {
-		// Create batch
-		batch1, err := testEnv.queries.CreateSignalBatch(ctx, database.CreateSignalBatchParams{
-			IsnID:     testISN.ID,
+		b1, err := testEnv.queries.UpsertSignalBatch(ctx, database.UpsertSignalBatchParams{
+			BatchRef:  ref,
 			AccountID: serviceAccount.ID,
 		})
 		if err != nil {
-			t.Fatalf("Failed to create first batch: %v", err)
+			t.Fatalf("first upsert failed: %v", err)
 		}
 
-		// Verify batch was created and is latest
-		assertBatchState(t, ctx, testEnv.queries, batch1.ID, true)
-
-		// Verify batch appears as the latest batch for this account/ISN
-		latestBatch := getLatestBatchForAccountAndISN(t, ctx, testEnv.queries, serviceAccount.ID, testISN.Slug)
-		if latestBatch == nil {
-			t.Fatal("Expected to find latest batch after creation")
-		}
-		if latestBatch.ID != batch1.ID {
-			t.Errorf("Expected batch ID %v, got %v", batch1.ID, latestBatch.ID)
-		}
-		if !latestBatch.IsLatest {
-			t.Error("Expected first batch to be latest")
-		}
-	})
-
-	t.Run("creating second batch closes previous batch", func(t *testing.T) {
-		// Get the current latest batch
-		currentBatch := getLatestBatchForAccountAndISN(t, ctx, testEnv.queries, serviceAccount.ID, testISN.Slug)
-		if currentBatch == nil {
-			t.Fatal("Expected existing batch from previous test")
-		}
-		firstBatchID := currentBatch.ID
-
-		// Close any existing batches (simulating the CreateSignalsBatchHandler behavior)
-		_, err := testEnv.queries.CloseSignalBatchByIsnIdAndAccountID(ctx, database.CloseSignalBatchByIsnIdAndAccountIDParams{
-			IsnID:     testISN.ID,
+		b2, err := testEnv.queries.UpsertSignalBatch(ctx, database.UpsertSignalBatchParams{
+			BatchRef:  ref,
 			AccountID: serviceAccount.ID,
 		})
 		if err != nil {
-			t.Fatalf("Failed to close existing batch: %v", err)
+			t.Fatalf("second upsert failed: %v", err)
 		}
 
-		// Create second batch
-		batch2, err := testEnv.queries.CreateSignalBatch(ctx, database.CreateSignalBatchParams{
-			IsnID:     testISN.ID,
-			AccountID: serviceAccount.ID,
-		})
-		if err != nil {
-			t.Fatalf("Failed to create second batch: %v", err)
+		if b1.ID != b2.ID {
+			t.Errorf("expected same batch UUID on second call, got %v and %v", b1.ID, b2.ID)
 		}
-
-		// Verify first batch is no longer latest
-		assertBatchState(t, ctx, testEnv.queries, firstBatchID, false)
-
-		// Verify second batch is latest
-		assertBatchState(t, ctx, testEnv.queries, batch2.ID, true)
-
-		// Verify only the second batch appears as the latest batch
-		latestBatch := getLatestBatchForAccountAndISN(t, ctx, testEnv.queries, serviceAccount.ID, testISN.Slug)
-		if latestBatch == nil {
-			t.Fatal("Expected to find latest batch after second batch creation")
-		}
-		if latestBatch.ID != batch2.ID {
-			t.Errorf("Expected latest batch ID %v, got %v", batch2.ID, latestBatch.ID)
+		if b1.BatchRef != ref {
+			t.Errorf("expected batch_ref %q, got %q", ref, b1.BatchRef)
 		}
 	})
 
+	t.Run("different refs produce different batches for same account", func(t *testing.T) {
+		b1, err := testEnv.queries.UpsertSignalBatch(ctx, database.UpsertSignalBatchParams{
+			BatchRef:  "run-1",
+			AccountID: serviceAccount.ID,
+		})
+		if err != nil {
+			t.Fatalf("first batch failed: %v", err)
+		}
+
+		b2, err := testEnv.queries.UpsertSignalBatch(ctx, database.UpsertSignalBatchParams{
+			BatchRef:  "run-2",
+			AccountID: serviceAccount.ID,
+		})
+		if err != nil {
+			t.Fatalf("second batch failed: %v", err)
+		}
+
+		if b1.ID == b2.ID {
+			t.Error("expected different batch UUIDs for different refs")
+		}
+	})
+
+	t.Run("same ref for different accounts produces separate batches", func(t *testing.T) {
+		ref := "shared-ref"
+
+		b1, err := testEnv.queries.UpsertSignalBatch(ctx, database.UpsertSignalBatchParams{
+			BatchRef:  ref,
+			AccountID: serviceAccount.ID,
+		})
+		if err != nil {
+			t.Fatalf("service account batch failed: %v", err)
+		}
+
+		b2, err := testEnv.queries.UpsertSignalBatch(ctx, database.UpsertSignalBatchParams{
+			BatchRef:  ref,
+			AccountID: siteAdminAccount.ID,
+		})
+		if err != nil {
+			t.Fatalf("site admin batch failed: %v", err)
+		}
+
+		if b1.ID == b2.ID {
+			t.Error("expected different batch UUIDs for different accounts with the same ref")
+		}
+	})
+
+	t.Run("get by ref and account returns correct batch", func(t *testing.T) {
+		ref := "lookup-test-" + uuid.New().String()[:8]
+
+		created, err := testEnv.queries.UpsertSignalBatch(ctx, database.UpsertSignalBatchParams{
+			BatchRef:  ref,
+			AccountID: serviceAccount.ID,
+		})
+		if err != nil {
+			t.Fatalf("create failed: %v", err)
+		}
+
+		found := getBatchByRef(t, ctx, testEnv.queries, serviceAccount.ID, ref)
+		if found == nil {
+			t.Fatal("expected to find batch by ref, got nil")
+		}
+		if found.ID != created.ID {
+			t.Errorf("expected ID %v, got %v", created.ID, found.ID)
+		}
+	})
+
+	t.Run("get by ref returns nil for unknown ref", func(t *testing.T) {
+		result := getBatchByRef(t, ctx, testEnv.queries, serviceAccount.ID, "does-not-exist")
+		if result != nil {
+			t.Errorf("expected nil for unknown ref, got batch %v", result.ID)
+		}
+	})
 }
