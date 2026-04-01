@@ -105,6 +105,26 @@ import (
 //	@description
 //	@description	**Response Bodies**: All date/time fields in JSON responses use RFC3339 format (ISO 8601):
 //	@description	- Example: "2025-06-03T13:47:47.331787+01:00"
+//	@description
+//	@description	# UI Endpoints
+//	@description
+//	@description	UI endpoints serve the browser-based management interface.
+//	@description
+//	@description	## Route types
+//	@description	- **Page handlers** (`GET /admin/*`, `/search`, etc.): return a full HTML page (`200`)
+//	@description	- **HTMX action handlers** (`PUT`/`POST` to `/ui-api/*`): return an HTML partial (`200`) — either a success or error alert fragment
+//	@description
+//	@description	- see /ui-docs for more information
+//	@description
+//	@description	## Auth
+//	@description	All protected routes require a valid session (cookie-based). Unauthenticated requests redirect to `/login`.
+//	@description	Requests with insufficient role are redirected to `/access-denied`.
+//	@description
+//	@description	## Role requirements
+//	@description	- **Public** (`/login`, `/register`): no authentication required
+//	@description	- **Authenticated**: any logged-in user (`/dashboard`, `/search`, `/settings`)
+//	@description	- **`isnadmin` or `siteadmin`**: ISN account and signal type management
+//	@description	- **`siteadmin` only**: ISN creation and ownership transfer, role management, signal type creation
 //	@license.name	MIT
 
 //	@servers.url			https://api.example.com
@@ -138,8 +158,15 @@ import (
 //	@tag.name			Signal Types
 //	@tag.description	Define the format of the data being shared in an ISN
 
-// @tag.name			Service Accounts
-// @tag.description	Manage service account end points
+//	@tag.name			Service Accounts
+//	@tag.description	Manage service account end points
+
+//	@tag.name			UI Pages
+//	@tag.description	Browser-based management interface. Page handlers return full HTML
+//
+//	@tag.name			HTMX Actions
+//
+// HTMX action handlers (/ui-api/*) return HTML partials.
 func main() {
 	rootCmd := &cobra.Command{
 		Use:   "signalsd",

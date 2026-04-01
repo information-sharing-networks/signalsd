@@ -14,8 +14,8 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
-// IsnStatusPage renders the admin ISN enable/disable page
-func IsnStatusPage(environment string, isns []types.IsnOption) templ.Component {
+// ManageIsnStatusPage renders the admin ISN enable/disable page
+func ManageIsnStatusPage(environment string, isns []types.IsnOption) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -78,7 +78,7 @@ func IsnStatusPage(environment string, isns []types.IsnOption) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<form hx-put=\"/ui-api/isn/status\" hx-target=\"#status-result\" hx-swap=\"innerHTML\" class=\"margin-top-4\"><div class=\"form-group\"><label for=\"isn-slug\" class=\"form-label\">ISN</label> <select id=\"isn-slug\" name=\"isn-slug\" required class=\"form-select\"><option value=\"\">Select ISN...</option> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<form hx-put=\"/ui-api/isn/manage\" hx-target=\"#status-result\" hx-swap=\"innerHTML\" class=\"margin-top-4\"><div class=\"form-group\"><label for=\"isn-slug\" class=\"form-label\">ISN</label> <select id=\"isn-slug\" name=\"isn-slug\" required class=\"form-select\"><option value=\"\">Select ISN...</option> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

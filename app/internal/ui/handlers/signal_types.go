@@ -46,13 +46,13 @@ func (h *HandlerService) RegisterNewSignalTypeSchemaPage(w http.ResponseWriter, 
 	}
 
 	// Deduplicate by slug to show each signal type once
-	signalTypeSlugs := make([]types.SignalTypeSlugOption, 0, len(signalTypes))
+	signalTypeSlugs := make([]types.SignalTypeSlug, 0, len(signalTypes))
 	seen := make(map[string]bool)
 
 	for _, signalType := range signalTypes {
 		if !seen[signalType.Slug] {
 			seen[signalType.Slug] = true
-			signalTypeSlugs = append(signalTypeSlugs, types.SignalTypeSlugOption{
+			signalTypeSlugs = append(signalTypeSlugs, types.SignalTypeSlug{
 				Slug: signalType.Slug,
 			})
 		}
@@ -282,7 +282,7 @@ func (h *HandlerService) AddSignalTypeToIsnPage(w http.ResponseWriter, r *http.R
 		return
 	}
 	// populate the isn dropdown list with ISNs where the user is an admin
-	isns := h.getIsnOptions(isnPerms, true, false)
+	isns := getIsnOptions(isnPerms, true, false)
 
 	component := templates.AddSignalTypeToIsnPage(h.Environment, isns)
 	if err := component.Render(r.Context(), w); err != nil {
@@ -290,8 +290,8 @@ func (h *HandlerService) AddSignalTypeToIsnPage(w http.ResponseWriter, r *http.R
 	}
 }
 
-// IsnSignalTypeStatusPage renders the ISN-level signal type status management page
-func (h *HandlerService) IsnSignalTypeStatusPage(w http.ResponseWriter, r *http.Request) {
+// ManageIsnSignalTypesStatusPage renders the ISN-level signal type status management page
+func (h *HandlerService) ManageIsnSignalTypesStatusPage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
@@ -311,17 +311,17 @@ func (h *HandlerService) IsnSignalTypeStatusPage(w http.ResponseWriter, r *http.
 	}
 
 	// Convert permissions to ISN list for dropdown (only ISNs where user has admin rights)
-	isns := h.getIsnOptions(isnPerms, true, false)
+	isns := getIsnOptions(isnPerms, true, false)
 
 	// Render ISN signal type status management page
-	component := templates.IsnSignalTypeStatusPage(h.Environment, isns)
+	component := templates.ManageIsnSignalTypesStatusPage(h.Environment, isns)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render ISN signal type status management page", slog.String("error", err.Error()))
 	}
 }
 
-// AdminIsnSignalTypeStatus handles the form submission to enable or disable signal types for an ISN
-func (h *HandlerService) AdminIsnSignalTypeStatus(w http.ResponseWriter, r *http.Request) {
+// ManageIsnSignalTypesStatus handles the form submission to enable or disable signal types for an ISN
+func (h *HandlerService) ManageIsnSignalTypesStatus(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Parse form data
@@ -396,8 +396,8 @@ func (h *HandlerService) AdminIsnSignalTypeStatus(w http.ResponseWriter, r *http
 	}
 }
 
-// SignalTypesConfigPage renders a read-only config report of all registered signal types
-func (h *HandlerService) SignalTypesConfigPage(w http.ResponseWriter, r *http.Request) {
+// ListSignalTypesPage renders a read-only config report of all registered signal types
+func (h *HandlerService) ListSignalTypesPage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
@@ -417,7 +417,7 @@ func (h *HandlerService) SignalTypesConfigPage(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	component := templates.SignalTypesConfigPage(h.Environment, signalTypes)
+	component := templates.ListSignalTypesPage(h.Environment, signalTypes)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render signal types config page", slog.String("error", err.Error()))
 	}

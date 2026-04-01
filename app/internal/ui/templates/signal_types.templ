@@ -101,7 +101,7 @@ templ RegisterNewSignalTypeSchemaPage(environment string, isns []types.IsnOption
 
 // RegisterNewSignalTypeSchemaPageWithOptions renders the register new schema page with pre-populated signal type options
 // Used when we want to populate the dropdown server-side (admin operations)
-templ RegisterNewSignalTypeSchemaPageWithOptions(environment string, signalTypes []types.SignalTypeSlugOption) {
+templ RegisterNewSignalTypeSchemaPageWithOptions(environment string, signalTypes []types.SignalTypeSlug) {
 	@BaseLayout("Register a New Signal schema") {
 		@Navigation(environment)
 		<div class="page-container">
@@ -163,7 +163,7 @@ templ AddSignalTypeToIsnPage(environment string, isns []types.IsnOption) {
 				<div class="card-body">
 					<p class="card-description text-muted">Link an existing signal type to an Information Sharing Network by selecting the ISN, signal type, and version.</p>
 					<form
-						hx-post="/ui-api/signal-types/add"
+						hx-post="/ui-api/isn/signal-types/add"
 						hx-target="#associate-result"
 						hx-swap="innerHTML"
 						class="margin-top-4"
@@ -176,7 +176,7 @@ templ AddSignalTypeToIsnPage(environment string, isns []types.IsnOption) {
 										id="isn-slug"
 										name="isn-slug"
 										required
-										hx-get="/ui-api/options/signal-type-slugs-for-isn?include_inactive=false"
+										hx-get="/ui-api/options/signal-type-slugs"
 										hx-target="#signal-type-slug"
 										hx-swap="outerHTML"
 										hx-trigger="change"
@@ -235,6 +235,75 @@ templ AddSignalTypeToIsnPage(environment string, isns []types.IsnOption) {
 		</div>
 	}
 }
+
+templ ListSignalTypesPage(environment string, signalTypes []client.SignalTypeDetail) {
+	@BaseLayout("Signal Types Configuration") {
+		@Navigation(environment)
+		<div class="page-container">
+			<h1 class="page-title">Signal Types Configuration</h1>
+			<div class="card">
+				<div class="card-body">
+					<p class="card-description text-muted">
+						Registered signal types available on this site.
+					</p>
+
+					if len(signalTypes) == 0 {
+						<div class="alert alert-info mt-4">
+							<p>No signal types have been registered yet.</p>
+						</div>
+					} else {
+						<div class="margin-top-4">
+							<table class="table table-striped">
+								<thead>
+									<tr>
+										<th>Title</th>
+										<th>Slug</th>
+										<th>Version</th>
+										<th>Description</th>
+										<th>Schema URL</th>
+										<th>README URL</th>
+										<th>Created At</th>
+									</tr>
+								</thead>
+								<tbody>
+									for _, st := range signalTypes {
+										<tr>
+											<td class="font-semibold">{ st.Title }</td>
+											<td><code class="bg-gray-100 px-2 py-1 rounded text-sm">{ st.Slug }</code></td>
+											<td><code class="bg-gray-100 px-2 py-1 rounded text-sm">{ st.SemVer }</code></td>
+											<td class="text-sm text-muted">{ st.Detail }</td>
+											<td class="text-sm">
+
+												if st.SchemaURL == "" {
+													<p class="text-muted">Not provided</p>
+												} else {
+													<a href={ templ.SafeURL(st.SchemaURL) } target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">
+														View
+													</a>
+												}
+											</td>
+											<td class="text-sm">
+												if st.ReadmeURL == "" {
+													<p class="text-muted">Not provided</p>
+												} else {
+													<a href={ templ.SafeURL(st.ReadmeURL) } target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">
+														View
+													</a>
+												}
+											</td>
+											<td class="text-sm text-muted">{ st.CreatedAt }</td>
+										</tr>
+									}
+								</tbody>
+							</table>
+						</div>
+					}
+				</div>
+			</div>
+		</div>
+	}
+}
+
 
 // SignalTypeCreationSuccess renders a success message after signal type creation
 templ SignalTypeCreationSuccess(response client.NewSignalTypeResponse) {

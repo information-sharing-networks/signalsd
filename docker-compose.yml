@@ -86,7 +86,8 @@ services:
         echo 'Generating sqlc files...' &&
         go tool sqlc generate &&
         echo 'Creating swagger documentation...' &&
-        go tool swag init -g ./cmd/signalsd/main.go &&
+        go tool swag init -g ./cmd/signalsd/main.go --tags '!HTMX Actions,!UI Pages' && 
+        go tool swag init -g ./cmd/signalsd/main.go --tags 'HTMX Actions,UI Pages' -o ./docs/ui
         echo 'Running database migrations...' &&
         go tool goose -dir sql/schema postgres $$DATABASE_URL -env=none up &&
         echo 'Starting signalsd service (live reload)...' &&

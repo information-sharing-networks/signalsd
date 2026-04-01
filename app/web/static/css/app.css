@@ -183,6 +183,12 @@ body[data-environment="dev"] .login-title::after {
 .grid {
   display: grid;
   gap: 1rem;
+
+}
+
+
+.grid.dashboard {
+  justify-items: start;
 }
 
 .grid-cols-1 {
@@ -219,6 +225,8 @@ body[data-environment="dev"] .login-title::after {
   border-radius: 0.5rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   padding: 1.5rem;
+  width: 100%;
+
 }
 
 .card-body {

@@ -242,7 +242,7 @@ func (i *IsnAccountHandler) UpdateIsnAccountPermissionHandler(w http.ResponseWri
 
 // GetIsnAccountsHandler godoc
 //
-//	@Summary		Get ISN account membership
+//	@Summary		Get ISN Account Membership
 //	@Tags			ISN Configuration
 //	@Description	Get a list of all accounts (users and service accounts) that have permissions on the specified ISN.
 //	@Description	Only ISN admins and site owners can view this information

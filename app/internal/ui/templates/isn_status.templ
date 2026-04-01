@@ -6,8 +6,8 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
-// IsnStatusPage renders the admin ISN enable/disable page
-templ IsnStatusPage(environment string, isns []types.IsnOption) {
+// ManageIsnStatusPage renders the admin ISN enable/disable page
+templ ManageIsnStatusPage(environment string, isns []types.IsnOption) {
 	@BaseLayout("ISN Status Management") {
 		@Navigation(environment)
 		<div class="page-container">
@@ -22,7 +22,7 @@ templ IsnStatusPage(environment string, isns []types.IsnOption) {
 					}
 
 					<form
-						hx-put="/ui-api/isn/status"
+						hx-put="/ui-api/isn/manage"
 						hx-target="#status-result"
 						hx-swap="innerHTML"
 						class="margin-top-4">

@@ -7,6 +7,7 @@ import (
 )
 
 
+// AccountTypeSelector displays a dropdown to select the account type
 templ AccountTypeSelector() {
 	<label for="account-type" class="form-label">Account Type</label>
     <select
@@ -18,6 +19,55 @@ templ AccountTypeSelector() {
         <option value="">Select Account Type...</option>
         <option value="user">User</option>
         <option value="service-account">Service Account</option>
+    </select>
+}
+
+// UserSelector displays a dropdown to select a user
+templ UserSelector(users []types.UserOption) {
+	<label for="user-dropdown" class="form-label">User</label>
+	<select
+		id="user-dropdown"
+		name="user-dropdown"
+		required
+		class="form-select"
+	>
+		<option value="">Select User...</option>
+		for _, user := range users {
+			<option value={ user.Email + "|" + user.UserRole }>{ user.Email } ({ user.UserRole })</option>
+		}
+	</select>
+}
+
+// ServiceAccountSelector displays a dropdown to select a service account
+templ ServiceAccountSelector(serviceAccounts []types.ServiceAccountOption) {
+	<label for="service-account-dropdown" class="form-label">Service Account</label>
+	<select
+		id="service-account-dropdown"
+		name="service-account-dropdown"
+		required
+		class="form-select"
+	>
+		<option value="">Select Service Account...</option>
+		for _, account := range serviceAccounts {
+			<option value={ account.ClientID }>{ account.ClientOrganization } / { account.ClientContactEmail } ({ account.ClientID })</option>
+		}
+	</select>
+}
+
+
+templ IsnAccountPermissionSelector() {
+	<label for="permission" class="form-label">Permission Level</label>
+    <select
+        id="permission"
+        name="permission"
+        required
+        class="form-select"
+    >
+        <option value="">Select Permission...</option>
+        <option value="none">None - Revoke access to the ISN</option>
+        <option value="read">Read - Can view signals only</option>
+        <option value="write">Write - Can create signals only</option>
+        <option value="read-write">Read-Write - Can view and create signals</option>
     </select>
 }
 
@@ -64,86 +114,7 @@ templ AccountSelector(users []types.UserOption, serviceAccounts []types.ServiceA
     </div>
 }
 
-// =============================================================================
-// USER SELECTORS
-// =============================================================================
-
-// Base user selector component
-templ UserSelector(users []types.UserOption, id, name string) {
-    <select
-        id={ id }
-        name={ name }
-        required
-        class="form-select"
-    >
-        <option value="">Select User...</option>
-        for _, user := range users {
-            <option value={ user.Email }>{ user.Email } ({ user.UserRole })</option>
-        }
-    </select>
-}
-
-
-
-// =============================================================================
-// SERVICE ACCOUNT SELECTORS
-// =============================================================================
-
-
-
-// service account selector component.
-// supply the id for the select element.
-templ ServiceAccountSelector(serviceAccounts []types.ServiceAccountOption) {
-	<label for="service-account-dropdown" class="form-label">Service Account</label>
-	<select
-		id="service-account-dropdown"
-		name="service-account-dropdown"
-		required
-		class="form-select"
-	>
-		<option value="">Select Service Account...</option>
-		for _, account := range serviceAccounts {
-			<option value={ account.ClientID }>{ account.ClientOrganization } / { account.ClientContactEmail } ({ account.ClientID })</option>
-		}
-	</select>
-}
-
-
-
-
-
-templ UserOptionsSelector(users []types.UserOption) {
-	<label for="user-dropdown" class="form-label">User</label>
-	<select
-		id="user-dropdown"
-		name="user-dropdown"
-		required
-		class="form-select"
-	>
-		<option value="">Select User...</option>
-		for _, user := range users {
-			<option value={ user.Email + "|" + user.UserRole }>{ user.Email } ({ user.UserRole })</option>
-		}
-	</select>
-}
-
-templ IsnAccountPermissionSelector() {
-	<label for="permission" class="form-label">Permission Level</label>
-    <select
-        id="permission"
-        name="permission"
-        required
-        class="form-select"
-    >
-        <option value="">Select Permission...</option>
-        <option value="none">None - Revoke access to the ISN</option>
-        <option value="read">Read - Can view signals only</option>
-        <option value="write">Write - Can create signals only</option>
-        <option value="read-write">Read-Write - Can view and create signals</option>
-    </select>
-}
-
-// ISN selector dropdown 
+// ISNSelector displays a dropdown to select an ISN (the isn list should always be filtered by the caller, based on the claims)
 templ IsnSelector(isns []types.IsnOption) {
 	<lable for="isn-slug" class="form-label">ISN</lable>
     <select
@@ -159,53 +130,6 @@ templ IsnSelector(isns []types.IsnOption) {
     </select>
 }
 
-
-
-
-// ************************************************************************ //
-// SIGNAL TYPE SELECTOR
-// ************************************************************************ //
-
-// SignalTypeSelectorFields creates cascading dropdowns: Signal Type → Version
-// Uses HTMX to dynamically load options based on selections
-templ SignalTypeSelectorFields(isns []types.IsnOption, includeInactive bool) {
-	<div class="grid grid-cols-1 md:grid-cols-2">
-		<div class="form-group">
-			<label for="signal-type-slug" class="form-label">Signal Type</label>
-			<div class="relative">
-				{{ endpoint:= fmt.Sprintf("/ui-api/options/signal-type-slugs?include_inactive=%v", includeInactive) }}
-				<select
-					id="signal-type-slug"
-					name="signal-type-slug"
-					required
-					hx-get={ endpoint }
-					hx-target="#sem-ver"
-					hx-swap="outerHTML"
-					hx-trigger="change"
-					hx-include="this"
-					hx-indicator="#signal-type-loading"
-					class="form-select"
-				>
-					<option value="">Select Signal Type...</option>
-				</select>
-				<div id="signal-type-loading" class="htmx-indicator loading-spinner">Loading...</div>
-			</div>
-		</div>
-		<div id="version-select" class="form-group">
-			<label for="sem-ver" class="form-label">Version</label>
-			<select
-				id="sem-ver"
-				name="sem-ver"
-				required
-				disabled
-				class="form-select"
-			>
-				<option value="">Select Version...</option>
-			</select>
-		</div>
-	</div>
-}
-
 // SignalTypeSelectorFieldsWithISN creates cascading dropdowns: ISN → Signal Type → Version
 // Uses HTMX to dynamically load options based on selections
 // Signal types are filtered to those associated with the selected ISN
@@ -219,7 +143,7 @@ templ SignalTypeSelectorFieldsWithISN(isns []types.IsnOption, includeInactive bo
 					id="isn-slug"
 					name="isn-slug"
 					required
-					hx-get={ fmt.Sprintf("/ui-api/options/signal-type-slugs-for-isn?include_inactive=%v", includeInactive) }
+					hx-get={ fmt.Sprintf("/ui-api/options/isn/signal-type-slugs?include_inactive=%v", includeInactive) }
 					hx-target="#signal-type-slug"
 					hx-swap="outerHTML"
 					hx-trigger="change"
@@ -242,11 +166,11 @@ templ SignalTypeSelectorFieldsWithISN(isns []types.IsnOption, includeInactive bo
 					name="signal-type-slug"
 					required
 					disabled
-					hx-get={ fmt.Sprintf("/ui-api/options/signal-type-versions?include_inactive=%v", includeInactive) }
+					hx-get={ fmt.Sprintf("/ui-api/options/isn/signal-type-versions?include_inactive=%v", includeInactive) }
 					hx-target="#sem-ver"
 					hx-swap="outerHTML"
 					hx-trigger="change"
-					hx-include="this"
+					hx-include="this, #isn-slug"
 					hx-indicator="#signal-type-loading"
 					class="form-select"
 				>
@@ -271,19 +195,20 @@ templ SignalTypeSelectorFieldsWithISN(isns []types.IsnOption, includeInactive bo
 }
 
 
-// SignalTypeSlugOptions renders signal type dropdown options via HTMX
-// Called when the page loads to populate signal types
-templ SignalTypeSlugOptions(signalTypes []types.SignalTypeSlugOption, includeInactive bool) {
-    {{ endpoint:= fmt.Sprintf("/ui-api/options/signal-type-versions?include_inactive=%v", includeInactive) }}
+// SignalTypeSlugsSelect renders the signal type dropdown after an ISN is selected.
+// It replaces the signal-type-slug select in place via HTMX swap.
+// versionsEndpoint is the URL the rendered select will call to load the version dropdown;
+// callers supply the correct endpoint depending on whether versions come from the token or the API.
+templ SignalTypeSlugsSelect(signalTypes []types.SignalTypeSlug, versionsEndpoint string) {
 	<select
 		id="signal-type-slug"
 		name="signal-type-slug"
 		required
-		hx-get={ endpoint }
+		hx-get={ versionsEndpoint }
 		hx-target="#sem-ver"
 		hx-swap="outerHTML"
 		hx-trigger="change"
-		hx-include="this"
+		hx-include="this, #isn-slug"
 		class="form-select"
 	>
 		<option value="">Select Signal Type...</option>
@@ -294,8 +219,8 @@ templ SignalTypeSlugOptions(signalTypes []types.SignalTypeSlugOption, includeIna
 }
 
 
-//the list of available versions for the selected signal type use with SignalTypeSelectorFields)
-templ SignalTypeVersionOptions(versions []types.VersionOption) {
+// SignalTypeVersionsSelect renders the version dropdown for a selected signal type.
+templ SignalTypeVersionsSelect(versions []types.SignalTypeVersion) {
 	<select
 		id="sem-ver"
 		name="sem-ver"

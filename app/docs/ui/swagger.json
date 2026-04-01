@@ -1,0 +1,976 @@
+{
+    "consumes": [
+        "application/json"
+    ],
+    "produces": [
+        "application/json"
+    ],
+    "swagger": "2.0",
+    "info": {
+        "description": "Signals ISN service API for managing Information Sharing Networks\n\n## Common Error Responses\nAll endpoints may return:\n- `400` Malformed request (invalid json, missing required fields, etc.)\n- `401` Unauthorized (invalid credentials)\n- `403` Forbidden (insufficient permissions)\n- `413` Request body exceeds size limit\n- `429` Rate limit exceeded\n- `500` Internal server error\n\nIndividual endpoints document their specific business logic errors.\n\n## Request Limits\nAll endpoints are protected by:\n- **Rate limiting**: Configurable requests per second\n- **Request size limits**: 64KB for admin/auth endpoints, 5MB for signal ingestion\n\nCheck the Signalsd-Max-Request-Body response header for the configured limit on signals payload.\n\nThe rate limit is set globaly and prevents abuse of the service.\nIn production there will be additional protections in place such as per-IP rate limiting provided by the load balancer/reverse proxy.\n\n## Authentication \u0026 Authorization\n\n### OAuth\nThe signalsd backend service acts as an OAuth 2.0 Authorization Server and supports web users and service accounts.\n\n### Authentication Flows\n- **Web users**: (Refresh Token Grant Type) Authentication via /auth/login → receive JWT access token + HTTP-only refresh cookie → use bearer tokens for API calls\n- **Service accounts**: Clients implement OAuth Client Credentials flow → receive JWT access token → use bearer tokens for API calls\n\n### Token Usage\nAll protected API endpoints require a valid JWT access token in the Authorization header:\n```\nAuthorization: Bearer \u003cjwt-access-token\u003e\n```\n\n**Token Refresh (Web Users):**\n- Client calls `/oauth/token?grant_type=refresh_token` with HTTP-only refresh token cookie\n- API validates refresh token and issues new access token + rotated refresh cookie\n- Client receives new bearer token for subsequent API calls\n\n**Token Refresh (Service Accounts):**\n- Client calls `/oauth/token?grant_type=client_credentials` with client ID/secret\n- API validates credentials and issues new access token\n- Client receives new bearer token for subsequent API calls\n\n**Token Lifetimes:**\n- Access tokens: 30 minutes\n- Refresh tokens: 30 days (web users only)\n\n### CSRF Protection\nThe refresh token used by the /oauth API endpoints is stored in an HttpOnly cookie (to prevent access by JavaScript)\nand marked with SameSite=Strict (to prevent it from being sent in cross-site requests, mitigating CSRF).\n\n### CORS Protection\n\nCORS is used to control which browser-based clients can make cross-origin requests to the API and read responses.\n\nthe `ALLOWED_ORIGINS` environment variable is used to configure the CORS rules.\n\nIn production, you should restrict ALLOWED_ORIGINS to trusted client origins (the server will not start if it is not set)\n\n## Date/Time Handling:\n\n**URL Parameters**: The following ISO 8601 formats are accepted in URL query parameters:\n- 2006-01-02T15:04:05Z (UTC)\n- 2006-01-02T15:04:05+07:00 (with offset)\n- 2006-01-02T15:04:05.999999999Z (nano precision)\n- 2006-01-02 (date only, treated as start of day UTC: 2006-01-02T00:00:00Z)\n\nNote: When including a timestamp with a timezone offset in a query parameter, encode the + sign as %2B (e.g. 2025-08-31T12:00:00%2B07:00). Otherwise, + may be interpreted as a space.\n\n**Response Bodies**: All date/time fields in JSON responses use RFC3339 format (ISO 8601):\n- Example: \"2025-06-03T13:47:47.331787+01:00\"\n\n# UI Endpoints\n\nUI endpoints serve the browser-based management interface.\n\n## Route types\n- **Page handlers** (`GET /admin/*`, `/search`, etc.): return a full HTML page (`200`)\n- **HTMX action handlers** (`PUT`/`POST` to `/ui-api/*`): return an HTML partial (`200`) — either a success or error alert fragment\n\n- see /ui-docs for more information\n\n## Auth\nAll protected routes require a valid session (cookie-based). Unauthenticated requests redirect to `/login`.\nRequests with insufficient role are redirected to `/access-denied`.\n\n## Role requirements\n- **Public** (`/login`, `/register`): no authentication required\n- **Authenticated**: any logged-in user (`/dashboard`, `/search`, `/settings`)\n- **`isnadmin` or `siteadmin`**: ISN account and signal type management\n- **`siteadmin` only**: ISN creation and ownership transfer, role management, signal type creation",
+        "title": "Signals ISN API",
+        "contact": {},
+        "license": {
+            "name": "MIT"
+        }
+    },
+    "paths": {
+        "/admin": {
+            "get": {
+                "description": "Admin landing page. Requires isnadmin or siteadmin role.",
+                "tags": [
+                    "UI Pages"
+                ],
+                "summary": "Admin dashboard",
+                "responses": {
+                    "200": {
+                        "description": "HTML page"
+                    }
+                }
+            }
+        },
+        "/admin/accounts/isn-admins/manage": {
+            "get": {
+                "description": "Renders the ISN admin role management form. Requires siteadmin role.",
+                "tags": [
+                    "UI Pages"
+                ],
+                "summary": "Manage ISN admin roles page",
+                "responses": {
+                    "200": {
+                        "description": "HTML page"
+                    }
+                }
+            }
+        },
+        "/admin/accounts/manage": {
+            "get": {
+                "description": "Renders the account enable/disable form for users and service accounts. Requires isnadmin or siteadmin role.",
+                "tags": [
+                    "UI Pages"
+                ],
+                "summary": "Manage account status page",
+                "responses": {
+                    "200": {
+                        "description": "HTML page"
+                    }
+                }
+            }
+        },
+        "/admin/accounts/site-admins/manage": {
+            "get": {
+                "description": "Renders the site admin role management form. Requires siteadmin role.",
+                "tags": [
+                    "UI Pages"
+                ],
+                "summary": "Manage site admin roles page",
+                "responses": {
+                    "200": {
+                        "description": "HTML page"
+                    }
+                }
+            }
+        },
+        "/admin/isn/accounts/manage": {
+            "get": {
+                "description": "Renders the ISN accounts management page. Requires isnadmin role.",
+                "tags": [
+                    "UI Pages"
+                ],
+                "summary": "Manage ISN accounts page",
+                "responses": {
+                    "200": {
+                        "description": "HTML page"
+                    }
+                }
+            }
+        },
+        "/admin/isn/create": {
+            "get": {
+                "description": "Renders the create ISN form. Requires isnadmin or siteadmin role.",
+                "tags": [
+                    "UI Pages"
+                ],
+                "summary": "Create ISN page",
+                "responses": {
+                    "200": {
+                        "description": "HTML page"
+                    }
+                }
+            }
+        },
+        "/admin/isn/manage": {
+            "get": {
+                "description": "Renders the ISN enable/disable page. Only shows ISNs the user administers. Requires isnadmin or siteadmin role.",
+                "tags": [
+                    "UI Pages"
+                ],
+                "summary": "Manage ISN status page",
+                "responses": {
+                    "200": {
+                        "description": "HTML page"
+                    }
+                }
+            }
+        },
+        "/admin/isn/signal-types/add": {
+            "get": {
+                "description": "Renders the form to associate a signal type version with an ISN. Requires isnadmin role.",
+                "tags": [
+                    "UI Pages"
+                ],
+                "summary": "Add signal type to ISN page",
+                "responses": {
+                    "200": {
+                        "description": "HTML page"
+                    }
+                }
+            }
+        },
+        "/admin/isn/signal-types/manage": {
+            "get": {
+                "description": "Renders the form to enable or disable signal types within an ISN. Requires isnadmin role.",
+                "tags": [
+                    "UI Pages"
+                ],
+                "summary": "Manage ISN signal type status page",
+                "responses": {
+                    "200": {
+                        "description": "HTML page"
+                    }
+                }
+            }
+        },
+        "/admin/isn/transfer-ownership": {
+            "get": {
+                "description": "Renders the ISN ownership transfer page. Requires siteadmin role.",
+                "tags": [
+                    "UI Pages"
+                ],
+                "summary": "Transfer ISN ownership page",
+                "responses": {
+                    "200": {
+                        "description": "HTML page"
+                    }
+                }
+            }
+        },
+        "/admin/signal-types/create": {
+            "get": {
+                "description": "Renders the create signal type form. Requires siteadmin role.",
+                "tags": [
+                    "UI Pages"
+                ],
+                "summary": "Create signal type page",
+                "responses": {
+                    "200": {
+                        "description": "HTML page"
+                    }
+                }
+            }
+        },
+        "/admin/signal-types/list": {
+            "get": {
+                "description": "Renders a read-only report of all registered signal types. Requires isnadmin role.",
+                "tags": [
+                    "UI Pages"
+                ],
+                "summary": "List signal types page",
+                "responses": {
+                    "200": {
+                        "description": "HTML page"
+                    }
+                }
+            }
+        },
+        "/admin/signal-types/register-new-schema": {
+            "get": {
+                "description": "Renders the form to register a new schema version for an existing signal type. Requires siteadmin role.",
+                "tags": [
+                    "UI Pages"
+                ],
+                "summary": "Register new signal type schema page",
+                "responses": {
+                    "200": {
+                        "description": "HTML page"
+                    }
+                }
+            }
+        },
+        "/admin/users/generate-password-reset-link": {
+            "get": {
+                "description": "Renders the password reset link generation form. Requires isnadmin or siteadmin role.",
+                "tags": [
+                    "UI Pages"
+                ],
+                "summary": "Generate password reset link page",
+                "responses": {
+                    "200": {
+                        "description": "HTML page"
+                    }
+                }
+            }
+        },
+        "/dashboard": {
+            "get": {
+                "description": "Entry point after login. Requires authentication.",
+                "tags": [
+                    "UI Pages"
+                ],
+                "summary": "User dashboard",
+                "responses": {
+                    "200": {
+                        "description": "HTML page"
+                    }
+                }
+            }
+        },
+        "/login": {
+            "get": {
+                "tags": [
+                    "UI Pages"
+                ],
+                "summary": "Login page",
+                "responses": {
+                    "200": {
+                        "description": "HTML page"
+                    }
+                }
+            },
+            "post": {
+                "description": "HTMX endpoint. Authenticates the user and sets session cookies. On success redirects to /dashboard via HX-Redirect.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Authenticate user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User email",
+                        "name": "email",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "User password",
+                        "name": "password",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial or HX-Redirect header"
+                    }
+                }
+            }
+        },
+        "/logout": {
+            "post": {
+                "description": "Clears session cookies and redirects to /login.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Log out",
+                "responses": {
+                    "200": {
+                        "description": "HX-Redirect header"
+                    }
+                }
+            }
+        },
+        "/register": {
+            "get": {
+                "tags": [
+                    "UI Pages"
+                ],
+                "summary": "Registration page",
+                "responses": {
+                    "200": {
+                        "description": "HTML page"
+                    }
+                }
+            }
+        },
+        "/search": {
+            "get": {
+                "description": "Renders the signal search page. Requires authentication and at least one ISN access permission.",
+                "tags": [
+                    "UI Pages"
+                ],
+                "summary": "Search signals page",
+                "responses": {
+                    "200": {
+                        "description": "HTML page"
+                    }
+                }
+            }
+        },
+        "/settings": {
+            "get": {
+                "description": "Renders the user account settings page. Requires authentication.",
+                "tags": [
+                    "UI Pages"
+                ],
+                "summary": "Account settings page",
+                "responses": {
+                    "200": {
+                        "description": "HTML page"
+                    }
+                }
+            }
+        },
+        "/ui-api/account/password": {
+            "put": {
+                "description": "HTMX endpoint. Changes the authenticated user's password.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Update password",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Current password",
+                        "name": "current-password",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "New password",
+                        "name": "new-password",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Confirm new password",
+                        "name": "confirm-password",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    }
+                }
+            }
+        },
+        "/ui-api/accounts/isn-admins/manage": {
+            "put": {
+                "description": "HTMX endpoint. Grants or revokes the isnadmin role for a user. Requires siteadmin role.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Grant or revoke ISN admin role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User email",
+                        "name": "user-email",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "'grant' or 'revoke'",
+                        "name": "action",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    }
+                }
+            }
+        },
+        "/ui-api/accounts/manage": {
+            "put": {
+                "description": "HTMX endpoint. Enables or disables a user or service account. Requires isnadmin or siteadmin role.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Enable or disable an account",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "'user' or 'service-account'",
+                        "name": "account-type",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "'enable' or 'disable'",
+                        "name": "action",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "User email (when account-type is 'user')",
+                        "name": "user-identifier",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Client ID (when account-type is 'service-account')",
+                        "name": "service-account-identifier",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    }
+                }
+            }
+        },
+        "/ui-api/accounts/site-admins/manage": {
+            "put": {
+                "description": "HTMX endpoint. Grants or revokes the siteadmin role for a user. Requires siteadmin role.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Grant or revoke site admin role",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User email",
+                        "name": "user-email",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "'grant' or 'revoke'",
+                        "name": "action",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    }
+                }
+            }
+        },
+        "/ui-api/isn/accounts/manage": {
+            "put": {
+                "description": "HTMX endpoint. Adds or removes a user/service account from an ISN. Requires isnadmin role.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Manage ISN accounts",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ISN slug",
+                        "name": "isn-slug",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "'user' or 'service-account'",
+                        "name": "account-type",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "'read', 'write', or 'none' (removes account)",
+                        "name": "permission",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "User email (when account-type is 'user')",
+                        "name": "user-identifier",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Client ID (when account-type is 'service-account')",
+                        "name": "service-account-identifier",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    }
+                }
+            }
+        },
+        "/ui-api/isn/create": {
+            "post": {
+                "description": "HTMX endpoint. Creates a new ISN. Requires isnadmin or siteadmin role.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Create ISN",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ISN title",
+                        "name": "title",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "ISN description",
+                        "name": "detail",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "'public' or 'private'",
+                        "name": "visibility",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    }
+                }
+            }
+        },
+        "/ui-api/isn/manage": {
+            "put": {
+                "description": "HTMX endpoint. Enables or disables an ISN. Requires isnadmin or siteadmin role.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Enable or disable an ISN",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ISN slug",
+                        "name": "isn-slug",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "'enable' or 'disable'",
+                        "name": "action",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    }
+                }
+            }
+        },
+        "/ui-api/isn/signal-types/add": {
+            "post": {
+                "description": "HTMX endpoint. Associates a signal type version with an ISN. Requires isnadmin role for the target ISN.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Add signal type to ISN",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ISN slug",
+                        "name": "isn-slug",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Signal type slug",
+                        "name": "signal-type-slug",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Semantic version",
+                        "name": "sem-ver",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    }
+                }
+            }
+        },
+        "/ui-api/isn/signal-types/manage": {
+            "put": {
+                "description": "HTMX endpoint. Enables or disables a specific signal type version within an ISN. Requires isnadmin role.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Enable or disable a signal type for an ISN",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ISN slug",
+                        "name": "isn-slug",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Signal type slug",
+                        "name": "signal-type-slug",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Semantic version",
+                        "name": "sem-ver",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "'enable' or 'disable'",
+                        "name": "action",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    }
+                }
+            }
+        },
+        "/ui-api/isn/transfer-ownership": {
+            "put": {
+                "description": "HTMX endpoint. Transfers ownership of an ISN to another user. Requires siteadmin role.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Transfer ISN ownership",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ISN slug",
+                        "name": "isn-slug",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Email of the new owner (must be an existing user)",
+                        "name": "new-owner-email",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    }
+                }
+            }
+        },
+        "/ui-api/service-accounts/create": {
+            "post": {
+                "description": "HTMX endpoint. Creates a new service account. Requires isnadmin or siteadmin role.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Create service account",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Contact email",
+                        "name": "email",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Organization name",
+                        "name": "organization",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    }
+                }
+            }
+        },
+        "/ui-api/service-accounts/reissue-credentials": {
+            "put": {
+                "description": "HTMX endpoint. Issues a new client secret for the selected service account. Requires isnadmin or siteadmin role.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Reissue service account credentials",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Client ID of the service account",
+                        "name": "service-account-dropdown",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    }
+                }
+            }
+        },
+        "/ui-api/signal-types/create": {
+            "post": {
+                "description": "HTMX endpoint. Creates a new signal type at version 1.0.0. Requires siteadmin role.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Create signal type",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Signal type title",
+                        "name": "title",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Description",
+                        "name": "detail",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "JSON Schema URL (ignored when skip-validation is true)",
+                        "name": "schema-url",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Readme URL (ignored when skip-readme is true)",
+                        "name": "readme-url",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "'true' to skip schema validation",
+                        "name": "skip-validation",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "'true' to skip readme requirement",
+                        "name": "skip-readme",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    }
+                }
+            }
+        },
+        "/ui-api/signal-types/register-new-schema": {
+            "put": {
+                "description": "HTMX endpoint. Registers a new schema version for an existing signal type. Requires siteadmin role.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Register new signal type schema version",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Signal type slug",
+                        "name": "signal-type-slug",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "JSON Schema URL",
+                        "name": "schema-url",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Readme URL",
+                        "name": "readme-url",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Description of changes",
+                        "name": "detail",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "'major', 'minor', or 'patch'",
+                        "name": "bump-type",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    }
+                }
+            }
+        },
+        "/ui-api/signals/search": {
+            "get": {
+                "description": "HTMX endpoint. Returns a table of signals matching the search criteria. Requires ISN read access.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Search signals",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ISN slug",
+                        "name": "isn-slug",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Signal type slug",
+                        "name": "signal-type-slug",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Semantic version",
+                        "name": "sem-ver",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Start date (ISO 8601)",
+                        "name": "start-date",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "End date (ISO 8601)",
+                        "name": "end-date",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by account ID",
+                        "name": "account-id",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by signal ID",
+                        "name": "signal-id",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by local reference",
+                        "name": "local-ref",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "'true' to include withdrawn signals",
+                        "name": "include-withdrawn",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "'true' to include correlated signals",
+                        "name": "include-correlated",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "'true' to include previous schema versions",
+                        "name": "include-previous-versions",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    }
+                }
+            }
+        },
+        "/ui-api/users/generate-password-reset-link": {
+            "put": {
+                "description": "HTMX endpoint. Generates a one-time password reset URL for a user. Requires isnadmin or siteadmin role.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Generate password reset link",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Selected user in 'email|role' format",
+                        "name": "user-dropdown",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    }
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAccessToken": {
+            "description": "Bearer {JWT access token}",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    },
+    "tags": [
+        {
+            "description": "Browser-based management interface. Page handlers return full HTML",
+            "name": "UI Pages"
+        },
+        {
+            "name": "HTMX Actions"
+        }
+    ]
+}

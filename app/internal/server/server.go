@@ -451,6 +451,16 @@ func (s *Server) registerApiDocoRoutes() {
 		r.Get("/swagger.json", func(w http.ResponseWriter, r *http.Request) {
 			http.ServeFile(w, r, "./docs/swagger.json")
 		})
+
+		// UI api documentation
+		r.Get("/ui-docs", func(w http.ResponseWriter, r *http.Request) {
+			http.ServeFile(w, r, "./docs/ui/rapidoc.html")
+		})
+
+		// UI OpenAPI specification
+		r.Get("/ui-swagger.json", func(w http.ResponseWriter, r *http.Request) {
+			http.ServeFile(w, r, "./docs/ui/swagger.json")
+		})
 	})
 }
 
@@ -470,7 +480,7 @@ func (s *Server) setupUIServer() {
 
 	// Create UI server and register its routes on the signalsd router
 	uiServer := uiserver.NewIntegratedServer(s.router, uiConfig, s.logger)
-	uiServer.RegisterRoutes(s.router)
+	uiServer.RegisterRoutes()
 
 	s.logger.Info("UI routes registered")
 }

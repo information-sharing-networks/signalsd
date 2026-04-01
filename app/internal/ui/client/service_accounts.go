@@ -1,5 +1,7 @@
 package client
 
+// these functions call the signalsd API to manage service accounts (create, reissue credentials) and handles the API calls to lookup service accounts
+
 import (
 	"bytes"
 	"encoding/json"
@@ -10,37 +12,20 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
-type CreateServiceAccountRequest struct {
-	ClientOrganization string `json:"client_organization" example:"example org"`
-	ClientContactEmail string `json:"client_contact_email" example:"example@example.com"`
+// ServiceAccount represents a service account as returned by the signalsd API.
+type ServiceAccount struct {
+	AccountID          uuid.UUID `json:"account_id"`
+	CreatedAt          time.Time `json:"created_at"`
+	UpdatedAt          time.Time `json:"updated_at"`
+	ClientID           string    `json:"client_id"`
+	ClientContactEmail string    `json:"client_contact_email"`
+	ClientOrganization string    `json:"client_organization"`
 }
 
-type CreateServiceAccountResponse struct {
-	ClientID  string    `json:"client_id" example:"sa_example-org_k7j2m9x1"`
-	AccountID uuid.UUID `json:"account_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	SetupURL  string    `json:"setup_url" example:"https://api.example.com/api/auth/service-accounts/setup/550e8400-e29b-41d4-a716-446655440000"`
-	ExpiresAt time.Time `json:"expires_at" example:"2024-12-25T10:30:00Z"`
-	ExpiresIn int       `json:"expires_in" example:"172800"`
-}
-
-type ReissueServiceAccountRequest struct {
-	ClientID string `json:"client_id" example:"sa_example-org_k7j2m9x1"`
-}
-
-type ReissueServiceAccountResponse struct {
-	ClientID           string    `json:"client_id" example:"sa_example-org_k7j2m9x1"`
-	ClientContactEmail string    `json:"client_contact_email" example:"example@example.com"`
-	AccountID          uuid.UUID `json:"account_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	SetupURL           string    `json:"setup_url" example:"https://api.example.com/api/auth/service-accounts/setup/550e8400-e29b-41d4-a716-446655440000"`
-	ExpiresAt          time.Time `json:"expires_at" example:"2024-12-25T10:30:00Z"`
-	ExpiresIn          int       `json:"expires_in" example:"172800"`
-}
-
-// GetServiceAccountOptionsList returns a list of service accounts for use in a dropdown component
-func (c *Client) GetServiceAccountOptionsList(accessToken string) ([]types.ServiceAccountOption, error) {
+// GetServiceAccounts returns all service accounts, sorted by client organisation name.
+func (c *Client) GetServiceAccounts(accessToken string) ([]ServiceAccount, error) {
 	url := fmt.Sprintf("%s/api/admin/service-accounts", c.baseURL)
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -60,11 +45,12 @@ func (c *Client) GetServiceAccountOptionsList(accessToken string) ([]types.Servi
 		return nil, NewClientApiError(res)
 	}
 
-	var serviceAccounts []types.ServiceAccountOption
+	var serviceAccounts []ServiceAccount
 	if err := json.NewDecoder(res.Body).Decode(&serviceAccounts); err != nil {
 		return nil, NewClientInternalError(err, "decoding service accounts response")
 	}
-	slices.SortFunc(serviceAccounts, func(a, b types.ServiceAccountOption) int {
+
+	slices.SortFunc(serviceAccounts, func(a, b ServiceAccount) int {
 		if strings.ToLower(a.ClientOrganization) < strings.ToLower(b.ClientOrganization) {
 			return -1
 		}
@@ -75,6 +61,19 @@ func (c *Client) GetServiceAccountOptionsList(accessToken string) ([]types.Servi
 	})
 
 	return serviceAccounts, nil
+}
+
+type CreateServiceAccountRequest struct {
+	ClientOrganization string `json:"client_organization" example:"example org"`
+	ClientContactEmail string `json:"client_contact_email" example:"example@example.com"`
+}
+
+type CreateServiceAccountResponse struct {
+	ClientID  string    `json:"client_id" example:"sa_example-org_k7j2m9x1"`
+	AccountID uuid.UUID `json:"account_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	SetupURL  string    `json:"setup_url" example:"https://api.example.com/api/auth/service-accounts/setup/550e8400-e29b-41d4-a716-446655440000"`
+	ExpiresAt time.Time `json:"expires_at" example:"2024-12-25T10:30:00Z"`
+	ExpiresIn int       `json:"expires_in" example:"172800"`
 }
 
 func (c *Client) CreateServiceAccount(accessToken string, req CreateServiceAccountRequest) (*CreateServiceAccountResponse, error) {
@@ -111,6 +110,19 @@ func (c *Client) CreateServiceAccount(accessToken string, req CreateServiceAccou
 	return &createServiceAccountResponse, nil
 }
 
+type ReissueServiceAccountRequest struct {
+	ClientID string `json:"client_id" example:"sa_example-org_k7j2m9x1"`
+}
+
+type ReissueServiceAccountResponse struct {
+	ClientID           string    `json:"client_id" example:"sa_example-org_k7j2m9x1"`
+	ClientContactEmail string    `json:"client_contact_email" example:"example@example.com"`
+	AccountID          uuid.UUID `json:"account_id" example:"550e8400-e29b-41d4-a716-446655440000"`
+	SetupURL           string    `json:"setup_url" example:"https://api.example.com/api/auth/service-accounts/setup/550e8400-e29b-41d4-a716-446655440000"`
+	ExpiresAt          time.Time `json:"expires_at" example:"2024-12-25T10:30:00Z"`
+	ExpiresIn          int       `json:"expires_in" example:"172800"`
+}
+
 // ReissueServiceAccountCredentials reissues credentials for an existing service account
 func (c *Client) ReissueServiceAccountCredentials(accessToken string, reissueServiceAccountRequest ReissueServiceAccountRequest) (*ReissueServiceAccountResponse, error) {
 	url := fmt.Sprintf("%s/api/auth/service-accounts/reissue-credentials", c.baseURL)
@@ -144,4 +156,52 @@ func (c *Client) ReissueServiceAccountCredentials(accessToken string, reissueSer
 	}
 
 	return &reissueResponse, nil
+}
+
+type ServiceAccountLookupResponse struct {
+	AccountID string `json:"account_id"`
+	ClientID  string `json:"client_id"`
+}
+
+// LookupServiceAccountByClientID looks up a service account by client ID using the admin endpoint
+// Note: This requires admin permissions
+func (c *Client) LookupServiceAccountByClientID(accessToken, clientID string) (*ServiceAccountLookupResponse, error) {
+	// Use the admin service accounts endpoint to get all service accounts, then filter by client_id
+	// This is similar to how the user lookup works but for service accounts
+
+	url := fmt.Sprintf("%s/api/admin/service-accounts?client_id=%s", c.baseURL, clientID)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, NewClientInternalError(err, "creating service account lookup request")
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+
+	res, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, NewClientConnectionError(err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		if res.StatusCode == http.StatusNotFound {
+			return nil, &ClientError{
+				StatusCode:  http.StatusNotFound,
+				UserMessage: "Client ID not found.",
+				LogMessage:  fmt.Sprintf("service account lookup failed: client_id %s not found", clientID),
+			}
+		}
+		return nil, NewClientApiError(res)
+	}
+
+	// Parse the service accounts list response
+	var serviceAccount ServiceAccountLookupResponse
+
+	if err := json.NewDecoder(res.Body).Decode(&serviceAccount); err != nil {
+		return nil, NewClientInternalError(err, "decoding service accounts response")
+	}
+
+	return &serviceAccount, nil
+
 }

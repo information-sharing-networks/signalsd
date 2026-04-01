@@ -17,7 +17,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
-func SignalSearchPage(environment string, isns []types.IsnOption, perms map[string]types.IsnPerm, results []client.SearchSignalWithCorrelationsAndVersions) templ.Component {
+func SearchSignalsPage(environment string, isns []types.IsnOption, perms map[string]types.IsnPerm, results []client.SearchSignalWithCorrelationsAndVersions) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {

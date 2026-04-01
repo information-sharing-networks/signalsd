@@ -6,10 +6,6 @@ import (
 	"net/http"
 )
 
-// =============================================================================
-// SIGNAL SEARCH TYPES
-// =============================================================================
-
 // SignalSearchParams represents search parameters for signals
 type SignalSearchParams struct {
 	IsnSlug                 string

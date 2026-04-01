@@ -8,7 +8,6 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
-	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
 // CreateIsnPage renders the Create ISN page
@@ -83,9 +82,9 @@ func (h *HandlerService) CreateIsn(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// IsnStatusPage renders the admin ISN enable/disable page.
+// ManageIsnStatusPage renders the admin ISN enable/disable page.
 // note this page only shows ISNs that the user has admin rights for (i.e. they created it or they a site admin)
-func (h *HandlerService) IsnStatusPage(w http.ResponseWriter, r *http.Request) {
+func (h *HandlerService) ManageIsnStatusPage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
@@ -94,39 +93,20 @@ func (h *HandlerService) IsnStatusPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Fetch all ISNs (including inactive) from the API
-	isns, err := h.ApiClient.GetIsns(accessTokenDetails.AccessToken, true)
-	if err != nil {
-		reqLogger.Error("Failed to fetch ISNs", slog.String("error", err.Error()))
-		component := templates.ErrorAlert("Failed to load ISNs. Please try again.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
-		return
-	}
-
-	// Filter to only ISNs where user has admin rights
-	var adminIsns []types.IsnOption
-	for _, isn := range isns {
-		if accessTokenDetails.AccountID == isn.UserAccountID || accessTokenDetails.Role == "siteadmin" {
-			adminIsns = append(adminIsns, types.IsnOption{
-				Slug:          isn.Slug,
-				IsInUse:       isn.IsInUse,
-				Visibility:    isn.Visibility,
-				UserAccountID: isn.UserAccountID,
-			})
-		}
-	}
+	// Inactive ISNs are included in the token claims (IsnPerm.InUse flags the current status).
+	// CanAdminister is true for ISNs the user owns and for all ISNs when the user is a siteadmin,
+	// so getIsnOptions with filterByIsnAdmin=true gives exactly the right set for this page.
+	adminIsns := getIsnOptions(accessTokenDetails.IsnPerms, true, false)
 
 	// Render ISN status management page
-	component := templates.IsnStatusPage(h.Environment, adminIsns)
+	component := templates.ManageIsnStatusPage(h.Environment, adminIsns)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render ISN status management page", slog.String("error", err.Error()))
 	}
 }
 
-// IsnStatus handles the form submission to enable or disable ISNs
-func (h *HandlerService) IsnStatus(w http.ResponseWriter, r *http.Request) {
+// ManageIsnStatus handles the form submission to enable or disable ISNs
+func (h *HandlerService) ManageIsnStatus(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Parse form data

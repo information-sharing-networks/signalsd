@@ -10,8 +10,8 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import "github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 
-// IsnAdminRoleManagementPage renders the admin role management page
-func IsnAdminRoleManagementPage(environment string, users []types.UserOption) templ.Component {
+// ManageIsnAdminRolesPage renders the admin role management page
+func ManageIsnAdminRolesPage(environment string, users []types.UserOption) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -74,7 +74,7 @@ func IsnAdminRoleManagementPage(environment string, users []types.UserOption) te
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<form hx-put=\"/ui-api/admin/accounts/isn-admin-role\" hx-target=\"#role-result\" hx-swap=\"innerHTML\" class=\"margin-top-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\"><label for=\"user-email\" class=\"form-label\">User Account</label> <select id=\"user-email\" name=\"user-email\" required class=\"form-select\"><option value=\"\">Select User...</option> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<form hx-put=\"/ui-api/accounts/isn-admins/manage\" hx-target=\"#role-result\" hx-swap=\"innerHTML\" class=\"margin-top-4\"><div class=\"grid grid-cols-1 md:grid-cols-2 gap-4\"><div class=\"form-group\"><label for=\"user-email\" class=\"form-label\">User Account</label> <select id=\"user-email\" name=\"user-email\" required class=\"form-select\"><option value=\"\">Select User...</option> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

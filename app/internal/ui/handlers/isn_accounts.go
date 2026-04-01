@@ -10,10 +10,11 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
-// UpdateIsnAccountsPage renders the ISN accounts administration page
-func (h *HandlerService) UpdateIsnAccountsPage(w http.ResponseWriter, r *http.Request) {
+// ManageIsnAccountsPage renders the ISN accounts administration page
+func (h *HandlerService) ManageIsnAccountsPage(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
@@ -32,10 +33,10 @@ func (h *HandlerService) UpdateIsnAccountsPage(w http.ResponseWriter, r *http.Re
 		return
 	}
 	// Convert permissions to ISN list for dropdown (only ISNs where user has admin rights)
-	isns := h.getIsnOptions(isnPerms, true, false)
+	isns := getIsnOptions(isnPerms, true, false)
 
 	// Fetch users for dropdown
-	users, err := h.ApiClient.GetUserOptionsList(accessTokenDetails.AccessToken)
+	rawUsers, err := h.ApiClient.GetUsers(accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get users list", slog.String("error", err.Error()))
 		component := templates.ErrorAlert("Failed to load users. Please try again.")
@@ -44,9 +45,13 @@ func (h *HandlerService) UpdateIsnAccountsPage(w http.ResponseWriter, r *http.Re
 		}
 		return
 	}
+	users := make([]types.UserOption, len(rawUsers))
+	for i, u := range rawUsers {
+		users[i] = types.UserOption{Email: u.Email, UserRole: u.UserRole}
+	}
 
 	// Fetch service accounts for dropdown
-	serviceAccounts, err := h.ApiClient.GetServiceAccountOptionsList(accessTokenDetails.AccessToken)
+	rawServiceAccounts, err := h.ApiClient.GetServiceAccounts(accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get service accounts list", slog.String("error", err.Error()))
 		component := templates.ErrorAlert("Failed to load service accounts. Please try again.")
@@ -55,16 +60,24 @@ func (h *HandlerService) UpdateIsnAccountsPage(w http.ResponseWriter, r *http.Re
 		}
 		return
 	}
+	serviceAccounts := make([]types.ServiceAccountOption, len(rawServiceAccounts))
+	for i, sa := range rawServiceAccounts {
+		serviceAccounts[i] = types.ServiceAccountOption{
+			ClientOrganization: sa.ClientOrganization,
+			ClientContactEmail: sa.ClientContactEmail,
+			ClientID:           sa.ClientID,
+		}
+	}
 
 	// Render admin page
-	component := templates.IsnAccountManagementPage(h.Environment, isns, users, serviceAccounts)
+	component := templates.ManageIsnAccountsPage(h.Environment, isns, users, serviceAccounts)
 	if err := component.Render(r.Context(), w); err != nil {
 		reqLogger.Error("Failed to render ISN accounts admin page", slog.String("error", err.Error()))
 	}
 }
 
-// UpdateIsnAccounts handles the form submission to add an account to an ISN
-func (h *HandlerService) UpdateIsnAccounts(w http.ResponseWriter, r *http.Request) {
+// ManageIsnAccounts handles the form submission to add an account to an ISN
+func (h *HandlerService) ManageIsnAccounts(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Parse form data
@@ -166,10 +179,10 @@ func (h *HandlerService) TransferOwnershipPage(w http.ResponseWriter, r *http.Re
 	}
 
 	// Convert permissions to ISN list for dropdown (only ISNs where user has admin rights)
-	isns := h.getIsnOptions(isnPerms, true, false)
+	isns := getIsnOptions(isnPerms, true, false)
 
 	// Fetch admin users for dropdown
-	users, err := h.ApiClient.GetUserOptionsList(accessTokenDetails.AccessToken)
+	rawUsers, err := h.ApiClient.GetUsers(accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get users list", slog.String("error", err.Error()))
 		component := templates.ErrorAlert("Failed to load users. Please try again.")
@@ -177,6 +190,10 @@ func (h *HandlerService) TransferOwnershipPage(w http.ResponseWriter, r *http.Re
 			reqLogger.Error("Failed to render error alert", slog.String("error", renderErr.Error()))
 		}
 		return
+	}
+	users := make([]types.UserOption, len(rawUsers))
+	for i, u := range rawUsers {
+		users[i] = types.UserOption{Email: u.Email, UserRole: u.UserRole}
 	}
 
 	// Render transfer ownership page

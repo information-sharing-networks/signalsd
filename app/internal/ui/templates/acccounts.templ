@@ -2,8 +2,8 @@ package templates
 
 import "github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 
-// AccountStatusPage renders the admin account disable/enable page
-templ AccountStatusPage(environment string, users []types.UserOption, serviceAccounts []types.ServiceAccountOption) {
+// ManageAccountStatusPage renders the admin account disable/enable page
+templ ManageAccountStatusPage(environment string, users []types.UserOption, serviceAccounts []types.ServiceAccountOption) {
 	@BaseLayout("Account Status Management") {
 		@Navigation(environment)
 		<div class="page-container">
@@ -27,7 +27,7 @@ templ AccountStatusPage(environment string, users []types.UserOption, serviceAcc
 					}
 
 					<form
-						hx-put="/ui-api/admin/accounts/status"
+						hx-put="/ui-api/accounts/manage"
 						hx-target="#status-result"
 						hx-swap="innerHTML"
 						class="margin-top-4">

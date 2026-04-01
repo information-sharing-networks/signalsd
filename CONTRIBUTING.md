@@ -53,14 +53,5 @@ make check
 ## API Changes
 
 - Update Swagger annotations in handler code
-- Run `make docs` (or `swag init -g cmd/signalsd/main.go`) to regenerate docs
+- Run `make docs` 
 
-## Release Process
-
-Releases are automated when version tags are pushed. Use the build script:
-
-```bash
-./build.sh -t patch|minor|major
-```
-
-This automatically handles versioning, testing, and triggering deployment.

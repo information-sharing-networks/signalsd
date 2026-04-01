@@ -1,0 +1,767 @@
+consumes:
+- application/json
+info:
+  contact: {}
+  description: |-
+    Signals ISN service API for managing Information Sharing Networks
+
+    ## Common Error Responses
+    All endpoints may return:
+    - `400` Malformed request (invalid json, missing required fields, etc.)
+    - `401` Unauthorized (invalid credentials)
+    - `403` Forbidden (insufficient permissions)
+    - `413` Request body exceeds size limit
+    - `429` Rate limit exceeded
+    - `500` Internal server error
+
+    Individual endpoints document their specific business logic errors.
+
+    ## Request Limits
+    All endpoints are protected by:
+    - **Rate limiting**: Configurable requests per second
+    - **Request size limits**: 64KB for admin/auth endpoints, 5MB for signal ingestion
+
+    Check the Signalsd-Max-Request-Body response header for the configured limit on signals payload.
+
+    The rate limit is set globaly and prevents abuse of the service.
+    In production there will be additional protections in place such as per-IP rate limiting provided by the load balancer/reverse proxy.
+
+    ## Authentication & Authorization
+
+    ### OAuth
+    The signalsd backend service acts as an OAuth 2.0 Authorization Server and supports web users and service accounts.
+
+    ### Authentication Flows
+    - **Web users**: (Refresh Token Grant Type) Authentication via /auth/login → receive JWT access token + HTTP-only refresh cookie → use bearer tokens for API calls
+    - **Service accounts**: Clients implement OAuth Client Credentials flow → receive JWT access token → use bearer tokens for API calls
+
+    ### Token Usage
+    All protected API endpoints require a valid JWT access token in the Authorization header:
+    ```
+    Authorization: Bearer <jwt-access-token>
+    ```
+
+    **Token Refresh (Web Users):**
+    - Client calls `/oauth/token?grant_type=refresh_token` with HTTP-only refresh token cookie
+    - API validates refresh token and issues new access token + rotated refresh cookie
+    - Client receives new bearer token for subsequent API calls
+
+    **Token Refresh (Service Accounts):**
+    - Client calls `/oauth/token?grant_type=client_credentials` with client ID/secret
+    - API validates credentials and issues new access token
+    - Client receives new bearer token for subsequent API calls
+
+    **Token Lifetimes:**
+    - Access tokens: 30 minutes
+    - Refresh tokens: 30 days (web users only)
+
+    ### CSRF Protection
+    The refresh token used by the /oauth API endpoints is stored in an HttpOnly cookie (to prevent access by JavaScript)
+    and marked with SameSite=Strict (to prevent it from being sent in cross-site requests, mitigating CSRF).
+
+    ### CORS Protection
+
+    CORS is used to control which browser-based clients can make cross-origin requests to the API and read responses.
+
+    the `ALLOWED_ORIGINS` environment variable is used to configure the CORS rules.
+
+    In production, you should restrict ALLOWED_ORIGINS to trusted client origins (the server will not start if it is not set)
+
+    ## Date/Time Handling:
+
+    **URL Parameters**: The following ISO 8601 formats are accepted in URL query parameters:
+    - 2006-01-02T15:04:05Z (UTC)
+    - 2006-01-02T15:04:05+07:00 (with offset)
+    - 2006-01-02T15:04:05.999999999Z (nano precision)
+    - 2006-01-02 (date only, treated as start of day UTC: 2006-01-02T00:00:00Z)
+
+    Note: When including a timestamp with a timezone offset in a query parameter, encode the + sign as %2B (e.g. 2025-08-31T12:00:00%2B07:00). Otherwise, + may be interpreted as a space.
+
+    **Response Bodies**: All date/time fields in JSON responses use RFC3339 format (ISO 8601):
+    - Example: "2025-06-03T13:47:47.331787+01:00"
+
+    # UI Endpoints
+
+    UI endpoints serve the browser-based management interface.
+
+    ## Route types
+    - **Page handlers** (`GET /admin/*`, `/search`, etc.): return a full HTML page (`200`)
+    - **HTMX action handlers** (`PUT`/`POST` to `/ui-api/*`): return an HTML partial (`200`) — either a success or error alert fragment
+
+    - see /ui-docs for more information
+
+    ## Auth
+    All protected routes require a valid session (cookie-based). Unauthenticated requests redirect to `/login`.
+    Requests with insufficient role are redirected to `/access-denied`.
+
+    ## Role requirements
+    - **Public** (`/login`, `/register`): no authentication required
+    - **Authenticated**: any logged-in user (`/dashboard`, `/search`, `/settings`)
+    - **`isnadmin` or `siteadmin`**: ISN account and signal type management
+    - **`siteadmin` only**: ISN creation and ownership transfer, role management, signal type creation
+  license:
+    name: MIT
+  title: Signals ISN API
+paths:
+  /admin:
+    get:
+      description: Admin landing page. Requires isnadmin or siteadmin role.
+      responses:
+        "200":
+          description: HTML page
+      summary: Admin dashboard
+      tags:
+      - UI Pages
+  /admin/accounts/isn-admins/manage:
+    get:
+      description: Renders the ISN admin role management form. Requires siteadmin
+        role.
+      responses:
+        "200":
+          description: HTML page
+      summary: Manage ISN admin roles page
+      tags:
+      - UI Pages
+  /admin/accounts/manage:
+    get:
+      description: Renders the account enable/disable form for users and service accounts.
+        Requires isnadmin or siteadmin role.
+      responses:
+        "200":
+          description: HTML page
+      summary: Manage account status page
+      tags:
+      - UI Pages
+  /admin/accounts/site-admins/manage:
+    get:
+      description: Renders the site admin role management form. Requires siteadmin
+        role.
+      responses:
+        "200":
+          description: HTML page
+      summary: Manage site admin roles page
+      tags:
+      - UI Pages
+  /admin/isn/accounts/manage:
+    get:
+      description: Renders the ISN accounts management page. Requires isnadmin role.
+      responses:
+        "200":
+          description: HTML page
+      summary: Manage ISN accounts page
+      tags:
+      - UI Pages
+  /admin/isn/create:
+    get:
+      description: Renders the create ISN form. Requires isnadmin or siteadmin role.
+      responses:
+        "200":
+          description: HTML page
+      summary: Create ISN page
+      tags:
+      - UI Pages
+  /admin/isn/manage:
+    get:
+      description: Renders the ISN enable/disable page. Only shows ISNs the user administers.
+        Requires isnadmin or siteadmin role.
+      responses:
+        "200":
+          description: HTML page
+      summary: Manage ISN status page
+      tags:
+      - UI Pages
+  /admin/isn/signal-types/add:
+    get:
+      description: Renders the form to associate a signal type version with an ISN.
+        Requires isnadmin role.
+      responses:
+        "200":
+          description: HTML page
+      summary: Add signal type to ISN page
+      tags:
+      - UI Pages
+  /admin/isn/signal-types/manage:
+    get:
+      description: Renders the form to enable or disable signal types within an ISN.
+        Requires isnadmin role.
+      responses:
+        "200":
+          description: HTML page
+      summary: Manage ISN signal type status page
+      tags:
+      - UI Pages
+  /admin/isn/transfer-ownership:
+    get:
+      description: Renders the ISN ownership transfer page. Requires siteadmin role.
+      responses:
+        "200":
+          description: HTML page
+      summary: Transfer ISN ownership page
+      tags:
+      - UI Pages
+  /admin/signal-types/create:
+    get:
+      description: Renders the create signal type form. Requires siteadmin role.
+      responses:
+        "200":
+          description: HTML page
+      summary: Create signal type page
+      tags:
+      - UI Pages
+  /admin/signal-types/list:
+    get:
+      description: Renders a read-only report of all registered signal types. Requires
+        isnadmin role.
+      responses:
+        "200":
+          description: HTML page
+      summary: List signal types page
+      tags:
+      - UI Pages
+  /admin/signal-types/register-new-schema:
+    get:
+      description: Renders the form to register a new schema version for an existing
+        signal type. Requires siteadmin role.
+      responses:
+        "200":
+          description: HTML page
+      summary: Register new signal type schema page
+      tags:
+      - UI Pages
+  /admin/users/generate-password-reset-link:
+    get:
+      description: Renders the password reset link generation form. Requires isnadmin
+        or siteadmin role.
+      responses:
+        "200":
+          description: HTML page
+      summary: Generate password reset link page
+      tags:
+      - UI Pages
+  /dashboard:
+    get:
+      description: Entry point after login. Requires authentication.
+      responses:
+        "200":
+          description: HTML page
+      summary: User dashboard
+      tags:
+      - UI Pages
+  /login:
+    get:
+      responses:
+        "200":
+          description: HTML page
+      summary: Login page
+      tags:
+      - UI Pages
+    post:
+      description: HTMX endpoint. Authenticates the user and sets session cookies.
+        On success redirects to /dashboard via HX-Redirect.
+      parameters:
+      - description: User email
+        in: formData
+        name: email
+        required: true
+        type: string
+      - description: User password
+        in: formData
+        name: password
+        required: true
+        type: string
+      responses:
+        "200":
+          description: HTML partial or HX-Redirect header
+      summary: Authenticate user
+      tags:
+      - HTMX Actions
+  /logout:
+    post:
+      description: Clears session cookies and redirects to /login.
+      responses:
+        "200":
+          description: HX-Redirect header
+      summary: Log out
+      tags:
+      - HTMX Actions
+  /register:
+    get:
+      responses:
+        "200":
+          description: HTML page
+      summary: Registration page
+      tags:
+      - UI Pages
+  /search:
+    get:
+      description: Renders the signal search page. Requires authentication and at
+        least one ISN access permission.
+      responses:
+        "200":
+          description: HTML page
+      summary: Search signals page
+      tags:
+      - UI Pages
+  /settings:
+    get:
+      description: Renders the user account settings page. Requires authentication.
+      responses:
+        "200":
+          description: HTML page
+      summary: Account settings page
+      tags:
+      - UI Pages
+  /ui-api/account/password:
+    put:
+      description: HTMX endpoint. Changes the authenticated user's password.
+      parameters:
+      - description: Current password
+        in: formData
+        name: current-password
+        required: true
+        type: string
+      - description: New password
+        in: formData
+        name: new-password
+        required: true
+        type: string
+      - description: Confirm new password
+        in: formData
+        name: confirm-password
+        required: true
+        type: string
+      responses:
+        "200":
+          description: HTML partial
+      summary: Update password
+      tags:
+      - HTMX Actions
+  /ui-api/accounts/isn-admins/manage:
+    put:
+      description: HTMX endpoint. Grants or revokes the isnadmin role for a user.
+        Requires siteadmin role.
+      parameters:
+      - description: User email
+        in: formData
+        name: user-email
+        required: true
+        type: string
+      - description: '''grant'' or ''revoke'''
+        in: formData
+        name: action
+        required: true
+        type: string
+      responses:
+        "200":
+          description: HTML partial
+      summary: Grant or revoke ISN admin role
+      tags:
+      - HTMX Actions
+  /ui-api/accounts/manage:
+    put:
+      description: HTMX endpoint. Enables or disables a user or service account. Requires
+        isnadmin or siteadmin role.
+      parameters:
+      - description: '''user'' or ''service-account'''
+        in: formData
+        name: account-type
+        required: true
+        type: string
+      - description: '''enable'' or ''disable'''
+        in: formData
+        name: action
+        required: true
+        type: string
+      - description: User email (when account-type is 'user')
+        in: formData
+        name: user-identifier
+        type: string
+      - description: Client ID (when account-type is 'service-account')
+        in: formData
+        name: service-account-identifier
+        type: string
+      responses:
+        "200":
+          description: HTML partial
+      summary: Enable or disable an account
+      tags:
+      - HTMX Actions
+  /ui-api/accounts/site-admins/manage:
+    put:
+      description: HTMX endpoint. Grants or revokes the siteadmin role for a user.
+        Requires siteadmin role.
+      parameters:
+      - description: User email
+        in: formData
+        name: user-email
+        required: true
+        type: string
+      - description: '''grant'' or ''revoke'''
+        in: formData
+        name: action
+        required: true
+        type: string
+      responses:
+        "200":
+          description: HTML partial
+      summary: Grant or revoke site admin role
+      tags:
+      - HTMX Actions
+  /ui-api/isn/accounts/manage:
+    put:
+      description: HTMX endpoint. Adds or removes a user/service account from an ISN.
+        Requires isnadmin role.
+      parameters:
+      - description: ISN slug
+        in: formData
+        name: isn-slug
+        required: true
+        type: string
+      - description: '''user'' or ''service-account'''
+        in: formData
+        name: account-type
+        required: true
+        type: string
+      - description: '''read'', ''write'', or ''none'' (removes account)'
+        in: formData
+        name: permission
+        required: true
+        type: string
+      - description: User email (when account-type is 'user')
+        in: formData
+        name: user-identifier
+        type: string
+      - description: Client ID (when account-type is 'service-account')
+        in: formData
+        name: service-account-identifier
+        type: string
+      responses:
+        "200":
+          description: HTML partial
+      summary: Manage ISN accounts
+      tags:
+      - HTMX Actions
+  /ui-api/isn/create:
+    post:
+      description: HTMX endpoint. Creates a new ISN. Requires isnadmin or siteadmin
+        role.
+      parameters:
+      - description: ISN title
+        in: formData
+        name: title
+        required: true
+        type: string
+      - description: ISN description
+        in: formData
+        name: detail
+        required: true
+        type: string
+      - description: '''public'' or ''private'''
+        in: formData
+        name: visibility
+        required: true
+        type: string
+      responses:
+        "200":
+          description: HTML partial
+      summary: Create ISN
+      tags:
+      - HTMX Actions
+  /ui-api/isn/manage:
+    put:
+      description: HTMX endpoint. Enables or disables an ISN. Requires isnadmin or
+        siteadmin role.
+      parameters:
+      - description: ISN slug
+        in: formData
+        name: isn-slug
+        required: true
+        type: string
+      - description: '''enable'' or ''disable'''
+        in: formData
+        name: action
+        required: true
+        type: string
+      responses:
+        "200":
+          description: HTML partial
+      summary: Enable or disable an ISN
+      tags:
+      - HTMX Actions
+  /ui-api/isn/signal-types/add:
+    post:
+      description: HTMX endpoint. Associates a signal type version with an ISN. Requires
+        isnadmin role for the target ISN.
+      parameters:
+      - description: ISN slug
+        in: formData
+        name: isn-slug
+        required: true
+        type: string
+      - description: Signal type slug
+        in: formData
+        name: signal-type-slug
+        required: true
+        type: string
+      - description: Semantic version
+        in: formData
+        name: sem-ver
+        required: true
+        type: string
+      responses:
+        "200":
+          description: HTML partial
+      summary: Add signal type to ISN
+      tags:
+      - HTMX Actions
+  /ui-api/isn/signal-types/manage:
+    put:
+      description: HTMX endpoint. Enables or disables a specific signal type version
+        within an ISN. Requires isnadmin role.
+      parameters:
+      - description: ISN slug
+        in: formData
+        name: isn-slug
+        required: true
+        type: string
+      - description: Signal type slug
+        in: formData
+        name: signal-type-slug
+        required: true
+        type: string
+      - description: Semantic version
+        in: formData
+        name: sem-ver
+        required: true
+        type: string
+      - description: '''enable'' or ''disable'''
+        in: formData
+        name: action
+        required: true
+        type: string
+      responses:
+        "200":
+          description: HTML partial
+      summary: Enable or disable a signal type for an ISN
+      tags:
+      - HTMX Actions
+  /ui-api/isn/transfer-ownership:
+    put:
+      description: HTMX endpoint. Transfers ownership of an ISN to another user. Requires
+        siteadmin role.
+      parameters:
+      - description: ISN slug
+        in: formData
+        name: isn-slug
+        required: true
+        type: string
+      - description: Email of the new owner (must be an existing user)
+        in: formData
+        name: new-owner-email
+        required: true
+        type: string
+      responses:
+        "200":
+          description: HTML partial
+      summary: Transfer ISN ownership
+      tags:
+      - HTMX Actions
+  /ui-api/service-accounts/create:
+    post:
+      description: HTMX endpoint. Creates a new service account. Requires isnadmin
+        or siteadmin role.
+      parameters:
+      - description: Contact email
+        in: formData
+        name: email
+        required: true
+        type: string
+      - description: Organization name
+        in: formData
+        name: organization
+        required: true
+        type: string
+      responses:
+        "200":
+          description: HTML partial
+      summary: Create service account
+      tags:
+      - HTMX Actions
+  /ui-api/service-accounts/reissue-credentials:
+    put:
+      description: HTMX endpoint. Issues a new client secret for the selected service
+        account. Requires isnadmin or siteadmin role.
+      parameters:
+      - description: Client ID of the service account
+        in: formData
+        name: service-account-dropdown
+        required: true
+        type: string
+      responses:
+        "200":
+          description: HTML partial
+      summary: Reissue service account credentials
+      tags:
+      - HTMX Actions
+  /ui-api/signal-types/create:
+    post:
+      description: HTMX endpoint. Creates a new signal type at version 1.0.0. Requires
+        siteadmin role.
+      parameters:
+      - description: Signal type title
+        in: formData
+        name: title
+        required: true
+        type: string
+      - description: Description
+        in: formData
+        name: detail
+        required: true
+        type: string
+      - description: JSON Schema URL (ignored when skip-validation is true)
+        in: formData
+        name: schema-url
+        required: true
+        type: string
+      - description: Readme URL (ignored when skip-readme is true)
+        in: formData
+        name: readme-url
+        required: true
+        type: string
+      - description: '''true'' to skip schema validation'
+        in: formData
+        name: skip-validation
+        type: string
+      - description: '''true'' to skip readme requirement'
+        in: formData
+        name: skip-readme
+        type: string
+      responses:
+        "200":
+          description: HTML partial
+      summary: Create signal type
+      tags:
+      - HTMX Actions
+  /ui-api/signal-types/register-new-schema:
+    put:
+      description: HTMX endpoint. Registers a new schema version for an existing signal
+        type. Requires siteadmin role.
+      parameters:
+      - description: Signal type slug
+        in: formData
+        name: signal-type-slug
+        required: true
+        type: string
+      - description: JSON Schema URL
+        in: formData
+        name: schema-url
+        required: true
+        type: string
+      - description: Readme URL
+        in: formData
+        name: readme-url
+        required: true
+        type: string
+      - description: Description of changes
+        in: formData
+        name: detail
+        required: true
+        type: string
+      - description: '''major'', ''minor'', or ''patch'''
+        in: formData
+        name: bump-type
+        required: true
+        type: string
+      responses:
+        "200":
+          description: HTML partial
+      summary: Register new signal type schema version
+      tags:
+      - HTMX Actions
+  /ui-api/signals/search:
+    get:
+      description: HTMX endpoint. Returns a table of signals matching the search criteria.
+        Requires ISN read access.
+      parameters:
+      - description: ISN slug
+        in: formData
+        name: isn-slug
+        required: true
+        type: string
+      - description: Signal type slug
+        in: formData
+        name: signal-type-slug
+        required: true
+        type: string
+      - description: Semantic version
+        in: formData
+        name: sem-ver
+        required: true
+        type: string
+      - description: Start date (ISO 8601)
+        in: formData
+        name: start-date
+        type: string
+      - description: End date (ISO 8601)
+        in: formData
+        name: end-date
+        type: string
+      - description: Filter by account ID
+        in: formData
+        name: account-id
+        type: string
+      - description: Filter by signal ID
+        in: formData
+        name: signal-id
+        type: string
+      - description: Filter by local reference
+        in: formData
+        name: local-ref
+        type: string
+      - description: '''true'' to include withdrawn signals'
+        in: formData
+        name: include-withdrawn
+        type: string
+      - description: '''true'' to include correlated signals'
+        in: formData
+        name: include-correlated
+        type: string
+      - description: '''true'' to include previous schema versions'
+        in: formData
+        name: include-previous-versions
+        type: string
+      responses:
+        "200":
+          description: HTML partial
+      summary: Search signals
+      tags:
+      - HTMX Actions
+  /ui-api/users/generate-password-reset-link:
+    put:
+      description: HTMX endpoint. Generates a one-time password reset URL for a user.
+        Requires isnadmin or siteadmin role.
+      parameters:
+      - description: Selected user in 'email|role' format
+        in: formData
+        name: user-dropdown
+        required: true
+        type: string
+      responses:
+        "200":
+          description: HTML partial
+      summary: Generate password reset link
+      tags:
+      - HTMX Actions
+produces:
+- application/json
+securityDefinitions:
+  BearerAccessToken:
+    description: Bearer {JWT access token}
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
+tags:
+- description: Browser-based management interface. Page handlers return full HTML
+  name: UI Pages
+- name: HTMX Actions

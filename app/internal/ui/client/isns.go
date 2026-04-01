@@ -1,12 +1,12 @@
 package client
 
+// these functions call the signalsd API to manage ISNs (create, update and get)
+
 import (
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
-
-	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
 type CreateIsnRequest struct {
@@ -20,6 +20,15 @@ type CreateIsnResponse struct {
 	ID          string `json:"id" example:"67890684-3b14-42cf-b785-df28ce570400"`
 	Slug        string `json:"slug" example:"sample-isn"`
 	ResourceURL string `json:"resource_url" example:"http://localhost:8080/api/isn/sample-isn"`
+}
+
+// IsnDetails holds the full ISN data returned by the GET /api/isn endpoint.
+// Used in admin pages that need to filter or display metadata beyond the slug (e.g. owner, status).
+type IsnDetails struct {
+	Slug          string `json:"slug"`
+	IsInUse       bool   `json:"is_in_use"`
+	Visibility    string `json:"visibility"`
+	UserAccountID string `json:"user_account_id"`
 }
 
 // UpdateIsnStatusRequest represents the request body for updating ISN status
@@ -64,8 +73,8 @@ func (c *Client) CreateIsn(accessToken string, req CreateIsnRequest) (*CreateIsn
 	return &createIsnResp, nil
 }
 
-// GetIsns fetches all ISNs, optionally including inactive ones
-func (c *Client) GetIsns(accessToken string, includeInactive bool) ([]types.IsnOption, error) {
+// GetIsns fetches all ISNs for the Site, optionally including inactive ones
+func (c *Client) GetIsns(accessToken string, includeInactive bool) ([]IsnDetails, error) {
 	url := fmt.Sprintf("%s/api/isn", c.baseURL)
 
 	if includeInactive {
@@ -89,7 +98,7 @@ func (c *Client) GetIsns(accessToken string, includeInactive bool) ([]types.IsnO
 		return nil, NewClientApiError(res)
 	}
 
-	var isns []types.IsnOption
+	var isns []IsnDetails
 	if err := json.NewDecoder(res.Body).Decode(&isns); err != nil {
 		return nil, NewClientInternalError(err, "decoding get isns response")
 	}

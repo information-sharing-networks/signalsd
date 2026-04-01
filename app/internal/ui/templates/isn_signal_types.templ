@@ -2,8 +2,8 @@ package templates
 
 import "github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 
-// IsnSignalTypeStatusPage renders the ISN-level signal type enable/disable page
-templ IsnSignalTypeStatusPage(environment string, isns []types.IsnOption) {
+// ManageIsnSignalTypesStatusPage renders the ISN-level signal type enable/disable page
+templ ManageIsnSignalTypesStatusPage(environment string, isns []types.IsnOption) {
 	@BaseLayout("ISN Signal Type Status Management") {
 		@Navigation(environment)
 		<div class="page-container">
@@ -20,7 +20,7 @@ templ IsnSignalTypeStatusPage(environment string, isns []types.IsnOption) {
 					}
 
 					<form
-						hx-put="/ui-api/isn-signal-types/status"
+						hx-put="/ui-api/isn/signal-types/manage"
 						hx-target="#status-result"
 						hx-swap="innerHTML"
 						class="margin-top-4">

@@ -1,5 +1,7 @@
 package client
 
+// these functions handle the error responses from the signalsd API, translating them into user-friendly messages and renders the error message to the end user.
+
 import (
 	"encoding/json"
 	"fmt"

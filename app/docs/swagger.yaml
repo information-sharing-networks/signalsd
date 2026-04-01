@@ -981,10 +981,50 @@ info:
 
     **Response Bodies**: All date/time fields in JSON responses use RFC3339 format (ISO 8601):
     - Example: "2025-06-03T13:47:47.331787+01:00"
+
+    # UI Endpoints
+
+    UI endpoints serve the browser-based management interface.
+
+    ## Route types
+    - **Page handlers** (`GET /admin/*`, `/search`, etc.): return a full HTML page (`200`)
+    - **HTMX action handlers** (`PUT`/`POST` to `/ui-api/*`): return an HTML partial (`200`) — either a success or error alert fragment
+
+    - see /ui-docs for more information
+
+    ## Auth
+    All protected routes require a valid session (cookie-based). Unauthenticated requests redirect to `/login`.
+    Requests with insufficient role are redirected to `/access-denied`.
+
+    ## Role requirements
+    - **Public** (`/login`, `/register`): no authentication required
+    - **Authenticated**: any logged-in user (`/dashboard`, `/search`, `/settings`)
+    - **`isnadmin` or `siteadmin`**: ISN account and signal type management
+    - **`siteadmin` only**: ISN creation and ownership transfer, role management, signal type creation
   license:
     name: MIT
   title: Signals ISN API
 paths:
+  /admin/service-accounts/create:
+    get:
+      description: Renders the create service account form. Requires isnadmin or siteadmin
+        role.
+      responses:
+        "200":
+          description: HTML page
+      summary: Create service account page
+      tags:
+      - UI Page
+  /admin/service-accounts/reissue-credentials:
+    get:
+      description: Renders the reissue credentials form. Requires isnadmin or siteadmin
+        role.
+      responses:
+        "200":
+          description: HTML page
+      summary: Reissue service account credentials page
+      tags:
+      - UI Page
   /api/admin/accounts/{account_id}/disable:
     post:
       description: |-
@@ -2093,7 +2133,7 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      summary: Get ISN account membership
+      summary: Get ISN Account Membership
       tags:
       - ISN Configuration
   /api/isn/{isn_slug}/accounts/{account_id}:
@@ -2812,6 +2852,31 @@ paths:
       summary: Refresh Access Token
       tags:
       - auth
+  /register:
+    post:
+      description: Creates a new user account.
+      parameters:
+      - description: User email
+        in: formData
+        name: email
+        required: true
+        type: string
+      - description: Password
+        in: formData
+        name: password
+        required: true
+        type: string
+      - description: Confirm password
+        in: formData
+        name: confirm-password
+        required: true
+        type: string
+      responses:
+        "200":
+          description: HTML partial
+      summary: Register new user
+      tags:
+      - HTMX Action
   /version:
     get:
       description: Returns the current API version details

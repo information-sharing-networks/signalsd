@@ -2,7 +2,7 @@ package templates
 
 import "github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 
-templ IsnAccountManagementPage(environment string, isns []types.IsnOption, users []types.UserOption, serviceAccounts []types.ServiceAccountOption) {
+templ ManageIsnAccountsPage(environment string, isns []types.IsnOption, users []types.UserOption, serviceAccounts []types.ServiceAccountOption) {
 	@BaseLayout("ISN Account Permissions") {
 		@Navigation(environment)
 		<div class="page-container">
@@ -23,7 +23,7 @@ templ IsnAccountManagementPage(environment string, isns []types.IsnOption, users
                         </ul>
                     }
 					<form 
-                        hx-put="/ui-api/isn/accounts/update" 
+                        hx-put="/ui-api/isn/accounts/manage" 
                         hx-target="#result"
                         class="margin-top-4">
 						<div class="grid grid-cols-1 md:grid-cols-3 gap-4">

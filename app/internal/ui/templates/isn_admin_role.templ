@@ -2,8 +2,8 @@ package templates
 
 import "github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 
-// IsnAdminRoleManagementPage renders the admin role management page
-templ IsnAdminRoleManagementPage(environment string, users []types.UserOption) {
+// ManageIsnAdminRolesPage renders the admin role management page
+templ ManageIsnAdminRolesPage(environment string, users []types.UserOption) {
 	@BaseLayout("ISN Admin Role Management") {
 		@Navigation(environment)
 		<div class="page-container">
@@ -29,7 +29,7 @@ templ IsnAdminRoleManagementPage(environment string, users []types.UserOption) {
 					}
 					
 					<form 
-						hx-put="/ui-api/admin/accounts/isn-admin-role"
+						hx-put="/ui-api/accounts/isn-admins/manage"
 						hx-target="#role-result"
 						hx-swap="innerHTML"
 						class="margin-top-4">
