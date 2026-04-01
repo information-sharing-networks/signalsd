@@ -292,6 +292,30 @@ paths:
       summary: Registration page
       tags:
       - UI Pages
+    post:
+      description: Creates a new user account.
+      parameters:
+      - description: User email
+        in: formData
+        name: email
+        required: true
+        type: string
+      - description: Password
+        in: formData
+        name: password
+        required: true
+        type: string
+      - description: Confirm password
+        in: formData
+        name: confirm-password
+        required: true
+        type: string
+      responses:
+        "200":
+          description: HTML partial
+      summary: Register new user
+      tags:
+      - HTMX Actions
   /search:
     get:
       description: Renders the signal search page. Requires authentication and at

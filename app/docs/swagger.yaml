@@ -2855,31 +2855,6 @@ paths:
       summary: Refresh Access Token
       tags:
       - auth
-  /register:
-    post:
-      description: Creates a new user account.
-      parameters:
-      - description: User email
-        in: formData
-        name: email
-        required: true
-        type: string
-      - description: Password
-        in: formData
-        name: password
-        required: true
-        type: string
-      - description: Confirm password
-        in: formData
-        name: confirm-password
-        required: true
-        type: string
-      responses:
-        "200":
-          description: HTML partial
-      summary: Register new user
-      tags:
-      - HTMX Action
   /version:
     get:
       description: Returns the current API version details
