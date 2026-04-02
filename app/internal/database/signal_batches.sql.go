@@ -12,186 +12,42 @@ import (
 	"github.com/google/uuid"
 )
 
-const CloseSignalBatchByIsnIdAndAccountID = `-- name: CloseSignalBatchByIsnIdAndAccountID :execrows
-UPDATE signal_batches 
-SET is_latest = FALSE
-WHERE isn_id = $1 and account_id = $2
-`
-
-type CloseSignalBatchByIsnIdAndAccountIDParams struct {
-	IsnID     uuid.UUID `json:"isn_id"`
-	AccountID uuid.UUID `json:"account_id"`
-}
-
-// close the open batch for an account on a specific ISN (use when creating a new batch or revoking write access)
-func (q *Queries) CloseSignalBatchByIsnIdAndAccountID(ctx context.Context, arg CloseSignalBatchByIsnIdAndAccountIDParams) (int64, error) {
-	result, err := q.db.Exec(ctx, CloseSignalBatchByIsnIdAndAccountID, arg.IsnID, arg.AccountID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
-const CloseSignalBatchesByAccountID = `-- name: CloseSignalBatchesByAccountID :execrows
-UPDATE signal_batches 
-SET is_latest = FALSE
-WHERE account_id = $1
-`
-
-// close any open batches for an account (use when disabling an account)
-func (q *Queries) CloseSignalBatchesByAccountID(ctx context.Context, accountID uuid.UUID) (int64, error) {
-	result, err := q.db.Exec(ctx, CloseSignalBatchesByAccountID, accountID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
-const CreateSignalBatch = `-- name: CreateSignalBatch :one
-INSERT INTO signal_batches (
-    id,
-    created_at,
-    updated_at,
-    isn_id,
-    account_id,
-    is_latest
-) VALUES (
-    gen_random_uuid(), 
-    now(), 
-    now(), 
-    $1, 
-    $2, 
-    TRUE
-)
-RETURNING id, created_at, updated_at, isn_id, account_id, is_latest
-`
-
-type CreateSignalBatchParams struct {
-	IsnID     uuid.UUID `json:"isn_id"`
-	AccountID uuid.UUID `json:"account_id"`
-}
-
-func (q *Queries) CreateSignalBatch(ctx context.Context, arg CreateSignalBatchParams) (SignalBatch, error) {
-	row := q.db.QueryRow(ctx, CreateSignalBatch, arg.IsnID, arg.AccountID)
-	var i SignalBatch
-	err := row.Scan(
-		&i.ID,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.IsnID,
-		&i.AccountID,
-		&i.IsLatest,
-	)
-	return i, err
-}
-
-const ExistsSignalBatchForAccountAndIsnId = `-- name: ExistsSignalBatchForAccountAndIsnId :one
-SELECT EXISTS(
-    SELECT 1
-    FROM signal_batches
-    WHERE isn_id = $1
-    AND account_id = $2
-    AND is_latest = TRUE
-) AS exists
-`
-
-type ExistsSignalBatchForAccountAndIsnIdParams struct {
-	IsnID     uuid.UUID `json:"isn_id"`
-	AccountID uuid.UUID `json:"account_id"`
-}
-
-func (q *Queries) ExistsSignalBatchForAccountAndIsnId(ctx context.Context, arg ExistsSignalBatchForAccountAndIsnIdParams) (bool, error) {
-	row := q.db.QueryRow(ctx, ExistsSignalBatchForAccountAndIsnId, arg.IsnID, arg.AccountID)
-	var exists bool
-	err := row.Scan(&exists)
-	return exists, err
-}
-
 const GetBatchesWithOptionalFilters = `-- name: GetBatchesWithOptionalFilters :many
-WITH RankedBatches AS (
-    SELECT
-        sb.id as batch_id,
-        sb.created_at,
-        sb.updated_at,
-        sb.account_id,
-        sb.is_latest,
-        i.slug as isn_slug,
-        ROW_NUMBER() OVER (PARTITION BY sb.account_id ORDER BY sb.created_at DESC) as rn
-    FROM signal_batches sb
-    JOIN isn i ON i.id = sb.isn_id
-    WHERE i.slug = $4
-        -- Account permission: users see own batches, site admin or ISN owner sees all
-        AND (sb.account_id = $5::uuid
-             OR $6::boolean = true)
-        AND ($7::timestamptz IS NULL OR sb.created_at >= $7::timestamptz)
-        AND ($8::timestamptz IS NULL OR sb.created_at <= $8::timestamptz)
-        -- Closed date filters (only apply to closed batches: is_latest = false)
-        AND ($9::timestamptz IS NULL OR (sb.is_latest = false AND sb.updated_at >= $9::timestamptz))
-        AND ($10::timestamptz IS NULL OR (sb.is_latest = false AND sb.updated_at <= $10::timestamptz))
-)
 SELECT
-    batch_id,
-    created_at,
-    updated_at,
-    account_id,
-    is_latest,
-    isn_slug
-FROM RankedBatches
+    sb.id   AS batch_id,
+    sb.batch_ref,
+    sb.created_at,
+    sb.account_id
+FROM signal_batches sb
 WHERE
-    -- Apply latest & previous filtering only when latest=true
-    ($1::boolean IS NOT TRUE
-     OR ($1::boolean = true AND $2::boolean = true AND rn = 1)
-     OR ($1::boolean = true AND $2::boolean = false AND is_latest = true))
-    AND
-    ($3::boolean IS NOT TRUE
-     OR ($3::boolean = true AND $2::boolean = true AND rn = 2)
-     OR ($3::boolean = true AND $2::boolean = false))
-ORDER BY created_at DESC
-LIMIT CASE
-    WHEN $1::boolean = true AND $2::boolean = false THEN 1  
-    WHEN $3::boolean = true AND $2::boolean = false THEN 1
-    ELSE NULL  -- No limit for admin latest/previous (returns per account)
-END
-OFFSET CASE
-    WHEN $3::boolean = true AND $2::boolean = false THEN 1  -- Skip the latest to get previous (members only)
-    ELSE 0
-END
+    -- Access control: members see their own batches; site admins see all
+    (sb.account_id = $1::uuid
+     OR $2::boolean = true)
+    AND ($3::timestamptz IS NULL OR sb.created_at >= $3::timestamptz)
+    AND ($4::timestamptz IS NULL OR sb.created_at <= $4::timestamptz)
+ORDER BY sb.created_at DESC
 `
 
 type GetBatchesWithOptionalFiltersParams struct {
-	Latest              *bool      `json:"latest"`
-	IsAdmin             *bool      `json:"is_admin"`
-	Previous            *bool      `json:"previous"`
-	IsnSlug             string     `json:"isn_slug"`
 	RequestingAccountID *uuid.UUID `json:"requesting_account_id"`
-	IsOwnerOrAdmin      *bool      `json:"is_owner_or_admin"`
+	IsAdmin             *bool      `json:"is_admin"`
 	CreatedAfter        *time.Time `json:"created_after"`
 	CreatedBefore       *time.Time `json:"created_before"`
-	ClosedAfter         *time.Time `json:"closed_after"`
-	ClosedBefore        *time.Time `json:"closed_before"`
 }
 
 type GetBatchesWithOptionalFiltersRow struct {
 	BatchID   uuid.UUID `json:"batch_id"`
+	BatchRef  string    `json:"batch_ref"`
 	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
 	AccountID uuid.UUID `json:"account_id"`
-	IsLatest  bool      `json:"is_latest"`
-	IsnSlug   string    `json:"isn_slug"`
 }
 
 func (q *Queries) GetBatchesWithOptionalFilters(ctx context.Context, arg GetBatchesWithOptionalFiltersParams) ([]GetBatchesWithOptionalFiltersRow, error) {
 	rows, err := q.db.Query(ctx, GetBatchesWithOptionalFilters,
-		arg.Latest,
-		arg.IsAdmin,
-		arg.Previous,
-		arg.IsnSlug,
 		arg.RequestingAccountID,
-		arg.IsOwnerOrAdmin,
+		arg.IsAdmin,
 		arg.CreatedAfter,
 		arg.CreatedBefore,
-		arg.ClosedAfter,
-		arg.ClosedBefore,
 	)
 	if err != nil {
 		return nil, err
@@ -202,11 +58,9 @@ func (q *Queries) GetBatchesWithOptionalFilters(ctx context.Context, arg GetBatc
 		var i GetBatchesWithOptionalFiltersRow
 		if err := rows.Scan(
 			&i.BatchID,
+			&i.BatchRef,
 			&i.CreatedAt,
-			&i.UpdatedAt,
 			&i.AccountID,
-			&i.IsLatest,
-			&i.IsnSlug,
 		); err != nil {
 			return nil, err
 		}
@@ -221,36 +75,35 @@ func (q *Queries) GetBatchesWithOptionalFilters(ctx context.Context, arg GetBatc
 const GetFailedSignalsByBatchID = `-- name: GetFailedSignalsByBatchID :many
 SELECT DISTINCT
     sb.id as batch_id,
-    sb.created_at as batch_opened_at,
+    sb.created_at as batch_created_at,
     sb.account_id,
     i.slug as isn_slug,
-    sb.is_latest,
     spf.signal_type_slug,
     spf.signal_type_sem_ver,
     spf.local_ref,
     spf.error_code,
     spf.error_message
 FROM signal_batches sb
-JOIN isn i ON i.id = sb.isn_id
 JOIN signal_processing_failures spf ON spf.signal_batch_id = sb.id
 JOIN signal_types st ON st.slug = spf.signal_type_slug
     AND st.sem_ver = spf.signal_type_sem_ver
+JOIN signals s ON s.local_ref = spf.local_ref
+    AND s.signal_type_id = st.id
+    AND s.account_id = sb.account_id
+JOIN isn i ON i.id = s.isn_id
 WHERE sb.id = $1
 AND NOT EXISTS (
-        SELECT 1 FROM signals s 
-        JOIN signal_versions sv ON sv.signal_id = s.id
-        WHERE s.local_ref = spf.local_ref
-            AND s.signal_type_id = st.id
+        SELECT 1 FROM signal_versions sv
+        WHERE sv.signal_id = s.id
             AND sv.created_at > spf.created_at
     )
 `
 
 type GetFailedSignalsByBatchIDRow struct {
 	BatchID          uuid.UUID `json:"batch_id"`
-	BatchOpenedAt    time.Time `json:"batch_opened_at"`
+	BatchCreatedAt   time.Time `json:"batch_created_at"`
 	AccountID        uuid.UUID `json:"account_id"`
 	IsnSlug          string    `json:"isn_slug"`
-	IsLatest         bool      `json:"is_latest"`
 	SignalTypeSlug   string    `json:"signal_type_slug"`
 	SignalTypeSemVer string    `json:"signal_type_sem_ver"`
 	LocalRef         string    `json:"local_ref"`
@@ -258,7 +111,8 @@ type GetFailedSignalsByBatchIDRow struct {
 	ErrorMessage     string    `json:"error_message"`
 }
 
-// failed local_refs that were not subsequently loaded
+// Unresolved failures: failed local_refs that were not subsequently loaded successfully.
+// ISN slug is derived via signals to avoid depending on isn_id on signal_batches.
 func (q *Queries) GetFailedSignalsByBatchID(ctx context.Context, id uuid.UUID) ([]GetFailedSignalsByBatchIDRow, error) {
 	rows, err := q.db.Query(ctx, GetFailedSignalsByBatchID, id)
 	if err != nil {
@@ -270,10 +124,9 @@ func (q *Queries) GetFailedSignalsByBatchID(ctx context.Context, id uuid.UUID) (
 		var i GetFailedSignalsByBatchIDRow
 		if err := rows.Scan(
 			&i.BatchID,
-			&i.BatchOpenedAt,
+			&i.BatchCreatedAt,
 			&i.AccountID,
 			&i.IsnSlug,
-			&i.IsLatest,
 			&i.SignalTypeSlug,
 			&i.SignalTypeSemVer,
 			&i.LocalRef,
@@ -290,159 +143,10 @@ func (q *Queries) GetFailedSignalsByBatchID(ctx context.Context, id uuid.UUID) (
 	return items, nil
 }
 
-const GetLatestBatchByAccountAndIsnID = `-- name: GetLatestBatchByAccountAndIsnID :one
-SELECT sb.id, sb.created_at, sb.updated_at, sb.isn_id, sb.account_id, sb.is_latest FROM signal_batches sb
-WHERE sb.account_id = $1
-AND sb.isn_id = $2
-AND sb.is_latest = TRUE
-`
-
-type GetLatestBatchByAccountAndIsnIDParams struct {
-	AccountID uuid.UUID `json:"account_id"`
-	IsnID     uuid.UUID `json:"isn_id"`
-}
-
-func (q *Queries) GetLatestBatchByAccountAndIsnID(ctx context.Context, arg GetLatestBatchByAccountAndIsnIDParams) (SignalBatch, error) {
-	row := q.db.QueryRow(ctx, GetLatestBatchByAccountAndIsnID, arg.AccountID, arg.IsnID)
-	var i SignalBatch
-	err := row.Scan(
-		&i.ID,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.IsnID,
-		&i.AccountID,
-		&i.IsLatest,
-	)
-	return i, err
-}
-
-const GetLatestBatchByAccountAndIsnSlug = `-- name: GetLatestBatchByAccountAndIsnSlug :one
-SELECT sb.id, sb.created_at, sb.updated_at, sb.isn_id, sb.account_id, sb.is_latest, i.slug as isn_slug FROM signal_batches sb
-JOIN isn i
-ON i.id = sb.isn_id
-WHERE sb.account_id = $1
-AND i.slug = $2
-AND sb.is_latest = TRUE
-`
-
-type GetLatestBatchByAccountAndIsnSlugParams struct {
-	AccountID uuid.UUID `json:"account_id"`
-	Slug      string    `json:"slug"`
-}
-
-type GetLatestBatchByAccountAndIsnSlugRow struct {
-	ID        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	IsnID     uuid.UUID `json:"isn_id"`
-	AccountID uuid.UUID `json:"account_id"`
-	IsLatest  bool      `json:"is_latest"`
-	IsnSlug   string    `json:"isn_slug"`
-}
-
-func (q *Queries) GetLatestBatchByAccountAndIsnSlug(ctx context.Context, arg GetLatestBatchByAccountAndIsnSlugParams) (GetLatestBatchByAccountAndIsnSlugRow, error) {
-	row := q.db.QueryRow(ctx, GetLatestBatchByAccountAndIsnSlug, arg.AccountID, arg.Slug)
-	var i GetLatestBatchByAccountAndIsnSlugRow
-	err := row.Scan(
-		&i.ID,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.IsnID,
-		&i.AccountID,
-		&i.IsLatest,
-		&i.IsnSlug,
-	)
-	return i, err
-}
-
-const GetLatestIsnSignalBatchesByAccountID = `-- name: GetLatestIsnSignalBatchesByAccountID :many
-SELECT sb.id, sb.created_at, sb.updated_at, sb.isn_id, sb.account_id, sb.is_latest, i.slug as isn_slug FROM signal_batches sb 
-JOIN isn i
-    ON sb.isn_id = i.id
-WHERE account_id = $1
-AND is_latest = TRUE
-`
-
-type GetLatestIsnSignalBatchesByAccountIDRow struct {
-	ID        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	IsnID     uuid.UUID `json:"isn_id"`
-	AccountID uuid.UUID `json:"account_id"`
-	IsLatest  bool      `json:"is_latest"`
-	IsnSlug   string    `json:"isn_slug"`
-}
-
-func (q *Queries) GetLatestIsnSignalBatchesByAccountID(ctx context.Context, accountID uuid.UUID) ([]GetLatestIsnSignalBatchesByAccountIDRow, error) {
-	rows, err := q.db.Query(ctx, GetLatestIsnSignalBatchesByAccountID, accountID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetLatestIsnSignalBatchesByAccountIDRow
-	for rows.Next() {
-		var i GetLatestIsnSignalBatchesByAccountIDRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.IsnID,
-			&i.AccountID,
-			&i.IsLatest,
-			&i.IsnSlug,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const GetLatestSignalBatchByIsnSlugAndBatchID = `-- name: GetLatestSignalBatchByIsnSlugAndBatchID :one
-SELECT sb.id, sb.created_at, sb.updated_at, sb.isn_id, sb.account_id, sb.is_latest, i.slug as isn_slug FROM signal_batches sb
-JOIN isn i
-ON i.id = sb.isn_id
-WHERE i.slug = $1
-AND sb.id = $2
-AND sb.is_latest = TRUE
-`
-
-type GetLatestSignalBatchByIsnSlugAndBatchIDParams struct {
-	Slug string    `json:"slug"`
-	ID   uuid.UUID `json:"id"`
-}
-
-type GetLatestSignalBatchByIsnSlugAndBatchIDRow struct {
-	ID        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	IsnID     uuid.UUID `json:"isn_id"`
-	AccountID uuid.UUID `json:"account_id"`
-	IsLatest  bool      `json:"is_latest"`
-	IsnSlug   string    `json:"isn_slug"`
-}
-
-func (q *Queries) GetLatestSignalBatchByIsnSlugAndBatchID(ctx context.Context, arg GetLatestSignalBatchByIsnSlugAndBatchIDParams) (GetLatestSignalBatchByIsnSlugAndBatchIDRow, error) {
-	row := q.db.QueryRow(ctx, GetLatestSignalBatchByIsnSlugAndBatchID, arg.Slug, arg.ID)
-	var i GetLatestSignalBatchByIsnSlugAndBatchIDRow
-	err := row.Scan(
-		&i.ID,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.IsnID,
-		&i.AccountID,
-		&i.IsLatest,
-		&i.IsnSlug,
-	)
-	return i, err
-}
-
 const GetLoadedSignalsSummaryByBatchID = `-- name: GetLoadedSignalsSummaryByBatchID :many
 SELECT
     COUNT(*) as submitted_count,
+    i.slug AS isn_slug,
     st.slug AS signal_type_slug,
     st.sem_ver AS signal_type_sem_ver
 FROM
@@ -455,6 +159,8 @@ JOIN
     signals s ON s.id = lsv.signal_id
 JOIN
     signal_types st on st.id = s.signal_type_id
+JOIN
+    isn i ON i.id = s.isn_id
 WHERE
     sb.id = $1
     AND NOT EXISTS ( -- do not count signals that failed processing and have not been corrected yet
@@ -465,19 +171,20 @@ WHERE
             AND spf.signal_type_sem_ver = st.sem_ver
             AND spf.created_at > lsv.created_at
         )
-GROUP BY st.slug, st.sem_ver
+GROUP BY i.slug, st.slug, st.sem_ver
 `
 
 type GetLoadedSignalsSummaryByBatchIDRow struct {
 	SubmittedCount   int64  `json:"submitted_count"`
+	IsnSlug          string `json:"isn_slug"`
 	SignalTypeSlug   string `json:"signal_type_slug"`
 	SignalTypeSemVer string `json:"signal_type_sem_ver"`
 }
 
-// count of sucessfully loaded signals grouped by signal type (note that a local_ref can be submitted multiple times and only the latest version is counted).
-//
-// where a signal has failed processing and has not subsequently been loaded again, it is not counted
-// Uses latest_signal_versions view to avoid ROW_NUMBER() window function
+// Count successfully loaded signals grouped by ISN and signal type.
+// A local_ref submitted multiple times is counted once (latest version only).
+// Signals with an unresolved processing failure are excluded.
+// Uses latest_signal_versions view to avoid ROW_NUMBER() window function.
 func (q *Queries) GetLoadedSignalsSummaryByBatchID(ctx context.Context, id uuid.UUID) ([]GetLoadedSignalsSummaryByBatchIDRow, error) {
 	rows, err := q.db.Query(ctx, GetLoadedSignalsSummaryByBatchID, id)
 	if err != nil {
@@ -487,7 +194,12 @@ func (q *Queries) GetLoadedSignalsSummaryByBatchID(ctx context.Context, id uuid.
 	var items []GetLoadedSignalsSummaryByBatchIDRow
 	for rows.Next() {
 		var i GetLoadedSignalsSummaryByBatchIDRow
-		if err := rows.Scan(&i.SubmittedCount, &i.SignalTypeSlug, &i.SignalTypeSemVer); err != nil {
+		if err := rows.Scan(
+			&i.SubmittedCount,
+			&i.IsnSlug,
+			&i.SignalTypeSlug,
+			&i.SignalTypeSemVer,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -499,33 +211,65 @@ func (q *Queries) GetLoadedSignalsSummaryByBatchID(ctx context.Context, id uuid.
 }
 
 const GetSignalBatchByID = `-- name: GetSignalBatchByID :one
-SELECT sb.id, sb.created_at, sb.updated_at, sb.isn_id, sb.account_id, sb.is_latest, i.slug as isn_slug FROM signal_batches sb
-JOIN isn i 
-ON i.id = sb.isn_id
-WHERE sb.id = $1
+SELECT id, batch_ref, account_id, created_at FROM signal_batches
+WHERE id = $1
 `
 
-type GetSignalBatchByIDRow struct {
-	ID        uuid.UUID `json:"id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	IsnID     uuid.UUID `json:"isn_id"`
-	AccountID uuid.UUID `json:"account_id"`
-	IsLatest  bool      `json:"is_latest"`
-	IsnSlug   string    `json:"isn_slug"`
-}
-
-func (q *Queries) GetSignalBatchByID(ctx context.Context, id uuid.UUID) (GetSignalBatchByIDRow, error) {
+func (q *Queries) GetSignalBatchByID(ctx context.Context, id uuid.UUID) (SignalBatch, error) {
 	row := q.db.QueryRow(ctx, GetSignalBatchByID, id)
-	var i GetSignalBatchByIDRow
+	var i SignalBatch
 	err := row.Scan(
 		&i.ID,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.IsnID,
+		&i.BatchRef,
 		&i.AccountID,
-		&i.IsLatest,
-		&i.IsnSlug,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const GetSignalBatchByRefAndAccountID = `-- name: GetSignalBatchByRefAndAccountID :one
+SELECT id, batch_ref, account_id, created_at FROM signal_batches
+WHERE account_id = $1 AND batch_ref = $2
+`
+
+type GetSignalBatchByRefAndAccountIDParams struct {
+	AccountID uuid.UUID `json:"account_id"`
+	BatchRef  string    `json:"batch_ref"`
+}
+
+func (q *Queries) GetSignalBatchByRefAndAccountID(ctx context.Context, arg GetSignalBatchByRefAndAccountIDParams) (SignalBatch, error) {
+	row := q.db.QueryRow(ctx, GetSignalBatchByRefAndAccountID, arg.AccountID, arg.BatchRef)
+	var i SignalBatch
+	err := row.Scan(
+		&i.ID,
+		&i.BatchRef,
+		&i.AccountID,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const UpsertSignalBatch = `-- name: UpsertSignalBatch :one
+INSERT INTO signal_batches (batch_ref, account_id)
+VALUES ($1, $2)
+ON CONFLICT (account_id, batch_ref) DO UPDATE
+  SET batch_ref = EXCLUDED.batch_ref  -- no-op update to trigger RETURNING
+RETURNING id, batch_ref, account_id, created_at
+`
+
+type UpsertSignalBatchParams struct {
+	BatchRef  string    `json:"batch_ref"`
+	AccountID uuid.UUID `json:"account_id"`
+}
+
+func (q *Queries) UpsertSignalBatch(ctx context.Context, arg UpsertSignalBatchParams) (SignalBatch, error) {
+	row := q.db.QueryRow(ctx, UpsertSignalBatch, arg.BatchRef, arg.AccountID)
+	var i SignalBatch
+	err := row.Scan(
+		&i.ID,
+		&i.BatchRef,
+		&i.AccountID,
+		&i.CreatedAt,
 	)
 	return i, err
 }

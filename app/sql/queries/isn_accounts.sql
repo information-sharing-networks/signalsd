@@ -1,4 +1,4 @@
--- name: CreateIsnAccount :one
+-- name: UpsertIsnAccount :one
 INSERT INTO isn_accounts (
     id,
     created_at,
@@ -8,15 +8,10 @@ INSERT INTO isn_accounts (
     can_read,
     can_write
 ) VALUES (gen_random_uuid(), now(), now(), $1, $2, $3, $4)
-RETURNING *;
-
--- name: UpdateIsnAccount :one
-UPDATE isn_accounts SET
-    updated_at = now(),
-    can_read = $3,
-    can_write = $4
-WHERE isn_id =  $1
-AND account_id = $2
+ON CONFLICT (isn_id, account_id) DO UPDATE
+    SET updated_at = now(),
+        can_read = EXCLUDED.can_read,
+        can_write = EXCLUDED.can_write
 RETURNING *;
 
 

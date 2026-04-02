@@ -128,7 +128,7 @@ func (s *Server) RegisterPage(w http.ResponseWriter, r *http.Request) {
 //
 //	@Summary		Register new user
 //	@Description	Creates a new user account.
-//	@Tags			HTMX Action
+//	@Tags			HTMX Actions
 //	@Param			email				formData	string	true	"User email"
 //	@Param			password			formData	string	true	"Password"
 //	@Param			confirm-password	formData	string	true	"Confirm password"

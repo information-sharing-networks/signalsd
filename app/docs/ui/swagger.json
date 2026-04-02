@@ -291,6 +291,41 @@
                         "description": "HTML page"
                     }
                 }
+            },
+            "post": {
+                "description": "Creates a new user account.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Register new user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User email",
+                        "name": "email",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Password",
+                        "name": "password",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Confirm password",
+                        "name": "confirm-password",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    }
+                }
             }
         },
         "/search": {

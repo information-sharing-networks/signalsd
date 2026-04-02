@@ -26,24 +26,16 @@ func NewSignalsBatchHandler(queries *database.Queries) *SignalsBatchHandler {
 	return &SignalsBatchHandler{queries: queries}
 }
 
-type CreateSignalsBatchRequest struct {
-	IsnSlug string `json:"isn_slug" example:"sample-isn"`
-}
-
-type CreateSignalsBatchResponse struct {
-	AccountID      uuid.UUID `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
-	SignalsBatchID uuid.UUID `json:"signals_batch_id" example:"b51faf05-aaed-4250-b334-2258ccdf1ff2"`
-}
-
-// FailureRow represents a failed local_ref for a specific signal type
+// FailureRow represents a single unresolved failure within a batch
 type FailureRow struct {
 	LocalRef     string `json:"local_ref"`
 	ErrorCode    string `json:"error_code"`
 	ErrorMessage string `json:"error_message"`
 }
 
-// BatchStatus represents the summary status for all signal types in a batch
+// BatchStatus summarises stored and failed signals for one ISN + signal type combination within a batch
 type BatchStatus struct {
+	IsnSlug            string       `json:"isn_slug"`
 	SignalTypeSlug     string       `json:"signal_type_slug"`
 	SignalTypeVersion  string       `json:"signal_type_version"`
 	StoredCount        int64        `json:"stored_count"`
@@ -51,171 +43,75 @@ type BatchStatus struct {
 	UnresolvedFailures []FailureRow `json:"unresolved_failures,omitempty"`
 }
 
-// BatchStatusResponse represents the complete batch status with successful loads and failures
+// BatchStatusResponse is the full status for a batch across all ISNs and signal types
 type BatchStatusResponse struct {
 	BatchID          uuid.UUID     `json:"batch_id"`
+	BatchRef         string        `json:"batch_ref"`
 	AccountID        uuid.UUID     `json:"account_id"`
-	IsnSlug          string        `json:"isn_slug"`
 	CreatedAt        time.Time     `json:"created_at"`
-	ClosedAt         *time.Time    `json:"closed_at,omitempty"`
-	IsLatest         bool          `json:"is_latest"`
 	ContainsFailures bool          `json:"contains_failures"`
 	BatchStatus      []BatchStatus `json:"batch_status"`
 }
 
-// structs used by the batch search endpoint
+// BatchSearchParams holds validated query parameters for batch search
 type BatchSearchParams struct {
-	IsnSlug       string
-	Latest        *bool
-	Previous      *bool
 	CreatedAfter  *time.Time
 	CreatedBefore *time.Time
-	ClosedAfter   *time.Time
-	ClosedBefore  *time.Time
 }
 
-// CreateSignalsBatchHandler godoc
-//
-//	@Summary		Open a New Signal Batch
-//	@Description	This endpoint is used create a new batch for an account on the specified ISN.
-//	@Description	Batches are used to track signals sent by an account to the specified ISN (accounts can only have one open batch at a time on an ISN)
-//	@Description
-//	@Description	Opening a batch closes the previous batch (the client app can decide how long to keep a batch open)
-//	@Description
-//	@Description	Signals can only be sent to open batches.
-//	@Description
-//	@Description	Authentication is based on the supplied access token:
-//	@Description	site admins, the isn owner and members with an isn_perm=write can create a batch for the ISN.
-//	@Description
-//	@Description	Note: Batches are automatically created when accounts first write to an ISN,
-//	@Description	so you only need to explicitly create a batch using this endpoint if you want to track signals in separate batches.
-//	@Description
-//	@Tags		Signal Exchange
-//
-//	@Success	201	{object}	CreateSignalsBatchResponse
-//
-//	@Security	BearerAccessToken
-//
-//	@Router		/api/isn/{isn_slug}/batches [post]
-//
-// CreateSignalsBatchHandler must be used with the RequireValidAccessToken and RequireIsnPermission middleware functions
-func (s *SignalsBatchHandler) CreateSignalsBatchHandler(w http.ResponseWriter, r *http.Request) {
-
-	// these checks have been done already in the middleware so - if there is an error here - it is a bug.
-	_, ok := auth.ContextClaims(r.Context())
-	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, " could not get claims from context")
-		return
-	}
-
-	accountID, ok := auth.ContextAccountID(r.Context())
-	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
-		return
-	}
-	account, err := s.queries.GetAccountByID(r.Context(), accountID)
-	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "database error")
-		return
-	}
-
-	if account.AccountType == "user" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "this endpoint is only for service accounts")
-		return
-	}
-
-	// check isn exists
-	isnSlug := r.PathValue("isn_slug")
-	isn, err := s.queries.GetIsnBySlug(r.Context(), isnSlug)
-	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-			slog.String("isn_slug", isnSlug),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
-	}
-
-	_, err = s.queries.CloseSignalBatchByIsnIdAndAccountID(r.Context(), database.CloseSignalBatchByIsnIdAndAccountIDParams{
-		IsnID:     isn.ID,
-		AccountID: accountID,
-	})
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
-	}
-
-	returnedRow, err := s.queries.CreateSignalBatch(r.Context(), database.CreateSignalBatchParams{
-		IsnID:     isn.ID,
-		AccountID: account.ID,
-	})
-	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
-	}
-
-	logger.ContextWithLogAttrs(r.Context(),
-		slog.String("batch_id", returnedRow.ID.String()),
-	)
-
-	responses.RespondWithJSON(w, http.StatusOK, CreateSignalsBatchResponse{
-		AccountID:      account.ID,
-		SignalsBatchID: returnedRow.ID,
-	})
-}
-
-// GetSignalBatchStatusHandler godocs
+// GetSignalBatchStatusHandler godoc
 //
 //	@Summary		Get Batch Status
-//	@Description	Returns the status of a batch, including the number of signals loaded and the number of failures for each signal type
+//
+//	@Description	Returns the status of a batch identified by batch_ref, scoped to the authenticated account.
 //	@Description
-//	@Description	The endpoint returns the full batch status for the batch
+//	@Description	The response shows stored and failed signal counts broken down by ISN and signal type.
+//	@Description	Failures listed are unresolved: the signal failed in this batch and has not been successfully resubmitted since.
 //	@Description
-//	@Description	Where a signal has failed to load as part of the batch and not subsequently been loaded, the failure is considered unresolved and listed as a failure in the batch status
+//	@Description	Members can view their own batches. Site admins can supply ?account_id= to view another account's batch.
 //	@Description
-//	@Description	Note:  Unresolved failures are signals that failed to load in this batch and have not been successfully loaded since the failure occurred.
-//	@Description	If a signal is fixed but subsequently fails again in a later batch, it will be recorded as a new failure, and this new failure will appear in that batch's status.
-//	@Description
-//	@Description	Member accounts can see the status of batches that they created.
-//	@Description	ISN Admins can see the status of any batch created for ISNs they administer.
-//	@Description	The site owner can see the status of any batch on the site.
-//	@Description
+//
 //	@Tags		Signal Exchange
-//	@Param		isn_slug	path		string	true	"ISN slug"	example(sample-isn)
-//	@Param		batch_id	path		string	true	"Batch ID"	example(67890684-3b14-42cf-b785-df28ce570400)
+//	@Param		batch_ref	path		string	true	"Batch reference"	example(daily-sync-2026-04-02)
+//	@Param		account_id	query		string	false	"Account ID (site admins only)"
+//
 //	@Success	200			{object}	BatchStatusResponse
 //	@Failure	400			{object}	responses.ErrorResponse
+//	@Failure	403			{object}	responses.ErrorResponse
 //	@Failure	404			{object}	responses.ErrorResponse
 //	@Failure	500			{object}	responses.ErrorResponse
-//	@Router		/isn/{isn_slug}/batches/{batch_id}/status [get]
 //
-// todo handle the fact that the list of failed local_refs might be very large if errors go undetected for a long time
+//	@Security	BearerAccessToken
+//	@Router		/api/batches/{batch_ref}/status [get]
 func (s *SignalsBatchHandler) GetSignalBatchStatusHandler(w http.ResponseWriter, r *http.Request) {
 
-	// Extract path parameters
-	batchIDString := r.PathValue("batch_id")
+	batchRef := r.PathValue("batch_ref")
 
-	// Parse batch ID
-	batchID, err := uuid.Parse(batchIDString)
-	if err != nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid batch_id format")
+	claims, ok := auth.ContextClaims(r.Context())
+	if !ok {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
 		return
 	}
 
-	signalBatch, err := s.queries.GetSignalBatchByID(r.Context(), batchID)
+	// Site admins may supply ?account_id= to view another account's batch; everyone else sees their own.
+	resolvedAccountID := claims.AccountID
+	if accountIDString := r.URL.Query().Get("account_id"); accountIDString != "" {
+		if claims.Role != "siteadmin" {
+			responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "only site admins can view other accounts' batches")
+			return
+		}
+		parsed, err := uuid.Parse(accountIDString)
+		if err != nil {
+			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "invalid account_id format")
+			return
+		}
+		resolvedAccountID = parsed
+	}
+
+	signalBatch, err := s.queries.GetSignalBatchByRefAndAccountID(r.Context(), database.GetSignalBatchByRefAndAccountIDParams{
+		AccountID: resolvedAccountID,
+		BatchRef:  batchRef,
+	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "batch not found")
@@ -223,51 +119,18 @@ func (s *SignalsBatchHandler) GetSignalBatchStatusHandler(w http.ResponseWriter,
 		}
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
-			slog.String("batch_id", batchIDString),
+			slog.String("batch_ref", batchRef),
 		)
 
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
-	// Access control rules:
-	// - Member accounts can only see batches they have created
-	// - ISN Admins can see batches for ISNs they administer
-	// - Site admins can see all batches
-	claims, ok := auth.ContextClaims(r.Context())
-	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
-		return
-	}
-
-	// Get the ISN to check if user is an ISN admin
-	isn, err := s.queries.GetIsnBySlug(r.Context(), r.PathValue("isn_slug"))
+	response, err := s.getBatchStatusDetails(r.Context(), signalBatch.ID)
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
-			slog.String("isn_slug", r.PathValue("isn_slug")),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
-	}
-
-	// Check access permissions
-	isBatchCreator := signalBatch.AccountID == claims.AccountID
-	isIsnAdmin := isn.UserAccountID == claims.AccountID
-	isSiteAdmin := claims.Role == "siteadmin"
-
-	if !isBatchCreator && !isIsnAdmin && !isSiteAdmin {
-		responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeForbidden, "you do not have permission to view this batch")
-		return
-	}
-
-	// Get batch status details using shared helper function
-	response, err := s.getBatchStatusDetails(r.Context(), batchID)
-	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-			slog.String("batch_id", batchID.String()),
+			slog.String("batch_ref", batchRef),
 		)
 
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
@@ -277,7 +140,7 @@ func (s *SignalsBatchHandler) GetSignalBatchStatusHandler(w http.ResponseWriter,
 	responses.RespondWithJSON(w, http.StatusOK, response)
 }
 
-// getBatchStatusDetails gets the full status details for a batch (successful signals + failures)
+// getBatchStatusDetails returns the full status for a batch across all ISNs and signal types.
 func (s *SignalsBatchHandler) getBatchStatusDetails(ctx context.Context, batchID uuid.UUID) (*BatchStatusResponse, error) {
 
 	signalBatch, err := s.queries.GetSignalBatchByID(ctx, batchID)
@@ -285,264 +148,135 @@ func (s *SignalsBatchHandler) getBatchStatusDetails(ctx context.Context, batchID
 		return nil, fmt.Errorf("failed to get batch: %w", err)
 	}
 
-	// Get successful signals by type
-	loadedSignalSummaryRows, err := s.queries.GetLoadedSignalsSummaryByBatchID(ctx, batchID)
+	loadedRows, err := s.queries.GetLoadedSignalsSummaryByBatchID(ctx, batchID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get successful signals: %w", err)
 	}
 
-	// Get batch failures summary (unresolved failures only)
-	failedSignalRows, err := s.queries.GetFailedSignalsByBatchID(ctx, batchID)
+	failedRows, err := s.queries.GetFailedSignalsByBatchID(ctx, batchID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get batch failures: %w", err)
 	}
 
-	// Build the response structure (reusing existing logic)
+	// key on isn_slug + signal_type + version so a batch spanning multiple ISNs shows correctly
 	batchSummary := make(map[string]BatchStatus)
 
-	// Process successful loads
-	for _, successes := range loadedSignalSummaryRows {
-		key := successes.SignalTypeSlug + "/" + successes.SignalTypeSemVer
+	for _, row := range loadedRows {
+		key := row.IsnSlug + "/" + row.SignalTypeSlug + "/" + row.SignalTypeSemVer
 		batchSummary[key] = BatchStatus{
-			SignalTypeSlug:     successes.SignalTypeSlug,
-			SignalTypeVersion:  "v" + successes.SignalTypeSemVer,
-			StoredCount:        successes.SubmittedCount,
+			IsnSlug:            row.IsnSlug,
+			SignalTypeSlug:     row.SignalTypeSlug,
+			SignalTypeVersion:  "v" + row.SignalTypeSemVer,
+			StoredCount:        row.SubmittedCount,
 			UnresolvedFailures: []FailureRow{},
 		}
 	}
 
-	// loop through failed signals and add to the batch summary (indexed by signal type)
-	for _, failures := range failedSignalRows {
-		key := failures.SignalTypeSlug + "/" + failures.SignalTypeSemVer
-
-		status := batchSummary[key] // New entry
+	for _, row := range failedRows {
+		key := row.IsnSlug + "/" + row.SignalTypeSlug + "/" + row.SignalTypeSemVer
+		status := batchSummary[key]
 		if status.SignalTypeSlug == "" {
-			status.SignalTypeSlug = failures.SignalTypeSlug
-			status.SignalTypeVersion = "v" + failures.SignalTypeSemVer
-			status.StoredCount = 0
+			status.IsnSlug = row.IsnSlug
+			status.SignalTypeSlug = row.SignalTypeSlug
+			status.SignalTypeVersion = "v" + row.SignalTypeSemVer
 		}
-
 		status.UnresolvedFailures = append(status.UnresolvedFailures, FailureRow{
-			LocalRef:     failures.LocalRef,
-			ErrorCode:    failures.ErrorCode,
-			ErrorMessage: failures.ErrorMessage,
+			LocalRef:     row.LocalRef,
+			ErrorCode:    row.ErrorCode,
+			ErrorMessage: row.ErrorMessage,
 		})
 		status.FailedCount++
 		batchSummary[key] = status
 	}
 
-	// Convert to slice
 	batchStatus := make([]BatchStatus, 0, len(batchSummary))
 	for _, status := range batchSummary {
 		batchStatus = append(batchStatus, status)
 	}
 
-	// Check if batch contains failures
-	containsFalures := len(failedSignalRows) > 0
-
-	// Set batch-specific fields
-	var closedAt *time.Time
-	if !signalBatch.IsLatest {
-		closedAt = &signalBatch.UpdatedAt
-	}
-
 	return &BatchStatusResponse{
 		BatchID:          batchID,
+		BatchRef:         signalBatch.BatchRef,
 		AccountID:        signalBatch.AccountID,
-		IsnSlug:          signalBatch.IsnSlug,
 		CreatedAt:        signalBatch.CreatedAt,
-		ClosedAt:         closedAt,
-		IsLatest:         signalBatch.IsLatest,
-		ContainsFailures: containsFalures,
+		ContainsFailures: len(failedRows) > 0,
 		BatchStatus:      batchStatus,
 	}, nil
 }
 
-// SearchBatchesHandler godocs
+// SearchBatchesHandler godoc
 //
 //	@Summary		Search For Batches
 //	@Tags			Signal Exchange
 //
-//	@Description	Search for batches with optional filtering parameters
-//	@Description
-//	@Description	The search endpoint returns the full batch status for each batch.
-//	@Description
-//	@Description	Where a signal has failed to load as part of the batch and not subsequently been loaded, the failure is considered unresolved and listed as a failure in the batch status
-//	@Description
-//	@Description	Member accounts can only see batches they have created. ISN Admins can see batches for ISNs they administer. The site owner can see all batches.
-//	@Description
-//	@Description	At least one search criteria must be provided:
-//	@Description	- latest=true (get the latest batch)
-//	@Description	- previous=true (get the previous batch)
-//	@Description	- created date range
-//	@Description	- closed date range
-//	@Description
+//	@Description	Returns the full status for all matching batches. Members see their own batches; site admins see all.
+//	@Description	At least one date filter must be provided.
 //
-//	@Param		latest			query		boolean	false	"Get the latest batch"						example(true)
-//	@Param		previous		query		boolean	false	"Get the previous batch"					example(true)
-//	@Param		created_after	query		string	false	"Start date for batch creation filtering"	example(2006-01-02T15:04:05Z)
-//	@Param		created_before	query		string	false	"End date for batch creation filtering"		example(2006-01-02T16:00:00Z)
-//	@Param		closed_after	query		string	false	"Start date for batch closure filtering"	example(2006-01-02T15:04:05Z)
-//	@Param		closed_before	query		string	false	"End date for batch closure filtering"		example(2006-01-02T16:00:00Z)
+//	@Param			created_after	query		string	false	"Earliest batch creation time"	example(2006-01-02T15:04:05Z)
+//	@Param			created_before	query		string	false	"Latest batch creation time"	example(2006-01-02T16:00:00Z)
 //
-//	@Success	200				{array}		BatchStatusResponse
-//	@Failure	400				{object}	responses.ErrorResponse
-//
-//	@Security	BearerAccessToken
-//
-//	@Router		/isn/{isn_slug}/batches/search [get]
+//	@Success		200				{array}		BatchStatusResponse
+//	@Failure		400				{object}	responses.ErrorResponse
+//	@Failure		500				{object}	responses.ErrorResponse
+//	@Security		BearerAccessToken
+//	@Router			/api/batches/search [get]
 func (s *SignalsBatchHandler) SearchBatchesHandler(w http.ResponseWriter, r *http.Request) {
 
-	// Extract path parameters
-	isnSlug := r.PathValue("isn_slug")
-
-	// check isn exists
-	isn, err := s.queries.GetIsnBySlug(r.Context(), isnSlug)
-	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-			slog.String("isn_slug", isnSlug),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
-	}
-
-	// Initialize search parameters
-	searchParams := BatchSearchParams{
-		IsnSlug: isnSlug,
-	}
-
-	// Parse query parameters following signals pattern
-	if latestString := r.URL.Query().Get("latest"); latestString != "" {
-		latest := latestString == "true"
-		searchParams.Latest = &latest
-	}
-
-	if previousString := r.URL.Query().Get("previous"); previousString != "" {
-		previous := previousString == "true"
-		searchParams.Previous = &previous
-	}
-
-	if createdAfterString := r.URL.Query().Get("created_after"); createdAfterString != "" {
-		createdAfter, err := utils.ParseDateTime(createdAfterString)
-		if err != nil {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
-			return
-		}
-		searchParams.CreatedAfter = &createdAfter
-	}
-
-	if createdBeforeString := r.URL.Query().Get("created_before"); createdBeforeString != "" {
-		createdBefore, err := utils.ParseDateTime(createdBeforeString)
-		if err != nil {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
-			return
-		}
-		searchParams.CreatedBefore = &createdBefore
-	}
-
-	if closedAfterString := r.URL.Query().Get("closed_after"); closedAfterString != "" {
-		closedAfter, err := utils.ParseDateTime(closedAfterString)
-		if err != nil {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
-			return
-		}
-		searchParams.ClosedAfter = &closedAfter
-	}
-
-	if closedBeforeString := r.URL.Query().Get("closed_before"); closedBeforeString != "" {
-		closedBefore, err := utils.ParseDateTime(closedBeforeString)
-		if err != nil {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
-			return
-		}
-		searchParams.ClosedBefore = &closedBefore
-	}
-
-	// Get authentication claims for permission checking
 	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
 		return
 	}
 
-	// Check that latest/previous values are actually "true" if provided
-	if latestString := r.URL.Query().Get("latest"); latestString != "" && latestString != "true" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "latest parameter must be 'true' if provided")
+	var searchParams BatchSearchParams
+
+	if v := r.URL.Query().Get("created_after"); v != "" {
+		t, err := utils.ParseDateTime(v)
+		if err != nil {
+			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
+			return
+		}
+		searchParams.CreatedAfter = &t
+	}
+
+	if v := r.URL.Query().Get("created_before"); v != "" {
+		t, err := utils.ParseDateTime(v)
+		if err != nil {
+			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
+			return
+		}
+		searchParams.CreatedBefore = &t
+	}
+
+	if (searchParams.CreatedAfter != nil) != (searchParams.CreatedBefore != nil) {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "supply both created_after and created_before, or neither")
 		return
 	}
 
-	if previousString := r.URL.Query().Get("previous"); previousString != "" && previousString != "true" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "previous parameter must be 'true' if provided")
+	if searchParams.CreatedAfter == nil {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "at least one date range filter must be provided")
 		return
 	}
 
-	// Validation: latest and previous are mutually exclusive
-	if searchParams.Latest != nil && *searchParams.Latest && searchParams.Previous != nil && *searchParams.Previous {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "latest and previous parameters are mutually exclusive")
-		return
-	}
-
-	// Validation: date ranges must be complete (both start and end)
-	hasPartialCreatedRange := (searchParams.CreatedAfter != nil) != (searchParams.CreatedBefore != nil)
-	hasPartialClosedRange := (searchParams.ClosedAfter != nil) != (searchParams.ClosedBefore != nil)
-
-	if hasPartialCreatedRange {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "you must supply both created_after and created_before parameters")
-		return
-	}
-
-	if hasPartialClosedRange {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "you must supply both closed_after and closed_before parameters")
-		return
-	}
-
-	// Validation: At least one search criteria must be provided
-	hasLatestOrPrevious := (searchParams.Latest != nil && *searchParams.Latest) || (searchParams.Previous != nil && *searchParams.Previous)
-	hasCreatedRange := searchParams.CreatedAfter != nil && searchParams.CreatedBefore != nil
-	hasClosedRange := searchParams.ClosedAfter != nil && searchParams.ClosedBefore != nil
-
-	if !hasLatestOrPrevious && !hasCreatedRange && !hasClosedRange {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "at least one search criteria must be provided: latest=true, previous=true, created date range, or closed date range")
-		return
-	}
-
-	// Access control rules:
-	// - site admins can see all batches
-	// - ISN Admins can see any batches created in ISNs that they own
-	// - Member accounts can only see batches they created
-	isOwnerOrAdmin := claims.Role == "siteadmin" || isn.UserAccountID == claims.AccountID
+	isAdmin := claims.Role == "siteadmin"
 	var requestingAccountID *uuid.UUID
-	if !isOwnerOrAdmin {
+	if !isAdmin {
 		requestingAccountID = &claims.AccountID
 	}
 
-	// when isOwnerOrAdmin is true, all mathing batches are returned for the isn, otherwise only batches for the requesting account are returned
 	batches, err := s.queries.GetBatchesWithOptionalFilters(r.Context(), database.GetBatchesWithOptionalFiltersParams{
-		IsnSlug:             searchParams.IsnSlug,
 		RequestingAccountID: requestingAccountID,
-		IsOwnerOrAdmin:      &isOwnerOrAdmin,
+		IsAdmin:             &isAdmin,
 		CreatedAfter:        searchParams.CreatedAfter,
 		CreatedBefore:       searchParams.CreatedBefore,
-		ClosedAfter:         searchParams.ClosedAfter,
-		ClosedBefore:        searchParams.ClosedBefore,
-		Latest:              searchParams.Latest,
-		Previous:            searchParams.Previous,
 	})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-			slog.String("isn_slug", isnSlug),
-		)
-
+		logger.ContextWithLogAttrs(r.Context(), slog.String("error", err.Error()))
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
 
-	// Get full status details for each batch
 	batchStatusList := make([]BatchStatusResponse, 0, len(batches))
-
 	for _, batch := range batches {
 		statusResponse, err := s.getBatchStatusDetails(r.Context(), batch.BatchID)
 		if err != nil {
@@ -550,11 +284,9 @@ func (s *SignalsBatchHandler) SearchBatchesHandler(w http.ResponseWriter, r *htt
 				slog.String("error", err.Error()),
 				slog.String("batch_id", batch.BatchID.String()),
 			)
-
 			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 			return
 		}
-
 		batchStatusList = append(batchStatusList, *statusResponse)
 	}
 

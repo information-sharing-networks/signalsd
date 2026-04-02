@@ -168,21 +168,18 @@ CREATE TABLE isn_signal_types (
 -- Signal processing
 -- -------------------------------------------------------------------------
 
--- signal_batches: groups signals submitted together in a single operation
+-- signal_batches: groups signals submitted together when loaded
+-- batch_ref is chosen by the sender 
 CREATE TABLE signal_batches (
-    id UUID PRIMARY KEY,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    isn_id UUID NOT NULL,
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    batch_ref  TEXT NOT NULL,
     account_id UUID NOT NULL,
-    is_latest BOOLEAN DEFAULT TRUE NOT NULL,
-    CONSTRAINT unique_signal_batches_id_account_id UNIQUE (id, account_id),
-    CONSTRAINT fk_signal_batches_isn FOREIGN KEY (isn_id) REFERENCES isn(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    CONSTRAINT unique_batch_ref_per_account UNIQUE (account_id, batch_ref),
+    CONSTRAINT batch_ref_format CHECK (batch_ref ~ '^[a-zA-Z0-9_-]+$'),
+    CONSTRAINT batch_ref_length CHECK (length(batch_ref) BETWEEN 1 AND 128),
     CONSTRAINT fk_signal_batches_accounts FOREIGN KEY (account_id) REFERENCES accounts(id) ON DELETE CASCADE
 );
-
--- one active batch per account per ISN
-CREATE UNIQUE INDEX one_latest_signal_batch_per_account_per_isn_idx ON signal_batches (account_id, isn_id) WHERE (is_latest = true);
 
 -- signal_processing_failures: records signals that failed validation or processing
 CREATE TABLE signal_processing_failures (
@@ -303,7 +300,7 @@ ALTER TABLE signals ADD CONSTRAINT fk_signal_isn FOREIGN KEY (isn_id) REFERENCES
 ALTER TABLE signals ADD CONSTRAINT fk_signal_signal_type FOREIGN KEY (signal_type_id) REFERENCES signal_types(id) ON DELETE CASCADE;
 
 ALTER TABLE signal_versions ADD CONSTRAINT fk_signal_version_signal_id FOREIGN KEY (signal_id, account_id) REFERENCES signals(id, account_id) ON DELETE CASCADE;
-ALTER TABLE signal_versions ADD CONSTRAINT fk_signal_version_signal_batch FOREIGN KEY (signal_batch_id, account_id) REFERENCES signal_batches(id, account_id) ON DELETE CASCADE;
+ALTER TABLE signal_versions ADD CONSTRAINT fk_signal_version_signal_batch FOREIGN KEY (signal_batch_id) REFERENCES signal_batches(id) ON DELETE CASCADE;
 
 -- -------------------------------------------------------------------------
 -- Views

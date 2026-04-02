@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/google/uuid"
@@ -48,7 +49,11 @@ type CreateSignal struct {
 }
 
 type CreateSignalsRequest struct {
-	Signals []CreateSignal `json:"signals"`
+	// BatchRef groups signals under a sender-chosen label
+	// Reuse the same batch_ref across requests to add signals to an existing batch.
+	// Allowed characters: alphanumeric, hyphens, underscores. Max length 128.
+	BatchRef string         `json:"batch_ref" example:"daily-sync-2026-04-02"`
+	Signals  []CreateSignal `json:"signals"`
 }
 
 // structs - partial loads are possible - c.f StoredSignal and FailedSignal
@@ -56,7 +61,7 @@ type CreateSignalsResponse struct {
 	IsnSlug        string               `json:"isn_slug" example:"sample-isn"`
 	SignalTypePath string               `json:"signal_type_path" example:"signal-type-1/v0.0.1"`
 	AccountID      uuid.UUID            `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
-	SignalsBatchID uuid.UUID            `json:"signals_batch_id" example:"b51faf05-aaed-4250-b334-2258ccdf1ff2"`
+	BatchRef       string               `json:"batch_ref" example:"daily-sync-2026-04-02"`
 	Results        CreateSignalsResults `json:"results"`
 	Summary        CreateSignalsSummary `json:"summary"`
 }
@@ -442,71 +447,40 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	// Create a signal batch if needed
-	var signalBatchID uuid.UUID
-
-	if claims.IsnPerms[isnSlug].SignalBatchID != nil {
-		signalBatchID = *claims.IsnPerms[isnSlug].SignalBatchID
-
-	} else {
-
-		// get isn ID
-		isn, err := s.queries.GetIsnBySlug(r.Context(), isnSlug)
-		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
-			)
-
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-			return
-		}
-
-		// check batch database table for an existing batch for this account and ISN
-		exists, err := s.queries.ExistsSignalBatchForAccountAndIsnId(r.Context(), database.ExistsSignalBatchForAccountAndIsnIdParams{
-			AccountID: accountID,
-			IsnID:     isn.ID,
-		})
-		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
-			)
-
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-			return
-		}
-
-		// if exists - internal error - the batch id should have been in the claims
-		if exists {
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", "batch exists but no batch id in claims"),
-			)
-
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "internal error - batch exists but no batch id in claims")
-			return
-		}
-		// create a new batch
-		batch, err := s.queries.CreateSignalBatch(r.Context(), database.CreateSignalBatchParams{
-			IsnID:     isn.ID,
-			AccountID: accountID,
-		})
-		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
-			)
-
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-			return
-		}
-
-		signalBatchID = batch.ID
+	batchRef := createSignalsRequest.BatchRef
+	if batchRef == "" {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "batch_ref is required")
+		return
 	}
+	if !isValidBatchRef(batchRef) {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "batch_ref may only contain alphanumeric characters, hyphens, and underscores, and must be between 1 and 128 characters")
+		return
+	}
+
+	batch, err := s.queries.UpsertSignalBatch(r.Context(), database.UpsertSignalBatchParams{
+		BatchRef:  batchRef,
+		AccountID: accountID,
+	})
+	if err != nil {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+		return
+	}
+
+	logger.ContextWithLogAttrs(r.Context(),
+		slog.String("batch_ref", batch.BatchRef),
+		slog.String("batch_id", batch.ID.String()),
+	)
 
 	// prepare response
 	createSignalsResponse := CreateSignalsResponse{
 		IsnSlug:        isnSlug,
 		SignalTypePath: signalTypePath,
 		AccountID:      accountID,
-		SignalsBatchID: signalBatchID,
+		BatchRef:       batch.BatchRef,
 		Results: CreateSignalsResults{
 			StoredSignals: make([]StoredSignal, 0),
 			FailedSignals: make([]FailedSignal, 0),
@@ -637,7 +611,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 		// Signal creation succeeded, now create the signal_version entry
 		versionResult, versionErr := s.queries.WithTx(tx).CreateSignalVersion(r.Context(), database.CreateSignalVersionParams{
 			AccountID:      claims.AccountID,
-			SignalBatchID:  signalBatchID,
+			SignalBatchID:  batch.ID,
 			Content:        signal.Content,
 			LocalRef:       signal.LocalRef,
 			SignalTypeSlug: signalTypeSlug,
@@ -709,7 +683,7 @@ func (s *SignalsHandler) CreateSignalsHandler(w http.ResponseWriter, r *http.Req
 	if len(createSignalsResponse.Results.FailedSignals) > 0 {
 		for _, failed := range createSignalsResponse.Results.FailedSignals {
 			_, err := s.queries.CreateSignalProcessingFailureDetail(r.Context(), database.CreateSignalProcessingFailureDetailParams{
-				SignalBatchID:    signalBatchID,
+				SignalBatchID:    batch.ID,
 				SignalTypeSlug:   signalTypeSlug,
 				SignalTypeSemVer: semVer,
 				LocalRef:         failed.LocalRef,
@@ -1187,4 +1161,12 @@ func (s *SignalsHandler) WithdrawSignalHandler(w http.ResponseWriter, r *http.Re
 	)
 
 	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
+}
+
+var batchRefRe = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,128}$`)
+
+// isValidBatchRef checks that batch_ref satisfies the DB constraint
+// alphanumeric, hyphens, and underscores only, length 1–128.
+func isValidBatchRef(s string) bool {
+	return batchRefRe.MatchString(s)
 }

@@ -114,11 +114,6 @@ definitions:
         description: InUse is true if the isn is active
         example: true
         type: boolean
-      signal_batch_id:
-        description: SignalBatchID is the ID of the current signal batch for the ISN
-          (used for tracking signals when writing to the isn)
-        example: 967affe9-5628-4fdd-921f-020051344a12
-        type: string
       signal_types:
         additionalProperties:
           $ref: '#/definitions/auth.SignalType'
@@ -177,6 +172,8 @@ definitions:
     properties:
       failed_count:
         type: integer
+      isn_slug:
+        type: string
       signal_type_slug:
         type: string
       signal_type_version:
@@ -194,19 +191,15 @@ definitions:
         type: string
       batch_id:
         type: string
+      batch_ref:
+        type: string
       batch_status:
         items:
           $ref: '#/definitions/handlers.BatchStatus'
         type: array
-      closed_at:
-        type: string
       contains_failures:
         type: boolean
       created_at:
-        type: string
-      is_latest:
-        type: boolean
-      isn_slug:
         type: string
     type: object
   handlers.CreateIsnRequest:
@@ -307,17 +300,15 @@ definitions:
         example: Sample Signal @example.org
         type: string
     type: object
-  handlers.CreateSignalsBatchResponse:
-    properties:
-      account_id:
-        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
-        type: string
-      signals_batch_id:
-        example: b51faf05-aaed-4250-b334-2258ccdf1ff2
-        type: string
-    type: object
   handlers.CreateSignalsRequest:
     properties:
+      batch_ref:
+        description: |-
+          BatchRef groups signals under a sender-chosen label
+          Reuse the same batch_ref across requests to add signals to an existing batch.
+          Allowed characters: alphanumeric, hyphens, underscores. Max length 128.
+        example: daily-sync-2026-04-02
+        type: string
       signals:
         items:
           $ref: '#/definitions/handlers.CreateSignal'
@@ -328,6 +319,9 @@ definitions:
       account_id:
         example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
         type: string
+      batch_ref:
+        example: daily-sync-2026-04-02
+        type: string
       isn_slug:
         example: sample-isn
         type: string
@@ -335,9 +329,6 @@ definitions:
         $ref: '#/definitions/handlers.CreateSignalsResults'
       signal_type_path:
         example: signal-type-1/v0.0.1
-        type: string
-      signals_batch_id:
-        example: b51faf05-aaed-4250-b334-2258ccdf1ff2
         type: string
       summary:
         $ref: '#/definitions/handlers.CreateSignalsSummary'
@@ -1979,6 +1970,88 @@ paths:
       summary: Complete Service Account Setup
       tags:
       - Account Management
+  /api/batches/{batch_ref}/status:
+    get:
+      description: |
+        Returns the status of a batch identified by batch_ref, scoped to the authenticated account.
+
+        The response shows stored and failed signal counts broken down by ISN and signal type.
+        Failures listed are unresolved: the signal failed in this batch and has not been successfully resubmitted since.
+
+        Members can view their own batches. Site admins can supply ?account_id= to view another account's batch.
+      parameters:
+      - description: Batch reference
+        example: daily-sync-2026-04-02
+        in: path
+        name: batch_ref
+        required: true
+        type: string
+      - description: Account ID (site admins only)
+        in: query
+        name: account_id
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.BatchStatusResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Get Batch Status
+      tags:
+      - Signal Exchange
+  /api/batches/search:
+    get:
+      description: |-
+        Returns the full status for all matching batches. Members see their own batches; site admins see all.
+        At least one date filter must be provided.
+      parameters:
+      - description: Earliest batch creation time
+        example: "2006-01-02T15:04:05Z"
+        in: query
+        name: created_after
+        type: string
+      - description: Latest batch creation time
+        example: "2006-01-02T16:00:00Z"
+        in: query
+        name: created_before
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.BatchStatusResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Search For Batches
+      tags:
+      - Signal Exchange
   /api/isn:
     get:
       description: get a list of the configured ISNs
@@ -2196,31 +2269,6 @@ paths:
       summary: Grant/Revoke ISN Access
       tags:
       - Account Management
-  /api/isn/{isn_slug}/batches:
-    post:
-      description: |
-        This endpoint is used create a new batch for an account on the specified ISN.
-        Batches are used to track signals sent by an account to the specified ISN (accounts can only have one open batch at a time on an ISN)
-
-        Opening a batch closes the previous batch (the client app can decide how long to keep a batch open)
-
-        Signals can only be sent to open batches.
-
-        Authentication is based on the supplied access token:
-        site admins, the isn owner and members with an isn_perm=write can create a batch for the ISN.
-
-        Note: Batches are automatically created when accounts first write to an ISN,
-        so you only need to explicitly create a batch using this endpoint if you want to track signals in separate batches.
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/handlers.CreateSignalsBatchResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Open a New Signal Batch
-      tags:
-      - Signal Exchange
   /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}:
     put:
       description: |-
@@ -2647,117 +2695,6 @@ paths:
       summary: Readiness Check
       tags:
       - Site Admin
-  /isn/{isn_slug}/batches/{batch_id}/status:
-    get:
-      description: |
-        Returns the status of a batch, including the number of signals loaded and the number of failures for each signal type
-
-        The endpoint returns the full batch status for the batch
-
-        Where a signal has failed to load as part of the batch and not subsequently been loaded, the failure is considered unresolved and listed as a failure in the batch status
-
-        Note:  Unresolved failures are signals that failed to load in this batch and have not been successfully loaded since the failure occurred.
-        If a signal is fixed but subsequently fails again in a later batch, it will be recorded as a new failure, and this new failure will appear in that batch's status.
-
-        Member accounts can see the status of batches that they created.
-        ISN Admins can see the status of any batch created for ISNs they administer.
-        The site owner can see the status of any batch on the site.
-      parameters:
-      - description: ISN slug
-        example: sample-isn
-        in: path
-        name: isn_slug
-        required: true
-        type: string
-      - description: Batch ID
-        example: 67890684-3b14-42cf-b785-df28ce570400
-        in: path
-        name: batch_id
-        required: true
-        type: string
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/handlers.BatchStatusResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      summary: Get Batch Status
-      tags:
-      - Signal Exchange
-  /isn/{isn_slug}/batches/search:
-    get:
-      description: |
-        Search for batches with optional filtering parameters
-
-        The search endpoint returns the full batch status for each batch.
-
-        Where a signal has failed to load as part of the batch and not subsequently been loaded, the failure is considered unresolved and listed as a failure in the batch status
-
-        Member accounts can only see batches they have created. ISN Admins can see batches for ISNs they administer. The site owner can see all batches.
-
-        At least one search criteria must be provided:
-        - latest=true (get the latest batch)
-        - previous=true (get the previous batch)
-        - created date range
-        - closed date range
-      parameters:
-      - description: Get the latest batch
-        example: true
-        in: query
-        name: latest
-        type: boolean
-      - description: Get the previous batch
-        example: true
-        in: query
-        name: previous
-        type: boolean
-      - description: Start date for batch creation filtering
-        example: "2006-01-02T15:04:05Z"
-        in: query
-        name: created_after
-        type: string
-      - description: End date for batch creation filtering
-        example: "2006-01-02T16:00:00Z"
-        in: query
-        name: created_before
-        type: string
-      - description: Start date for batch closure filtering
-        example: "2006-01-02T15:04:05Z"
-        in: query
-        name: closed_after
-        type: string
-      - description: End date for batch closure filtering
-        example: "2006-01-02T16:00:00Z"
-        in: query
-        name: closed_before
-        type: string
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/handlers.BatchStatusResponse'
-            type: array
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-      security:
-      - BearerAccessToken: []
-      summary: Search For Batches
-      tags:
-      - Signal Exchange
   /oauth/revoke:
     post:
       description: |
@@ -2855,31 +2792,6 @@ paths:
       summary: Refresh Access Token
       tags:
       - auth
-  /register:
-    post:
-      description: Creates a new user account.
-      parameters:
-      - description: User email
-        in: formData
-        name: email
-        required: true
-        type: string
-      - description: Password
-        in: formData
-        name: password
-        required: true
-        type: string
-      - description: Confirm password
-        in: formData
-        name: confirm-password
-        required: true
-        type: string
-      responses:
-        "200":
-          description: HTML partial
-      summary: Register new user
-      tags:
-      - HTMX Action
   /version:
     get:
       description: Returns the current API version details

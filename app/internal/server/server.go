@@ -189,9 +189,6 @@ func (s *Server) registerAdminRoutes() {
 	// isn permissions
 	isnAccount := handlers.NewIsnAccountHandler(s.queries)
 
-	// signal batches
-	signalBatches := handlers.NewSignalsBatchHandler(s.queries)
-
 	// protected routes
 	s.router.Group(func(r chi.Router) {
 		r.Use(middleware.CORS(s.corsConfigs.Protected))
@@ -280,16 +277,6 @@ func (s *Server) registerAdminRoutes() {
 
 					})
 
-					// create new signal batches
-					r.Group(func(r chi.Router) {
-						// accounts must have write permission to the isn to create or read batches
-						r.Use(s.authService.RequireAccessPermission("write"))
-
-						r.Post("/{isn_slug}/batches", signalBatches.CreateSignalsBatchHandler)
-						r.Get("/{isn_slug}/batches/{batch_id}/status", signalBatches.GetSignalBatchStatusHandler)
-						r.Get("/{isn_slug}/batches/search", signalBatches.SearchBatchesHandler)
-					})
-
 					// view ISN and signal type details
 					r.Get("/", isn.GetIsnsHandler)
 					r.Get("/{isn_slug}", isn.GetIsnHandler)
@@ -356,6 +343,7 @@ func (s *Server) registerAdminRoutes() {
 // registerSignalWriteRoutes registers signal write routes
 func (s *Server) registerSignalWriteRoutes() {
 	signals := handlers.NewSignalsHandler(s.queries, s.pool, s.schemaCache, s.publicIsnCache)
+	signalBatches := handlers.NewSignalsBatchHandler(s.queries)
 
 	s.router.Group(func(r chi.Router) {
 		r.Use(middleware.CORS(s.corsConfigs.Protected))
@@ -369,6 +357,9 @@ func (s *Server) registerSignalWriteRoutes() {
 		// signal withdrawal
 		r.Put("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/withdraw", signals.WithdrawSignalHandler)
 
+		// batch status endpoints
+		r.Get("/api/batches/search", signalBatches.SearchBatchesHandler)
+		r.Get("/api/batches/{batch_ref}/status", signalBatches.GetSignalBatchStatusHandler)
 	})
 }
 
