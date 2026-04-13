@@ -1,6 +1,6 @@
 module github.com/information-sharing-networks/signalsd/app
 
-go 1.26.1
+go 1.26.2
 
 require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -21,6 +21,8 @@ require (
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/spf13/cobra v1.10.2
 	github.com/swaggo/swag v1.16.6
+	github.com/tidwall/gjson v1.18.0
+	github.com/tidwall/match v1.2.0
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20250803194717-c247dead11de
 	golang.org/x/time v0.15.0
 )
@@ -122,8 +124,6 @@ require (
 	github.com/stoewer/go-strcase v1.2.0 // indirect
 	github.com/tdewolff/parse/v2 v2.8.3 // indirect
 	github.com/tetratelabs/wazero v1.9.0 // indirect
-	github.com/tidwall/gjson v1.18.0 // indirect
-	github.com/tidwall/match v1.2.0 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/tursodatabase/libsql-client-go v0.0.0-20251219100830-236aa1ff8acc // indirect

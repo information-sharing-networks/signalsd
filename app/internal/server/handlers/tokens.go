@@ -9,8 +9,8 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
+	"github.com/information-sharing-networks/signalsd/app/internal/responses"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
-	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -45,7 +45,7 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, p
 	}
 }
 
-// RefreshAccessTokenHandler godoc
+// RefreshAccessToken godoc
 //
 //	@Summary	Refresh Access Token
 //	@Description
@@ -81,12 +81,12 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, p
 //
 //	@Router		/oauth/token [post]
 //
-// RefreshAccessTokenHandler handles requests for both service accounts and web users.
+// RefreshAccessToken handles requests for both service accounts and web users.
 // For web users, a new refresh tokens is sent as http-only cookies whenever the client uses this endpoint.
 //
 // Must be called with the AuthenticateByGrantTypAuthenticateByGrantTypee middleware.
 // This calls the appropriate authentication middleware for the grant_type (client_credentials or refresh_token)) and adds the authenticated accountID to the context
-func (a *TokenHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.Request) {
+func (a *TokenHandler) RefreshAccessToken(w http.ResponseWriter, r *http.Request) {
 
 	accountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
@@ -139,7 +139,7 @@ func (a *TokenHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.
 	responses.RespondWithJSON(w, http.StatusOK, accessTokenResponse)
 }
 
-// RevokeTokenHandler godoc
+// RevokeToken godoc
 //
 //	@Summary		Revoke token
 //	@Description	Revoke a refresh token or client secret to prevent it being used to create new access tokens (self-service)
@@ -176,7 +176,7 @@ func (a *TokenHandler) RefreshAccessTokenHandler(w http.ResponseWriter, r *http.
 //	@Router		/oauth/revoke [post]
 //
 // Use with AuthenticateByCredentalType middleware which will ensure the requestor is authenticated and add the accountID and accountType to the context
-func (a *TokenHandler) RevokeTokenHandler(w http.ResponseWriter, r *http.Request) {
+func (a *TokenHandler) RevokeToken(w http.ResponseWriter, r *http.Request) {
 	accountType, ok := auth.ContextAccountType(r.Context())
 	if !ok {
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get account type from context")
@@ -184,16 +184,16 @@ func (a *TokenHandler) RevokeTokenHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	if accountType == "user" {
-		a.RevokeRefreshTokenHandler(w, r)
+		a.RevokeRefreshToken(w, r)
 		return
 	}
 	// service accounts
-	a.RevokeClientSecretHandler(w, r)
+	a.RevokeClientSecret(w, r)
 }
 
-// RevokeClientSecretHandler revokes ALL client secrets for a service account - called by the wrapper handler for /oauth/revoke (RevokeTokenHandler)
+// RevokeClientSecret revokes ALL client secrets for a service account - called by the wrapper handler for /oauth/revoke (RevokeTokenHandler)
 // This effectively disables the service account until an admin re-registers it via POST /api/auth/service-accounts/register
-func (a *TokenHandler) RevokeClientSecretHandler(w http.ResponseWriter, r *http.Request) {
+func (a *TokenHandler) RevokeClientSecret(w http.ResponseWriter, r *http.Request) {
 
 	serverAccountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
@@ -220,9 +220,9 @@ func (a *TokenHandler) RevokeClientSecretHandler(w http.ResponseWriter, r *http.
 	responses.RespondWithStatusCodeOnly(w, http.StatusOK)
 }
 
-// RevokeRefreshTokenHandler revokes a specific refresh token for web users (logout) - called by the wrapper handler for /oauth/revoke (RevokeTokenHandler)
+// RevokeRefreshToken revokes a specific refresh token for web users (logout) - called by the wrapper handler for /oauth/revoke (RevokeTokenHandler)
 // Users can log back in immediately via /auth/login to get a new refresh token
-func (a *TokenHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.Request) {
+func (a *TokenHandler) RevokeRefreshToken(w http.ResponseWriter, r *http.Request) {
 
 	userAccountId, ok := auth.ContextAccountID(r.Context())
 	if !ok {
@@ -274,7 +274,7 @@ func (a *TokenHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.
 
 }
 
-// RotateServiceAccountSecretHandler godoc
+// RotateServiceAccountSecret godoc
 //
 //	@Summary		Rotate Service Account Client Secret
 //	@Description	Self-service endpoint for service accounts to rotate their client secret.
@@ -297,7 +297,7 @@ func (a *TokenHandler) RevokeRefreshTokenHandler(w http.ResponseWriter, r *http.
 //	@Failure	500		{object}	responses.ErrorResponse	"Internal server error"
 //
 //	@Router		/api/auth/service-accounts/rotate-secret [post]
-func (a *TokenHandler) RotateServiceAccountSecretHandler(w http.ResponseWriter, r *http.Request) {
+func (a *TokenHandler) RotateServiceAccountSecret(w http.ResponseWriter, r *http.Request) {
 
 	// Get service account ID from context (set by RequireClientCredentials middleware)
 	serviceAccountID, ok := auth.ContextAccountID(r.Context())

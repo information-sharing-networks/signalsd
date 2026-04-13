@@ -215,9 +215,16 @@ SELECT id, batch_ref, account_id, created_at FROM signal_batches
 WHERE id = $1
 `
 
-func (q *Queries) GetSignalBatchByID(ctx context.Context, id uuid.UUID) (SignalBatch, error) {
+type GetSignalBatchByIDRow struct {
+	ID        uuid.UUID `json:"id"`
+	BatchRef  string    `json:"batch_ref"`
+	AccountID uuid.UUID `json:"account_id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func (q *Queries) GetSignalBatchByID(ctx context.Context, id uuid.UUID) (GetSignalBatchByIDRow, error) {
 	row := q.db.QueryRow(ctx, GetSignalBatchByID, id)
-	var i SignalBatch
+	var i GetSignalBatchByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.BatchRef,
@@ -237,9 +244,16 @@ type GetSignalBatchByRefAndAccountIDParams struct {
 	BatchRef  string    `json:"batch_ref"`
 }
 
-func (q *Queries) GetSignalBatchByRefAndAccountID(ctx context.Context, arg GetSignalBatchByRefAndAccountIDParams) (SignalBatch, error) {
+type GetSignalBatchByRefAndAccountIDRow struct {
+	ID        uuid.UUID `json:"id"`
+	BatchRef  string    `json:"batch_ref"`
+	AccountID uuid.UUID `json:"account_id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func (q *Queries) GetSignalBatchByRefAndAccountID(ctx context.Context, arg GetSignalBatchByRefAndAccountIDParams) (GetSignalBatchByRefAndAccountIDRow, error) {
 	row := q.db.QueryRow(ctx, GetSignalBatchByRefAndAccountID, arg.AccountID, arg.BatchRef)
-	var i SignalBatch
+	var i GetSignalBatchByRefAndAccountIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.BatchRef,
@@ -250,11 +264,20 @@ func (q *Queries) GetSignalBatchByRefAndAccountID(ctx context.Context, arg GetSi
 }
 
 const UpsertSignalBatch = `-- name: UpsertSignalBatch :one
-INSERT INTO signal_batches (batch_ref, account_id)
-VALUES ($1, $2)
-ON CONFLICT (account_id, batch_ref) DO UPDATE
-  SET batch_ref = EXCLUDED.batch_ref  -- no-op update to trigger RETURNING
-RETURNING id, batch_ref, account_id, created_at
+WITH ins AS (
+  INSERT INTO signal_batches (id, batch_ref, account_id)
+  VALUES (gen_random_uuid(), $1, $2)
+  ON CONFLICT (account_id, batch_ref) DO NOTHING
+  RETURNING id, batch_ref, account_id, created_at
+)
+SELECT id, batch_ref, account_id, created_at FROM ins
+UNION ALL
+SELECT id, batch_ref, account_id, created_at
+  FROM signal_batches
+ WHERE account_id = $2
+   AND batch_ref = $1
+   AND NOT EXISTS (SELECT 1 FROM ins)
+LIMIT 1
 `
 
 type UpsertSignalBatchParams struct {
@@ -262,9 +285,17 @@ type UpsertSignalBatchParams struct {
 	AccountID uuid.UUID `json:"account_id"`
 }
 
-func (q *Queries) UpsertSignalBatch(ctx context.Context, arg UpsertSignalBatchParams) (SignalBatch, error) {
+type UpsertSignalBatchRow struct {
+	ID        uuid.UUID `json:"id"`
+	BatchRef  string    `json:"batch_ref"`
+	AccountID uuid.UUID `json:"account_id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// use this to create a new batch when a new batch ref is supplied
+func (q *Queries) UpsertSignalBatch(ctx context.Context, arg UpsertSignalBatchParams) (UpsertSignalBatchRow, error) {
 	row := q.db.QueryRow(ctx, UpsertSignalBatch, arg.BatchRef, arg.AccountID)
-	var i SignalBatch
+	var i UpsertSignalBatchRow
 	err := row.Scan(
 		&i.ID,
 		&i.BatchRef,

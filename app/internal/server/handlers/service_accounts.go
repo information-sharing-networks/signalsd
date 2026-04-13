@@ -14,11 +14,11 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
+	"github.com/information-sharing-networks/signalsd/app/internal/responses"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
-	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
-	errorTemplates "github.com/information-sharing-networks/signalsd/app/internal/server/templates/errors"
-	serviceAccountTemplates "github.com/information-sharing-networks/signalsd/app/internal/server/templates/service_accounts"
-	"github.com/information-sharing-networks/signalsd/app/internal/server/utils"
+	errorTemplates "github.com/information-sharing-networks/signalsd/app/internal/templates/errors"
+	serviceAccountTemplates "github.com/information-sharing-networks/signalsd/app/internal/templates/service_accounts"
+	"github.com/information-sharing-networks/signalsd/app/internal/utils"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -71,7 +71,7 @@ type SetupPageData struct {
 	ExpiresAt    time.Time
 }
 
-// RegisterServiceAccountHandler godocs
+// RegisterServiceAccount godocs
 //
 //	@Summary		Register Service Account
 //	@Description	Registring a new service account creates a one-time link with the client credentials in it - this must be used by the client within 48 hrs.
@@ -94,7 +94,7 @@ type SetupPageData struct {
 //	@Security	BearerAccessToken
 //
 //	@Router		/api/auth/service-accounts/register [post]
-func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWriter, r *http.Request) {
+func (s *ServiceAccountHandler) RegisterServiceAccount(w http.ResponseWriter, r *http.Request) {
 	var req CreateServiceAccountRequest
 
 	defer r.Body.Close()
@@ -258,7 +258,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 	responses.RespondWithJSON(w, http.StatusCreated, response)
 }
 
-// ReissueServiceAccountCredentialsHandler godocs
+// ReissueServiceAccountCredentials godocs
 //
 //	@Summary		Reissue Service Account Credentials
 //	@Description	Reissue credentials for an existing service account.
@@ -282,7 +282,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccountHandler(w http.ResponseWri
 //	@Security	BearerAccessToken
 //
 //	@Router		/api/auth/service-accounts/reissue-credentials [post]
-func (s *ServiceAccountHandler) ReissueServiceAccountCredentialsHandler(w http.ResponseWriter, r *http.Request) {
+func (s *ServiceAccountHandler) ReissueServiceAccountCredentials(w http.ResponseWriter, r *http.Request) {
 	var req ReissueServiceAccountCredentialsRequest
 
 	defer r.Body.Close()
@@ -433,7 +433,7 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentialsHandler(w http.R
 	responses.RespondWithJSON(w, http.StatusOK, response)
 }
 
-// SetupServiceAccountHandler godoc
+// SetupServiceAccount godoc
 //
 //	@Summary		Complete Service Account Setup
 //	@Description	Exchange one-time setup token for permanent client credentials (the one-time request url is created when a new service account is registered).
@@ -451,7 +451,7 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentialsHandler(w http.R
 //	@Failure	410	{object}	responses.ErrorResponse
 //
 //	@Router		/api/auth/service-accounts/setup/{setup_id} [get]
-func (s *ServiceAccountHandler) SetupServiceAccountHandler(w http.ResponseWriter, r *http.Request) {
+func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *http.Request) {
 	// Extract token from URL path
 	oneTimeSecretIDString := r.PathValue("setup_id")
 

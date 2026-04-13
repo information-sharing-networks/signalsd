@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/a-h/templ"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
@@ -14,27 +15,21 @@ import (
 //
 //	@Summary		Create service account page
 //	@Description	Renders the create service account form. Requires isnadmin or siteadmin role.
-//	@Tags			UI Page
+//	@Tags			UI Pages
 //	@Success		200	"HTML page"
 //	@Router			/admin/service-accounts/create [get]
 func (s *Server) CreateServiceAccountsPage(w http.ResponseWriter, r *http.Request) {
-	reqLogger := logger.ContextRequestLogger(r.Context())
-
-	if err := templates.CreateServiceAccountsPage(s.config.Environment).Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render CreateServiceAccount template", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.CreateServiceAccountsPage(s.config.Environment)).ServeHTTP(w, r)
 }
 
 // ReissueServiceAccountCredentialsPage godoc
 //
 //	@Summary		Reissue service account credentials page
 //	@Description	Renders the reissue credentials form. Requires isnadmin or siteadmin role.
-//	@Tags			UI Page
+//	@Tags			UI Pages
 //	@Success		200	"HTML page"
 //	@Router			/admin/service-accounts/reissue-credentials [get]
 func (s *Server) ReissueServiceAccountCredentialsPage(w http.ResponseWriter, r *http.Request) {
-	reqLogger := logger.ContextRequestLogger(r.Context())
-
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
 		s.renderErrorAlert(w, r, "Authentication required. Please log in again.", "Failed to get accessTokenDetails from context in ReissueServiceAccountCredentialsPage")
@@ -48,9 +43,7 @@ func (s *Server) ReissueServiceAccountCredentialsPage(w http.ResponseWriter, r *
 		return
 	}
 
-	if err := templates.ReissueServiceAccountCredentialsPage(s.config.Environment, getServiceAccountOptions(serviceAccounts)).Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render ReissueServiceAccount template", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.ReissueServiceAccountCredentialsPage(s.config.Environment, getServiceAccountOptions(serviceAccounts))).ServeHTTP(w, r)
 }
 
 // CreateServiceAccount godoc
@@ -61,6 +54,8 @@ func (s *Server) ReissueServiceAccountCredentialsPage(w http.ResponseWriter, r *
 //	@Param			email			formData	string	true	"Contact email"
 //	@Param			organization	formData	string	true	"Organization name"
 //	@Success		200				"HTML partial"
+//	@Failure		400				"HTML error partial"
+//	@Failure		401				"HTML error partial"
 //	@Router			/ui-api/service-accounts/create [post]
 func (s *Server) CreateServiceAccount(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
@@ -69,20 +64,14 @@ func (s *Server) CreateServiceAccount(w http.ResponseWriter, r *http.Request) {
 	organization := r.FormValue("organization")
 
 	if email == "" || organization == "" {
-		component := templates.ErrorAlert("you must supply values for both email and organization")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render ErrorAlert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("you must supply values for both email and organization")).ServeHTTP(w, r)
 		return
 	}
 
 	// Get access token from context
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
-		component := templates.ErrorAlert("Authentication required. Please log in again.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Authentication required. Please log in again.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -102,18 +91,11 @@ func (s *Server) CreateServiceAccount(w http.ResponseWriter, r *http.Request) {
 			msg = "An error occurred. Please try again."
 		}
 
-		component := templates.ErrorAlert(msg)
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
 		return
 	}
 
-	// Success response
-	component := templates.ServiceAccountCreationSuccess(*res)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.ServiceAccountCreationSuccess(*res)).ServeHTTP(w, r)
 }
 
 // ReissueServiceAccountCredentials godoc
@@ -123,26 +105,22 @@ func (s *Server) CreateServiceAccount(w http.ResponseWriter, r *http.Request) {
 //	@Tags			HTMX Actions
 //	@Param			service-account-dropdown	formData	string	true	"Client ID of the service account"
 //	@Success		200							"HTML partial"
+//	@Failure		400							"HTML error partial"
+//	@Failure		401							"HTML error partial"
 //	@Router			/ui-api/service-accounts/reissue-credentials [put]
 func (s *Server) ReissueServiceAccountCredentials(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	clientID := r.FormValue("service-account-dropdown")
 	if clientID == "" {
-		component := templates.ErrorAlert("you must select a service account to reissue credentials")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render ErrorAlert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("you must select a service account to reissue credentials")).ServeHTTP(w, r)
 		return
 	}
 
 	// Get access token from context
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
-		component := templates.ErrorAlert("Authentication required. Please log in again.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Authentication required. Please log in again.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -161,10 +139,7 @@ func (s *Server) ReissueServiceAccountCredentials(w http.ResponseWriter, r *http
 			msg = "An error occurred. Please try again."
 		}
 
-		component := templates.ErrorAlert(msg)
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
 		return
 	}
 
@@ -177,8 +152,5 @@ func (s *Server) ReissueServiceAccountCredentials(w http.ResponseWriter, r *http
 		ExpiresAt:          res.ExpiresAt,
 		ExpiresIn:          res.ExpiresIn,
 	}
-	component := templates.ServiceAccountReissueSuccess(successResponse)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.ServiceAccountReissueSuccess(successResponse)).ServeHTTP(w, r)
 }

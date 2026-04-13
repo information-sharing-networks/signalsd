@@ -9,7 +9,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
-	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
+	"github.com/information-sharing-networks/signalsd/app/internal/responses"
 )
 
 type LoginHandler struct {
@@ -30,7 +30,7 @@ type LoginRequest struct {
 	CreateUserRequest
 }
 
-// LoginHandler godoc
+// Login godoc
 //
 //	@Summary		Login
 //	@Description	The response body includes an access token which can be used to access the protected enpoints, assuming the account has the appropriate permissions.
@@ -53,7 +53,7 @@ type LoginRequest struct {
 //	@Failure		500		{object}	responses.ErrorResponse
 //
 //	@Router			/api/auth/login [post]
-func (l *LoginHandler) LoginHandler(w http.ResponseWriter, r *http.Request) {
+func (l *LoginHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
 
 	defer r.Body.Close()

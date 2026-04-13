@@ -11,11 +11,12 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
+	"github.com/information-sharing-networks/signalsd/app/internal/publicisns"
+	"github.com/information-sharing-networks/signalsd/app/internal/router"
+	"github.com/information-sharing-networks/signalsd/app/internal/schemas"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/handlers"
-	"github.com/information-sharing-networks/signalsd/app/internal/server/isns"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/middleware"
-	"github.com/information-sharing-networks/signalsd/app/internal/server/schemas"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/config"
 	uiserver "github.com/information-sharing-networks/signalsd/app/internal/ui/server"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -44,13 +45,16 @@ type Server struct {
 	router *chi.Mux
 
 	// schemaCache is the JSON schema cache for signal types - used to validate incoming signals
-	// this schema cache auto refreshes when a new signal type is created
-	schemaCache *schemas.SchemaCache
+	// refreshed by polling the database every CachePollInterval.
+	schemaCache *schemas.Cache
 
 	// publicIsnCache is the cache of public ISNs and their signal types - used by the public signal search endpoint
-	// this cache is only initiated when the server is started - it is not dynamically loaded.
-	// use the Refresh method to reload the cache if you need to add a new public ISN while the server is running
-	publicIsnCache *isns.PublicIsnCache
+	// refreshed by polling the database every CachePollInterval.
+	publicIsnCache *publicisns.Cache
+
+	// signalRouterCache holds the compiled Signals Routing Rules. It is loaded at startup and
+	// refreshed by polling the database every CachePollInterval.
+	signalRouterCache *router.Cache
 }
 
 func NewServer(
@@ -60,19 +64,21 @@ func NewServer(
 	config *signalsd.ServerEnvironment,
 	corsConfigs *signalsd.CORSConfigs,
 	logger *slog.Logger,
-	schemaCache *schemas.SchemaCache,
-	publicIsnCache *isns.PublicIsnCache,
+	schemaCache *schemas.Cache,
+	publicIsnCache *publicisns.Cache,
+	signalRouterCache *router.Cache,
 ) *Server {
 	server := &Server{
-		pool:           pool,
-		queries:        queries,
-		authService:    authService,
-		config:         config,
-		corsConfigs:    corsConfigs,
-		logger:         logger,
-		router:         chi.NewRouter(),
-		schemaCache:    schemaCache,
-		publicIsnCache: publicIsnCache,
+		pool:              pool,
+		queries:           queries,
+		authService:       authService,
+		config:            config,
+		corsConfigs:       corsConfigs,
+		logger:            logger,
+		router:            chi.NewRouter(),
+		schemaCache:       schemaCache,
+		publicIsnCache:    publicIsnCache,
+		signalRouterCache: signalRouterCache,
 	}
 
 	server.setupMiddleware()
@@ -114,6 +120,11 @@ func (s *Server) Start(ctx context.Context) error {
 		WriteTimeout: s.config.WriteTimeout,
 		IdleTimeout:  s.config.IdleTimeout,
 	}
+
+	// Start polling for cache changes.
+	s.signalRouterCache.StartPolling(ctx, signalsd.CachePollInterval)
+	s.publicIsnCache.StartPolling(ctx, signalsd.CachePollInterval)
+	s.schemaCache.StartPolling(ctx, signalsd.CachePollInterval)
 
 	serverErrors := make(chan error, 1)
 
@@ -185,6 +196,7 @@ func (s *Server) registerAdminRoutes() {
 	// isn definition handlers
 	isn := handlers.NewIsnHandler(s.queries, s.pool, s.config.PublicBaseURL)
 	signalTypes := handlers.NewSignalTypeHandler(s.queries)
+	isnRouter := handlers.NewRoutingConfigHandler(s.queries, s.pool, s.signalRouterCache)
 
 	// isn permissions
 	isnAccount := handlers.NewIsnAccountHandler(s.queries)
@@ -202,7 +214,7 @@ func (s *Server) registerAdminRoutes() {
 				r.Use(s.authService.AuthenticateByGrantType)
 
 				// get new access tokens
-				r.Post("/token", tokens.RefreshAccessTokenHandler)
+				r.Post("/token", tokens.RefreshAccessToken)
 			})
 
 			r.Group(func(r chi.Router) {
@@ -211,7 +223,7 @@ func (s *Server) registerAdminRoutes() {
 				r.Use(s.authService.AuthenticateByCredentalType)
 
 				// revoke a client secret (service accounts) or refresh token (web users)
-				r.Post("/revoke", tokens.RevokeTokenHandler)
+				r.Post("/revoke", tokens.RevokeToken)
 			})
 		})
 
@@ -224,29 +236,29 @@ func (s *Server) registerAdminRoutes() {
 				r.Group(func(r chi.Router) {
 					r.Use(s.authService.RequireValidAccessToken)
 
-					r.Put("/password/reset", users.UpdatePasswordHandler)
+					r.Put("/password/reset", users.UpdatePassword)
 				})
 
 				r.Group(func(r chi.Router) {
 					r.Use(s.authService.RequireValidAccessToken)
 					r.Use(s.authService.RequireRole("siteadmin", "isnadmin"))
 
-					r.Post("/service-accounts/register", serviceAccounts.RegisterServiceAccountHandler)
-					r.Post("/service-accounts/reissue-credentials", serviceAccounts.ReissueServiceAccountCredentialsHandler)
+					r.Post("/service-accounts/register", serviceAccounts.RegisterServiceAccount)
+					r.Post("/service-accounts/reissue-credentials", serviceAccounts.ReissueServiceAccountCredentials)
 				})
 
 				r.Group(func(r chi.Router) {
 					r.Use(s.authService.RequireValidClientCredentials)
 
-					r.Post("/service-accounts/rotate-secret", tokens.RotateServiceAccountSecretHandler)
+					r.Post("/service-accounts/rotate-secret", tokens.RotateServiceAccountSecret)
 				})
 
 				// no authentication required
-				r.Post("/register", users.RegisterUserHandler)
-				r.Post("/login", login.LoginHandler)
-				r.Get("/service-accounts/setup/{setup_id}", serviceAccounts.SetupServiceAccountHandler)
-				r.Get("/password-reset/{token_id}", users.PasswordResetTokenPageHandler)
-				r.Post("/password-reset/{token_id}", users.PasswordResetTokenHandler)
+				r.Post("/register", users.RegisterUser)
+				r.Post("/login", login.Login)
+				r.Get("/service-accounts/setup/{setup_id}", serviceAccounts.SetupServiceAccount)
+				r.Get("/password-reset/{token_id}", users.PasswordResetTokenPage)
+				r.Post("/password-reset/{token_id}", users.PasswordResetToken)
 			})
 
 			// isn admin endpoints
@@ -262,26 +274,26 @@ func (s *Server) registerAdminRoutes() {
 						r.Use(s.authService.RequireRole("siteadmin", "isnadmin"))
 
 						// ISN management
-						r.Post("/", isn.CreateIsnHandler)
-						r.Put("/{isn_slug}", isn.UpdateIsnHandler)
+						r.Post("/", isn.CreateIsn)
+						r.Put("/{isn_slug}", isn.UpdateIsn)
 
 						// add signal types to an ISN
-						r.Post("/{isn_slug}/signal-types/add", signalTypes.AddSignalTypeToISNHandler)
+						r.Post("/{isn_slug}/signal-types/add", signalTypes.AddSignalTypeToISN)
 
 						// ISN signal type status management
-						r.Put("/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}", signalTypes.UpdateIsnSignalTypeStatusHandler)
+						r.Put("/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}", signalTypes.UpdateIsnSignalTypeStatus)
 
 						// ISN account permissions
-						r.Put("/{isn_slug}/accounts/{account_id}", isnAccount.UpdateIsnAccountPermissionHandler)
-						r.Get("/{isn_slug}/accounts", isnAccount.GetIsnAccountsHandler)
+						r.Put("/{isn_slug}/accounts/{account_id}", isnAccount.UpdateIsnAccountPermission)
+						r.Get("/{isn_slug}/accounts", isnAccount.GetIsnAccounts)
 
 					})
 
 					// view ISN and signal type details
-					r.Get("/", isn.GetIsnsHandler)
-					r.Get("/{isn_slug}", isn.GetIsnHandler)
-					r.Get("/{isn_slug}/signal-types", signalTypes.GetSignalTypesHandler)
-					r.Get("/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}", signalTypes.GetSignalTypeHandler)
+					r.Get("/", isn.GetIsns)
+					r.Get("/{isn_slug}", isn.GetIsn)
+					r.Get("/{isn_slug}/signal-types", signalTypes.GetSignalTypes)
+					r.Get("/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}", signalTypes.GetSignalType)
 				})
 
 			})
@@ -295,7 +307,7 @@ func (s *Server) registerAdminRoutes() {
 				r.Use(s.authService.RequireDevEnv)
 
 				// delete all users and content
-				r.Post("/reset", admin.ResetHandler)
+				r.Post("/reset", admin.ResetEnv)
 			})
 
 			// siteadmin operations
@@ -305,22 +317,27 @@ func (s *Server) registerAdminRoutes() {
 				r.Use(s.authService.RequireRole("siteadmin"))
 
 				// ISN admin role management
-				r.Put("/accounts/{account_id}/isn-admin-role", users.GrantUserIsnAdminRoleHandler)
-				r.Delete("/accounts/{account_id}/isn-admin-role", users.RevokeUserIsnAdminRoleHandler)
+				r.Put("/accounts/{account_id}/isn-admin-role", users.GrantUserIsnAdminRole)
+				r.Delete("/accounts/{account_id}/isn-admin-role", users.RevokeUserIsnAdminRole)
 
 				// Site admin role management
-				r.Put("/accounts/{account_id}/site-admin-role", users.GrantUserSiteAdminRoleHandler)
-				r.Delete("/accounts/{account_id}/site-admin-role", users.RevokeUserSiteAdminRoleHandler)
+				r.Put("/accounts/{account_id}/site-admin-role", users.GrantUserSiteAdminRole)
+				r.Delete("/accounts/{account_id}/site-admin-role", users.RevokeUserSiteAdminRole)
 
 				// ISN ownership transfer
-				r.Put("/isn/{isn_slug}/transfer-ownership", isn.TransferIsnOwnershipHandler)
+				r.Put("/isn/{isn_slug}/transfer-ownership", isn.TransferIsnOwnership)
 
 				// signal types management
-				r.Get("/signal-types", signalTypes.GetSignalTypesHandler)
-				r.Post("/signal-types", signalTypes.CreateSignalTypeHandler)
-				r.Post("/signal-types/{signal_type_slug}/schemas", signalTypes.RegisterNewSignalTypeSchemaHandler)
-				r.Put("/signal-types/{signal_type_slug}/v{sem_ver}", signalTypes.UpdateSignalTypeHandler)
-				r.Delete("/signal-types/{signal_type_slug}/v{sem_ver}", signalTypes.DeleteSignalTypeHandler)
+				r.Get("/signal-types", signalTypes.GetSignalTypes)
+				r.Post("/signal-types", signalTypes.CreateSignalType)
+				r.Post("/signal-types/{signal_type_slug}/schemas", signalTypes.RegisterNewSignalTypeSchema)
+				r.Put("/signal-types/{signal_type_slug}/v{sem_ver}", signalTypes.UpdateSignalType)
+				r.Delete("/signal-types/{signal_type_slug}/v{sem_ver}", signalTypes.DeleteSignalType)
+
+				// Signals Routing Rules management
+				r.Get("/signal-types/{signal_type_slug}/v{sem_ver}/routes", isnRouter.GetSignalRoutingConfig)
+				r.Put("/signal-types/{signal_type_slug}/v{sem_ver}/routes", isnRouter.UpdateSignalRoutingConfig)
+				r.Delete("/signal-types/{signal_type_slug}/v{sem_ver}/routes", isnRouter.DeleteSignalRoutingConfig)
 			})
 
 			// shared site-admin and isn-admin operations
@@ -330,11 +347,11 @@ func (s *Server) registerAdminRoutes() {
 				r.Use(s.authService.RequireRole("siteadmin", "isnadmin"))
 
 				// Account management
-				r.Post("/accounts/{account_id}/disable", admin.DisableAccountHandler)
-				r.Post("/accounts/{account_id}/enable", admin.EnableAccountHandler)
-				r.Get("/users", admin.GetUsersHandler)
-				r.Get("/service-accounts", admin.GetServiceAccountsHandler)
-				r.Post("/users/{user_id}/generate-password-reset-link", admin.GeneratePasswordResetLinkHandler)
+				r.Post("/accounts/{account_id}/disable", admin.DisableAccount)
+				r.Post("/accounts/{account_id}/enable", admin.EnableAccount)
+				r.Get("/users", admin.GetUsers)
+				r.Get("/service-accounts", admin.GetServiceAccounts)
+				r.Post("/users/{user_id}/generate-password-reset-link", admin.GeneratePasswordResetLink)
 			})
 		})
 	})
@@ -344,6 +361,7 @@ func (s *Server) registerAdminRoutes() {
 func (s *Server) registerSignalWriteRoutes() {
 	signals := handlers.NewSignalsHandler(s.queries, s.pool, s.schemaCache, s.publicIsnCache)
 	signalBatches := handlers.NewSignalsBatchHandler(s.queries)
+	routerSignals := handlers.NewSignalRouter(s.queries, s.pool, s.schemaCache, s.signalRouterCache)
 
 	s.router.Group(func(r chi.Router) {
 		r.Use(middleware.CORS(s.corsConfigs.Protected))
@@ -351,15 +369,33 @@ func (s *Server) registerSignalWriteRoutes() {
 		r.Use(s.authService.RequireValidAccessToken)
 		r.Use(s.authService.RequireAccessPermission("write"))
 
-		// signals post
-		r.Post("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals", signals.CreateSignalsHandler)
-
-		// signal withdrawal
-		r.Put("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/withdraw", signals.WithdrawSignalHandler)
+		// direct ISN signal post and withdrawal
+		r.Post("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals", signals.CreateSignals)
+		r.Put("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/withdraw", signals.WithdrawSignal)
 
 		// batch status endpoints
-		r.Get("/api/batches/search", signalBatches.SearchBatchesHandler)
-		r.Get("/api/batches/{batch_ref}/status", signalBatches.GetSignalBatchStatusHandler)
+		r.Get("/api/batches/search", signalBatches.SearchBatches)
+		r.Get("/api/batches/{batch_ref}/status", signalBatches.GetSignalBatchStatus)
+	})
+
+	// Router signal endpoint: ISN is resolved by routing rules, not from the URL.
+	// RequireAccessPermission("write") is NOT used here - permission is checked in-handler
+	// after ISN resolution, via auth.CheckIsnWritePermission.
+	s.router.Group(func(r chi.Router) {
+		r.Use(middleware.CORS(s.corsConfigs.Protected))
+		r.Use(middleware.RequestSizeLimit(s.config.MaxSignalPayloadSize))
+		r.Use(s.authService.RequireValidAccessToken)
+		r.Post("/api/router/signal-types/{signal_type_slug}/v{sem_ver}/signals", routerSignals.RouteSignals)
+	})
+
+	// Router signal endpoint: ISN is resolved by routing rules, not from the URL.
+	// RequireAccessPermission("write") is NOT used here - permission is checked in-handler
+	// after ISN resolution, via auth.CheckIsnWritePermission.
+	s.router.Group(func(r chi.Router) {
+		r.Use(middleware.CORS(s.corsConfigs.Protected))
+		r.Use(middleware.RequestSizeLimit(s.config.MaxSignalPayloadSize))
+		r.Use(s.authService.RequireValidAccessToken)
+		r.Post("/api/router/signal-types/{signal_type_slug}/v{sem_ver}/signals", routerSignals.RouteSignals)
 	})
 }
 
@@ -370,7 +406,7 @@ func (s *Server) registerSignalReadRoutes() {
 	// Public ISN signal search - no authentication required
 	s.router.Group(func(r chi.Router) {
 		r.Use(middleware.CORS(s.corsConfigs.Public))
-		r.Get("/api/public/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search", signals.SearchPublicSignalsHandler)
+		r.Get("/api/public/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search", signals.SearchPublicSignals)
 	})
 
 	// Private ISN signal search - any ISN member (read or write) may call this endpoint.
@@ -379,7 +415,7 @@ func (s *Server) registerSignalReadRoutes() {
 		r.Use(middleware.CORS(s.corsConfigs.Protected))
 		r.Use(s.authService.RequireValidAccessToken)
 		r.Use(s.authService.RequireIsnMembership)
-		r.Get("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search", signals.SearchPrivateSignalsHandler)
+		r.Get("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search", signals.SearchPrivateSignals)
 	})
 
 }
@@ -394,16 +430,16 @@ func (s *Server) registerCommonRoutes() {
 		r.Use(middleware.CORS(s.corsConfigs.Public))
 
 		// Readiness - checks if the service is ready to accept traffic (includes database connectivity)
-		r.Get("/ready", admin.ReadinessHandler)
+		r.Get("/ready", admin.Readiness)
 
 		// Liveness - checks if the service is running (basic health check)
-		r.Get("/live", admin.LivenessHandler)
+		r.Get("/live", admin.Liveness)
 	})
 
 	// Version information
 	s.router.Route("/version", func(r chi.Router) {
 		r.Use(middleware.CORS(s.corsConfigs.Public))
-		r.Get("/", admin.VersionHandler)
+		r.Get("/", admin.Version)
 	})
 }
 

@@ -13,8 +13,8 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
-	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
-	"github.com/information-sharing-networks/signalsd/app/internal/server/utils"
+	"github.com/information-sharing-networks/signalsd/app/internal/responses"
+	"github.com/information-sharing-networks/signalsd/app/internal/utils"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -39,7 +39,7 @@ type BatchStatus struct {
 	SignalTypeSlug     string       `json:"signal_type_slug"`
 	SignalTypeVersion  string       `json:"signal_type_version"`
 	StoredCount        int64        `json:"stored_count"`
-	FailedCount        int64        `json:"failed_count"`
+	RejectedCount      int64        `json:"rejected_count"`
 	UnresolvedFailures []FailureRow `json:"unresolved_failures,omitempty"`
 }
 
@@ -59,14 +59,14 @@ type BatchSearchParams struct {
 	CreatedBefore *time.Time
 }
 
-// GetSignalBatchStatusHandler godoc
+// GetSignalBatchStatus godoc
 //
 //	@Summary		Get Batch Status
 //
 //	@Description	Returns the status of a batch identified by batch_ref, scoped to the authenticated account.
 //	@Description
 //	@Description	The response shows stored and failed signal counts broken down by ISN and signal type.
-//	@Description	Failures listed are unresolved: the signal failed in this batch and has not been successfully resubmitted since.
+//	@Description	Where a signal is listed as 'rejected' this means the signal failed to load in this batch and has not been successfully resubmitted subsequently.
 //	@Description
 //	@Description	Members can view their own batches. Site admins can supply ?account_id= to view another account's batch.
 //	@Description
@@ -83,7 +83,7 @@ type BatchSearchParams struct {
 //
 //	@Security	BearerAccessToken
 //	@Router		/api/batches/{batch_ref}/status [get]
-func (s *SignalsBatchHandler) GetSignalBatchStatusHandler(w http.ResponseWriter, r *http.Request) {
+func (s *SignalsBatchHandler) GetSignalBatchStatus(w http.ResponseWriter, r *http.Request) {
 
 	batchRef := r.PathValue("batch_ref")
 
@@ -185,7 +185,7 @@ func (s *SignalsBatchHandler) getBatchStatusDetails(ctx context.Context, batchID
 			ErrorCode:    row.ErrorCode,
 			ErrorMessage: row.ErrorMessage,
 		})
-		status.FailedCount++
+		status.RejectedCount++
 		batchSummary[key] = status
 	}
 
@@ -204,7 +204,7 @@ func (s *SignalsBatchHandler) getBatchStatusDetails(ctx context.Context, batchID
 	}, nil
 }
 
-// SearchBatchesHandler godoc
+// SearchBatches godoc
 //
 //	@Summary		Search For Batches
 //	@Tags			Signal Exchange
@@ -220,7 +220,7 @@ func (s *SignalsBatchHandler) getBatchStatusDetails(ctx context.Context, batchID
 //	@Failure		500				{object}	responses.ErrorResponse
 //	@Security		BearerAccessToken
 //	@Router			/api/batches/search [get]
-func (s *SignalsBatchHandler) SearchBatchesHandler(w http.ResponseWriter, r *http.Request) {
+func (s *SignalsBatchHandler) SearchBatches(w http.ResponseWriter, r *http.Request) {
 
 	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {

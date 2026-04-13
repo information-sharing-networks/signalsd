@@ -13,8 +13,8 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
+	"github.com/information-sharing-networks/signalsd/app/internal/responses"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
-	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
 	"github.com/information-sharing-networks/signalsd/app/internal/version"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -60,7 +60,7 @@ type AccountStatusResponse struct {
 	Status      string    `json:"status" example:"disabled" enums:"enabled,disabled"`
 }
 
-// ResetHandler godoc
+// ResetEnv godoc
 //
 //	@Summary		Site Reset
 //	@Description	Delete all registered users and associated data.
@@ -71,7 +71,7 @@ type AccountStatusResponse struct {
 //	@Failure		403	{object}	responses.ErrorResponse
 //
 //	@Router			/api/admin/reset [post]
-func (a *AdminHandler) ResetHandler(w http.ResponseWriter, r *http.Request) {
+func (a *AdminHandler) ResetEnv(w http.ResponseWriter, r *http.Request) {
 
 	deletedAccountsCount, err := a.queries.DeleteAccounts(r.Context())
 	if err != nil {
@@ -86,7 +86,7 @@ func (a *AdminHandler) ResetHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(fmt.Appendf(nil, "%d accounts deleted", deletedAccountsCount))
 }
 
-// ReadinessHandler godoc
+// Readiness godoc
 //
 //	@Summary		Readiness Check
 //	@Description	Check if the signalsd service is ready to accept traffic.
@@ -97,7 +97,7 @@ func (a *AdminHandler) ResetHandler(w http.ResponseWriter, r *http.Request) {
 //	@Failure		503	{string}	string	"Service Unavailable - Database connection failed"
 //
 //	@Router			/health/ready [get]
-func (a *AdminHandler) ReadinessHandler(w http.ResponseWriter, r *http.Request) {
+func (a *AdminHandler) Readiness(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), signalsd.ReadinessTimeout)
 	defer cancel()
 
@@ -113,7 +113,7 @@ func (a *AdminHandler) ReadinessHandler(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-// LivenessHandler godoc
+// Liveness godoc
 //
 //	@Summary		Liveness Check
 //	@Description	Check if the signalsd http service is alive and responding.
@@ -123,13 +123,13 @@ func (a *AdminHandler) ReadinessHandler(w http.ResponseWriter, r *http.Request) 
 //	@Success		200	{string}	string	"OK - Service is alive"
 //
 //	@Router			/health/live [get]
-func (a *AdminHandler) LivenessHandler(w http.ResponseWriter, r *http.Request) {
+func (a *AdminHandler) Liveness(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("OK"))
 }
 
-// VersionHandler godoc
+// Version godoc
 //
 //	@Summary		Get API Version
 //	@Description	Returns the current API version details
@@ -138,11 +138,11 @@ func (a *AdminHandler) LivenessHandler(w http.ResponseWriter, r *http.Request) {
 //	@Success		200	{object}	version.Info
 //
 //	@Router			/version [get]
-func (a *AdminHandler) VersionHandler(w http.ResponseWriter, r *http.Request) {
+func (a *AdminHandler) Version(w http.ResponseWriter, r *http.Request) {
 	responses.RespondWithJSON(w, http.StatusOK, version.Get())
 }
 
-// DisableAccountHandler godoc
+// DisableAccount godoc
 //
 //	@Summary	Disable an Account
 //	@Description
@@ -171,7 +171,7 @@ func (a *AdminHandler) VersionHandler(w http.ResponseWriter, r *http.Request) {
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/admin/accounts/{account_id}/disable [post]
-func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Request) {
+func (a *AdminHandler) DisableAccount(w http.ResponseWriter, r *http.Request) {
 	accountIDString := r.PathValue("account_id")
 
 	accountID, err := uuid.Parse(accountIDString)
@@ -310,7 +310,7 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 	responses.RespondWithJSON(w, http.StatusOK, response)
 }
 
-// EnableAccountHandler godoc
+// EnableAccount godoc
 //
 //	@Summary		Enable an Account
 //	@Description	**Administrative endpoint to re-enable previously disabled accounts.**
@@ -334,7 +334,7 @@ func (a *AdminHandler) DisableAccountHandler(w http.ResponseWriter, r *http.Requ
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/admin/accounts/{account_id}/enable [post]
-func (a *AdminHandler) EnableAccountHandler(w http.ResponseWriter, r *http.Request) {
+func (a *AdminHandler) EnableAccount(w http.ResponseWriter, r *http.Request) {
 	accountIDString := r.PathValue("account_id")
 
 	// Parse account ID as UUID
@@ -394,7 +394,7 @@ func (a *AdminHandler) EnableAccountHandler(w http.ResponseWriter, r *http.Reque
 	responses.RespondWithJSON(w, http.StatusOK, response)
 }
 
-// GetUsersHandler godoc
+// GetUsers godoc
 //
 //	@Summary		Get Users
 //	@Description	This api displays site users and their email addresses (can only be used by admin accounts)
@@ -415,7 +415,7 @@ func (a *AdminHandler) EnableAccountHandler(w http.ResponseWriter, r *http.Reque
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/admin/users [get]
-func (a *AdminHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
+func (a *AdminHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 
 	accountIdParam := r.URL.Query().Get("id")
 	emailParam := r.URL.Query().Get("email")
@@ -518,7 +518,7 @@ func (a *AdminHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 	responses.RespondWithJSON(w, http.StatusOK, user)
 }
 
-// GetServiceAccountsHandler godoc
+// GetServiceAccounts godoc
 //
 //	@Summary		Get Service Accounts
 //	@Description	Only owners and admins can view service account lists.
@@ -544,7 +544,7 @@ func (a *AdminHandler) GetUsersHandler(w http.ResponseWriter, r *http.Request) {
 //	@Security	BearerAccessToken
 //
 //	@Router		/api/admin/service-accounts [get]
-func (a *AdminHandler) GetServiceAccountsHandler(w http.ResponseWriter, r *http.Request) {
+func (a *AdminHandler) GetServiceAccounts(w http.ResponseWriter, r *http.Request) {
 
 	accountIDString := r.URL.Query().Get("id")
 	clientID := r.URL.Query().Get("client_id")
@@ -709,7 +709,7 @@ type GeneratePasswordResetLinkResponse struct {
 	ExpiresIn int       `json:"expires_in" example:"1800"`
 }
 
-// GeneratePasswordResetLinkHandler godoc
+// GeneratePasswordResetLink godoc
 //
 //	@Summary		Generate Password Reset Link
 //	@Description	Allows admins to generate a one-time password reset link for a user (use this endpoint when a user has forgotten their password)
@@ -735,7 +735,7 @@ type GeneratePasswordResetLinkResponse struct {
 //	@Router			/api/admin/users/{user_id}/generate-password-reset-link [post]
 //
 //	this handler must use the RequireRole (isnadmin/siteadmin) middleware
-func (a *AdminHandler) GeneratePasswordResetLinkHandler(w http.ResponseWriter, r *http.Request) {
+func (a *AdminHandler) GeneratePasswordResetLink(w http.ResponseWriter, r *http.Request) {
 
 	// Get account ID from context (set by middleware)
 	accountID, ok := auth.ContextAccountID(r.Context())

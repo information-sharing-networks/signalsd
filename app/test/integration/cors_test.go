@@ -52,7 +52,6 @@ func TestCORS(t *testing.T) {
 
 	// Start server
 	testEnv := startInProcessServer(t, "")
-	defer testEnv.shutdown()
 
 	privateEndpoint := testEnv.baseURL + "/api/accounts"
 	publicEndpoint := testEnv.baseURL + "/health/live"

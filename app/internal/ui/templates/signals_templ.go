@@ -385,7 +385,7 @@ func NoSignalsFound() templ.Component {
 			templ_7745c5c3_Var11 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "<div class=\"card-body text-center text-muted\"><p>No signals found matching your search criteria.</p></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 27, "<div class=\"card-body text-muted\"><p>No signals found matching your search criteria.</p></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -755,7 +755,7 @@ func AccountIDField() templ.Component {
 	})
 }
 
-/* code highlgiht json  - todo - test escaping of html characters */
+/* code highlgiht json */
 func HighlightJSON(jsonElement json.RawMessage) string {
 	prettyPrintJSON := prettyPrintJSON(jsonElement)
 	var buf bytes.Buffer

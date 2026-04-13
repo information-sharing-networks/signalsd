@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/a-h/templ"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
@@ -31,10 +32,7 @@ func (s *Server) ManageIsnAccountsPage(w http.ResponseWriter, r *http.Request) {
 	isnPerms := accessTokenDetails.IsnPerms
 
 	if len(isnPerms) == 0 {
-		component := templates.ErrorAlert("You don't have permission to access any ISNs.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("You don't have permission to access any ISNs.")).ServeHTTP(w, r)
 		return
 	}
 	// Convert permissions to ISN list for dropdown (only ISNs where user has admin rights)
@@ -44,10 +42,7 @@ func (s *Server) ManageIsnAccountsPage(w http.ResponseWriter, r *http.Request) {
 	rawUsers, err := s.apiClient.GetUsers(accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get users list", slog.String("error", err.Error()))
-		component := templates.ErrorAlert("Failed to load users. Please try again.")
-		if renderErr := component.Render(r.Context(), w); renderErr != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", renderErr.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Failed to load users. Please try again.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -55,18 +50,11 @@ func (s *Server) ManageIsnAccountsPage(w http.ResponseWriter, r *http.Request) {
 	rawServiceAccounts, err := s.apiClient.GetServiceAccounts(accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get service accounts list", slog.String("error", err.Error()))
-		component := templates.ErrorAlert("Failed to load service accounts. Please try again.")
-		if renderErr := component.Render(r.Context(), w); renderErr != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", renderErr.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Failed to load service accounts. Please try again.")).ServeHTTP(w, r)
 		return
 	}
 
-	// Render admin page
-	component := templates.ManageIsnAccountsPage(s.config.Environment, isns, getUserOptions(rawUsers, accessTokenDetails.Email), getServiceAccountOptions(rawServiceAccounts))
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render ISN accounts admin page", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.ManageIsnAccountsPage(s.config.Environment, isns, getUserOptions(rawUsers, accessTokenDetails.Email), getServiceAccountOptions(rawServiceAccounts))).ServeHTTP(w, r)
 }
 
 // ManageIsnAccounts godoc
@@ -80,6 +68,8 @@ func (s *Server) ManageIsnAccountsPage(w http.ResponseWriter, r *http.Request) {
 //	@Param			user-identifier				formData	string	false	"User email (when account-type is 'user')"
 //	@Param			service-account-identifier	formData	string	false	"Client ID (when account-type is 'service-account')"
 //	@Success		200							"HTML partial"
+//	@Failure		400							"HTML error partial"
+//	@Failure		401							"HTML error partial"
 //	@Router			/ui-api/isn/accounts/manage [put]
 func (s *Server) ManageIsnAccounts(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
@@ -100,19 +90,13 @@ func (s *Server) ManageIsnAccounts(w http.ResponseWriter, r *http.Request) {
 
 	// Validate required fields
 	if isnSlug == "" || accountType == "" || accountIdentifier == "" || permission == "" {
-		component := templates.ErrorAlert("Please fill in all fields.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Please fill in all fields.")).ServeHTTP(w, r)
 		return
 	}
 
 	// Validate account type
 	if !signalsd.ValidAccountTypes[accountType] {
-		component := templates.ErrorAlert(fmt.Sprintf("Invalid account type selected: %v", accountType))
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert(fmt.Sprintf("Invalid account type selected: %v", accountType))).ServeHTTP(w, r)
 		return
 	}
 
@@ -121,11 +105,7 @@ func (s *Server) ManageIsnAccounts(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		// unexpected - this should be caught by middleware check on ISN access
 		reqLogger.Error("Failed to read access token from context", slog.String("component", "templates.handleAddIsnAccount"))
-
-		component := templates.ErrorAlert("Authentication required. Please log in again.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Authentication required. Please log in again.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -141,25 +121,18 @@ func (s *Server) ManageIsnAccounts(w http.ResponseWriter, r *http.Request) {
 			msg = "An error occurred. Please try again."
 		}
 
-		component := templates.ErrorAlert(msg)
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
 		return
 	}
 
-	// Success response
-	msg := ""
+	var msg string
 	if permission == "none" {
 		msg = "Account successfully removed from ISN"
 	} else {
 		msg = "Account successfully added to ISN"
 	}
 
-	component := templates.SuccessAlert(msg)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.SuccessAlert(msg)).ServeHTTP(w, r)
 }
 
 // TransferOwnershipPage godoc
@@ -181,10 +154,7 @@ func (s *Server) TransferOwnershipPage(w http.ResponseWriter, r *http.Request) {
 	isnPerms := accessTokenDetails.IsnPerms
 
 	if len(isnPerms) == 0 {
-		component := templates.ErrorAlert("You don't have permission to access any ISNs.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("You don't have permission to access any ISNs.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -195,18 +165,11 @@ func (s *Server) TransferOwnershipPage(w http.ResponseWriter, r *http.Request) {
 	rawUsers, err := s.apiClient.GetUsers(accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get users list", slog.String("error", err.Error()))
-		component := templates.ErrorAlert("Failed to load users. Please try again.")
-		if renderErr := component.Render(r.Context(), w); renderErr != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", renderErr.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Failed to load users. Please try again.")).ServeHTTP(w, r)
 		return
 	}
 
-	// Render transfer ownership page
-	component := templates.TransferOwnershipPage(s.config.Environment, isns, getUserOptions(rawUsers, accessTokenDetails.Email))
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render transfer ownership page", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.TransferOwnershipPage(s.config.Environment, isns, getUserOptions(rawUsers, accessTokenDetails.Email))).ServeHTTP(w, r)
 }
 
 // TransferOwnership godoc
@@ -217,6 +180,8 @@ func (s *Server) TransferOwnershipPage(w http.ResponseWriter, r *http.Request) {
 //	@Param			isn-slug		formData	string	true	"ISN slug"
 //	@Param			new-owner-email	formData	string	true	"Email of the new owner (must be an existing user)"
 //	@Success		200				"HTML partial"
+//	@Failure		400				"HTML error partial"
+//	@Failure		401				"HTML error partial"
 //	@Router			/ui-api/isn/transfer-ownership [put]
 func (s *Server) TransferOwnership(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
@@ -227,20 +192,14 @@ func (s *Server) TransferOwnership(w http.ResponseWriter, r *http.Request) {
 
 	// Validate required fields
 	if isnSlug == "" || newOwnerEmail == "" {
-		component := templates.ErrorAlert("Please fill in all fields.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Please fill in all fields.")).ServeHTTP(w, r)
 		return
 	}
 
 	// Get access token from context
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
-		component := templates.ErrorAlert("Authentication required. Please log in again.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Authentication required. Please log in again.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -256,17 +215,9 @@ func (s *Server) TransferOwnership(w http.ResponseWriter, r *http.Request) {
 			msg = "An error occurred. Please try again."
 		}
 
-		component := templates.ErrorAlert(msg)
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
 		return
 	}
 
-	// Success response
-	msg := fmt.Sprintf("ISN ownership successfully transferred to %s", newOwnerEmail)
-	component := templates.SuccessAlert(msg)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.SuccessAlert(fmt.Sprintf("ISN ownership successfully transferred to %s", newOwnerEmail))).ServeHTTP(w, r)
 }

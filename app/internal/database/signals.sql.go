@@ -234,6 +234,27 @@ func (q *Queries) CreateSignalVersion(ctx context.Context, arg CreateSignalVersi
 	return i, err
 }
 
+const GetIsnBySignalID = `-- name: GetIsnBySignalID :one
+SELECT i.id, i.slug
+FROM signals s
+JOIN isn i ON i.id = s.isn_id
+WHERE s.id = $1
+AND i.is_in_use = true
+`
+
+type GetIsnBySignalIDRow struct {
+	ID   uuid.UUID `json:"id"`
+	Slug string    `json:"slug"`
+}
+
+// Returns the ISN id and slug for the ISN that owns the signal with the given ID.
+func (q *Queries) GetIsnBySignalID(ctx context.Context, id uuid.UUID) (GetIsnBySignalIDRow, error) {
+	row := q.db.QueryRow(ctx, GetIsnBySignalID, id)
+	var i GetIsnBySignalIDRow
+	err := row.Scan(&i.ID, &i.Slug)
+	return i, err
+}
+
 const GetPreviousSignalVersions = `-- name: GetPreviousSignalVersions :many
 SELECT sv.signal_id, id as signal_version_id, sv.created_at, sv.version_number, sv.content
 FROM signal_versions  sv

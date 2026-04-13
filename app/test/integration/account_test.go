@@ -138,7 +138,7 @@ func TestServiceAccountRegistration(t *testing.T) {
 
 	// Start server
 	testEnv := startInProcessServer(t, publicBaseURL)
-	defer testEnv.shutdown()
+
 
 	t.Log("Creating test data...")
 
@@ -346,7 +346,7 @@ func TestServiceAccountReissue(t *testing.T) {
 
 	// Start server
 	testEnv := startInProcessServer(t, publicBaseURL)
-	defer testEnv.shutdown()
+
 
 	t.Log("Creating test data...")
 
@@ -500,7 +500,7 @@ func TestUserLogin(t *testing.T) {
 
 	// Start server
 	testEnv := startInProcessServer(t, "")
-	defer testEnv.shutdown()
+
 
 	t.Log("Creating test data...")
 
@@ -778,7 +778,7 @@ func TestUserRegistration(t *testing.T) {
 
 	// Start server
 	testEnv := startInProcessServer(t, "")
-	defer testEnv.shutdown()
+
 
 	t.Log("Testing user registration endpoint...")
 
@@ -1045,7 +1045,7 @@ func TestPasswordResetFlow(t *testing.T) {
 
 	// Start test server
 	testEnv := startInProcessServer(t, publicBaseURL)
-	defer testEnv.shutdown()
+
 
 	// Create test accounts
 	adminAccount := createTestAccount(t, ctx, testEnv.queries, "isnadmin", "user", "admin@example.com")
@@ -1268,7 +1268,7 @@ func TestSelfServePasswordChange(t *testing.T) {
 
 	// Start test server
 	testEnv := startInProcessServer(t, "")
-	defer testEnv.shutdown()
+
 
 	t.Run("successful password change with correct current password", func(t *testing.T) {
 		// Create test user

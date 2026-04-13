@@ -11,7 +11,7 @@ import (
 
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
-	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
+	"github.com/information-sharing-networks/signalsd/app/internal/responses"
 )
 
 // CORS returns a CORS middleware using the provided pre-built middleware instance.

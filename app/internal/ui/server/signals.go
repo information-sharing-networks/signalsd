@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/a-h/templ"
 	"github.com/go-chi/chi/v5"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
@@ -40,13 +41,21 @@ func (s *Server) SearchSignalsPage(w http.ResponseWriter, r *http.Request) {
 	// Convert permissions to ISN list for dropdown
 	isns := getIsnOptions(insPerms, false, false)
 
-	// Render search page
-	component := templates.SearchSignalsPage(s.config.Environment, isns, insPerms, nil)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render signal search page", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.SearchSignalsPage(s.config.Environment, isns, insPerms, nil)).ServeHTTP(w, r)
 }
 
+// GetLatestCorrelatedSignals godoc
+//
+//	@Summary		Get correlated signals
+//	@Description	HTMX endpoint. Returns a table of signals correlated to the specified signal.
+//	@Tags			HTMX Actions
+//	@Param			signal_id			path	string	true	"Signal ID"
+//	@Param			isn_slug			path	string	true	"ISN slug"
+//	@Param			signal_type_slug	path	string	true	"Signal type slug"
+//	@Param			sem_ver				path	string	true	"Semantic version"
+//	@Param			count				path	int		true	"Number of correlated signals already displayed"
+//	@Success		200					"HTML partial"
+//	@Router			/ui-api/signals/{isn_slug}/{signal_type_slug}/v{sem_ver}/{signal_id}/correlated/{count} [get]
 func (s *Server) GetLatestCorrelatedSignals(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
@@ -67,11 +76,7 @@ func (s *Server) GetLatestCorrelatedSignals(w http.ResponseWriter, r *http.Reque
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
 		reqLogger.Error("Access token details not found in context")
-
-		component := templates.ErrorAlert("Authentication required. Please log in again.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Authentication required. Please log in again.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -85,20 +90,15 @@ func (s *Server) GetLatestCorrelatedSignals(w http.ResponseWriter, r *http.Reque
 	searchResp, err := s.apiClient.SearchSignals(accessTokenDetails.AccessToken, params, "private")
 	if err != nil {
 		reqLogger.Error("Signal search failed", slog.String("error", err.Error()))
-
 		return
 	}
 
-	if len(*searchResp) != 1 { // todo handle error
+	if len(*searchResp) != 1 {
 		reqLogger.Error(fmt.Sprintf("Expected 1 signal, got %d", len(*searchResp)))
 		return
 	}
 
-	// render correlated signals table
-	component := templates.CorrelatedSignalsTable((*searchResp)[0], count)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render correlated signals table", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.CorrelatedSignalsTable((*searchResp)[0], count)).ServeHTTP(w, r)
 }
 
 // SearchSignals godoc
@@ -106,18 +106,20 @@ func (s *Server) GetLatestCorrelatedSignals(w http.ResponseWriter, r *http.Reque
 //	@Summary		Search signals
 //	@Description	HTMX endpoint. Returns a table of signals matching the search criteria. Requires ISN read access.
 //	@Tags			HTMX Actions
-//	@Param			isn-slug					formData	string	true	"ISN slug"
-//	@Param			signal-type-slug			formData	string	true	"Signal type slug"
-//	@Param			sem-ver						formData	string	true	"Semantic version"
-//	@Param			start-date					formData	string	false	"Start date (ISO 8601)"
-//	@Param			end-date					formData	string	false	"End date (ISO 8601)"
-//	@Param			account-id					formData	string	false	"Filter by account ID"
-//	@Param			signal-id					formData	string	false	"Filter by signal ID"
-//	@Param			local-ref					formData	string	false	"Filter by local reference"
-//	@Param			include-withdrawn			formData	string	false	"'true' to include withdrawn signals"
-//	@Param			include-correlated			formData	string	false	"'true' to include correlated signals"
-//	@Param			include-previous-versions	formData	string	false	"'true' to include previous schema versions"
+//	@Param			isn-slug					query	string	true	"ISN slug"
+//	@Param			signal-type-slug			query	string	true	"Signal type slug"
+//	@Param			sem-ver						query	string	true	"Semantic version"
+//	@Param			start-date					query	string	false	"Start date (ISO 8601)"
+//	@Param			end-date					query	string	false	"End date (ISO 8601)"
+//	@Param			account-id					query	string	false	"Filter by account ID"
+//	@Param			signal-id					query	string	false	"Filter by signal ID"
+//	@Param			local-ref					query	string	false	"Filter by local reference"
+//	@Param			include-withdrawn			query	bool	false	"Include withdrawn signals"
+//	@Param			include-correlated			query	bool	false	"Include correlated signals"
+//	@Param			include-previous-versions	query	bool	false	"Include previous schema versions"
 //	@Success		200							"HTML partial"
+//	@Failure		400							"HTML error partial"
+//	@Failure		401							"HTML error partial"
 //	@Router			/ui-api/signals/search [get]
 func (s *Server) SearchSignals(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
@@ -139,10 +141,7 @@ func (s *Server) SearchSignals(w http.ResponseWriter, r *http.Request) {
 
 	// Validate required parameters
 	if params.IsnSlug == "" || params.SignalTypeSlug == "" || params.SemVer == "" {
-		component := templates.ErrorAlert("Please select ISN, signal type, and version.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Please select ISN, signal type, and version.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -150,21 +149,14 @@ func (s *Server) SearchSignals(w http.ResponseWriter, r *http.Request) {
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
 		reqLogger.Error("Access token details not found in context")
-
-		component := templates.ErrorAlert("Authentication required. Please log in again.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Authentication required. Please log in again.")).ServeHTTP(w, r)
 		return
 	}
 
 	// Get user permissions to determine visibility of the isn being searched
 	isnPerms := accessTokenDetails.IsnPerms
 	if len(isnPerms) == 0 {
-		component := templates.ErrorAlert("You don't have permission to access this ISN.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("You don't have permission to access this ISN.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -180,16 +172,9 @@ func (s *Server) SearchSignals(w http.ResponseWriter, r *http.Request) {
 			msg = "An error occurred. Please try again."
 		}
 
-		component := templates.ErrorAlert(msg)
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
 		return
 	}
 
-	// Render search results
-	component := templates.SearchResults(*searchResp, params)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render search results", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.SearchResults(*searchResp, params)).ServeHTTP(w, r)
 }

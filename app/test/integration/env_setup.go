@@ -18,6 +18,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -28,11 +29,14 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
+	"github.com/information-sharing-networks/signalsd/app/internal/publicisns"
+	"github.com/information-sharing-networks/signalsd/app/internal/router"
+	"github.com/information-sharing-networks/signalsd/app/internal/schemas"
 	"github.com/information-sharing-networks/signalsd/app/internal/server"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
-	"github.com/information-sharing-networks/signalsd/app/internal/server/isns"
-	"github.com/information-sharing-networks/signalsd/app/internal/server/schemas"
 )
+
+const testSecretKey = "test-secret-key-12345"
 
 // testEnv provides access to test db and server for integration tests
 type testEnv struct {
@@ -41,12 +45,14 @@ type testEnv struct {
 	pool           *pgxpool.Pool
 	queries        *database.Queries
 	authService    *auth.AuthService
-	publicIsnCache *isns.PublicIsnCache
-	shutdown       func()
+	publicIsnCache *publicisns.Cache
+	routerCache    *router.Cache
+	schemaCache    *schemas.Cache
 }
 
-// startInProcessServer starts the signalsd server in-process for testing - returns the base URL for the API and a shutdown function
-// a new database is created for each test and the server is configured to use it.
+// startInProcessServer starts the signalsd server in-process for testing.
+// A new database is created for each test and the server is configured to use it.
+// Server shutdown is registered via t.Cleanup automatically.
 func startInProcessServer(t *testing.T, publicBaseURL string) *testEnv {
 	t.Helper()
 
@@ -54,56 +60,54 @@ func startInProcessServer(t *testing.T, publicBaseURL string) *testEnv {
 
 	t.Log("Starting in-process server...")
 
-	// server config
 	var (
 		ctx         = context.Background()
 		port        = findFreePort(t)
 		logLevel    = logger.ParseLogLevel("none")
 		environment = "test"
-		secretKey   = "test-secret-key-12345"
 	)
 
 	// configure db
 	testEnv.pool = setupTestDatabase(t)
-	testDatabaseURL := testEnv.pool.Config().ConnString()
 
-	// Set environment variables before calling NewServerConfig
-	testEnvVars := map[string]string{
-		"SECRET_KEY":   secretKey,
-		"DATABASE_URL": testDatabaseURL,
-		"ENVIRONMENT":  environment,
-		"LOG_LEVEL":    logLevel.String(),
-		"PORT":         fmt.Sprintf("%d", port),
+	// Build config directly instead of round-tripping through environment variables
+	cfg := &signalsd.ServerEnvironment{
+		Environment:          environment,
+		Host:                 "0.0.0.0",
+		Port:                 port,
+		SecretKey:            testSecretKey,
+		DatabaseURL:          testEnv.pool.Config().ConnString(),
+		LogLevel:             logLevel.String(),
+		ServiceMode:          "all",
+		ReadTimeout:          15 * time.Second,
+		WriteTimeout:         15 * time.Second,
+		IdleTimeout:          60 * time.Second,
+		AllowedOrigins:       []string{"*"},
+		MaxSignalPayloadSize: 5242880,
+		MaxAPIRequestSize:    65536,
+		RateLimitRPS:         2500,
+		RateLimitBurst:       5000,
+		DBMaxConnections:     4,
+		DBMinConnections:     0,
+		DBMaxConnLifetime:    60 * time.Minute,
+		DBMaxConnIdleTime:    30 * time.Minute,
+		DBConnectTimeout:     5 * time.Second,
+		PublicBaseURL:        fmt.Sprintf("http://localhost:%d", port),
 	}
 
-	// Save original env vars and set test values
-	originalEnvVars := make(map[string]string)
-	for key, value := range testEnvVars {
-		originalEnvVars[key] = os.Getenv(key)
-		os.Setenv(key, value)
-	}
-
-	// Restore original environment variables when test completes
-	t.Cleanup(func() {
-		for key, original := range originalEnvVars {
-			if original != "" {
-				os.Setenv(key, original)
-			} else {
-				os.Unsetenv(key)
-			}
-		}
-	})
-
-	cfg, corsConfigs, err := signalsd.NewServerConfig()
-	if err != nil {
-		t.Fatalf("Failed to load configuration: %v", err)
-	}
-
-	cfg.ServiceMode = "all"
-
-	// publicBaseURL is only used when generating end user facing links like password reset - default to the test env url
+	// publicBaseURL is only used when generating end user facing links like password reset
 	if publicBaseURL != "" {
 		cfg.PublicBaseURL = publicBaseURL
+	}
+
+	// Allow tests to override allowed origins (e.g. CORS tests)
+	if origins := os.Getenv("ALLOWED_ORIGINS"); origins != "" {
+		cfg.AllowedOrigins = strings.Split(origins, "|")
+	}
+
+	corsConfigs, err := signalsd.CreateCORSConfigs(cfg)
+	if err != nil {
+		t.Fatalf("Failed to create CORS configs: %v", err)
 	}
 
 	testEnv.queries = database.New(testEnv.pool)
@@ -112,16 +116,21 @@ func startInProcessServer(t *testing.T, publicBaseURL string) *testEnv {
 		logLevel = logger.ParseLogLevel("Info")
 	}
 
-	testEnv.authService = auth.NewAuthService(secretKey, environment, testEnv.queries)
+	testEnv.authService = auth.NewAuthService(testSecretKey, environment, testEnv.queries)
 
-	schemaCache := schemas.NewSchemaCache()
-	if err := schemaCache.Load(ctx, testEnv.queries); err != nil {
+	testEnv.schemaCache = schemas.NewCache(testEnv.queries)
+	if err := testEnv.schemaCache.Load(ctx); err != nil {
 		t.Logf("Warning: Failed to load schema cache: %v", err)
 	}
 
-	testEnv.publicIsnCache = isns.NewPublicIsnCache()
-	if err := testEnv.publicIsnCache.Load(ctx, testEnv.queries); err != nil {
+	testEnv.publicIsnCache = publicisns.NewCache(testEnv.queries)
+	if err := testEnv.publicIsnCache.Load(ctx); err != nil {
 		t.Logf("Warning: Failed to load public ISN cache: %v", err)
+	}
+
+	testEnv.routerCache = router.NewCache(testEnv.queries)
+	if err := testEnv.routerCache.Load(ctx); err != nil {
+		t.Logf("Warning: Failed to load router cache: %v", err)
 	}
 
 	appLogger := logger.InitLogger(logLevel, environment)
@@ -133,8 +142,9 @@ func startInProcessServer(t *testing.T, publicBaseURL string) *testEnv {
 		cfg,
 		corsConfigs,
 		appLogger,
-		schemaCache,
+		testEnv.schemaCache,
 		testEnv.publicIsnCache,
+		testEnv.routerCache,
 	)
 
 	// Create a cancellable context for server shutdown
@@ -149,31 +159,26 @@ func startInProcessServer(t *testing.T, publicBaseURL string) *testEnv {
 		}
 	}()
 
-	// Create shutdown function to be called by the test
-	testEnv.shutdown = func() {
+	// Register shutdown via t.Cleanup so callers don't need to remember defer
+	t.Cleanup(func() {
 		t.Log("Stopping server...")
-
-		// Cancel the server context to trigger graceful shutdown
 		serverCancel()
 
-		// Wait for server to shut down gracefully with timeout
 		select {
 		case err := <-serverDone:
 			if err != nil {
-				t.Logf("❌ Server shutdown with error: %v", err)
+				t.Logf("Server shutdown with error: %v", err)
 			} else {
-				t.Log("✅ Server shut down")
+				t.Log("Server shut down")
 			}
 		case <-time.After(5 * time.Second):
-			t.Log("⚠️ Server shutdown timeout")
+			t.Log("Server shutdown timeout")
 		}
 
-		// Ensure database connections are closed
 		serverInstance.DatabaseShutdown()
-	}
+	})
 
 	testEnv.baseURL = fmt.Sprintf("http://localhost:%d", cfg.Port)
-
 	testEnv.cfg = cfg
 
 	// Wait for server to be ready
@@ -181,18 +186,7 @@ func startInProcessServer(t *testing.T, publicBaseURL string) *testEnv {
 		t.Fatal("Server failed to start within timeout")
 	}
 
-	// Test the server is working
-	resp, err := http.Get(testEnv.baseURL + "/health/live")
-	if err != nil {
-		t.Fatalf("Failed to call health endpoint: %v", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		t.Errorf("Expected status 200, got %d", resp.StatusCode)
-	}
-
-	t.Logf("✅ Server started at %s", testEnv.baseURL)
+	t.Logf("Server started at %s", testEnv.baseURL)
 	return testEnv
 }
 
@@ -239,54 +233,21 @@ func (d *databaseConfig) connectionURL() string {
 		d.user, d.host, d.port, d.dbname)
 }
 
-func (d *databaseConfig) WithDbname(dbname string) *databaseConfig {
-	return &databaseConfig{
-		user:   d.user,
-		host:   d.host,
-		port:   d.port,
-		dbname: dbname,
-	}
-}
-
-func (d *databaseConfig) WithPort(port int) *databaseConfig {
-	return &databaseConfig{
-		user:   d.user,
-		host:   d.host,
-		port:   port,
-		dbname: d.dbname,
-	}
-}
-
-func (d *databaseConfig) WithUser(user string) *databaseConfig {
-	return &databaseConfig{
-		user:   user,
-		host:   d.host,
-		port:   d.port,
-		dbname: d.dbname,
-	}
-}
-
-// setupTestDatabase creates an empty test db, applies migrations and returns a connection pool
-// the function auto-detetcs if it is running in CI (github actions) and uses the appropriate database config
+// setupTestDatabase creates an empty test db, applies migrations and returns a connection pool.
+// The function auto-detects if it is running in CI (github actions) and uses the appropriate database config.
 func setupTestDatabase(t *testing.T) *pgxpool.Pool {
 	ctx := context.Background()
-	config := &databaseConfig{
-		host: "localhost",
-	}
+
+	config := &databaseConfig{host: "localhost", user: "signalsd-dev", port: 15432}
 	if os.Getenv("GITHUB_ACTIONS") == "true" {
-		config = config.WithUser("postgres:postgres").
-			WithPort(5432)
-	} else {
-		config = config.WithUser("signalsd-dev").
-			WithPort(15432)
+		config = &databaseConfig{host: "localhost", user: "postgres:postgres", port: 5432}
 	}
 
 	// Generate a unique test database name
 	testDbName := fmt.Sprintf("test_%d", time.Now().UnixMilli())
 
 	// Connect to the postgres database to create the test database
-	postgresConfig := config.WithDbname("postgres")
-	postgresConnectionURL := postgresConfig.connectionURL()
+	postgresConnectionURL := (&databaseConfig{user: config.user, host: config.host, port: config.port, dbname: "postgres"}).connectionURL()
 
 	postgresPoolConfig, err := pgxpool.ParseConfig(postgresConnectionURL)
 	if err != nil {
@@ -317,8 +278,7 @@ func setupTestDatabase(t *testing.T) *pgxpool.Pool {
 	})
 
 	// Connect to the new test database
-	testDbConfig := config.WithDbname(testDbName)
-	testDatabaseURL := testDbConfig.connectionURL()
+	testDatabaseURL := (&databaseConfig{user: config.user, host: config.host, port: config.port, dbname: testDbName}).connectionURL()
 	testDatabasePool := setupDatabaseConn(t, testDatabaseURL)
 
 	// Apply database migrations

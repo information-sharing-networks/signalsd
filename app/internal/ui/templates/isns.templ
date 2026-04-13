@@ -8,9 +8,30 @@ templ CreateIsnPage(environment string) {
 	@BaseLayout("Create ISN") {
 		@Navigation(environment)
 		<div class="page-container">
-			<h1 class="page-title">Create a new Information Sharing Network</h1>
+			<h1 class="page-title">Create a New Information Sharing Network</h1>
 			<div class="card">     
 				<div class="card-body"> 
+					@InfoAlert() {
+						<em>Visibility</em>
+						<br></br>
+						<br></br>
+
+						Signals in a private ISN can only be seen by members of the ISN. Signals in a public ISNs can be viewed by anyone (no authentication required). Accounts need write permission for the ISN before they can submit signals
+						<br></br>
+						<br></br>
+						Once the ISN is created you can:
+						<ul>
+							<li>Grant accounts permission to use it</li>
+							<li>Add the Signal Types that can be shared over the network</li>
+						</ul>
+						There can be multiple ISNs on the site and each ISN can have a different membership and be configured for different Signal Types.
+					}
+					@NoticeAlert() {
+						Newly created ISNs are not listed in your session permissions until you login again.
+						If you get "You need to be an admin for at least one ISN to access this page" alerts or 
+						do not see the new ISN in the app dropdown lists, you need to login
+						again to refresh your permissions.
+					}
 					<form hx-post="/ui-api/isn/create" hx-target="#isn-result" class="margin-top-4">
 						<div class="form-group">
 							<label for="title" class="form-label">Title</label>

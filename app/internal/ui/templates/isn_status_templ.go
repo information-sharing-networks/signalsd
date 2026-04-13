@@ -9,8 +9,6 @@ import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
 import (
-	"strings"
-
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
@@ -90,7 +88,7 @@ func ManageIsnStatusPage(environment string, isns []types.IsnOption) templ.Compo
 				var templ_7745c5c3_Var4 string
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(isn.Slug)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/isn_status.templ`, Line: 40, Col: 33}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/isn_status.templ`, Line: 38, Col: 33}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 				if templ_7745c5c3_Err != nil {
@@ -101,9 +99,9 @@ func ManageIsnStatusPage(environment string, isns []types.IsnOption) templ.Compo
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var5 string
-				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(strings.ReplaceAll(isn.Slug, "-", " "))
+				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(isn.Slug)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/isn_status.templ`, Line: 40, Col: 76}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/isn_status.templ`, Line: 38, Col: 46}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 				if templ_7745c5c3_Err != nil {

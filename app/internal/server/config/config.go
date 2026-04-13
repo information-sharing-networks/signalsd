@@ -1,4 +1,4 @@
-package signalsd
+package config
 
 import (
 	"fmt"
@@ -42,11 +42,12 @@ type CORSConfigs struct {
 	Protected *cors.Middleware
 }
 
+// fixed configs for the server (use ServerEnvironment where values need to be configurable)
 const (
 	RefreshTokenCookieName = "refresh_token"
 	TokenIssuerName        = "Signalsd"
 
-	// Security & Auth constants
+	// Security & Auth constants - TODO - make security settings env configurable?
 	BcryptCost            = 10                   // bcrypt.DefaultCost = 10
 	AccessTokenExpiry     = 30 * time.Minute     // JWT access token lifetime
 	RefreshTokenExpiry    = 30 * 24 * time.Hour  // Refresh token lifetime (30 days)
@@ -60,6 +61,9 @@ const (
 	DatabasePingTimeout   = 10 * time.Second
 	ReadinessTimeout      = 2 * time.Second // Health check timeout
 
+	// CachePollInterval is how often each instance checks the DB for cache changes
+	CachePollInterval = 30 * time.Second
+
 	// CORS settings
 	CORSMaxAgeInSeconds = 86400 // 24 hours
 
@@ -72,6 +76,7 @@ const (
 
 // common maps - used to validate enum values
 
+// validEnvs lists the valid deployment types (prod, dev etc)
 var validEnvs = map[string]bool{
 	"dev":     true,
 	"test":    true,
@@ -80,29 +85,47 @@ var validEnvs = map[string]bool{
 	"staging": true,
 }
 
-var ValidVisibilities = map[string]bool{ // isn.visibility
+// ValidVisiblities is the list of valid isn visibility statuses
+var ValidVisibilities = map[string]bool{
 	"public":  true,
 	"private": true,
 }
 
-var ValidRoles = map[string]bool{ // users.user_role
+// ValidRoles is the list of roles supported on the site
+var ValidRoles = map[string]bool{
 	"siteadmin": true,
 	"isnadmin":  true,
 	"member":    true,
 }
 
-var ValidAccountTypes = map[string]bool{ // accounts.account_type
+// ValidAccountTypes is the list of account types on the site
+var ValidAccountTypes = map[string]bool{
 	"user":            true,
 	"service-account": true,
 }
 
+// ValidServiceModes is the list of modes that can be used when starting the signalsd service
 var ValidServiceModes = map[string]bool{ // service modes for CLI
-	"all":           true, // signalsd backend + embeded UI
-	"api":           true, // all the api endpoints (no UI)
-	"admin":         true, // admin endpoints w/o signals ops
-	"signals":       true, // both read and write
-	"signals-read":  true, // read-only signal operations
-	"signals-write": true, // write-only signal operations
+	// signalsd backend + embeded UI
+	"all": true,
+	// all the api endpoints (no UI)
+	"api": true,
+	// admin endpoints w/o signals ops
+	"admin": true,
+	// read and write signal operations (no admin)
+	"signals": true,
+	// read-only signal operations
+	"signals-read": true,
+	// write-only signal operations
+	"signals-write": true,
+}
+
+// ValidRouteMatchingOperators list the limited set of operations supported for isn routes
+var ValidRouteMatchingOperators = map[string]bool{
+	"matches":        true,
+	"equals":         true,
+	"does_not_match": true,
+	"does_not_equal": true,
 }
 
 // NewServerConfig loads environment variables and returns a ServerEnvironment struct and CORSConfigs
@@ -132,7 +155,7 @@ func NewServerConfig() (*ServerEnvironment, *CORSConfigs, error) {
 	}
 
 	// Initialize CORS configurations
-	corsConfigs, err := createCORSConfigs(&cfg)
+	corsConfigs, err := CreateCORSConfigs(&cfg)
 	if err != nil {
 		return nil, nil, fmt.Errorf("CORS configuration failed: %w", err)
 	}
@@ -223,8 +246,8 @@ func validateConfig(cfg *ServerEnvironment) error {
 	return nil
 }
 
-// createCORSConfigs creates the CORS configurations based on the server config
-func createCORSConfigs(cfg *ServerEnvironment) (*CORSConfigs, error) {
+// CreateCORSConfigs creates the CORS configurations based on the server config
+func CreateCORSConfigs(cfg *ServerEnvironment) (*CORSConfigs, error) {
 	// Trim whitespace from all origins
 	origins := make([]string, len(cfg.AllowedOrigins))
 	for i, origin := range cfg.AllowedOrigins {

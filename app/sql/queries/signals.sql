@@ -299,6 +299,14 @@ ORDER BY
     lsv.version_number,
     lsv.id;
 
+-- name: GetIsnBySignalID :one
+-- Returns the ISN id and slug for the ISN that owns the signal with the given ID.
+SELECT i.id, i.slug
+FROM signals s
+JOIN isn i ON i.id = s.isn_id
+WHERE s.id = $1
+AND i.is_in_use = true;
+
 -- name: GetPreviousSignalVersions :many
 -- get the previous versions for the supplied signals (no rows returned if the signal only has 1 version)
 SELECT sv.signal_id, id as signal_version_id, sv.created_at, sv.version_number, sv.content

@@ -32,8 +32,8 @@ info:
     The signalsd backend service acts as an OAuth 2.0 Authorization Server and supports web users and service accounts.
 
     ### Authentication Flows
-    - **Web users**: (Refresh Token Grant Type) Authentication via /auth/login → receive JWT access token + HTTP-only refresh cookie → use bearer tokens for API calls
-    - **Service accounts**: Clients implement OAuth Client Credentials flow → receive JWT access token → use bearer tokens for API calls
+    - **Web users**: (Refresh Token Grant Type) Authentication via /auth/login -> receive JWT access token + HTTP-only refresh cookie -> use bearer tokens for API calls
+    - **Service accounts**: Clients implement OAuth Client Credentials flow -> receive JWT access token -> use bearer tokens for API calls
 
     ### Token Usage
     All protected API endpoints require a valid JWT access token in the Authorization header:
@@ -86,7 +86,7 @@ info:
 
     ## Route types
     - **Page handlers** (`GET /admin/*`, `/search`, etc.): return a full HTML page (`200`)
-    - **HTMX action handlers** (`PUT`/`POST` to `/ui-api/*`): return an HTML partial (`200`) — either a success or error alert fragment
+    - **HTMX action handlers** (`PUT`/`POST` to `/ui-api/*`): return an HTML partial (`200`) - either a success or error alert fragment
 
     - see /ui-docs for more information
 
@@ -199,6 +199,26 @@ paths:
       summary: Transfer ISN ownership page
       tags:
       - UI Pages
+  /admin/service-accounts/create:
+    get:
+      description: Renders the create service account form. Requires isnadmin or siteadmin
+        role.
+      responses:
+        "200":
+          description: HTML page
+      summary: Create service account page
+      tags:
+      - UI Pages
+  /admin/service-accounts/reissue-credentials:
+    get:
+      description: Renders the reissue credentials form. Requires isnadmin or siteadmin
+        role.
+      responses:
+        "200":
+          description: HTML page
+      summary: Reissue service account credentials page
+      tags:
+      - UI Pages
   /admin/signal-types/create:
     get:
       description: Renders the create signal type form. Requires siteadmin role.
@@ -226,6 +246,16 @@ paths:
         "200":
           description: HTML page
       summary: Register new signal type schema page
+      tags:
+      - UI Pages
+  /admin/signal-types/routing:
+    get:
+      description: Renders the Signals Routing Rules management page. Requires siteadmin
+        role.
+      responses:
+        "200":
+          description: HTML page
+      summary: Manage ISN routing page
       tags:
       - UI Pages
   /admin/users/generate-password-reset-link:
@@ -272,6 +302,8 @@ paths:
       responses:
         "200":
           description: HTML partial or HX-Redirect header
+        "400":
+          description: HTML error partial
       summary: Authenticate user
       tags:
       - HTMX Actions
@@ -313,6 +345,8 @@ paths:
       responses:
         "200":
           description: HTML partial
+        "400":
+          description: HTML error partial
       summary: Register new user
       tags:
       - HTMX Actions
@@ -357,6 +391,10 @@ paths:
       responses:
         "200":
           description: HTML partial
+        "400":
+          description: HTML error partial
+        "401":
+          description: HTML error partial
       summary: Update password
       tags:
       - HTMX Actions
@@ -378,6 +416,10 @@ paths:
       responses:
         "200":
           description: HTML partial
+        "400":
+          description: HTML error partial
+        "401":
+          description: HTML error partial
       summary: Grant or revoke ISN admin role
       tags:
       - HTMX Actions
@@ -407,6 +449,10 @@ paths:
       responses:
         "200":
           description: HTML partial
+        "400":
+          description: HTML error partial
+        "401":
+          description: HTML error partial
       summary: Enable or disable an account
       tags:
       - HTMX Actions
@@ -428,7 +474,21 @@ paths:
       responses:
         "200":
           description: HTML partial
+        "400":
+          description: HTML error partial
+        "401":
+          description: HTML error partial
       summary: Grant or revoke site admin role
+      tags:
+      - HTMX Actions
+  /ui-api/alerts/clear:
+    get:
+      description: HTMX endpoint. Returns empty content to clear any displayed alert
+        partial.
+      responses:
+        "200":
+          description: empty
+      summary: Clear alert messages
       tags:
       - HTMX Actions
   /ui-api/isn/accounts/manage:
@@ -462,6 +522,10 @@ paths:
       responses:
         "200":
           description: HTML partial
+        "400":
+          description: HTML error partial
+        "401":
+          description: HTML error partial
       summary: Manage ISN accounts
       tags:
       - HTMX Actions
@@ -488,6 +552,10 @@ paths:
       responses:
         "200":
           description: HTML partial
+        "400":
+          description: HTML error partial
+        "401":
+          description: HTML error partial
       summary: Create ISN
       tags:
       - HTMX Actions
@@ -509,6 +577,10 @@ paths:
       responses:
         "200":
           description: HTML partial
+        "400":
+          description: HTML error partial
+        "401":
+          description: HTML error partial
       summary: Enable or disable an ISN
       tags:
       - HTMX Actions
@@ -535,6 +607,10 @@ paths:
       responses:
         "200":
           description: HTML partial
+        "400":
+          description: HTML error partial
+        "401":
+          description: HTML error partial
       summary: Add signal type to ISN
       tags:
       - HTMX Actions
@@ -566,6 +642,10 @@ paths:
       responses:
         "200":
           description: HTML partial
+        "400":
+          description: HTML error partial
+        "401":
+          description: HTML error partial
       summary: Enable or disable a signal type for an ISN
       tags:
       - HTMX Actions
@@ -587,7 +667,93 @@ paths:
       responses:
         "200":
           description: HTML partial
+        "400":
+          description: HTML error partial
+        "401":
+          description: HTML error partial
       summary: Transfer ISN ownership
+      tags:
+      - HTMX Actions
+  /ui-api/options/isn/signal-type-slugs:
+    get:
+      description: HTMX endpoint. Returns a signal type slug select element scoped
+        to the user's token permissions for the selected ISN.
+      parameters:
+      - description: ISN slug
+        example: felixstowe-isn
+        in: query
+        name: isn-slug
+        required: true
+        type: string
+      - description: Include inactive signal types
+        in: query
+        name: include_inactive
+        type: boolean
+      responses:
+        "200":
+          description: HTML partial
+        "400":
+          description: empty response
+      summary: Signal type slugs dropdown (token-scoped)
+      tags:
+      - HTMX Actions
+  /ui-api/options/isn/signal-type-versions:
+    get:
+      description: HTMX endpoint. Returns a version select element for a signal type,
+        scoped to the selected ISN via the user's token permissions.
+      parameters:
+      - description: Signal type slug
+        example: sample-signal-type
+        in: query
+        name: signal-type-slug
+        required: true
+        type: string
+      - description: ISN slug
+        example: felixstowe-isn
+        in: query
+        name: isn-slug
+        required: true
+        type: string
+      - description: Include inactive versions
+        in: query
+        name: include_inactive
+        type: boolean
+      responses:
+        "200":
+          description: HTML partial
+        "400":
+          description: empty response
+      summary: Signal type versions dropdown (token-scoped)
+      tags:
+      - HTMX Actions
+  /ui-api/options/signal-type-slugs:
+    get:
+      description: |-
+        HTMX endpoint. Returns a signal type slug select element for admin forms.
+        Covers all globally-registered signal types regardless of ISN membership.
+      responses:
+        "200":
+          description: HTML partial
+      summary: Signal type slugs dropdown (admin)
+      tags:
+      - HTMX Actions
+  /ui-api/options/signal-type-versions:
+    get:
+      description: HTMX endpoint. Returns a version select element for a signal type.
+        Covers all globally-registered versions.
+      parameters:
+      - description: Signal type slug
+        example: sample-signal-type
+        in: query
+        name: signal-type-slug
+        required: true
+        type: string
+      responses:
+        "200":
+          description: HTML partial
+        "400":
+          description: empty response
+      summary: Signal type versions dropdown (admin)
       tags:
       - HTMX Actions
   /ui-api/service-accounts/create:
@@ -608,6 +774,10 @@ paths:
       responses:
         "200":
           description: HTML partial
+        "400":
+          description: HTML error partial
+        "401":
+          description: HTML error partial
       summary: Create service account
       tags:
       - HTMX Actions
@@ -624,12 +794,16 @@ paths:
       responses:
         "200":
           description: HTML partial
+        "400":
+          description: HTML error partial
+        "401":
+          description: HTML error partial
       summary: Reissue service account credentials
       tags:
       - HTMX Actions
   /ui-api/signal-types/create:
     post:
-      description: HTMX endpoint. Creates a new signal type at version 1.0.0. Requires
+      description: HTMX endpoint. Creates a new signal type at version . Requires
         siteadmin role.
       parameters:
       - description: Signal type title
@@ -663,6 +837,10 @@ paths:
       responses:
         "200":
           description: HTML partial
+        "400":
+          description: HTML error partial
+        "401":
+          description: HTML error partial
       summary: Create signal type
       tags:
       - HTMX Actions
@@ -699,7 +877,217 @@ paths:
       responses:
         "200":
           description: HTML partial
+        "400":
+          description: HTML error partial
+        "401":
+          description: HTML error partial
       summary: Register new signal type schema version
+      tags:
+      - HTMX Actions
+  /ui-api/signal-types/routing:
+    delete:
+      description: HTMX endpoint. Deletes all routing rules for a signal type version.
+      parameters:
+      - description: signal type slug
+        example: sample-signal-type
+        in: formData
+        name: signal-type-slug
+        required: true
+        type: string
+      - description: version
+        example: 1.0.0
+        in: formData
+        name: sem-ver
+        required: true
+        type: string
+      responses:
+        "200":
+          description: HTML partial
+        "400":
+          description: HTML error partial
+        "401":
+          description: HTML error partial
+      summary: Delete Signals Routing Rules
+      tags:
+      - HTMX Actions
+    get:
+      description: |-
+        HTMX endpoint. Renders the routing rule form for the selected signal type version.
+        Returns empty 200 if either param is missing (htmx cascade not yet complete).
+      parameters:
+      - description: signal type slug
+        example: sample-signal-type
+        in: query
+        name: signal-type-slug
+        required: true
+        type: string
+      - description: version
+        example: 1.0.0
+        in: query
+        name: sem-ver
+        required: true
+        type: string
+      responses:
+        "200":
+          description: HTML partial
+      summary: Load signals routing form
+      tags:
+      - HTMX Actions
+    put:
+      description: HTMX endpoint. Saves routing rules for a signal type version.
+      parameters:
+      - description: signal type slug
+        example: sample-signal-type
+        in: formData
+        name: signal-type-slug
+        required: true
+        type: string
+      - description: version
+        example: 1.0.0
+        in: formData
+        name: sem-ver
+        required: true
+        type: string
+      - description: gjson path to routing field
+        example: payload.portOfEntry
+        in: formData
+        name: routing-field
+        required: true
+        type: string
+      - collectionFormat: csv
+        description: match pattern per row
+        example: '*felixstowe*'
+        in: formData
+        items:
+          type: string
+        name: match-patterns
+        required: true
+        type: array
+      - collectionFormat: csv
+        description: operator per row
+        in: formData
+        items:
+          enum:
+          - matches
+          - equals
+          - does_not_match
+          - does_not_equal
+          type: string
+        name: operators
+        required: true
+        type: array
+      - collectionFormat: csv
+        description: '''true'' or ''false'' per row'
+        in: formData
+        items:
+          type: string
+        name: case-insensitive
+        required: true
+        type: array
+      - collectionFormat: csv
+        description: target ISN slug per row
+        example: felixstowe-isn
+        in: formData
+        items:
+          type: string
+        name: isn-slugs
+        required: true
+        type: array
+      responses:
+        "200":
+          description: HTML partial
+        "400":
+          description: HTML error partial
+        "401":
+          description: HTML error partial
+      summary: Save Signals Routing Rules
+      tags:
+      - HTMX Actions
+  /ui-api/signal-types/routing/add-row:
+    get:
+      description: |-
+        HTMX endpoint. Returns a new empty mapping row to append to the form table.
+        The optional count param is used to set the initial sequence label in the rendered row.
+      responses:
+        "200":
+          description: HTML partial
+      summary: Add routing mapping row
+      tags:
+      - HTMX Actions
+  /ui-api/signal-types/routing/remove-row:
+    get:
+      description: HTMX endpoint. Returns empty content; the caller uses hx-swap="outerHTML"
+        to remove the row.
+      responses:
+        "200":
+          description: empty
+      summary: Remove routing mapping row
+      tags:
+      - HTMX Actions
+  /ui-api/signal-types/toggle-skip-readme:
+    get:
+      description: HTMX endpoint. Returns a readme URL input field, enabled or disabled
+        based on the skip-readme flag.
+      parameters:
+      - description: '''true'' to render the field as disabled'
+        in: query
+        name: skip-readme
+        type: boolean
+      responses:
+        "200":
+          description: HTML partial
+      summary: Toggle readme URL input
+      tags:
+      - HTMX Actions
+  /ui-api/signal-types/toggle-skip-validation:
+    get:
+      description: HTMX endpoint. Returns a schema URL input field, enabled or disabled
+        based on the skip-validation flag.
+      parameters:
+      - description: '''true'' to render the field as disabled'
+        in: query
+        name: skip-validation
+        type: boolean
+      responses:
+        "200":
+          description: HTML partial
+      summary: Toggle schema validation input
+      tags:
+      - HTMX Actions
+  /ui-api/signals/{isn_slug}/{signal_type_slug}/v{sem_ver}/{signal_id}/correlated/{count}:
+    get:
+      description: HTMX endpoint. Returns a table of signals correlated to the specified
+        signal.
+      parameters:
+      - description: Signal ID
+        in: path
+        name: signal_id
+        required: true
+        type: string
+      - description: ISN slug
+        in: path
+        name: isn_slug
+        required: true
+        type: string
+      - description: Signal type slug
+        in: path
+        name: signal_type_slug
+        required: true
+        type: string
+      - description: Semantic version
+        in: path
+        name: sem_ver
+        required: true
+        type: string
+      - description: Number of correlated signals already displayed
+        in: path
+        name: count
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: HTML partial
+      summary: Get correlated signals
       tags:
       - HTMX Actions
   /ui-api/signals/search:
@@ -708,55 +1096,59 @@ paths:
         Requires ISN read access.
       parameters:
       - description: ISN slug
-        in: formData
+        in: query
         name: isn-slug
         required: true
         type: string
       - description: Signal type slug
-        in: formData
+        in: query
         name: signal-type-slug
         required: true
         type: string
       - description: Semantic version
-        in: formData
+        in: query
         name: sem-ver
         required: true
         type: string
       - description: Start date (ISO 8601)
-        in: formData
+        in: query
         name: start-date
         type: string
       - description: End date (ISO 8601)
-        in: formData
+        in: query
         name: end-date
         type: string
       - description: Filter by account ID
-        in: formData
+        in: query
         name: account-id
         type: string
       - description: Filter by signal ID
-        in: formData
+        in: query
         name: signal-id
         type: string
       - description: Filter by local reference
-        in: formData
+        in: query
         name: local-ref
         type: string
-      - description: '''true'' to include withdrawn signals'
-        in: formData
+      - description: Include withdrawn signals
+        in: query
         name: include-withdrawn
-        type: string
-      - description: '''true'' to include correlated signals'
-        in: formData
+        type: boolean
+      - description: Include correlated signals
+        in: query
         name: include-correlated
-        type: string
-      - description: '''true'' to include previous schema versions'
-        in: formData
+        type: boolean
+      - description: Include previous schema versions
+        in: query
         name: include-previous-versions
-        type: string
+        type: boolean
       responses:
         "200":
           description: HTML partial
+        "400":
+          description: HTML error partial
+        "401":
+          description: HTML error partial
       summary: Search signals
       tags:
       - HTMX Actions
@@ -773,6 +1165,10 @@ paths:
       responses:
         "200":
           description: HTML partial
+        "400":
+          description: HTML error partial
+        "401":
+          description: HTML error partial
       summary: Generate password reset link
       tags:
       - HTMX Actions
@@ -788,4 +1184,5 @@ swagger: "2.0"
 tags:
 - description: Browser-based management interface. Page handlers return full HTML
   name: UI Pages
-- name: HTMX Actions
+- description: HTMX action handlers (/ui-api/*) return HTML partials
+  name: HTMX Actions

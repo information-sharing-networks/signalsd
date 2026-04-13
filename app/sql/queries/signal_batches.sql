@@ -1,10 +1,19 @@
-
 -- name: UpsertSignalBatch :one
-INSERT INTO signal_batches (batch_ref, account_id)
-VALUES ($1, $2)
-ON CONFLICT (account_id, batch_ref) DO UPDATE
-  SET batch_ref = EXCLUDED.batch_ref  -- no-op update to trigger RETURNING
-RETURNING id, batch_ref, account_id, created_at;
+-- use this to create a new batch when a new batch ref is supplied
+WITH ins AS (
+  INSERT INTO signal_batches (id, batch_ref, account_id)
+  VALUES (gen_random_uuid(), $1, $2)
+  ON CONFLICT (account_id, batch_ref) DO NOTHING
+  RETURNING id, batch_ref, account_id, created_at
+)
+SELECT * FROM ins
+UNION ALL
+SELECT id, batch_ref, account_id, created_at
+  FROM signal_batches
+ WHERE account_id = $2
+   AND batch_ref = $1
+   AND NOT EXISTS (SELECT 1 FROM ins)
+LIMIT 1;
 
 -- name: GetSignalBatchByID :one
 SELECT id, batch_ref, account_id, created_at FROM signal_batches

@@ -48,7 +48,7 @@ func AccessDeniedPage(environment string, title, message string) templ.Component
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><div class=\"text-center\"><h1 class=\"page-title\">Access Denied</h1><div class=\"card max-w-md mx-auto\"><div class=\"card-body\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, " <div class=\"page-container\"><h1 class=\"page-title\">Access Denied</h1><div class=\"card max-w-md mx-auto\"><div class=\"card-body\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -56,7 +56,7 @@ func AccessDeniedPage(environment string, title, message string) templ.Component
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"margin-top-4\"><a href=\"/dashboard\" class=\"btn btn-primary\">← Back to Dashboard</a></div></div></div></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<div class=\"margin-top-4\"><a href=\"/dashboard\" class=\"btn btn-primary\">← Back to Dashboard</a></div></div></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

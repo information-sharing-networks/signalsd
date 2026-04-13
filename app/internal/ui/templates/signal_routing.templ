@@ -1,0 +1,220 @@
+package templates
+
+import (
+	"fmt"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
+	"strconv"
+)
+
+// ManageSignalRoutingPage is the top-level page.
+// The user selects a signal type then a version.
+// The routing form is loaded via HTMX once a version is chosen.
+templ ManageSignalRoutingPage(environment string, signalTypes []types.SignalTypeSlug) {
+	@BaseLayout("Manage ISN routing") {
+		@Navigation(environment)
+		<div class="page-container">
+			<h1 class="page-title">Signals Routing Rules</h1>
+			<div class="card">
+				<div class="card-body">
+					<p class="card-description text-muted">
+						Configure which ISN receives signals based on a field value in the signal content.
+						Select a signal type and version to view or edit its routing rules.
+					</p>
+					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+						<div class="form-group">
+							<label for="signal-type-slug" class="form-label">Signal Type</label>
+							<select
+								id="signal-type-slug"
+								name="signal-type-slug"
+								required
+								class="form-select"
+								hx-get="/ui-api/options/signal-type-versions"
+								hx-target="#sem-ver"
+								hx-swap="outerHTML"
+								hx-trigger="change"
+								hx-indicator="#signal-type-loading"
+							>
+								<option value="">Select Signal Type...</option>
+								for _, st := range signalTypes {
+									<option value={ st.Slug }>{ st.Slug }</option>
+								}
+							</select>
+							<div id="signal-type-loading" class="htmx-indicator loading-spinner">Loading...</div>
+						</div>
+						// The form-load trigger lives on this stable parent div (form-group)
+						// The change event bubbles up from the version select and returns the routing form
+						<div
+							class="form-group"
+							hx-get="/ui-api/signal-types/routing"
+							hx-target="#routing-form-container"
+							hx-swap="innerHTML"
+							hx-trigger="change"
+							hx-include="[name='signal-type-slug'],[name='sem-ver']"
+						>
+							<label for="sem-ver" class="form-label">Version</label>
+							<select id="sem-ver" name="sem-ver" required disabled class="form-select">
+								<option value="">Select version...</option>
+							</select>
+						</div>
+					</div>
+					<div id="routing-form-container" class="margin-top-4"></div>
+				</div>
+			</div>
+		</div>
+		@RoutingTableScript()
+	}
+}
+
+// SignalRoutingForm renders the editable routing rule form for a signal type version.
+// existingConfig is nil when no rules are configured yet.
+// isnOptions is used to populate the target ISN dropdown in each mapping row.
+templ SignalRoutingForm(slug, semVer string, existingConfig *client.SignalRoutingConfigResponse, isnOptions []types.IsnOption) {
+	<div id="routing-form">
+		<h2 class="text-lg font-semibold margin-top-4">
+			{ slug }/v{ semVer }
+		</h2>
+		if existingConfig != nil {
+			<p class="text-muted text-sm">Routing field: <code>{ existingConfig.RoutingField }</code> { fmt.Sprintf("(%d mapping(s) configured)", len(existingConfig.RoutingRules)) }</p>
+		} else {
+			<p class="text-muted text-sm">No routing rules configured yet.</p>
+		}
+		<form
+			hx-put="/ui-api/signal-types/routing"
+			hx-target="#routing-result"
+			hx-swap="innerHTML"
+			class="margin-top-4"
+		>
+			<input type="hidden" name="signal-type-slug" value={ slug }/>
+			<input type="hidden" name="sem-ver" value={ semVer }/>
+			<div class="form-group">
+				<label for="routing-field" class="form-label">Routing Field</label>
+				<input
+					id="routing-field"
+					name="routing-field"
+					type="text"
+					required
+					class="form-input"
+					placeholder="e.g. payload.portOfEntry"
+					if existingConfig != nil {
+						value={ existingConfig.RoutingField }
+					}
+				/>
+				<p class="text-muted text-sm mt-1">Use a simple 'dot notation' path to identify the field in the signal content that will be used for routing.</p>
+			</div>
+			<div class="form-group margin-top-4">
+				<h3 class="form-label" id="routing-title">Pattern Matching Rules</h3>
+				<ul id="routing-description" class="text-muted text-sm mb-2">
+					<li>The rules are applied in the order shown below — the first match wins.</li>
+					<li>With the "match" operator, use <code>*</code> to match any sequence of characters and <code>_</code> to match a single character.</li>
+					<li>If the routing field is an array, a rule matches if any element satisfies the pattern.</li>
+				</ul>
+				<table class="table table-striped" id="mapping-table" aria-labelledby="routing-title" aria-describedby="routing-description">
+					<thead>
+						<tr>
+							<th scope="col" style="width: 50px;">#</th>
+							<th scope="col">Pattern</th>
+							<th scope="col">Operator</th>
+							<th scope="col">Case Insensitive</th>
+							<th scope="col">Target ISN Slug</th>
+							<th scope="col" aria-label="Actions">Delete Row</th>
+						</tr>
+					</thead>
+					<tbody id="mapping-rows">
+						if existingConfig != nil && len(existingConfig.RoutingRules) > 0 {
+							for i, rule := range existingConfig.RoutingRules {
+								@RoutingMappingRow(i+1, rule, isnOptions)
+							}
+						} else {
+							@RoutingMappingRow(1, client.SignalRoutingRule{}, isnOptions)
+						}
+					</tbody>
+				</table>
+				<button
+					type="button"
+					class="btn btn-table margin-top-4"
+					hx-get="/ui-api/signal-types/routing/add-row"
+					hx-target="#mapping-rows"
+					hx-swap="beforeend"
+				>+ Add Mapping</button>
+			</div>
+			<div class="form-group" id="routing-result"></div>
+			<div class="form-group margin-top-4">
+				<button type="submit" class="btn btn-primary">Save Routing Rules</button>
+				if existingConfig != nil {
+					<button
+						type="button"
+						class="btn ml-2"
+						hx-delete="/ui-api/signal-types/routing"
+						hx-target="#routing-form"
+						hx-swap="outerHTML"
+						hx-include="closest form"
+						hx-confirm="Delete all routing rules for this signal type? This cannot be undone."
+					>Delete All Rules</button>
+				}
+			</div>
+		</form>
+	</div>
+}
+
+// RoutingMappingRow renders a single editable mapping row in the form table.
+// isnOptions populates the target ISN dropdown.
+templ RoutingMappingRow(seq int, rule client.SignalRoutingRule, isnOptions []types.IsnOption) {
+	<tr>
+		<td class="text-muted text-sm">{ fmt.Sprintf("%d", seq) }</td>
+		<td>
+			<input
+				name="match-patterns"
+				type="text"
+				class="form-input"
+				placeholder="*example*"
+				required
+				value={ rule.MatchPattern }
+			/>
+		</td>
+		<td>
+			<select name="operators" class="form-select" required aria-label="Operator">
+				<option value="">Select operator...</option>
+				<option value="matches" selected?={ rule.Operator == "matches" }>matches</option>
+				<option value="equals" selected?={ rule.Operator == "equals" }>equals</option>
+				<option value="does_not_match" selected?={ rule.Operator == "does_not_match" }>does not match</option>
+				<option value="does_not_equal" selected?={ rule.Operator == "does_not_equal" }>does not equal</option>
+			</select>
+		</td>
+		<td class="contains-btn">
+			<input type="hidden" name="case-insensitive" value={ strconv.FormatBool(rule.IsCaseInsensitve) }/>
+			<button
+				type="button"
+				class={ "btn btn-small btn-toggle-bool", templ.KV("btn-active", rule.IsCaseInsensitve) }
+				aria-pressed={ strconv.FormatBool(rule.IsCaseInsensitve) }
+				data-toggle-bool
+			>{ strconv.FormatBool(rule.IsCaseInsensitve) }</button>
+		</td>
+		<td>
+			<select name="isn-slugs" class="form-select" required arial-label="Target ISN">
+				<option value="">Select ISN...</option>
+				for _, isn := range isnOptions {
+					if isn.Slug == rule.IsnSlug {
+						<option value={ isn.Slug } selected>{ isn.Slug }</option>
+					} else {
+						<option value={ isn.Slug }>{ isn.Slug }</option>
+					}
+				}
+			</select>
+		</td>
+		<td>
+			<button
+				type="button"
+				class="btn btn-small"
+				hx-get="/ui-api/signal-types/routing/remove-row"
+				hx-target="closest tr"
+				hx-swap="outerHTML"
+			>✖</button>
+		</td>
+	</tr>
+}
+
+// SignalRoutingSaveSuccess renders the success partial after saving routing rules.
+templ SignalRoutingSaveSuccess(result *client.SignalRoutingConfigResponse) {
+	@SuccessAlert(fmt.Sprintf("Routing rules saved. %d mapping(s) active for %s.", len(result.RoutingRules), result.SignalTypePath))
+}

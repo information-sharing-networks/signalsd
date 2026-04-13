@@ -36,7 +36,6 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 
 	// Start server
 	testEnv := startInProcessServer(t, "")
-	defer testEnv.shutdown()
 
 	t.Log("Creating test data...")
 
@@ -418,7 +417,6 @@ func TestOAuthRevokeEndpoint(t *testing.T) {
 
 	// Start server
 	testEnv := startInProcessServer(t, "")
-	defer testEnv.shutdown()
 
 	t.Log("Creating test data...")
 

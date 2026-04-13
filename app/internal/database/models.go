@@ -94,6 +94,17 @@ type RefreshToken struct {
 	RevokedAt     *time.Time `json:"revoked_at"`
 }
 
+type RoutingRule struct {
+	ID                    uuid.UUID `json:"id"`
+	CreatedAt             time.Time `json:"created_at"`
+	SignalRoutingConfigID uuid.UUID `json:"signal_routing_config_id"`
+	MatchPattern          string    `json:"match_pattern"`
+	Operator              string    `json:"operator"`
+	IsCaseInsensitive     bool      `json:"is_case_insensitive"`
+	IsnID                 uuid.UUID `json:"isn_id"`
+	RuleSequence          int32     `json:"rule_sequence"`
+}
+
 type ServiceAccount struct {
 	AccountID          uuid.UUID `json:"account_id"`
 	CreatedAt          time.Time `json:"created_at"`
@@ -118,9 +129,9 @@ type Signal struct {
 
 type SignalBatch struct {
 	ID        uuid.UUID `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
 	BatchRef  string    `json:"batch_ref"`
 	AccountID uuid.UUID `json:"account_id"`
-	CreatedAt time.Time `json:"created_at"`
 }
 
 type SignalProcessingFailure struct {
@@ -134,23 +145,11 @@ type SignalProcessingFailure struct {
 	ErrorMessage     string    `json:"error_message"`
 }
 
-type SignalRoutingMapping struct {
-	ID                  uuid.UUID `json:"id"`
-	SignalRoutingRuleID uuid.UUID `json:"signal_routing_rule_id"`
-	MatchPattern        string    `json:"match_pattern"`
-	Notes               string    `json:"notes"`
-	IsnID               uuid.UUID `json:"isn_id"`
-	RuleSequence        int32     `json:"rule_sequence"`
-	CreatedAt           time.Time `json:"created_at"`
-	UpdatedAt           time.Time `json:"updated_at"`
-}
-
-type SignalRoutingRule struct {
+type SignalRoutingConfig struct {
 	ID           uuid.UUID `json:"id"`
+	CreatedAt    time.Time `json:"created_at"`
 	SignalTypeID uuid.UUID `json:"signal_type_id"`
 	RoutingField string    `json:"routing_field"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 type SignalType struct {

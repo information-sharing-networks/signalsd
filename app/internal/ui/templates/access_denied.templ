@@ -1,22 +1,20 @@
 package templates
 
 // =============================================================================
-// ACCESS DENIED PAGE 
+// ACCESS DENIED PAGE
 // =============================================================================
 templ AccessDeniedPage(environment string, title, message string) {
 	@BaseLayout(title) {
 		@Navigation(environment)
 		<div class="page-container">
-			<div class="text-center">
-				<h1 class="page-title">Access Denied</h1>
-				<div class="card max-w-md mx-auto">
-					<div class="card-body">
-						@ErrorAlert(message)
-						<div class="margin-top-4">
-							<a href="/dashboard" class="btn btn-primary">
-								← Back to Dashboard
-							</a>
-						</div>
+			<h1 class="page-title">Access Denied</h1>
+			<div class="card max-w-md mx-auto">
+				<div class="card-body">
+					@ErrorAlert(message)
+					<div class="margin-top-4">
+						<a href="/dashboard" class="btn btn-primary">
+							← Back to Dashboard
+						</a>
 					</div>
 				</div>
 			</div>
