@@ -1,21 +1,15 @@
 package server
 
 import (
-	"log/slog"
 	"net/http"
 
-	"github.com/information-sharing-networks/signalsd/app/internal/logger"
+	"github.com/a-h/templ"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
 )
 
 // renderAccessDeniedPage is a helper function that renders access denied pages with different messages
 func (s *Server) renderAccessDeniedPage(w http.ResponseWriter, r *http.Request, message string) {
-	reqLogger := logger.ContextRequestLogger(r.Context())
-
-	component := templates.AccessDeniedPage(s.config.Environment, "Access Denied", message)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render access denied page", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.AccessDeniedPage(s.config.Environment, "Access Denied", message)).ServeHTTP(w, r)
 }
 
 // AccessDeniedPage renders the general access denied page.

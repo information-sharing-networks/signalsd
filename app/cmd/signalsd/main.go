@@ -14,10 +14,11 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
+	"github.com/information-sharing-networks/signalsd/app/internal/publicisns"
+	"github.com/information-sharing-networks/signalsd/app/internal/router"
+	"github.com/information-sharing-networks/signalsd/app/internal/schemas"
 	"github.com/information-sharing-networks/signalsd/app/internal/server"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
-	"github.com/information-sharing-networks/signalsd/app/internal/server/isns"
-	"github.com/information-sharing-networks/signalsd/app/internal/server/schemas"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/spf13/cobra"
 
@@ -58,8 +59,8 @@ import (
 //	@description	The signalsd backend service acts as an OAuth 2.0 Authorization Server and supports web users and service accounts.
 //	@description
 //	@description	### Authentication Flows
-//	@description	- **Web users**: (Refresh Token Grant Type) Authentication via /auth/login → receive JWT access token + HTTP-only refresh cookie → use bearer tokens for API calls
-//	@description	- **Service accounts**: Clients implement OAuth Client Credentials flow → receive JWT access token → use bearer tokens for API calls
+//	@description	- **Web users**: (Refresh Token Grant Type) Authentication via /auth/login -> receive JWT access token + HTTP-only refresh cookie -> use bearer tokens for API calls
+//	@description	- **Service accounts**: Clients implement OAuth Client Credentials flow -> receive JWT access token -> use bearer tokens for API calls
 //	@description
 //	@description	### Token Usage
 //	@description	All protected API endpoints require a valid JWT access token in the Authorization header:
@@ -112,7 +113,7 @@ import (
 //	@description
 //	@description	## Route types
 //	@description	- **Page handlers** (`GET /admin/*`, `/search`, etc.): return a full HTML page (`200`)
-//	@description	- **HTMX action handlers** (`PUT`/`POST` to `/ui-api/*`): return an HTML partial (`200`) — either a success or error alert fragment
+//	@description	- **HTMX action handlers** (`PUT`/`POST` to `/ui-api/*`): return an HTML partial (`200`) - either a success or error alert fragment
 //	@description
 //	@description	- see /ui-docs for more information
 //	@description
@@ -163,10 +164,10 @@ import (
 
 //	@tag.name			UI Pages
 //	@tag.description	Browser-based management interface. Page handlers return full HTML
-//
+
 //	@tag.name			HTMX Actions
-//
-// HTMX action handlers (/ui-api/*) return HTML partials.
+//	@tag.description	HTMX action handlers (/ui-api/*) return HTML partials
+
 func main() {
 	rootCmd := &cobra.Command{
 		Use:   "signalsd",
@@ -293,30 +294,30 @@ func run(mode string) error {
 	queries := database.New(pool)
 
 	// set up the signal schema cache - these schemas are stored on the database and used to validate the incoming signals (they are cached to avoid database roundtrips when validating signals)
-	schemaCache := schemas.NewSchemaCache()
-	if err := schemaCache.Load(dbCtx, queries); err != nil {
+	schemaCache := schemas.NewCache(queries)
+	if err := schemaCache.Load(dbCtx); err != nil {
 		appLogger.Error("Failed to load schema cache", slog.String("error", err.Error()))
 		os.Exit(1)
 	}
 
-	if schemaCache.Len() > 0 {
-		appLogger.Info("Loaded signal schemas into cache", slog.Int("count", schemaCache.Len()))
-	} else {
-		appLogger.Info("No signal schemas defined for this site")
-	}
+	appLogger.Info("Loaded signal schema cache", slog.Int("count", schemaCache.Len()))
 
 	// set up the public ISN cache - this is used by the public signal search endpoint (this endpoint can be used by unauthenticated users)
-	publicIsnCache := isns.NewPublicIsnCache()
-	if err := publicIsnCache.Load(dbCtx, queries); err != nil {
+	publicIsnCache := publicisns.NewCache(queries)
+	if err := publicIsnCache.Load(dbCtx); err != nil {
 		appLogger.Error("Failed to load public ISN cache", slog.String("error", err.Error()))
 		os.Exit(1)
 	}
 
-	if publicIsnCache.Len() > 0 {
-		appLogger.Info("Loaded public ISNs into cache", slog.Int("count", publicIsnCache.Len()))
-	} else {
-		appLogger.Info("No public ISNs defined for this site")
+	appLogger.Info("Loaded public ISN cache", slog.Int("count", publicIsnCache.Len()))
+
+	// set up the router cache - holds compiled ISN routing config, polled for changes every CachePollInterval
+	signalRouterCache := router.NewCache(queries)
+	if err := signalRouterCache.Load(dbCtx); err != nil {
+		appLogger.Error("Failed to load router cache", slog.String("error", err.Error()))
+		os.Exit(1)
 	}
+	appLogger.Info("Loaded ISN router cache", slog.Int("count", signalRouterCache.Len()))
 
 	// set up the site level rate limiter (disable if RPS <= 0) - note there are payload size limits in addition to rate limiting and these are set when the routes are created in the server package
 	if cfg.RateLimitRPS <= 0 {
@@ -339,6 +340,7 @@ func run(mode string) error {
 		appLogger,
 		schemaCache,
 		publicIsnCache,
+		signalRouterCache,
 	)
 
 	// Set up graceful shutdown handling

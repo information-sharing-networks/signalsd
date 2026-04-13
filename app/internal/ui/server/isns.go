@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/a-h/templ"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
@@ -18,12 +19,7 @@ import (
 //	@Success		200	"HTML page"
 //	@Router			/admin/isn/create [get]
 func (s *Server) CreateIsnPage(w http.ResponseWriter, r *http.Request) {
-	reqLogger := logger.ContextRequestLogger(r.Context())
-
-	component := templates.CreateIsnPage(s.config.Environment)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render create ISN page", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.CreateIsnPage(s.config.Environment)).ServeHTTP(w, r)
 }
 
 // CreateIsn godoc
@@ -35,6 +31,8 @@ func (s *Server) CreateIsnPage(w http.ResponseWriter, r *http.Request) {
 //	@Param			detail		formData	string	true	"ISN description"
 //	@Param			visibility	formData	string	true	"'public' or 'private'"
 //	@Success		200			"HTML partial"
+//	@Failure		400			"HTML error partial"
+//	@Failure		401			"HTML error partial"
 //	@Router			/ui-api/isn/create [post]
 func (s *Server) CreateIsn(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
@@ -46,20 +44,14 @@ func (s *Server) CreateIsn(w http.ResponseWriter, r *http.Request) {
 
 	// Validate required fields
 	if title == "" || detail == "" || visibility == "" {
-		component := templates.ErrorAlert("Please fill in all fields.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Please fill in all fields.")).ServeHTTP(w, r)
 		return
 	}
 
 	// Get access token from context
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
-		component := templates.ErrorAlert("Authentication required. Please log in again.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Authentication required. Please log in again.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -82,18 +74,11 @@ func (s *Server) CreateIsn(w http.ResponseWriter, r *http.Request) {
 			msg = "An error occurred. Please try again."
 		}
 
-		component := templates.ErrorAlert(msg)
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
 		return
 	}
 
-	// Success response
-	component := templates.IsnCreationSuccess(*res)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.IsnCreationSuccess(*res)).ServeHTTP(w, r)
 }
 
 // ManageIsnStatusPage godoc
@@ -117,11 +102,7 @@ func (s *Server) ManageIsnStatusPage(w http.ResponseWriter, r *http.Request) {
 	// so getIsnOptions with filterByIsnAdmin=true gives exactly the right set for this page.
 	adminIsns := getIsnOptions(accessTokenDetails.IsnPerms, true, false)
 
-	// Render ISN status management page
-	component := templates.ManageIsnStatusPage(s.config.Environment, adminIsns)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render ISN status management page", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.ManageIsnStatusPage(s.config.Environment, adminIsns)).ServeHTTP(w, r)
 }
 
 // ManageIsnStatus godoc
@@ -132,6 +113,8 @@ func (s *Server) ManageIsnStatusPage(w http.ResponseWriter, r *http.Request) {
 //	@Param			isn-slug	formData	string	true	"ISN slug"
 //	@Param			action		formData	string	true	"'enable' or 'disable'"
 //	@Success		200			"HTML partial"
+//	@Failure		400			"HTML error partial"
+//	@Failure		401			"HTML error partial"
 //	@Router			/ui-api/isn/manage [put]
 func (s *Server) ManageIsnStatus(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
@@ -142,20 +125,14 @@ func (s *Server) ManageIsnStatus(w http.ResponseWriter, r *http.Request) {
 
 	// Validate required fields
 	if isnSlug == "" || action == "" {
-		component := templates.ErrorAlert("Please fill in all fields.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Please fill in all fields.")).ServeHTTP(w, r)
 		return
 	}
 
 	// Get access token from context
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
-		component := templates.ErrorAlert("Authentication required. Please log in again.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Authentication required. Please log in again.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -167,10 +144,7 @@ func (s *Server) ManageIsnStatus(w http.ResponseWriter, r *http.Request) {
 	case "disable":
 		isInUse = false
 	default:
-		component := templates.ErrorAlert("Invalid action. Please select a valid action.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Invalid action. Please select a valid action.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -186,14 +160,10 @@ func (s *Server) ManageIsnStatus(w http.ResponseWriter, r *http.Request) {
 			msg = "An error occurred. Please try again."
 		}
 
-		component := templates.ErrorAlert(msg)
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
 		return
 	}
 
-	// Success response
 	var successMsg string
 	if isInUse {
 		successMsg = "ISN enabled successfully"
@@ -201,8 +171,5 @@ func (s *Server) ManageIsnStatus(w http.ResponseWriter, r *http.Request) {
 		successMsg = "ISN disabled successfully"
 	}
 
-	component := templates.SuccessAlert(successMsg)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.SuccessAlert(successMsg)).ServeHTTP(w, r)
 }

@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/a-h/templ"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
@@ -12,9 +13,14 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
-// APISignalTypeSlugs gets all signal types from the API and renders the Signal Type and version dropdowns.
-// Used by admin-only forms that need all globally-registered signal types regardless of ISN membership
-// or user permissions.
+// APISignalTypeSlugs godoc
+//
+//	@Summary		Signal type slugs dropdown (admin)
+//	@Description	HTMX endpoint. Returns a signal type slug select element for admin forms.
+//	@Description	Covers all globally-registered signal types regardless of ISN membership.
+//	@Tags			HTMX Actions
+//	@Success		200	"HTML partial"
+//	@Router			/ui-api/options/signal-type-slugs [get]
 func (s *Server) APISignalTypeSlugs(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
@@ -25,9 +31,7 @@ func (s *Server) APISignalTypeSlugs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	includeInactive := r.FormValue("include_inactive") == "true"
-
-	signalTypes, err := s.apiClient.GetSignalTypes(accessTokenDetails.AccessToken, includeInactive)
+	signalTypes, err := s.apiClient.GetSignalTypes(accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get signal types", slog.String("error", err.Error()))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -44,20 +48,22 @@ func (s *Server) APISignalTypeSlugs(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	versionsEndpoint := fmt.Sprintf("/ui-api/options/signal-type-versions?include_inactive=%v", includeInactive)
+	versionsEndpoint := "/ui-api/options/signal-type-versions"
 
 	// this will render the signal type dropdown and the version dropdown
 	// the version dropdown is initially disabled and will be populated when a signal type is selected
-	component := templates.SignalTypeSlugsSelect(signalTypeSlugs, versionsEndpoint)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render signal type options", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.SignalTypeSlugsSelect(signalTypeSlugs, versionsEndpoint, "#isn-slug")).ServeHTTP(w, r)
 }
 
-// APISignalTypeVersions returns versions for a signal type from the API.
-// Used by admin-only forms (e.g. AddSignalTypeToIsn) that need all globally-registered
-// versions regardless of ISN membership or user permissions.
-// This endpoint is called by the SignalTypeSlugs handler via HTMX.
+// APISignalTypeVersions godoc
+//
+//	@Summary		Signal type versions dropdown (admin)
+//	@Description	HTMX endpoint. Returns a version select element for a signal type. Covers all globally-registered versions.
+//	@Tags			HTMX Actions
+//	@Param			signal-type-slug	query	string	true	"Signal type slug"	example(sample-signal-type)
+//	@Success		200					"HTML partial"
+//	@Failure		400					"empty response"
+//	@Router			/ui-api/options/signal-type-versions [get]
 func (s *Server) APISignalTypeVersions(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
@@ -67,8 +73,6 @@ func (s *Server) APISignalTypeVersions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	includeInactive := r.FormValue("include_inactive") == "true"
-
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
 		reqLogger.Error("Failed to get accessTokenDetails from context in versions handler")
@@ -76,7 +80,7 @@ func (s *Server) APISignalTypeVersions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	signalTypes, err := s.apiClient.GetSignalTypes(accessTokenDetails.AccessToken, includeInactive)
+	signalTypes, err := s.apiClient.GetSignalTypes(accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get signal types", slog.String("error", err.Error()))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -90,16 +94,19 @@ func (s *Server) APISignalTypeVersions(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	component := templates.SignalTypeVersionsSelect(versions)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render version options", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.SignalTypeVersionsSelect(versions)).ServeHTTP(w, r)
 }
 
-// TokenSignalTypeSlugs returns signal type slug options for a selected ISN.
-// Signal types are derived from the user's token (IsnPerms) so the list is
-// limited to what the user actually has access to.
-// Used by user-facing forms (e.g. signal search)
+// TokenSignalTypeSlugs godoc
+//
+//	@Summary		Signal type slugs dropdown (token-scoped)
+//	@Description	HTMX endpoint. Returns a signal type slug select element scoped to the user's token permissions for the selected ISN.
+//	@Tags			HTMX Actions
+//	@Param			isn-slug			query	string	true	"ISN slug"	example(felixstowe-isn)
+//	@Param			include_inactive	query	bool	false	"Include inactive signal types"
+//	@Success		200					"HTML partial"
+//	@Failure		400					"empty response"
+//	@Router			/ui-api/options/isn/signal-type-slugs [get]
 func (s *Server) TokenSignalTypeSlugs(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
@@ -125,7 +132,7 @@ func (s *Server) TokenSignalTypeSlugs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Deduplicate by slug — the token stores one entry per signal type path (slug/vX.Y.Z).
+	// Deduplicate by slug - the token stores one entry per signal type path (slug/vX.Y.Z).
 	seen := make(map[string]bool)
 	signalTypeSlugs := make([]types.SignalTypeSlug, 0, len(isnPerm.SignalTypes))
 	for _, st := range isnPerm.SignalTypes {
@@ -139,14 +146,20 @@ func (s *Server) TokenSignalTypeSlugs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	versionsEndpoint := fmt.Sprintf("/ui-api/options/isn/signal-type-versions?include_inactive=%v", includeInactive)
-	component := templates.SignalTypeSlugsSelect(signalTypeSlugs, versionsEndpoint)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render signal type options", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.SignalTypeSlugsSelect(signalTypeSlugs, versionsEndpoint, "#isn-slug")).ServeHTTP(w, r)
 }
 
-// TokenSignalTypeVersions returns versions for a signal type scoped to a specific ISN.
-// Versions are read from the user's token (IsnPerms)
+// TokenSignalTypeVersions godoc
+//
+//	@Summary		Signal type versions dropdown (token-scoped)
+//	@Description	HTMX endpoint. Returns a version select element for a signal type, scoped to the selected ISN via the user's token permissions.
+//	@Tags			HTMX Actions
+//	@Param			signal-type-slug	query	string	true	"Signal type slug"	example(sample-signal-type)
+//	@Param			isn-slug			query	string	true	"ISN slug"			example(felixstowe-isn)
+//	@Param			include_inactive	query	bool	false	"Include inactive versions"
+//	@Success		200					"HTML partial"
+//	@Failure		400					"empty response"
+//	@Router			/ui-api/options/isn/signal-type-versions [get]
 func (s *Server) TokenSignalTypeVersions(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
@@ -184,10 +197,7 @@ func (s *Server) TokenSignalTypeVersions(w http.ResponseWriter, r *http.Request)
 		versions = append(versions, types.SignalTypeVersion{Version: st.SemVer})
 	}
 
-	component := templates.SignalTypeVersionsSelect(versions)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render version options", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.SignalTypeVersionsSelect(versions)).ServeHTTP(w, r)
 }
 
 // getIsnOptions returns ISN slugs from the user's token claims, filtered by permission.

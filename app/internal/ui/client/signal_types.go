@@ -155,12 +155,8 @@ type SignalTypeDetail struct {
 }
 
 // GetSignalTypes gets all signal types using the signalsd API
-func (c *Client) GetSignalTypes(accessToken string, includeInactive bool) ([]SignalTypeDetail, error) {
+func (c *Client) GetSignalTypes(accessToken string) ([]SignalTypeDetail, error) {
 	url := fmt.Sprintf("%s/api/admin/signal-types", c.baseURL)
-
-	if includeInactive {
-		url += "?include_inactive=true"
-	}
 
 	httpReq, err := http.NewRequest("GET", url, nil)
 	if err != nil {

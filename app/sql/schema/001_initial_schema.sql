@@ -171,10 +171,10 @@ CREATE TABLE isn_signal_types (
 -- signal_batches: groups signals submitted together when loaded
 -- batch_ref is chosen by the sender 
 CREATE TABLE signal_batches (
-    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id         UUID PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     batch_ref  TEXT NOT NULL,
     account_id UUID NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     CONSTRAINT unique_batch_ref_per_account UNIQUE (account_id, batch_ref),
     CONSTRAINT batch_ref_format CHECK (batch_ref ~ '^[a-zA-Z0-9_-]+$'),
     CONSTRAINT batch_ref_length CHECK (length(batch_ref) BETWEEN 1 AND 128),
@@ -183,7 +183,7 @@ CREATE TABLE signal_batches (
 
 -- signal_processing_failures: records signals that failed validation or processing
 CREATE TABLE signal_processing_failures (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    id UUID PRIMARY KEY,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT now() NOT NULL,
     signal_batch_id UUID NOT NULL,
     signal_type_slug TEXT NOT NULL,
@@ -202,33 +202,38 @@ CREATE INDEX idx_signal_processing_failures_error_code ON signal_processing_fail
 -- Signal routing
 -- -------------------------------------------------------------------------
 
--- signal_routing_rules: defines which field in a signal type drives routing decisions
-CREATE TABLE signal_routing_rules (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+-- signal_routing_configs: defines which field in a signal type drives routing decisions
+-- fields are identified with JSON Paths
+-- only one routing field per signal type path is allowed
+CREATE TABLE signal_routing_configs (
+    id UUID PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
     signal_type_id UUID NOT NULL,
     routing_field TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    CONSTRAINT unique_routing_rule_per_signal_field UNIQUE (signal_type_id, routing_field),
-    CONSTRAINT fk_signal_routing_rules_signal_type FOREIGN KEY (signal_type_id) REFERENCES signal_types(id) ON DELETE CASCADE
+    CONSTRAINT unique_routing_rule_per_signal_type UNIQUE (signal_type_id),
+    CONSTRAINT fk_isn_routing_fields_signal_type FOREIGN KEY (signal_type_id) REFERENCES signal_types(id) ON DELETE CASCADE
 );
 
--- signal_routing_mappings: maps field values to destination ISNs
-CREATE TABLE signal_routing_mappings (
-    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-    signal_routing_rule_id UUID NOT NULL,
+-- routing_rules: maps match patterns to destination ISNs
+-- match patterns are text strings with optional glob symbols (? *)
+-- (the database entry is converted to a gjson pattern match by the server)
+-- the operator and is_case_insensitive fields control match behaviour
+CREATE TABLE routing_rules (
+    id UUID PRIMARY KEY,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    signal_routing_config_id UUID NOT NULL,
     match_pattern TEXT NOT NULL,
-    notes TEXT NOT NULL,
+    operator TEXT NOT NULL,
+    is_case_insensitive bool NOT NULL,
     isn_id UUID NOT NULL,
     rule_sequence INTEGER NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    CONSTRAINT unique_sequence_per_rule UNIQUE (signal_routing_rule_id, rule_sequence),
-    CONSTRAINT fk_signal_routing_mappings_rule FOREIGN KEY (signal_routing_rule_id) REFERENCES signal_routing_rules(id) ON DELETE CASCADE,
-    CONSTRAINT fk_signal_routing_mappings_isn FOREIGN KEY (isn_id) REFERENCES isn(id) ON DELETE CASCADE
+    CONSTRAINT operator_check CHECK (operator IN ('matches', 'equals','does_not_match','does_not_equal')),
+    CONSTRAINT unique_sequence_per_rule UNIQUE (signal_routing_config_id, rule_sequence),
+    CONSTRAINT fk_routing_rules_field FOREIGN KEY (signal_routing_config_id) REFERENCES signal_routing_configs(id) ON DELETE CASCADE,
+    CONSTRAINT fk_routing_rules_isn FOREIGN KEY (isn_id) REFERENCES isn(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_signal_routing_mappings_rule_sequence ON signal_routing_mappings (signal_routing_rule_id, rule_sequence);
+CREATE INDEX idx_routing_rules_rule_sequence ON routing_rules (signal_routing_config_id, rule_sequence);
 
 -- -------------------------------------------------------------------------
 -- Signals (hash-partitioned by account_id, 8 partitions)
@@ -322,8 +327,8 @@ DROP VIEW IF EXISTS latest_signal_versions;
 
 DROP TABLE IF EXISTS signal_versions CASCADE;
 DROP TABLE IF EXISTS signals CASCADE;
-DROP TABLE IF EXISTS signal_routing_mappings CASCADE;
-DROP TABLE IF EXISTS signal_routing_rules CASCADE;
+DROP TABLE IF EXISTS routing_rules CASCADE;
+DROP TABLE IF EXISTS signal_routing_configs CASCADE;
 DROP TABLE IF EXISTS signal_processing_failures CASCADE;
 DROP TABLE IF EXISTS signal_batches CASCADE;
 DROP TABLE IF EXISTS isn_signal_types CASCADE;

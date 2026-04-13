@@ -13,8 +13,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
+	"github.com/information-sharing-networks/signalsd/app/internal/responses"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
-	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -353,11 +353,12 @@ func (a *AuthService) RequireRole(allowedRoles ...string) func(http.Handler) htt
 // RequireAccessPermission checks the access token claims to ensure the account has permission to access the data in the ISN.
 //
 // To use the ISN the account must have the specified permissions (read and/or write) supplied in the function call for the
-// ISN specified in the isn_slug URL parameter. The ISN must also be in use.
+// ISN specified in the isn_slug URL parameter. The middleware also checks the ISN is active (in_use = true)
 //
-// Where the middleware is used to protect signal type specific endpoints, it also validates that the signal type is in use.
+// Where the middleware is used to protect signal type specific endpoints, it also validates that the signal type is in use on the specified ISN.
 //
-// This middleware should only be used after RequireValidAccessToken middlware, which adds the claims in the context
+// This middleware uses the claims to determine permissions and should therefore only be used after
+// RequireValidAccessToken middlware, which adds the claims in the context
 func (a *AuthService) RequireAccessPermission(permissions ...string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -374,70 +375,47 @@ func (a *AuthService) RequireAccessPermission(permissions ...string) func(http.H
 				return
 			}
 
-			perms, ok := claims.IsnPerms[isnSlug]
-			if !ok {
-				responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "account does not have access to this isn")
-				return
+			signalTypeSlug := r.PathValue("signal_type_slug")
+			semVer := r.PathValue("sem_ver")
+			signalTypePath := ""
+			if signalTypeSlug != "" && semVer != "" {
+				signalTypePath = fmt.Sprintf("%s/v%s", signalTypeSlug, semVer)
 			}
 
-			// Check ISN is in use
-			if !perms.InUse {
-				logger.ContextWithLogAttrs(r.Context(),
-					slog.String("isn_slug", isnSlug),
-				)
-				responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not in use")
-				return
-			}
-
-			// check the account has the specified read/write permission(s)
-			hasPermission := false
+			// check the account has at least one of the specified read/write permission(s)
+			var lastErr error
 			for _, permission := range permissions {
-
-				allowed := (permission == "read" && perms.CanRead) ||
-					(permission == "write" && perms.CanWrite)
-
-				if allowed {
-					hasPermission = true
+				switch permission {
+				case "read":
+					lastErr = CheckIsnReadPermission(claims, isnSlug, signalTypePath)
+				case "write":
+					lastErr = CheckIsnWritePermission(claims, isnSlug, signalTypePath)
+				default:
+					lastErr = &PermissionError{
+						Status:  http.StatusInternalServerError,
+						Code:    apperrors.ErrCodeInternalError,
+						Message: fmt.Sprintf("unknown permission %q", permission),
+					}
+				}
+				if lastErr == nil {
 					break
 				}
 			}
 
-			if hasPermission {
-				signalTypeSlug := r.PathValue("signal_type_slug")
-				semVer := r.PathValue("sem_ver")
-
-				if signalTypeSlug != "" && semVer != "" {
-					// check signal type is valid and in use
-					signalTypePath := fmt.Sprintf("%s/v%s", signalTypeSlug, semVer)
-					signalType, found := perms.SignalTypes[signalTypePath]
-					if !found {
-						responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "signal type not found on this ISN")
-						return
-					}
-
-					if !signalType.InUse {
-						responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "signal type not in use")
-						return
-					}
+			if lastErr != nil {
+				if permErr, ok := lastErr.(*PermissionError); ok {
+					responses.RespondWithError(w, r, permErr.Status, permErr.Code, permErr.Message)
+				} else {
+					responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "permission check failed")
 				}
-
-				logger.ContextWithLogAttrs(r.Context(),
-					slog.String("isn_permission", strings.Join(permissions, ",")),
-					slog.String("isn_slug", isnSlug),
-				)
-				next.ServeHTTP(w, r)
 				return
 			}
 
-			// Add context for final request log
 			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("forbidden_isn_slug", isnSlug),
-				slog.String("error", "account does not have the necessary access permission for this isn"),
-				slog.String("required_permissions", strings.Join(permissions, ", ")),
-				slog.String("has permissions", fmt.Sprintf("read: %v, write: %v", perms.CanRead, perms.CanWrite)),
+				slog.String("isn_permission", strings.Join(permissions, ",")),
+				slog.String("isn_slug", isnSlug),
 			)
-
-			responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you do not have the necessary access permission for this isn")
+			next.ServeHTTP(w, r)
 		})
 	}
 }

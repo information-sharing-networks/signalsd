@@ -82,7 +82,7 @@ AND ist.is_in_use = true;
 
 
 -- name: GetInUsePublicIsnSignalTypes :many
--- only returns active ISNs and signal types (is_in_use = true), and checks ISN-level signal type status
+-- only returns active ISNs (is_in_use = true), and checks the signal type is active on the ISN
 SELECT
     i.slug as isn_slug,
     st.slug as signal_type_slug,

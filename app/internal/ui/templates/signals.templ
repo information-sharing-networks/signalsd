@@ -155,7 +155,7 @@ templ MonitorButton() {
 }
 
 templ NoSignalsFound() {
-	<div class="card-body text-center text-muted">
+	<div class="card-body text-muted">
 		<p>No signals found matching your search criteria.</p>
 	</div>
 }
@@ -271,7 +271,7 @@ templ AccountIDField() {
 	</div>
 }
 
-/* code highlgiht json  - todo - test escaping of html characters */
+/* code highlgiht json */
 func HighlightJSON(jsonElement json.RawMessage) string {
 	prettyPrintJSON := prettyPrintJSON(jsonElement)
 	var buf bytes.Buffer

@@ -35,7 +35,6 @@ import (
 func TestPermissions(t *testing.T) {
 	ctx := context.Background()
 	testEnv := startInProcessServer(t, "")
-	defer testEnv.shutdown()
 
 	authService := auth.NewAuthService(testEnv.cfg.SecretKey, testEnv.cfg.Environment, testEnv.queries)
 
@@ -51,18 +50,15 @@ func TestPermissions(t *testing.T) {
 	publicISN := createTestISN(t, ctx, testEnv.queries, "public-isn", "Public ISN", adminAccount.ID, "public")
 
 	// Create signal types
-	_ = createTestSignalType(t, ctx, testEnv.queries, siteAdminISN.ID, "siteadmin ISN signal", "1.0.0")
-	_ = createTestSignalType(t, ctx, testEnv.queries, adminISN.ID, "admin ISN signal", "1.0.0")
-	_ = createTestSignalType(t, ctx, testEnv.queries, publicISN.ID, "public ISN signal", "1.0.0")
+	_ = createTestSignalType(t, ctx, testEnv.queries, siteAdminISN.ID, "siteadmin ISN signal", "")
+	_ = createTestSignalType(t, ctx, testEnv.queries, adminISN.ID, "admin ISN signal", "")
+	_ = createTestSignalType(t, ctx, testEnv.queries, publicISN.ID, "public ISN signal", "")
 
 	// Grant permission to ISNs
 	// note there is no need to  grant permissions to owners (automatically get write access to all isns)
 	// ... or admins (automatically get write access to their own isns)
 	grantPermission(t, ctx, testEnv.queries, adminISN.ID, memberAccount.ID, "read")
 	grantPermission(t, ctx, testEnv.queries, publicISN.ID, serviceAccount.ID, "write")
-
-	// Create signal batch for the service account
-	createTestSignalBatch(t, ctx, testEnv.queries, serviceAccount.ID, "auth-test-batch")
 
 	var validSignalTypePaths = make(map[string]string)
 
@@ -192,7 +188,7 @@ func checkPermissions(t *testing.T,
 		}
 		if expectedPath, exists := validSignalTypePaths[isnSlug]; exists {
 			if _, found := perm.SignalTypes[expectedPath]; !found {
-				t.Errorf("expected signal type path %s for %s, not found in signal types", expectedPath, isnSlug)
+				t.Errorf("expected signal type path %s not listed int the claims for isn %s", expectedPath, isnSlug)
 			}
 		}
 	}
@@ -304,7 +300,6 @@ func createClientSecret(t *testing.T, ctx context.Context, queries *database.Que
 func TestLoginAuth(t *testing.T) {
 	ctx := context.Background()
 	testEnv := startInProcessServer(t, "")
-	defer testEnv.shutdown()
 
 	authService := auth.NewAuthService(testEnv.cfg.SecretKey, testEnv.cfg.Environment, testEnv.queries)
 

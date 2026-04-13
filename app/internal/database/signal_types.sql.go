@@ -147,7 +147,7 @@ type GetInUsePublicIsnSignalTypesRow struct {
 	SemVer         string `json:"sem_ver"`
 }
 
-// only returns active ISNs and signal types (is_in_use = true), and checks ISN-level signal type status
+// only returns active ISNs (is_in_use = true), and checks the signal type is active on the ISN
 func (q *Queries) GetInUsePublicIsnSignalTypes(ctx context.Context) ([]GetInUsePublicIsnSignalTypesRow, error) {
 	rows, err := q.db.Query(ctx, GetInUsePublicIsnSignalTypes)
 	if err != nil {

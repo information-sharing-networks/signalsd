@@ -13,6 +13,7 @@ import (
 
 const CreateSignalProcessingFailureDetail = `-- name: CreateSignalProcessingFailureDetail :one
 INSERT INTO signal_processing_failures (
+    id,
     signal_batch_id,
     signal_type_slug,
     signal_type_sem_ver,
@@ -20,6 +21,7 @@ INSERT INTO signal_processing_failures (
     error_code,
     error_message
 ) VALUES (
+    gen_random_uuid(),
     $1, -- signal_batch_id
     $2, -- signal_type_slug
     $3, -- signal_type_sem_ver

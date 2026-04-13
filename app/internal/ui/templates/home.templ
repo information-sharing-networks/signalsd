@@ -55,7 +55,7 @@ templ LoginPageWithEnvironment(environment string) {
 							</button>
 						</div>
 					</form>
-					<div class="form-group text-center">
+					<div class="form-group">
 						<p class="card-description text-muted">Don't have an account?</p>
 						<button
 							hx-get="/register"
@@ -125,7 +125,7 @@ templ RegisterPage() {
 					</div>
 				</form>
 				<div id="register-error"></div>
-				<div class="form-group text-center">
+				<div class="form-group">
 					<p class="card-description text-muted">Already have an account?</p>
 					<button
 						hx-get="/login"
@@ -146,7 +146,7 @@ templ RegisterPage() {
 templ RegistrationSuccess() {
 	<div class="alert alert-success" data-auto-redirect-to-login="true">
 		<strong>Account created!</strong> You can now sign in.
-		<div class="form-group text-center" style="margin-top: 1rem;">
+		<div class="form-group" style="margin-top: 1rem;">
 			<button
 				hx-get="/login"
 				hx-target="body"

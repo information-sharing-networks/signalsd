@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/a-h/templ"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
@@ -19,20 +20,12 @@ import (
 //	@Success		200	"HTML page"
 //	@Router			/settings [get]
 func (s *Server) SettingsPage(w http.ResponseWriter, r *http.Request) {
-	reqLogger := logger.ContextRequestLogger(r.Context())
-
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
-		component := templates.ErrorAlert("Authentication required. Please log in again.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Authentication required. Please log in again.")).ServeHTTP(w, r)
 		return
 	}
-	component := templates.SettingsPage(s.config.Environment, accessTokenDetails.Email)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render settings page", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.SettingsPage(s.config.Environment, accessTokenDetails.Email)).ServeHTTP(w, r)
 }
 
 // UpdatePassword godoc
@@ -44,6 +37,8 @@ func (s *Server) SettingsPage(w http.ResponseWriter, r *http.Request) {
 //	@Param			new-password		formData	string	true	"New password"
 //	@Param			confirm-password	formData	string	true	"Confirm new password"
 //	@Success		200					"HTML partial"
+//	@Failure		400					"HTML error partial"
+//	@Failure		401					"HTML error partial"
 //	@Router			/ui-api/account/password [put]
 func (s *Server) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
@@ -54,29 +49,20 @@ func (s *Server) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	confirmPassword := r.FormValue("confirm-password")
 
 	if currentPassword == "" || newPassword == "" || confirmPassword == "" {
-		component := templates.ErrorAlert("Please fill in all fields.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Please fill in all fields.")).ServeHTTP(w, r)
 		return
 	}
 
 	// Validate passwords match
 	if newPassword != confirmPassword {
-		component := templates.ErrorAlert("New passwords do not match.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("New passwords do not match.")).ServeHTTP(w, r)
 		return
 	}
 
 	// Get access token from context
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
-		component := templates.ErrorAlert("Authentication required. Please log in again.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Authentication required. Please log in again.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -92,18 +78,11 @@ func (s *Server) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 			msg = "An error occurred. Please try again."
 		}
 
-		component := templates.ErrorAlert(msg)
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
 		return
 	}
 
-	// Success response
-	component := templates.SuccessAlert("Password updated successfully. Your new password is now active.")
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.SuccessAlert("Password updated successfully. Your new password is now active.")).ServeHTTP(w, r)
 }
 
 // GeneratePasswordResetLinkPage godoc
@@ -114,8 +93,6 @@ func (s *Server) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 //	@Success		200	"HTML page"
 //	@Router			/admin/users/generate-password-reset-link [get]
 func (s *Server) GeneratePasswordResetLinkPage(w http.ResponseWriter, r *http.Request) {
-	reqLogger := logger.ContextRequestLogger(r.Context())
-
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
 		s.renderErrorAlert(w, r, "Authentication required. Please log in again.", "Failed to get accessTokenDetails from context in GeneratePasswordResetLinkPage")
@@ -130,9 +107,7 @@ func (s *Server) GeneratePasswordResetLinkPage(w http.ResponseWriter, r *http.Re
 	}
 
 	users := getUserOptions(rawUsers, "")
-	if err := templates.GeneratePasswordResetLinkPage(s.config.Environment, users).Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render manage users page", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.GeneratePasswordResetLinkPage(s.config.Environment, users)).ServeHTTP(w, r)
 }
 
 // GeneratePasswordResetLink godoc
@@ -142,26 +117,22 @@ func (s *Server) GeneratePasswordResetLinkPage(w http.ResponseWriter, r *http.Re
 //	@Tags			HTMX Actions
 //	@Param			user-dropdown	formData	string	true	"Selected user in 'email|role' format"
 //	@Success		200				"HTML partial"
+//	@Failure		400				"HTML error partial"
+//	@Failure		401				"HTML error partial"
 //	@Router			/ui-api/users/generate-password-reset-link [put]
 func (s *Server) GeneratePasswordResetLink(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	userDropdownValue := r.FormValue("user-dropdown")
 	if userDropdownValue == "" {
-		component := templates.ErrorAlert("you must select a user account")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render ErrorAlert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("you must select a user account")).ServeHTTP(w, r)
 		return
 	}
 
 	// Parse the combined organization|email value
 	parts := strings.Split(userDropdownValue, "|")
 	if len(parts) != 2 {
-		component := templates.ErrorAlert("invalid user account selection")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render ErrorAlert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("invalid user account selection")).ServeHTTP(w, r)
 		return
 	}
 
@@ -170,10 +141,7 @@ func (s *Server) GeneratePasswordResetLink(w http.ResponseWriter, r *http.Reques
 	// Get access token from context
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
-		component := templates.ErrorAlert("Authentication required. Please log in again.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Authentication required. Please log in again.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -188,10 +156,7 @@ func (s *Server) GeneratePasswordResetLink(w http.ResponseWriter, r *http.Reques
 			msg = "An error occurred. Please try again."
 		}
 
-		component := templates.ErrorAlert(msg)
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
 		return
 	}
 
@@ -203,10 +168,7 @@ func (s *Server) GeneratePasswordResetLink(w http.ResponseWriter, r *http.Reques
 		ExpiresAt: res.ExpiresAt,
 		ExpiresIn: res.ExpiresIn,
 	}
-	component := templates.GeneratePasswordResetLinkSuccess(successResponse)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.GeneratePasswordResetLinkSuccess(successResponse)).ServeHTTP(w, r)
 }
 
 // ManageIsnAdminRolesPage godoc
@@ -229,18 +191,11 @@ func (s *Server) ManageIsnAdminRolesPage(w http.ResponseWriter, r *http.Request)
 	rawUsers, err := s.apiClient.GetUsers(accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get users list", slog.String("error", err.Error()))
-		component := templates.ErrorAlert("Failed to load users. Please try again.")
-		if renderErr := component.Render(r.Context(), w); renderErr != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", renderErr.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Failed to load users. Please try again.")).ServeHTTP(w, r)
 		return
 	}
 
-	// Render isn admin role management page
-	component := templates.ManageIsnAdminRolesPage(s.config.Environment, getUserOptions(rawUsers, accessTokenDetails.Email))
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render isn admin role management page", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.ManageIsnAdminRolesPage(s.config.Environment, getUserOptions(rawUsers, accessTokenDetails.Email))).ServeHTTP(w, r)
 }
 
 // ManageAccountStatusPage godoc
@@ -263,10 +218,7 @@ func (s *Server) ManageAccountStatusPage(w http.ResponseWriter, r *http.Request)
 	rawUsers, err := s.apiClient.GetUsers(accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get users list", slog.String("error", err.Error()))
-		component := templates.ErrorAlert("Failed to load users. Please try again.")
-		if renderErr := component.Render(r.Context(), w); renderErr != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", renderErr.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Failed to load users. Please try again.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -274,18 +226,11 @@ func (s *Server) ManageAccountStatusPage(w http.ResponseWriter, r *http.Request)
 	rawServiceAccounts, err := s.apiClient.GetServiceAccounts(accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get service accounts list", slog.String("error", err.Error()))
-		component := templates.ErrorAlert("Failed to load service accounts. Please try again.")
-		if renderErr := component.Render(r.Context(), w); renderErr != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", renderErr.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Failed to load service accounts. Please try again.")).ServeHTTP(w, r)
 		return
 	}
 
-	// Render account status management page
-	component := templates.ManageAccountStatusPage(s.config.Environment, getUserOptions(rawUsers, accessTokenDetails.Email), getServiceAccountOptions(rawServiceAccounts))
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render account status management page", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.ManageAccountStatusPage(s.config.Environment, getUserOptions(rawUsers, accessTokenDetails.Email), getServiceAccountOptions(rawServiceAccounts))).ServeHTTP(w, r)
 }
 
 // ManageAccountStatus godoc
@@ -298,6 +243,8 @@ func (s *Server) ManageAccountStatusPage(w http.ResponseWriter, r *http.Request)
 //	@Param			user-identifier				formData	string	false	"User email (when account-type is 'user')"
 //	@Param			service-account-identifier	formData	string	false	"Client ID (when account-type is 'service-account')"
 //	@Success		200							"HTML partial"
+//	@Failure		400							"HTML error partial"
+//	@Failure		401							"HTML error partial"
 //	@Router			/ui-api/accounts/manage [put]
 func (s *Server) ManageAccountStatus(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
@@ -317,10 +264,7 @@ func (s *Server) ManageAccountStatus(w http.ResponseWriter, r *http.Request) {
 
 	// Validate required fields
 	if accountType == "" || accountIdentifier == "" || action == "" {
-		component := templates.ErrorAlert("Please fill in all fields.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Please fill in all fields.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -328,11 +272,7 @@ func (s *Server) ManageAccountStatus(w http.ResponseWriter, r *http.Request) {
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
 		reqLogger.Error("Failed to read access token from context", slog.String("component", "handlers.AdminAccountStatus"))
-
-		component := templates.ErrorAlert("Authentication required. Please log in again.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Authentication required. Please log in again.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -346,10 +286,7 @@ func (s *Server) ManageAccountStatus(w http.ResponseWriter, r *http.Request) {
 		user, err := s.apiClient.LookupUserByEmail(accessTokenDetails.AccessToken, accountIdentifier)
 		if err != nil {
 			reqLogger.Error("Failed to lookup user", slog.String("error", err.Error()))
-			component := templates.ErrorAlert("User not found.")
-			if renderErr := component.Render(r.Context(), w); renderErr != nil {
-				reqLogger.Error("Failed to render error alert", slog.String("error", renderErr.Error()))
-			}
+			templ.Handler(templates.ErrorAlert("User not found.")).ServeHTTP(w, r)
 			return
 		}
 		accountID = user.AccountID
@@ -357,10 +294,7 @@ func (s *Server) ManageAccountStatus(w http.ResponseWriter, r *http.Request) {
 		serviceAccount, err := s.apiClient.LookupServiceAccountByClientID(accessTokenDetails.AccessToken, accountIdentifier)
 		if err != nil {
 			reqLogger.Error("Failed to lookup service account", slog.String("error", err.Error()))
-			component := templates.ErrorAlert("Service account not found.")
-			if renderErr := component.Render(r.Context(), w); renderErr != nil {
-				reqLogger.Error("Failed to render error alert", slog.String("error", renderErr.Error()))
-			}
+			templ.Handler(templates.ErrorAlert("Service account not found.")).ServeHTTP(w, r)
 			return
 		}
 		accountID = serviceAccount.AccountID
@@ -377,10 +311,7 @@ func (s *Server) ManageAccountStatus(w http.ResponseWriter, r *http.Request) {
 		err = s.apiClient.EnableAccount(accessTokenDetails.AccessToken, accountID)
 		successMsg = "Account enabled successfully"
 	default:
-		component := templates.ErrorAlert("Invalid action. Please select a valid action.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Invalid action. Please select a valid action.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -394,18 +325,11 @@ func (s *Server) ManageAccountStatus(w http.ResponseWriter, r *http.Request) {
 			msg = "An error occurred. Please try again."
 		}
 
-		component := templates.ErrorAlert(msg)
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
 		return
 	}
 
-	// Success response
-	component := templates.SuccessAlert(successMsg)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.SuccessAlert(successMsg)).ServeHTTP(w, r)
 }
 
 // MangeSiteAdminRolesPage godoc
@@ -428,18 +352,11 @@ func (s *Server) MangeSiteAdminRolesPage(w http.ResponseWriter, r *http.Request)
 	rawUsers, err := s.apiClient.GetUsers(accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get users list", slog.String("error", err.Error()))
-		component := templates.ErrorAlert("Failed to load users. Please try again.")
-		if renderErr := component.Render(r.Context(), w); renderErr != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", renderErr.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Failed to load users. Please try again.")).ServeHTTP(w, r)
 		return
 	}
 
-	// Render site admin role management page
-	component := templates.MangeSiteAdminRolesPage(s.config.Environment, getUserOptions(rawUsers, accessTokenDetails.Email))
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render site admin role management page", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.MangeSiteAdminRolesPage(s.config.Environment, getUserOptions(rawUsers, accessTokenDetails.Email))).ServeHTTP(w, r)
 }
 
 // ManageAdminRoles godoc
@@ -450,6 +367,8 @@ func (s *Server) MangeSiteAdminRolesPage(w http.ResponseWriter, r *http.Request)
 //	@Param			user-email	formData	string	true	"User email"
 //	@Param			action		formData	string	true	"'grant' or 'revoke'"
 //	@Success		200			"HTML partial"
+//	@Failure		400			"HTML error partial"
+//	@Failure		401			"HTML error partial"
 //	@Router			/ui-api/accounts/isn-admins/manage [put]
 func (s *Server) ManageAdminRoles(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
@@ -460,19 +379,13 @@ func (s *Server) ManageAdminRoles(w http.ResponseWriter, r *http.Request) {
 
 	// Validate required fields
 	if userEmail == "" || action == "" {
-		component := templates.ErrorAlert("Please fill in all fields.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Please fill in all fields.")).ServeHTTP(w, r)
 		return
 	}
 
 	// Validate action
 	if action != "grant" && action != "revoke" {
-		component := templates.ErrorAlert("Invalid action selected.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Invalid action selected.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -505,18 +418,11 @@ func (s *Server) ManageAdminRoles(w http.ResponseWriter, r *http.Request) {
 			msg = "An error occurred. Please try again."
 		}
 
-		component := templates.ErrorAlert(msg)
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
 		return
 	}
 
-	// Success response
-	component := templates.SuccessAlert(successMsg)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render success alert", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.SuccessAlert(successMsg)).ServeHTTP(w, r)
 }
 
 // ManageSiteAdminRoles godoc
@@ -527,6 +433,8 @@ func (s *Server) ManageAdminRoles(w http.ResponseWriter, r *http.Request) {
 //	@Param			user-email	formData	string	true	"User email"
 //	@Param			action		formData	string	true	"'grant' or 'revoke'"
 //	@Success		200			"HTML partial"
+//	@Failure		400			"HTML error partial"
+//	@Failure		401			"HTML error partial"
 //	@Router			/ui-api/accounts/site-admins/manage [put]
 func (s *Server) ManageSiteAdminRoles(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
@@ -537,20 +445,14 @@ func (s *Server) ManageSiteAdminRoles(w http.ResponseWriter, r *http.Request) {
 
 	// Validate required fields
 	if userEmail == "" || action == "" {
-		component := templates.ErrorAlert("Please fill in all fields.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Please fill in all fields.")).ServeHTTP(w, r)
 		return
 	}
 
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
 		reqLogger.Error("failed to read accessTokenDetails from context")
-		component := templates.ErrorAlert("An error occurred. Please try again.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("An error occurred. Please try again.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -576,16 +478,9 @@ func (s *Server) ManageSiteAdminRoles(w http.ResponseWriter, r *http.Request) {
 			msg = "An error occurred. Please try again."
 		}
 
-		component := templates.ErrorAlert(msg)
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
 		return
 	}
 
-	// Success response
-	component := templates.SuccessAlert(successMsg)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render success alert", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.SuccessAlert(successMsg)).ServeHTTP(w, r)
 }

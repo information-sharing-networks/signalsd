@@ -3,7 +3,7 @@
 ## Unit Tests 
 
 Unit tests are used to test a couple of areas:
-- `app/internal/server/utils/utils_test.go` - URL validation and SSRF protection (ensures user submitted URLs are only GitHub URLs)
+- `app/internal/utils/utils_test.go` - URL validation and SSRF protection (ensures user submitted URLs are only GitHub URLs)
 - `app/internal/server/request_limits_test.go` - Rate limiting and request size controls
 
 ## Integration Tests

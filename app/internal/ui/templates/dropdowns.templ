@@ -1,11 +1,9 @@
 package templates
 
 import (
-    "strings"
     "fmt"
     "github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
-
 
 // AccountTypeSelector displays a dropdown to select the account type
 templ AccountTypeSelector() {
@@ -102,7 +100,7 @@ templ AccountSelector(users []types.UserOption, serviceAccounts []types.ServiceA
             </select>
         </div>
         <div id="account-placeholder" class="account-selector-default">
-            <lable for="account-identifier-placeholder" class="form-label">Account</lable>
+            <label for="account-identifier-placeholder" class="form-label">Account</label>
             <input
                 id="account-identifier-placeholder"
                 type="text"
@@ -116,7 +114,7 @@ templ AccountSelector(users []types.UserOption, serviceAccounts []types.ServiceA
 
 // ISNSelector displays a dropdown to select an ISN (the isn list should always be filtered by the caller, based on the claims)
 templ IsnSelector(isns []types.IsnOption) {
-	<lable for="isn-slug" class="form-label">ISN</lable>
+	<label for="isn-slug" class="form-label">ISN</label>
     <select
         id="isn-slug"
         name="isn-slug"
@@ -125,61 +123,51 @@ templ IsnSelector(isns []types.IsnOption) {
     >
         <option value="">Select ISN...</option>
         for _, isn := range isns {
-            <option value={ isn.Slug }>{ strings.ReplaceAll(isn.Slug, "-", " ") }</option>
+            <option value={ isn.Slug }>{ isn.Slug }</option>
         }
     </select>
 }
 
-// SignalTypeSelectorFieldsWithISN creates cascading dropdowns: ISN → Signal Type → Version
-// Uses HTMX to dynamically load options based on selections
-// Signal types are filtered to those associated with the selected ISN
-// Used for: Signal Search and Signal Type Status pages
-templ SignalTypeSelectorFieldsWithISN(isns []types.IsnOption, includeInactive bool) {
-	<div class="grid grid-cols-1 md:grid-cols-3">
+// IsnSignalTypeCascade creates cascading dropdowns: ISN -> Signal Type -> Version.
+// Uses HTMX to dynamically load options based on selections.
+// slugsEndpoint is the URL called when the ISN selection changes to load signal type options.
+// Used for: Signal Search, Signal Type Status pages, and Add Signal Type to ISN.
+templ IsnSignalTypeCascade(isns []types.IsnOption, slugsEndpoint string, includeInactive bool) {
+	<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
 		<div class="form-group">
 			<label for="isn-slug" class="form-label">ISN</label>
-			<div class="relative">
-				<select
-					id="isn-slug"
-					name="isn-slug"
-					required
-					hx-get={ fmt.Sprintf("/ui-api/options/isn/signal-type-slugs?include_inactive=%v", includeInactive) }
-					hx-target="#signal-type-slug"
-					hx-swap="outerHTML"
-					hx-trigger="change"
-					hx-indicator="#isn-loading"
-					class="form-select"
-				>
-					<option value="">Select ISN...</option>
-					for _, isn := range isns {
-						<option value={ isn.Slug }>{ strings.ReplaceAll(isn.Slug, "-", " ") }</option>
-					}
-				</select>
-				<div id="isn-loading" class="htmx-indicator loading-spinner">Loading...</div>
-			</div>
+			<select
+				id="isn-slug"
+				name="isn-slug"
+				required
+				hx-get={ fmt.Sprintf("%s?include_inactive=%v", slugsEndpoint, includeInactive) }
+				hx-target="#signal-type-slug"
+				hx-swap="outerHTML"
+				hx-trigger="change"
+				hx-indicator="#isn-loading"
+				class="form-select"
+			>
+				<option value="">Select ISN...</option>
+				for _, isn := range isns {
+					<option value={ isn.Slug }>{ isn.Slug }</option>
+				}
+			</select>
+			<div id="isn-loading" class="htmx-indicator loading-spinner">Loading...</div>
 		</div>
 		<div class="form-group">
 			<label for="signal-type-slug" class="form-label">Signal Type</label>
-			<div class="relative">
-				<select
-					id="signal-type-slug"
-					name="signal-type-slug"
-					required
-					disabled
-					hx-get={ fmt.Sprintf("/ui-api/options/isn/signal-type-versions?include_inactive=%v", includeInactive) }
-					hx-target="#sem-ver"
-					hx-swap="outerHTML"
-					hx-trigger="change"
-					hx-include="this, #isn-slug"
-					hx-indicator="#signal-type-loading"
-					class="form-select"
-				>
-					<option value="">Select Signal Type...</option>
-				</select>
-				<div id="signal-type-loading" class="htmx-indicator loading-spinner">Loading...</div>
-			</div>
+			<select
+				id="signal-type-slug"
+				name="signal-type-slug"
+				required
+				disabled
+				class="form-select"
+			>
+				<option value="">Select Signal Type...</option>
+			</select>
+			<div id="signal-type-loading" class="htmx-indicator loading-spinner">Loading...</div>
 		</div>
-		<div id="version-select" class="form-group">
+		<div class="form-group">
 			<label for="sem-ver" class="form-label">Version</label>
 			<select
 				id="sem-ver"
@@ -194,12 +182,19 @@ templ SignalTypeSelectorFieldsWithISN(isns []types.IsnOption, includeInactive bo
 	</div>
 }
 
+// SignalTypeSelectorFieldsWithISN is a convenience wrapper for the token-based ISN cascade
+// used by Signal Search and Signal Type Status pages.
+templ SignalTypeSelectorFieldsWithISN(isns []types.IsnOption, includeInactive bool) {
+	@IsnSignalTypeCascade(isns, "/ui-api/options/isn/signal-type-slugs", includeInactive)
+}
 
-// SignalTypeSlugsSelect renders the signal type dropdown after an ISN is selected.
+
+// SignalTypeSlugsSelect renders the signal type dropdown after a selection triggers it.
 // It replaces the signal-type-slug select in place via HTMX swap.
-// versionsEndpoint is the URL the rendered select will call to load the version dropdown;
-// callers supply the correct endpoint depending on whether versions come from the token or the API.
-templ SignalTypeSlugsSelect(signalTypes []types.SignalTypeSlug, versionsEndpoint string) {
+// versionsEndpoint is the URL the rendered select will call to load the version dropdown.
+// hxInclude specifies which additional fields to send when fetching versions
+// (e.g. "#isn-slug" for ISN-scoped cascades, or "" when no extra context is needed).
+templ SignalTypeSlugsSelect(signalTypes []types.SignalTypeSlug, versionsEndpoint string, hxInclude string) {
 	<select
 		id="signal-type-slug"
 		name="signal-type-slug"
@@ -208,12 +203,14 @@ templ SignalTypeSlugsSelect(signalTypes []types.SignalTypeSlug, versionsEndpoint
 		hx-target="#sem-ver"
 		hx-swap="outerHTML"
 		hx-trigger="change"
-		hx-include="this, #isn-slug"
+		if hxInclude != "" {
+			hx-include={ hxInclude }
+		}
 		class="form-select"
 	>
 		<option value="">Select Signal Type...</option>
 		for _, signalType := range signalTypes {
-			<option value={ signalType.Slug }>{ strings.ReplaceAll(signalType.Slug, "-", " ") }</option>
+			<option value={ signalType.Slug }>{ signalType.Slug}</option>
 		}
 	</select>
 }

@@ -25,7 +25,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
-	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 )
 
@@ -39,7 +38,6 @@ func TestSignalSubmission(t *testing.T) {
 	ctx := context.Background()
 
 	testEnv := startInProcessServer(t, "")
-	defer testEnv.shutdown()
 
 	// create test data (take care if updating as used by multiple test below)
 	t.Log("Creating test data...")
@@ -51,16 +49,12 @@ func TestSignalSubmission(t *testing.T) {
 	siteAdminISN := createTestISN(t, ctx, testEnv.queries, "siteadmin-isn", "SiteAdmin ISN", siteAdminAccount.ID, "private")
 	adminISN := createTestISN(t, ctx, testEnv.queries, "admin-isn", "Admin ISN", adminAccount.ID, "private")
 
-	siteAdminSignalType := createTestSignalType(t, ctx, testEnv.queries, siteAdminISN.ID, "siteadmin ISN signal", "1.0.0")
-	adminSignalType := createTestSignalType(t, ctx, testEnv.queries, adminISN.ID, "admin ISN signal", "1.0.0")
+	siteAdminSignalType := createTestSignalType(t, ctx, testEnv.queries, siteAdminISN.ID, "siteadmin ISN signal", "")
+	adminSignalType := createTestSignalType(t, ctx, testEnv.queries, adminISN.ID, "admin ISN signal", "")
 
 	grantPermission(t, ctx, testEnv.queries, adminISN.ID, memberAccount.ID, "read")
 
-	createTestSignalBatch(t, ctx, testEnv.queries, siteAdminAccount.ID, "test-batch-siteadmin")
-	createTestSignalBatch(t, ctx, testEnv.queries, siteAdminAccount.ID, "test-batch-siteadmin-admin-isn")
-	createTestSignalBatch(t, ctx, testEnv.queries, adminAccount.ID, "test-batch-admin")
-
-	ownerEndpoint := testSignalEndpoint{
+	siteAdminEndpoint := testSignalEndpoint{
 		isnSlug:          siteAdminISN.Slug,
 		signalTypeSlug:   siteAdminSignalType.Slug,
 		signalTypeSemVer: siteAdminSignalType.SemVer,
@@ -70,6 +64,9 @@ func TestSignalSubmission(t *testing.T) {
 		signalTypeSlug:   adminSignalType.Slug,
 		signalTypeSemVer: adminSignalType.SemVer,
 	}
+
+	// refresh the schema cache
+	testEnv.schemaCache.Load(ctx)
 
 	// run the signal submission tests
 	t.Run("signal submission", func(t *testing.T) {
@@ -84,7 +81,7 @@ func TestSignalSubmission(t *testing.T) {
 			skipAuthToken     bool
 			customAuthToken   string
 			expectedStored    int // Expected stored_count in response
-			expectedFailed    int // Expected failed_count in response
+			expectedFailed    int // Expected rejected_count in response
 		}{
 			// valid signal loads
 			{
@@ -116,7 +113,7 @@ func TestSignalSubmission(t *testing.T) {
 				expectedStored: 3,
 				expectedFailed: 0,
 			},
-			// request level failures
+			// auth failures - this checks the approrpriate middleware is being used
 			{
 				name:              "unauthorized_signal_submission_by_member",
 				accountID:         memberAccount.ID,
@@ -161,11 +158,88 @@ func TestSignalSubmission(t *testing.T) {
 				expectedErrorCode: apperrors.ErrCodeAuthorizationFailure.String(),
 				customAuthToken:   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.malformed.signature", // Malformed JWT
 			},
+			// mandatory field failures
 			{
-				name:              "empty_signals_array",
-				accountID:         adminAccount.ID,
-				endpoint:          adminEndpoint,
-				payloadFunc:       func() map[string]any { return createEmptySignalsPayload() },
+				name:      "missing_batch_ref",
+				accountID: adminAccount.ID,
+				endpoint:  adminEndpoint,
+				payloadFunc: func() map[string]any {
+					return map[string]any{
+						"signals": []map[string]any{
+							{"local_ref": "test-001", "content": map[string]any{"test": "data"}},
+						},
+					}
+				},
+				expectedStatus:    http.StatusBadRequest,
+				expectedErrorCode: apperrors.ErrCodeMalformedBody.String(),
+			},
+			{
+				name:      "invalid_batch_ref_format",
+				accountID: adminAccount.ID,
+				endpoint:  adminEndpoint,
+				payloadFunc: func() map[string]any {
+					return map[string]any{
+						"batch_ref": "invalid batch ref!@#$",
+						"signals": []map[string]any{
+							{"local_ref": "test-001", "content": map[string]any{"test": "data"}},
+						},
+					}
+				},
+				expectedStatus:    http.StatusBadRequest,
+				expectedErrorCode: apperrors.ErrCodeMalformedBody.String(),
+			},
+			{
+				name:      "missing_signals_array",
+				accountID: adminAccount.ID,
+				endpoint:  adminEndpoint,
+				payloadFunc: func() map[string]any {
+					return map[string]any{
+						"batch_ref": "test-batch",
+					}
+				},
+				expectedStatus:    http.StatusBadRequest,
+				expectedErrorCode: apperrors.ErrCodeMalformedBody.String(),
+			},
+			{
+				name:      "empty_signals_array",
+				accountID: adminAccount.ID,
+				endpoint:  adminEndpoint,
+				payloadFunc: func() map[string]any {
+					return map[string]any{
+						"batch_ref": "test-batch",
+						"signals":   []map[string]any{},
+					}
+				},
+				expectedStatus:    http.StatusBadRequest,
+				expectedErrorCode: apperrors.ErrCodeMalformedBody.String(),
+			},
+			{
+				name:      "missing_local_ref",
+				accountID: adminAccount.ID,
+				endpoint:  adminEndpoint,
+				payloadFunc: func() map[string]any {
+					return map[string]any{
+						"batch_ref": "test-batch",
+						"signals": []map[string]any{
+							{"content": map[string]any{"test": "data"}},
+						},
+					}
+				},
+				expectedStatus:    http.StatusBadRequest,
+				expectedErrorCode: apperrors.ErrCodeMalformedBody.String(),
+			},
+			{
+				name:      "missing_content",
+				accountID: adminAccount.ID,
+				endpoint:  adminEndpoint,
+				payloadFunc: func() map[string]any {
+					return map[string]any{
+						"batch_ref": "test-batch",
+						"signals": []map[string]any{
+							{"local_ref": "test-001"},
+						},
+					}
+				},
 				expectedStatus:    http.StatusBadRequest,
 				expectedErrorCode: apperrors.ErrCodeMalformedBody.String(),
 			},
@@ -282,7 +356,7 @@ func TestSignalSubmission(t *testing.T) {
 		// create a signal in the siteadmin isn
 		ownerPayload := createValidSignalPayload("siteadmin-correlation-test-signal-001")
 
-		ownerSignalResponse := submitCreateSignalRequest(t, testEnv.baseURL, ownerPayload, ownerToken, ownerEndpoint)
+		ownerSignalResponse := submitCreateSignalRequest(t, testEnv.baseURL, ownerPayload, ownerToken, siteAdminEndpoint)
 		defer ownerSignalResponse.Body.Close()
 
 		if ownerSignalResponse.StatusCode != http.StatusOK {
@@ -385,7 +459,15 @@ func TestSignalSubmission(t *testing.T) {
 							t.Fatalf("Failed to get error code from response: %v", correlatedSignalResponseBody)
 						}
 					} else { // 422 is for processing errors - each failed signal has its own error_code/error_message
-						errorCode, ok = correlatedSignalResponseBody["results"].(map[string]any)["failed_signals"].([]any)[0].(map[string]any)["error_code"].(string)
+						results, resultsOk := correlatedSignalResponseBody["results"].([]any)
+						var firstResult map[string]any
+						if resultsOk && len(results) > 0 {
+							firstResult, resultsOk = results[0].(map[string]any)
+						}
+						if !resultsOk {
+							t.Fatalf("Failed to get results from response: %v", correlatedSignalResponseBody)
+						}
+						errorCode, ok = firstResult["failed_signals"].([]any)[0].(map[string]any)["error_code"].(string)
 						if !ok {
 							t.Fatalf("Failed to get error code from response: %v", correlatedSignalResponseBody)
 						}
@@ -459,7 +541,6 @@ func TestIsInUseStatus(t *testing.T) {
 	ctx := context.Background()
 
 	testEnv := startInProcessServer(t, "")
-	defer testEnv.shutdown()
 
 	t.Log("Creating test data...")
 
@@ -470,8 +551,8 @@ func TestIsInUseStatus(t *testing.T) {
 	siteAdminISN := createTestISN(t, ctx, testEnv.queries, "siteadmin-isn", "SiteAdmin ISN", siteAdminAccount.ID, "private")
 	adminISN := createTestISN(t, ctx, testEnv.queries, "admin-isn", "Admin ISN", adminAccount.ID, "private")
 
-	siteAdminSignalType := createTestSignalType(t, ctx, testEnv.queries, siteAdminISN.ID, "siteadmin ISN signal", "1.0.0")
-	adminSignalType := createTestSignalType(t, ctx, testEnv.queries, adminISN.ID, "admin ISN signal", "1.0.0")
+	siteAdminSignalType := createTestSignalType(t, ctx, testEnv.queries, siteAdminISN.ID, "siteadmin ISN signal", "")
+	adminSignalType := createTestSignalType(t, ctx, testEnv.queries, adminISN.ID, "admin ISN signal", "")
 
 	// all accounts need read/write to all ISNs to make the test work
 
@@ -484,8 +565,8 @@ func TestIsInUseStatus(t *testing.T) {
 	grantPermission(t, ctx, testEnv.queries, adminISN.ID, memberAccount.ID, "read-write")
 	grantPermission(t, ctx, testEnv.queries, siteAdminISN.ID, memberAccount.ID, "read-write")
 
-	createTestSignalBatch(t, ctx, testEnv.queries, adminAccount.ID, "test-batch-admin-siteadmin-isn")
-	createTestSignalBatch(t, ctx, testEnv.queries, adminAccount.ID, "test-batch-admin-admin-isn")
+	// refresh signal schema cache
+	testEnv.schemaCache.Load(ctx)
 
 	ownerEndpoint := testSignalEndpoint{
 		isnSlug:          siteAdminISN.Slug,
@@ -595,7 +676,7 @@ func TestIsInUseStatus(t *testing.T) {
 
 						authToken := testEnv.createAuthToken(t, account.ID)
 
-						t.Logf("access token %v", authToken)
+						//t.Logf("access token %v", authToken)
 
 						switch tt.action {
 						case "write":
@@ -668,7 +749,7 @@ func TestSignalSearch(t *testing.T) {
 	// admin can see the signal on the admin ISN, since they created it, and can't see the siteadmin signal (auth error)
 	// member is granted access to the admin ISN and can see the admin signal but can't see the siteadmin signal (auth error)
 	//
-	// there is 1 pulic ISN with 1 signal -- all accounts can see this signal without auth
+	// there is 1 pulic ISN with 1 signal - all accounts can see this signal without auth
 
 	t.Log("Creating test data...")
 
@@ -680,9 +761,9 @@ func TestSignalSearch(t *testing.T) {
 	adminISN := createTestISN(t, ctx, testEnv.queries, "admin-search-isn", "Admin search ISN", adminAccount.ID, "private")
 	publicISN := createTestISN(t, ctx, testEnv.queries, "public-search-isn", "Public search ISN", adminAccount.ID, "public")
 
-	siteAdminSignalType := createTestSignalType(t, ctx, testEnv.queries, siteAdminISN.ID, "siteadmin ISN search signal", "1.0.0")
-	adminSignalType := createTestSignalType(t, ctx, testEnv.queries, adminISN.ID, "admin ISN search signal", "1.0.0")
-	publicSignalType := createTestSignalType(t, ctx, testEnv.queries, publicISN.ID, "public ISN search signal", "1.0.0")
+	siteAdminSignalType := createTestSignalType(t, ctx, testEnv.queries, siteAdminISN.ID, "siteadmin ISN search signal", "")
+	adminSignalType := createTestSignalType(t, ctx, testEnv.queries, adminISN.ID, "admin ISN search signal", "")
+	publicSignalType := createTestSignalType(t, ctx, testEnv.queries, publicISN.ID, "public ISN search signal", "")
 
 	// Grant write permissions to ISN owners so they can submit signals
 	grantPermission(t, ctx, testEnv.queries, siteAdminISN.ID, siteAdminAccount.ID, "write")
@@ -691,11 +772,6 @@ func TestSignalSearch(t *testing.T) {
 
 	// Grant read permission to member for admin ISN
 	grantPermission(t, ctx, testEnv.queries, adminISN.ID, memberAccount.ID, "read")
-
-	// create batches
-	createTestSignalBatch(t, ctx, testEnv.queries, siteAdminAccount.ID, "test-batch-siteadmin")
-	createTestSignalBatch(t, ctx, testEnv.queries, adminAccount.ID, "test-batch-admin")
-	createTestSignalBatch(t, ctx, testEnv.queries, adminAccount.ID, "test-batch-admin-public")
 
 	// Create tokens after granting permissions so they include the ISN permissions in claims
 	ownerToken := testEnv.createAuthToken(t, siteAdminAccount.ID)
@@ -721,8 +797,13 @@ func TestSignalSearch(t *testing.T) {
 		signalTypeSemVer: publicSignalType.SemVer,
 	}
 
+	// refresh signal schema cache
+	if err := testEnv.schemaCache.Load(ctx); err != nil {
+		t.Fatalf("Failed to refresh schema cache: %v", err)
+	}
+
 	// Refresh the public ISN cache to include the newly created public ISN
-	if err := testEnv.publicIsnCache.Refresh(ctx, testEnv.queries); err != nil {
+	if err := testEnv.publicIsnCache.Load(ctx); err != nil {
 		t.Fatalf("Failed to refresh public ISN cache: %v", err)
 	}
 
@@ -1007,7 +1088,6 @@ func TestWriteOnlyAccountVisibility(t *testing.T) {
 	ctx := context.Background()
 
 	testEnv := startInProcessServer(t, "")
-	defer testEnv.shutdown()
 
 	t.Log("Creating test data...")
 
@@ -1017,15 +1097,16 @@ func TestWriteOnlyAccountVisibility(t *testing.T) {
 
 	// Create a shared ISN
 	sharedISN := createTestISN(t, ctx, testEnv.queries, "shared-writeonly-isn", "Shared Write-Only ISN", account1.ID, "private")
-	signalType := createTestSignalType(t, ctx, testEnv.queries, sharedISN.ID, "shared signal type", "1.0.0")
+	signalType := createTestSignalType(t, ctx, testEnv.queries, sharedISN.ID, "shared signal type", "")
 
 	// Grant write-only permission to both accounts - they can search but only see their own signals
 	grantPermission(t, ctx, testEnv.queries, sharedISN.ID, account1.ID, "write")
 	grantPermission(t, ctx, testEnv.queries, sharedISN.ID, account2.ID, "write")
 
-	// create batches
-	createTestSignalBatch(t, ctx, testEnv.queries, account1.ID, "test-batch-account1")
-	createTestSignalBatch(t, ctx, testEnv.queries, account2.ID, "test-batch-account2")
+	// refresh signal schema cache
+	if err := testEnv.schemaCache.Load(ctx); err != nil {
+		t.Fatalf("Failed to refresh schema cache: %v", err)
+	}
 
 	// Create tokens after granting permissions
 	token1 := testEnv.createAuthToken(t, account1.ID)
@@ -1113,7 +1194,6 @@ func TestCorrelatedAndPreviousVersionsSearch(t *testing.T) {
 	ctx := context.Background()
 
 	testEnv := startInProcessServer(t, "")
-	defer testEnv.shutdown()
 
 	// create test data
 	t.Log("Creating test data...")
@@ -1122,16 +1202,19 @@ func TestCorrelatedAndPreviousVersionsSearch(t *testing.T) {
 
 	siteAdminISN := createTestISN(t, ctx, testEnv.queries, "siteadmin-correlated-isn", "SiteAdmin correlated ISN", siteAdminAccount.ID, "private")
 
-	siteAdminSignalType := createTestSignalType(t, ctx, testEnv.queries, siteAdminISN.ID, "SiteAdmin correlated signal", "1.0.0")
+	siteAdminSignalType := createTestSignalType(t, ctx, testEnv.queries, siteAdminISN.ID, "SiteAdmin correlated signal", "")
 
-	// create batch
-	createTestSignalBatch(t, ctx, testEnv.queries, siteAdminAccount.ID, "test-batch-correlated")
 	ownerAuthToken := testEnv.createAuthToken(t, siteAdminAccount.ID)
 
 	ownerEndpoint := testSignalEndpoint{
 		isnSlug:          siteAdminISN.Slug,
 		signalTypeSlug:   siteAdminSignalType.Slug,
 		signalTypeSemVer: siteAdminSignalType.SemVer,
+	}
+
+	// refresh signal schema cache
+	if err := testEnv.schemaCache.Load(ctx); err != nil {
+		t.Fatalf("Failed to refresh schema cache: %v", err)
 	}
 
 	// create master-001 signal (will have two correlated signals)
@@ -1189,6 +1272,10 @@ func TestCorrelatedAndPreviousVersionsSearch(t *testing.T) {
 		t.Fatalf("Failed to submit signal to siteadmin ISN: %d", correlated002SignalResponse.StatusCode)
 	}
 
+	// refresh signal schema cache
+	if err := testEnv.schemaCache.Load(ctx); err != nil {
+		t.Fatalf("Failed to refresh schema cache: %v", err)
+	}
 	t.Run("search without correlated signals", func(t *testing.T) {
 		response := searchPrivateSignals(t, testEnv.baseURL, ownerEndpoint, ownerAuthToken, false, false, false)
 		defer response.Body.Close()
@@ -1292,22 +1379,13 @@ func TestCorrelatedAndPreviousVersionsSearch(t *testing.T) {
 	})
 }
 
-func (env *testEnv) createAuthToken(t *testing.T, accountID uuid.UUID) string {
-	ctx := auth.ContextWithAccountID(context.Background(), accountID)
-	tokenResponse, err := env.authService.CreateAccessToken(ctx)
-	if err != nil {
-		t.Fatalf("Failed to create access token: %v", err)
-	}
-	return tokenResponse.AccessToken
-}
-
 type testSignalEndpoint struct {
 	isnSlug          string
 	signalTypeSlug   string
 	signalTypeSemVer string
 }
 
-// createValidSignalPayload creates json valid for https://github.com/information-sharing-networks/signalsd_test_schemas/blob/main/2025.05.13/integration-test-schema.json
+// createValidSignalPayload creates json valid for https://github.com/information-sharing-networks/signal-library/blob/main/signalsd-testing/simple.json
 func createValidSignalPayload(localRef string) map[string]any {
 	return map[string]any{
 		"batch_ref": "test-batch",
@@ -1322,13 +1400,13 @@ func createValidSignalPayload(localRef string) map[string]any {
 	}
 }
 
-func createValidSignalPayloadWithCorrelatedID(localRef string, correlationID string) map[string]any {
+func createValidSignalPayloadWithCorrelatedID(localRef string, CorrelationID string) map[string]any {
 	return map[string]any{
 		"batch_ref": "test-batch",
 		"signals": []map[string]any{
 			{
 				"local_ref":      localRef,
-				"correlation_id": correlationID,
+				"correlation_id": CorrelationID,
 				"content": map[string]any{
 					"test": "valid content for simple schema",
 				},
@@ -1397,14 +1475,6 @@ func createMultipleSignalsPayloadPartialFailure(localRefs []string) map[string]a
 	}
 }
 
-// createEmptySignalsPayload creates a payload with empty signals array
-func createEmptySignalsPayload() map[string]any {
-	return map[string]any{
-		"batch_ref": "test-batch",
-		"signals":   []map[string]any{},
-	}
-}
-
 // Helper function to validate response counts
 func validateResponseCounts(t *testing.T, auditTrail map[string]any, expectedStored, expectedFailed int, testName string) bool {
 	t.Helper()
@@ -1440,21 +1510,21 @@ func validateResponseCounts(t *testing.T, auditTrail map[string]any, expectedSto
 		t.Errorf("Missing stored_count in summary for %s", testName)
 	}
 
-	// Verify failed_count
-	if failedCount, ok := summaryMap["failed_count"]; ok {
-		if failedCountFloat, ok := failedCount.(float64); ok {
-			actualFailed := int(failedCountFloat)
+	// Verify rejected_count
+	if rejectedCount, ok := summaryMap["rejected_count"]; ok {
+		if rejectedCountFloat, ok := rejectedCount.(float64); ok {
+			actualFailed := int(rejectedCountFloat)
 			if actualFailed != expectedFailed {
 				countMismatch = true
-				t.Errorf("Expected failed_count %d, got %d for %s", expectedFailed, actualFailed, testName)
+				t.Errorf("Expected rejected_count %d, got %d for %s", expectedFailed, actualFailed, testName)
 			}
 		} else {
 			countMismatch = true
-			t.Errorf("failed_count is not a number for %s", testName)
+			t.Errorf("rejected_count is not a number for %s", testName)
 		}
 	} else {
 		countMismatch = true
-		t.Errorf("Missing failed_count in summary for %s", testName)
+		t.Errorf("Missing rejected_count in summary for %s", testName)
 	}
 
 	return countMismatch
@@ -1619,16 +1689,18 @@ func withdrawSignal(t *testing.T, baseURL string, endpoint testSignalEndpoint, t
 func getSignalIDFromCreateSignalResponse(t *testing.T, response map[string]any) string {
 	t.Helper()
 
-	results, ok := response["results"].(map[string]any)
-	if !ok {
-		t.Fatal("Failed to get results from response")
+	results, ok := response["results"].([]any)
+	if !ok || len(results) == 0 {
+		t.Fatal("Failed to get results array from response")
 	}
 
-	storedSignals, ok := results["stored_signals"].([]any)
-	if !ok || len(storedSignals) == 0 {
-		t.Fatal("No stored signals in response")
+	firstResult, ok := results[0].(map[string]any)
+	if !ok {
+		t.Fatal("First result is not a map")
 	}
-	if len(storedSignals) == 0 {
+
+	storedSignals, ok := firstResult["stored_signals"].([]any)
+	if !ok || len(storedSignals) == 0 {
 		t.Fatal("No stored signals in response")
 	}
 
@@ -1643,5 +1715,4 @@ func getSignalIDFromCreateSignalResponse(t *testing.T, response map[string]any) 
 	}
 
 	return signalID
-
 }

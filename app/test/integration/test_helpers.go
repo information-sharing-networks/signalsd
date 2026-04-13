@@ -4,7 +4,6 @@ package integration
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -14,17 +13,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
-	"github.com/information-sharing-networks/signalsd/app/internal/server/utils"
-	"github.com/jackc/pgx/v5"
-)
-
-const (
-
-	// Test signal type
-	testSignalTypeDetail = "Simple test signal type for integration tests"
-	testSchemaURL        = "https://github.com/information-sharing-networks/signalsd_test_schemas/blob/main/2025.05.13/integration-test-schema.json"
-	testReadmeURL        = "https://github.com/information-sharing-networks/signalsd_test_schemas/blob/main/2025.05.13/README.md"
-	testSchemaContent    = `{"type": "object", "properties": {"test": {"type": "string"}}, "required": ["test"], "additionalProperties": false }`
+	"github.com/information-sharing-networks/signalsd/app/internal/utils"
 )
 
 // createExpiredAccessToken creates an expired JWT access token for testing purposes
@@ -62,6 +51,7 @@ func createExpiredAccessToken(t *testing.T, accountID uuid.UUID, secretKey strin
 
 // createTestAccount creates entries in account and user/service_account tables
 func createTestAccount(t *testing.T, ctx context.Context, queries *database.Queries, role, accountType string, email string) database.GetAccountByIDRow {
+	t.Helper()
 
 	// Create account record
 	account, err := queries.CreateUserAccount(ctx)
@@ -124,6 +114,7 @@ func createTestAccount(t *testing.T, ctx context.Context, queries *database.Quer
 
 // createTestISN creates a test ISN with specified owner and visibility
 func createTestISN(t *testing.T, ctx context.Context, queries *database.Queries, slug, title string, siteAdminID uuid.UUID, visibility string) database.Isn {
+	t.Helper()
 
 	result, err := queries.CreateIsn(ctx, database.CreateIsnParams{
 		UserAccountID: siteAdminID,
@@ -147,27 +138,26 @@ func createTestISN(t *testing.T, ctx context.Context, queries *database.Queries,
 	}
 }
 
-// getBatchByRef returns a batch by account and batch_ref, or nil if none exists
-func getBatchByRef(t *testing.T, ctx context.Context, queries *database.Queries, accountID uuid.UUID, batchRef string) *database.SignalBatch {
-	t.Helper()
-
-	batch, err := queries.GetSignalBatchByRefAndAccountID(ctx, database.GetSignalBatchByRefAndAccountIDParams{
-		AccountID: accountID,
-		BatchRef:  batchRef,
-	})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil
-		}
-		t.Fatalf("Failed to get batch %q: %v", batchRef, err)
-	}
-	return &batch
-}
+// Test signal type - CreateTestSignalType will create a signal type with the same content as the github version in the url
+// The setup inserts directly to the DB, rather than using the handler, to avoid going to github in the tests
+const (
+	testSignalTypeDetail = "Simple test signal type for integration tests"
+	testSchemaURL        = "https://github.com/information-sharing-networks/signal-library/blob/main/signalsd-testing/simple.json"
+	testReadmeURL        = "https://github.com/information-sharing-networks/signal-library/blob/main/signalsd-testing/README.md"
+	testSchemaContent    = `{"type": "object", "properties": {"test": {"type": "string"}}, "required": ["test"], "additionalProperties": false }`
+)
 
 // createTestSignalType creates a signal type and associates it with an ISN
+// the simple schema expect content to have a single field called test, e.g "{ "test": "Hello, world!" }"
+// signal types default to version 1.0.0 if no version is supplied
 func createTestSignalType(t *testing.T, ctx context.Context, queries *database.Queries, isnID uuid.UUID, title string, version string) database.SignalType {
+	t.Helper()
 
 	slug, _ := utils.GenerateSlug(title)
+
+	if version == "" {
+		version = "1.0.0"
+	}
 
 	signalType, err := queries.CreateSignalType(ctx, database.CreateSignalTypeParams{
 		Slug:          slug,
@@ -197,6 +187,7 @@ func createTestSignalType(t *testing.T, ctx context.Context, queries *database.Q
 // grantPermission creates a permission grant between an account and ISN
 // permission should be "read" (read-only), "write" (write-only), or "read-write" (both)
 func grantPermission(t *testing.T, ctx context.Context, queries *database.Queries, isnID, accountID uuid.UUID, permission string) {
+	t.Helper()
 	canRead := permission == "read" || permission == "read-write"
 	canWrite := permission == "write" || permission == "read-write"
 
@@ -224,22 +215,6 @@ func enableAccount(t *testing.T, ctx context.Context, queries *database.Queries,
 	if err != nil {
 		t.Fatalf("failed to disable account %s: %v", accountID, err)
 	}
-}
-
-// createTestSignalBatch creates or retrieves a signal batch for an account using the given batch_ref.
-// In production this happens automatically when a signal is written.
-func createTestSignalBatch(t *testing.T, ctx context.Context, queries *database.Queries, accountID uuid.UUID, batchRef string) database.SignalBatch {
-	t.Helper()
-
-	batch, err := queries.UpsertSignalBatch(ctx, database.UpsertSignalBatchParams{
-		BatchRef:  batchRef,
-		AccountID: accountID,
-	})
-	if err != nil {
-		t.Fatalf("Failed to get or create signal batch (ref=%q, account=%s): %v", batchRef, accountID, err)
-	}
-
-	return batch
 }
 
 // createTestUserWithPassword creates a user account with a specific hashed password for login testing
@@ -286,4 +261,13 @@ func createTestUserWithPassword(t *testing.T, ctx context.Context, queries *data
 		AccountType: account.AccountType,
 		AccountRole: role,
 	}
+}
+
+func (env *testEnv) createAuthToken(t *testing.T, accountID uuid.UUID) string {
+	ctx := auth.ContextWithAccountID(context.Background(), accountID)
+	tokenResponse, err := env.authService.CreateAccessToken(ctx)
+	if err != nil {
+		t.Fatalf("Failed to create access token: %v", err)
+	}
+	return tokenResponse.AccessToken
 }

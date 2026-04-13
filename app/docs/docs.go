@@ -24,34 +24,6 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/admin/service-accounts/create": {
-            "get": {
-                "description": "Renders the create service account form. Requires isnadmin or siteadmin role.",
-                "tags": [
-                    "UI Page"
-                ],
-                "summary": "Create service account page",
-                "responses": {
-                    "200": {
-                        "description": "HTML page"
-                    }
-                }
-            }
-        },
-        "/admin/service-accounts/reissue-credentials": {
-            "get": {
-                "description": "Renders the reissue credentials form. Requires isnadmin or siteadmin role.",
-                "tags": [
-                    "UI Page"
-                ],
-                "summary": "Reissue service account credentials page",
-                "responses": {
-                    "200": {
-                        "description": "HTML page"
-                    }
-                }
-            }
-        },
         "/api/admin/accounts/{account_id}/disable": {
             "post": {
                 "security": [
@@ -330,6 +302,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
+                        "example": "sample-isn",
                         "description": "ISN slug",
                         "name": "isn_slug",
                         "in": "path",
@@ -482,7 +455,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Signal types specify a record that can be shared over the ISN\n- Each type has a unique title and this is used to create a URL-friendly slug\n- The title and slug fields can't be changed and must be unique for the site\n- The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading\n\nSchema URL Requirements\n- Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)\n- To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json\n\nReadme URL requirements\n- Must be a link to a file ending .md on a public github repo.\n- Use the special URL: https://github.com/skip/readme/main/readme.md to indicate there is no readme\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas\n- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)\n\nAfter creating a signal type, use the AddSignalTypeToIsn endpoint to link it to an ISN.\n\nSignal type definitions are referred to like this: /api/signal-types/{signal_type_slug}/v{sem_ver}\n\nNote: this endpoint can only be used by site admins",
+                "description": "Signal types specify a record that can be shared on the site\n- Each type has a unique title and this is used to create a URL-friendly slug\n- The title and slug fields can't be changed and must be unique for the site\n- The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading\n\nSchema URL Requirements\n- Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)\n- To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json\n\nReadme URL requirements\n- Must be a link to a file ending .md on a public github repo.\n- Use the special URL: https://github.com/skip/readme/main/readme.md to indicate there is no readme\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas\n- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (, 0.1.0 or 0.0.1)\n\nAfter creating a signal type, use the AddSignalTypeToIsn endpoint to link it to one or more ISNs.\n\nSignal type definitions are referred to like this: /api/signal-types/{signal_type_slug}/v{sem_ver}\n\nNote: this endpoint can only be used by site admins",
                 "tags": [
                     "Signal Types"
                 ],
@@ -541,7 +514,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "example": "sample-signal",
+                        "example": "sample-signal-type",
                         "description": "signal type slug",
                         "name": "signal_type_slug",
                         "in": "path",
@@ -595,7 +568,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "example": "sample-signal",
+                        "example": "sample-signal-type",
                         "description": "signal type slug",
                         "name": "signal_type_slug",
                         "in": "path",
@@ -603,8 +576,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "example": "0.0.1",
-                        "description": "version to be recieved",
+                        "example": "1.0.0",
+                        "description": "version",
                         "name": "sem_ver",
                         "in": "path",
                         "required": true
@@ -651,7 +624,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "example": "sample-signal",
+                        "example": "sample-signal-type",
                         "description": "signal type slug",
                         "name": "signal_type_slug",
                         "in": "path",
@@ -659,8 +632,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "example": "0.0.1",
-                        "description": "Sem ver",
+                        "example": "1.0.0",
+                        "description": "version",
                         "name": "sem_ver",
                         "in": "path",
                         "required": true
@@ -719,7 +692,7 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "example": "sample-signal",
+                        "example": "sample-signal-type",
                         "description": "signal type slug",
                         "name": "signal_type_slug",
                         "in": "path",
@@ -727,8 +700,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "example": "0.0.1",
-                        "description": "version to be deleted",
+                        "example": "1.0.0",
+                        "description": "version",
                         "name": "sem_ver",
                         "in": "path",
                         "required": true
@@ -758,6 +731,146 @@ const docTemplate = `{
                     },
                     "500": {
                         "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/signal-types/{signal_type_slug}/v{sem_ver}/routes": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Returns the Signals Routing Rules for a signal type.",
+                "tags": [
+                    "Signals Routing"
+                ],
+                "summary": "Get Signals Routing Config",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-signal-type",
+                        "description": "signal type slug",
+                        "name": "signal_type_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "1.0.0",
+                        "description": "version",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.SignalRoutingConfigResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Replaces the route config for the specified signal type path\n\nthe routing_field must be a plain Dot Notation path -\nunder the covers the service uses gjson paths, however the special patern matching symbols (*?#@|!()[]%\u003c\u003e=) are not currently allowed.\n\nWhen using the 'matches' and 'not matches' operator, any occurance of '*' and '?' in the matching pattern will be treated as a wildcard.\nThe pattern is always compared to the full contents of the specified routing field.\n\nPatterns are matched in order according to the supplied sequence number (smallest sequence first)\nand the first match is accepted. Where the routing field is an array, as long as one or more elements match\nthe match is accepted.",
+                "summary": "Update Signals Routing Config",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-signal-type",
+                        "description": "signal type slug",
+                        "name": "signal_type_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "1.0.0",
+                        "description": "version",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "routing config",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.UpdateSignalRoutingConfigRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Removes all routing information for a signal type version.",
+                "tags": [
+                    "Signals Routing"
+                ],
+                "summary": "Delete Signals Routing Config",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-signal-type",
+                        "description": "signal type slug",
+                        "name": "signal_type_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "1.0.0",
+                        "description": "version",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1342,7 +1455,7 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Returns the status of a batch identified by batch_ref, scoped to the authenticated account.\n\nThe response shows stored and failed signal counts broken down by ISN and signal type.\nFailures listed are unresolved: the signal failed in this batch and has not been successfully resubmitted since.\n\nMembers can view their own batches. Site admins can supply ?account_id= to view another account's batch.\n",
+                "description": "Returns the status of a batch identified by batch_ref, scoped to the authenticated account.\n\nThe response shows stored and failed signal counts broken down by ISN and signal type.\nWhere a signal is listed as 'rejected' this means the signal failed to load in this batch and has not been successfully resubmitted subsequently.\n\nMembers can view their own batches. Site admins can supply ?account_id= to view another account's batch.\n",
                 "tags": [
                     "Signal Exchange"
                 ],
@@ -1436,7 +1549,7 @@ const docTemplate = `{
                         "RefreshTokenCookieAuth": []
                     }
                 ],
-                "description": "Create an Information Sharing Network (ISN)\n\nvisibility = \"private\" means that signalsd on the network can only be seen by network participants.\n\nThis endpoint can only be used by ISN admins and site admins\n\nNote there is a cache of public ISNs that is used by the search endpoints. This cache is not dynamically loaded, so adding public ISNs requires a restart of the service",
+                "description": "Create an Information Sharing Network (ISN)\n\n*Visibility*\nSignals in a private ISN can only be seen by members of the ISN.\nSignals in a public ISN can be viewed by anyone (no authentication required).\nAccounts need write permission for the ISN before they can submit signals\n\nOnce the ISN is created you can:\n- Grant accounts permission to use it\n- Add the Signal Types that can be shared over the network\n\nThere can be multiple ISNs on the site and each ISN can have a\ndifferent membership and be configured for different Signal Types.\n\nThis endpoint can only be used by ISN admins and site admins",
                 "tags": [
                     "ISN Configuration"
                 ],
@@ -1485,7 +1598,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "example": "sample-isn",
-                        "description": "isn slug",
+                        "description": "ISN slug",
                         "name": "isn_slug",
                         "in": "path",
                         "required": true
@@ -1527,7 +1640,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "example": "sample-isn",
-                        "description": "isn slug",
+                        "description": "ISN slug",
                         "name": "isn_slug",
                         "in": "path",
                         "required": true
@@ -1651,7 +1764,7 @@ const docTemplate = `{
                     {
                         "type": "string",
                         "example": "sample-isn",
-                        "description": "isn slug",
+                        "description": "ISN slug",
                         "name": "isn_slug",
                         "in": "path",
                         "required": true
@@ -1775,7 +1888,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "example": "sample-signal",
+                        "example": "sample-signal-type",
                         "description": "signal type slug",
                         "name": "signal_type_slug",
                         "in": "path",
@@ -1783,8 +1896,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "example": "0.0.1",
-                        "description": "Sem ver",
+                        "example": "1.0.0",
+                        "description": "version",
                         "name": "sem_ver",
                         "in": "path",
                         "required": true
@@ -1837,23 +1950,23 @@ const docTemplate = `{
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Submit an array of signals for storage on the ISN\n- payloads must not mix signals of different types and are subject to the size limits defined on the site.\n- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.\n- If a local reference is received more than once from an account for the specified signal_type a new version of the signal will be stored with a incremented version number.\n- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.\n\n**Batches**\n\nBatches group separate loads for reporting and tracking purposes.\n- There is no need to explicitly create a batch before loading - a new batch is automatically created when an account first starts sending signals to an ISN.\n- Accounts that wish to start a new batch for tracking purposes can do so using the /api/isn/{isn_slug}/batches endpoint.\n- Each account can only have a single ISN batch open at a time. Opening a new batch will automatically close the previous batch.\n- Signals are always stored in the context of the account's currently open batch.\n\n**Authentication**\n\nRequires a valid access token.\nThe claims in the access token list the ISNs and signal_types that the account is permitted to use.\n\n**Error handling**\n\nif the request is a vaild format but individual signals contain errors (validation errors, incorrect correlation ids, database errors) the errors are recorded in the response but do not prevent other signals from being processed.\nIndividual failures are logged and can be tracked using the signals_batch_id returned in the response - see the batch status endpoint.\n\nErrors that relate to the entire request  - e.g invalid json, authentication, permission and server errors (400, 401, 403, 500) - are not recorded and should be handled by the client immediately.\n\n**JSON Schema Validation**\n\nSignals are validated against the JSON schema specified for the signal type unless validation is disabled on the type definition.\n\nWhen validation is disabled, basic checks are still done on the incoming data and the following issues create a 400 error and cause the entire payload to be rejected:\n- invalid json format\n- missing fields (the array of signals must be in a json object called signals, and content and local_ref must be present for each record).\n\n**Signal versions**\n\nMultiple versions are created when signals are resupplied using the same local_ref, e.g. because the client wants to correct a previously publsihed signal.\nBy default search will return the latest version of the signal.\nIf a signal has been withdrawn it will be reactivated if you resubmit it using the same local_ref.\n\n**Correlating signals**\n\nCorrelation IDs can be used to link signals together.  Signals can only be correlated within the same ISN.\nIf the supplied correlation_id is not found in the same ISN as the signal being submitted, the response will contain a 422 or 207 status code and the error_code for the failed signal will be ` + "`" + `invalid_correlation_id` + "`" + `.\n\nrequest level errors (e.g. invalid json, authentication failure etc) return a simple error_code/error_message response rather than a detailed audit log",
+                "description": "Submit signals to an ISN\n- payloads must not mix signals of different types and are subject to the size limits defined on the site.\n- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.\n- If a local reference is received more than once from an account for the specified signal_type a new version of the signal will be stored with a incremented version number.\n- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.\n\n**Batches**\n\nBatches group separate loads for reporting and tracking purposes.\n- Signal loads are tracked under the batch_ref supplied as part of the request. To start a new batch\njust supply a different batch_ref.\n- Batches are stored at the account level and therefore can include signals from different ISNs and Signal Types\n- Use the *Get Batch Status* endpoint to get a report on the status of signals loaded in a batch.\n\n**Authentication**\n\nRequires a valid access token.\nThe claims in the access token list the ISNs and signal_types that the account is permitted to use.\n\n**Error handling**\n\nPartial loads of the data are possible where the request is a valid format but individual signals fail to load\n(e.g schema validation errors, incorrect correlations ids).\nFailures are logged and trackable via the Batch Status endpoint.\nThe response provides an audit trail detailing the submission outcome.\n\nNote the response structure is also used by the Signals Router hanlder which can return results for multiple ISNs -\nconsequently the ` + "`" + `Results` + "`" + ` field is an array (one element for each ISN in the results).\nThere will only ever be a single entry when using this handler.\n\nErrors that relate to the entire request  - e.g invalid json, authentication, permission and server errors (400, 401, 403, 500) -\nreturn a simple error_code/error_message response rather than a detailed audit log.\nThe individual signal failures are not logged in this case, and the client must resupply the data once the problem is resolved.\n\n**JSON Schema Validation**\n\nthe json contained in the ` + "`" + `content` + "`" + ` field is validated against the JSON schema specified for the signal type unless validation is disabled on the type definition.\n\nWhen schema validation is disabled, basic checks are still done on the incoming data and the following issues create a 400 error and cause the entire payload to be rejected:\n- invalid json format\n- missing fields (batch_ref must be present; the array of signals must be in a json object called signals; and the content and local_ref must be present for each element of the signals array).\n\n**Signal versions**\n\nNew versions are created when signals are resupplied using the same local_ref, e.g. because the client wants to correct a previously publsihed signal.\nIf a signal has been withdrawn it will be reactivated if you resubmit it using the same local_ref.\n\n**Correlating signals**\n\nCorrelation IDs can be used to link signals together (a ` + "`" + `correlation_id` + "`" + ` is the ` + "`" + `signals_id` + "`" + ` of a previosuly submitted signal)\nSignals can only be correlated within the same ISN.\nIf the supplied correlation_id is not found in the same ISN as the signal being submitted,\nthe response will contain a 422 or 207 status code and the error_code for the failed signal will be ` + "`" + `invalid_correlation_id` + "`" + `.\n",
                 "tags": [
                     "Signal Exchange"
                 ],
-                "summary": "Create Signals",
+                "summary": "Submit Signals",
                 "parameters": [
                     {
                         "type": "string",
                         "example": "sample-isn",
-                        "description": "isn slug",
+                        "description": "ISN slug",
                         "name": "isn_slug",
                         "in": "path",
                         "required": true
                     },
                     {
                         "type": "string",
-                        "example": "sample-signal",
+                        "example": "sample-signal-type",
                         "description": "signal type slug",
                         "name": "signal_type_slug",
                         "in": "path",
@@ -1861,8 +1974,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "example": "0.0.1",
-                        "description": "signal type sem_ver number",
+                        "example": "1.0.0",
+                        "description": "version",
                         "name": "sem_ver",
                         "in": "path",
                         "required": true
@@ -1881,13 +1994,13 @@ const docTemplate = `{
                     "200": {
                         "description": "All signals processed successfully",
                         "schema": {
-                            "$ref": "#/definitions/handlers.CreateSignalsResponse"
+                            "$ref": "#/definitions/handlers.SignalSubmissionResponse"
                         }
                     },
                     "207": {
                         "description": "Partial success - some signals succeeded, some failed",
                         "schema": {
-                            "$ref": "#/definitions/handlers.CreateSignalsResponse"
+                            "$ref": "#/definitions/handlers.SignalSubmissionResponse"
                         }
                     },
                     "400": {
@@ -1917,7 +2030,7 @@ const docTemplate = `{
                     "422": {
                         "description": "Valid request format but all signals failed processing - returns detailed error information",
                         "schema": {
-                            "$ref": "#/definitions/handlers.CreateSignalsResponse"
+                            "$ref": "#/definitions/handlers.SignalSubmissionResponse"
                         }
                     }
                 }
@@ -2043,8 +2156,8 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "example": "0.0.1",
-                        "description": "Signal type version",
+                        "example": "1.0.0",
+                        "description": "version",
                         "name": "sem_ver",
                         "in": "path",
                         "required": true
@@ -2169,6 +2282,85 @@ const docTemplate = `{
                         "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/router/signal-types/{signal_type_slug}/v{sem_ver}/signals": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Submit signals without specifying a target ISN. The router resolves the target ISN\nfor each signal using configured routing rules, or via correlation ID if supplied.\n\n**ISN resolution by correlation ID**\n\nWhere a _correlation ID_ is supplied, the routing rules do not apply and the signal\nwill be routed to the ISN that received the original correlated signal.\n\n**ISN resolution by pattern match**\n\nIf no correlation ID is present the handler attempts to resolve the ISN using the routing rules\ndefined for the _Signal Type_.\nThe rules are applied in the order defined in the _Routing Rules Config_ (first match is accepted).\n\n**Resolution Faiulres**\n\nSignals subject to pattern matches are rejected when:\n- they do not contain the routing field defined in the _Routing Rules Config_\n- they do not satisfy any of the routing rules\n\nSignals that resolve to an ISN where the account lacks write permission are rejected.\n\n**Usage**\n\nOther than the ISN resolution feature, this handler behaves the same way as the standard _Submit Signals_ endpoint:\n- payloads must not mix signals of different types and are subject to the size limits defined on the site.\n- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.\n- If a local reference is received more than once from an account for the specified signal_type a new version of the signal will be stored with a incremented version number.\n- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.\n\n**Batches**\n\nBatches group separate loads for reporting and tracking purposes.\n- Signal loads are tracked under the batch_ref supplied as part of the request. To start a new batch\njust supply a different batch_ref.\n- Batches are stored at the account level and therefore can include signals from different ISNs and Signal Types\n- Use the *Get Batch Status* endpoint to get a report on the status of signals loaded in a batch.\n\n**Authentication**\n\nRequires a valid access token.\nThe claims in the access token list the ISNs and signal_types that the account is permitted to use.\n\n**Error handling**\n\nPartial loads of the data are possible where the request is a valid format but individual signals fail to load\n(e.g resolution failurs, schema validation errors, incorrect correlations ids).\nFailures are logged and trackable via the Batch Status endpoint.\nThe response provides an audit trail detailing the submission outcome.\n\nErrors that relate to the entire request  - e.g invalid json, authentication, permission and server errors (400, 401, 403, 500) -\nreturn a simple error_code/error_message response rather than a detailed audit log.\nThe individual signal failures are not logged in this case, and the client must resupply the data once the problem is resolved.\n\n**JSON Schema Validation**\n\nthe json contained in the ` + "`" + `content` + "`" + ` field is validated against the JSON schema specified for the signal type unless validation is disabled on the type definition.\n\nWhen schema validation is disabled, basic checks are still done on the incoming data and the following issues create a 400 error and cause the entire payload to be rejected:\n- invalid json format\n- missing fields (batch_ref must be present; the array of signals must be in a json object called signals; and the content and local_ref must be present for each element of the signals array).\n\n**Signal versions**\n\nNew versions are created when signals are resupplied using the same local_ref, e.g. because the client wants to correct a previously publsihed signal.\nIf a signal has been withdrawn it will be reactivated if you resubmit it using the same local_ref.\n\n**Correlating signals**\n\nCorrelation IDs can be used to link signals together (a ` + "`" + `correlation_id` + "`" + ` is the ` + "`" + `signals_id` + "`" + ` of a previosuly submitted signal)\nSignals can only be correlated within the same ISN.\nIf the supplied correlation_id is not found in the same ISN as the signal being submitted,\nthe response will contain a 422 or 207 status code and the error_code for the failed signal will be ` + "`" + `invalid_correlation_id` + "`" + `.",
+                "tags": [
+                    "Signal Exchange"
+                ],
+                "summary": "Submit Signals via Router",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-signal-type",
+                        "description": "signal type slug",
+                        "name": "signal_type_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "1.0.0",
+                        "description": "version",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "signals to submit",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/handlers.CreateSignalsRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "All signals processed successfully",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.SignalSubmissionResponse"
+                        }
+                    },
+                    "207": {
+                        "description": "Partial success - some signals succeeded, some failed",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.SignalSubmissionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request format (error_code = malformed_body)",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized request (invalid credentials, error_code = authentication_error)",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found (mistyped url or signal_type marked 'not in use')",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "Valid request format but all signals failed processing - returns detailed error information",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.SignalSubmissionResponse"
                         }
                     }
                 }
@@ -2471,7 +2663,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "in_use": {
-                    "description": "InUse is true if the signal type is active",
+                    "description": "InUse is true if the signal type is active. Note this will always be false if the parent ISN has been marked as 'not in use'",
                     "type": "boolean",
                     "example": true
                 },
@@ -2520,11 +2712,11 @@ const docTemplate = `{
         "handlers.BatchStatus": {
             "type": "object",
             "properties": {
-                "failed_count": {
-                    "type": "integer"
-                },
                 "isn_slug": {
                     "type": "string"
+                },
+                "rejected_count": {
+                    "type": "integer"
                 },
                 "signal_type_slug": {
                     "type": "string"
@@ -2649,23 +2841,6 @@ const docTemplate = `{
                 }
             }
         },
-        "handlers.CreateSignal": {
-            "type": "object",
-            "properties": {
-                "content": {
-                    "type": "object"
-                },
-                "correlation_id": {
-                    "description": "optional - supply the id of another signal if you want to link to it",
-                    "type": "string",
-                    "example": "75b45fe1-ecc2-4629-946b-fd9058c3b2ca"
-                },
-                "local_ref": {
-                    "type": "string",
-                    "example": "item_id_#1"
-                }
-            }
-        },
         "handlers.CreateSignalTypeRequest": {
             "type": "object",
             "properties": {
@@ -2705,58 +2880,15 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "batch_ref": {
-                    "description": "BatchRef groups signals under a sender-chosen label\nReuse the same batch_ref across requests to add signals to an existing batch.\nAllowed characters: alphanumeric, hyphens, underscores. Max length 128.",
+                    "description": "BatchRef groups signals under a sender-chosen label",
                     "type": "string",
                     "example": "daily-sync-2026-04-02"
                 },
                 "signals": {
+                    "description": "Signals - the list of signals to be loaded",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/handlers.CreateSignal"
-                    }
-                }
-            }
-        },
-        "handlers.CreateSignalsResponse": {
-            "type": "object",
-            "properties": {
-                "account_id": {
-                    "type": "string",
-                    "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3"
-                },
-                "batch_ref": {
-                    "type": "string",
-                    "example": "daily-sync-2026-04-02"
-                },
-                "isn_slug": {
-                    "type": "string",
-                    "example": "sample-isn"
-                },
-                "results": {
-                    "$ref": "#/definitions/handlers.CreateSignalsResults"
-                },
-                "signal_type_path": {
-                    "type": "string",
-                    "example": "signal-type-1/v0.0.1"
-                },
-                "summary": {
-                    "$ref": "#/definitions/handlers.CreateSignalsSummary"
-                }
-            }
-        },
-        "handlers.CreateSignalsResults": {
-            "type": "object",
-            "properties": {
-                "failed_signals": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/handlers.FailedSignal"
-                    }
-                },
-                "stored_signals": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/handlers.StoredSignal"
+                        "$ref": "#/definitions/handlers.Signal"
                     }
                 }
             }
@@ -2764,17 +2896,25 @@ const docTemplate = `{
         "handlers.CreateSignalsSummary": {
             "type": "object",
             "properties": {
-                "failed_count": {
+                "rejected_count": {
+                    "description": "Rejected Count is the list of records rejected due to issues with the contents of the record",
                     "type": "integer",
-                    "example": 5
+                    "example": 1
                 },
                 "stored_count": {
+                    "description": "StoredCount is the count of records sucessfully loaded",
                     "type": "integer",
-                    "example": 95
+                    "example": 1
                 },
                 "total_submitted": {
+                    "description": "TotalSubmitted is the count of all the signals supplied in the request\nStoredCount+RejectedCount+UnroutableCount = TotalSubmitted",
                     "type": "integer",
-                    "example": 100
+                    "example": 3
+                },
+                "unroutable_count": {
+                    "description": "UnroutableCount is the count of signals sent to the Signal Router that could not be routed.\n(e.g because no routing rule matched the data, or the account lacks write permission to the resolved ISN)\n\nThis field is only supplied in responses to the Signals Router handler.",
+                    "type": "integer",
+                    "example": 1
                 }
             }
         },
@@ -2973,6 +3113,35 @@ const docTemplate = `{
                 },
                 "user": {
                     "$ref": "#/definitions/handlers.User"
+                }
+            }
+        },
+        "handlers.IsnResult": {
+            "type": "object",
+            "properties": {
+                "failed_signals": {
+                    "description": "Failed Signals is the list of signals that could not be loaded to the target ISN",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.FailedSignal"
+                    }
+                },
+                "isn_slug": {
+                    "description": "IsnSlug is the target ISN",
+                    "type": "string",
+                    "example": "sample-isn"
+                },
+                "signal_type_path": {
+                    "description": "SignalTypePath is the target Signal Type",
+                    "type": "string",
+                    "example": "signal-type-1/v0.0.1"
+                },
+                "stored_signals": {
+                    "description": "StoredSignals is the list of signals sucessfully processed",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.StoredSignal"
+                    }
                 }
             }
         },
@@ -3268,6 +3437,112 @@ const docTemplate = `{
                 }
             }
         },
+        "handlers.Signal": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "description": "Content is the json payload that is validated against the stored signal type schema",
+                    "type": "object"
+                },
+                "correlation_id": {
+                    "description": "CorrelationID is an optional ID for another signal in the same ISN - the submitted signal is linked to the correlated signal",
+                    "type": "string",
+                    "example": "75b45fe1-ecc2-4629-946b-fd9058c3b2ca"
+                },
+                "local_ref": {
+                    "description": "LocalRef is supplied by the sender and uniquely identify each signal\nRepeat deliveries of the same LocalRef are treated as updates to the original signal",
+                    "type": "string",
+                    "example": "item_id_#1"
+                }
+            }
+        },
+        "handlers.SignalRoutingConfigResponse": {
+            "type": "object",
+            "properties": {
+                "routing_field": {
+                    "type": "string",
+                    "example": "payload.PorfOfEntry"
+                },
+                "routing_rules": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.SignalRoutingRule"
+                    }
+                },
+                "signal_type_path": {
+                    "type": "string",
+                    "example": "sample-signal-type/v1.0.0"
+                }
+            }
+        },
+        "handlers.SignalRoutingRule": {
+            "type": "object",
+            "properties": {
+                "is_case_insensitive": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "isn_slug": {
+                    "type": "string",
+                    "example": "felixstowe-isn"
+                },
+                "match_pattern": {
+                    "type": "string",
+                    "example": "*felixstowe*"
+                },
+                "operator": {
+                    "type": "string",
+                    "enum": [
+                        "matches",
+                        "equals",
+                        "does_not_match",
+                        "does_not_equal"
+                    ],
+                    "example": "matches"
+                },
+                "sequence": {
+                    "type": "integer",
+                    "example": 1
+                }
+            }
+        },
+        "handlers.SignalSubmissionResponse": {
+            "type": "object",
+            "properties": {
+                "account_id": {
+                    "description": "AccountID is the account that sent the data",
+                    "type": "string",
+                    "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3"
+                },
+                "batch_ref": {
+                    "description": "BatchRef is the client supplied batch identifier",
+                    "type": "string",
+                    "example": "daily-sync-2026-04-02"
+                },
+                "results": {
+                    "description": "Results contains per-ISN outcomes.  It will only contain one entry for standard signal submisions (the ISN from the URL)",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.IsnResult"
+                    }
+                },
+                "summary": {
+                    "description": "Summary contains the summary of counts",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/handlers.CreateSignalsSummary"
+                        }
+                    ]
+                },
+                "unroutable_signals": {
+                    "description": "UnroutableSignals is only included when using the Signal Router (N/A for standard signal submission)",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.FailedSignal"
+                    }
+                }
+            }
+        },
         "handlers.SignalType": {
             "type": "object",
             "properties": {
@@ -3297,7 +3572,7 @@ const docTemplate = `{
                 },
                 "sem_ver": {
                     "type": "string",
-                    "example": "1.0.0"
+                    "example": ""
                 },
                 "slug": {
                     "type": "string",
@@ -3338,7 +3613,7 @@ const docTemplate = `{
                 },
                 "sem_ver": {
                     "type": "string",
-                    "example": "1.0.0"
+                    "example": ""
                 },
                 "slug": {
                     "type": "string",
@@ -3358,18 +3633,22 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "local_ref": {
+                    "description": "LocalRef is the sender-supplied identifier for the signal",
                     "type": "string",
                     "example": "item_id_#1"
                 },
                 "signal_id": {
+                    "description": "SignalID is the server generated ID for this signal",
                     "type": "string",
                     "example": "b8ded113-ac0e-4a2c-a89f-0876fe97b440"
                 },
                 "signal_version_id": {
+                    "description": "SignalVersionID is the server generated version ID for the version of this signal created by the handler",
                     "type": "string",
                     "example": "835788bd-789d-4091-96e3-db0f51ccbabc"
                 },
                 "version_number": {
+                    "description": "VersionNumber is the version created by the server\n(where the same localRef is received in subsequent loads the versionNumber is incremented)",
                     "type": "integer",
                     "example": 1
                 }
@@ -3428,6 +3707,21 @@ const docTemplate = `{
                 "new-password": {
                     "type": "string",
                     "example": "ue6U\u003e\u0026X3j570"
+                }
+            }
+        },
+        "handlers.UpdateSignalRoutingConfigRequest": {
+            "type": "object",
+            "properties": {
+                "routing_field": {
+                    "type": "string",
+                    "example": "payload.portOfEntry"
+                },
+                "routing_rules": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/handlers.SignalRoutingRule"
+                    }
                 }
             }
         },
@@ -3589,7 +3883,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "",
 	Schemes:          []string{},
 	Title:            "Signals ISN API",
-	Description:      "Signals ISN service API for managing Information Sharing Networks\n\n## Common Error Responses\nAll endpoints may return:\n- `400` Malformed request (invalid json, missing required fields, etc.)\n- `401` Unauthorized (invalid credentials)\n- `403` Forbidden (insufficient permissions)\n- `413` Request body exceeds size limit\n- `429` Rate limit exceeded\n- `500` Internal server error\n\nIndividual endpoints document their specific business logic errors.\n\n## Request Limits\nAll endpoints are protected by:\n- **Rate limiting**: Configurable requests per second\n- **Request size limits**: 64KB for admin/auth endpoints, 5MB for signal ingestion\n\nCheck the Signalsd-Max-Request-Body response header for the configured limit on signals payload.\n\nThe rate limit is set globaly and prevents abuse of the service.\nIn production there will be additional protections in place such as per-IP rate limiting provided by the load balancer/reverse proxy.\n\n## Authentication & Authorization\n\n### OAuth\nThe signalsd backend service acts as an OAuth 2.0 Authorization Server and supports web users and service accounts.\n\n### Authentication Flows\n- **Web users**: (Refresh Token Grant Type) Authentication via /auth/login → receive JWT access token + HTTP-only refresh cookie → use bearer tokens for API calls\n- **Service accounts**: Clients implement OAuth Client Credentials flow → receive JWT access token → use bearer tokens for API calls\n\n### Token Usage\nAll protected API endpoints require a valid JWT access token in the Authorization header:\n```\nAuthorization: Bearer <jwt-access-token>\n```\n\n**Token Refresh (Web Users):**\n- Client calls `/oauth/token?grant_type=refresh_token` with HTTP-only refresh token cookie\n- API validates refresh token and issues new access token + rotated refresh cookie\n- Client receives new bearer token for subsequent API calls\n\n**Token Refresh (Service Accounts):**\n- Client calls `/oauth/token?grant_type=client_credentials` with client ID/secret\n- API validates credentials and issues new access token\n- Client receives new bearer token for subsequent API calls\n\n**Token Lifetimes:**\n- Access tokens: 30 minutes\n- Refresh tokens: 30 days (web users only)\n\n### CSRF Protection\nThe refresh token used by the /oauth API endpoints is stored in an HttpOnly cookie (to prevent access by JavaScript)\nand marked with SameSite=Strict (to prevent it from being sent in cross-site requests, mitigating CSRF).\n\n### CORS Protection\n\nCORS is used to control which browser-based clients can make cross-origin requests to the API and read responses.\n\nthe `ALLOWED_ORIGINS` environment variable is used to configure the CORS rules.\n\nIn production, you should restrict ALLOWED_ORIGINS to trusted client origins (the server will not start if it is not set)\n\n## Date/Time Handling:\n\n**URL Parameters**: The following ISO 8601 formats are accepted in URL query parameters:\n- 2006-01-02T15:04:05Z (UTC)\n- 2006-01-02T15:04:05+07:00 (with offset)\n- 2006-01-02T15:04:05.999999999Z (nano precision)\n- 2006-01-02 (date only, treated as start of day UTC: 2006-01-02T00:00:00Z)\n\nNote: When including a timestamp with a timezone offset in a query parameter, encode the + sign as %2B (e.g. 2025-08-31T12:00:00%2B07:00). Otherwise, + may be interpreted as a space.\n\n**Response Bodies**: All date/time fields in JSON responses use RFC3339 format (ISO 8601):\n- Example: \"2025-06-03T13:47:47.331787+01:00\"\n\n# UI Endpoints\n\nUI endpoints serve the browser-based management interface.\n\n## Route types\n- **Page handlers** (`GET /admin/*`, `/search`, etc.): return a full HTML page (`200`)\n- **HTMX action handlers** (`PUT`/`POST` to `/ui-api/*`): return an HTML partial (`200`) — either a success or error alert fragment\n\n- see /ui-docs for more information\n\n## Auth\nAll protected routes require a valid session (cookie-based). Unauthenticated requests redirect to `/login`.\nRequests with insufficient role are redirected to `/access-denied`.\n\n## Role requirements\n- **Public** (`/login`, `/register`): no authentication required\n- **Authenticated**: any logged-in user (`/dashboard`, `/search`, `/settings`)\n- **`isnadmin` or `siteadmin`**: ISN account and signal type management\n- **`siteadmin` only**: ISN creation and ownership transfer, role management, signal type creation",
+	Description:      "Signals ISN service API for managing Information Sharing Networks\n\n## Common Error Responses\nAll endpoints may return:\n- `400` Malformed request (invalid json, missing required fields, etc.)\n- `401` Unauthorized (invalid credentials)\n- `403` Forbidden (insufficient permissions)\n- `413` Request body exceeds size limit\n- `429` Rate limit exceeded\n- `500` Internal server error\n\nIndividual endpoints document their specific business logic errors.\n\n## Request Limits\nAll endpoints are protected by:\n- **Rate limiting**: Configurable requests per second\n- **Request size limits**: 64KB for admin/auth endpoints, 5MB for signal ingestion\n\nCheck the Signalsd-Max-Request-Body response header for the configured limit on signals payload.\n\nThe rate limit is set globaly and prevents abuse of the service.\nIn production there will be additional protections in place such as per-IP rate limiting provided by the load balancer/reverse proxy.\n\n## Authentication & Authorization\n\n### OAuth\nThe signalsd backend service acts as an OAuth 2.0 Authorization Server and supports web users and service accounts.\n\n### Authentication Flows\n- **Web users**: (Refresh Token Grant Type) Authentication via /auth/login -> receive JWT access token + HTTP-only refresh cookie -> use bearer tokens for API calls\n- **Service accounts**: Clients implement OAuth Client Credentials flow -> receive JWT access token -> use bearer tokens for API calls\n\n### Token Usage\nAll protected API endpoints require a valid JWT access token in the Authorization header:\n```\nAuthorization: Bearer <jwt-access-token>\n```\n\n**Token Refresh (Web Users):**\n- Client calls `/oauth/token?grant_type=refresh_token` with HTTP-only refresh token cookie\n- API validates refresh token and issues new access token + rotated refresh cookie\n- Client receives new bearer token for subsequent API calls\n\n**Token Refresh (Service Accounts):**\n- Client calls `/oauth/token?grant_type=client_credentials` with client ID/secret\n- API validates credentials and issues new access token\n- Client receives new bearer token for subsequent API calls\n\n**Token Lifetimes:**\n- Access tokens: 30 minutes\n- Refresh tokens: 30 days (web users only)\n\n### CSRF Protection\nThe refresh token used by the /oauth API endpoints is stored in an HttpOnly cookie (to prevent access by JavaScript)\nand marked with SameSite=Strict (to prevent it from being sent in cross-site requests, mitigating CSRF).\n\n### CORS Protection\n\nCORS is used to control which browser-based clients can make cross-origin requests to the API and read responses.\n\nthe `ALLOWED_ORIGINS` environment variable is used to configure the CORS rules.\n\nIn production, you should restrict ALLOWED_ORIGINS to trusted client origins (the server will not start if it is not set)\n\n## Date/Time Handling:\n\n**URL Parameters**: The following ISO 8601 formats are accepted in URL query parameters:\n- 2006-01-02T15:04:05Z (UTC)\n- 2006-01-02T15:04:05+07:00 (with offset)\n- 2006-01-02T15:04:05.999999999Z (nano precision)\n- 2006-01-02 (date only, treated as start of day UTC: 2006-01-02T00:00:00Z)\n\nNote: When including a timestamp with a timezone offset in a query parameter, encode the + sign as %2B (e.g. 2025-08-31T12:00:00%2B07:00). Otherwise, + may be interpreted as a space.\n\n**Response Bodies**: All date/time fields in JSON responses use RFC3339 format (ISO 8601):\n- Example: \"2025-06-03T13:47:47.331787+01:00\"\n\n# UI Endpoints\n\nUI endpoints serve the browser-based management interface.\n\n## Route types\n- **Page handlers** (`GET /admin/*`, `/search`, etc.): return a full HTML page (`200`)\n- **HTMX action handlers** (`PUT`/`POST` to `/ui-api/*`): return an HTML partial (`200`) - either a success or error alert fragment\n\n- see /ui-docs for more information\n\n## Auth\nAll protected routes require a valid session (cookie-based). Unauthenticated requests redirect to `/login`.\nRequests with insufficient role are redirected to `/access-denied`.\n\n## Role requirements\n- **Public** (`/login`, `/register`): no authentication required\n- **Authenticated**: any logged-in user (`/dashboard`, `/search`, `/settings`)\n- **`isnadmin` or `siteadmin`**: ISN account and signal type management\n- **`siteadmin` only**: ISN creation and ownership transfer, role management, signal type creation",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

@@ -1,18 +1,33 @@
 package templates
 
 import (
-	"strings"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
-templ CreateSignalTypePage(environment string, isns []types.IsnOption) {
+templ CreateSignalTypePage(environment string) {
 	@BaseLayout("Create New Signal Type") {
 		@Navigation(environment)
 		<div class="page-container">
 			<h1 class="page-title">Create a New Signal Type</h1>
 			<div class="card">
 				<div class="card-body">
+					@InfoAlert(){
+						Signal types specify a record that can be shared over an ISN.  The field definition is held as an external json schema file on GithHub.
+						Signal Types are defined at a site level and must be added to the ISNs that need to use them.
+						<br></br>
+						<br></br>
+						When creating a new Signal Type select a unqiue title to identify it.
+						A Signal Type can have multiple versions - these share the same title but have different json schemas. 
+						Use the <em>Register Schema</em> feature to add a new version.
+						<br></br>
+						<br></br>
+					}
+					@NoticeAlert() {
+						Newly created Signal Types are not listed in your session permissions until you login again.
+						If you do not see the new Signal Type in the app dropdown lists, you need to login
+						again to refresh your permissions.
+					}
 					<p class="card-description text-muted">Create a new signal type with an initial version (v1.0.0).</p>
 					<form
 						hx-post="/ui-api/signal-types/create"
@@ -51,7 +66,9 @@ templ CreateSignalTypePage(environment string, isns []types.IsnOption) {
 	}
 }
 
-templ RegisterNewSignalTypeSchemaPage(environment string, isns []types.IsnOption) {
+// RegisterNewSignalTypeSchemaPage renders the page to register a new schema version.
+// When signalTypes is non-empty, a dropdown is shown; otherwise a free-text input.
+templ RegisterNewSignalTypeSchemaPage(environment string, signalTypes []types.SignalTypeSlug) {
 	@BaseLayout("Register a New Signal schema") {
 		@Navigation(environment)
 		<div class="page-container">
@@ -62,15 +79,30 @@ templ RegisterNewSignalTypeSchemaPage(environment string, isns []types.IsnOption
 					<form hx-put="/ui-api/signal-types/register-new-schema" hx-target="#register-new-schema-result" hx-swap="innerHTML" class="margin-top-4">
 						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
 							<div class="form-group">
-								<label for="signal-type-slug" class="form-label">Signal Type Slug</label>
-								<input
-									id="signal-type-slug"
-									name="signal-type-slug"
-									type="text"
-									required
-									class="form-input"
-									placeholder="e.g., my-signal-type"
-								/>
+								if len(signalTypes) > 0 {
+									<label for="signal-type-slug" class="form-label">Signal Type</label>
+									<select
+										id="signal-type-slug"
+										name="signal-type-slug"
+										required
+										class="form-select"
+									>
+										<option value="">Select Signal Type...</option>
+										for _, signalType := range signalTypes {
+											<option value={ signalType.Slug }>{ signalType.Slug}</option>
+										}
+									</select>
+								} else {
+									<label for="signal-type-slug" class="form-label">Signal Type Slug</label>
+									<input
+										id="signal-type-slug"
+										name="signal-type-slug"
+										type="text"
+										required
+										class="form-input"
+										placeholder="e.g., my-signal-type"
+									/>
+								}
 							</div>
 							<div class="form-group">
 								@VersionNumberSelector()
@@ -99,61 +131,9 @@ templ RegisterNewSignalTypeSchemaPage(environment string, isns []types.IsnOption
 	}
 }
 
-// RegisterNewSignalTypeSchemaPageWithOptions renders the register new schema page with pre-populated signal type options
-// Used when we want to populate the dropdown server-side (admin operations)
-templ RegisterNewSignalTypeSchemaPageWithOptions(environment string, signalTypes []types.SignalTypeSlug) {
-	@BaseLayout("Register a New Signal schema") {
-		@Navigation(environment)
-		<div class="page-container">
-			<h1 class="page-title">Register a New Schema</h1>
-			<div class="card">
-				<div class="card-body">
-					<p class="card-description text-muted">Create a new version of an existing signal type.</p>
-					<form hx-put="/ui-api/signal-types/register-new-schema" hx-target="#register-new-schema-result" hx-swap="innerHTML" class="margin-top-4">
-						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-							<div class="form-group">
-								<label for="signal-type-slug" class="form-label">Signal Type</label>
-								<select
-									id="signal-type-slug"
-									name="signal-type-slug"
-									required
-									class="form-select"
-								>
-									<option value="">Select Signal Type...</option>
-									for _, signalType := range signalTypes {
-										<option value={ signalType.Slug }>{ strings.ReplaceAll(signalType.Slug, "-", " ") }</option>
-									}
-								</select>
-							</div>
-							<div class="form-group">
-								@VersionNumberSelector()
-								<p class="text-muted text-sm mt-1">Specify how to increment the version</p>
-							</div>
-						</div>
-						<div class="form-group">
-							@SchemaURLInput(false)
-						</div>
-						<div class="form-group">
-							@ReadmeURLInput(false)
-						</div>
-						<div class="form-group">
-							@DescriptionInput()
-						</div>
-						<div class="form-group" id="register-new-schema-result"></div>
-						<div class="form-group">
-							<button type="submit" id="register-new-schema-btn" class="btn btn-primary">
-								Register new schema
-							</button>
-						</div>
-					</form>
-				</div>
-			</div>
-		</div>
-	}
-}
-
-// AddSignalTypeToIsnPage renders the page to associate a signal type with an ISN
-// Uses cascading dropdowns: ISN → Signal Type → Version
+// AddSignalTypeToIsnPage renders the page to associate a signal type with an ISN.
+// Uses cascading dropdowns: ISN -> Signal Type -> Version.
+// Signal types come from the API (all globally-registered types), not the user's token.
 templ AddSignalTypeToIsnPage(environment string, isns []types.IsnOption) {
 	@BaseLayout("Add Signal Type with ISN") {
 		@Navigation(environment)
@@ -168,63 +148,7 @@ templ AddSignalTypeToIsnPage(environment string, isns []types.IsnOption) {
 						hx-swap="innerHTML"
 						class="margin-top-4"
 					>
-						<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-							<div class="form-group">
-								<label for="isn-slug" class="form-label">ISN</label>
-								<div class="relative">
-									<select
-										id="isn-slug"
-										name="isn-slug"
-										required
-										hx-get="/ui-api/options/signal-type-slugs"
-										hx-target="#signal-type-slug"
-										hx-swap="outerHTML"
-										hx-trigger="change"
-										hx-indicator="#isn-loading"
-										class="form-select"
-									>
-										<option value="">Select ISN...</option>
-										for _, isn := range isns {
-											<option value={ isn.Slug }>{ strings.ReplaceAll(isn.Slug, "-", " ") }</option>
-										}
-									</select>
-									<div id="isn-loading" class="htmx-indicator loading-spinner">Loading...</div>
-								</div>
-							</div>
-							<div class="form-group">
-								<label for="signal-type-slug" class="form-label">Signal Type</label>
-								<div class="relative">
-									<select
-										id="signal-type-slug"
-										name="signal-type-slug"
-										required
-										disabled
-										hx-get="/ui-api/options/signal-type-versions?include_inactive=false"
-										hx-target="#sem-ver"
-										hx-swap="outerHTML"
-										hx-trigger="change"
-										hx-include="this"
-										hx-indicator="#signal-type-loading"
-										class="form-select"
-									>
-										<option value="">Select Signal Type...</option>
-									</select>
-									<div id="signal-type-loading" class="htmx-indicator loading-spinner">Loading...</div>
-								</div>
-							</div>
-							<div class="form-group">
-								<label for="sem-ver" class="form-label">Version</label>
-								<select
-									id="sem-ver"
-									name="sem-ver"
-									required
-									disabled
-									class="form-select"
-								>
-									<option value="">Select Version...</option>
-								</select>
-							</div>
-						</div>
+						@IsnSignalTypeCascade(isns, "/ui-api/options/signal-type-slugs", false)
 						<div class="form-group" id="associate-result"></div>
 						<div class="form-group">
 							<button type="submit" class="btn btn-primary">Add Signal Type</button>

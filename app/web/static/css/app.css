@@ -272,7 +272,6 @@ p {
   align-items: center;
   justify-content: center;
   padding: 0.5rem 1rem;
-  border: 1px solid transparent;
   font-size: 0.875rem;
   font-weight: 500;
   border-radius: 0.375rem;
@@ -303,9 +302,7 @@ p {
 .btn-small {
   background: white;
   color: black;
-  font-size: 0.75rem;
-  padding: 0.25rem 0.5rem;
-  border: 1px solid black;
+  width: fit-content;
 }
 
 .btn-copy {
@@ -468,14 +465,26 @@ p {
   cursor: pointer;
 }
 
-.checkbox-input {
-  margin-right: 0.5rem;
+input[type="checkbox"] {
+  width: 1.25rem;
+  height: 1.25rem;
+  accent-color: #007bff; 
+  cursor: pointer;
+}
+
+.checkbox-cell {
+  height: 2.5rem;
+}
+
+code {
+  color: #d97706!important;
 }
 
 /* Table Styles */
 
 table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 0.95rem;
   line-height: 1.4;
@@ -489,12 +498,16 @@ table caption {
   margin-top: 2rem;
   margin-bottom: 1rem;
 }
+td {
+  text-align: center;    /* Horizontal centering */
+  vertical-align: middle;  /* Vertical centering */
+}
 
 table th,
 table td {
-  padding: 0.5rem 0.75rem;
+  padding:  0.5rem 0.75rem;
   border: 1px solid #b1b4b6;
-  vertical-align: top;
+  height: 2.5rem;
 }
 
 table thead th {
@@ -510,6 +523,7 @@ table tbody tr:nth-child(even) {
 table tbody tr:hover {
   background: #eef4ff;
 }
+
 
 /* Alerts */
 .alert {

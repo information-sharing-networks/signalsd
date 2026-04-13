@@ -14,9 +14,9 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
+	"github.com/information-sharing-networks/signalsd/app/internal/responses"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
-	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
-	"github.com/information-sharing-networks/signalsd/app/internal/server/utils"
+	"github.com/information-sharing-networks/signalsd/app/internal/utils"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -84,7 +84,7 @@ type SignalType struct {
 	ReadmeURL string    `json:"readme_url" example:"https://example.com/readme.md"`
 	Title     string    `json:"title" example:"Sample Signal Type"`
 	Detail    string    `json:"detail" example:"Sample signal type description"`
-	SemVer    string    `json:"sem_ver" example:"1.0.0"`
+	SemVer    string    `json:"sem_ver" example:""`
 	IsInUse   bool      `json:"is_in_use" example:"true"`
 }
 
@@ -94,16 +94,24 @@ type IsnAndLinkedInfo struct {
 	SignalTypes *[]SignalType `json:"signal_types,omitempty"`
 }
 
-// CreateIsnHandler godoc
+// CreateIsn godoc
 //
 //	@Summary		Create an ISN
 //	@Description	Create an Information Sharing Network (ISN)
 //	@Description
-//	@Description	visibility = "private" means that signalsd on the network can only be seen by network participants.
+//	@Description	*Visibility*
+//	@Description	Signals in a private ISN can only be seen by members of the ISN.
+//	@Description	Signals in a public ISN can be viewed by anyone (no authentication required).
+//	@Description	Accounts need write permission for the ISN before they can submit signals
+//	@Description
+//	@Description	Once the ISN is created you can:
+//	@Description	- Grant accounts permission to use it
+//	@Description	- Add the Signal Types that can be shared over the network
+//	@Description
+//	@Description	There can be multiple ISNs on the site and each ISN can have a
+//	@Description	different membership and be configured for different Signal Types.
 //	@Description
 //	@Description	This endpoint can only be used by ISN admins and site admins
-//	@Description
-//	@Description	Note there is a cache of public ISNs that is used by the search endpoints. This cache is not dynamically loaded, so adding public ISNs requires a restart of the service
 //
 //	@Tags			ISN Configuration
 //
@@ -119,7 +127,7 @@ type IsnAndLinkedInfo struct {
 //	@Router			/api/isn/ [post]
 //
 // Use with RequireRole (isnadmin,siteadmin)
-func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
+func (i *IsnHandler) CreateIsn(w http.ResponseWriter, r *http.Request) {
 	var req CreateIsnRequest
 
 	var slug string
@@ -233,7 +241,7 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// UpdateIsnHandler godoc
+// UpdateIsn godoc
 //
 //	@Summary		Update an ISN
 //	@Description	Update the ISN configuration
@@ -243,7 +251,7 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 //
 //	@Tags			ISN Configuration
 //
-//	@Param			isn_slug	path	string						true	"isn slug"	example(sample-isn)
+//	@Param			isn_slug	path	string						true	"ISN slug"	example(sample-isn)
 //	@Param			request		body	handlers.UpdateIsnRequest	true	"ISN configuration"
 //
 //	@Success		204
@@ -257,7 +265,7 @@ func (i *IsnHandler) CreateIsnHandler(w http.ResponseWriter, r *http.Request) {
 //	@Router			/api/isn/{isn_slug} [put]
 //
 // Use with RequireRole (isnadmin,siteadmin) middleware
-func (i *IsnHandler) UpdateIsnHandler(w http.ResponseWriter, r *http.Request) {
+func (i *IsnHandler) UpdateIsn(w http.ResponseWriter, r *http.Request) {
 	var req UpdateIsnRequest
 
 	userAccountID, ok := auth.ContextAccountID(r.Context())
@@ -339,7 +347,7 @@ func (i *IsnHandler) UpdateIsnHandler(w http.ResponseWriter, r *http.Request) {
 	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
 }
 
-// GetIsnsHandler godoc
+// GetIsns godoc
 //
 //	@Summary		Get ISN configurations
 //	@Description	get a list of the configured ISNs
@@ -349,7 +357,7 @@ func (i *IsnHandler) UpdateIsnHandler(w http.ResponseWriter, r *http.Request) {
 //	@Success		200	{array}	handlers.Isn
 //
 //	@Router			/api/isn [get]
-func (s *IsnHandler) GetIsnsHandler(w http.ResponseWriter, r *http.Request) {
+func (s *IsnHandler) GetIsns(w http.ResponseWriter, r *http.Request) {
 
 	includeInactive := r.URL.Query().Get("include_inactive") == "true"
 
@@ -389,11 +397,11 @@ func (s *IsnHandler) GetIsnsHandler(w http.ResponseWriter, r *http.Request) {
 	responses.RespondWithJSON(w, http.StatusOK, isns)
 }
 
-// GetIsnHandler godoc
+// GetIsn godoc
 //
 //	@Summary		Get an ISN configuration
 //	@Description	Returns details about the ISN
-//	@Param			isn_slug	path	string	true	"isn slug"	example(sample-isn)
+//	@Param			isn_slug	path	string	true	"ISN slug"	example(sample-isn)
 //
 //	@Tags			ISN Configuration
 //
@@ -402,7 +410,7 @@ func (s *IsnHandler) GetIsnsHandler(w http.ResponseWriter, r *http.Request) {
 //	@Failure		404	{object}	responses.ErrorResponse
 //
 //	@Router			/api/isn/{isn_slug} [get]
-func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
+func (s *IsnHandler) GetIsn(w http.ResponseWriter, r *http.Request) {
 
 	slug := r.PathValue("isn_slug")
 
@@ -493,7 +501,7 @@ func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 	responses.RespondWithJSON(w, http.StatusOK, res)
 }
 
-// TransferIsnOwnershipHandler godoc
+// TransferIsnOwnership godoc
 //
 //	@Summary		Transfer ISN Ownership
 //	@Description	Transfer ownership of an ISN to another admin account.
@@ -501,7 +509,7 @@ func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 //	@Description	Only site admins can transfer ISN ownership.
 //	@Tags			ISN Configuration
 //
-//	@Param			isn_slug	path	string									true	"ISN slug"
+//	@Param			isn_slug	path	string									true	"ISN slug"	example(sample-isn)
 //	@Param			request		body	handlers.TransferIsnOwnershipRequest	true	"Transfer details"
 //
 //	@Success		200
@@ -515,7 +523,7 @@ func (s *IsnHandler) GetIsnHandler(w http.ResponseWriter, r *http.Request) {
 //	@Router			/api/admin/isn/{isn_slug}/transfer-ownership [put]
 //
 // Use with RequireRole (siteadmin)
-func (i *IsnHandler) TransferIsnOwnershipHandler(w http.ResponseWriter, r *http.Request) {
+func (i *IsnHandler) TransferIsnOwnership(w http.ResponseWriter, r *http.Request) {
 	var req TransferIsnOwnershipRequest
 
 	isnSlug := r.PathValue("isn_slug")

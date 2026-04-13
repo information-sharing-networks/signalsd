@@ -12,7 +12,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
-	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
+	"github.com/information-sharing-networks/signalsd/app/internal/responses"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -68,7 +68,7 @@ type IsnAccount struct {
 //	@Description	You must supply values for both can_read and can_write.
 //
 //	@Param			request		body	handlers.UpdateIsnAccountPermissionRequest	true	"permission details"
-//	@Param			isn_slug	path	string										true	"isn slug"		example(sample-isn)
+//	@Param			isn_slug	path	string										true	"ISN slug"		example(sample-isn)
 //	@Param			account_id	path	string										true	"account id"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
 //	@Success		200
@@ -81,7 +81,7 @@ type IsnAccount struct {
 //	@Router			/api/isn/{isn_slug}/accounts/{account_id}  [put]
 //
 //	this handler must use the RequireRole (siteadmin,admin) middleware
-func (i *IsnAccountHandler) UpdateIsnAccountPermissionHandler(w http.ResponseWriter, r *http.Request) {
+func (i *IsnAccountHandler) UpdateIsnAccountPermission(w http.ResponseWriter, r *http.Request) {
 
 	req := UpdateIsnAccountPermissionRequest{}
 
@@ -193,7 +193,7 @@ func (i *IsnAccountHandler) UpdateIsnAccountPermissionHandler(w http.ResponseWri
 	responses.RespondWithStatusCodeOnly(w, http.StatusOK)
 }
 
-// GetIsnAccountsHandler godoc
+// GetIsnAccounts godoc
 //
 //	@Summary		Get ISN Account Membership
 //	@Tags			ISN Configuration
@@ -212,7 +212,7 @@ func (i *IsnAccountHandler) UpdateIsnAccountPermissionHandler(w http.ResponseWri
 //	@Router			/api/isn/{isn_slug}/accounts [get]
 //
 // this handler must use the RequireRole (siteadmin,admin) middleware
-func (i *IsnAccountHandler) GetIsnAccountsHandler(w http.ResponseWriter, r *http.Request) {
+func (i *IsnAccountHandler) GetIsnAccounts(w http.ResponseWriter, r *http.Request) {
 
 	// get user account id for user making request
 	userAccountID, ok := auth.ContextAccountID(r.Context())

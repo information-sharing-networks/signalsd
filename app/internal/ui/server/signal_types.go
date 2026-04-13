@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/a-h/templ"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
@@ -21,12 +22,7 @@ import (
 //	@Success		200	"HTML page"
 //	@Router			/admin/signal-types/create [get]
 func (s *Server) CreateSignalTypePage(w http.ResponseWriter, r *http.Request) {
-	reqLogger := logger.ContextRequestLogger(r.Context())
-
-	component := templates.CreateSignalTypePage(s.config.Environment, make([]types.IsnOption, 0))
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render create signal type page", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.CreateSignalTypePage(s.config.Environment)).ServeHTTP(w, r)
 }
 
 // RegisterNewSignalTypeSchemaPage godoc
@@ -45,14 +41,11 @@ func (s *Server) RegisterNewSignalTypeSchemaPage(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Get all signal types (include inactive for schema registration)
-	signalTypes, err := s.apiClient.GetSignalTypes(accessTokenDetails.AccessToken, true)
+	// Get all signal types
+	signalTypes, err := s.apiClient.GetSignalTypes(accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get signal types", slog.String("error", err.Error()))
-		component := templates.ErrorAlert("Failed to load signal types. Please try again.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Failed to load signal types. Please try again.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -69,16 +62,13 @@ func (s *Server) RegisterNewSignalTypeSchemaPage(w http.ResponseWriter, r *http.
 		}
 	}
 
-	component := templates.RegisterNewSignalTypeSchemaPageWithOptions(s.config.Environment, signalTypeSlugs)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render register new schema page", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.RegisterNewSignalTypeSchemaPage(s.config.Environment, signalTypeSlugs)).ServeHTTP(w, r)
 }
 
 // CreateSignalType godoc
 //
 //	@Summary		Create signal type
-//	@Description	HTMX endpoint. Creates a new signal type at version 1.0.0. Requires siteadmin role.
+//	@Description	HTMX endpoint. Creates a new signal type at version . Requires siteadmin role.
 //	@Tags			HTMX Actions
 //	@Param			title			formData	string	true	"Signal type title"
 //	@Param			detail			formData	string	true	"Description"
@@ -87,6 +77,8 @@ func (s *Server) RegisterNewSignalTypeSchemaPage(w http.ResponseWriter, r *http.
 //	@Param			skip-validation	formData	string	false	"'true' to skip schema validation"
 //	@Param			skip-readme		formData	string	false	"'true' to skip readme requirement"
 //	@Success		200				"HTML partial"
+//	@Failure		400				"HTML error partial"
+//	@Failure		401				"HTML error partial"
 //	@Router			/ui-api/signal-types/create [post]
 func (s *Server) CreateSignalType(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
@@ -108,30 +100,24 @@ func (s *Server) CreateSignalType(w http.ResponseWriter, r *http.Request) {
 
 	// Validate required fields
 	if title == "" || schemaURL == "" || readmeURL == "" || detail == "" {
-		component := templates.ErrorAlert("Please fill in all required fields.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Please fill in all required fields.")).ServeHTTP(w, r)
 		return
 	}
 
 	// Get access token from context
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
-		component := templates.ErrorAlert("Authentication required. Please log in again.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Authentication required. Please log in again.")).ServeHTTP(w, r)
 		return
 	}
 
-	// Prepare request - create signal type with initial version 1.0.0
+	// Prepare request - create signal type with initial version
 	createReq := client.CreateSignalTypeRequest{
 		SchemaURL: schemaURL,
 		Title:     title,
 		ReadmeURL: readmeURL,
 		Detail:    detail,
-		BumpType:  "major", // Initial version is always 1.0.0
+		BumpType:  "major", // Initial version is always
 	}
 
 	// Call the API to create the signal type
@@ -146,18 +132,11 @@ func (s *Server) CreateSignalType(w http.ResponseWriter, r *http.Request) {
 			msg = "An error occurred. Please try again."
 		}
 
-		component := templates.ErrorAlert(msg)
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
 		return
 	}
 
-	// Success response
-	component := templates.SignalTypeCreationSuccess(*response)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.SignalTypeCreationSuccess(*response)).ServeHTTP(w, r)
 }
 
 // RegisterNewSignalTypeSchema godoc
@@ -171,6 +150,8 @@ func (s *Server) CreateSignalType(w http.ResponseWriter, r *http.Request) {
 //	@Param			detail				formData	string	true	"Description of changes"
 //	@Param			bump-type			formData	string	true	"'major', 'minor', or 'patch'"
 //	@Success		200					"HTML partial"
+//	@Failure		400					"HTML error partial"
+//	@Failure		401					"HTML error partial"
 //	@Router			/ui-api/signal-types/register-new-schema [put]
 func (s *Server) RegisterNewSignalTypeSchema(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
@@ -183,20 +164,14 @@ func (s *Server) RegisterNewSignalTypeSchema(w http.ResponseWriter, r *http.Requ
 	detail := r.FormValue("detail")
 
 	if slug == "" || schemaURL == "" || bumpType == "" || readmeURL == "" || detail == "" {
-		component := templates.ErrorAlert("Please fill in all required fields.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Please fill in all required fields.")).ServeHTTP(w, r)
 		return
 	}
 
 	// Get access token from context
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
-		component := templates.ErrorAlert("Authentication required. Please log in again.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Authentication required. Please log in again.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -221,18 +196,11 @@ func (s *Server) RegisterNewSignalTypeSchema(w http.ResponseWriter, r *http.Requ
 			msg = "An error occurred. Please try again."
 		}
 
-		component := templates.ErrorAlert(msg)
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
 		return
 	}
 
-	// Success response
-	component := templates.SignalTypeCreationSuccess(*response)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.SignalTypeCreationSuccess(*response)).ServeHTTP(w, r)
 }
 
 // AddSignalTypeToIsn godoc
@@ -244,6 +212,8 @@ func (s *Server) RegisterNewSignalTypeSchema(w http.ResponseWriter, r *http.Requ
 //	@Param			signal-type-slug	formData	string	true	"Signal type slug"
 //	@Param			sem-ver				formData	string	true	"Semantic version"
 //	@Success		200					"HTML partial"
+//	@Failure		400					"HTML error partial"
+//	@Failure		401					"HTML error partial"
 //	@Router			/ui-api/isn/signal-types/add [post]
 func (s *Server) AddSignalTypeToIsn(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
@@ -255,20 +225,14 @@ func (s *Server) AddSignalTypeToIsn(w http.ResponseWriter, r *http.Request) {
 
 	// Validate required fields
 	if isnSlug == "" || signalTypeSlug == "" || semVer == "" {
-		component := templates.ErrorAlert("Please fill in all required fields.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Please fill in all required fields.")).ServeHTTP(w, r)
 		return
 	}
 
 	// Get access token from context
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
-		component := templates.ErrorAlert("Authentication required. Please log in again.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Authentication required. Please log in again.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -290,18 +254,11 @@ func (s *Server) AddSignalTypeToIsn(w http.ResponseWriter, r *http.Request) {
 			msg = "An error occurred. Please try again."
 		}
 
-		component := templates.ErrorAlert(msg)
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
 		return
 	}
 
-	// Success response
-	component := templates.SuccessAlert(fmt.Sprintf("Signal type %s/v%s associated with ISN successfully", signalTypeSlug, semVer))
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.SuccessAlert(fmt.Sprintf("Signal type %s/v%s associated with ISN successfully", signalTypeSlug, semVer))).ServeHTTP(w, r)
 }
 
 // AddSignalTypeToIsnPage godoc
@@ -329,10 +286,7 @@ func (s *Server) AddSignalTypeToIsnPage(w http.ResponseWriter, r *http.Request) 
 	// populate the isn dropdown list with ISNs where the user is an admin
 	isns := getIsnOptions(isnPerms, true, false)
 
-	component := templates.AddSignalTypeToIsnPage(s.config.Environment, isns)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render add signal type page", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.AddSignalTypeToIsnPage(s.config.Environment, isns)).ServeHTTP(w, r)
 }
 
 // ManageIsnSignalTypesStatusPage godoc
@@ -354,21 +308,14 @@ func (s *Server) ManageIsnSignalTypesStatusPage(w http.ResponseWriter, r *http.R
 	isnPerms := accessTokenDetails.IsnPerms
 
 	if len(isnPerms) == 0 {
-		component := templates.ErrorAlert("You don't have permission to access any ISNs.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("You don't have permission to access any ISNs.")).ServeHTTP(w, r)
 		return
 	}
 
 	// Convert permissions to ISN list for dropdown (only ISNs where user has admin rights)
 	isns := getIsnOptions(isnPerms, true, false)
 
-	// Render ISN signal type status management page
-	component := templates.ManageIsnSignalTypesStatusPage(s.config.Environment, isns)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render ISN signal type status management page", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.ManageIsnSignalTypesStatusPage(s.config.Environment, isns)).ServeHTTP(w, r)
 }
 
 // ManageIsnSignalTypesStatus godoc
@@ -381,6 +328,8 @@ func (s *Server) ManageIsnSignalTypesStatusPage(w http.ResponseWriter, r *http.R
 //	@Param			sem-ver				formData	string	true	"Semantic version"
 //	@Param			action				formData	string	true	"'enable' or 'disable'"
 //	@Success		200					"HTML partial"
+//	@Failure		400					"HTML error partial"
+//	@Failure		401					"HTML error partial"
 //	@Router			/ui-api/isn/signal-types/manage [put]
 func (s *Server) ManageIsnSignalTypesStatus(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
@@ -393,10 +342,7 @@ func (s *Server) ManageIsnSignalTypesStatus(w http.ResponseWriter, r *http.Reque
 
 	// Validate required fields
 	if isnSlug == "" || signalTypeSlug == "" || semVer == "" || action == "" {
-		component := templates.ErrorAlert("Please fill in all fields.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Please fill in all fields.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -404,11 +350,7 @@ func (s *Server) ManageIsnSignalTypesStatus(w http.ResponseWriter, r *http.Reque
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
 		reqLogger.Error("Failed to read access token from context", slog.String("component", "handlers.AdminIsnSignalTypeStatus"))
-
-		component := templates.ErrorAlert("Authentication required. Please log in again.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Authentication required. Please log in again.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -424,10 +366,7 @@ func (s *Server) ManageIsnSignalTypesStatus(w http.ResponseWriter, r *http.Reque
 		isInUse = true
 		successMsg = fmt.Sprintf("Signal type %s/v%s enabled for this ISN successfully", signalTypeSlug, semVer)
 	default:
-		component := templates.ErrorAlert("Invalid action. Please select a valid action.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Invalid action. Please select a valid action.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -443,18 +382,11 @@ func (s *Server) ManageIsnSignalTypesStatus(w http.ResponseWriter, r *http.Reque
 			msg = "An error occurred. Please try again."
 		}
 
-		component := templates.ErrorAlert(msg)
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
 		return
 	}
 
-	// Success response
-	component := templates.SuccessAlert(successMsg)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render success message", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.SuccessAlert(successMsg)).ServeHTTP(w, r)
 }
 
 // ListSignalTypesPage godoc
@@ -474,40 +406,38 @@ func (s *Server) ListSignalTypesPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch all signal types for the report
-	signalTypes, err := s.apiClient.GetSignalTypes(accessTokenDetails.AccessToken, false)
+	signalTypes, err := s.apiClient.GetSignalTypes(accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get signal types", slog.String("error", err.Error()))
-		component := templates.ErrorAlert("Failed to load signal types. Please try again.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Failed to load signal types. Please try again.")).ServeHTTP(w, r)
 		return
 	}
 
-	component := templates.ListSignalTypesPage(s.config.Environment, signalTypes)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render signal types config page", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.ListSignalTypesPage(s.config.Environment, signalTypes)).ServeHTTP(w, r)
 }
 
+// ToggleSkipValidation godoc
+//
+//	@Summary		Toggle schema validation input
+//	@Description	HTMX endpoint. Returns a schema URL input field, enabled or disabled based on the skip-validation flag.
+//	@Tags			HTMX Actions
+//	@Param			skip-validation	query	bool	false	"'true' to render the field as disabled"
+//	@Success		200				"HTML partial"
+//	@Router			/ui-api/signal-types/toggle-skip-validation [get]
 func (s *Server) ToggleSkipValidation(w http.ResponseWriter, r *http.Request) {
-	reqLogger := logger.ContextRequestLogger(r.Context())
-
 	skipValidation := r.FormValue("skip-validation") == "true"
-
-	component := templates.SchemaURLInput(skipValidation)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render schema URL input", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.SchemaURLInput(skipValidation)).ServeHTTP(w, r)
 }
 
+// ToggleSkipReadme godoc
+//
+//	@Summary		Toggle readme URL input
+//	@Description	HTMX endpoint. Returns a readme URL input field, enabled or disabled based on the skip-readme flag.
+//	@Tags			HTMX Actions
+//	@Param			skip-readme	query	bool	false	"'true' to render the field as disabled"
+//	@Success		200			"HTML partial"
+//	@Router			/ui-api/signal-types/toggle-skip-readme [get]
 func (s *Server) ToggleSkipReadme(w http.ResponseWriter, r *http.Request) {
-	reqLogger := logger.ContextRequestLogger(r.Context())
-
 	skipReadme := r.FormValue("skip-readme") == "true"
-
-	component := templates.ReadmeURLInput(skipReadme)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render readme URL input", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.ReadmeURLInput(skipReadme)).ServeHTTP(w, r)
 }

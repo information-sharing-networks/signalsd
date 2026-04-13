@@ -15,10 +15,10 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
+	"github.com/information-sharing-networks/signalsd/app/internal/responses"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
-	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
-	authTemplates "github.com/information-sharing-networks/signalsd/app/internal/server/templates/auth"
-	errorTemplates "github.com/information-sharing-networks/signalsd/app/internal/server/templates/errors"
+	authTemplates "github.com/information-sharing-networks/signalsd/app/internal/templates/auth"
+	errorTemplates "github.com/information-sharing-networks/signalsd/app/internal/templates/errors"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -47,7 +47,7 @@ type UpdatePasswordRequest struct {
 	NewPassword     string `json:"new-password" example:"ue6U>&X3j570"`
 }
 
-// RegisterUserHandler godoc
+// RegisterUser godoc
 //
 //	@Summary		Register User
 //	@Tags			auth
@@ -66,7 +66,7 @@ type UpdatePasswordRequest struct {
 //	@Failure		409	{object}	responses.ErrorResponse	"Conflict with possible error code: resource_already_exists"
 //
 //	@Router			/api/auth/register [post]
-func (u *UserHandler) RegisterUserHandler(w http.ResponseWriter, r *http.Request) {
+func (u *UserHandler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 	var req CreateUserRequest
 
 	defer r.Body.Close()
@@ -196,7 +196,7 @@ func (u *UserHandler) RegisterUserHandler(w http.ResponseWriter, r *http.Request
 	responses.RespondWithStatusCodeOnly(w, http.StatusCreated)
 }
 
-// UpdatePasswordHandler godoc
+// UpdatePassword godoc
 //
 //	@Summary		Password Reset (self service)
 //	@Description	Self-service endpoint for users to reset their password.  Requires a valid access token and the current password
@@ -211,7 +211,7 @@ func (u *UserHandler) RegisterUserHandler(w http.ResponseWriter, r *http.Request
 //	@Security	BearerAccessToken
 //
 //	@Router		/api/auth/password/reset [put]
-func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Request) {
+func (u *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	req := UpdatePasswordRequest{}
 
 	// this request was already authenticated by the middleware
@@ -297,7 +297,7 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 
 }
 
-// GrantUserIsnAdminRoleHandler godocs
+// GrantUserIsnAdminRole godocs
 //
 //	@Summary		Grant ISN Admin Role
 //	@Tags			Account Management
@@ -331,7 +331,7 @@ func (u *UserHandler) UpdatePasswordHandler(w http.ResponseWriter, r *http.Reque
 //	@Router			/api/admin/accounts/{account_id}/isn-admin-role [put]
 //
 //	this handler must use the RequireRole (siteadmin) middleware
-func (u *UserHandler) GrantUserIsnAdminRoleHandler(w http.ResponseWriter, r *http.Request) {
+func (u *UserHandler) GrantUserIsnAdminRole(w http.ResponseWriter, r *http.Request) {
 
 	// get user account id for user making request
 	userAccountID, ok := auth.ContextAccountID(r.Context())
@@ -396,7 +396,7 @@ func (u *UserHandler) GrantUserIsnAdminRoleHandler(w http.ResponseWriter, r *htt
 	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
 }
 
-// RevokeUserIsnAdminRoleHandler godocs
+// RevokeUserIsnAdminRole godocs
 //
 //	@Summary		Revoke ISN Admin Role
 //	@Tags			Account Management
@@ -414,7 +414,7 @@ func (u *UserHandler) GrantUserIsnAdminRoleHandler(w http.ResponseWriter, r *htt
 //	@Router			/api/admin/accounts/{account_id}/isn-admin-role [delete]
 //
 //	this handler must use the RequireRole (siteadmin) middleware
-func (u *UserHandler) RevokeUserIsnAdminRoleHandler(w http.ResponseWriter, r *http.Request) {
+func (u *UserHandler) RevokeUserIsnAdminRole(w http.ResponseWriter, r *http.Request) {
 
 	// get user account id for user making request
 	userAccountID, ok := auth.ContextAccountID(r.Context())
@@ -479,7 +479,7 @@ func (u *UserHandler) RevokeUserIsnAdminRoleHandler(w http.ResponseWriter, r *ht
 	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
 }
 
-// GrantUserSiteAdminRoleHandler godocs
+// GrantUserSiteAdminRole godocs
 //
 //	@Summary		Grant Site Admin Role
 //	@Tags			Account Management
@@ -507,7 +507,7 @@ func (u *UserHandler) RevokeUserIsnAdminRoleHandler(w http.ResponseWriter, r *ht
 //	@Router			/api/admin/accounts/{account_id}/site-admin-role [put]
 //
 //	this handler must use the RequireRole (siteadmin) middleware
-func (u *UserHandler) GrantUserSiteAdminRoleHandler(w http.ResponseWriter, r *http.Request) {
+func (u *UserHandler) GrantUserSiteAdminRole(w http.ResponseWriter, r *http.Request) {
 
 	// get user account id for user making request
 	userAccountID, ok := auth.ContextAccountID(r.Context())
@@ -573,7 +573,7 @@ func (u *UserHandler) GrantUserSiteAdminRoleHandler(w http.ResponseWriter, r *ht
 	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
 }
 
-// RevokeUserSiteAdminRoleHandler godocs
+// RevokeUserSiteAdminRole godocs
 //
 //	@Summary		Revoke Site Admin Role
 //	@Tags			Account Management
@@ -591,7 +591,7 @@ func (u *UserHandler) GrantUserSiteAdminRoleHandler(w http.ResponseWriter, r *ht
 //	@Router			/api/admin/accounts/{account_id}/site-admin-role [delete]
 //
 //	this handler must use the RequireRole (siteadmin) middleware
-func (u *UserHandler) RevokeUserSiteAdminRoleHandler(w http.ResponseWriter, r *http.Request) {
+func (u *UserHandler) RevokeUserSiteAdminRole(w http.ResponseWriter, r *http.Request) {
 
 	// get user account id for user making request
 	userAccountID, ok := auth.ContextAccountID(r.Context())
@@ -670,7 +670,7 @@ type PasswordResetPageData struct {
 	ExpiresIn time.Duration
 }
 
-// PasswordResetTokenPageHandler godoc
+// PasswordResetTokenPage godoc
 //
 //	@Summary		Display Password Reset Form
 //	@Description	Renders a password reset form for users with a valid reset token.
@@ -687,7 +687,7 @@ type PasswordResetPageData struct {
 //	@Failure		410	{object}	responses.ErrorResponse
 //
 //	@Router			/api/auth/password-reset/{token_id} [get]
-func (u *UserHandler) PasswordResetTokenPageHandler(w http.ResponseWriter, r *http.Request) {
+func (u *UserHandler) PasswordResetTokenPage(w http.ResponseWriter, r *http.Request) {
 	// Extract token from URL path
 	tokenIDString := r.PathValue("token_id")
 
@@ -763,7 +763,7 @@ func (u *UserHandler) PasswordResetTokenPageHandler(w http.ResponseWriter, r *ht
 	}
 }
 
-// PasswordResetTokenHandler godoc
+// PasswordResetToken godoc
 //
 //	@Summary		Process Password Reset Token
 //	@Description	Endpoint to handle password requests received from the PasswordResetTokenPageHandler (do not call the endpoint directly)
@@ -782,7 +782,7 @@ func (u *UserHandler) PasswordResetTokenPageHandler(w http.ResponseWriter, r *ht
 //	@Failure		410	{object}	responses.ErrorResponse
 //
 //	@Router			/api/auth/password-reset/{token_id} [post]
-func (u *UserHandler) PasswordResetTokenHandler(w http.ResponseWriter, r *http.Request) {
+func (u *UserHandler) PasswordResetToken(w http.ResponseWriter, r *http.Request) {
 	// Extract token from URL path
 	tokenIDString := r.PathValue("token_id")
 

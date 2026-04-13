@@ -111,7 +111,7 @@ type SignalType struct {
 	// ReadmeURL is the URL of the signal type readme
 	ReadmeURL string `json:"readme_url,omitempty" example:"https://github.com/user/project/blob/2025.01.01/readme.md"`
 
-	// InUse is true if the signal type is active
+	// InUse is true if the signal type is active. Note this will always be false if the parent ISN has been marked as 'not in use'
 	InUse bool `json:"in_use" example:"true"`
 }
 
@@ -131,7 +131,7 @@ type Claims struct {
 	Role string `json:"role" enums:"siteadmin,isnadmin,member" example:"isnadmin"`
 
 	// IsnPerms is a map of the ISNs and signal types the account has access to and the permissions they have been granted (the map key is the isn slug)
-	IsnPerms map[string]IsnPerm `json:"isn_perms,omitempty" example:"isn1"`
+	IsnPerms map[string]IsnPerm `json:"isn_perms,omitempty" example:"sample-isn"`
 }
 
 // stucts to hold a temporary full list of isns and signal types used when building the AccessTokenResponse.
@@ -170,13 +170,16 @@ func toSignalTypes(details []signalTypeDetails) map[string]SignalType {
 	return signalTypes
 }
 
-// toSignalTypesClaims converts internal signalTypeDetails to a map of simplified SignalType structs keyed by path
-// this simplified struct is used in the claims
-func toSignalTypesClaims(details []signalTypeDetails) map[string]SignalType {
+// toSignalTypesClaims converts internal signalTypeDetails to a map of simplified SignalType structs keyed by path.
+// this simplified struct is used in the claims.
+// If isnInUse is false, all signal types are marked InUse=false regardless of their own flag,
+// since they are unreachable when the parent ISN is disabled.
+func toSignalTypesClaims(details []signalTypeDetails, isnInUse bool) map[string]SignalType {
 	signalType := make(map[string]SignalType, len(details))
 	for _, st := range details {
+		inUse := st.inUse && isnInUse
 		signalType[st.path] = SignalType{
-			InUse: st.inUse,
+			InUse: inUse,
 		}
 	}
 	return signalType
@@ -359,10 +362,12 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 		return AccessTokenResponse{}, fmt.Errorf("unexpected role: %v", account.AccountRole)
 	}
 
-	// build isnPermsClaims from isnPerms — identical fields, but with simplified signal types
+	// build isnPermsClaims from isnPerms - identical fields, but with simplified signal types.
+	// Signal types are marked in_use=false when the parent ISN is not in use, since they are
+	// unreachable regardless of their own flag.
 	for slug, perm := range isnPerms {
 		claimPerm := perm
-		claimPerm.SignalTypes = toSignalTypesClaims(isnList[slug].signalTypes)
+		claimPerm.SignalTypes = toSignalTypesClaims(isnList[slug].signalTypes, perm.InUse)
 		isnPermsClaims[slug] = claimPerm
 	}
 

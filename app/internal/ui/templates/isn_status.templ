@@ -1,8 +1,6 @@
 package templates
 
 import (
-	"strings"
-
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
@@ -37,7 +35,7 @@ templ ManageIsnStatusPage(environment string, isns []types.IsnOption) {
 							>
 								<option value="">Select ISN...</option>
 								for _, isn := range isns {
-									<option value={ isn.Slug }>{ strings.ReplaceAll(isn.Slug, "-", " ") }</option>
+									<option value={ isn.Slug }>{ isn.Slug }</option>
 								}
 							</select>
 						</div>

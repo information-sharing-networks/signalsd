@@ -14,10 +14,10 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
+	"github.com/information-sharing-networks/signalsd/app/internal/responses"
+	"github.com/information-sharing-networks/signalsd/app/internal/schemas"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
-	"github.com/information-sharing-networks/signalsd/app/internal/server/responses"
-	"github.com/information-sharing-networks/signalsd/app/internal/server/schemas"
-	"github.com/information-sharing-networks/signalsd/app/internal/server/utils"
+	"github.com/information-sharing-networks/signalsd/app/internal/utils"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -70,14 +70,14 @@ type SignalTypeDetail struct {
 	ReadmeURL string    `json:"readme_url" example:"https://github.com/user/project/blob/2025.01.01/readme.md"`
 	Title     string    `json:"title" example:"Sample Signal Type"`
 	Detail    string    `json:"detail" example:"Sample signal type description"`
-	SemVer    string    `json:"sem_ver" example:"1.0.0"`
+	SemVer    string    `json:"sem_ver" example:""`
 }
 
-// CreateSignalTypeHandler godoc
+// CreateSignalType godoc
 //
 //	@Summary		Create Signal Type
 //
-//	@Description	Signal types specify a record that can be shared over the ISN
+//	@Description	Signal types specify a record that can be shared on the site
 //	@Description	- Each type has a unique title and this is used to create a URL-friendly slug
 //	@Description	- The title and slug fields can't be changed and must be unique for the site
 //	@Description	- The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading
@@ -92,9 +92,9 @@ type SignalTypeDetail struct {
 //	@Description
 //	@Description	Versions
 //	@Description	- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas
-//	@Description	- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)
+//	@Description	- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (, 0.1.0 or 0.0.1)
 //	@Description
-//	@Description	After creating a signal type, use the AddSignalTypeToIsn endpoint to link it to an ISN.
+//	@Description	After creating a signal type, use the AddSignalTypeToIsn endpoint to link it to one or more ISNs.
 //	@Description
 //	@Description	Signal type definitions are referred to like this: /api/signal-types/{signal_type_slug}/v{sem_ver}
 //	@Description
@@ -114,7 +114,7 @@ type SignalTypeDetail struct {
 //	@Router			/api/admin/signal-types [post]
 //
 // Should only be used with RequireRole (siteadmin) middleware
-func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *http.Request) {
+func (s *SignalTypeHandler) CreateSignalType(w http.ResponseWriter, r *http.Request) {
 	var req CreateSignalTypeRequest
 	var slug string
 	var semVer string
@@ -274,7 +274,7 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 	})
 }
 
-// RegisterNewSignalTypeSchemaHandler godoc
+// RegisterNewSignalTypeSchema godoc
 //
 //	@Summary		Register a New Schema
 //	@Description	Registers a new schema for an existing signal type
@@ -287,7 +287,7 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 //
 //	@Tags			Signal Types
 //
-//	@Param			signal_type_slug	path		string										true	"signal type slug"	example(sample-signal)
+//	@Param			signal_type_slug	path		string										true	"signal type slug"	example(sample-signal-type)
 //	@Param			request				body		handlers.RegisterNewSignalTypeSchemaRequest	true	"signal type details"
 //
 //	@Success		201					{object}	handlers.NewSignalTypeResponse
@@ -300,7 +300,7 @@ func (s *SignalTypeHandler) CreateSignalTypeHandler(w http.ResponseWriter, r *ht
 //	@Router			/api/admin/signal-types/{signal_type_slug}/schemas [post]
 //
 // Should only be used with RequiresRole (siteadmin) middleware
-func (s *SignalTypeHandler) RegisterNewSignalTypeSchemaHandler(w http.ResponseWriter, r *http.Request) {
+func (s *SignalTypeHandler) RegisterNewSignalTypeSchema(w http.ResponseWriter, r *http.Request) {
 
 	slug := r.PathValue("signal_type_slug")
 
@@ -467,15 +467,15 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchemaHandler(w http.ResponseWr
 	})
 }
 
-// UpdateSignalTypeHandler godoc
+// UpdateSignalType godoc
 //
 //	@Summary		Update a Signal Type
 //	@Description	Update the description or link to the readme file
 //	@Description
 //	@Description	Note: this endpoint can only be used by site admins
 //
-//	@Param			signal_type_slug	path	string								true	"signal type slug"	example(sample-signal)
-//	@Param			sem_ver				path	string								true	"Sem ver"			example(0.0.1)
+//	@Param			signal_type_slug	path	string								true	"signal type slug"	example(sample-signal-type)
+//	@Param			sem_ver				path	string								true	"version"			example(1.0.0)
 //	@Param			request				body	handlers.UpdateSignalTypeRequest	true	"signal type details to be updated"
 //
 //	@Tags			Signal Types
@@ -491,7 +491,7 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchemaHandler(w http.ResponseWr
 //	@Router			/api/admin/signal-types/{signal_type_slug}/v{sem_ver} [put]
 //
 // Should only be used with RequiresRole (siteadmin) middleware
-func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *http.Request) {
+func (s *SignalTypeHandler) UpdateSignalType(w http.ResponseWriter, r *http.Request) {
 
 	var req = UpdateSignalTypeRequest{}
 
@@ -590,13 +590,13 @@ func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *ht
 	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
 }
 
-// DeleteSignalTypeHandler godoc
+// DeleteSignalType godoc
 //
 //	@Summary		Delete a Signal Type
 //	@Description	Only signal types that have never been referenced by signals can be deleted
 //
-//	@Param			signal_type_slug	path	string	true	"signal type slug"		example(sample-signal)
-//	@Param			sem_ver				path	string	true	"version to be deleted"	example(0.0.1)
+//	@Param			signal_type_slug	path	string	true	"signal type slug"	example(sample-signal-type)
+//	@Param			sem_ver				path	string	true	"version"			example(1.0.0)
 //
 //	@Tags			Signal Types
 //
@@ -611,7 +611,7 @@ func (s *SignalTypeHandler) UpdateSignalTypeHandler(w http.ResponseWriter, r *ht
 //	@Router			/api/admin/signal-types/{signal_type_slug}/v{sem_ver} [delete]
 //
 // Should only be used with RequireRole (siteadmin) middleware
-func (s *SignalTypeHandler) DeleteSignalTypeHandler(w http.ResponseWriter, r *http.Request) {
+func (s *SignalTypeHandler) DeleteSignalType(w http.ResponseWriter, r *http.Request) {
 
 	signalTypeSlug := r.PathValue("signal_type_slug")
 	semVer := r.PathValue("sem_ver")
@@ -672,7 +672,7 @@ func (s *SignalTypeHandler) DeleteSignalTypeHandler(w http.ResponseWriter, r *ht
 	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
 }
 
-// GetSignalTypeHandler godoc
+// GetSignalType godoc
 //
 //	@Summary		Get a Signal Type
 //	@Description	Returns the signal type details.
@@ -680,8 +680,8 @@ func (s *SignalTypeHandler) DeleteSignalTypeHandler(w http.ResponseWriter, r *ht
 //
 //	@Tags			Signal Types
 //
-//	@Param			signal_type_slug	path		string	true	"signal type slug"			example(sample-signal)
-//	@Param			sem_ver				path		string	true	"version to be recieved"	example(0.0.1)
+//	@Param			signal_type_slug	path		string	true	"signal type slug"	example(sample-signal-type)
+//	@Param			sem_ver				path		string	true	"version"			example(1.0.0)
 //
 //	@Success		200					{object}	handlers.SignalTypeDetail
 //	@Failure		400					{object}	responses.ErrorResponse
@@ -689,7 +689,7 @@ func (s *SignalTypeHandler) DeleteSignalTypeHandler(w http.ResponseWriter, r *ht
 //	@Failure		500					{object}	responses.ErrorResponse
 //
 //	@Router			/api/admin/signal-types/{signal_type_slug}/v{sem_ver} [get]
-func (s *SignalTypeHandler) GetSignalTypeHandler(w http.ResponseWriter, r *http.Request) {
+func (s *SignalTypeHandler) GetSignalType(w http.ResponseWriter, r *http.Request) {
 
 	signalTypeSlug := r.PathValue("signal_type_slug")
 	semVer := r.PathValue("sem_ver")
@@ -737,7 +737,7 @@ func (s *SignalTypeHandler) GetSignalTypeHandler(w http.ResponseWriter, r *http.
 	responses.RespondWithJSON(w, http.StatusOK, signalType)
 }
 
-// GetSignalTypesHandler godoc
+// GetSignalTypes godoc
 //
 //	@Summary		Get Signal Types
 //	@Description	Get details for all the signal types defined on the ISN.
@@ -748,7 +748,7 @@ func (s *SignalTypeHandler) GetSignalTypeHandler(w http.ResponseWriter, r *http.
 //	@Success		200	{array}	handlers.SignalTypeDetail
 //
 //	@Router			/api/admin/signal-types [get]
-func (s *SignalTypeHandler) GetSignalTypesHandler(w http.ResponseWriter, r *http.Request) {
+func (s *SignalTypeHandler) GetSignalTypes(w http.ResponseWriter, r *http.Request) {
 
 	var dbSignalTypes []database.SignalType
 	var err error
@@ -790,7 +790,7 @@ func (s *SignalTypeHandler) GetSignalTypesHandler(w http.ResponseWriter, r *http
 	responses.RespondWithJSON(w, http.StatusOK, signalTypes)
 }
 
-// AddSignalTypeToISNHandler godoc
+// AddSignalTypeToISN godoc
 //
 //	@Summary		Add a Signal Type to an ISN
 //	@Description	Link an existing signal type to an ISN
@@ -814,7 +814,7 @@ func (s *SignalTypeHandler) GetSignalTypesHandler(w http.ResponseWriter, r *http
 //	@Router			/api/isn/{isn_slug}/signal-types/add [post]
 //
 // Should only be used with RequireRole (siteadmin, isnadmin) middleware
-func (s *SignalTypeHandler) AddSignalTypeToISNHandler(w http.ResponseWriter, r *http.Request) {
+func (s *SignalTypeHandler) AddSignalTypeToISN(w http.ResponseWriter, r *http.Request) {
 	var req AddSignalTypeToIsnRequest
 
 	defer r.Body.Close()
@@ -904,7 +904,7 @@ func (s *SignalTypeHandler) AddSignalTypeToISNHandler(w http.ResponseWriter, r *
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// UpdateIsnSignalTypeStatusHandler godoc
+// UpdateIsnSignalTypeStatus godoc
 //
 //	@Summary		Update ISN Signal Type Status
 //	@Description	Enable or disable a signal type for a specific ISN
@@ -915,8 +915,8 @@ func (s *SignalTypeHandler) AddSignalTypeToISNHandler(w http.ResponseWriter, r *
 //	@Description	ISN admins can only update signal types for ISNs they own.
 //
 //	@Param			isn_slug			path	string								true	"ISN slug"			example(sample-isn)
-//	@Param			signal_type_slug	path	string								true	"signal type slug"	example(sample-signal)
-//	@Param			sem_ver				path	string								true	"Sem ver"			example(0.0.1)
+//	@Param			signal_type_slug	path	string								true	"signal type slug"	example(sample-signal-type)
+//	@Param			sem_ver				path	string								true	"version"			example(1.0.0)
 //	@Param			request				body	handlers.UpdateSignalTypeRequest	true	"status update request"
 //
 //	@Tags			ISN Configuration
@@ -932,7 +932,7 @@ func (s *SignalTypeHandler) AddSignalTypeToISNHandler(w http.ResponseWriter, r *
 //	@Router			/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver} [put]
 //
 // Should only be used with RequireRole (isnadmin,siteadmin) middleware
-func (s *SignalTypeHandler) UpdateIsnSignalTypeStatusHandler(w http.ResponseWriter, r *http.Request) {
+func (s *SignalTypeHandler) UpdateIsnSignalTypeStatus(w http.ResponseWriter, r *http.Request) {
 	var req = UpdateSignalTypeRequest{}
 
 	isnSlug := r.PathValue("isn_slug")

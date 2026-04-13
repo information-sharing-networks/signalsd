@@ -164,6 +164,34 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/service-accounts/create": {
+            "get": {
+                "description": "Renders the create service account form. Requires isnadmin or siteadmin role.",
+                "tags": [
+                    "UI Pages"
+                ],
+                "summary": "Create service account page",
+                "responses": {
+                    "200": {
+                        "description": "HTML page"
+                    }
+                }
+            }
+        },
+        "/admin/service-accounts/reissue-credentials": {
+            "get": {
+                "description": "Renders the reissue credentials form. Requires isnadmin or siteadmin role.",
+                "tags": [
+                    "UI Pages"
+                ],
+                "summary": "Reissue service account credentials page",
+                "responses": {
+                    "200": {
+                        "description": "HTML page"
+                    }
+                }
+            }
+        },
         "/admin/signal-types/create": {
             "get": {
                 "description": "Renders the create signal type form. Requires siteadmin role.",
@@ -199,6 +227,20 @@ const docTemplate = `{
                     "UI Pages"
                 ],
                 "summary": "Register new signal type schema page",
+                "responses": {
+                    "200": {
+                        "description": "HTML page"
+                    }
+                }
+            }
+        },
+        "/admin/signal-types/routing": {
+            "get": {
+                "description": "Renders the Signals Routing Rules management page. Requires siteadmin role.",
+                "tags": [
+                    "UI Pages"
+                ],
+                "summary": "Manage ISN routing page",
                 "responses": {
                     "200": {
                         "description": "HTML page"
@@ -271,6 +313,9 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "HTML partial or HX-Redirect header"
+                    },
+                    "400": {
+                        "description": "HTML error partial"
                     }
                 }
             }
@@ -333,6 +378,9 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "HTML partial"
+                    },
+                    "400": {
+                        "description": "HTML error partial"
                     }
                 }
             }
@@ -398,6 +446,12 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "HTML partial"
+                    },
+                    "400": {
+                        "description": "HTML error partial"
+                    },
+                    "401": {
+                        "description": "HTML error partial"
                     }
                 }
             }
@@ -428,6 +482,12 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "HTML partial"
+                    },
+                    "400": {
+                        "description": "HTML error partial"
+                    },
+                    "401": {
+                        "description": "HTML error partial"
                     }
                 }
             }
@@ -470,6 +530,12 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "HTML partial"
+                    },
+                    "400": {
+                        "description": "HTML error partial"
+                    },
+                    "401": {
+                        "description": "HTML error partial"
                     }
                 }
             }
@@ -500,6 +566,26 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "HTML partial"
+                    },
+                    "400": {
+                        "description": "HTML error partial"
+                    },
+                    "401": {
+                        "description": "HTML error partial"
+                    }
+                }
+            }
+        },
+        "/ui-api/alerts/clear": {
+            "get": {
+                "description": "HTMX endpoint. Returns empty content to clear any displayed alert partial.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Clear alert messages",
+                "responses": {
+                    "200": {
+                        "description": "empty"
                     }
                 }
             }
@@ -549,6 +635,12 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "HTML partial"
+                    },
+                    "400": {
+                        "description": "HTML error partial"
+                    },
+                    "401": {
+                        "description": "HTML error partial"
                     }
                 }
             }
@@ -586,6 +678,12 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "HTML partial"
+                    },
+                    "400": {
+                        "description": "HTML error partial"
+                    },
+                    "401": {
+                        "description": "HTML error partial"
                     }
                 }
             }
@@ -616,6 +714,12 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "HTML partial"
+                    },
+                    "400": {
+                        "description": "HTML error partial"
+                    },
+                    "401": {
+                        "description": "HTML error partial"
                     }
                 }
             }
@@ -653,6 +757,12 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "HTML partial"
+                    },
+                    "400": {
+                        "description": "HTML error partial"
+                    },
+                    "401": {
+                        "description": "HTML error partial"
                     }
                 }
             }
@@ -697,6 +807,12 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "HTML partial"
+                    },
+                    "400": {
+                        "description": "HTML error partial"
+                    },
+                    "401": {
+                        "description": "HTML error partial"
                     }
                 }
             }
@@ -727,6 +843,127 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "HTML partial"
+                    },
+                    "400": {
+                        "description": "HTML error partial"
+                    },
+                    "401": {
+                        "description": "HTML error partial"
+                    }
+                }
+            }
+        },
+        "/ui-api/options/isn/signal-type-slugs": {
+            "get": {
+                "description": "HTMX endpoint. Returns a signal type slug select element scoped to the user's token permissions for the selected ISN.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Signal type slugs dropdown (token-scoped)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "felixstowe-isn",
+                        "description": "ISN slug",
+                        "name": "isn-slug",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Include inactive signal types",
+                        "name": "include_inactive",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    },
+                    "400": {
+                        "description": "empty response"
+                    }
+                }
+            }
+        },
+        "/ui-api/options/isn/signal-type-versions": {
+            "get": {
+                "description": "HTMX endpoint. Returns a version select element for a signal type, scoped to the selected ISN via the user's token permissions.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Signal type versions dropdown (token-scoped)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-signal-type",
+                        "description": "Signal type slug",
+                        "name": "signal-type-slug",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "felixstowe-isn",
+                        "description": "ISN slug",
+                        "name": "isn-slug",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Include inactive versions",
+                        "name": "include_inactive",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    },
+                    "400": {
+                        "description": "empty response"
+                    }
+                }
+            }
+        },
+        "/ui-api/options/signal-type-slugs": {
+            "get": {
+                "description": "HTMX endpoint. Returns a signal type slug select element for admin forms.\nCovers all globally-registered signal types regardless of ISN membership.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Signal type slugs dropdown (admin)",
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    }
+                }
+            }
+        },
+        "/ui-api/options/signal-type-versions": {
+            "get": {
+                "description": "HTMX endpoint. Returns a version select element for a signal type. Covers all globally-registered versions.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Signal type versions dropdown (admin)",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-signal-type",
+                        "description": "Signal type slug",
+                        "name": "signal-type-slug",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    },
+                    "400": {
+                        "description": "empty response"
                     }
                 }
             }
@@ -757,6 +994,12 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "HTML partial"
+                    },
+                    "400": {
+                        "description": "HTML error partial"
+                    },
+                    "401": {
+                        "description": "HTML error partial"
                     }
                 }
             }
@@ -780,13 +1023,19 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "HTML partial"
+                    },
+                    "400": {
+                        "description": "HTML error partial"
+                    },
+                    "401": {
+                        "description": "HTML error partial"
                     }
                 }
             }
         },
         "/ui-api/signal-types/create": {
             "post": {
-                "description": "HTMX endpoint. Creates a new signal type at version 1.0.0. Requires siteadmin role.",
+                "description": "HTMX endpoint. Creates a new signal type at version . Requires siteadmin role.",
                 "tags": [
                     "HTMX Actions"
                 ],
@@ -836,6 +1085,12 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "HTML partial"
+                    },
+                    "400": {
+                        "description": "HTML error partial"
+                    },
+                    "401": {
+                        "description": "HTML error partial"
                     }
                 }
             }
@@ -887,6 +1142,248 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "HTML partial"
+                    },
+                    "400": {
+                        "description": "HTML error partial"
+                    },
+                    "401": {
+                        "description": "HTML error partial"
+                    }
+                }
+            }
+        },
+        "/ui-api/signal-types/routing": {
+            "get": {
+                "description": "HTMX endpoint. Renders the routing rule form for the selected signal type version.\nReturns empty 200 if either param is missing (htmx cascade not yet complete).",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Load signals routing form",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-signal-type",
+                        "description": "signal type slug",
+                        "name": "signal-type-slug",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "1.0.0",
+                        "description": "version",
+                        "name": "sem-ver",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    }
+                }
+            },
+            "put": {
+                "description": "HTMX endpoint. Saves routing rules for a signal type version.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Save Signals Routing Rules",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-signal-type",
+                        "description": "signal type slug",
+                        "name": "signal-type-slug",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "1.0.0",
+                        "description": "version",
+                        "name": "sem-ver",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "payload.portOfEntry",
+                        "description": "gjson path to routing field",
+                        "name": "routing-field",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "example": "*felixstowe*",
+                        "description": "match pattern per row",
+                        "name": "match-patterns",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "enum": [
+                                "matches",
+                                "equals",
+                                "does_not_match",
+                                "does_not_equal"
+                            ],
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "operator per row",
+                        "name": "operators",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "'true' or 'false' per row",
+                        "name": "case-insensitive",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "example": "felixstowe-isn",
+                        "description": "target ISN slug per row",
+                        "name": "isn-slugs",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    },
+                    "400": {
+                        "description": "HTML error partial"
+                    },
+                    "401": {
+                        "description": "HTML error partial"
+                    }
+                }
+            },
+            "delete": {
+                "description": "HTMX endpoint. Deletes all routing rules for a signal type version.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Delete Signals Routing Rules",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-signal-type",
+                        "description": "signal type slug",
+                        "name": "signal-type-slug",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "1.0.0",
+                        "description": "version",
+                        "name": "sem-ver",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    },
+                    "400": {
+                        "description": "HTML error partial"
+                    },
+                    "401": {
+                        "description": "HTML error partial"
+                    }
+                }
+            }
+        },
+        "/ui-api/signal-types/routing/add-row": {
+            "get": {
+                "description": "HTMX endpoint. Returns a new empty mapping row to append to the form table.\nThe optional count param is used to set the initial sequence label in the rendered row.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Add routing mapping row",
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    }
+                }
+            }
+        },
+        "/ui-api/signal-types/routing/remove-row": {
+            "get": {
+                "description": "HTMX endpoint. Returns empty content; the caller uses hx-swap=\"outerHTML\" to remove the row.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Remove routing mapping row",
+                "responses": {
+                    "200": {
+                        "description": "empty"
+                    }
+                }
+            }
+        },
+        "/ui-api/signal-types/toggle-skip-readme": {
+            "get": {
+                "description": "HTMX endpoint. Returns a readme URL input field, enabled or disabled based on the skip-readme flag.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Toggle readme URL input",
+                "parameters": [
+                    {
+                        "type": "boolean",
+                        "description": "'true' to render the field as disabled",
+                        "name": "skip-readme",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    }
+                }
+            }
+        },
+        "/ui-api/signal-types/toggle-skip-validation": {
+            "get": {
+                "description": "HTMX endpoint. Returns a schema URL input field, enabled or disabled based on the skip-validation flag.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Toggle schema validation input",
+                "parameters": [
+                    {
+                        "type": "boolean",
+                        "description": "'true' to render the field as disabled",
+                        "name": "skip-validation",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
                     }
                 }
             }
@@ -903,70 +1400,127 @@ const docTemplate = `{
                         "type": "string",
                         "description": "ISN slug",
                         "name": "isn-slug",
-                        "in": "formData",
+                        "in": "query",
                         "required": true
                     },
                     {
                         "type": "string",
                         "description": "Signal type slug",
                         "name": "signal-type-slug",
-                        "in": "formData",
+                        "in": "query",
                         "required": true
                     },
                     {
                         "type": "string",
                         "description": "Semantic version",
                         "name": "sem-ver",
-                        "in": "formData",
+                        "in": "query",
                         "required": true
                     },
                     {
                         "type": "string",
                         "description": "Start date (ISO 8601)",
                         "name": "start-date",
-                        "in": "formData"
+                        "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "End date (ISO 8601)",
                         "name": "end-date",
-                        "in": "formData"
+                        "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Filter by account ID",
                         "name": "account-id",
-                        "in": "formData"
+                        "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Filter by signal ID",
                         "name": "signal-id",
-                        "in": "formData"
+                        "in": "query"
                     },
                     {
                         "type": "string",
                         "description": "Filter by local reference",
                         "name": "local-ref",
-                        "in": "formData"
+                        "in": "query"
                     },
                     {
-                        "type": "string",
-                        "description": "'true' to include withdrawn signals",
+                        "type": "boolean",
+                        "description": "Include withdrawn signals",
                         "name": "include-withdrawn",
-                        "in": "formData"
+                        "in": "query"
                     },
                     {
-                        "type": "string",
-                        "description": "'true' to include correlated signals",
+                        "type": "boolean",
+                        "description": "Include correlated signals",
                         "name": "include-correlated",
-                        "in": "formData"
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Include previous schema versions",
+                        "name": "include-previous-versions",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    },
+                    "400": {
+                        "description": "HTML error partial"
+                    },
+                    "401": {
+                        "description": "HTML error partial"
+                    }
+                }
+            }
+        },
+        "/ui-api/signals/{isn_slug}/{signal_type_slug}/v{sem_ver}/{signal_id}/correlated/{count}": {
+            "get": {
+                "description": "HTMX endpoint. Returns a table of signals correlated to the specified signal.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Get correlated signals",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Signal ID",
+                        "name": "signal_id",
+                        "in": "path",
+                        "required": true
                     },
                     {
                         "type": "string",
-                        "description": "'true' to include previous schema versions",
-                        "name": "include-previous-versions",
-                        "in": "formData"
+                        "description": "ISN slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Signal type slug",
+                        "name": "signal_type_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Semantic version",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of correlated signals already displayed",
+                        "name": "count",
+                        "in": "path",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -995,6 +1549,12 @@ const docTemplate = `{
                 "responses": {
                     "200": {
                         "description": "HTML partial"
+                    },
+                    "400": {
+                        "description": "HTML error partial"
+                    },
+                    "401": {
+                        "description": "HTML error partial"
                     }
                 }
             }
@@ -1014,6 +1574,7 @@ const docTemplate = `{
             "name": "UI Pages"
         },
         {
+            "description": "HTMX action handlers (/ui-api/*) return HTML partials",
             "name": "HTMX Actions"
         }
     ]
@@ -1026,7 +1587,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "",
 	Schemes:          []string{},
 	Title:            "Signals ISN API",
-	Description:      "Signals ISN service API for managing Information Sharing Networks\n\n## Common Error Responses\nAll endpoints may return:\n- `400` Malformed request (invalid json, missing required fields, etc.)\n- `401` Unauthorized (invalid credentials)\n- `403` Forbidden (insufficient permissions)\n- `413` Request body exceeds size limit\n- `429` Rate limit exceeded\n- `500` Internal server error\n\nIndividual endpoints document their specific business logic errors.\n\n## Request Limits\nAll endpoints are protected by:\n- **Rate limiting**: Configurable requests per second\n- **Request size limits**: 64KB for admin/auth endpoints, 5MB for signal ingestion\n\nCheck the Signalsd-Max-Request-Body response header for the configured limit on signals payload.\n\nThe rate limit is set globaly and prevents abuse of the service.\nIn production there will be additional protections in place such as per-IP rate limiting provided by the load balancer/reverse proxy.\n\n## Authentication & Authorization\n\n### OAuth\nThe signalsd backend service acts as an OAuth 2.0 Authorization Server and supports web users and service accounts.\n\n### Authentication Flows\n- **Web users**: (Refresh Token Grant Type) Authentication via /auth/login → receive JWT access token + HTTP-only refresh cookie → use bearer tokens for API calls\n- **Service accounts**: Clients implement OAuth Client Credentials flow → receive JWT access token → use bearer tokens for API calls\n\n### Token Usage\nAll protected API endpoints require a valid JWT access token in the Authorization header:\n```\nAuthorization: Bearer <jwt-access-token>\n```\n\n**Token Refresh (Web Users):**\n- Client calls `/oauth/token?grant_type=refresh_token` with HTTP-only refresh token cookie\n- API validates refresh token and issues new access token + rotated refresh cookie\n- Client receives new bearer token for subsequent API calls\n\n**Token Refresh (Service Accounts):**\n- Client calls `/oauth/token?grant_type=client_credentials` with client ID/secret\n- API validates credentials and issues new access token\n- Client receives new bearer token for subsequent API calls\n\n**Token Lifetimes:**\n- Access tokens: 30 minutes\n- Refresh tokens: 30 days (web users only)\n\n### CSRF Protection\nThe refresh token used by the /oauth API endpoints is stored in an HttpOnly cookie (to prevent access by JavaScript)\nand marked with SameSite=Strict (to prevent it from being sent in cross-site requests, mitigating CSRF).\n\n### CORS Protection\n\nCORS is used to control which browser-based clients can make cross-origin requests to the API and read responses.\n\nthe `ALLOWED_ORIGINS` environment variable is used to configure the CORS rules.\n\nIn production, you should restrict ALLOWED_ORIGINS to trusted client origins (the server will not start if it is not set)\n\n## Date/Time Handling:\n\n**URL Parameters**: The following ISO 8601 formats are accepted in URL query parameters:\n- 2006-01-02T15:04:05Z (UTC)\n- 2006-01-02T15:04:05+07:00 (with offset)\n- 2006-01-02T15:04:05.999999999Z (nano precision)\n- 2006-01-02 (date only, treated as start of day UTC: 2006-01-02T00:00:00Z)\n\nNote: When including a timestamp with a timezone offset in a query parameter, encode the + sign as %2B (e.g. 2025-08-31T12:00:00%2B07:00). Otherwise, + may be interpreted as a space.\n\n**Response Bodies**: All date/time fields in JSON responses use RFC3339 format (ISO 8601):\n- Example: \"2025-06-03T13:47:47.331787+01:00\"\n\n# UI Endpoints\n\nUI endpoints serve the browser-based management interface.\n\n## Route types\n- **Page handlers** (`GET /admin/*`, `/search`, etc.): return a full HTML page (`200`)\n- **HTMX action handlers** (`PUT`/`POST` to `/ui-api/*`): return an HTML partial (`200`) — either a success or error alert fragment\n\n- see /ui-docs for more information\n\n## Auth\nAll protected routes require a valid session (cookie-based). Unauthenticated requests redirect to `/login`.\nRequests with insufficient role are redirected to `/access-denied`.\n\n## Role requirements\n- **Public** (`/login`, `/register`): no authentication required\n- **Authenticated**: any logged-in user (`/dashboard`, `/search`, `/settings`)\n- **`isnadmin` or `siteadmin`**: ISN account and signal type management\n- **`siteadmin` only**: ISN creation and ownership transfer, role management, signal type creation",
+	Description:      "Signals ISN service API for managing Information Sharing Networks\n\n## Common Error Responses\nAll endpoints may return:\n- `400` Malformed request (invalid json, missing required fields, etc.)\n- `401` Unauthorized (invalid credentials)\n- `403` Forbidden (insufficient permissions)\n- `413` Request body exceeds size limit\n- `429` Rate limit exceeded\n- `500` Internal server error\n\nIndividual endpoints document their specific business logic errors.\n\n## Request Limits\nAll endpoints are protected by:\n- **Rate limiting**: Configurable requests per second\n- **Request size limits**: 64KB for admin/auth endpoints, 5MB for signal ingestion\n\nCheck the Signalsd-Max-Request-Body response header for the configured limit on signals payload.\n\nThe rate limit is set globaly and prevents abuse of the service.\nIn production there will be additional protections in place such as per-IP rate limiting provided by the load balancer/reverse proxy.\n\n## Authentication & Authorization\n\n### OAuth\nThe signalsd backend service acts as an OAuth 2.0 Authorization Server and supports web users and service accounts.\n\n### Authentication Flows\n- **Web users**: (Refresh Token Grant Type) Authentication via /auth/login -> receive JWT access token + HTTP-only refresh cookie -> use bearer tokens for API calls\n- **Service accounts**: Clients implement OAuth Client Credentials flow -> receive JWT access token -> use bearer tokens for API calls\n\n### Token Usage\nAll protected API endpoints require a valid JWT access token in the Authorization header:\n```\nAuthorization: Bearer <jwt-access-token>\n```\n\n**Token Refresh (Web Users):**\n- Client calls `/oauth/token?grant_type=refresh_token` with HTTP-only refresh token cookie\n- API validates refresh token and issues new access token + rotated refresh cookie\n- Client receives new bearer token for subsequent API calls\n\n**Token Refresh (Service Accounts):**\n- Client calls `/oauth/token?grant_type=client_credentials` with client ID/secret\n- API validates credentials and issues new access token\n- Client receives new bearer token for subsequent API calls\n\n**Token Lifetimes:**\n- Access tokens: 30 minutes\n- Refresh tokens: 30 days (web users only)\n\n### CSRF Protection\nThe refresh token used by the /oauth API endpoints is stored in an HttpOnly cookie (to prevent access by JavaScript)\nand marked with SameSite=Strict (to prevent it from being sent in cross-site requests, mitigating CSRF).\n\n### CORS Protection\n\nCORS is used to control which browser-based clients can make cross-origin requests to the API and read responses.\n\nthe `ALLOWED_ORIGINS` environment variable is used to configure the CORS rules.\n\nIn production, you should restrict ALLOWED_ORIGINS to trusted client origins (the server will not start if it is not set)\n\n## Date/Time Handling:\n\n**URL Parameters**: The following ISO 8601 formats are accepted in URL query parameters:\n- 2006-01-02T15:04:05Z (UTC)\n- 2006-01-02T15:04:05+07:00 (with offset)\n- 2006-01-02T15:04:05.999999999Z (nano precision)\n- 2006-01-02 (date only, treated as start of day UTC: 2006-01-02T00:00:00Z)\n\nNote: When including a timestamp with a timezone offset in a query parameter, encode the + sign as %2B (e.g. 2025-08-31T12:00:00%2B07:00). Otherwise, + may be interpreted as a space.\n\n**Response Bodies**: All date/time fields in JSON responses use RFC3339 format (ISO 8601):\n- Example: \"2025-06-03T13:47:47.331787+01:00\"\n\n# UI Endpoints\n\nUI endpoints serve the browser-based management interface.\n\n## Route types\n- **Page handlers** (`GET /admin/*`, `/search`, etc.): return a full HTML page (`200`)\n- **HTMX action handlers** (`PUT`/`POST` to `/ui-api/*`): return an HTML partial (`200`) - either a success or error alert fragment\n\n- see /ui-docs for more information\n\n## Auth\nAll protected routes require a valid session (cookie-based). Unauthenticated requests redirect to `/login`.\nRequests with insufficient role are redirected to `/access-denied`.\n\n## Role requirements\n- **Public** (`/login`, `/register`): no authentication required\n- **Authenticated**: any logged-in user (`/dashboard`, `/search`, `/settings`)\n- **`isnadmin` or `siteadmin`**: ISN account and signal type management\n- **`siteadmin` only**: ISN creation and ownership transfer, role management, signal type creation",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

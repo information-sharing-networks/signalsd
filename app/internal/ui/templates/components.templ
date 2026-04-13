@@ -10,6 +10,15 @@ templ NoticeAlert() {
 	</div>
 }
 
+
+templ InfoAlert() {
+	<div class="alert alert-info">
+	    <b>Info</b>
+        <br/><br/>
+		{ children... }
+	</div>
+}
+
 templ ErrorAlert(message string) {
 	<div class="alert alert-error">
 		{ message }
@@ -83,4 +92,10 @@ templ SignalSearchScript() {
 // Required for the HomePage (auto-redirect to login after registration)
 templ HomeRedirectScript() {
   <script src="/static/js/home-redirect.js"></script>
+}
+
+// RoutingTableScript loads routing table functionality
+// Required for the ManageSignalRoutingPage (boolean toggle buttons in the mapping table)
+templ RoutingTableScript() {
+  <script src="/static/js/routing-table.js"></script>
 }

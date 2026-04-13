@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/a-h/templ"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
@@ -36,12 +37,7 @@ func (s *Server) HomePage(w http.ResponseWriter, r *http.Request) {
 //	@Success	200	"HTML page"
 //	@Router		/login [get]
 func (s *Server) LoginPage(w http.ResponseWriter, r *http.Request) {
-	// Render login page
-	component := templates.LoginPageWithEnvironment(s.config.Environment)
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger := logger.ContextRequestLogger(r.Context())
-		reqLogger.Error("Failed to render login page", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.LoginPageWithEnvironment(s.config.Environment)).ServeHTTP(w, r)
 }
 
 // Helper method for redirecting to login
@@ -62,6 +58,7 @@ func (s *Server) RedirectToLogin(w http.ResponseWriter, r *http.Request) {
 //	@Param			email		formData	string	true	"User email"
 //	@Param			password	formData	string	true	"User password"
 //	@Success		200			"HTML partial or HX-Redirect header"
+//	@Failure		400			"HTML error partial"
 //	@Router			/login [post]
 func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
@@ -81,21 +78,14 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 			msg = "An error occurred. Please try again."
 		}
 
-		component := templates.ErrorAlert(msg)
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
 		return
 	}
 
 	// Set all authentication cookies
 	if err := s.authService.SetAuthCookies(w, accessTokenDetails, refreshTokenCookie); err != nil {
 		reqLogger.Error("Failed to set authentication cookies", slog.String("error", err.Error()))
-
-		component := templates.ErrorAlert("An error occurred. Please try again.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("An error occurred. Please try again.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -116,12 +106,7 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 //	@Success	200	"HTML page"
 //	@Router		/register [get]
 func (s *Server) RegisterPage(w http.ResponseWriter, r *http.Request) {
-	// Render registration page
-	component := templates.RegisterPage()
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger := logger.ContextRequestLogger(r.Context())
-		reqLogger.Error("Failed to render registration page", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.RegisterPage()).ServeHTTP(w, r)
 }
 
 // Register godoc
@@ -133,6 +118,7 @@ func (s *Server) RegisterPage(w http.ResponseWriter, r *http.Request) {
 //	@Param			password			formData	string	true	"Password"
 //	@Param			confirm-password	formData	string	true	"Confirm password"
 //	@Success		200					"HTML partial"
+//	@Failure		400					"HTML error partial"
 //	@Router			/register [post]
 func (s *Server) Register(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
@@ -141,18 +127,12 @@ func (s *Server) Register(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	if email == "" || password == "" || confirmPassword == "" {
-		component := templates.ErrorAlert("Please fill in all fields.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Please fill in all fields.")).ServeHTTP(w, r)
 		return
 	}
 
 	if password != confirmPassword {
-		component := templates.ErrorAlert("Passwords do not match.")
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert("Passwords do not match.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -168,19 +148,13 @@ func (s *Server) Register(w http.ResponseWriter, r *http.Request) {
 			msg = "An error occurred. Please try again."
 		}
 
-		component := templates.ErrorAlert(msg)
-		if err := component.Render(r.Context(), w); err != nil {
-			reqLogger.Error("Failed to render error alert", slog.String("error", err.Error()))
-		}
+		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
 		return
 	}
 
 	// Registration successful - show success message and redirect to login after delay
 	w.Header().Set("HX-Trigger-After-Settle", "registrationSuccess")
-	component := templates.RegistrationSuccess()
-	if err := component.Render(r.Context(), w); err != nil {
-		reqLogger.Error("Failed to render registration success", slog.String("error", err.Error()))
-	}
+	templ.Handler(templates.RegistrationSuccess()).ServeHTTP(w, r)
 }
 
 // Logout godoc
