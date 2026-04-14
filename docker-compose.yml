@@ -1,7 +1,7 @@
 # docker-compose.yml (development env - mounts the local repo directory)
 services:
   db:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     restart: unless-stopped
     container_name: signalsd-db
     volumes:
