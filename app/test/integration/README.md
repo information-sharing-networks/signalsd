@@ -1,5 +1,15 @@
 # Signalsd Testing
 
+## UI Testing
+There are no automated tests for the UI, beyond the testing of the backend API (signalsd) that it relies on. If you want to do some exploratory testing on the web app UI in a new dev installation, you can use: 
+
+```bash
+cd app
+# only use for dev envs!
+go run ./cmd/seed
+```
+... which will create a basic set of accounts and isns.  The siteadmin is `owner@gmail.com` (password 12345678901).  
+
 ## Unit Tests 
 
 Unit tests are used to test a couple of areas:

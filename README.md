@@ -218,13 +218,13 @@ By default the signalsd service starts with a basic web interface. If you want t
 
 # Technical overview
 ## Auth
-![Auth 2026.04.01](https://github.com/user-attachments/assets/d8de8a57-7727-4ac5-ae59-6ef391d94b3c)
+![auth-2025-10-20-1039](https://github.com/user-attachments/assets/8ae6e0f7-dd08-42e5-b1f2-72c944866e22)
 
 ## ISN config
-![ISN Config 2026.03.29](https://github.com/user-attachments/assets/f4e9ee34-1585-41ae-a0b7-cc6cc576020c)
+![isn-config-2025-10-20-1039](https://github.com/user-attachments/assets/b7ad1604-8c47-4591-9393-d4968f8c0e6d)
 
 ## Signal Load
-![SignalsLoad 2026.04.01](https://github.com/user-attachments/assets/fe17dd87-fd81-410d-80fb-fea849014cd5)
+![signals-load-2025-10-20-1039](https://github.com/user-attachments/assets/3798eecc-87b9-4dce-9053-54cb6b9baebb)
 
 ## Rate Limits
 The service includes a shared rate limiter for all traffic regardless of source IP or user identity and protects all endpoints including auth, API, and admin routes.
