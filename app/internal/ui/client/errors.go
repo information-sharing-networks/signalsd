@@ -52,16 +52,16 @@ func NewClientApiError(res *http.Response) *ClientError {
 
 	if res.Body == nil {
 		return &ClientError{
-			StatusCode:  0,
+			StatusCode:  res.StatusCode,
 			UserMessage: "An error occurred. Please try again.",
-			LogMessage:  fmt.Sprintf("signaslsd error response body is nil, got status code %d", res.StatusCode),
+			LogMessage:  fmt.Sprintf("signalsd returned status %d with no response body", res.StatusCode),
 		}
 	}
 	if err := json.NewDecoder(res.Body).Decode(&serverErr); err != nil {
 		return &ClientError{
-			StatusCode:  0,
+			StatusCode:  res.StatusCode,
 			UserMessage: "An error occurred. Please try again.",
-			LogMessage:  fmt.Sprintf("error decoding signalsd error response: %v, got status code %d", err, res.StatusCode),
+			LogMessage:  fmt.Sprintf("signalsd returned status %d with non-JSON body (decode error: %v)", res.StatusCode, err),
 		}
 	}
 
