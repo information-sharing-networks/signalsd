@@ -82,15 +82,15 @@ func (c *Client) UpdateSignalRoutingConfig(accessToken, slug, semVer string, req
 	}
 	defer res.Body.Close()
 
-	if res.StatusCode != http.StatusOK {
+	if res.StatusCode != http.StatusNoContent {
 		return nil, NewClientApiError(res)
 	}
 
-	var detail SignalRoutingConfigResponse
-	if err := json.NewDecoder(res.Body).Decode(&detail); err != nil {
-		return nil, NewClientInternalError(err, "decoding put ISN routing response")
-	}
-	return &detail, nil
+	return &SignalRoutingConfigResponse{
+		SignalTypePath: fmt.Sprintf("%s/v%s", slug, semVer),
+		RoutingField:   req.RoutingField,
+		RoutingRules:   req.RoutingRules,
+	}, nil
 }
 
 // DeleteSignalRoutingConfig removes all routing rules for a signal type version.
