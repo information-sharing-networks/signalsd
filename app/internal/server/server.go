@@ -196,7 +196,7 @@ func (s *Server) registerAdminRoutes() {
 	// isn definition handlers
 	isn := handlers.NewIsnHandler(s.queries, s.pool, s.config.PublicBaseURL)
 	signalTypes := handlers.NewSignalTypeHandler(s.queries)
-	isnRouter := handlers.NewRoutingConfigHandler(s.queries, s.pool, s.signalRouterCache)
+	isnRouter := handlers.NewRoutingConfigHandler(s.queries, s.pool, s.signalRouterCache, s.schemaCache)
 
 	// isn permissions
 	isnAccount := handlers.NewIsnAccountHandler(s.queries)

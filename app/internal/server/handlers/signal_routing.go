@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
@@ -15,6 +16,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/responses"
 	"github.com/information-sharing-networks/signalsd/app/internal/router"
+	"github.com/information-sharing-networks/signalsd/app/internal/schemas"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -24,10 +26,11 @@ type RoutingConfigHandler struct {
 	queries           *database.Queries
 	pool              *pgxpool.Pool
 	signalRouterCache *router.Cache
+	schemaCache       *schemas.Cache
 }
 
-func NewRoutingConfigHandler(queries *database.Queries, pool *pgxpool.Pool, signalRouterCache *router.Cache) *RoutingConfigHandler {
-	return &RoutingConfigHandler{queries: queries, pool: pool, signalRouterCache: signalRouterCache}
+func NewRoutingConfigHandler(queries *database.Queries, pool *pgxpool.Pool, signalRouterCache *router.Cache, schemaCache *schemas.Cache) *RoutingConfigHandler {
+	return &RoutingConfigHandler{queries: queries, pool: pool, signalRouterCache: signalRouterCache, schemaCache: schemaCache}
 }
 
 // SignalRoutingRule is the mapping between a pattern and a isn.
@@ -167,7 +170,13 @@ func (h *RoutingConfigHandler) UpdateSignalRoutingConfig(w http.ResponseWriter, 
 		return
 	}
 
-	// TODO the routing field should be compared to the schema to make sure it is a valid path.
+	// prevent numeric path segments (gjson array index access e.g. payload.0.item)
+	for seg := range strings.SplitSeq(req.RoutingField, ".") {
+		if _, err := strconv.Atoi(seg); err == nil {
+			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "routing_field must not contain numeric segments - routing by array index is not supported")
+			return
+		}
+	}
 
 	if len(req.RoutingRules) == 0 {
 		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "at least one mapping is required")
@@ -200,6 +209,21 @@ func (h *RoutingConfigHandler) UpdateSignalRoutingConfig(w http.ResponseWriter, 
 		}
 		logger.ContextWithLogAttrs(r.Context(), slog.String("error", err.Error()))
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+		return
+	}
+
+	// Validate the routing field against the cached schema for this signal type.
+	// The cache is guaranteed to be populated for any existing signal type, so a
+	// miss here is an unexpected internal error rather than a user error.
+	signalTypePath := fmt.Sprintf("%s/v%s", slug, semVer)
+	fieldExists, err := h.schemaCache.FieldPathExistsInSchema(signalTypePath, req.RoutingField)
+	if err != nil {
+		logger.ContextWithLogAttrs(r.Context(), slog.String("error", err.Error()))
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "schema cache error")
+		return
+	}
+	if !fieldExists {
+		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("routing_field %q is not defined in the schema for %s", req.RoutingField, signalTypePath))
 		return
 	}
 

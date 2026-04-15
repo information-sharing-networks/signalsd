@@ -141,6 +141,58 @@ func (c *Cache) ValidateSignal(ctx context.Context, queries *database.Queries, s
 	return nil
 }
 
+// FieldPathExistsInSchema reports whether fieldPath is a valid dot-notation path
+// in the compiled schema for signalTypePath.
+//
+// **Limitations**
+//
+// The validation is best-effort: it catches typos in straightforward
+// schemas but will asume the path is valid if traversal hits a
+// $ref, allOf, anyOf, oneOf, or any other construct that hides properties.
+//
+// Returns (true, nil) when the path resolves successfully, or when the signal
+// type uses skip-validation (no schema to check against).
+// Returns (false, nil) when a schema is present but the path cannot be resolved.
+// Returns (false, error) when the signal type is not in the cache at all (unexpected err)
+func (c *Cache) FieldPathExistsInSchema(signalTypePath, fieldPath string) (bool, error) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	schemaURL, ok := c.schemaURLs[signalTypePath]
+	if !ok {
+		return false, fmt.Errorf("signal type %q not found in schema cache", signalTypePath)
+	}
+	if SkipValidation(schemaURL) {
+		return true, nil // no schema to validate against
+	}
+
+	schema, ok := c.schemas[signalTypePath]
+	if !ok {
+		return false, fmt.Errorf("schema missing from cache for signal type %q", signalTypePath)
+	}
+
+	current := schema
+
+	for seg := range strings.SplitSeq(fieldPath, ".") {
+
+		if seg == "" {
+			return false, fmt.Errorf("empty path segment (double dot?)")
+		}
+
+		if current.Properties == nil {
+			// Can't see properties at this level — $ref, allOf, scalar type, etc.
+			// Assume valid rather than reject.
+			return true, nil
+		}
+		next, ok := current.Properties[seg]
+		if !ok {
+			return false, nil
+		}
+		current = next
+	}
+	return true, nil
+}
+
 // ValidateAndCompileSchema validates schema content and returns the compiled schema
 func ValidateAndCompileSchema(schemaURL, content string) (*jsonschema.Schema, error) {
 	// Parse the schema content using UnmarshalJSON

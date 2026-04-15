@@ -86,7 +86,22 @@ func (s *Server) renderRoutingForm(w http.ResponseWriter, r *http.Request, slug,
 		return
 	}
 
-	templ.Handler(templates.SignalRoutingForm(slug, semVer, existing, isnOptions)).ServeHTTP(w, r)
+	var schemaURL, readmeURL string
+	signalTypes, err := s.apiClient.GetSignalTypes(accessTokenDetails.AccessToken)
+	if err != nil {
+		reqLogger.Error("failed to load signal types", slog.String("error", err.Error()))
+		templ.Handler(templates.ErrorAlert("Failed to load signal type details. Please try again.")).ServeHTTP(w, r)
+		return
+	}
+	for _, st := range signalTypes {
+		if st.Slug == slug && st.SemVer == semVer {
+			schemaURL = st.SchemaURL
+			readmeURL = st.ReadmeURL
+			break
+		}
+	}
+
+	templ.Handler(templates.SignalRoutingForm(slug, semVer, schemaURL, readmeURL, existing, isnOptions)).ServeHTTP(w, r)
 }
 
 // SaveSignalRoutingConfig godoc

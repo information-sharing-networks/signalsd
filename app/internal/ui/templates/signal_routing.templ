@@ -67,13 +67,22 @@ templ ManageSignalRoutingPage(environment string, signalTypes []types.SignalType
 }
 
 // SignalRoutingForm renders the editable routing rule form for a signal type version.
+// schemaURL and readmeURL are empty strings when the signal type has no schema/readme.
 // existingConfig is nil when no rules are configured yet.
 // isnOptions is used to populate the target ISN dropdown in each mapping row.
-templ SignalRoutingForm(slug, semVer string, existingConfig *client.SignalRoutingConfigResponse, isnOptions []types.IsnOption) {
+templ SignalRoutingForm(slug, semVer, schemaURL, readmeURL string, existingConfig *client.SignalRoutingConfigResponse, isnOptions []types.IsnOption) {
 	<div id="routing-form">
 		<h2 class="text-lg font-semibold margin-top-4">
 			{ slug }/v{ semVer }
 		</h2>
+		<div class="flex gap-4 text-sm margin-top-1">
+			if schemaURL != "" {
+				<a href={ templ.SafeURL(schemaURL) } target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Schema</a>
+			}
+			if readmeURL != "" {
+				<a href={ templ.SafeURL(readmeURL) } target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">Readme</a>
+			}
+		</div>
 		if existingConfig != nil {
 			<p class="text-muted text-sm">Routing field: <code>{ existingConfig.RoutingField }</code> { fmt.Sprintf("(%d mapping(s) configured)", len(existingConfig.RoutingRules)) }</p>
 		} else {

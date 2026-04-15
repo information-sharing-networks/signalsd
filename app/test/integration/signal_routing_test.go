@@ -106,6 +106,11 @@ func TestSignalRoutingConfig(t *testing.T) {
 	isn := createTestISN(t, ctx, testEnv.queries, "test-isn", "Test ISN", siteAdminAccount.ID, "private")
 	signalType := createTestSignalType(t, ctx, testEnv.queries, isn.ID, "test signal type", "")
 
+	// refresh schema cache so the handler can validate the routing field against the signal type schema
+	if err := testEnv.schemaCache.Load(ctx); err != nil {
+		t.Fatalf("Failed to refresh schema cache: %v", err)
+	}
+
 	slug := signalType.Slug
 	semVer := signalType.SemVer
 
