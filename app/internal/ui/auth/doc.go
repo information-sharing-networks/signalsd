@@ -1,15 +1,30 @@
-// auth package provides authentication and authorization services for the UI.
+// Package auth provides authentication and authorisation middleware for the UI server.
 //
-// The authentication flow is as follows:
+// See server/doc.go for the full BFF token management flow.
 //
-//  1. The user enters submits the login form.
-//  2. The UI calls the signalsd API /api/auth/login endpoint
-//  3. The signalsd API returns an access token and a refresh token cookie.
-//  4. The UI stores the access token in a cookie and the refresh token cookie in the browser.
-//  5. The UI redirects the user to the home page.
-//  6. The UI makes calls to the signalsd API by adding the access token to the Authorization header.
-//  7. When the access token expires, the UI calls the signalsd API /oauth/token endpoint with the refresh token cookie.
+// # Middleware
 //
-// the middleware in this package intercepts the requests and reads cookies (access token details cookie, refresh token cookie),
-// handles HTMX-aware redirects to /login or /access-denied, and checks ISN-level permissions for the web UI.
+// [AuthService.RequireAuth] — validates the access token cookie on each request and
+// refreshes it via the signalsd API when expired. Redirects to /login
+// on failure.
+//
+// [AuthService.RequireRole] — checks that the authenticated account holds one of the
+// specified roles; redirects to /access-denied otherwise.
+//
+// [AuthService.RequireIsnAdmin] — checks that the account has admin rights for at
+// least one ISN; redirects to /access-denied otherwise.
+//
+// [AuthService.RequireIsnAccess] — checks that the account is a member of at least
+// one ISN; redirects to /access-denied otherwise.
+//
+// # Cookie Helpers
+//
+// [AuthService.SetAuthCookies] writes the access token details and refresh token as
+// httpOnly, SameSite=Strict cookies. [AuthService.ClearAuthCookies] expires them on logout.
+//
+// # Context
+//
+// [ContextWithAccessTokenDetails] and [ContextAccessTokenDetails] store and retrieve
+// the decoded access token payload within a request context, making account identity
+// and ISN permissions available to downstream handlers without re-parsing the cookie.
 package auth
