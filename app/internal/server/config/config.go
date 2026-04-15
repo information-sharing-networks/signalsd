@@ -230,7 +230,7 @@ func validateConfig(cfg *ServerEnvironment) error {
 		return fmt.Errorf("PUBLIC_BASE_URL should not include a path: %s", cfg.PublicBaseURL)
 	}
 
-	if cfg.Environment == "prod" || cfg.Environment == "staging " {
+	if cfg.Environment == "prod" || cfg.Environment == "staging" {
 		if len(cfg.AllowedOrigins) == 0 {
 			return fmt.Errorf("ALLOWED_ORIGINS must be set in %v", cfg.Environment)
 		}
