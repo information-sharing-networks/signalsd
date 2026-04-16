@@ -211,7 +211,7 @@ func (s *Server) registerAdminRoutes() {
 
 			r.Group(func(r chi.Router) {
 				// select the authentication method based on the suppled the grant_type URL param (client_credentials or refresh_token)
-				r.Use(s.authService.AuthenticateByGrantType)
+				r.Use(s.authService.RequireAuthByGrantType)
 
 				// get new access tokens
 				r.Post("/token", tokens.RefreshAccessToken)
@@ -220,7 +220,7 @@ func (s *Server) registerAdminRoutes() {
 			r.Group(func(r chi.Router) {
 
 				// select the appropriate authentication method based on the user account type (user or service_account)
-				r.Use(s.authService.AuthenticateByCredentalType)
+				r.Use(s.authService.RequireAuthForCredentialType)
 
 				// revoke a client secret (service accounts) or refresh token (web users)
 				r.Post("/revoke", tokens.RevokeToken)

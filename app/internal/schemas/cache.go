@@ -144,7 +144,7 @@ func (c *Cache) ValidateSignal(ctx context.Context, queries *database.Queries, s
 // FieldPathExistsInSchema reports whether fieldPath is a valid dot-notation path
 // in the compiled schema for signalTypePath.
 //
-// **Limitations**
+//	Limitations
 //
 // The validation is best-effort: it catches typos in straightforward
 // schemas but will asume the path is valid if traversal hits a

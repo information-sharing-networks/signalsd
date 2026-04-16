@@ -1,9 +1,9 @@
 // package auth contains the code to handle tokens and auth middleware
 //
-// **Access tokens**
+// # Access tokens
 //
-// web users are authenticated with email/password and are issued an access token and refresh token when logging in.
-// The JWT access token is contained in the response body and the refresh token is in a httponly cookie
+// Web users are authenticated with email/password and are issued an access token and refresh token when logging in.
+// The JWT access token is contained in the response body and the refresh token is in a httponly cookie.
 //
 // For web users, access token renewal is handled automatically by the browser sending the HttpOnly refresh token
 // (the client-side application does not manually transmit or access the token).
@@ -25,7 +25,7 @@
 //
 // Permissions are revalidated on the database when access tokens are refreshed, the rest of the time auth checks are done using the token claims.
 //
-// **isActive status**
+// # isActive status
 //
 // marking an account  is_active= false:
 //   - prevents new access tokens being created.
@@ -35,7 +35,7 @@
 //
 // The isActive status is checked in the RequireValidClientCredentials, so handlers generally don't need to check it directly.
 //
-// **inUse flags**
+// # inUse flags
 //
 // ISNs can be disabled (isn.in_use = false) and signal_types can be disabled for a specific isn (isn_signal_types.in_use = false)
 //
@@ -43,16 +43,16 @@
 // The in_use flags in the claims are consulted by the RequireAccessPermission middleware - which denies access to not-in-use resources - so handlers generally don't need to check directly.
 // As a fallback, the same rule is enforced at the database level (see the queries in signals.sql)
 //
-// **Middleware**
+// # Middleware
 //
-// access controls are handled in middleware:
+// access controls are handled in middleware - make sure to call the appropriated middleware for any new routes.
 //
 //   - [AuthService.RequireValidAccessToken]: validates JWT signature and expiry; adds accountID, accountType and claims to context.
 //
-//   - [AuthService.AuthenticateByGrantType]: routes to [AuthService.RequireValidClientCredentials] or [AuthService.RequireValidRefreshToken]
+//   - [AuthService.RequireAuthForGrantType]: routes to [AuthService.RequireValidClientCredentials] or [AuthService.RequireAuthByCredentialSource]
 //     based on the grant_type query param. Used on the /oauth/token endpoint.
 //
-//   - [AuthService.AuthenticateByCredentalType]: same routing decision but inferred from whether a refresh token cookie is present.
+//   - [AuthService.RequireAuthForCredentialType]: same routing decision but inferred from whether a refresh token cookie is present.
 //     Used on the /oauth/revoke endpoint.
 //
 //   - [AuthService.RequireValidRefreshToken]: validates the HttpOnly refresh token cookie against the database; adds accountID and hashedRefreshToken to context.
