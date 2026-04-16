@@ -7,6 +7,9 @@ on:
       - 'v*'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 env:
   # Mandatory environment settings 
   DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -35,6 +38,8 @@ jobs:
   deploy:
     name: Deploy to Production
     runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 20
 
     steps:
       - name: Check out code
@@ -60,30 +65,19 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v3
 
-      - name: Configure Docker to use gcloud as credential helper
-        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
-
-      - name: Build and push Docker image
+      - name: Promote staging image to production
         run: |
-          
-          # Get Go version from go.mod
-          GO_VERSION=$(grep '^go ' app/go.mod | awk '{print $2}')
+          # Re-tag the staging image in Artifact Registry without pulling or pushing layers.
+          # Fails fast if the staging image doesn't exist (i.e. staging was never deployed).
+          REGISTRY="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}"
 
-          # Get version info for Docker build
-          VERSION=$(git describe --tags --abbrev=0 2>/dev/null || git describe --tags --always --dirty)
-          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          GIT_COMMIT=$(git rev-parse --short HEAD)
+          gcloud artifacts docker tags add \
+            "${REGISTRY}:staging-${{ github.sha }}" \
+            "${REGISTRY}:${{ github.sha }}"
 
-          docker buildx build --build-arg GO_VERSION=${GO_VERSION} \
-          --platform linux/amd64 \
-          -f app/Dockerfile \
-          --build-arg VERSION=${VERSION} \
-          --build-arg BUILD_DATE=${BUILD_DATE} \
-          --build-arg GIT_COMMIT=${GIT_COMMIT} \
-          --push \
-          -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
-          -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:latest \
-          .
+          gcloud artifacts docker tags add \
+            "${REGISTRY}:staging-${{ github.sha }}" \
+            "${REGISTRY}:latest"
       
       - name: Run migrations
         working-directory: app

@@ -10,6 +10,9 @@ on:
       - main
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 env:
   # mandatory environment settings
   STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
@@ -38,6 +41,8 @@ jobs:
   deploy:
     name: Deploy to Staging
     runs-on: ubuntu-latest
+    environment: staging
+    timeout-minutes: 30
     # Only run if the CI workflow succeeded
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
@@ -79,15 +84,19 @@ jobs:
           BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           GIT_COMMIT=$(git rev-parse --short HEAD)
 
+          REGISTRY="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}"
+
           docker buildx build --build-arg GO_VERSION=${GO_VERSION} \
           --platform linux/amd64 \
           -f app/Dockerfile \
           --build-arg VERSION=${VERSION} \
           --build-arg BUILD_DATE=${BUILD_DATE} \
           --build-arg GIT_COMMIT=${GIT_COMMIT} \
+          --cache-from type=registry,ref=${REGISTRY}:buildcache \
+          --cache-to   type=registry,ref=${REGISTRY}:buildcache,mode=max \
           --push \
-          -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:staging-${{ github.sha }} \
-          -t ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:staging-latest \
+          -t ${REGISTRY}:staging-${{ github.sha }} \
+          -t ${REGISTRY}:staging-latest \
           .
       
       - name: Run migrations

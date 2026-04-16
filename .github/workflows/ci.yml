@@ -19,6 +19,7 @@ jobs:
   tests:
     name: Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     services:
       postgres:
@@ -62,6 +63,7 @@ jobs:
   formatting:
     name: Formatting and linting
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     defaults:
       run:
@@ -93,6 +95,7 @@ jobs:
   security:
     name: Security analysis
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     defaults:
       run:
