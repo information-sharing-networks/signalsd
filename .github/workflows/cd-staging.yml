@@ -92,8 +92,6 @@ jobs:
           --build-arg VERSION=${VERSION} \
           --build-arg BUILD_DATE=${BUILD_DATE} \
           --build-arg GIT_COMMIT=${GIT_COMMIT} \
-          --cache-from type=registry,ref=${REGISTRY}:buildcache \
-          --cache-to   type=registry,ref=${REGISTRY}:buildcache,mode=max \
           --push \
           -t ${REGISTRY}:staging-${{ github.sha }} \
           -t ${REGISTRY}:staging-latest \
