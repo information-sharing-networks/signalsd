@@ -77,9 +77,8 @@ type IsnPerm struct {
 	InUse bool `json:"in_use"`
 }
 
-// ErrorResponse represents an error response from the API
-// Shared to avoid circular imports between auth ↔ client
-type ErrorResponse struct {
+// BackendErrorResponse represents an error response from the signalsd API
+type BackendErrorResponse struct {
 	ErrorCode apperrors.ErrorCode `json:"error_code"`
 	Message   string              `json:"message"`
 }

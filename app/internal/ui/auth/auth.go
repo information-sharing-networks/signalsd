@@ -79,7 +79,7 @@ func (a *AuthService) RefreshToken(refreshTokenCookie *http.Cookie) (*types.Acce
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		var errorResp types.ErrorResponse
+		var errorResp types.BackendErrorResponse
 		if err := json.NewDecoder(res.Body).Decode(&errorResp); err != nil {
 			return nil, nil, fmt.Errorf("token refresh failed with status %d", res.StatusCode)
 		}

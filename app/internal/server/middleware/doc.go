@@ -2,7 +2,7 @@
 //
 // Available middleware:
 //
-//   - CORS: wraps a pre-built [cors.Middleware] to handle cross-origin requests.
+//   - CORS: wraps a pre-built (jub0bs) middleware [cors.Middleware] to handle cross-origin requests.
 //
 //   - SecurityHeaders: sets defensive HTTP response headers (CSP, X-Frame-Options,
 //     X-Content-Type-Options, Referrer-Policy). Adds HSTS in prod/staging environments.

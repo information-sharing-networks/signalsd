@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
 // ClientError represents an error encountered when communicating with the signalsd API
@@ -45,10 +47,7 @@ func NewClientInternalError(err error, while string) *ClientError {
 
 // NewClientApiError creates a ClientError from an HTTP response sent by the signalsd server
 func NewClientApiError(res *http.Response) *ClientError {
-	var serverErr struct {
-		ErrorCode string `json:"error_code"`
-		Message   string `json:"message"`
-	}
+	serverErr := types.BackendErrorResponse{}
 
 	if res.Body == nil {
 		return &ClientError{
@@ -57,6 +56,7 @@ func NewClientApiError(res *http.Response) *ClientError {
 			LogMessage:  fmt.Sprintf("signalsd returned status %d with no response body", res.StatusCode),
 		}
 	}
+
 	if err := json.NewDecoder(res.Body).Decode(&serverErr); err != nil {
 		return &ClientError{
 			StatusCode:  res.StatusCode,
@@ -74,8 +74,10 @@ func NewClientApiError(res *http.Response) *ClientError {
 		} else {
 			userMsg = "Login failed. Please check your email and password and try again."
 		}
+
 	case http.StatusForbidden:
 		userMsg = "You don't have permission to access this resource."
+
 	case http.StatusBadRequest, http.StatusConflict:
 		// Use server message for validation errors if available
 		if serverErr.Message != "" {
@@ -83,10 +85,13 @@ func NewClientApiError(res *http.Response) *ClientError {
 		} else {
 			userMsg = "Invalid request. Please check your input and try again."
 		}
+
 	case http.StatusTooManyRequests:
 		userMsg = "Too many requests. Please try again in a few moments."
+
 	case http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable:
 		userMsg = "The service is temporarily unavailable. Please try again later."
+
 	default:
 		userMsg = "An error occurred. Please try again."
 	}
