@@ -1308,18 +1308,27 @@
         "/api/auth/service-accounts/rotate-secret": {
             "post": {
                 "description": "Self-service endpoint for service accounts to rotate their client secret.\nThis endpoint requires current valid client_id and client_secret for authentication.\nThe old secret remains valid for 5 minutes to prevent race conditions when multiple instances are involved and to stop clients being locked out where network issues prevent them from receiving the new secret immediately.\n\n**Use Cases:**\n- Regular credential rotation for security compliance\n- Suspected credential compromise requiring immediate rotation\n",
+                "consumes": [
+                    "application/x-www-form-urlencoded"
+                ],
                 "tags": [
                     "auth"
                 ],
                 "summary": "Rotate Service Account Client Secret",
                 "parameters": [
                     {
-                        "description": "Service account credentials",
-                        "name": "request",
-                        "in": "body",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ServiceAccountTokenRequest"
-                        }
+                        "type": "string",
+                        "description": "Client ID",
+                        "name": "client_id",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Client secret",
+                        "name": "client_secret",
+                        "in": "formData",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -2405,23 +2414,51 @@
         },
         "/oauth/revoke": {
             "post": {
-                "description": "Revoke a refresh token or client secret to prevent it being used to create new access tokens (self-service)\n\n**Use Cases:**\n- **Web User Logout**: User wants to log out of their session\n- **Service Account Security**: Account no longer being used/compromised secret\n\n**Service Accounts:**\nYou must supply your `client ID` and `client secret` in the request body.\nThis revokes all client secrets for the service account, effectively disabling it.\n\n**IMPORTANT - Service Account Reinstatement:**\n- This endpoint does not permanently disable the service account itself (use `POST /admin/accounts/{account_id}/disable` for that)\n- To restore access, an admin must call `/api/auth/service-accounts/reissue_credentials` with the same organization and email\n- This will generate a new setup URL and client secret while preserving the same client_id\n- If the account was disabled by an admin, it must first be re-enabled via `POST /admin/accounts/{account_id}/enable`\n\n**Web Users (Logout):**\nThis endpoint expects a refresh token in an `http-only cookie`.\nThis revokes the user's refresh token, effectively logging them out.\n\nIf the refresh token has expired or been revoked, the user must login again to get a new one.\n\n**Note:** Any unexpired access tokens issued for the account will continue to work until they expire.\n",
+                "description": "Revokes credentials to prevent them being used to obtain new access tokens.\nThe request body must be `application/x-www-form-urlencoded` (RFC 6749).\nAny access tokens already issued remain valid until they expire (30 minutes).\n\n---\n\n**Service Accounts — `client_credentials` grant (logout / credential rotation)**\n\nInclude in the request body:\n- `grant_type=client_credentials`\n- `client_id=\u003cyour_client_id\u003e`\n- `client_secret=\u003cyour_client_secret\u003e`\n\nAlternatively, credentials may be supplied via HTTP Basic Auth (`Authorization: Basic base64(client_id:client_secret)`).\n\nRevokes **all** client secrets for the service account, which prevents any further token requests\nuntil an admin reissues credentials via `POST /api/auth/service-accounts/reissue_credentials`.\nThis does not permanently disable the account — use `POST /admin/accounts/{account_id}/disable` for that.\n\n---\n\n**Web Users — `refresh_token` grant (logout)**\n\nInclude in the request body:\n- `grant_type=refresh_token`\n\nThe refresh token is read automatically from the `refresh_token` HTTP-only cookie.\nNo additional form fields are required.\n\nRevokes the current refresh token. The user must log in again to obtain a new one.\n",
+                "consumes": [
+                    "application/x-www-form-urlencoded"
+                ],
                 "tags": [
                     "auth"
                 ],
-                "summary": "Revoke token",
+                "summary": "Revoke Token",
+                "parameters": [
+                    {
+                        "enum": [
+                            "client_credentials",
+                            "refresh_token"
+                        ],
+                        "type": "string",
+                        "description": "Grant type",
+                        "name": "grant_type",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Client ID (client_credentials grant only)",
+                        "name": "client_id",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Client secret (client_credentials grant only)",
+                        "name": "client_secret",
+                        "in": "formData"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK"
                     },
                     "400": {
-                        "description": "Invalid request body ",
+                        "description": "Missing or invalid grant_type",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Authentication failed ",
+                        "description": "Invalid credentials or missing refresh token cookie",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -2437,7 +2474,10 @@
         },
         "/oauth/token": {
             "post": {
-                "description": "**Client Credentials Grant (Service Accounts):**\n\nIssues new access token (in response body)\n\n- Set `grant_type=client_credentials` as URL parameter\n- Provide `client_id` and `client_secret` in request body\n- Access tokens expire after 30 minutes\n(subsequent requests using the token will fail with HTTP status 401 and an error_code of \"access_token_expired\")\n\n**Refresh Token Grant (Web Users):**\n\nIssues new access token (in response body) and rotates refresh token (HTTP-only cookie)\n\n- Set `grant_type=refresh_token` as URL parameter\n- Must have valid refresh token cookie\n- Access tokens expire after 30 minutes\n(subsequent requests using the token will fail with HTTP status 401 and an error_code of \"access_token_expired\")\n- Refresh tokens expire after 30 days\n- subsequent requests using the refresh token will fail with HTTP status 401 and an error_code of \"refresh_token_expired\" and users must login again to get a new one.\n",
+                "description": "Issues a new access token. The request body must be `application/x-www-form-urlencoded` (RFC 6749).\n\n---\n\n**Service Accounts — `client_credentials` grant**\n\nInclude in the request body:\n- `grant_type=client_credentials`\n- `client_id=\u003cyour_client_id\u003e`\n- `client_secret=\u003cyour_client_secret\u003e`\n\nAlternatively, credentials may be supplied via HTTP Basic Auth (`Authorization: Basic base64(client_id:client_secret)`).\n\nReturns a new access token in the response body. Access tokens expire after 30 minutes.\n\n---\n\n**Web Users — `refresh_token` grant**\n\nInclude in the request body:\n- `grant_type=refresh_token`\n\nThe refresh token is read automatically from the `refresh_token` HTTP-only cookie set during login.\nNo additional form fields are required.\n\nReturns a new access token in the response body. The rotated refresh token is set as a new HTTP-only cookie.\nAccess tokens expire after 30 minutes. Refresh tokens expire after 30 days — if the refresh token\nhas expired the user must log in again.\n",
+                "consumes": [
+                    "application/x-www-form-urlencoded"
+                ],
                 "tags": [
                     "auth"
                 ],
@@ -2449,18 +2489,22 @@
                             "refresh_token"
                         ],
                         "type": "string",
-                        "description": "grant type",
+                        "description": "Grant type",
                         "name": "grant_type",
-                        "in": "query",
+                        "in": "formData",
                         "required": true
                     },
                     {
-                        "description": "Service account credentials (required for client_credentials grant)",
-                        "name": "request",
-                        "in": "body",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.ServiceAccountTokenRequest"
-                        }
+                        "type": "string",
+                        "description": "Client ID (client_credentials grant only)",
+                        "name": "client_id",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Client secret (client_credentials grant only)",
+                        "name": "client_secret",
+                        "in": "formData"
                     }
                 ],
                 "responses": {
@@ -2471,13 +2515,13 @@
                         }
                     },
                     "400": {
-                        "description": "Invalid grant_type parameter ",
+                        "description": "Missing or invalid grant_type",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Authentication failed ",
+                        "description": "Invalid credentials or expired refresh token",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -3412,19 +3456,6 @@
                     "description": "seconds (1 year)",
                     "type": "integer",
                     "example": 31536000
-                }
-            }
-        },
-        "handlers.ServiceAccountTokenRequest": {
-            "type": "object",
-            "properties": {
-                "client_id": {
-                    "type": "string",
-                    "example": "sa_exampleorg_k7j2m9x1"
-                },
-                "client_secret": {
-                    "type": "string",
-                    "example": "dGhpcyBpcyBhIHNlY3JldA"
                 }
             }
         },

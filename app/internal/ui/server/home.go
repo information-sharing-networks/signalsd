@@ -8,6 +8,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
+	uiconfig "github.com/information-sharing-networks/signalsd/app/internal/ui/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
 )
 
@@ -160,11 +161,25 @@ func (s *Server) Register(w http.ResponseWriter, r *http.Request) {
 // Logout godoc
 //
 //	@Summary		Log out
-//	@Description	Clears session cookies and redirects to /login.
+//	@Description	Revokes the refresh token, clears session cookies, and redirects to /login.
 //	@Tags			HTMX Actions
 //	@Success		200	"HX-Redirect header"
 //	@Router			/logout [post]
 func (s *Server) Logout(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	// Revoke the refresh token on the backend. If this fails (e.g. already expired)
+	// we still proceed — the browser cookies are cleared regardless.
+	refreshTokenCookie, err := r.Cookie(uiconfig.RefreshTokenCookieName)
+	if err == nil {
+		if err := s.authService.RevokeToken(refreshTokenCookie); err != nil {
+			reqLogger.Warn("Failed to revoke refresh token during logout",
+				slog.String("component", "ui.Logout"),
+				slog.String("error", err.Error()),
+			)
+		}
+	}
+
 	s.authService.ClearAuthCookies(w)
 
 	// Redirect to login page

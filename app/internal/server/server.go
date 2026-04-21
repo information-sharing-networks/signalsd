@@ -215,12 +215,6 @@ func (s *Server) registerAdminRoutes() {
 
 				// get new access tokens
 				r.Post("/token", tokens.RefreshAccessToken)
-			})
-
-			r.Group(func(r chi.Router) {
-
-				// select the appropriate authentication method based on the user account type (user or service_account)
-				r.Use(s.authService.RequireAuthForCredentialType)
 
 				// revoke a client secret (service accounts) or refresh token (web users)
 				r.Post("/revoke", tokens.RevokeToken)
@@ -376,16 +370,6 @@ func (s *Server) registerSignalWriteRoutes() {
 		// batch status endpoints
 		r.Get("/api/batches/search", signalBatches.SearchBatches)
 		r.Get("/api/batches/{batch_ref}/status", signalBatches.GetSignalBatchStatus)
-	})
-
-	// Router signal endpoint: ISN is resolved by routing rules, not from the URL.
-	// RequireAccessPermission("write") is NOT used here - permission is checked in-handler
-	// after ISN resolution, via auth.CheckIsnWritePermission.
-	s.router.Group(func(r chi.Router) {
-		r.Use(middleware.CORS(s.corsConfigs.Protected))
-		r.Use(middleware.RequestSizeLimit(s.config.MaxSignalPayloadSize))
-		r.Use(s.authService.RequireValidAccessToken)
-		r.Post("/api/router/signal-types/{signal_type_slug}/v{sem_ver}/signals", routerSignals.RouteSignals)
 	})
 
 	// Router signal endpoint: ISN is resolved by routing rules, not from the URL.

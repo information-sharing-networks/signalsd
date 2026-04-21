@@ -11,11 +11,12 @@ package integration
 // Error response validation
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -308,25 +309,24 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 	})
 }
 
-// makeOAuthTokenRequest makes a POST request to /oauth/token
+// makeOAuthTokenRequest makes a POST request to /oauth/token with form-encoded body (RFC 6749).
+// grant_type and service account credentials are form fields; refresh tokens are sent as an
+// HTTP-only cookie (RFC 9700 §4 — browser-based app best practice).
 func makeOAuthTokenRequest(t *testing.T, baseURL, grantType string, payload map[string]string, refreshToken string) *http.Response {
 	t.Helper()
 
-	url := fmt.Sprintf("%s/oauth/token?grant_type=%s", baseURL, grantType)
-
-	body, err := json.Marshal(payload)
-	if err != nil {
-		t.Fatalf("Failed to marshal payload: %v", err)
+	form := url.Values{}
+	form.Set("grant_type", grantType)
+	for k, v := range payload {
+		form.Set(k, v)
 	}
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/oauth/token", baseURL), strings.NewReader(form.Encode()))
 	if err != nil {
 		t.Fatalf("Failed to create request: %v", err)
 	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	req.Header.Set("Content-Type", "application/json")
-
-	// Add refresh token cookie if provided
 	if refreshToken != "" {
 		req.AddCookie(&http.Cookie{
 			Name:  signalsd.RefreshTokenCookieName,
@@ -344,29 +344,23 @@ func makeOAuthTokenRequest(t *testing.T, baseURL, grantType string, payload map[
 	return resp
 }
 
-// makeOAuthRevokeRequest makes a POST request to /oauth/revoke
+// makeOAuthRevokeRequest makes a POST request to /oauth/revoke with form-encoded body (RFC 6749).
+// grant_type and service account credentials are form fields; refresh tokens are sent as an
+// HTTP-only cookie (RFC 9700 §4 — browser-based app best practice).
 func makeOAuthRevokeRequest(t *testing.T, baseURL string, payload map[string]string, refreshToken string) *http.Response {
 	t.Helper()
 
-	url := fmt.Sprintf("%s/oauth/revoke", baseURL)
-
-	var body []byte
-	if payload != nil {
-		var err error
-		body, err = json.Marshal(payload)
-		if err != nil {
-			t.Fatalf("Failed to marshal payload: %v", err)
-		}
+	form := url.Values{}
+	for k, v := range payload {
+		form.Set(k, v)
 	}
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/oauth/revoke", baseURL), strings.NewReader(form.Encode()))
 	if err != nil {
 		t.Fatalf("Failed to create request: %v", err)
 	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	req.Header.Set("Content-Type", "application/json")
-
-	// Add refresh token cookie if provided
 	if refreshToken != "" {
 		req.AddCookie(&http.Cookie{
 			Name:  signalsd.RefreshTokenCookieName,
@@ -395,7 +389,7 @@ func makeLoginRequest(t *testing.T, baseURL string, payload map[string]string) *
 		t.Fatalf("Failed to marshal payload: %v", err)
 	}
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	req, err := http.NewRequest("POST", url, strings.NewReader(string(body)))
 	if err != nil {
 		t.Fatalf("Failed to create request: %v", err)
 	}
@@ -472,7 +466,12 @@ func TestOAuthRevokeEndpoint(t *testing.T) {
 		}
 
 		// Test revoke with valid credentials (service accounts use client credentials, not access token)
-		revokeResponse := makeOAuthRevokeRequest(t, testEnv.baseURL, tokenPayload, "")
+		revokePayload := map[string]string{
+			"grant_type":    "client_credentials",
+			"client_id":     serviceAccountDetails.ClientID,
+			"client_secret": clientSecret,
+		}
+		revokeResponse := makeOAuthRevokeRequest(t, testEnv.baseURL, revokePayload, "")
 		defer revokeResponse.Body.Close()
 
 		if revokeResponse.StatusCode != http.StatusOK {
@@ -520,7 +519,7 @@ func TestOAuthRevokeEndpoint(t *testing.T) {
 		}
 
 		// Test revoke with valid refresh token
-		revokeResponse := makeOAuthRevokeRequest(t, testEnv.baseURL, nil, refreshTokenCookie.Value)
+		revokeResponse := makeOAuthRevokeRequest(t, testEnv.baseURL, map[string]string{"grant_type": "refresh_token"}, refreshTokenCookie.Value)
 		defer revokeResponse.Body.Close()
 
 		if revokeResponse.StatusCode != http.StatusOK {

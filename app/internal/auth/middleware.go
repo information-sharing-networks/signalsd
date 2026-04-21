@@ -2,7 +2,6 @@ package auth
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -17,11 +16,6 @@ import (
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/jackc/pgx/v5"
 )
-
-type ServiceAccountTokenRequest struct {
-	ClientID     string `json:"client_id" example:"sa_example-org_k7j2m9x1"`
-	ClientSecret string `json:"client_secret" example:"dGhpcyBpcyBhIHNlY3JldA"`
-}
 
 // RequireValidAccessToken checks that the supplied access token is well formed, correctly signed and has not expired.
 //
@@ -119,7 +113,7 @@ func (a *AuthService) RequireValidAccessToken(next http.Handler) http.Handler {
 // This middleware should be called before allowing an account to get a new access token (/oauth/token)
 func (a *AuthService) RequireAuthByGrantType(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		grantType := r.URL.Query().Get("grant_type")
+		grantType := r.PostFormValue("grant_type")
 
 		switch grantType {
 		case "client_credentials":
@@ -133,37 +127,15 @@ func (a *AuthService) RequireAuthByGrantType(next http.Handler) http.Handler {
 	})
 }
 
-// RequireAuthForCredentialType - checks auth before revoking a refresh token.
-//
-// the authentication method is determined based on request structure:
-//   - If refresh token cookie is present: Web user - RequireValidRefreshToken
-//   - If no refresh token cookie: Service account - RequireValidClientCredentials
-//
-// This middleware should be called before allowing an account to revoke a refresh token or client secret.
-func (a *AuthService) RequireAuthForCredentialType(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Check for refresh token cookie to determine if this is a web user request
-		_, err := r.Cookie(signalsd.RefreshTokenCookieName)
-
-		if err == nil {
-			// Web user request: Has refresh token cookie
-			a.RequireValidRefreshToken(next).ServeHTTP(w, r)
-		} else {
-			// Service account request: No refresh token cookie
-			a.RequireValidClientCredentials(next).ServeHTTP(w, r)
-		}
-	})
-}
-
 // RequireValidRefreshToken checks that the refresh token is present, not expired and not revoked.
 //
-// The refresh token is retieved from the cookie named [ignalsd.RefreshTokenCookieName].
+// # The refresh token is read from the HTTP-only cookie
 //
 // If the token is valid, the userAccountID, accountType, and hashedRefreshToken are added to the Context.
 func (a *AuthService) RequireValidRefreshToken(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		// extract the refresh token from the cookie
+		// extract the refresh token
 		cookie, err := r.Cookie(signalsd.RefreshTokenCookieName)
 		if err != nil {
 			if err == http.ErrNoCookie {
@@ -230,23 +202,26 @@ func (a *AuthService) RequireValidRefreshToken(next http.Handler) http.Handler {
 func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-		var req ServiceAccountTokenRequest
+		var clientID, clientSecret string
 
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
-			return
-
+		// RFC 6749 §2.3.1: support HTTP Basic Auth or form body
+		if id, secret, ok := r.BasicAuth(); ok {
+			clientID = id
+			clientSecret = secret
+		} else {
+			clientID = r.PostFormValue("client_id")
+			clientSecret = r.PostFormValue("client_secret")
 		}
 
-		if req.ClientID == "" || req.ClientSecret == "" {
+		if clientID == "" || clientSecret == "" {
 			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "client_id and client_secret are required")
 			return
 		}
 
-		serviceAccount, err := a.queries.GetServiceAccountByClientID(r.Context(), req.ClientID)
+		serviceAccount, err := a.queries.GetServiceAccountByClientID(r.Context(), clientID)
 		if err != nil {
 			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("invalid_client_id", req.ClientID),
+				slog.String("invalid_client_id", clientID),
 			)
 
 			responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "invalid client_id")
@@ -258,7 +233,7 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 		if err != nil {
 			if err == sql.ErrNoRows {
 				logger.ContextWithLogAttrs(r.Context(),
-					slog.String("client_id", req.ClientID),
+					slog.String("client_id", clientID),
 					slog.String("error", err.Error()),
 				)
 
@@ -266,7 +241,7 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 				return
 			}
 			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("client_id", req.ClientID),
+				slog.String("client_id", clientID),
 				slog.String("error", err.Error()),
 			)
 
@@ -276,7 +251,7 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 
 		if !account.IsActive {
 			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("client_id", req.ClientID),
+				slog.String("client_id", clientID),
 				slog.String("account_id", serviceAccount.AccountID.String()),
 			)
 
@@ -285,13 +260,12 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 		}
 
 		// check the client secret
-		hashedSecret := a.HashToken(req.ClientSecret)
+		hashedSecret := a.HashToken(clientSecret)
 
 		_, err = a.queries.GetValidClientSecretByHashedSecret(r.Context(), hashedSecret)
 		if err != nil {
-			// Add context for final request log
 			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("client_id", req.ClientID),
+				slog.String("client_id", clientID),
 			)
 
 			responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "invalid client secret")
@@ -303,13 +277,13 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 		// Log successful client credentials validation
 		reqLogger.Debug("Client credentials validation successful",
 			slog.String("component", "signalsd.RequireValidClientCredentials"),
-			slog.String("client_id", req.ClientID),
+			slog.String("client_id", clientID),
 			slog.String("account_id", serviceAccount.AccountID.String()),
 		)
 
 		// Add context for final request log
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("client_id", req.ClientID),
+			slog.String("client_id", clientID),
 			slog.String("account_id", serviceAccount.AccountID.String()),
 		)
 

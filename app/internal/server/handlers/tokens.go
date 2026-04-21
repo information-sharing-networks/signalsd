@@ -17,11 +17,6 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 )
 
-type ServiceAccountTokenRequest struct {
-	ClientID     string `json:"client_id" example:"sa_exampleorg_k7j2m9x1"`
-	ClientSecret string `json:"client_secret" example:"dGhpcyBpcyBhIHNlY3JldA"`
-}
-
 type ServiceAccountRotateResponse struct {
 	ClientID     string `json:"client_id" example:"sa_exampleorg_k7j2m9x1"`
 	ClientSecret string `json:"client_secret" example:"dGhpcyBpcyBhIHNlY3JldA"`
@@ -49,43 +44,47 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, p
 //
 //	@Summary	Refresh Access Token
 //	@Description
-//	@Description	**Client Credentials Grant (Service Accounts):**
+//	@Description	Issues a new access token. The request body must be `application/x-www-form-urlencoded` (RFC 6749).
 //	@Description
-//	@Description	Issues new access token (in response body)
+//	@Description	---
 //	@Description
-//	@Description	- Set `grant_type=client_credentials` as URL parameter
-//	@Description	- Provide `client_id` and `client_secret` in request body
-//	@Description	- Access tokens expire after 30 minutes
-//	@Description	(subsequent requests using the token will fail with HTTP status 401 and an error_code of "access_token_expired")
+//	@Description	**Service Accounts — `client_credentials` grant**
 //	@Description
-//	@Description	**Refresh Token Grant (Web Users):**
+//	@Description	Include in the request body:
+//	@Description	- `grant_type=client_credentials`
+//	@Description	- `client_id=<your_client_id>`
+//	@Description	- `client_secret=<your_client_secret>`
 //	@Description
-//	@Description	Issues new access token (in response body) and rotates refresh token (HTTP-only cookie)
+//	@Description	Alternatively, credentials may be supplied via HTTP Basic Auth (`Authorization: Basic base64(client_id:client_secret)`).
 //	@Description
-//	@Description	- Set `grant_type=refresh_token` as URL parameter
-//	@Description	- Must have valid refresh token cookie
-//	@Description	- Access tokens expire after 30 minutes
-//	@Description	(subsequent requests using the token will fail with HTTP status 401 and an error_code of "access_token_expired")
-//	@Description	- Refresh tokens expire after 30 days
-//	@Description	- subsequent requests using the refresh token will fail with HTTP status 401 and an error_code of "refresh_token_expired" and users must login again to get a new one.
+//	@Description	Returns a new access token in the response body. Access tokens expire after 30 minutes.
+//	@Description
+//	@Description	---
+//	@Description
+//	@Description	**Web Users — `refresh_token` grant**
+//	@Description
+//	@Description	Include in the request body:
+//	@Description	- `grant_type=refresh_token`
+//	@Description
+//	@Description	The refresh token is read automatically from the `refresh_token` HTTP-only cookie set during login.
+//	@Description	No additional form fields are required.
+//	@Description
+//	@Description	Returns a new access token in the response body. The rotated refresh token is set as a new HTTP-only cookie.
+//	@Description	Access tokens expire after 30 minutes. Refresh tokens expire after 30 days — if the refresh token
+//	@Description	has expired the user must log in again.
 //	@Description
 //	@Tags		auth
+//	@Accept		x-www-form-urlencoded
 //
-//	@Param		grant_type	query		string						true	"grant type"	Enums(client_credentials, refresh_token)
-//	@Param		request		body		ServiceAccountTokenRequest	false	"Service account credentials (required for client_credentials grant)"
+//	@Param		grant_type		formData	string	true	"Grant type"	Enums(client_credentials, refresh_token)
+//	@Param		client_id		formData	string	false	"Client ID (client_credentials grant only)"
+//	@Param		client_secret	formData	string	false	"Client secret (client_credentials grant only)"
 //
-//	@Success	200			{object}	auth.AccessTokenResponse
-//	@Failure	400			{object}	responses.ErrorResponse	"Invalid grant_type parameter "
-//	@Failure	401			{object}	responses.ErrorResponse	"Authentication failed "
-//
+//	@Success	200				{object}	auth.AccessTokenResponse
+//	@Failure	400				{object}	responses.ErrorResponse	"Missing or invalid grant_type"
+//	@Failure	401				{object}	responses.ErrorResponse	"Invalid credentials or expired refresh token"
 //
 //	@Router		/oauth/token [post]
-//
-// RefreshAccessToken handles requests for both service accounts and web users.
-// For web users, a new refresh tokens is sent as http-only cookies whenever the client uses this endpoint.
-//
-// Must be called with the AuthenticateByGrantTypAuthenticateByGrantTypee middleware.
-// This calls the appropriate authentication middleware for the grant_type (client_credentials or refresh_token)) and adds the authenticated accountID to the context
 func (a *TokenHandler) RefreshAccessToken(w http.ResponseWriter, r *http.Request) {
 
 	accountID, ok := auth.ContextAccountID(r.Context())
@@ -141,41 +140,52 @@ func (a *TokenHandler) RefreshAccessToken(w http.ResponseWriter, r *http.Request
 
 // RevokeToken godoc
 //
-//	@Summary		Revoke token
-//	@Description	Revoke a refresh token or client secret to prevent it being used to create new access tokens (self-service)
+//	@Summary	Revoke Token
 //	@Description
-//	@Description	**Use Cases:**
-//	@Description	- **Web User Logout**: User wants to log out of their session
-//	@Description	- **Service Account Security**: Account no longer being used/compromised secret
+//	@Description	Revokes credentials to prevent them being used to obtain new access tokens.
+//	@Description	The request body must be `application/x-www-form-urlencoded` (RFC 6749).
+//	@Description	Any access tokens already issued remain valid until they expire (30 minutes).
 //	@Description
-//	@Description	**Service Accounts:**
-//	@Description	You must supply your `client ID` and `client secret` in the request body.
-//	@Description	This revokes all client secrets for the service account, effectively disabling it.
+//	@Description	---
 //	@Description
-//	@Description	**IMPORTANT - Service Account Reinstatement:**
-//	@Description	- This endpoint does not permanently disable the service account itself (use `POST /admin/accounts/{account_id}/disable` for that)
-//	@Description	- To restore access, an admin must call `/api/auth/service-accounts/reissue_credentials` with the same organization and email
-//	@Description	- This will generate a new setup URL and client secret while preserving the same client_id
-//	@Description	- If the account was disabled by an admin, it must first be re-enabled via `POST /admin/accounts/{account_id}/enable`
+//	@Description	**Service Accounts — `client_credentials` grant (logout / credential rotation)**
 //	@Description
-//	@Description	**Web Users (Logout):**
-//	@Description	This endpoint expects a refresh token in an `http-only cookie`.
-//	@Description	This revokes the user's refresh token, effectively logging them out.
+//	@Description	Include in the request body:
+//	@Description	- `grant_type=client_credentials`
+//	@Description	- `client_id=<your_client_id>`
+//	@Description	- `client_secret=<your_client_secret>`
 //	@Description
-//	@Description	If the refresh token has expired or been revoked, the user must login again to get a new one.
+//	@Description	Alternatively, credentials may be supplied via HTTP Basic Auth (`Authorization: Basic base64(client_id:client_secret)`).
 //	@Description
-//	@Description	**Note:** Any unexpired access tokens issued for the account will continue to work until they expire.
+//	@Description	Revokes **all** client secrets for the service account, which prevents any further token requests
+//	@Description	until an admin reissues credentials via `POST /api/auth/service-accounts/reissue_credentials`.
+//	@Description	This does not permanently disable the account — use `POST /admin/accounts/{account_id}/disable` for that.
+//	@Description
+//	@Description	---
+//	@Description
+//	@Description	**Web Users — `refresh_token` grant (logout)**
+//	@Description
+//	@Description	Include in the request body:
+//	@Description	- `grant_type=refresh_token`
+//	@Description
+//	@Description	The refresh token is read automatically from the `refresh_token` HTTP-only cookie.
+//	@Description	No additional form fields are required.
+//	@Description
+//	@Description	Revokes the current refresh token. The user must log in again to obtain a new one.
 //	@Description
 //	@Tags		auth
+//	@Accept		x-www-form-urlencoded
+//
+//	@Param		grant_type		formData	string	true	"Grant type"	Enums(client_credentials, refresh_token)
+//	@Param		client_id		formData	string	false	"Client ID (client_credentials grant only)"
+//	@Param		client_secret	formData	string	false	"Client secret (client_credentials grant only)"
 //
 //	@Success	200
-//	@Failure	400	{object}	responses.ErrorResponse	"Invalid request body "
-//	@Failure	401	{object}	responses.ErrorResponse	"Authentication failed "
+//	@Failure	400	{object}	responses.ErrorResponse	"Missing or invalid grant_type"
+//	@Failure	401	{object}	responses.ErrorResponse	"Invalid credentials or missing refresh token cookie"
 //	@Failure	404	{object}	responses.ErrorResponse	"Token not found or already revoked"
 //
 //	@Router		/oauth/revoke [post]
-//
-// Use with AuthenticateByCredentalType middleware which will ensure the requestor is authenticated and add the accountID and accountType to the context
 func (a *TokenHandler) RevokeToken(w http.ResponseWriter, r *http.Request) {
 	accountType, ok := auth.ContextAccountType(r.Context())
 	if !ok {
@@ -290,11 +300,14 @@ func (a *TokenHandler) RevokeRefreshToken(w http.ResponseWriter, r *http.Request
 //	@Description
 //	@Tags		auth
 //
-//	@Param		request	body		ServiceAccountTokenRequest	false	"Service account credentials"
+//	@Accept		x-www-form-urlencoded
 //
-//	@Success	200		{object}	ServiceAccountRotateResponse
-//	@Failure	401		{object}	responses.ErrorResponse	"Authentication failed"
-//	@Failure	500		{object}	responses.ErrorResponse	"Internal server error"
+//	@Param		client_id		formData	string	true	"Client ID"
+//	@Param		client_secret	formData	string	true	"Client secret"
+//
+//	@Success	200				{object}	ServiceAccountRotateResponse
+//	@Failure	401				{object}	responses.ErrorResponse	"Authentication failed"
+//	@Failure	500				{object}	responses.ErrorResponse	"Internal server error"
 //
 //	@Router		/api/auth/service-accounts/rotate-secret [post]
 func (a *TokenHandler) RotateServiceAccountSecret(w http.ResponseWriter, r *http.Request) {
