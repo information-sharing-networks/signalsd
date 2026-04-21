@@ -76,8 +76,6 @@ jobs:
           --build-arg VERSION=${VERSION} \
           --build-arg BUILD_DATE=${BUILD_DATE} \
           --build-arg GIT_COMMIT=${GIT_COMMIT} \
-          --cache-from type=registry,ref=${REGISTRY}/signalsd:buildcache \
-          --cache-to   type=registry,ref=${REGISTRY}/signalsd:buildcache,mode=max \
           --push \
           -t ${REGISTRY}/signalsd:staging-${{ github.sha }} \
           -t ${REGISTRY}/signalsd:staging-latest \
