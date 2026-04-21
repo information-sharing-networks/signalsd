@@ -44,7 +44,7 @@ jobs:
     environment: staging
     timeout-minutes: 30
     # Only run if the CI workflow succeeded
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       - name: Check out code
@@ -92,6 +92,8 @@ jobs:
           --build-arg VERSION=${VERSION} \
           --build-arg BUILD_DATE=${BUILD_DATE} \
           --build-arg GIT_COMMIT=${GIT_COMMIT} \
+          --cache-from type=registry,ref=${REGISTRY}:buildcache \
+          --cache-to   type=registry,ref=${REGISTRY}:buildcache,mode=max \
           --push \
           -t ${REGISTRY}:staging-${{ github.sha }} \
           -t ${REGISTRY}:staging-latest \

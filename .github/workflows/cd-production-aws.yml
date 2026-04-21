@@ -1,0 +1,186 @@
+# Deploy to AWS production environment on version tags
+name: Deploy to AWS Production
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  id-token: write    # Required for OIDC token request to AWS
+  contents: read
+
+env:
+  ENVIRONMENT: prod
+  LOG_LEVEL: info
+  REGION: eu-west-1
+
+jobs:
+  deploy:
+    name: Deploy to AWS Production
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0  # Fetch all history including tags
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: app/go.mod
+          cache: true
+          cache-dependency-path: app/go.sum
+
+      - name: Download Go modules
+        run: cd app && go mod download
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.REGION }}
+
+      - name: Promote staging image to production
+        run: |
+          # Re-tag the staging image in ECR without pulling or pushing layers.
+          # Fails fast if the staging image doesn't exist (i.e. staging was never deployed).
+          MANIFEST=$(aws ecr batch-get-image \
+            --repository-name signalsd \
+            --image-ids imageTag=staging-${{ github.sha }} \
+            --region ${{ env.REGION }} \
+            --query 'images[0].imageManifest' --output text)
+
+          if [ -z "$MANIFEST" ] || [ "$MANIFEST" = "None" ]; then
+            echo "Error: staging image staging-${{ github.sha }} not found in ECR"
+            exit 1
+          fi
+
+          aws ecr put-image --repository-name signalsd \
+            --region ${{ env.REGION }} \
+            --image-tag ${{ github.sha }} \
+            --image-manifest "$MANIFEST"
+
+          aws ecr put-image --repository-name signalsd \
+            --region ${{ env.REGION }} \
+            --image-tag latest \
+            --image-manifest "$MANIFEST"
+
+      - name: Run migrations
+        working-directory: app
+        run: |
+          DATABASE_URL=$(aws secretsmanager get-secret-value \
+            --secret-id "signalsd/prod/database-url" \
+            --query SecretString --output text)
+          go tool goose -dir sql/schema postgres "$DATABASE_URL" up
+
+      - name: Deploy to App Runner
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          REGISTRY="${ACCOUNT_ID}.dkr.ecr.${{ env.REGION }}.amazonaws.com"
+          ECR_ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/apprunner-ecr-access"
+
+          # Look up service ARN by name — no need to store it in GitHub
+          SERVICE_ARN=$(aws apprunner list-services \
+            --query "ServiceSummaryList[?ServiceName=='signalsd'].ServiceArn" \
+            --output text \
+            --region ${{ env.REGION }})
+
+          # Resolve secret ARNs from Secrets Manager by name
+          DB_SECRET_ARN=$(aws secretsmanager describe-secret \
+            --secret-id "signalsd/prod/database-url" \
+            --query ARN --output text)
+          SK_SECRET_ARN=$(aws secretsmanager describe-secret \
+            --secret-id "signalsd/prod/secret-key" \
+            --query ARN --output text)
+
+          # Fetch non-sensitive config from SSM Parameter Store
+          PUBLIC_BASE_URL=$(aws ssm get-parameter \
+            --name "/signalsd/prod/public-base-url" \
+            --query 'Parameter.Value' --output text)
+          ALLOWED_ORIGINS=$(aws ssm get-parameter \
+            --name "/signalsd/prod/allowed-origins" \
+            --query 'Parameter.Value' --output text)
+
+          # Write source configuration to a temp file (avoids inline JSON escaping issues).
+          # The file:// prefix tells the AWS CLI to read from disk.
+          cat > /tmp/source-config.json << EOF
+          {
+            "ImageRepository": {
+              "ImageIdentifier": "${REGISTRY}/signalsd:${{ github.sha }}",
+              "ImageConfiguration": {
+                "Port": "8080",
+                "RuntimeEnvironmentVariables": {
+                  "ENVIRONMENT": "${{ env.ENVIRONMENT }}",
+                  "LOG_LEVEL": "${{ env.LOG_LEVEL }}",
+                  "PUBLIC_BASE_URL": "${PUBLIC_BASE_URL}",
+                  "ALLOWED_ORIGINS": "${ALLOWED_ORIGINS}"
+                },
+                "RuntimeEnvironmentSecrets": {
+                  "DATABASE_URL": "${DB_SECRET_ARN}",
+                  "SECRET_KEY": "${SK_SECRET_ARN}"
+                }
+              },
+              "ImageRepositoryType": "ECR"
+            },
+            "AuthenticationConfiguration": {
+              "AccessRoleArn": "${ECR_ROLE_ARN}"
+            },
+            "AutoDeploymentsEnabled": false
+          }
+          EOF
+          chmod 600 /tmp/source-config.json
+
+          # Add optional tuning vars from SSM if present
+          for PARAM in DB_MAX_CONNECTIONS DB_MIN_CONNECTIONS DB_MAX_CONN_LIFETIME \
+              DB_MAX_CONN_IDLE_TIME DB_CONNECT_TIMEOUT RATE_LIMIT_RPS RATE_LIMIT_BURST \
+              MAX_SIGNAL_PAYLOAD_SIZE READ_TIMEOUT WRITE_TIMEOUT IDLE_TIMEOUT; do
+            if VALUE=$(aws ssm get-parameter \
+              --name "/signalsd/prod/${PARAM}" \
+              --query 'Parameter.Value' --output text 2>/dev/null); then
+              jq --arg k "$PARAM" --arg v "$VALUE" \
+                '.ImageRepository.ImageConfiguration.RuntimeEnvironmentVariables[$k] = $v' \
+                /tmp/source-config.json > /tmp/tmp.json && mv /tmp/tmp.json /tmp/source-config.json
+            fi
+          done
+
+          # Start the deployment
+          aws apprunner update-service \
+            --service-arn "$SERVICE_ARN" \
+            --source-configuration file:///tmp/source-config.json \
+            --region ${{ env.REGION }}
+
+          # Poll until deployment completes — App Runner's update-service returns
+          # immediately (unlike gcloud run deploy which blocks), so we must wait.
+          echo "Waiting for deployment..."
+          TIMEOUT=600
+          ELAPSED=0
+          while true; do
+            STATUS=$(aws apprunner describe-service \
+              --service-arn "$SERVICE_ARN" \
+              --region ${{ env.REGION }} \
+              --query 'Service.Status' --output text)
+            echo "  Status: $STATUS"
+            case "$STATUS" in
+              RUNNING)
+                echo "Deployment complete"
+                break
+                ;;
+              OPERATION_IN_PROGRESS)
+                if [ $ELAPSED -ge $TIMEOUT ]; then
+                  echo "Deployment timed out after ${TIMEOUT}s"
+                  exit 1
+                fi
+                sleep 15
+                ELAPSED=$((ELAPSED + 15))
+                ;;
+              *)
+                echo "Deployment failed with status: $STATUS"
+                exit 1
+                ;;
+            esac
+          done

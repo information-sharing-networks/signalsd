@@ -1,6 +1,6 @@
 package apperrors
 
-// ErrorCode represents a specific error condition - used in either the backend API or client
+// ErrorCode represents a specific error condition - used in the backend API
 type ErrorCode string
 
 const (
