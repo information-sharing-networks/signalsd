@@ -81,6 +81,19 @@ jobs:
           -t ${REGISTRY}/signalsd:staging-latest \
           .
 
+      - name: Open RDS access for runner
+        run: |
+          RDS_SG=$(aws ec2 describe-security-groups \
+            --region ${{ env.REGION }} \
+            --filters Name=tag:Project,Values=signalsd Name=group-name,Values=signalsd-rds \
+            --query 'SecurityGroups[0].GroupId' --output text)
+          RUNNER_IP=$(curl -s https://checkip.amazonaws.com)
+          echo "RDS_SG=$RDS_SG" >> $GITHUB_ENV
+          echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+          aws ec2 authorize-security-group-ingress \
+            --group-id "$RDS_SG" --protocol tcp --port 5432 \
+            --cidr "${RUNNER_IP}/32" --region ${{ env.REGION }}
+
       - name: Run migrations
         working-directory: app
         run: |
@@ -88,6 +101,13 @@ jobs:
             --secret-id "signalsd/staging/database-url" \
             --query SecretString --output text)
           go tool goose -dir sql/schema postgres "$DATABASE_URL" up
+
+      - name: Close RDS access for runner
+        if: always()
+        run: |
+          aws ec2 revoke-security-group-ingress \
+            --group-id "$RDS_SG" --protocol tcp --port 5432 \
+            --cidr "${RUNNER_IP}/32" --region ${{ env.REGION }}
 
       - name: Deploy to App Runner
         run: |
