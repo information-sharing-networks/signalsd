@@ -43,6 +43,10 @@ import (
 //	@description
 //	@description	Individual endpoints document their specific business logic errors.
 //	@description
+//	@description	Standard error responses include a JSON response body containing `error_code` and `error_description` fields
+//	@description
+//	@description	The /oauth endpoints include an additional `error` field - this contains the RFC6749 standard error code.
+//	@description
 //	@description	## Request Limits
 //	@description	All endpoints are protected by:
 //	@description	- **Rate limiting**: Configurable requests per second

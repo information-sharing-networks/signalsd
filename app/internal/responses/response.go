@@ -45,9 +45,15 @@ const (
 // OAuthErrorResponse is the RFC 6749 §5.2 token endpoint error response.
 // ErrorCode is an extension field that mirrors the internal error_code
 type OAuthErrorResponse struct {
-	Error            string              `json:"error"`
-	ErrorDescription string              `json:"error_description,omitempty"`
-	ErrorCode        apperrors.ErrorCode `json:"error_code,omitempty"`
+
+	// Error is the RFC 6749 §5.2 token endpoint error code
+	Error string `json:"error" example:"invalid_grant"`
+
+	// ErrorCode contains the internal app error code
+	ErrorCode apperrors.ErrorCode `json:"error_code,omitempty" example:"refresh_token_invalid"`
+
+	// ErrorDescripton contains the detailed description
+	ErrorDescription string `json:"error_description,omitempty" example:"session expired, please log in again"`
 }
 
 // RespondWithOAuthError writes an RFC 6749 §5.2 compliant error response.
