@@ -117,8 +117,8 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 				}
 
 				if tt.wantErr {
-					if _, hasErrorCode := responseBody["error_code"]; !hasErrorCode {
-						t.Error("Expected error_code in error response")
+					if _, hasError := responseBody["error"]; !hasError {
+						t.Error("Expected error field in RFC 6749 error response")
 					}
 					return
 				}
@@ -187,7 +187,7 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 				// the previous sucessful refresh should have revoked the original refresh token
 				name:           "revoked refresh_token",
 				cookie:         originaRefreshTokenCookie,
-				expectedStatus: http.StatusUnauthorized,
+				expectedStatus: http.StatusBadRequest,
 				wantErr:        true,
 			},
 			{
@@ -203,7 +203,7 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 					Value: "invalid-token",
 					Path:  "/",
 				},
-				expectedStatus: http.StatusUnauthorized,
+				expectedStatus: http.StatusBadRequest,
 				wantErr:        true,
 			},
 		}
@@ -229,8 +229,8 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 				}
 
 				if tt.wantErr {
-					if _, hasErrorCode := responseBody["error_code"]; !hasErrorCode {
-						t.Error("Expected error_code in error response")
+					if _, hasError := responseBody["error"]; !hasError {
+						t.Error("Expected error field in RFC 6749 error response")
 						return
 					}
 					return
@@ -303,8 +303,8 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 			t.Fatalf("Failed to decode response: %v", err)
 		}
 
-		if _, hasErrorCode := responseBody["error_code"]; !hasErrorCode {
-			t.Error("Expected error_code in error response")
+		if _, hasError := responseBody["error"]; !hasError {
+			t.Error("Expected error field in RFC 6749 error response")
 		}
 	})
 }
@@ -530,8 +530,8 @@ func TestOAuthRevokeEndpoint(t *testing.T) {
 		retryResponse := makeOAuthTokenRequest(t, testEnv.baseURL, "refresh_token", nil, refreshTokenCookie.Value)
 		defer retryResponse.Body.Close()
 
-		if retryResponse.StatusCode != http.StatusUnauthorized {
-			t.Errorf("Expected revoked refresh token to fail with 401, got %d", retryResponse.StatusCode)
+		if retryResponse.StatusCode != http.StatusBadRequest {
+			t.Errorf("Expected revoked refresh token to fail with 400, got %d", retryResponse.StatusCode)
 		}
 	})
 }

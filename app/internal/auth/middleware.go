@@ -103,14 +103,14 @@ func (a *AuthService) RequireValidAccessToken(next http.Handler) http.Handler {
 	})
 }
 
-// RequireAuthByGrantType - checks authentiation before issuing a new access token.
+// RequireAuthByGrantType - checks authentication before issuing a new access token.
 //
-// The funciton calls the appropriate authentication middleware based on the grant_type URL param:
+// The function calls the appropriate authentication middleware based on the grant_type form field (RFC 6749):
 //
 //   - grant_type = client_credentials: service accounts - RequireValidClientCredentials
 //   - grant_type = refresh_token: web users - RequireValidRefreshToken
 //
-// This middleware should be called before allowing an account to get a new access token (/oauth/token)
+// This middleware should be called before allowing an account to get a new access token (/oauth/token) or revoke a token (/oauth/revoke)
 func (a *AuthService) RequireAuthByGrantType(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		grantType := r.PostFormValue("grant_type")
@@ -121,7 +121,7 @@ func (a *AuthService) RequireAuthByGrantType(next http.Handler) http.Handler {
 		case "refresh_token":
 			a.RequireValidRefreshToken(next).ServeHTTP(w, r)
 		default:
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "invalid grant_type parameter")
+			responses.RespondWithOAuthError(w, r, http.StatusBadRequest, responses.OAuthErrUnsupportedGrantType, "grant_type must be client_credentials or refresh_token", apperrors.ErrCodeInvalidRequest)
 			return
 		}
 	})
@@ -139,7 +139,7 @@ func (a *AuthService) RequireValidRefreshToken(next http.Handler) http.Handler {
 		cookie, err := r.Cookie(signalsd.RefreshTokenCookieName)
 		if err != nil {
 			if err == http.ErrNoCookie {
-				responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeRefreshTokenInvalid, "unauthorised: refresh_token cookie not found")
+				responses.RespondWithOAuthError(w, r, http.StatusBadRequest, responses.OAuthErrInvalidGrant, "refresh_token cookie not found", apperrors.ErrCodeRefreshTokenInvalid)
 				return
 			}
 			logger.ContextWithLogAttrs(r.Context(),
@@ -157,7 +157,7 @@ func (a *AuthService) RequireValidRefreshToken(next http.Handler) http.Handler {
 		refreshTokenRow, err := a.queries.GetValidRefreshTokenByHashedToken(r.Context(), hashedToken)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeRefreshTokenInvalid, "unauthorised: session expired, please log in again")
+				responses.RespondWithOAuthError(w, r, http.StatusBadRequest, responses.OAuthErrInvalidGrant, "session expired, please log in again", apperrors.ErrCodeRefreshTokenInvalid)
 				return
 			}
 			logger.ContextWithLogAttrs(r.Context(),
@@ -214,7 +214,7 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 		}
 
 		if clientID == "" || clientSecret == "" {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "client_id and client_secret are required")
+			responses.RespondWithOAuthError(w, r, http.StatusBadRequest, responses.OAuthErrInvalidRequest, "client_id and client_secret are required", apperrors.ErrCodeInvalidRequest)
 			return
 		}
 
@@ -224,7 +224,7 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 				slog.String("invalid_client_id", clientID),
 			)
 
-			responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "invalid client_id")
+			responses.RespondWithOAuthError(w, r, http.StatusUnauthorized, responses.OAuthErrInvalidClient, "invalid client_id", apperrors.ErrCodeAuthenticationFailure)
 			return
 		}
 
@@ -255,7 +255,7 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 				slog.String("account_id", serviceAccount.AccountID.String()),
 			)
 
-			responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "account is disabled")
+			responses.RespondWithOAuthError(w, r, http.StatusUnauthorized, responses.OAuthErrInvalidClient, "account is disabled", apperrors.ErrCodeAuthorizationFailure)
 			return
 		}
 
@@ -268,7 +268,7 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 				slog.String("client_id", clientID),
 			)
 
-			responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "invalid client secret")
+			responses.RespondWithOAuthError(w, r, http.StatusUnauthorized, responses.OAuthErrInvalidClient, "invalid client secret", apperrors.ErrCodeAuthenticationFailure)
 			return
 		}
 

@@ -81,11 +81,11 @@ func (a *AuthService) RefreshToken(refreshTokenCookie *http.Cookie) (*types.Acce
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		var errorResp types.BackendErrorResponse
+		var errorResp types.OAuthErrorResponse
 		if err := json.NewDecoder(res.Body).Decode(&errorResp); err != nil {
 			return nil, nil, fmt.Errorf("token refresh failed with status %d", res.StatusCode)
 		}
-		return nil, nil, fmt.Errorf("token refresh failed: %s", errorResp.Message)
+		return nil, nil, fmt.Errorf("token refresh failed: %s (%s)", errorResp.Error, errorResp.ErrorDescription)
 	}
 
 	var accessTokenDetails types.AccessTokenDetails
@@ -130,11 +130,11 @@ func (a *AuthService) RevokeToken(refreshTokenCookie *http.Cookie) error {
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		var errorResp types.BackendErrorResponse
+		var errorResp types.OAuthErrorResponse
 		if err := json.NewDecoder(res.Body).Decode(&errorResp); err != nil {
 			return fmt.Errorf("token revocation failed with status %d", res.StatusCode)
 		}
-		return fmt.Errorf("token revocation failed: %s", errorResp.Message)
+		return fmt.Errorf("token revocation failed: %s (%s)", errorResp.Error, errorResp.ErrorDescription)
 	}
 
 	return nil

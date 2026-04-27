@@ -82,3 +82,11 @@ type BackendErrorResponse struct {
 	ErrorCode apperrors.ErrorCode `json:"error_code"`
 	Message   string              `json:"message"`
 }
+
+// OAuthErrorResponse represents an RFC 6749 §5.2 error response from the OAuth endpoints.
+// ErrorCode is an extension field mirroring the internal error_code used on other API endpoints.
+type OAuthErrorResponse struct {
+	Error            string `json:"error"`
+	ErrorDescription string `json:"error_description,omitempty"`
+	ErrorCode        string `json:"error_code,omitempty"`
+}
