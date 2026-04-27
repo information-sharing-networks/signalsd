@@ -189,7 +189,7 @@ func RequestLogging(logger *slog.Logger) func(http.Handler) http.Handler {
 
 			// Add duration and bytes written to response
 			logAttrs = append(logAttrs,
-				slog.Duration("duration", duration),
+				slog.String("duration", duration.String()),
 				slog.Int("bytes", ww.BytesWritten()),
 			)
 
