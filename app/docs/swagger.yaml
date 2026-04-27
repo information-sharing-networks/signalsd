@@ -965,6 +965,15 @@ definitions:
         example: message describing the error
         type: string
     type: object
+  responses.OAuthErrorResponse:
+    properties:
+      error:
+        type: string
+      error_code:
+        $ref: '#/definitions/apperrors.ErrorCode'
+      error_description:
+        type: string
+    type: object
   version.Info:
     properties:
       build_date:
@@ -2100,10 +2109,14 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/handlers.ServiceAccountRotateResponse'
-        "401":
-          description: Authentication failed
+        "400":
+          description: invalid_request (missing client_id or client_secret)
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/responses.OAuthErrorResponse'
+        "401":
+          description: invalid_client
+          schema:
+            $ref: '#/definitions/responses.OAuthErrorResponse'
         "500":
           description: Internal server error
           schema:
@@ -3064,17 +3077,21 @@ paths:
         "200":
           description: OK
         "400":
-          description: Missing or invalid grant_type
+          description: unsupported_grant_type · invalid_request · invalid_grant
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/responses.OAuthErrorResponse'
         "401":
-          description: Invalid credentials or missing refresh token cookie
+          description: invalid_client
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/responses.OAuthErrorResponse'
         "404":
-          description: Token not found or already revoked
+          description: invalid_grant (token not found)
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/responses.OAuthErrorResponse'
+        "500":
+          description: server_error
+          schema:
+            $ref: '#/definitions/responses.OAuthErrorResponse'
       summary: Revoke Token
       tags:
       - auth
@@ -3134,13 +3151,17 @@ paths:
           schema:
             $ref: '#/definitions/auth.AccessTokenResponse'
         "400":
-          description: Missing or invalid grant_type
+          description: unsupported_grant_type · invalid_request · invalid_grant
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/responses.OAuthErrorResponse'
         "401":
-          description: Invalid credentials or expired refresh token
+          description: invalid_client
           schema:
-            $ref: '#/definitions/responses.ErrorResponse'
+            $ref: '#/definitions/responses.OAuthErrorResponse'
+        "500":
+          description: server_error
+          schema:
+            $ref: '#/definitions/responses.OAuthErrorResponse'
       summary: Refresh Access Token
       tags:
       - auth

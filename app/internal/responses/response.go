@@ -36,6 +36,10 @@ const (
 	// OAuthErrInvalidScope is returned when the requested scope is invalid, unknown, malformed,
 	// or exceeds the scope granted by the resource owner.
 	OAuthErrInvalidScope = "invalid_scope"
+
+	// OAuthErrServerError is returned when the server encountered an unexpected condition
+	// that prevented it from fulfilling the request.
+	OAuthErrServerError = "server_error"
 )
 
 // OAuthErrorResponse is the RFC 6749 §5.2 token endpoint error response.

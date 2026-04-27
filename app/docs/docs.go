@@ -1347,10 +1347,16 @@ const docTemplate = `{
                             "$ref": "#/definitions/handlers.ServiceAccountRotateResponse"
                         }
                     },
-                    "401": {
-                        "description": "Authentication failed",
+                    "400": {
+                        "description": "invalid_request (missing client_id or client_secret)",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/responses.OAuthErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "invalid_client",
+                        "schema": {
+                            "$ref": "#/definitions/responses.OAuthErrorResponse"
                         }
                     },
                     "500": {
@@ -2461,21 +2467,27 @@ const docTemplate = `{
                         "description": "OK"
                     },
                     "400": {
-                        "description": "Missing or invalid grant_type",
+                        "description": "unsupported_grant_type · invalid_request · invalid_grant",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/responses.OAuthErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Invalid credentials or missing refresh token cookie",
+                        "description": "invalid_client",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/responses.OAuthErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Token not found or already revoked",
+                        "description": "invalid_grant (token not found)",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/responses.OAuthErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "server_error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.OAuthErrorResponse"
                         }
                     }
                 }
@@ -2524,15 +2536,21 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Missing or invalid grant_type",
+                        "description": "unsupported_grant_type · invalid_request · invalid_grant",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/responses.OAuthErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Invalid credentials or expired refresh token",
+                        "description": "invalid_client",
                         "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
+                            "$ref": "#/definitions/responses.OAuthErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "server_error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.OAuthErrorResponse"
                         }
                     }
                 }
@@ -3846,6 +3864,20 @@ const docTemplate = `{
                 "message": {
                     "type": "string",
                     "example": "message describing the error"
+                }
+            }
+        },
+        "responses.OAuthErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "error_code": {
+                    "$ref": "#/definitions/apperrors.ErrorCode"
+                },
+                "error_description": {
+                    "type": "string"
                 }
             }
         },

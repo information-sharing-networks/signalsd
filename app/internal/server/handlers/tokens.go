@@ -81,21 +81,22 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, p
 //	@Param		client_secret	formData	string	false	"Client secret (client_credentials grant only)"
 //
 //	@Success	200				{object}	auth.AccessTokenResponse
-//	@Failure	400				{object}	responses.ErrorResponse	"Missing or invalid grant_type"
-//	@Failure	401				{object}	responses.ErrorResponse	"Invalid credentials or expired refresh token"
+//	@Failure	400				{object}	responses.OAuthErrorResponse	"unsupported_grant_type · invalid_request · invalid_grant"
+//	@Failure	401				{object}	responses.OAuthErrorResponse	"invalid_client"
+//	@Failure	500				{object}	responses.OAuthErrorResponse	"server_error"
 //
 //	@Router		/oauth/token [post]
 func (a *TokenHandler) RefreshAccessToken(w http.ResponseWriter, r *http.Request) {
 
 	accountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
+		responses.RespondWithOAuthError(w, r, http.StatusInternalServerError, responses.OAuthErrServerError, "did not receive userAccountID from middleware", apperrors.ErrCodeInternalError)
 		return
 	}
 
 	accountType, ok := auth.ContextAccountType(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive accountType from middleware")
+		responses.RespondWithOAuthError(w, r, http.StatusInternalServerError, responses.OAuthErrServerError, "did not receive accountType from middleware", apperrors.ErrCodeInternalError)
 		return
 	}
 
@@ -106,7 +107,7 @@ func (a *TokenHandler) RefreshAccessToken(w http.ResponseWriter, r *http.Request
 			slog.String("error", err.Error()),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenInvalid, "error creating access token")
+		responses.RespondWithOAuthError(w, r, http.StatusInternalServerError, responses.OAuthErrServerError, "error creating access token", apperrors.ErrCodeTokenInvalid)
 		return
 	}
 
@@ -118,7 +119,7 @@ func (a *TokenHandler) RefreshAccessToken(w http.ResponseWriter, r *http.Request
 				slog.String("error", err.Error()),
 			)
 
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenInvalid, "error creating refresh token")
+			responses.RespondWithOAuthError(w, r, http.StatusInternalServerError, responses.OAuthErrServerError, "error creating refresh token", apperrors.ErrCodeTokenInvalid)
 			return
 		}
 
@@ -181,15 +182,16 @@ func (a *TokenHandler) RefreshAccessToken(w http.ResponseWriter, r *http.Request
 //	@Param		client_secret	formData	string	false	"Client secret (client_credentials grant only)"
 //
 //	@Success	200
-//	@Failure	400	{object}	responses.ErrorResponse	"Missing or invalid grant_type"
-//	@Failure	401	{object}	responses.ErrorResponse	"Invalid credentials or missing refresh token cookie"
-//	@Failure	404	{object}	responses.ErrorResponse	"Token not found or already revoked"
+//	@Failure	400	{object}	responses.OAuthErrorResponse	"unsupported_grant_type · invalid_request · invalid_grant"
+//	@Failure	401	{object}	responses.OAuthErrorResponse	"invalid_client"
+//	@Failure	404	{object}	responses.OAuthErrorResponse	"invalid_grant (token not found)"
+//	@Failure	500	{object}	responses.OAuthErrorResponse	"server_error"
 //
 //	@Router		/oauth/revoke [post]
 func (a *TokenHandler) RevokeToken(w http.ResponseWriter, r *http.Request) {
 	accountType, ok := auth.ContextAccountType(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get account type from context")
+		responses.RespondWithOAuthError(w, r, http.StatusInternalServerError, responses.OAuthErrServerError, "could not get account type from context", apperrors.ErrCodeInternalError)
 		return
 	}
 
@@ -207,7 +209,7 @@ func (a *TokenHandler) RevokeClientSecret(w http.ResponseWriter, r *http.Request
 
 	serverAccountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "middleware did not supply a serverAccountID")
+		responses.RespondWithOAuthError(w, r, http.StatusInternalServerError, responses.OAuthErrServerError, "middleware did not supply a serverAccountID", apperrors.ErrCodeInternalError)
 		return
 	}
 
@@ -218,12 +220,12 @@ func (a *TokenHandler) RevokeClientSecret(w http.ResponseWriter, r *http.Request
 			slog.String("error", err.Error()),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+		responses.RespondWithOAuthError(w, r, http.StatusInternalServerError, responses.OAuthErrServerError, "database error", apperrors.ErrCodeDatabaseError)
 		return
 	}
 
 	if rowsUpdated == 0 {
-		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeTokenInvalid, "no client secrets found to revoke")
+		responses.RespondWithOAuthError(w, r, http.StatusNotFound, responses.OAuthErrInvalidGrant, "no client secrets found to revoke", apperrors.ErrCodeTokenInvalid)
 		return
 	}
 
@@ -236,12 +238,12 @@ func (a *TokenHandler) RevokeRefreshToken(w http.ResponseWriter, r *http.Request
 
 	userAccountId, ok := auth.ContextAccountID(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "middleware did not supply a userAccountID")
+		responses.RespondWithOAuthError(w, r, http.StatusInternalServerError, responses.OAuthErrServerError, "middleware did not supply a userAccountID", apperrors.ErrCodeInternalError)
 		return
 	}
 	hashedRefreshToken, ok := auth.ContextHashedRefreshToken(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "middleware did not supply a refresh token")
+		responses.RespondWithOAuthError(w, r, http.StatusInternalServerError, responses.OAuthErrServerError, "middleware did not supply a refresh token", apperrors.ErrCodeInternalError)
 		return
 	}
 
@@ -253,7 +255,7 @@ func (a *TokenHandler) RevokeRefreshToken(w http.ResponseWriter, r *http.Request
 			slog.String("error", err.Error()),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+		responses.RespondWithOAuthError(w, r, http.StatusInternalServerError, responses.OAuthErrServerError, "database error", apperrors.ErrCodeDatabaseError)
 		return
 	}
 	if rowsAffected == 0 {
@@ -263,7 +265,7 @@ func (a *TokenHandler) RevokeRefreshToken(w http.ResponseWriter, r *http.Request
 			slog.String("error", "refresh token not found"),
 		)
 
-		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeTokenInvalid, "refresh token not found")
+		responses.RespondWithOAuthError(w, r, http.StatusNotFound, responses.OAuthErrInvalidGrant, "refresh token not found", apperrors.ErrCodeTokenInvalid)
 		return
 	}
 	if rowsAffected != 1 {
@@ -271,7 +273,7 @@ func (a *TokenHandler) RevokeRefreshToken(w http.ResponseWriter, r *http.Request
 			slog.Int64("error_rows_affected", rowsAffected),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+		responses.RespondWithOAuthError(w, r, http.StatusInternalServerError, responses.OAuthErrServerError, "database error", apperrors.ErrCodeDatabaseError)
 		return
 	}
 
@@ -306,8 +308,9 @@ func (a *TokenHandler) RevokeRefreshToken(w http.ResponseWriter, r *http.Request
 //	@Param		client_secret	formData	string	true	"Client secret"
 //
 //	@Success	200				{object}	ServiceAccountRotateResponse
-//	@Failure	401				{object}	responses.ErrorResponse	"Authentication failed"
-//	@Failure	500				{object}	responses.ErrorResponse	"Internal server error"
+//	@Failure	400				{object}	responses.OAuthErrorResponse	"invalid_request (missing client_id or client_secret)"
+//	@Failure	401				{object}	responses.OAuthErrorResponse	"invalid_client"
+//	@Failure	500				{object}	responses.ErrorResponse			"Internal server error"
 //
 //	@Router		/api/auth/service-accounts/rotate-secret [post]
 func (a *TokenHandler) RotateServiceAccountSecret(w http.ResponseWriter, r *http.Request) {
