@@ -309,7 +309,8 @@ paths:
       - HTMX Actions
   /logout:
     post:
-      description: Clears session cookies and redirects to /login.
+      description: Revokes the refresh token, clears session cookies, and redirects
+        to /login.
       responses:
         "200":
           description: HX-Redirect header

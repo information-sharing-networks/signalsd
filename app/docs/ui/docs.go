@@ -322,7 +322,7 @@ const docTemplate = `{
         },
         "/logout": {
             "post": {
-                "description": "Clears session cookies and redirects to /login.",
+                "description": "Revokes the refresh token, clears session cookies, and redirects to /login.",
                 "tags": [
                     "HTMX Actions"
                 ],

@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -60,14 +62,14 @@ func (t AccessTokenStatus) String() string {
 // RefreshToken uses the signalsd backend API to refresh an access token using the supplied refresh token.
 // Returns a new refresh token cookie and access token.
 func (a *AuthService) RefreshToken(refreshTokenCookie *http.Cookie) (*types.AccessTokenDetails, *http.Cookie, error) {
-	url := fmt.Sprintf("%s/oauth/token?grant_type=refresh_token", a.apiBaseURL)
+	form := url.Values{"grant_type": {"refresh_token"}}
 
-	req, err := http.NewRequest("POST", url, nil)
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/oauth/token", a.apiBaseURL), strings.NewReader(form.Encode()))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 	// add the refresh token cookie from the browser's request to the API request
 	req.AddCookie(refreshTokenCookie)
@@ -106,6 +108,36 @@ func (a *AuthService) RefreshToken(refreshTokenCookie *http.Cookie) (*types.Acce
 	}
 
 	return &accessTokenDetails, newRefreshTokenCookie, nil
+}
+
+// RevokeToken calls the signalsd backend API to revoke the supplied refresh token (logout).
+// Errors are returned so the caller can log them, but logout should proceed regardless.
+func (a *AuthService) RevokeToken(refreshTokenCookie *http.Cookie) error {
+	form := url.Values{"grant_type": {"refresh_token"}}
+
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/oauth/revoke", a.apiBaseURL), strings.NewReader(form.Encode()))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(refreshTokenCookie)
+
+	res, err := a.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to make request: %w", err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		var errorResp types.BackendErrorResponse
+		if err := json.NewDecoder(res.Body).Decode(&errorResp); err != nil {
+			return fmt.Errorf("token revocation failed with status %d", res.StatusCode)
+		}
+		return fmt.Errorf("token revocation failed: %s", errorResp.Message)
+	}
+
+	return nil
 }
 
 // CheckAccessTokenStatus checks the status of an access token from context
