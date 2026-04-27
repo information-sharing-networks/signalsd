@@ -10,6 +10,68 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 )
 
+// RFC 6749 §5.2 token endpoint error codes
+const (
+	// OAuthErrInvalidRequest is returned when the request is missing a required parameter,
+	// includes an unsupported parameter value, repeats a parameter, or is otherwise malformed.
+	OAuthErrInvalidRequest = "invalid_request"
+
+	// OAuthErrInvalidClient is returned when client authentication failed, such as an unknown
+	// client, no client authentication included, or unsupported authentication method. May
+	// respond with HTTP 401 when the client authenticated via the Authorization header.
+	OAuthErrInvalidClient = "invalid_client"
+
+	// OAuthErrInvalidGrant is returned when the authorization code or refresh token is invalid,
+	// expired, revoked, does not match the redirect URI, or was issued to another client.
+	OAuthErrInvalidGrant = "invalid_grant"
+
+	// OAuthErrUnauthorizedClient is returned when the authenticated client is not authorised
+	// to use this authorization grant type.
+	OAuthErrUnauthorizedClient = "unauthorized_client"
+
+	// OAuthErrUnsupportedGrantType is returned when the authorization grant type is not
+	// supported by the authorization server.
+	OAuthErrUnsupportedGrantType = "unsupported_grant_type"
+
+	// OAuthErrInvalidScope is returned when the requested scope is invalid, unknown, malformed,
+	// or exceeds the scope granted by the resource owner.
+	OAuthErrInvalidScope = "invalid_scope"
+)
+
+// OAuthErrorResponse is the RFC 6749 §5.2 token endpoint error response.
+// ErrorCode is an extension field that mirrors the internal error_code
+type OAuthErrorResponse struct {
+	Error            string              `json:"error"`
+	ErrorDescription string              `json:"error_description,omitempty"`
+	ErrorCode        apperrors.ErrorCode `json:"error_code,omitempty"`
+}
+
+// RespondWithOAuthError writes an RFC 6749 §5.2 compliant error response.
+// Use this for /oauth/token and /oauth/revoke endpoints only.
+// For all other API errors use RespondWithError.
+func RespondWithOAuthError(w http.ResponseWriter, r *http.Request, statusCode int, oauthError string, description string, errorCode apperrors.ErrorCode) {
+	logger.ContextWithLogAttrs(r.Context(),
+		slog.String("oauth_error", oauthError),
+		slog.String("message", description),
+	)
+
+	dat, err := json.Marshal(OAuthErrorResponse{
+		Error:            oauthError,
+		ErrorDescription: description,
+		ErrorCode:        errorCode,
+	})
+	if err != nil {
+		slog.Error("error marshaling oauth error response", slog.String("error", err.Error()))
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":"server_error","error_description":"Internal Server Error"}`))
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.WriteHeader(statusCode)
+	_, _ = w.Write(dat)
+}
+
 type ErrorResponse struct {
 	StatusCode int                 `json:"-"`
 	ErrorCode  apperrors.ErrorCode `json:"error_code" example:"example_error_code"`
