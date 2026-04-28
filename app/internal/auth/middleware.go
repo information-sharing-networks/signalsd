@@ -204,7 +204,7 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 
 		var clientID, clientSecret string
 
-		// RFC 6749 §2.3.1: support HTTP Basic Auth or form body
+		// support HTTP Basic Auth or form body (RFC 6749)
 		if id, secret, ok := r.BasicAuth(); ok {
 			clientID = id
 			clientSecret = secret
