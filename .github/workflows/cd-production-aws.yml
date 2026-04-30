@@ -137,6 +137,7 @@ jobs:
                 "RuntimeEnvironmentVariables": {
                   "ENVIRONMENT": "${{ env.ENVIRONMENT }}",
                   "LOG_LEVEL": "${{ env.LOG_LEVEL }}",
+                  "VERSION": "${{ github.ref_name }}",
                   "PUBLIC_BASE_URL": "${PUBLIC_BASE_URL}",
                   "ALLOWED_ORIGINS": "${ALLOWED_ORIGINS}"
                 },

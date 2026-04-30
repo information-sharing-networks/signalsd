@@ -1,5 +1,7 @@
 package version
 
+import "os"
+
 // Build-time variables set via ldflags
 var (
 	version   = "dev"
@@ -14,10 +16,16 @@ type Info struct {
 	GitCommit string `json:"git_commit" example:"abc123"`
 }
 
-// Get returns the current version information
+// Get returns the current version information. VERSION env var overrides the
+// ldflags value so production deployments can inject the release tag without
+// rebuilding the image promoted from staging.
 func Get() Info {
+	v := version
+	if env := os.Getenv("VERSION"); env != "" {
+		v = env
+	}
 	return Info{
-		Version:   version,
+		Version:   v,
 		BuildDate: buildDate,
 		GitCommit: gitCommit,
 	}
