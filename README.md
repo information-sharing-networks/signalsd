@@ -3,8 +3,8 @@
 [Technical Overview](#technical-overview)
 
 ![ci](https://github.com/information-sharing-networks/signalsd/actions/workflows/ci.yml/badge.svg)
- ![cd-staging](https://github.com/information-sharing-networks/signalsd/actions/workflows/cd-staging.yml/badge.svg)
- ![cd-production](https://github.com/information-sharing-networks/signalsd/actions/workflows/cd-production.yml/badge.svg)
+ ![cd-staging](https://github.com/information-sharing-networks/signalsd/actions/workflows/cd-staging-aws.yml/badge.svg)
+ ![cd-production](https://github.com/information-sharing-networks/signalsd/actions/workflows/cd-production-aws.yml/badge.svg)
 
 # Information Sharing Networks
 Information Sharing Networks (ISNs) give organisations a way to start sharing data with each other without having to build bespoke technology from scratch every time.
@@ -234,19 +234,22 @@ This just provides basic protection against abuse - in a production environment 
 ## CI/CD overview
 Github actions are used to automate checks and deployments.
 
-CI checks are run whenever there is a push to main.
+CI checks run on every push to `main` and every pull request opened against it.
 
-The service is deployed to staging whenever there is a push to main and depolyed to production whenever a new version tag (e.g v1.0.0) is pushed.
+This app is currently deployed to AWS (see below for details):
+- staging is deployed when CI passes on `main`
+- production is deployed when a new version tag (e.g `v1.0.0`) is pushed.
 
-![CI:CD (v0 11)](https://github.com/user-attachments/assets/6e39cd4b-1fc5-441f-a875-e51c814525ad)
+The CI workflow runs the same security, linting and application tests as `make check`
+does locally, plus GitHub's CodeQL action.
+
+Production never rebuilds the image — it promotes the staging image built from the same
+commit being tagged. If that commit was not previously deployed to staging, the
+production workflow fails fast.
 
 See GitHub Actions workflows in `.github/workflows/`
 
-## Cloud Deployment
-
-This service is deployed to Google Cloud Run.  Google handles HTTPS, firewall, load balancing and autoscaling. The service will scale to zero when not in use.
-
-**Note: This is pre-production software and the cloud deployment should only be used with data that you don't mind being deleted or seen by other people.**
+## Deployment Options
 
 ## Service Mode Configuration
 
@@ -266,20 +269,23 @@ PORT=8081 go run cmd/signalsd/main.go run signals-read
 PORT=8082 go run cmd/signalsd/main.go run signals-write
 ```
 
-## Deployment Configurations
+## Deployment 
 ### Basic config
-The simplest configuration is to run containers that serve all endpoints.  This is the configuration used by the github actions CD pipeline but - although fine for testing - it is not recommended for production use.
 
-![deploy.0.2.0](https://github.com/user-attachments/assets/942384a7-ccd7-4abb-b2a7-a9e293e23a10)
+The simplest configuration is to run containers that serve all endpoints.  This is the configuration used by the github actions CD pipeline - high volume implementations might benefit from splitting the admin and signals handling accross muitlpe containers (see below)
 
-### Separate Admin vs Signals containers config
+All configurations require a loadbalancer to handle sharing traffic accross instances of the backend container.
+
+### Separate Admin & Signals containers config
 It is a good idea to separate the admin api container from the signals exchange containers: although they still share a common database, it will ensure that admin requests are not blocked when there are a large number of concurrent signal processing requests.
 
 See .github/workflow/cd-multi.yml for the github actions pipeline that can be used to deploy this configuration.
 
-To use this configuration, set up Google Cloud Load Balancer with path-based routing to direct traffic to the signals and admin instances:
+To use this configuration, set up the load balancer with path-based routing to direct traffic to the signals and admin instances.
+This example would work on the standard GCP load balancer that is deployed with Google Cloud Run apps:
 
 ```yaml
+# GCP load balancer config
 - match:
     path:
       regex: "^/api/isn/.*/signal-types/.*/signals.*"
@@ -322,89 +328,149 @@ A more advanced configuration is to separate read and write operations. This wou
 ![advanced config (v0 7 2)](https://github.com/user-attachments/assets/88b8fe9b-1329-45d9-b96c-fd4dde831026)
 
 
-## Google Cloud Run Setup
+## Google Cloud Run
 
-The steps to set up this environment in Google Cloud are below.  This is the configuration used by the github actions CD pipelines.
+There is a sample workflow to deploy to GCP - this was in use until April 2026 but is no longer maintainted.
 
-prerequisites: set up an empty prod and/or staging DB on your postgres provider - you will need the connection URLs and a random secret key for each environment.
+the GCP environment was set up as follows:
 
-### 1. Create Google Cloud Resources
-- Create a project called `signalsd`
-- Create an artifact registry called `signalsd`
+Container compute runs on Cloud Run with scale-to-zero — no instance is running when there
+is no traffic. Cloud Run handles HTTPS, the load balancer, and assigns a `*.run.app` URL
+out of the box. Custom domains are mapped through Cloud Run's domain-mapping feature.
 
-### 2. Create Service Accounts (IAM > Service Accounts)
-- `cloud-run-deploy`
-- `cloud-run-runtime`
+The deploy pipeline authenticates to GCP with a service account JSON key stored as a
+GitHub secret. On each push to `main` it builds the image, pushes it to Artifact Registry,
+and rolls out a new Cloud Run revision. A version tag triggers the same flow against
+production. The runtime container assumes a separate runtime service account with no GCP
+API access — it exists only as an identity, not as a permissions grant. 
 
-### 3. Configure cloud-run-deploy Account
-The `cloud-run-deploy` account will:
-- Build an image each time there is a push on main
-- Push the image to the artifact registry (the image is tagged with the commit id and 'latest')
-- Create a container based on the latest image and deploy to Cloud Run (the container will run under the cloud-run-runtime account)
+*Note* If you are considering a GCP deployment, github OICD authentication is now recommended instead of 
+storing credentials as secrets.
 
-### 4. Set Service Account Permissions
-- `cloud-run-deploy` needs the **Artifact Registry Writer** and **Cloud Run Admin** roles
-- The `cloud-run-runtime` account does not need access to any of the Google APIs and therefore doesn't have any roles. You do however need to configure it to allow the cloud-run-deploy account to use it:
+Application config and secrets are passed as environment variables at deploy time, sourced
+from GitHub secrets and variables (`DATABASE_URL`, `SECRET_KEY`, `PUBLIC_BASE_URL`,
+`ALLOWED_ORIGINS`, with `STAGING_*` parallels). The database itself is hosted Postgres
+reached over the public internet with `sslmode=require` — no VPC or private networking is
+involved on the GCP side.
 
-  **IAM > Service Accounts > cloud-run-runtime account > manage details > Principals with access > grant access**
+To set this up, an admin needs: a GCP project with Artifact Registry enabled, two service
+accounts (`cloud-run-deploy` with **Artifact Registry Writer** and **Cloud Run Admin**;
+`cloud-run-runtime` with no roles, and the deploy account granted **Service Account User**
+on it), a JSON key for the deploy account, and the GitHub secrets and variables listed
+above. Optional tuning variables (`DB_MAX_CONNECTIONS`, `RATE_LIMIT_RPS`, etc.) can be set
+as additional GitHub variables; if unset, app defaults apply.
 
-  Add the cloud-run-deploy account email address - give it the **Service Account User** role.
+## AWS
 
-### 5. Download Service Account Key
-Download a JSON key for the cloud-run-deploy account:
-**IAM > service accounts > cloud-run-deploy account > keys > add key > Create New**
+A `staging` and `production` version of the software runs in `eu-west-1`.
 
-### 6. Configure GitHub Secrets and Variables
-The deployment workflows (`.github/workflows`) are configured to use GitHub variables for non-sensitive configuration and GitHub secrets for sensitive configuration.
+### Compute and traffic
+
+Container compute runs on ECS Express Mode (Fargate) behind an Application Load Balancer
+that ECS provisions automatically. There are two services — `signalsd` (production) and
+`signalsd-staging` — sharing a single ALB, with host-header listener rules routing
+traffic to the correct service. Each service receives a stable default URL of the form
+`https://<service-name>.ecs.<region>.on.aws`.
+
+Custom domains are added by issuing an ACM certificate, attaching it to the shared ALB,
+and adding the custom hostname as an additional host-header value on the relevant
+service's listener rule. The default URL is preserved as a second value on the same rule
+so both hostnames continue to resolve.
+
+### Authentication
+
+The deploy pipeline authenticates via GitHub OIDC: GitHub's identity token is exchanged
+for short-lived AWS credentials by assuming an IAM role scoped to this repository. Three
+IAM roles are involved:
+
+- **Deploy role** (`github-actions-signalsd`, assumed by the workflow): push to ECR,
+  create and update ECS Express services, read secrets and SSM parameters, and manage its own runner IP on the RDS security group during migrations.
+- **Task-execution role** (`ecs-task-execution-signalsd`, assumed by Fargate at task
+  start): image pull from ECR, log writes to CloudWatch, secret injection from Secrets Manager.
+
+- **Infrastructure role** (`ecs-infrastructure-signalsd`, assumed by ECS to provision Express resources): ALB, auto-scaling, security groups and ACM bindings.
+
+The task-execution and infrastructure role names are hardcoded in the workflow files
+and must match exactly. The deploy role name is referenced only via the `AWS_ROLE_ARN` GitHub secret.
+
+### Configuration and secrets
+
+Each environment has its own isolated set of secrets and parameters under matching
+paths:
+
+- **Secrets Manager** (`signalsd/<env>/database-url`, `signalsd/<env>/secret-key`):
+  fetched at task start by the task-execution role and injected as `DATABASE_URL` and `SECRET_KEY`.
+- **SSM Parameter Store** (`signalsd/<env>/<param>`): non-sensitive runtime config —
+  `public-base-url`, `allowed-origins`, plus any of the optional tuning variables listed in [Environment Variables](#environment-variables). The SSM parameter name maps to an env var (e.g. `db-max-connections` -> `DB_MAX_CONNECTIONS`). 
+  The app uses its internal defaults where optional params are not set.
+
+A separate `signalsd/admin/master-password` secret holds the RDS master password, (used only during initial database setup)
+
+### Database and migrations
+
+A single `db.t4g.small` PostgreSQL 18 RDS instance hosts both `signalsd_prod` and
+`signalsd_staging` databases, with one application DB user per database. The instance runs with `rds.force_ssl` on and clients connect with `sslmode=require`.
+
+ECS tasks reach the database through a security-group rule pinned to the auto-managed ECS task security group. RDS is kept publicly accessible so that GitHub Actions runners can apply schema migrations: the deploy workflow temporarily authorizes its own runner IP on the RDS security group, runs `goose` against the public endpoint, and revokes the rule before continuing.
+
+### Networking
+
+The VPC uses two public subnets across two AZs with an Internet Gateway:
+ECS tasks receive public IPs and egress through the Internet Gateway, but inbound traffic is restricted to the ALB security group.
+
+Note:
+
+- **ALB type is fixed by the first service.** When the first ECS Express service is
+  created in a VPC, ECS auto-provisions a shared ALB and picks its type from that
+  service's subnets: public subnets produce an internet-facing ALB, private subnets an internal one. Every subsequent Express service in the VPC inherits the same ALB, and the choice cannot easily be reversed. This project needs an internet-facing ALB, so the first service deployed must use public subnets — both services here share the same two public subnets to ensure they bind to the same internet-facing ALB.
+
+- **Task security group is auto-created and must be wired to RDS manually.** ECS Express creates a task security group tagged `AmazonECSManaged=true` the first time a service is deployed. The application cannot reach RDS until that SG is added as an ingress rule on the RDS security group (`signalsd-rds`). This is a one-off step after the first service is created.
+
+### Container image
+
+A single ECR repository (`signalsd`) holds images for both environments, distinguished
+by tag. Staging builds push `staging-<sha>` and `staging-latest`; production deploys
+re-tag the matching staging image as `<sha>` and `latest` rather than rebuilding.
 
 
-#### Required GitHub Secrets
-Set up GitHub secrets in your fork of the repo:
-**repo > settings > secrets and variables > actions > secrets tab > new repository secret**
+ECR basic image scanning is enabled on the repository (`scanOnPush=true`).
 
-You will need three secrets:
-- `GCP_CREDENTIALS` (upload the contents of the JSON key downloaded earlier)
-- `DATABASE_URL` (URL of your postgres service - we are using Neon.tech, but any provider that supports current postgres versions should work)
-- `SECRET_KEY` (random secret key for your app - used by the signalsd server to sign JWT tokens)
+The application image contains only a statically compiled Go binary in a scratch image (no operating system or shell) — so basic scanning (which looks for OS-package CVEs) is not expected to return any useful information.
 
-if you are deploying to a staging environment you need to create a separate database and two additional secrets:
-- `STAGING_DATABASE_URL`
-- `STAGING_SECRET_KEY`
+The configuration is in place in case different image configs are loaded at a later date.  Today's vulnerability checks on the go app come from CI: `govulncheck` and `gosec` run on every build before the image is created.
 
-You need to create two github environment variables: 
-- `PUBLIC_BASE_URL` (e.g. https://yourdomain.com) to hold the public base url for your app
-- `ALLOWED_ORIGINS` (e.g. https://yourdomain.com) to hold a pipe-separated list of allowed CORS origins
+### Setup checklist
 
-If you are deploying to a staging environment you need to create separate variable to hold these values:
-- `STAGING_PUBLIC_BASE_URL` (e.g. https://staging.yourdomain.com)
-- `STAGING_ALLOWED_ORIGINS` (e.g. https://staging.yourdomain.com)
+All resources are tagged `Project=signalsd`. The workflow relies on this tag (combined with the security group's name) to discover the RDS security group at deploy time, so the convention must be followed throughout.
 
-The public base URL is used by the back-end server when generating password reset and service account setup links.
+To set up an equivalent environment, an admin needs:
 
-#### DNS
-google will automatically assign a *.run.app domain name to your Gcloud run service(s) and these can be mapped to custom domains using Google Cloud run DNS (see https://cloud.google.com/run/docs/mapping-custom-domains)
+- An ECR repository (`signalsd`) with image scanning on push.
+- The GitHub OIDC provider registered for the AWS account.
+- The three IAM roles described above (deploy, task-execution, infrastructure).
+- A VPC with two public subnets across two AZs, an Internet Gateway, and a security
+  group for RDS that allows the ECS task SG on port 5432.
+- An RDS PostgreSQL instance with the two databases and per-env application users.
+- Secrets Manager entries for `signalsd/<env>/database-url` and
+  `signalsd/<env>/secret-key`, and SSM parameters under `signalsd/<env>/` for at least
+  `public-base-url` and `allowed-origins`.
+- Two ECS Express services (`signalsd`, `signalsd-staging`) with appropriate CPU/memory
+  and the auto-scaling minimum/maximum each environment needs.
+- Two GitHub repository secrets:
+  - `AWS_ACCOUNT_ID` — used to construct ECR registry URLs and role ARNs in the
+  - `AWS_ROLE_ARN` — the deploy role ARN.
+    workflows.
 
-#### Optional GitHub Variables 
-For production tuning, you can set GitHub variables:
-**repo > settings > secrets and variables > actions > variables tab > new repository variable**
+Get the values for the gihub secrets using
+```bash
+# AWS_ACCOUNT_ID
+aws sts get-caller-identity --query Account --output text
 
-if you don't set these variables, app defautls are used.
-
-Recommended production variables:
+# ARW_ROLE_ARN
+aws iam get-role --role-name github-actions-signalsd --query 'Role.Arn' --output text
 ```
-# Database Pool Configuration
-DB_MAX_CONNECTIONS=25
-DB_MIN_CONNECTIONS=0
-DB_MAX_CONN_LIFETIME=120m
-DB_MAX_CONN_IDLE_TIME=20m
-DB_CONNECT_TIMEOUT=10s
 
-# Performance Configuration
-RATE_LIMIT_RPS=2000
-RATE_LIMIT_BURST=5000
+---
 
-# Server Configuration
-READ_TIMEOUT=30s
-WRITE_TIMEOUT=30s
-IDLE_TIMEOUT=120s
-```
+Detailed step-by-step setup runbooks for both clouds are maintained separately — contact
+the support team for access.

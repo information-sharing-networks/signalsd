@@ -1,45 +1,45 @@
-# Deploy to production environment on version tags
-name: Deploy to Production
+# Deploy to staging environment on main branch commits
+name: Deploy to Staging (GCP)
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
+    # Disabled - retained for reference
 
 permissions:
   contents: read
 
 env:
-  # Mandatory environment settings 
-  DATABASE_URL: ${{ secrets.DATABASE_URL }}
-  SECRET_KEY: ${{ secrets.SECRET_KEY }}
+  # mandatory environment settings
+  STAGING_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+  STAGING_SECRET_KEY: ${{ secrets.STAGING_SECRET_KEY }}
   GCP_CREDENTIALS: ${{ secrets.GCP_CREDENTIALS }}
-  PUBLIC_BASE_URL: ${{ vars.PUBLIC_BASE_URL }}
-  ALLOWED_ORIGINS: ${{ vars.ALLOWED_ORIGINS }}
+  STAGING_PUBLIC_BASE_URL: ${{ vars.STAGING_PUBLIC_BASE_URL }}
+  STAGING_ALLOWED_ORIGINS: ${{ vars.STAGING_ALLOWED_ORIGINS }}
 
-  # Service configuration 
-  ENVIRONMENT: prod
-  LOG_LEVEL: info
+  # Service configuration
+  ENVIRONMENT: staging
+  LOG_LEVEL: debug
 
-  # Google Cloud configuration 
-  SERVICE_NAME: signalsd
+  # Google Cloud configuration
+  SERVICE_NAME: signalsd-staging
   PROJECT_ID: signals-462015
   REGION: europe-west2
   REPOSITORY: signalsd
   IMAGE_NAME: signalsd
   DEPLOY_REGION: europe-west1
   RUNTIME_SERVICE_ACCOUNT: cloud-run-runtime@signals-462015.iam.gserviceaccount.com
-  MAX_INSTANCES: 4
-  CPU: 1
-  MEMORY: 512Mi
+  MAX_INSTANCES: 2
+  CPU: 0.5
+  MEMORY: 256Mi
 
 jobs:
   deploy:
-    name: Deploy to Production
+    name: Deploy to Staging
     runs-on: ubuntu-latest
-    environment: production
-    timeout-minutes: 20
+    environment: staging
+    timeout-minutes: 30
+    # Only run if the CI workflow succeeded
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
     steps:
       - name: Check out code
@@ -65,35 +65,48 @@ jobs:
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v3
 
-      - name: Promote staging image to production
+      - name: Configure Docker to use gcloud as credential helper
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev
+
+      - name: Build and push Docker image
         run: |
-          # Re-tag the staging image in Artifact Registry without pulling or pushing layers.
-          # Fails fast if the staging image doesn't exist (i.e. staging was never deployed).
+
+          # Get Go version from go.mod
+          GO_VERSION=$(grep '^go ' app/go.mod | awk '{print $2}')
+
+          # Get version info for Docker build
+          VERSION=$(git describe --tags --abbrev=0 2>/dev/null || git describe --tags --always --dirty)
+          BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          GIT_COMMIT=$(git rev-parse --short HEAD)
+
           REGISTRY="${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}"
 
-          gcloud artifacts docker tags add \
-            "${REGISTRY}:staging-${{ github.sha }}" \
-            "${REGISTRY}:${{ github.sha }}"
-
-          gcloud artifacts docker tags add \
-            "${REGISTRY}:staging-${{ github.sha }}" \
-            "${REGISTRY}:latest"
+          docker buildx build --build-arg GO_VERSION=${GO_VERSION} \
+          --platform linux/amd64 \
+          -f app/Dockerfile \
+          --build-arg VERSION=${VERSION} \
+          --build-arg BUILD_DATE=${BUILD_DATE} \
+          --build-arg GIT_COMMIT=${GIT_COMMIT} \
+          --push \
+          -t ${REGISTRY}:staging-${{ github.sha }} \
+          -t ${REGISTRY}:staging-latest \
+          .
       
       - name: Run migrations
         working-directory: app
-        run: go tool goose -dir sql/schema postgres "${{ env.DATABASE_URL }}" up
+        run: go tool goose -dir sql/schema postgres "${{ env.STAGING_DATABASE_URL }}" up
 
       - name: Deploy to Cloud Run
         run: |
           # Build environment variables string for Cloud Run 
-          ENV_VARS="DATABASE_URL=${{ env.DATABASE_URL }}"
-          ENV_VARS="${ENV_VARS},SECRET_KEY=${{ env.SECRET_KEY }}"
+          ENV_VARS="DATABASE_URL=${{ env.STAGING_DATABASE_URL }}"
+          ENV_VARS="${ENV_VARS},SECRET_KEY=${{ env.STAGING_SECRET_KEY }}"
           ENV_VARS="${ENV_VARS},ENVIRONMENT=${{ env.ENVIRONMENT }}"
           ENV_VARS="${ENV_VARS},LOG_LEVEL=${{ env.LOG_LEVEL }}"
-          ENV_VARS="${ENV_VARS},PUBLIC_BASE_URL=${{ env.PUBLIC_BASE_URL }}"
-          ENV_VARS="${ENV_VARS},ALLOWED_ORIGINS=${{ env.ALLOWED_ORIGINS }}"
+          ENV_VARS="${ENV_VARS},PUBLIC_BASE_URL=${{ env.STAGING_PUBLIC_BASE_URL }}"
+          ENV_VARS="${ENV_VARS},ALLOWED_ORIGINS=${{ env.STAGING_ALLOWED_ORIGINS }}"
 
-          # Add optional configuration variables only if they are set 
+          # Add optional configuration variables only if they are set
           if [ -n "${{ vars.DB_MAX_CONNECTIONS }}" ]; then
             ENV_VARS="${ENV_VARS},DB_MAX_CONNECTIONS=${{ vars.DB_MAX_CONNECTIONS }}"
           fi
@@ -128,9 +141,9 @@ jobs:
             ENV_VARS="${ENV_VARS},IDLE_TIMEOUT=${{ vars.IDLE_TIMEOUT }}"
           fi
 
-          # Deploy to Cloud Run 
+          # Deploy to Cloud Run
           gcloud run deploy ${{ env.SERVICE_NAME }} \
-            --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
+            --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPOSITORY }}/${{ env.IMAGE_NAME }}:staging-${{ github.sha }} \
             --region ${{ env.DEPLOY_REGION }} \
             --platform managed \
             --allow-unauthenticated \

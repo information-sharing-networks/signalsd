@@ -51,16 +51,11 @@ jobs:
           aws-region: ${{ env.REGION }}
 
       - name: Log in to Amazon ECR
-        run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          aws ecr get-login-password --region ${{ env.REGION }} | \
-            docker login --username AWS --password-stdin \
-            ${ACCOUNT_ID}.dkr.ecr.${{ env.REGION }}.amazonaws.com
+        uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build and push Docker image
         run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          REGISTRY="${ACCOUNT_ID}.dkr.ecr.${{ env.REGION }}.amazonaws.com"
+          REGISTRY="${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.REGION }}.amazonaws.com"
 
           # Get Go version from go.mod
           GO_VERSION=$(grep '^go ' app/go.mod | awk '{print $2}')
@@ -88,8 +83,8 @@ jobs:
             --filters Name=tag:Project,Values=signalsd Name=group-name,Values=signalsd-rds \
             --query 'SecurityGroups[0].GroupId' --output text)
           RUNNER_IP=$(curl -s https://checkip.amazonaws.com)
-          echo "RDS_SG=$RDS_SG" >> $GITHUB_ENV
-          echo "RUNNER_IP=$RUNNER_IP" >> $GITHUB_ENV
+          echo "RDS_SG=$RDS_SG" >> "$GITHUB_ENV"
+          echo "RUNNER_IP=$RUNNER_IP" >> "$GITHUB_ENV"
           aws ec2 authorize-security-group-ingress \
             --group-id "$RDS_SG" --protocol tcp --port 5432 \
             --cidr "${RUNNER_IP}/32" --region ${{ env.REGION }}
@@ -109,109 +104,70 @@ jobs:
             --group-id "$RDS_SG" --protocol tcp --port 5432 \
             --cidr "${RUNNER_IP}/32" --region ${{ env.REGION }}
 
-      - name: Deploy to App Runner
+      - name: Get secret ARNs
+        id: get-secrets
         run: |
-          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-          REGISTRY="${ACCOUNT_ID}.dkr.ecr.${{ env.REGION }}.amazonaws.com"
-          ECR_ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/apprunner-ecr-access"
-
-          # Look up service ARN by name — no need to store it in GitHub
-          SERVICE_ARN=$(aws apprunner list-services \
-            --query "ServiceSummaryList[?ServiceName=='signalsd-staging'].ServiceArn" \
-            --output text \
-            --region ${{ env.REGION }})
-
-          # Resolve secret ARNs from Secrets Manager by name
           DB_SECRET_ARN=$(aws secretsmanager describe-secret \
-            --secret-id "signalsd/staging/database-url" \
+            --secret-id "signalsd/${{ env.ENVIRONMENT }}/database-url" \
             --query ARN --output text)
           SK_SECRET_ARN=$(aws secretsmanager describe-secret \
-            --secret-id "signalsd/staging/secret-key" \
+            --secret-id "signalsd/${{ env.ENVIRONMENT }}/secret-key" \
             --query ARN --output text)
+          echo "db-secret-arn=$DB_SECRET_ARN" >> "$GITHUB_OUTPUT"
+          echo "sk-secret-arn=$SK_SECRET_ARN" >> "$GITHUB_OUTPUT"
 
-          # Fetch non-sensitive config from SSM Parameter Store
-          PUBLIC_BASE_URL=$(aws ssm get-parameter \
-            --name "/signalsd/staging/public-base-url" \
-            --query 'Parameter.Value' --output text)
-          ALLOWED_ORIGINS=$(aws ssm get-parameter \
-            --name "/signalsd/staging/allowed-origins" \
-            --query 'Parameter.Value' --output text)
+      - name: Build environment variables
+        id: env-vars
+        run: |
+          JSON=$(aws ssm get-parameters-by-path \
+            --path "/signalsd/${{ env.ENVIRONMENT }}/" \
+            --query 'Parameters[].{name:Name,value:Value}' \
+            --output json \
+            | jq -c \
+                --arg env "${{ env.ENVIRONMENT }}" \
+                --arg log "${{ env.LOG_LEVEL }}" \
+                --arg ver "${{ github.ref_name }}" '
+              map({
+                name: (.name | split("/")[-1] | ascii_upcase | gsub("-"; "_")),
+                value
+              }) + [
+                {name: "ENVIRONMENT", value: $env},
+                {name: "LOG_LEVEL",   value: $log},
+                {name: "VERSION",     value: $ver}
+              ]')
 
-          # Write source configuration to a temp file (avoids inline JSON escaping issues).
-          # The file:// prefix tells the AWS CLI to read from disk.
-          cat > /tmp/source-config.json << EOF
-          {
-            "ImageRepository": {
-              "ImageIdentifier": "${REGISTRY}/signalsd:staging-${{ github.sha }}",
-              "ImageConfiguration": {
-                "Port": "8080",
-                "RuntimeEnvironmentVariables": {
-                  "ENVIRONMENT": "${{ env.ENVIRONMENT }}",
-                  "LOG_LEVEL": "${{ env.LOG_LEVEL }}",
-                  "PUBLIC_BASE_URL": "${PUBLIC_BASE_URL}",
-                  "ALLOWED_ORIGINS": "${ALLOWED_ORIGINS}"
-                },
-                "RuntimeEnvironmentSecrets": {
-                  "DATABASE_URL": "${DB_SECRET_ARN}",
-                  "SECRET_KEY": "${SK_SECRET_ARN}"
-                }
-              },
-              "ImageRepositoryType": "ECR"
-            },
-            "AuthenticationConfiguration": {
-              "AccessRoleArn": "${ECR_ROLE_ARN}"
-            },
-            "AutoDeploymentsEnabled": false
-          }
-          EOF
-          chmod 600 /tmp/source-config.json
-
-          # Add optional tuning vars from SSM if present
-          for PARAM in DB_MAX_CONNECTIONS DB_MIN_CONNECTIONS DB_MAX_CONN_LIFETIME \
-              DB_MAX_CONN_IDLE_TIME DB_CONNECT_TIMEOUT RATE_LIMIT_RPS RATE_LIMIT_BURST \
-              MAX_SIGNAL_PAYLOAD_SIZE READ_TIMEOUT WRITE_TIMEOUT IDLE_TIMEOUT; do
-            if VALUE=$(aws ssm get-parameter \
-              --name "/signalsd/staging/${PARAM}" \
-              --query 'Parameter.Value' --output text 2>/dev/null); then
-              jq --arg k "$PARAM" --arg v "$VALUE" \
-                '.ImageRepository.ImageConfiguration.RuntimeEnvironmentVariables[$k] = $v' \
-                /tmp/source-config.json > /tmp/tmp.json && mv /tmp/tmp.json /tmp/source-config.json
-            fi
+          for required in PUBLIC_BASE_URL ALLOWED_ORIGINS; do
+            echo "$JSON" | jq -e --arg n "$required" 'any(.name == $n)' >/dev/null \
+              || { echo "Missing required SSM param: $required"; exit 1; }
           done
 
-          # Start the deployment
-          aws apprunner update-service \
-            --service-arn "$SERVICE_ARN" \
-            --source-configuration file:///tmp/source-config.json \
-            --region ${{ env.REGION }}
+          echo "json=$JSON" >> "$GITHUB_OUTPUT"
 
-          # Poll until deployment completes — App Runner's update-service returns
-          # immediately (unlike gcloud run deploy which blocks), so we must wait.
-          echo "Waiting for deployment..."
-          TIMEOUT=600
-          ELAPSED=0
-          while true; do
-            STATUS=$(aws apprunner describe-service \
-              --service-arn "$SERVICE_ARN" \
-              --region ${{ env.REGION }} \
-              --query 'Service.Status' --output text)
-            echo "  Status: $STATUS"
-            case "$STATUS" in
-              RUNNING)
-                echo "Deployment complete"
-                break
-                ;;
-              OPERATION_IN_PROGRESS)
-                if [ $ELAPSED -ge $TIMEOUT ]; then
-                  echo "Deployment timed out after ${TIMEOUT}s"
-                  exit 1
-                fi
-                sleep 15
-                ELAPSED=$((ELAPSED + 15))
-                ;;
-              *)
-                echo "Deployment failed with status: $STATUS"
-                exit 1
-                ;;
-            esac
-          done
+      - name: Deploy to ECS Express
+        uses: aws-actions/amazon-ecs-deploy-express-service@v1
+        with:
+          service-name: signalsd-staging
+          image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.REGION }}.amazonaws.com/signalsd:staging-${{ github.sha }}
+          execution-role-arn: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/ecs-task-execution-signalsd
+          infrastructure-role-arn: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/ecs-infrastructure-signalsd
+          cluster: default
+          secrets: >-
+            [
+              {"name":"DATABASE_URL","valueFrom":"${{ steps.get-secrets.outputs.db-secret-arn }}"},
+              {"name":"SECRET_KEY","valueFrom":"${{ steps.get-secrets.outputs.sk-secret-arn }}"}
+            ]
+          environment-variables: ${{ steps.env-vars.outputs.json }}
+
+      - name: Verify deployment
+        run: |
+          sleep 10
+          BASE_URL=$(aws ssm get-parameter \
+            --name "/signalsd/${{ env.ENVIRONMENT }}/public-base-url" \
+            --query 'Parameter.Value' --output text)
+          DEPLOYED=$(curl -sf "${BASE_URL}/version" | jq -r '.git_commit')
+          EXPECTED=$(git rev-parse --short HEAD)
+          if [ "$DEPLOYED" != "$EXPECTED" ]; then
+            echo "Deployment verification failed: expected ${EXPECTED}, got ${DEPLOYED}"
+            exit 1
+          fi
+          echo "Verified: ${DEPLOYED}"
