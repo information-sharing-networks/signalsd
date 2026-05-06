@@ -12,10 +12,10 @@ require (
 require (
 	github.com/Netflix/go-env v0.1.2
 	github.com/a-h/templ v0.3.1001
-	github.com/alecthomas/chroma/v2 v2.23.1
+	github.com/alecthomas/chroma/v2 v2.24.1
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/jackc/pgx/v5 v5.9.2
-	github.com/jub0bs/cors v1.0.1
+	github.com/jub0bs/cors v1.0.2
 	github.com/lmittmann/tint v1.1.3
 	github.com/pressly/goose/v3 v3.27.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
@@ -54,7 +54,7 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.6 // indirect
 	github.com/cubicdaiya/gonp v1.0.4 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/dlclark/regexp2 v1.11.5 // indirect
+	github.com/dlclark/regexp2 v1.12.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/elastic/go-sysinfo v1.15.4 // indirect
 	github.com/elastic/go-windows v1.0.2 // indirect
