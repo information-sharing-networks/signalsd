@@ -217,6 +217,12 @@ By default the signalsd service starts with a basic web interface. If you want t
 
 
 # Technical overview
+The wiki provides a helpful way to navigate the technical aspects of the project (AI Generated):
+
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/information-sharing-networks/signalsd)
+
+The concepts are described in the three diagrams below.
+
 ## Auth
 ![auth-2025-10-20-1039](https://github.com/user-attachments/assets/8ae6e0f7-dd08-42e5-b1f2-72c944866e22)
 
@@ -472,5 +478,5 @@ aws iam get-role --role-name github-actions-signalsd --query 'Role.Arn' --output
 
 ---
 
-Detailed step-by-step setup runbooks for both clouds are maintained separately — contact
+Detailed step-by-step setup runbooks are maintained separately — contact
 the support team for access.
