@@ -9,30 +9,30 @@
 # Information Sharing Networks
 Information Sharing Networks (ISNs) give organisations a way to start sharing data with each other without having to build bespoke technology from scratch every time.
 
-Members of a network exchange information through 'signals' — lightweight messages that pass information between participants.
+Members of a network exchange information through 'signals' - lightweight messages that pass information between participants.
 
 ## Signals
 
-A signal is essentially a notification: something happened in your business and the relevant parties need to know about it. When an order ships, a decision gets made or a review completes a signal goes out to whoever's been given access.
+A signal is a notification: something happened in your business and you want to let other people know about it. For instance, when an order ships, a decision gets made or a review completes a signal goes out to whoever's been given access.
 
-Each signal type carries only what's needed — there are no complex payloads carrrying data that might never be used. Signals can be chained together to build up a timeline of related events and - if more detail becomes available later - you can add it to a signal that's already been sent.
+Each signal type contains only what's needed - there are no complex payloads carrrying data that might never be used. Signals can be chained together to build up a timeline of related events and - if more detail becomes available later - you can add it to a signal that's already been sent.
 
 Organisations can use signals to share things like:
 
-- Events — order confirmations, delivery notifications, status updates
-- Decisions — approvals, rejections, policy changes
-- Analysis — audit results, risk assessments, compliance findings
-- Verification — confirming that data from another organisation is accurate
+- Events - order confirmations, delivery notifications, status updates
+- Decisions - approvals, rejections, policy changes
+- Analysis - audit results, risk assessments, compliance findings
+- Verification - confirming that data from another organisation is accurate
 
 ## Setting Up Networks
 
-The service handles all the ISN management — it's straightforward to deploy on public cloud infrastructure and doesn't require a dedicated technical team to keep running.
+The service handles all the ISN management - it's straightforward to deploy on public cloud infrastructure and doesn't require a dedicated technical team to keep running.
 
 One of the reasons data sharing projects stall is that they try to solve everything at once - teams can spend months mapping out every conceivable use case across multiple organisations, negotiating complex agreements and building data models for scenarios that never actually happen.
 
-ISNs take a different approach: you set up a network for one specific purpose — tracking shipments, sharing compliance data, coordinating approvals — and define only the signals you need. When new requirements arise, you add signal types as you go without breaking anything that's already in place.
+ISNs take a different approach: you set up a network for one specific purpose - tracking shipments, sharing compliance data, coordinating approvals - and define only the signals you need. When new requirements arise, you add signal types as you go without breaking anything that's already in place.
 
-The result is something you can get running quickly and that can grow as business relationships evolve,
+The result is something you can get running quickly and that can grow as business relationships evolve.
 
 ## Integrating with existing systems
 The service supports logged-in web users and system-to-system access via service accounts.  Authentication follows Oauth 2.0 standards and data is submitted and received as JSON over simple REST APIs.
@@ -40,13 +40,13 @@ The service supports logged-in web users and system-to-system access via service
 Signal types are defined as JSON schemas and the service can (optionally) validate data against a registered schema prior to loading.
 
 ## Reference Implementations
-The [initial implementation](https://github.com/information-sharing-networks/isn-ref-impl) was a proof of concept used as part of the UK government's Border Trade Demonstrator (BTD) initiative. The BTDs established ISNs that were used by several government agencies and industry groups to improve processes at the border by sharing supply chain information.
+The [initial implementation](https://github.com/information-sharing-networks/isn-ref-impl) was a proof of concept used as part of the UK government's _Border Trade Demonstrator_ (BTD) initiative. The BTD initiative established ISNs that were used by several government agencies and industry groups to improve processes at the border by sharing supply chain information.
 
 This repo contains the second version of the service, which develops the ISN administration facilities and is designed to scale to higher volumes of data.
 
 There are three components:
 - an [API](https://signalsd.corridorone.uk/docs) used to configure ISNs, register participants and deploy the data sharing infrastructure
-- a demonstration [UI](app/internal/ui/README.md)
+- an admin [UI](app/internal/ui/README.md)
 - an associated [framework agreement](https://github.com/information-sharing-networks/Framework) that establishes the responsibilities of the participants in an ISN
 
 ## Credits
@@ -145,7 +145,7 @@ DB_MAX_CONN_IDLE_TIME=30m
 DB_CONNECT_TIMEOUT=5s
 ```
 **Note**
-DATABASE_URL and SECRET_KEY contain sensitive information - production versions should be managed via a secrets management system (for local docker environments these values are set in `docker-compose.yml`)
+DATABASE_URL and SECRET_KEY contain sensitive information - production versions should be managed via a secrets management system (for local docker environments these values are hardcoded in `docker-compose.yml`)
 
 ### Development Tools
 
@@ -212,16 +212,15 @@ By default the signalsd service starts with a basic web interface. If you want t
 
 ## Getting Help
 - Check the [API documentation](https://signalsd.corridorone.uk/docs)
-- Review logs: `make logs`
 - Open an [issue](https://github.com/information-sharing-networks/signalsd/issues) on GitHub
 
 
 # Technical overview
-The wiki provides a helpful way to navigate the technical aspects of the project (AI Generated):
+The wiki provides a helpful overview of the technical aspects of the project (AI Generated):
 
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/information-sharing-networks/signalsd)
 
-The concepts are described in the three diagrams below.
+The core design concepts are described in the three diagrams below.
 
 ## Auth
 ![auth-2025-10-20-1039](https://github.com/user-attachments/assets/8ae6e0f7-dd08-42e5-b1f2-72c944866e22)
@@ -238,7 +237,7 @@ The service includes a shared rate limiter for all traffic regardless of source 
 This just provides basic protection against abuse - in a production environment you should configure your CDN/load balancer/reverse proxy with per-IP rate limiting.
 
 ## CI/CD overview
-Github actions are used to automate checks and deployments.
+Github Workflows are used to automate checks and deployments.
 
 CI checks run on every push to `main` and every pull request opened against it.
 
@@ -246,20 +245,16 @@ This app is currently deployed to AWS (see below for details):
 - staging is deployed when CI passes on `main`
 - production is deployed when a new version tag (e.g `v1.0.0`) is pushed.
 
+The production workflow promotes the staging image built from the same commit being tagged. 
+
 The CI workflow runs the same security, linting and application tests as `make check`
 does locally, plus GitHub's CodeQL action.
 
-Production never rebuilds the image — it promotes the staging image built from the same
-commit being tagged. If that commit was not previously deployed to staging, the
-production workflow fails fast.
+See GitHub workflows in `.github/workflows/`
 
-See GitHub Actions workflows in `.github/workflows/`
+## Service Configuration
 
-## Deployment Options
-
-## Service Mode Configuration
-
-You can run multiple instances of the signalsd service, each in a different mode.  This enables you to, for example, run a separate service for admin and signal processing workloads.
+You can run multiple instances of the signalsd service. Optionally, you can run each instance in a different mode.  This enables you to, for example, run a separate service for admin and signal processing workloads.
 The service mode is specified using the `run` command with one of the following arguments:
 
 - **`all`**: Serves all API endpoints + UI
@@ -275,208 +270,17 @@ PORT=8081 go run cmd/signalsd/main.go run signals-read
 PORT=8082 go run cmd/signalsd/main.go run signals-write
 ```
 
-## Deployment 
-### Basic config
+The simplest configuration is to run containers that serve all endpoints.  This is the configuration used by the github actions CD pipeline - high volume implementations might benefit from splitting the admin and signals handling accross muitlpe containers.
 
-The simplest configuration is to run containers that serve all endpoints.  This is the configuration used by the github actions CD pipeline - high volume implementations might benefit from splitting the admin and signals handling accross muitlpe containers (see below)
-
-All configurations require a loadbalancer to handle sharing traffic accross instances of the backend container.
-
-### Separate Admin & Signals containers config
-It is a good idea to separate the admin api container from the signals exchange containers: although they still share a common database, it will ensure that admin requests are not blocked when there are a large number of concurrent signal processing requests.
-
-See .github/workflow/cd-multi.yml for the github actions pipeline that can be used to deploy this configuration.
-
-To use this configuration, set up the load balancer with path-based routing to direct traffic to the signals and admin instances.
-This example would work on the standard GCP load balancer that is deployed with Google Cloud Run apps:
-
-```yaml
-# GCP load balancer config
-- match:
-    path:
-      regex: "^/api/isn/.*/signal-types/.*/signals.*"
-  route:
-    cluster: signalsd-signals
-
-- match:
-    prefix: "/"
-  route:
-    cluster: signalsd-admin
-```
-
-### Advanced Config
-A more advanced configuration is to separate read and write operations. This would be useful if using a read-only database replica for readers:
-
-```yaml
-# load balance config:
-# Write operations
-- match:
-    path:
-      regex: "^/api/isn/.*/signal-types/.*/signals$"
-    method: "POST"
-  route:
-    cluster: signalsd-signals-write
-
-# Read operations
-- match:
-    path:
-      regex: "^/api/isn/.*/signal-types/.*/signals/.*"
-    method: "GET"
-  route:
-    cluster: signalsd-signals-read
-
-# Admin operations
-- match:
-    prefix: "/"
-  route:
-    cluster: signalsd-admin
-```
+example of a more elaborate configuration
 ![advanced config (v0 7 2)](https://github.com/user-attachments/assets/88b8fe9b-1329-45d9-b96c-fd4dde831026)
 
 
-## Google Cloud Run
+# Cloud Deployment
+The app currently deploys to AWS - the containers run on ECS Fargate and the database is RDS Posgtres.
 
-There is a sample workflow to deploy to GCP - this was in use until April 2026 but is no longer maintainted.
+The app was deployed on GCP (CloudRun) and Neon Postgress until April 2026.  The Github Workflows are retained for reference but no longer run.
 
-the GCP environment was set up as follows:
-
-Container compute runs on Cloud Run with scale-to-zero — no instance is running when there
-is no traffic. Cloud Run handles HTTPS, the load balancer, and assigns a `*.run.app` URL
-out of the box. Custom domains are mapped through Cloud Run's domain-mapping feature.
-
-The deploy pipeline authenticates to GCP with a service account JSON key stored as a
-GitHub secret. On each push to `main` it builds the image, pushes it to Artifact Registry,
-and rolls out a new Cloud Run revision. A version tag triggers the same flow against
-production. The runtime container assumes a separate runtime service account with no GCP
-API access — it exists only as an identity, not as a permissions grant. 
-
-*Note* If you are considering a GCP deployment, github OICD authentication is now recommended instead of 
-storing credentials as secrets.
-
-Application config and secrets are passed as environment variables at deploy time, sourced
-from GitHub secrets and variables (`DATABASE_URL`, `SECRET_KEY`, `PUBLIC_BASE_URL`,
-`ALLOWED_ORIGINS`, with `STAGING_*` parallels). The database itself is hosted Postgres
-reached over the public internet with `sslmode=require` — no VPC or private networking is
-involved on the GCP side.
-
-To set this up, an admin needs: a GCP project with Artifact Registry enabled, two service
-accounts (`cloud-run-deploy` with **Artifact Registry Writer** and **Cloud Run Admin**;
-`cloud-run-runtime` with no roles, and the deploy account granted **Service Account User**
-on it), a JSON key for the deploy account, and the GitHub secrets and variables listed
-above. Optional tuning variables (`DB_MAX_CONNECTIONS`, `RATE_LIMIT_RPS`, etc.) can be set
-as additional GitHub variables; if unset, app defaults apply.
-
-## AWS
-
-A `staging` and `production` version of the software runs in `eu-west-1`.
-
-### Compute and traffic
-
-Container compute runs on ECS Express Mode (Fargate) behind an Application Load Balancer
-that ECS provisions automatically. There are two services — `signalsd` (production) and
-`signalsd-staging` — sharing a single ALB, with host-header listener rules routing
-traffic to the correct service. Each service receives a stable default URL of the form
-`https://<service-name>.ecs.<region>.on.aws`.
-
-Custom domains are added by issuing an ACM certificate, attaching it to the shared ALB,
-and adding the custom hostname as an additional host-header value on the relevant
-service's listener rule. The default URL is preserved as a second value on the same rule
-so both hostnames continue to resolve.
-
-### Authentication
-
-The deploy pipeline authenticates via GitHub OIDC: GitHub's identity token is exchanged
-for short-lived AWS credentials by assuming an IAM role scoped to this repository. Three
-IAM roles are involved:
-
-- **Deploy role** (`github-actions-signalsd`, assumed by the workflow): push to ECR,
-  create and update ECS Express services, read secrets and SSM parameters, and manage its own runner IP on the RDS security group during migrations.
-- **Task-execution role** (`ecs-task-execution-signalsd`, assumed by Fargate at task
-  start): image pull from ECR, log writes to CloudWatch, secret injection from Secrets Manager.
-
-- **Infrastructure role** (`ecs-infrastructure-signalsd`, assumed by ECS to provision Express resources): ALB, auto-scaling, security groups and ACM bindings.
-
-The task-execution and infrastructure role names are hardcoded in the workflow files
-and must match exactly. The deploy role name is referenced only via the `AWS_ROLE_ARN` GitHub secret.
-
-### Configuration and secrets
-
-Each environment has its own isolated set of secrets and parameters under matching
-paths:
-
-- **Secrets Manager** (`signalsd/<env>/database-url`, `signalsd/<env>/secret-key`):
-  fetched at task start by the task-execution role and injected as `DATABASE_URL` and `SECRET_KEY`.
-- **SSM Parameter Store** (`signalsd/<env>/<param>`): non-sensitive runtime config —
-  `public-base-url`, `allowed-origins`, plus any of the optional tuning variables listed in [Environment Variables](#environment-variables). The SSM parameter name maps to an env var (e.g. `db-max-connections` -> `DB_MAX_CONNECTIONS`). 
-  The app uses its internal defaults where optional params are not set.
-
-A separate `signalsd/admin/master-password` secret holds the RDS master password, (used only during initial database setup)
-
-### Database and migrations
-
-A single `db.t4g.small` PostgreSQL 18 RDS instance hosts both `signalsd_prod` and
-`signalsd_staging` databases, with one application DB user per database. The instance runs with `rds.force_ssl` on and clients connect with `sslmode=require`.
-
-ECS tasks reach the database through a security-group rule pinned to the auto-managed ECS task security group. RDS is kept publicly accessible so that GitHub Actions runners can apply schema migrations: the deploy workflow temporarily authorizes its own runner IP on the RDS security group, runs `goose` against the public endpoint, and revokes the rule before continuing.
-
-### Networking
-
-The VPC uses two public subnets across two AZs with an Internet Gateway:
-ECS tasks receive public IPs and egress through the Internet Gateway, but inbound traffic is restricted to the ALB security group.
-
-Note:
-
-- **ALB type is fixed by the first service.** When the first ECS Express service is
-  created in a VPC, ECS auto-provisions a shared ALB and picks its type from that
-  service's subnets: public subnets produce an internet-facing ALB, private subnets an internal one. Every subsequent Express service in the VPC inherits the same ALB, and the choice cannot easily be reversed. This project needs an internet-facing ALB, so the first service deployed must use public subnets — both services here share the same two public subnets to ensure they bind to the same internet-facing ALB.
-
-- **Task security group is auto-created and must be wired to RDS manually.** ECS Express creates a task security group tagged `AmazonECSManaged=true` the first time a service is deployed. The application cannot reach RDS until that SG is added as an ingress rule on the RDS security group (`signalsd-rds`). This is a one-off step after the first service is created.
-
-### Container image
-
-A single ECR repository (`signalsd`) holds images for both environments, distinguished
-by tag. Staging builds push `staging-<sha>` and `staging-latest`; production deploys
-re-tag the matching staging image as `<sha>` and `latest` rather than rebuilding.
-
-
-ECR basic image scanning is enabled on the repository (`scanOnPush=true`).
-
-The application image contains only a statically compiled Go binary in a scratch image (no operating system or shell) — so basic scanning (which looks for OS-package CVEs) is not expected to return any useful information.
-
-The configuration is in place in case different image configs are loaded at a later date.  Today's vulnerability checks on the go app come from CI: `govulncheck` and `gosec` run on every build before the image is created.
-
-### Setup checklist
-
-All resources are tagged `Project=signalsd`. The workflow relies on this tag (combined with the security group's name) to discover the RDS security group at deploy time, so the convention must be followed throughout.
-
-To set up an equivalent environment, an admin needs:
-
-- An ECR repository (`signalsd`) with image scanning on push.
-- The GitHub OIDC provider registered for the AWS account.
-- The three IAM roles described above (deploy, task-execution, infrastructure).
-- A VPC with two public subnets across two AZs, an Internet Gateway, and a security
-  group for RDS that allows the ECS task SG on port 5432.
-- An RDS PostgreSQL instance with the two databases and per-env application users.
-- Secrets Manager entries for `signalsd/<env>/database-url` and
-  `signalsd/<env>/secret-key`, and SSM parameters under `signalsd/<env>/` for at least
-  `public-base-url` and `allowed-origins`.
-- Two ECS Express services (`signalsd`, `signalsd-staging`) with appropriate CPU/memory
-  and the auto-scaling minimum/maximum each environment needs.
-- Two GitHub repository secrets:
-  - `AWS_ACCOUNT_ID` — used to construct ECR registry URLs and role ARNs in the
-  - `AWS_ROLE_ARN` — the deploy role ARN.
-    workflows.
-
-Get the values for the gihub secrets using
-```bash
-# AWS_ACCOUNT_ID
-aws sts get-caller-identity --query Account --output text
-
-# ARW_ROLE_ARN
-aws iam get-role --role-name github-actions-signalsd --query 'Role.Arn' --output text
-```
-
----
-
-Detailed step-by-step setup runbooks are maintained separately — contact
-the support team for access.
+Overviews of the process to create the GCP and AWS infrastruture are here
+- [AWS Deploy](depoy-AWS.md)
+- [GCP Deploy](deploy-GCP.md)
