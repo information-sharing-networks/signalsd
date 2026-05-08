@@ -125,15 +125,13 @@ jobs:
             --output json \
             | jq -c \
                 --arg env "${{ env.ENVIRONMENT }}" \
-                --arg log "${{ env.LOG_LEVEL }}" \
-                --arg ver "${{ github.ref_name }}" '
+                --arg log "${{ env.LOG_LEVEL }}" '
               map({
                 name: (.name | split("/")[-1] | ascii_upcase | gsub("-"; "_")),
                 value
               }) + [
                 {name: "ENVIRONMENT", value: $env},
-                {name: "LOG_LEVEL",   value: $log},
-                {name: "VERSION",     value: $ver}
+                {name: "LOG_LEVEL",   value: $log}
               ]')
 
           for required in PUBLIC_BASE_URL ALLOWED_ORIGINS; do
