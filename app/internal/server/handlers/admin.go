@@ -802,11 +802,16 @@ func (a *AdminHandler) GeneratePasswordResetLink(w http.ResponseWriter, r *http.
 		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
 		return
 	}
+	id, err := uuid.NewV7()
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "internal error")
+		return
 
+	}
 	// Create password reset token record
 	expiresAt := time.Now().Add(signalsd.PasswordResetExpiry)
 	tokenID, err := a.queries.CreatePasswordResetToken(r.Context(), database.CreatePasswordResetTokenParams{
-		ID:               uuid.New(),
+		ID:               id,
 		UserAccountID:    tagetUserID,
 		ExpiresAt:        expiresAt,
 		CreatedByAdminID: accountID,

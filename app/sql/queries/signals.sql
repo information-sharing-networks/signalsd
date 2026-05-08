@@ -6,7 +6,7 @@
 WITH ids AS (
     SELECT st.id AS signal_type_id,
         i.id AS isn_id,
-        gen_random_uuid() AS signal_id
+       uuidv7() AS signal_id
     FROM signal_types st
     JOIN isn_signal_types ist ON st.id = ist.signal_type_id
     JOIN isn i ON i.id = ist.isn_id
@@ -58,7 +58,7 @@ RETURNING id;
 WITH ids AS (
     SELECT st.id AS signal_type_id,
         i.id AS isn_id,
-        gen_random_uuid() AS signal_id
+       uuidv7() AS signal_id
     FROM signal_types st
     JOIN isn_signal_types ist ON st.id = ist.signal_type_id
     JOIN isn i ON i.id = ist.isn_id
@@ -80,7 +80,7 @@ INSERT INTO signals (
     is_withdrawn,
     is_archived)
 SELECT
-    gen_random_uuid(),
+   uuidv7(),
     now(),
     now(),
     sqlc.arg(account_id),
@@ -130,7 +130,7 @@ INSERT INTO signal_versions (
     content
 )
 SELECT
-    gen_random_uuid(),
+   uuidv7(),
     now(), 
     sqlc.arg(account_id),
     sqlc.arg(signal_batch_id),

@@ -1,11 +1,11 @@
 -- name: CreateUserAccount :one
 INSERT INTO accounts (id, created_at, updated_at, account_type, is_active)
-VALUES ( gen_random_uuid(), NOW(), NOW(), 'user', true)
+VALUES (uuidv7(), NOW(), NOW(), 'user', true)
 RETURNING *;
 
 -- name: CreateServiceAccountAccount :one
 INSERT INTO accounts (id, created_at, updated_at, account_type, is_active)
-VALUES ( gen_random_uuid(), NOW(), NOW(), 'service_account', true)
+VALUES (uuidv7(), NOW(), NOW(), 'service_account', true)
 RETURNING *;
 
 -- return the account and user_role (user_role is not applicable to service_accounts - which are always treated as members - so just return 'member' in these cases)

@@ -102,9 +102,13 @@ func TestPermissions(t *testing.T) {
 	})
 
 	t.Run("error handling ", func(t *testing.T) {
+		id, err := uuid.NewV7()
+		if err != nil {
+			t.Errorf("could not make uuid (%v)", err)
+		}
 
 		t.Run("nonexistent account", func(t *testing.T) {
-			ctx := auth.ContextWithAccountID(context.Background(), uuid.New())
+			ctx := auth.ContextWithAccountID(context.Background(), id)
 			_, err := authService.CreateAccessToken(ctx)
 			if err == nil {
 				t.Fatal("expected error for nonexistent account")

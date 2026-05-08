@@ -374,6 +374,11 @@ func TestSignalSubmission(t *testing.T) {
 		adminSignalID := getSignalIDFromCreateSignalResponse(t, adminResponseBody)
 		ownerSignalID := getSignalIDFromCreateSignalResponse(t, ownerResponseBody)
 
+		randomCorrelationID, err := uuid.NewV7()
+		if err != nil {
+			t.Fatalf("could not make uuid (%v)", err)
+		}
+
 		// tests run as admin - can write to their own isn but not to the siteadmin isn
 		tests := []struct {
 			name              string
@@ -405,7 +410,7 @@ func TestSignalSubmission(t *testing.T) {
 				name:              "random_correlation_id",
 				endpoint:          adminEndpoint,
 				accountID:         adminAccount.ID,
-				correlatedID:      uuid.New().String(),
+				correlatedID:      randomCorrelationID.String(),
 				wantErr:           true,
 				expectedStatus:    422,
 				expectedErrorCode: apperrors.ErrCodeInvalidCorrelationID.String(),

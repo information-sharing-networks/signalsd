@@ -187,6 +187,10 @@ func TestRouteSignals(t *testing.T) {
 	t.Run("record_level_failures", func(t *testing.T) {
 
 		// Unroutable signals: no matching rule or bad correlation ID.
+		missingCorrelationID, err := uuid.NewV7()
+		if err != nil {
+			t.Fatalf("could not make uuid (%v)", err)
+		}
 		unroutableTests := []struct {
 			name              string
 			signal            map[string]any
@@ -199,7 +203,7 @@ func TestRouteSignals(t *testing.T) {
 			},
 			{
 				name:              "correlation_id_not_found",
-				signal:            routerSignalWithCorrelation("s-badcorr", uuid.New(), "value-a"),
+				signal:            routerSignalWithCorrelation("s-badcorr", missingCorrelationID, "value-a"),
 				expectedErrorCode: apperrors.ErrCodeInvalidCorrelationID.String(),
 			},
 		}

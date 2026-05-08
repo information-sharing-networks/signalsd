@@ -209,9 +209,15 @@ func (s *ServiceAccountHandler) RegisterServiceAccount(w http.ResponseWriter, r 
 	}
 
 	// Create one-time secret record (used to complete the set up the service account)
+	id, err := uuid.NewV7()
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "internal error")
+		return
+
+	}
 	expiresAt := time.Now().Add(signalsd.OneTimeSecretExpiry)
 	oneTimeSecretID, err := txQueries.CreateOneTimeClientSecret(r.Context(), database.CreateOneTimeClientSecretParams{
-		ID:                      uuid.New(),
+		ID:                      id,
 		ServiceAccountAccountID: serviceAccountID,
 		PlaintextSecret:         clientSecret,
 		ExpiresAt:               expiresAt,
@@ -383,8 +389,14 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentials(w http.Response
 
 	// Create one-time secret record
 	expiresAt := time.Now().Add(signalsd.OneTimeSecretExpiry)
+	id, err := uuid.NewV7()
+	if err != nil {
+		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "internal error")
+		return
+
+	}
 	oneTimeSecretID, err := txQueries.CreateOneTimeClientSecret(r.Context(), database.CreateOneTimeClientSecretParams{
-		ID:                      uuid.New(),
+		ID:                      id,
 		ServiceAccountAccountID: serviceAccountID,
 		PlaintextSecret:         clientSecret,
 		ExpiresAt:               expiresAt,

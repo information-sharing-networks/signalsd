@@ -13,7 +13,7 @@ import (
 
 const CreateServiceAccountAccount = `-- name: CreateServiceAccountAccount :one
 INSERT INTO accounts (id, created_at, updated_at, account_type, is_active)
-VALUES ( gen_random_uuid(), NOW(), NOW(), 'service_account', true)
+VALUES (uuidv7(), NOW(), NOW(), 'service_account', true)
 RETURNING id, created_at, updated_at, account_type, is_active
 `
 
@@ -32,7 +32,7 @@ func (q *Queries) CreateServiceAccountAccount(ctx context.Context) (Account, err
 
 const CreateUserAccount = `-- name: CreateUserAccount :one
 INSERT INTO accounts (id, created_at, updated_at, account_type, is_active)
-VALUES ( gen_random_uuid(), NOW(), NOW(), 'user', true)
+VALUES (uuidv7(), NOW(), NOW(), 'user', true)
 RETURNING id, created_at, updated_at, account_type, is_active
 `
 
