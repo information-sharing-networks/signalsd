@@ -8,6 +8,7 @@ const (
 	ErrCodeAllSignalsFailedProcessing ErrorCode = "all_signals_failed_processing"
 	ErrCodeAuthenticationFailure      ErrorCode = "authentication_error"
 	ErrCodeAuthorizationFailure       ErrorCode = "authorization_error"
+	ErrCodeClientClosed               ErrorCode = "client_closed"
 	ErrCodeDatabaseError              ErrorCode = "database_error"
 	ErrCodeForbidden                  ErrorCode = "forbidden"
 	ErrCodeInvalidCorrelationID       ErrorCode = "invalid_correlation_id"
@@ -25,6 +26,7 @@ const (
 	ErrCodeResourceExpired            ErrorCode = "resource_expired"
 	ErrCodeResourceInUse              ErrorCode = "resource_in_use"
 	ErrCodeResourceNotFound           ErrorCode = "resource_not_found"
+	ErrCodeTimeout                    ErrorCode = "timeout"
 	ErrCodeTokenInvalid               ErrorCode = "token_invalid"
 )
 

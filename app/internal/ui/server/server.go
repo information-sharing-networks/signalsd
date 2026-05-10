@@ -201,7 +201,9 @@ func (s *Server) setupMiddleware() {
 	s.router.Use(chimiddleware.RealIP)
 	s.router.Use(logger.RequestLogging(s.logger)) // use the signalsd request logger
 	s.router.Use(chimiddleware.Recoverer)
-	s.router.Use(chimiddleware.Timeout(60 * time.Second))
+	// Cancel r.Context() just before WriteTimeout drops the TCP connection,
+	// so in-flight work is abandoned cleanly.
+	s.router.Use(chimiddleware.Timeout(s.config.WriteTimeout - time.Second))
 
 }
 

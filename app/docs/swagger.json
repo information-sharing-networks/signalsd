@@ -2573,6 +2573,7 @@
                 "all_signals_failed_processing",
                 "authentication_error",
                 "authorization_error",
+                "client_closed",
                 "database_error",
                 "forbidden",
                 "invalid_correlation_id",
@@ -2590,6 +2591,7 @@
                 "resource_expired",
                 "resource_in_use",
                 "resource_not_found",
+                "timeout",
                 "token_invalid"
             ],
             "x-enum-varnames": [
@@ -2597,6 +2599,7 @@
                 "ErrCodeAllSignalsFailedProcessing",
                 "ErrCodeAuthenticationFailure",
                 "ErrCodeAuthorizationFailure",
+                "ErrCodeClientClosed",
                 "ErrCodeDatabaseError",
                 "ErrCodeForbidden",
                 "ErrCodeInvalidCorrelationID",
@@ -2614,6 +2617,7 @@
                 "ErrCodeResourceExpired",
                 "ErrCodeResourceInUse",
                 "ErrCodeResourceNotFound",
+                "ErrCodeTimeout",
                 "ErrCodeTokenInvalid"
             ]
         },

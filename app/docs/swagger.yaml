@@ -7,6 +7,7 @@ definitions:
     - all_signals_failed_processing
     - authentication_error
     - authorization_error
+    - client_closed
     - database_error
     - forbidden
     - invalid_correlation_id
@@ -24,6 +25,7 @@ definitions:
     - resource_expired
     - resource_in_use
     - resource_not_found
+    - timeout
     - token_invalid
     type: string
     x-enum-varnames:
@@ -31,6 +33,7 @@ definitions:
     - ErrCodeAllSignalsFailedProcessing
     - ErrCodeAuthenticationFailure
     - ErrCodeAuthorizationFailure
+    - ErrCodeClientClosed
     - ErrCodeDatabaseError
     - ErrCodeForbidden
     - ErrCodeInvalidCorrelationID
@@ -48,6 +51,7 @@ definitions:
     - ErrCodeResourceExpired
     - ErrCodeResourceInUse
     - ErrCodeResourceNotFound
+    - ErrCodeTimeout
     - ErrCodeTokenInvalid
   auth.AccessTokenResponse:
     properties:

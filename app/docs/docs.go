@@ -2582,6 +2582,7 @@ const docTemplate = `{
                 "all_signals_failed_processing",
                 "authentication_error",
                 "authorization_error",
+                "client_closed",
                 "database_error",
                 "forbidden",
                 "invalid_correlation_id",
@@ -2599,6 +2600,7 @@ const docTemplate = `{
                 "resource_expired",
                 "resource_in_use",
                 "resource_not_found",
+                "timeout",
                 "token_invalid"
             ],
             "x-enum-varnames": [
@@ -2606,6 +2608,7 @@ const docTemplate = `{
                 "ErrCodeAllSignalsFailedProcessing",
                 "ErrCodeAuthenticationFailure",
                 "ErrCodeAuthorizationFailure",
+                "ErrCodeClientClosed",
                 "ErrCodeDatabaseError",
                 "ErrCodeForbidden",
                 "ErrCodeInvalidCorrelationID",
@@ -2623,6 +2626,7 @@ const docTemplate = `{
                 "ErrCodeResourceExpired",
                 "ErrCodeResourceInUse",
                 "ErrCodeResourceNotFound",
+                "ErrCodeTimeout",
                 "ErrCodeTokenInvalid"
             ]
         },

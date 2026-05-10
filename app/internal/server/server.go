@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
@@ -182,6 +183,9 @@ func (s *Server) setupMiddleware() {
 	s.router.Use(chimiddleware.StripSlashes)
 	s.router.Use(middleware.SecurityHeaders(s.config.Environment))
 	s.router.Use(middleware.RateLimit(s.config.RateLimitRPS, s.config.RateLimitBurst))
+	// Cancel r.Context() just before WriteTimeout drops the TCP connection,
+	// so in-flight DB queries and goroutines are abandoned cleanly.
+	s.router.Use(chimiddleware.Timeout(s.config.WriteTimeout - time.Second))
 }
 
 func (s *Server) registerAdminRoutes() {

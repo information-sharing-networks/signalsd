@@ -1,6 +1,7 @@
 package responses
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -150,10 +151,10 @@ func Wrap(fn JSONHandler) http.HandlerFunc {
 //
 // For apperrors.OauthError the response is OAuthErrorResponse (RFC 6749 §5.2)
 // For apperrors.HTTPError the response is the app standard ErrorResponse format.
+// All other errors are rendered as 500, except when context cancellation/timeout
+// is detected in this case the error is overwritten with a 499 or 504.
 //
-// # If a bare error is received it is rendered as a 500 error with a generic client message
-//
-// The client message and detalied error are logged. The client just gets
+// The client message and detailed error are logged. The client just gets
 // the sanitised client message.
 func RenderError(w http.ResponseWriter, r *http.Request, err error) {
 	if err == nil {
@@ -192,6 +193,15 @@ func RenderError(w http.ResponseWriter, r *http.Request, err error) {
 	herr, ok := errors.AsType[*apperrors.HTTPError](err)
 	if !ok {
 		herr = apperrors.InternalError("", err)
+	}
+
+	// check for client request cancellations and timeouts
+	switch {
+	case errors.Is(r.Context().Err(), context.Canceled):
+		herr = &apperrors.HTTPError{Status: 499, Code: apperrors.ErrCodeClientClosed, Err: err}
+	case errors.Is(r.Context().Err(), context.DeadlineExceeded),
+		errors.Is(err, context.DeadlineExceeded):
+		herr = &apperrors.HTTPError{Status: http.StatusGatewayTimeout, Code: apperrors.ErrCodeTimeout, Err: err}
 	}
 	attrs := []slog.Attr{slog.String("error_code", herr.Code.String())}
 
