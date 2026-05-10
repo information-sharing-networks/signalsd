@@ -39,12 +39,14 @@ func (a *AuthService) RequireAuth(next http.Handler) http.Handler {
 			if err != nil {
 				reqLogger.Error("could not decode access token detail cookie ", slog.String("error", err.Error()), slog.String("component", "ui.RequireAuth"))
 				redirectToLogin(w, r)
+				return
 			}
 
 			accessTokenDetails := &types.AccessTokenDetails{}
 			if err := json.Unmarshal(decodedAccessTokenDetails, accessTokenDetails); err != nil {
 				reqLogger.Error("could not unmarshal access token detail", slog.String("error", err.Error()), slog.String("component", "ui.RequireAuth"))
 				redirectToLogin(w, r)
+				return
 			}
 
 			// check the access token status
@@ -56,10 +58,6 @@ func (a *AuthService) RequireAuth(next http.Handler) http.Handler {
 
 		switch tokenStatus {
 		case TokenValid:
-			reqLogger.Debug("Authentication check successful",
-				slog.String("component", "ui.RequireAuth"),
-			)
-
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 
@@ -131,13 +129,6 @@ func (a *AuthService) RequireRole(allowedRoles ...string) func(http.Handler) htt
 
 			for _, role := range allowedRoles {
 				if accessTokenDetails.Role == role {
-					reqLogger.Debug("Role authorization successful",
-						slog.String("component", "ui.RequireRole"),
-						slog.String("account_id", accessTokenDetails.AccountID),
-						slog.Any("allowed_roles", allowedRoles),
-						slog.String("role", role),
-					)
-
 					next.ServeHTTP(w, r)
 					return
 				}
@@ -176,9 +167,7 @@ func (a *AuthService) RequireIsnAdmin(next http.Handler) http.Handler {
 		}
 
 		for perm := range accessTokenDetails.IsnPerms {
-
 			if accessTokenDetails.IsnPerms[perm].CanAdminister {
-				reqLogger.Debug("ISN admin check successful", slog.String("component", "ui.RequireIsnAdmin"))
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -210,9 +199,6 @@ func (a *AuthService) RequireIsnAccess(next http.Handler) http.Handler {
 			return
 		}
 
-		reqLogger.Debug("ISN access check successful", slog.String("component", "ui.RequireIsnAccess"))
-
-		// ISN permissions exist in context = user has access to one or more ISNs, proceed to handler
 		next.ServeHTTP(w, r)
 	})
 }

@@ -83,15 +83,7 @@ func (s *Server) CreateServiceAccount(w http.ResponseWriter, r *http.Request) {
 	res, err := s.apiClient.CreateServiceAccount(accessTokenDetails.AccessToken, req)
 	if err != nil {
 		reqLogger.Error("Failed to create service account", slog.String("error", err.Error()))
-
-		var msg string
-		if ce, ok := err.(*client.ClientError); ok {
-			msg = ce.UserError()
-		} else {
-			msg = "An error occurred. Please try again."
-		}
-
-		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
+		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)
 		return
 	}
 
@@ -131,15 +123,7 @@ func (s *Server) ReissueServiceAccountCredentials(w http.ResponseWriter, r *http
 	res, err := s.apiClient.ReissueServiceAccountCredentials(accessTokenDetails.AccessToken, req)
 	if err != nil {
 		reqLogger.Error("Failed to reissue service account credentials", slog.String("error", err.Error()))
-
-		var msg string
-		if ce, ok := err.(*client.ClientError); ok {
-			msg = ce.UserError()
-		} else {
-			msg = "An error occurred. Please try again."
-		}
-
-		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
+		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)
 		return
 	}
 

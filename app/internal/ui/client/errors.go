@@ -4,6 +4,7 @@ package client
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -25,6 +26,17 @@ func (e *ClientError) Error() string {
 // UserError returns the user-friendly message
 func (e *ClientError) UserError() string {
 	return e.UserMessage
+}
+
+// UserMessage extracts the user-facing message from a ClientError. Falls back
+// to a generic message for any other error type.
+func UserMessage(err error) string {
+
+	cerr, ok := errors.AsType[*ClientError](err)
+	if ok {
+		return cerr.UserMessage
+	}
+	return "An error occurred. Please try again."
 }
 
 // NewConnectionError creates a ClientError for network/connection issues

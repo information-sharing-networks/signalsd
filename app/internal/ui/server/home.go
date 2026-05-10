@@ -141,15 +141,7 @@ func (s *Server) Register(w http.ResponseWriter, r *http.Request) {
 	err := s.apiClient.RegisterUser(email, password)
 	if err != nil {
 		reqLogger.Error("Registration failed", slog.String("error", err.Error()))
-
-		var msg string
-		if ce, ok := err.(*client.ClientError); ok {
-			msg = ce.UserError()
-		} else {
-			msg = "An error occurred. Please try again."
-		}
-
-		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
+		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)
 		return
 	}
 

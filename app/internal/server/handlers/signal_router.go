@@ -341,7 +341,7 @@ func (s *SignalRouter) RouteSignals(w http.ResponseWriter, r *http.Request) erro
 			// rollback partial load of the signal
 			if rollbackErr := tx.Rollback(r.Context()); rollbackErr != nil {
 				logger.ContextWithLogAttrs(r.Context(),
-					slog.String("error", rollbackErr.Error()),
+					slog.String("rollback_error", rollbackErr.Error()),
 				)
 			}
 			errMsg := fmt.Sprintf("failed to create signal: %v", signalErr)
@@ -363,7 +363,7 @@ func (s *SignalRouter) RouteSignals(w http.ResponseWriter, r *http.Request) erro
 			// rollback partial load of the signal
 			if rollbackErr := tx.Rollback(r.Context()); rollbackErr != nil {
 				logger.ContextWithLogAttrs(r.Context(),
-					slog.String("error", rollbackErr.Error()),
+					slog.String("rollback_error", rollbackErr.Error()),
 				)
 			}
 			result.FailedSignals = append(result.FailedSignals, FailedSignal{

@@ -70,15 +70,7 @@ func (s *Server) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	err := s.apiClient.UpdatePassword(accessTokenDetails.AccessToken, currentPassword, newPassword)
 	if err != nil {
 		reqLogger.Error("Failed to update password", slog.String("error", err.Error()))
-
-		var msg string
-		if ce, ok := err.(*client.ClientError); ok {
-			msg = ce.UserError()
-		} else {
-			msg = "An error occurred. Please try again."
-		}
-
-		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
+		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)
 		return
 	}
 
@@ -148,15 +140,7 @@ func (s *Server) GeneratePasswordResetLink(w http.ResponseWriter, r *http.Reques
 	res, err := s.apiClient.GeneratePasswordResetLink(accessTokenDetails.AccessToken, email)
 	if err != nil {
 		reqLogger.Error("Failed to generate password reset link for user", slog.String("error", err.Error()))
-
-		var msg string
-		if ce, ok := err.(*client.ClientError); ok {
-			msg = ce.UserError()
-		} else {
-			msg = "An error occurred. Please try again."
-		}
-
-		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
+		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)
 		return
 	}
 
@@ -317,15 +301,7 @@ func (s *Server) ManageAccountStatus(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		reqLogger.Error("Failed to update account status", slog.String("error", err.Error()))
-
-		var msg string
-		if ce, ok := err.(*client.ClientError); ok {
-			msg = ce.UserError()
-		} else {
-			msg = "An error occurred. Please try again."
-		}
-
-		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
+		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)
 		return
 	}
 
@@ -410,15 +386,7 @@ func (s *Server) ManageAdminRoles(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		reqLogger.Error("Failed to update admin role", slog.String("error", err.Error()), slog.String("action", action), slog.String("user_email", userEmail))
-
-		var msg string
-		if ce, ok := err.(*client.ClientError); ok {
-			msg = ce.UserError()
-		} else {
-			msg = "An error occurred. Please try again."
-		}
-
-		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
+		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)
 		return
 	}
 
@@ -470,15 +438,7 @@ func (s *Server) ManageSiteAdminRoles(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		reqLogger.Error("Failed to update site admin role", slog.String("error", err.Error()), slog.String("action", action), slog.String("user_email", userEmail))
-
-		var msg string
-		if ce, ok := err.(*client.ClientError); ok {
-			msg = ce.UserError()
-		} else {
-			msg = "An error occurred. Please try again."
-		}
-
-		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
+		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)
 		return
 	}
 

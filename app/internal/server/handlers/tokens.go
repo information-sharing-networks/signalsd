@@ -286,7 +286,7 @@ func (a *TokenHandler) RotateServiceAccountSecret(w http.ResponseWriter, r *http
 	defer func() {
 		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
+				slog.String("rollback_error", err.Error()),
 			)
 		}
 	}()

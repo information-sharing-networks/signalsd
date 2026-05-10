@@ -124,15 +124,7 @@ func (s *Server) CreateSignalType(w http.ResponseWriter, r *http.Request) {
 	response, err := s.apiClient.CreateSignalType(accessTokenDetails.AccessToken, createReq)
 	if err != nil {
 		reqLogger.Error("Failed to create signal type", slog.String("error", err.Error()))
-
-		var msg string
-		if ce, ok := err.(*client.ClientError); ok {
-			msg = ce.UserError()
-		} else {
-			msg = "An error occurred. Please try again."
-		}
-
-		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
+		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)
 		return
 	}
 
@@ -188,15 +180,7 @@ func (s *Server) RegisterNewSignalTypeSchema(w http.ResponseWriter, r *http.Requ
 	response, err := s.apiClient.RegisterNewSignalTypeSchema(accessTokenDetails.AccessToken, createReq)
 	if err != nil {
 		reqLogger.Error("Failed to register new schema for signal type", slog.String("error", err.Error()))
-
-		var msg string
-		if ce, ok := err.(*client.ClientError); ok {
-			msg = ce.UserError()
-		} else {
-			msg = "An error occurred. Please try again."
-		}
-
-		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
+		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)
 		return
 	}
 
@@ -246,15 +230,7 @@ func (s *Server) AddSignalTypeToIsn(w http.ResponseWriter, r *http.Request) {
 	err := s.apiClient.AddSignalTypeToIsn(accessTokenDetails.AccessToken, isnSlug, associateReq)
 	if err != nil {
 		reqLogger.Error("Failed to add signal type to the ISN", slog.String("error", err.Error()))
-
-		var msg string
-		if ce, ok := err.(*client.ClientError); ok {
-			msg = ce.UserError()
-		} else {
-			msg = "An error occurred. Please try again."
-		}
-
-		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
+		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)
 		return
 	}
 
@@ -374,15 +350,7 @@ func (s *Server) ManageIsnSignalTypesStatus(w http.ResponseWriter, r *http.Reque
 	err := s.apiClient.UpdateIsnSignalTypeStatus(accessTokenDetails.AccessToken, isnSlug, signalTypeSlug, semVer, isInUse)
 	if err != nil {
 		reqLogger.Error("Failed to update ISN signal type status", slog.String("error", err.Error()))
-
-		var msg string
-		if ce, ok := err.(*client.ClientError); ok {
-			msg = ce.UserError()
-		} else {
-			msg = "An error occurred. Please try again."
-		}
-
-		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
+		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)
 		return
 	}
 

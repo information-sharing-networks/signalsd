@@ -112,7 +112,6 @@ func (s *Server) RegisterRoutes() {
 		r.Group(func(r chi.Router) {
 
 			r.Use(s.authService.RequireRole("isnadmin", "siteadmin"))
-			r.Use(s.authService.AddAccountIDToLogContext)
 
 			//dashboard
 			r.Get("/admin", s.IsnAdminDashboardPage)

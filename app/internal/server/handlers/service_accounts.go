@@ -135,7 +135,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccount(w http.ResponseWriter, r 
 	defer func() {
 		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
+				slog.String("rollback_error", err.Error()),
 			)
 
 		}
@@ -301,7 +301,7 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentials(w http.Response
 	defer func() {
 		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
+				slog.String("rollback_error", err.Error()),
 			)
 
 		}
@@ -406,7 +406,7 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 	defer func() {
 		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
+				slog.String("rollback_error", err.Error()),
 			)
 
 			s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
@@ -421,7 +421,7 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", "setup id has already been used or is no longer valid"),
+				slog.String("reason", "setup id has already been used or is no longer valid"),
 			)
 
 			s.renderErrorPage(w, "set up ID not found ", "The setup ID you provided has already been used or is no longer valid")
@@ -438,7 +438,7 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 	// Check if token has expired
 	if time.Now().After(oneTimeSecret.ExpiresAt) {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error:", "setup id has expired"),
+			slog.String("reason", "setup id has expired"),
 		)
 
 		s.renderErrorPage(w, "set up ID not found or already used", "The setup ID you provided has already been used or is no longer valid")

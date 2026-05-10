@@ -165,7 +165,7 @@ func (i *IsnHandler) CreateIsn(w http.ResponseWriter, r *http.Request) error {
 	defer func() {
 		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
+				slog.String("rollback_error", err.Error()),
 			)
 
 		}

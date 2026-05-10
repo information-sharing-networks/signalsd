@@ -182,11 +182,7 @@ func (s *Server) SaveSignalRoutingConfig(w http.ResponseWriter, r *http.Request)
 	})
 	if err != nil {
 		reqLogger.Error("failed to save routing rules", slog.String("error", err.Error()))
-		msg := "An error occurred saving the routing rules. Please try again."
-		if ce, ok := err.(*client.ClientError); ok {
-			msg = ce.UserError()
-		}
-		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
+		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)
 		return
 	}
 
@@ -222,11 +218,7 @@ func (s *Server) DeleteSignalRoutingConfig(w http.ResponseWriter, r *http.Reques
 
 	if err := s.apiClient.DeleteSignalRoutingConfig(accessTokenDetails.AccessToken, slug, semVer); err != nil {
 		reqLogger.Error("failed to delete routing rules", slog.String("error", err.Error()))
-		msg := "An error occurred. Please try again."
-		if ce, ok := err.(*client.ClientError); ok {
-			msg = ce.UserError()
-		}
-		templ.Handler(templates.ErrorAlert(msg)).ServeHTTP(w, r)
+		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)
 		return
 	}
 

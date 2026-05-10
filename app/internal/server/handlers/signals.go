@@ -573,7 +573,7 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) e
 				// roll back partial transaction
 				if rollbackErr := tx.Rollback(r.Context()); rollbackErr != nil {
 					logger.ContextWithLogAttrs(r.Context(),
-						slog.String("error", rollbackErr.Error()),
+						slog.String("rollback_error", rollbackErr.Error()),
 					)
 
 				}
@@ -590,7 +590,7 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) e
 				// rollback partial transaction
 				if rollbackErr := tx.Rollback(r.Context()); rollbackErr != nil {
 					logger.ContextWithLogAttrs(r.Context(),
-						slog.String("error", rollbackErr.Error()),
+						slog.String("rollback_error", rollbackErr.Error()),
 					)
 				}
 				// log the failure
@@ -619,7 +619,7 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) e
 			if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 				// Log the error but don't try to respond since the request may have already timed out
 				logger.ContextWithLogAttrs(r.Context(),
-					slog.String("error", err.Error()),
+					slog.String("rollback_error", err.Error()),
 				)
 
 				continue
@@ -655,7 +655,7 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) e
 			if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 				// Log the error but don't try to respond since the request may have already timed out
 				logger.ContextWithLogAttrs(r.Context(),
-					slog.String("error", err.Error()),
+					slog.String("rollback_error", err.Error()),
 				)
 
 			}

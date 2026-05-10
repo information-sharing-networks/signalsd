@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -28,8 +29,6 @@ import (
 // these fields will automatically be included in the final request log for all requests that require an access token.
 func (a *AuthService) RequireValidAccessToken(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		reqLogger := logger.ContextRequestLogger(r.Context())
-
 		accessToken, err := a.GetAccessTokenFromHeader(r.Header)
 		if err != nil {
 			responses.RenderError(w, r, &apperrors.HTTPError{
@@ -82,12 +81,6 @@ func (a *AuthService) RequireValidAccessToken(next http.Handler) http.Handler {
 			return
 		}
 
-		reqLogger.Debug("Access token validation successful",
-			slog.String("component", "signalsd.RequireValidAccessToken"),
-			slog.String("account_id", accountID.String()),
-			slog.String("account_type", claims.AccountType),
-		)
-
 		// Add account_id, role and account_type to final request log context
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("account_id", accountID.String()),
@@ -130,7 +123,7 @@ func (a *AuthService) RequireAuthByGrantType(next http.Handler) http.Handler {
 
 // RequireValidRefreshToken checks that the refresh token is present, not expired and not revoked.
 //
-// # The refresh token is read from the HTTP-only cookie
+// The refresh token is read from the HTTP-only cookie.
 //
 // If the token is valid, the userAccountID, accountType, and hashedRefreshToken are added to the Context.
 func (a *AuthService) RequireValidRefreshToken(next http.Handler) http.Handler {
@@ -165,9 +158,7 @@ func (a *AuthService) RequireValidRefreshToken(next http.Handler) http.Handler {
 
 		reqLogger := logger.ContextRequestLogger(r.Context())
 
-		// Log successful refresh token validation immediately
-		reqLogger.Debug("Refresh token validation successful",
-			slog.String("component", "signalsd.RequireValidRefreshToken"),
+		reqLogger.Info("Refresh token validation successful",
 			slog.String("account_id", userAccountID.String()),
 		)
 
@@ -292,25 +283,14 @@ func (a *AuthService) RequireRole(allowedRoles ...string) func(http.Handler) htt
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-			reqLogger := logger.ContextRequestLogger(r.Context())
-
 			claims, ok := ContextClaims(r.Context())
 			if !ok {
 				responses.RenderError(w, r, apperrors.InternalError("could not get claims from context", nil))
 				return
 			}
-			for _, role := range allowedRoles {
-				if claims.Role == role {
-					reqLogger.Debug("Role authorization successful",
-						slog.String("component", "signalsd.RequireAuth"),
-						slog.String("account_id", claims.AccountID.String()),
-						slog.Any("allowed_roles", allowedRoles),
-						slog.String("role", role),
-					)
-
-					next.ServeHTTP(w, r)
-					return
-				}
+			if slices.Contains(allowedRoles, claims.Role) {
+				next.ServeHTTP(w, r)
+				return
 			}
 
 			// let the logger middleware handle log message

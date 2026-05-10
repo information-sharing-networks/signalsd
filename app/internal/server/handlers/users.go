@@ -107,7 +107,7 @@ func (u *UserHandler) RegisterUser(w http.ResponseWriter, r *http.Request) error
 		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 			// Log the error but don't try to respond since the request may have already timed out
 			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
+				slog.String("rollback_error", err.Error()),
 			)
 
 		}
@@ -595,7 +595,7 @@ func (u *UserHandler) PasswordResetTokenPage(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", "password reset token has already been used or is no longer valid"),
+				slog.String("reason", "password reset token has already been used or is no longer valid"),
 			)
 
 			u.renderErrorPage(w, "Reset Token Not Found", "The password reset token you provided has already been used or is no longer valid")
@@ -612,7 +612,7 @@ func (u *UserHandler) PasswordResetTokenPage(w http.ResponseWriter, r *http.Requ
 	// Check if token has expired
 	if time.Now().After(resetToken.ExpiresAt) {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", "password reset token has expired"),
+			slog.String("reason", "password reset token has expired"),
 		)
 
 		u.renderErrorPage(w, "Reset Token Expired", "The password reset token you provided has expired. Please contact your administrator for a new reset link.")
@@ -710,7 +710,7 @@ func (u *UserHandler) PasswordResetToken(w http.ResponseWriter, r *http.Request)
 	defer func() {
 		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
+				slog.String("rollback_error", err.Error()),
 			)
 		}
 	}()
