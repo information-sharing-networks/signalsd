@@ -30,40 +30,70 @@ func (e *HTTPError) Error() string {
 
 func (e *HTTPError) Unwrap() error { return e.Err }
 
+// InternalError responds with 500 + internal_error.
 func InternalError(message string, err error) *HTTPError {
 	return &HTTPError{Status: http.StatusInternalServerError, Code: ErrCodeInternalError, Message: message, Err: err}
 }
 
+// DatabaseError responds with 500 + database_error.
 func DatabaseError(message string, err error) *HTTPError {
 	return &HTTPError{Status: http.StatusInternalServerError, Code: ErrCodeDatabaseError, Message: message, Err: err}
 }
 
+// MalformedBody responds with 400 + malformed_body.
 func MalformedBody(message string, err error) *HTTPError {
 	return &HTTPError{Status: http.StatusBadRequest, Code: ErrCodeMalformedBody, Message: message, Err: err}
 }
 
+// InvalidRequest responds with 400 + invalid_request.
 func InvalidRequest(message string, err error) *HTTPError {
 	return &HTTPError{Status: http.StatusBadRequest, Code: ErrCodeInvalidRequest, Message: message, Err: err}
 }
 
+// InvalidURLParam responds with 400 + invalid_url_param.
 func InvalidURLParam(message string, err error) *HTTPError {
 	return &HTTPError{Status: http.StatusBadRequest, Code: ErrCodeInvalidURLParam, Message: message, Err: err}
 }
 
+// NotFound responds with 404 + resource_not_found.
 func NotFound(message string, err error) *HTTPError {
 	return &HTTPError{Status: http.StatusNotFound, Code: ErrCodeResourceNotFound, Message: message, Err: err}
 }
 
+// Forbidden responds with 403 + forbidden.
 func Forbidden(message string, err error) *HTTPError {
 	return &HTTPError{Status: http.StatusForbidden, Code: ErrCodeForbidden, Message: message, Err: err}
 }
 
+// AlreadyExists responds with 409 + resource_already_exists.
 func AlreadyExists(message string, err error) *HTTPError {
 	return &HTTPError{Status: http.StatusConflict, Code: ErrCodeResourceAlreadyExists, Message: message, Err: err}
 }
 
+// AuthenticationFailure responds with 401 + authentication_error.
+// Use for errors authenticating logged in users
 func AuthenticationFailure(message string, err error) *HTTPError {
 	return &HTTPError{Status: http.StatusUnauthorized, Code: ErrCodeAuthenticationFailure, Message: message, Err: err}
+}
+
+// TokenCreationFailure responds with 500 + token_creation_failed.
+func TokenCreationFailure(message string, err error) *HTTPError {
+	return &HTTPError{Status: http.StatusInternalServerError, Code: ErrCodeFailedToCreateToken, Message: message, Err: err}
+}
+
+// PasswordTooShort responds with 400 + password_too_short.
+func PasswordTooShort(message string, err error) *HTTPError {
+	return &HTTPError{Status: http.StatusBadRequest, Code: ErrCodePasswordTooShort, Message: message, Err: err}
+}
+
+// ResourceExpired responds with 410 + resource_expired.
+func ResourceExpired(message string, err error) *HTTPError {
+	return &HTTPError{Status: http.StatusGone, Code: ErrCodeResourceExpired, Message: message, Err: err}
+}
+
+// ResourceInUse responds with 409 + resource_in_use.
+func ResourceInUse(message string, err error) *HTTPError {
+	return &HTTPError{Status: http.StatusConflict, Code: ErrCodeResourceInUse, Message: message, Err: err}
 }
 
 // OAuthError is returned by OAuth 2.0 endpoints (/oauth/token, /oauth/revoke).
@@ -94,10 +124,10 @@ func (e *OAuthError) Error() string {
 
 func (e *OAuthError) Unwrap() error { return e.Err }
 
-// OAuth canonical constructors. Pass nil for err when there is no wrapped error.
+// OAuth constructors. Pass nil for err when there is no wrapped error.
 
 // OAuthServerError responds with 500 + server_error.
-// Description is logged but never sent to the client.
+// Description is logged but not sent to the client.
 func OAuthServerError(description string, appCode ErrorCode, err error) *OAuthError {
 	return &OAuthError{Status: http.StatusInternalServerError, OAuthCode: "server_error", Description: description, AppCode: appCode, Err: err}
 }

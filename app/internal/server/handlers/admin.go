@@ -68,7 +68,8 @@ type AccountStatusResponse struct {
 //	@Tags			Site Admin
 //
 //	@Success		200
-//	@Failure		403	{object}	responses.ErrorResponse
+//	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Router			/api/admin/reset [post]
 func (a *AdminHandler) ResetEnv(w http.ResponseWriter, r *http.Request) error {
@@ -162,9 +163,10 @@ func (a *AdminHandler) Version(w http.ResponseWriter, r *http.Request) error {
 //	@Param			account_id	path	string	true	"Account ID to disable"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
 //	@Success		200
-//	@Failure		400	{object}	responses.ErrorResponse	"Invalid account ID format"
-//	@Failure		401	{object}	responses.ErrorResponse	"Authentication failed "
-//	@Failure		404	{object}	responses.ErrorResponse	"Account not found"
+//	@Failure		400	{object}	responses.ErrorResponse	"invalid_url_param"
+//	@Failure		401	{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
 //
@@ -277,10 +279,11 @@ func (a *AdminHandler) DisableAccount(w http.ResponseWriter, r *http.Request) er
 //	@Param			account_id	path	string	true	"Account ID to enable"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
 //	@Success		200
-//	@Failure		400	{object}	responses.ErrorResponse	"Invalid account ID format"
-//	@Failure		401	{object}	responses.ErrorResponse	"Authentication failed "
-//	@Failure		403	{object}	responses.ErrorResponse	"Insufficient permissions "
-//	@Failure		404	{object}	responses.ErrorResponse	"Account not found"
+//	@Failure		400	{object}	responses.ErrorResponse	"invalid_url_param"
+//	@Failure		401	{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
 //
@@ -337,10 +340,11 @@ func (a *AdminHandler) EnableAccount(w http.ResponseWriter, r *http.Request) err
 //	@Param			email	query		string					false	"user email address"	example(user@example.com)
 //	@Success		200		{array}		handlers.UserDetails	"All users (when no query params)"
 //	@Success		200		{object}	handlers.UserDetails	"Specific user (when query params provided)"
-//	@Failure		400		{object}	responses.ErrorResponse	"Invalid request - cannot provide both id and email parameters"
-//	@Failure		401		{object}	responses.ErrorResponse	"Authentication failed"
-//	@Failure		403		{object}	responses.ErrorResponse	"Insufficient permissions"
-//	@Failure		404		{object}	responses.ErrorResponse	"User not found"
+//	@Failure		400		{object}	responses.ErrorResponse	"invalid_request"
+//	@Failure		401		{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		403		{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		404		{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500		{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
 //
@@ -450,8 +454,11 @@ func (a *AdminHandler) GetUsers(w http.ResponseWriter, r *http.Request) error {
 //	@Param		client_organization	query		string	false	"Service Account Organization (must be used with client_email)"			example(Example Org)
 //
 //	@Success	200					{array}		handlers.ServiceAccountDetails
-//	@Failure	401					{object}	responses.ErrorResponse	"Authentication failed"
-//	@Failure	403					{object}	responses.ErrorResponse	"Insufficient permissions"
+//	@Failure	400					{object}	responses.ErrorResponse	"invalid_request"
+//	@Failure	401					{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure	403					{object}	responses.ErrorResponse	"forbidden"
+//	@Failure	404					{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure	500					{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security	BearerAccessToken
 //
@@ -608,10 +615,11 @@ type GeneratePasswordResetLinkResponse struct {
 //	@Param			user_id	path		string	true	"User Account ID"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
 //	@Success		200		{object}	handlers.GeneratePasswordResetLinkResponse
-//	@Failure		400		{object}	responses.ErrorResponse
-//	@Failure		401		{object}	responses.ErrorResponse	"Unauthorized"
-//	@Failure		403		{object}	responses.ErrorResponse	"Forbidden - admin role required"
-//	@Failure		404		{object}	responses.ErrorResponse	"User not found"
+//	@Failure		400		{object}	responses.ErrorResponse	"invalid_url_param"
+//	@Failure		401		{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		403		{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		404		{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500		{object}	responses.ErrorResponse	"database_error | internal_error"
 //
 //	@Security		BearerAccessToken
 //

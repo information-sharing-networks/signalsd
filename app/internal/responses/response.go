@@ -18,10 +18,10 @@ const internalServerErrorMessage = "Internal Server Error"
 type ErrorResponse struct {
 
 	// Standard app error code
-	ErrorCode apperrors.ErrorCode `json:"error_code" example:"access_token_expired"`
+	ErrorCode apperrors.ErrorCode `json:"error_code" example:"error_code"`
 
 	// Client message
-	Message string `json:"message" example:"access token expired, please use the /oauth/token endpoint to renew it"`
+	Message string `json:"message" example:"client message"`
 
 	// request tracking id
 	RequestID string `json:"request_id,omitempty" example:"a1b2c3d4"`

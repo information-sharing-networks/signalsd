@@ -76,10 +76,10 @@ type BatchSearchParams struct {
 //	@Param		account_id	query		string	false	"Account ID (site admins only)"
 //
 //	@Success	200			{object}	BatchStatusResponse
-//	@Failure	400			{object}	responses.ErrorResponse
-//	@Failure	403			{object}	responses.ErrorResponse
-//	@Failure	404			{object}	responses.ErrorResponse
-//	@Failure	500			{object}	responses.ErrorResponse
+//	@Failure	400			{object}	responses.ErrorResponse	"invalid_request"
+//	@Failure	403			{object}	responses.ErrorResponse	"forbidden"
+//	@Failure	404			{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure	500			{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security	BearerAccessToken
 //	@Router		/api/batches/{batch_ref}/status [get]
@@ -208,8 +208,8 @@ func (s *SignalsBatchHandler) getBatchStatusDetails(ctx context.Context, batchID
 //	@Param			created_before	query		string	false	"Latest batch creation time"	example(2006-01-02T16:00:00Z)
 //
 //	@Success		200				{array}		BatchStatusResponse
-//	@Failure		400				{object}	responses.ErrorResponse
-//	@Failure		500				{object}	responses.ErrorResponse
+//	@Failure		400				{object}	responses.ErrorResponse	"invalid_url_param"
+//	@Failure		500				{object}	responses.ErrorResponse	"database_error"
 //	@Security		BearerAccessToken
 //	@Router			/api/batches/search [get]
 func (s *SignalsBatchHandler) SearchBatches(w http.ResponseWriter, r *http.Request) error {

@@ -50,9 +50,9 @@ type LoginRequest struct {
 //	@Param			request	body		handlers.LoginRequest	true	"email and password"
 //
 //	@Success		200		{object}	auth.AccessTokenResponse
-//	@Failure		400		{object}	responses.ErrorResponse
-//	@Failure		401		{object}	responses.ErrorResponse
-//	@Failure		500		{object}	responses.ErrorResponse
+//	@Failure		400		{object}	responses.ErrorResponse	"malformed_body"
+//	@Failure		401		{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		500		{object}	responses.ErrorResponse	"database_error | token_creation_failed"
 //
 //	@Router			/api/auth/login [post]
 func (l *LoginHandler) Login(w http.ResponseWriter, r *http.Request) error {
@@ -97,23 +97,13 @@ func (l *LoginHandler) Login(w http.ResponseWriter, r *http.Request) error {
 
 	accessTokenResponse, err := l.authService.CreateAccessToken(ctx)
 	if err != nil {
-		return &apperrors.HTTPError{
-			Status:  http.StatusInternalServerError,
-			Code:    apperrors.ErrCodeTokenInvalid,
-			Message: "error creating access token",
-			Err:     err,
-		}
+		return apperrors.TokenCreationFailure("error creating access token", err)
 	}
 
 	// new refresh token
 	refreshToken, err := l.authService.RotateRefreshToken(ctx)
 	if err != nil {
-		return &apperrors.HTTPError{
-			Status:  http.StatusInternalServerError,
-			Code:    apperrors.ErrCodeTokenInvalid,
-			Message: "error creating refresh token",
-			Err:     err,
-		}
+		return apperrors.TokenCreationFailure("error creating refresh token", err)
 	}
 
 	// include the new refresh token in a http-only cookie

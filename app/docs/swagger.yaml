@@ -26,7 +26,7 @@ definitions:
     - resource_in_use
     - resource_not_found
     - timeout
-    - token_invalid
+    - token_creation_failed
     type: string
     x-enum-varnames:
     - ErrCodeAccessTokenExpired
@@ -52,7 +52,7 @@ definitions:
     - ErrCodeResourceInUse
     - ErrCodeResourceNotFound
     - ErrCodeTimeout
-    - ErrCodeTokenInvalid
+    - ErrCodeFailedToCreateToken
   auth.AccessTokenResponse:
     properties:
       access_token:
@@ -965,11 +965,10 @@ definitions:
         allOf:
         - $ref: '#/definitions/apperrors.ErrorCode'
         description: Standard app error code
-        example: access_token_expired
+        example: error_code
       message:
         description: Client message
-        example: access token expired, please use the /oauth/token endpoint to renew
-          it
+        example: client message
         type: string
       request_id:
         description: request tracking id
@@ -1138,15 +1137,19 @@ paths:
         "200":
           description: OK
         "400":
-          description: Invalid account ID format
+          description: invalid_url_param
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: 'Authentication failed '
+          description: authentication_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
-          description: Account not found
+          description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -1176,19 +1179,23 @@ paths:
         "200":
           description: OK
         "400":
-          description: Invalid account ID format
+          description: invalid_url_param
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: 'Authentication failed '
+          description: authentication_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
-          description: 'Insufficient permissions '
+          description: forbidden
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
-          description: Account not found
+          description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -1210,11 +1217,15 @@ paths:
         "204":
           description: No Content
         "400":
-          description: Bad Request
+          description: invalid_request
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
-          description: Forbidden
+          description: forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -1252,11 +1263,15 @@ paths:
         "204":
           description: No Content
         "400":
-          description: Bad Request
+          description: invalid_request
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
-          description: Forbidden
+          description: forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -1278,11 +1293,15 @@ paths:
         "204":
           description: No Content
         "400":
-          description: Bad Request
+          description: invalid_request
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
-          description: Forbidden
+          description: forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -1314,11 +1333,15 @@ paths:
         "204":
           description: No Content
         "400":
-          description: Bad Request
+          description: invalid_request
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
-          description: Forbidden
+          description: forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -1349,15 +1372,19 @@ paths:
         "200":
           description: OK
         "400":
-          description: Bad Request
+          description: malformed_body | invalid_request
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
-          description: Forbidden
+          description: forbidden
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
-          description: Not Found
+          description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -1375,7 +1402,11 @@ paths:
         "200":
           description: OK
         "403":
-          description: Forbidden
+          description: forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       summary: Site Reset
@@ -1415,12 +1446,24 @@ paths:
             items:
               $ref: '#/definitions/handlers.ServiceAccountDetails'
             type: array
+        "400":
+          description: invalid_request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: Authentication failed
+          description: authentication_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
-          description: Insufficient permissions
+          description: forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -1440,6 +1483,10 @@ paths:
             items:
               $ref: '#/definitions/handlers.SignalTypeDetail'
             type: array
+        "500":
+          description: database_error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
       summary: Get Signal Types
       tags:
       - Signal Types
@@ -1480,15 +1527,19 @@ paths:
           schema:
             $ref: '#/definitions/handlers.NewSignalTypeResponse'
         "400":
-          description: Bad Request
+          description: malformed_body
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
-          description: Forbidden
+          description: forbidden
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "409":
-          description: Conflict
+          description: resource_already_exists
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error | internal_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -1525,15 +1576,23 @@ paths:
           schema:
             $ref: '#/definitions/handlers.NewSignalTypeResponse'
         "400":
-          description: Bad Request
+          description: malformed_body
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
-          description: Forbidden
+          description: forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: resource_not_found
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "409":
-          description: Conflict
+          description: resource_already_exists
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error | internal_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -1561,20 +1620,16 @@ paths:
       responses:
         "204":
           description: No Content
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
         "404":
-          description: Not Found
+          description: resource_not_found
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "409":
-          description: Conflict
+          description: resource_in_use
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -1604,16 +1659,12 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/handlers.SignalTypeDetail'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
         "404":
-          description: Not Found
+          description: resource_not_found
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       summary: Get a Signal Type
@@ -1647,19 +1698,23 @@ paths:
         "204":
           description: No Content
         "400":
-          description: Bad Request
+          description: malformed_body
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: Unauthorized
+          description: authentication_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
-          description: Forbidden
+          description: forbidden
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
-          description: Not Found
+          description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -1687,7 +1742,11 @@ paths:
         "204":
           description: No Content
         "404":
-          description: Not Found
+          description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -1716,7 +1775,11 @@ paths:
           schema:
             $ref: '#/definitions/handlers.SignalRoutingConfigResponse'
         "404":
-          description: Not Found
+          description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -1760,11 +1823,15 @@ paths:
         "204":
           description: No Content
         "400":
-          description: Bad Request
+          description: malformed_body
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
-          description: Not Found
+          description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error | internal_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -1794,19 +1861,23 @@ paths:
           schema:
             $ref: '#/definitions/handlers.UserDetails'
         "400":
-          description: Invalid request - cannot provide both id and email parameters
+          description: invalid_request
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: Authentication failed
+          description: authentication_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
-          description: Insufficient permissions
+          description: forbidden
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
-          description: User not found
+          description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -1838,19 +1909,23 @@ paths:
           schema:
             $ref: '#/definitions/handlers.GeneratePasswordResetLinkResponse'
         "400":
-          description: Bad Request
+          description: invalid_url_param
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: Unauthorized
+          description: authentication_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
-          description: Forbidden - admin role required
+          description: forbidden
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
-          description: User not found
+          description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error | internal_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -1883,15 +1958,15 @@ paths:
           schema:
             $ref: '#/definitions/auth.AccessTokenResponse'
         "400":
-          description: Bad Request
+          description: malformed_body
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: Unauthorized
+          description: authentication_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: database_error | token_creation_failed
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       summary: Login
@@ -1915,15 +1990,15 @@ paths:
         "200":
           description: OK
         "400":
-          description: Bad Request
+          description: invalid_url_param
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
-          description: Not Found
+          description: resource_not_found
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "410":
-          description: Gone
+          description: resource_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       summary: Display Password Reset Form
@@ -1952,15 +2027,19 @@ paths:
         "200":
           description: OK
         "400":
-          description: Bad Request
+          description: invalid_url_param | malformed_body | password_too_short
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
-          description: Not Found
+          description: resource_not_found
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "410":
-          description: Gone
+          description: resource_expired
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error | internal_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       summary: Process Password Reset Token
@@ -1981,11 +2060,15 @@ paths:
         "204":
           description: No Content
         "400":
-          description: 'Bad request with possible error codes: malformed_body, password_too_short'
+          description: malformed_body | password_too_short
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: 'Unauthorized with possible error code: authentication_error'
+          description: authentication_error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error | internal_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -2014,11 +2097,15 @@ paths:
         "201":
           description: Created
         "400":
-          description: 'Bad request with possible error codes: malformed_body, password_too_short'
+          description: malformed_body | password_too_short
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "409":
-          description: 'Conflict with possible error code: resource_already_exists'
+          description: resource_already_exists
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error | internal_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       summary: Register User
@@ -2047,15 +2134,19 @@ paths:
           schema:
             $ref: '#/definitions/handlers.CreateServiceAccountResponse'
         "400":
-          description: Bad Request
+          description: malformed_body
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: Unauthorized
+          description: authentication_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "409":
-          description: Conflict
+          description: resource_already_exists
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error | internal_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -2087,15 +2178,19 @@ paths:
           schema:
             $ref: '#/definitions/handlers.ReissueServiceAccountCredentialsResponse'
         "400":
-          description: Bad Request
+          description: malformed_body
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: Unauthorized
+          description: authentication_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
-          description: Not Found
+          description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error | internal_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -2140,7 +2235,7 @@ paths:
           schema:
             $ref: '#/definitions/responses.OAuthErrorResponse'
         "500":
-          description: Internal server error
+          description: database_error | internal_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       summary: Rotate Service Account Client Secret
@@ -2163,15 +2258,15 @@ paths:
         "201":
           description: Created
         "400":
-          description: Bad Request
+          description: invalid_url_param
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
-          description: Not Found
+          description: resource_not_found
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "410":
-          description: Gone
+          description: resource_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       summary: Complete Service Account Setup
@@ -2203,19 +2298,19 @@ paths:
           schema:
             $ref: '#/definitions/handlers.BatchStatusResponse'
         "400":
-          description: Bad Request
+          description: invalid_request
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
-          description: Forbidden
+          description: forbidden
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
-          description: Not Found
+          description: resource_not_found
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -2247,11 +2342,11 @@ paths:
               $ref: '#/definitions/handlers.BatchStatusResponse'
             type: array
         "400":
-          description: Bad Request
+          description: invalid_url_param
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "500":
-          description: Internal Server Error
+          description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -2275,6 +2370,10 @@ paths:
             items:
               $ref: '#/definitions/handlers.Isn'
             type: array
+        "500":
+          description: database_error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
       summary: Get ISN configurations
       tags:
       - ISN Configuration
@@ -2309,11 +2408,15 @@ paths:
           schema:
             $ref: '#/definitions/handlers.CreateIsnResponse'
         "400":
-          description: Bad Request
+          description: malformed_body
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "409":
-          description: Conflict
+          description: resource_already_exists
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error | internal_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -2338,11 +2441,15 @@ paths:
           schema:
             $ref: '#/definitions/handlers.IsnAndLinkedInfo'
         "400":
-          description: Bad Request
+          description: invalid_url_param
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
-          description: Not Found
+          description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       summary: Get an ISN configuration
@@ -2371,19 +2478,23 @@ paths:
         "204":
           description: No Content
         "400":
-          description: Bad Request
+          description: malformed_body
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: Unauthorized
+          description: authentication_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
-          description: Forbidden
+          description: forbidden
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
-          description: Not Found
+          description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -2411,15 +2522,19 @@ paths:
               $ref: '#/definitions/handlers.IsnAccount'
             type: array
         "400":
-          description: Bad Request
+          description: invalid_url_param
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
-          description: Forbidden
+          description: forbidden
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
-          description: Not Found
+          description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -2468,15 +2583,19 @@ paths:
         "200":
           description: OK
         "400":
-          description: Bad Request
+          description: invalid_request | malformed_body
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
-          description: Forbidden
+          description: forbidden
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
-          description: Not Found
+          description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -2522,19 +2641,23 @@ paths:
         "204":
           description: No Content
         "400":
-          description: Bad Request
+          description: malformed_body
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: Unauthorized
+          description: authentication_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
-          description: Forbidden
+          description: forbidden
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
-          description: Not Found
+          description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -2633,19 +2756,19 @@ paths:
           schema:
             $ref: '#/definitions/handlers.SignalSubmissionResponse'
         "400":
-          description: Invalid request format (error_code = malformed_body)
+          description: malformed_body
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: Unauthorized request (invalid credentials, error_code = authentication_error)
+          description: authentication_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
-          description: Forbidden (no permission to write to ISN, error_code = forbidden)
+          description: forbidden
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
-          description: Not Found (mistyped url or signal_type marked 'not in use')
+          description: resource_not_found
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "422":
@@ -2653,6 +2776,10 @@ paths:
             detailed error information
           schema:
             $ref: '#/definitions/handlers.SignalSubmissionResponse'
+        "500":
+          description: database_error | internal_error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
       summary: Submit Signals
@@ -2715,7 +2842,15 @@ paths:
               $ref: '#/definitions/handlers.SearchSignalResponse'
             type: array
         "400":
-          description: Bad Request
+          description: invalid_url_param
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: authentication_error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -2760,19 +2895,27 @@ paths:
         "204":
           description: No Content
         "400":
-          description: Bad Request
+          description: malformed_body
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: Unauthorized
+          description: authentication_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
-          description: Forbidden
+          description: forbidden
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
-          description: Not Found
+          description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "409":
+          description: resource_already_exists
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -2804,19 +2947,23 @@ paths:
         "204":
           description: No Content
         "400":
-          description: Bad Request
+          description: malformed_body
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: Unauthorized
+          description: authentication_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
-          description: Forbidden
+          description: forbidden
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
-          description: Not Found
+          description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -2881,7 +3028,15 @@ paths:
               $ref: '#/definitions/handlers.SearchSignalResponse'
             type: array
         "400":
-          description: Bad Request
+          description: invalid_url_param
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       summary: Signal Search (public ISNs)
@@ -2992,15 +3147,15 @@ paths:
           schema:
             $ref: '#/definitions/handlers.SignalSubmissionResponse'
         "400":
-          description: Invalid request format (error_code = malformed_body)
+          description: malformed_body
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: Unauthorized request (invalid credentials, error_code = authentication_error)
+          description: authentication_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
-          description: Not Found (mistyped url or signal_type marked 'not in use')
+          description: resource_not_found
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "422":
@@ -3008,6 +3163,10 @@ paths:
             detailed error information
           schema:
             $ref: '#/definitions/handlers.SignalSubmissionResponse'
+        "500":
+          description: database_error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
       summary: Submit Signals via Router

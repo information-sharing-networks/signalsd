@@ -68,7 +68,8 @@ type SignalRoutingConfigResponse struct {
 //	@Param			sem_ver				path		string	true	"version"			example(1.0.0)
 //
 //	@Success		200					{object}	handlers.SignalRoutingConfigResponse
-//	@Failure		404					{object}	responses.ErrorResponse
+//	@Failure		404					{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500					{object}	responses.ErrorResponse	"database_error"
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/admin/signal-types/{signal_type_slug}/v{sem_ver}/routes [get]
@@ -135,8 +136,9 @@ func (h *RoutingConfigHandler) GetSignalRoutingConfig(w http.ResponseWriter, r *
 //	@Param			request				body	handlers.UpdateSignalRoutingConfigRequest	true	"routing config"
 //
 //	@Success		204
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		404	{object}	responses.ErrorResponse
+//	@Failure		400	{object}	responses.ErrorResponse	"malformed_body"
+//	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error | internal_error"
 //
 //	@Security		BearerAccessToken
 //
@@ -285,7 +287,8 @@ func (h *RoutingConfigHandler) UpdateSignalRoutingConfig(w http.ResponseWriter, 
 //	@Param			sem_ver				path	string	true	"version"			example(1.0.0)
 //
 //	@Success		204
-//	@Failure		404	{object}	responses.ErrorResponse
+//	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //	@Security		BearerAccessToken
 //	@Router			/api/admin/signal-types/{signal_type_slug}/v{sem_ver}/routes [delete]
 //

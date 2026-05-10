@@ -72,9 +72,10 @@ type IsnAccount struct {
 //	@Param			account_id	path	string										true	"account id"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
 //	@Success		200
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		403	{object}	responses.ErrorResponse
-//	@Failure		404	{object}	responses.ErrorResponse
+//	@Failure		400	{object}	responses.ErrorResponse	"invalid_request | malformed_body"
+//	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
 //
@@ -188,9 +189,10 @@ func (i *IsnAccountHandler) UpdateIsnAccountPermission(w http.ResponseWriter, r 
 //	@Param			isn_slug	path		string	true	"ISN slug"	example(sample-isn)
 //
 //	@Success		200			{array}		handlers.IsnAccount
-//	@Failure		400			{object}	responses.ErrorResponse
-//	@Failure		403			{object}	responses.ErrorResponse
-//	@Failure		404			{object}	responses.ErrorResponse
+//	@Failure		400			{object}	responses.ErrorResponse	"invalid_url_param"
+//	@Failure		403			{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		404			{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500			{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
 //

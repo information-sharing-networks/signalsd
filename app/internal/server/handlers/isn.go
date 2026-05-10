@@ -117,8 +117,9 @@ type IsnAndLinkedInfo struct {
 //	@Param			request	body		handlers.CreateIsnRequest	true	"ISN configuration"
 //
 //	@Success		201		{object}	handlers.CreateIsnResponse
-//	@Failure		400		{object}	responses.ErrorResponse
-//	@Failure		409		{object}	responses.ErrorResponse
+//	@Failure		400		{object}	responses.ErrorResponse	"malformed_body"
+//	@Failure		409		{object}	responses.ErrorResponse	"resource_already_exists"
+//	@Failure		500		{object}	responses.ErrorResponse	"database_error | internal_error"
 //
 //	@Security		BearerAccessToken
 //	@Security		RefreshTokenCookieAuth
@@ -231,10 +232,11 @@ func (i *IsnHandler) CreateIsn(w http.ResponseWriter, r *http.Request) error {
 //	@Param			request		body	handlers.UpdateIsnRequest	true	"ISN configuration"
 //
 //	@Success		204
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		401	{object}	responses.ErrorResponse
-//	@Failure		403	{object}	responses.ErrorResponse
-//	@Failure		404	{object}	responses.ErrorResponse
+//	@Failure		400	{object}	responses.ErrorResponse	"malformed_body"
+//	@Failure		401	{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
 //
@@ -317,7 +319,8 @@ func (i *IsnHandler) UpdateIsn(w http.ResponseWriter, r *http.Request) error {
 //	@Param			include_inactive	query	bool	false	"Include inactive ISNs"	default(false)
 //	@Tags			ISN Configuration
 //
-//	@Success		200	{array}	handlers.Isn
+//	@Success		200	{array}		handlers.Isn
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Router			/api/isn [get]
 func (s *IsnHandler) GetIsns(w http.ResponseWriter, r *http.Request) error {
@@ -364,8 +367,9 @@ func (s *IsnHandler) GetIsns(w http.ResponseWriter, r *http.Request) error {
 //	@Tags			ISN Configuration
 //
 //	@Success		200	{object}	handlers.IsnAndLinkedInfo
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		404	{object}	responses.ErrorResponse
+//	@Failure		400	{object}	responses.ErrorResponse	"invalid_url_param"
+//	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Router			/api/isn/{isn_slug} [get]
 func (s *IsnHandler) GetIsn(w http.ResponseWriter, r *http.Request) error {
@@ -464,9 +468,10 @@ func (s *IsnHandler) GetIsn(w http.ResponseWriter, r *http.Request) error {
 //	@Param			request		body	handlers.TransferIsnOwnershipRequest	true	"Transfer details"
 //
 //	@Success		200
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		403	{object}	responses.ErrorResponse
-//	@Failure		404	{object}	responses.ErrorResponse
+//	@Failure		400	{object}	responses.ErrorResponse	"malformed_body | invalid_request"
+//	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
 //	@Security		RefreshTokenCookieAuth

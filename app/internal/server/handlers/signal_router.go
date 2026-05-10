@@ -144,9 +144,10 @@ type resolvedSignal struct {
 //	@Success		200					{object}	handlers.SignalSubmissionResponse	"All signals processed successfully"
 //	@Success		207					{object}	handlers.SignalSubmissionResponse	"Partial success - some signals succeeded, some failed"
 //	@Success		422					{object}	handlers.SignalSubmissionResponse	"Valid request format but all signals failed processing - returns detailed error information"
-//	@Failure		400					{object}	responses.ErrorResponse				"Invalid request format (error_code = malformed_body)
-//	@Failure		401					{object}	responses.ErrorResponse				"Unauthorized request (invalid credentials, error_code = authentication_error)"
-//	@Failure		404					{object}	responses.ErrorResponse				"Not Found (mistyped url or signal_type marked 'not in use')
+//	@Failure		400					{object}	responses.ErrorResponse				"malformed_body"
+//	@Failure		401					{object}	responses.ErrorResponse				"authentication_error"
+//	@Failure		404					{object}	responses.ErrorResponse				"resource_not_found"
+//	@Failure		500					{object}	responses.ErrorResponse				"database_error"
 //
 //	@Security		BearerAccessToken
 //

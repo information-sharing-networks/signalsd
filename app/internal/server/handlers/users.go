@@ -62,8 +62,9 @@ type UpdatePasswordRequest struct {
 //	@Description	Admins can create ISNs and service accounts and grant other accounts permissions to read or write to ISNs they created.
 //
 //	@Success		201
-//	@Failure		400	{object}	responses.ErrorResponse	"Bad request with possible error codes: malformed_body, password_too_short"
-//	@Failure		409	{object}	responses.ErrorResponse	"Conflict with possible error code: resource_already_exists"
+//	@Failure		400	{object}	responses.ErrorResponse	"malformed_body | password_too_short"
+//	@Failure		409	{object}	responses.ErrorResponse	"resource_already_exists"
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error | internal_error"
 //
 //	@Router			/api/auth/register [post]
 func (u *UserHandler) RegisterUser(w http.ResponseWriter, r *http.Request) error {
@@ -88,11 +89,7 @@ func (u *UserHandler) RegisterUser(w http.ResponseWriter, r *http.Request) error
 	}
 
 	if len(req.Password) < signalsd.MinimumPasswordLength {
-		return &apperrors.HTTPError{
-			Status:  http.StatusBadRequest,
-			Code:    apperrors.ErrCodePasswordTooShort,
-			Message: fmt.Sprintf("password must be at least %d chars", signalsd.MinimumPasswordLength),
-		}
+		return apperrors.PasswordTooShort(fmt.Sprintf("password must be at least %d characters", signalsd.MinimumPasswordLength), nil)
 	}
 
 	hashedPassword, err := u.authService.HashPassword(req.Password)
@@ -166,8 +163,9 @@ func (u *UserHandler) RegisterUser(w http.ResponseWriter, r *http.Request) error
 //
 //	@Param		request	body	handlers.UpdatePasswordRequest	true	"user details"
 //	@Success	204
-//	@Failure	400	{object}	responses.ErrorResponse	"Bad request with possible error codes: malformed_body, password_too_short"
-//	@Failure	401	{object}	responses.ErrorResponse	"Unauthorized with possible error code: authentication_error"
+//	@Failure	400	{object}	responses.ErrorResponse	"malformed_body | password_too_short"
+//	@Failure	401	{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure	500	{object}	responses.ErrorResponse	"database_error | internal_error"
 //
 //	@Security	BearerAccessToken
 //
@@ -212,11 +210,7 @@ func (u *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) err
 	}
 
 	if len(req.NewPassword) < signalsd.MinimumPasswordLength {
-		return &apperrors.HTTPError{
-			Status:  http.StatusBadRequest,
-			Code:    apperrors.ErrCodePasswordTooShort,
-			Message: fmt.Sprintf("password must be at least %d chars", signalsd.MinimumPasswordLength),
-		}
+		return apperrors.PasswordTooShort(fmt.Sprintf("password must be at least %d characters", signalsd.MinimumPasswordLength), nil)
 	}
 
 	newPasswordHash, err := u.authService.HashPassword(req.NewPassword)
@@ -269,8 +263,9 @@ func (u *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) err
 //	@Param			account_id	path	string	true	"account id"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
 //	@Success		204
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		403	{object}	responses.ErrorResponse
+//	@Failure		400	{object}	responses.ErrorResponse	"invalid_request"
+//	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
 //
@@ -339,8 +334,9 @@ func (u *UserHandler) GrantUserIsnAdminRole(w http.ResponseWriter, r *http.Reque
 //	@Param			account_id	path	string	true	"account id"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
 //	@Success		204
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		403	{object}	responses.ErrorResponse
+//	@Failure		400	{object}	responses.ErrorResponse	"invalid_request"
+//	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
 //
@@ -419,8 +415,9 @@ func (u *UserHandler) RevokeUserIsnAdminRole(w http.ResponseWriter, r *http.Requ
 //	@Param			account_id	path	string	true	"account id"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
 //	@Success		204
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		403	{object}	responses.ErrorResponse
+//	@Failure		400	{object}	responses.ErrorResponse	"invalid_request"
+//	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
 //
@@ -490,8 +487,9 @@ func (u *UserHandler) GrantUserSiteAdminRole(w http.ResponseWriter, r *http.Requ
 //	@Param			account_id	path	string	true	"account id"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
 //	@Success		204
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		403	{object}	responses.ErrorResponse
+//	@Failure		400	{object}	responses.ErrorResponse	"invalid_request"
+//	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
 //
@@ -576,9 +574,9 @@ type PasswordResetPageData struct {
 //	@Param			token_id	path	string	true	"Password reset token ID"	example(550e8400-e29b-41d4-a716-446655440000)
 //
 //	@Success		200
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		404	{object}	responses.ErrorResponse
-//	@Failure		410	{object}	responses.ErrorResponse
+//	@Failure		400	{object}	responses.ErrorResponse	"invalid_url_param"
+//	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		410	{object}	responses.ErrorResponse	"resource_expired"
 //
 //	@Router			/api/auth/password-reset/{token_id} [get]
 func (u *UserHandler) PasswordResetTokenPage(w http.ResponseWriter, r *http.Request) {
@@ -671,9 +669,10 @@ func (u *UserHandler) PasswordResetTokenPage(w http.ResponseWriter, r *http.Requ
 //	@Param			request		body	handlers.PasswordResetRequest	true	"New password"
 //
 //	@Success		200
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		404	{object}	responses.ErrorResponse
-//	@Failure		410	{object}	responses.ErrorResponse
+//	@Failure		400	{object}	responses.ErrorResponse	"invalid_url_param | malformed_body | password_too_short"
+//	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		410	{object}	responses.ErrorResponse	"resource_expired"
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error | internal_error"
 //
 //	@Router			/api/auth/password-reset/{token_id} [post]
 func (u *UserHandler) PasswordResetToken(w http.ResponseWriter, r *http.Request) error {
@@ -700,11 +699,7 @@ func (u *UserHandler) PasswordResetToken(w http.ResponseWriter, r *http.Request)
 	}
 
 	if len(req.NewPassword) < signalsd.MinimumPasswordLength {
-		return &apperrors.HTTPError{
-			Status:  http.StatusBadRequest,
-			Code:    apperrors.ErrCodePasswordTooShort,
-			Message: fmt.Sprintf("password must be at least %d characters", signalsd.MinimumPasswordLength),
-		}
+		return apperrors.PasswordTooShort(fmt.Sprintf("password must be at least %d characters", signalsd.MinimumPasswordLength), nil)
 	}
 
 	tx, err := u.pool.BeginTx(r.Context(), pgx.TxOptions{})
@@ -733,11 +728,7 @@ func (u *UserHandler) PasswordResetToken(w http.ResponseWriter, r *http.Request)
 
 	// Check if token has expired
 	if time.Now().After(resetToken.ExpiresAt) {
-		return &apperrors.HTTPError{
-			Status:  http.StatusGone,
-			Code:    apperrors.ErrCodeResourceExpired,
-			Message: "password reset token has expired",
-		}
+		return apperrors.ResourceExpired("password reset token has expired", nil)
 	}
 
 	// Hash the new password

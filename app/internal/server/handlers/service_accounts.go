@@ -87,9 +87,10 @@ type SetupPageData struct {
 //	@Param		request	body		handlers.CreateServiceAccountRequest	true	"service account details"
 //
 //	@Success	201		{object}	handlers.CreateServiceAccountResponse
-//	@Failure	400		{object}	responses.ErrorResponse
-//	@Failure	401		{object}	responses.ErrorResponse
-//	@Failure	409		{object}	responses.ErrorResponse
+//	@Failure	400		{object}	responses.ErrorResponse	"malformed_body"
+//	@Failure	401		{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure	409		{object}	responses.ErrorResponse	"resource_already_exists"
+//	@Failure	500		{object}	responses.ErrorResponse	"database_error | internal_error"
 //
 //	@Security	BearerAccessToken
 //
@@ -233,9 +234,10 @@ func (s *ServiceAccountHandler) RegisterServiceAccount(w http.ResponseWriter, r 
 //	@Param		request	body		handlers.ReissueServiceAccountCredentialsRequest	true	"service account details"
 //
 //	@Success	200		{object}	handlers.ReissueServiceAccountCredentialsResponse
-//	@Failure	400		{object}	responses.ErrorResponse
-//	@Failure	401		{object}	responses.ErrorResponse
-//	@Failure	404		{object}	responses.ErrorResponse
+//	@Failure	400		{object}	responses.ErrorResponse	"malformed_body"
+//	@Failure	401		{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure	404		{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure	500		{object}	responses.ErrorResponse	"database_error | internal_error"
 //
 //	@Security	BearerAccessToken
 //
@@ -373,9 +375,9 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentials(w http.Response
 //
 //	@Success	201
 //
-//	@Failure	400	{object}	responses.ErrorResponse
-//	@Failure	404	{object}	responses.ErrorResponse
-//	@Failure	410	{object}	responses.ErrorResponse
+//	@Failure	400	{object}	responses.ErrorResponse	"invalid_url_param"
+//	@Failure	404	{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure	410	{object}	responses.ErrorResponse	"resource_expired"
 //
 //	@Router		/api/auth/service-accounts/setup/{setup_id} [get]
 func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *http.Request) {

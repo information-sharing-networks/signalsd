@@ -100,14 +100,14 @@ func (a *TokenHandler) RefreshAccessToken(w http.ResponseWriter, r *http.Request
 	// create new access token refresh
 	accessTokenResponse, err := a.authService.CreateAccessToken(r.Context())
 	if err != nil {
-		return apperrors.OAuthServerError("error creating access token", apperrors.ErrCodeTokenInvalid, err)
+		return apperrors.OAuthServerError("error creating access token", apperrors.ErrCodeFailedToCreateToken, err)
 	}
 
 	// rotate the refresh token (web users only)
 	if accountType == "user" {
 		newRefreshToken, err := a.authService.RotateRefreshToken(r.Context())
 		if err != nil {
-			return apperrors.OAuthServerError("error creating refresh token", apperrors.ErrCodeTokenInvalid, err)
+			return apperrors.OAuthServerError("error creating refresh token", apperrors.ErrCodeFailedToCreateToken, err)
 		}
 
 		reqLogger := logger.ContextRequestLogger(r.Context())
@@ -254,7 +254,7 @@ func (a *TokenHandler) RevokeRefreshToken(w http.ResponseWriter, r *http.Request
 //	@Success	200				{object}	ServiceAccountRotateResponse
 //	@Failure	400				{object}	responses.OAuthErrorResponse	"invalid_request (missing client_id or client_secret)"
 //	@Failure	401				{object}	responses.OAuthErrorResponse	"invalid_client"
-//	@Failure	500				{object}	responses.ErrorResponse			"Internal server error"
+//	@Failure	500				{object}	responses.ErrorResponse			"database_error | internal_error"
 //
 //	@Router		/api/auth/service-accounts/rotate-secret [post]
 func (a *TokenHandler) RotateServiceAccountSecret(w http.ResponseWriter, r *http.Request) error {

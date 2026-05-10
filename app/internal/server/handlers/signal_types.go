@@ -105,9 +105,10 @@ type SignalTypeDetail struct {
 //	@Param			request	body		handlers.CreateSignalTypeRequest	true	"signal type details"
 //
 //	@Success		201		{object}	handlers.NewSignalTypeResponse
-//	@Failure		400		{object}	responses.ErrorResponse
-//	@Failure		403		{object}	responses.ErrorResponse
-//	@Failure		409		{object}	responses.ErrorResponse
+//	@Failure		400		{object}	responses.ErrorResponse	"malformed_body"
+//	@Failure		403		{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		409		{object}	responses.ErrorResponse	"resource_already_exists"
+//	@Failure		500		{object}	responses.ErrorResponse	"database_error | internal_error"
 //
 //	@Security		BearerAccessToken
 //
@@ -266,9 +267,11 @@ func (s *SignalTypeHandler) CreateSignalType(w http.ResponseWriter, r *http.Requ
 //	@Param			request				body		handlers.RegisterNewSignalTypeSchemaRequest	true	"signal type details"
 //
 //	@Success		201					{object}	handlers.NewSignalTypeResponse
-//	@Failure		400					{object}	responses.ErrorResponse
-//	@Failure		403					{object}	responses.ErrorResponse
-//	@Failure		409					{object}	responses.ErrorResponse
+//	@Failure		400					{object}	responses.ErrorResponse	"malformed_body"
+//	@Failure		403					{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		404					{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		409					{object}	responses.ErrorResponse	"resource_already_exists"
+//	@Failure		500					{object}	responses.ErrorResponse	"database_error | internal_error"
 //
 //	@Security		BearerAccessToken
 //
@@ -427,10 +430,11 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchema(w http.ResponseWriter, r
 //	@Tags			Signal Types
 //
 //	@Success		204
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		401	{object}	responses.ErrorResponse
-//	@Failure		403	{object}	responses.ErrorResponse
-//	@Failure		404	{object}	responses.ErrorResponse
+//	@Failure		400	{object}	responses.ErrorResponse	"malformed_body"
+//	@Failure		401	{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
 //
@@ -531,10 +535,9 @@ func (s *SignalTypeHandler) UpdateSignalType(w http.ResponseWriter, r *http.Requ
 //	@Tags			Signal Types
 //
 //	@Success		204
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		404	{object}	responses.ErrorResponse
-//	@Failure		409	{object}	responses.ErrorResponse
-//	@Failure		500	{object}	responses.ErrorResponse
+//	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		409	{object}	responses.ErrorResponse	"resource_in_use"
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
 //
@@ -573,11 +576,7 @@ func (s *SignalTypeHandler) DeleteSignalType(w http.ResponseWriter, r *http.Requ
 	}
 
 	if hasSignals {
-		return &apperrors.HTTPError{
-			Status:  http.StatusConflict,
-			Code:    apperrors.ErrCodeResourceInUse,
-			Message: fmt.Sprintf("Cannot delete signal type %s/v%s: it is being used by existing signals", signalTypeSlug, semVer),
-		}
+		return apperrors.ResourceInUse(fmt.Sprintf("Cannot delete signal type %s/v%s: it is being used by existing signals", signalTypeSlug, semVer), nil)
 	}
 
 	// delete the signal type
@@ -609,9 +608,8 @@ func (s *SignalTypeHandler) DeleteSignalType(w http.ResponseWriter, r *http.Requ
 //	@Param			sem_ver				path		string	true	"version"			example(1.0.0)
 //
 //	@Success		200					{object}	handlers.SignalTypeDetail
-//	@Failure		400					{object}	responses.ErrorResponse
-//	@Failure		404					{object}	responses.ErrorResponse
-//	@Failure		500					{object}	responses.ErrorResponse
+//	@Failure		404					{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500					{object}	responses.ErrorResponse	"database_error"
 //
 //	@Router			/api/admin/signal-types/{signal_type_slug}/v{sem_ver} [get]
 func (s *SignalTypeHandler) GetSignalType(w http.ResponseWriter, r *http.Request) error {
@@ -667,7 +665,8 @@ func (s *SignalTypeHandler) GetSignalType(w http.ResponseWriter, r *http.Request
 //
 //	@Tags			Signal Types
 //
-//	@Success		200	{array}	handlers.SignalTypeDetail
+//	@Success		200	{array}		handlers.SignalTypeDetail
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Router			/api/admin/signal-types [get]
 func (s *SignalTypeHandler) GetSignalTypes(w http.ResponseWriter, r *http.Request) error {
@@ -721,10 +720,11 @@ func (s *SignalTypeHandler) GetSignalTypes(w http.ResponseWriter, r *http.Reques
 //	@Param			request		body	handlers.AddSignalTypeToIsnRequest	true	"signal type details"
 //
 //	@Success		204
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		401	{object}	responses.ErrorResponse
-//	@Failure		403	{object}	responses.ErrorResponse
-//	@Failure		404	{object}	responses.ErrorResponse
+//	@Failure		400	{object}	responses.ErrorResponse	"malformed_body"
+//	@Failure		401	{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
 //
@@ -824,10 +824,11 @@ func (s *SignalTypeHandler) AddSignalTypeToISN(w http.ResponseWriter, r *http.Re
 //	@Tags			ISN Configuration
 //
 //	@Success		204
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		401	{object}	responses.ErrorResponse
-//	@Failure		403	{object}	responses.ErrorResponse
-//	@Failure		404	{object}	responses.ErrorResponse
+//	@Failure		400	{object}	responses.ErrorResponse	"malformed_body"
+//	@Failure		401	{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
 //

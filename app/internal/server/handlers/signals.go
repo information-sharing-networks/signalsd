@@ -424,10 +424,11 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 //	@Success	200					{object}	handlers.SignalSubmissionResponse	"All signals processed successfully"
 //	@Success	207					{object}	handlers.SignalSubmissionResponse	"Partial success - some signals succeeded, some failed"
 //	@Success	422					{object}	handlers.SignalSubmissionResponse	"Valid request format but all signals failed processing - returns detailed error information"
-//	@Failure	400					{object}	responses.ErrorResponse				"Invalid request format (error_code = malformed_body)
-//	@Failure	401					{object}	responses.ErrorResponse				"Unauthorized request (invalid credentials, error_code = authentication_error)"
-//	@Failure	403					{object}	responses.ErrorResponse				"Forbidden (no permission to write to ISN, error_code = forbidden)"
-//	@Failure	404					{object}	responses.ErrorResponse				"Not Found (mistyped url or signal_type marked 'not in use')
+//	@Failure	400					{object}	responses.ErrorResponse				"malformed_body"
+//	@Failure	401					{object}	responses.ErrorResponse				"authentication_error"
+//	@Failure	403					{object}	responses.ErrorResponse				"forbidden"
+//	@Failure	404					{object}	responses.ErrorResponse				"resource_not_found"
+//	@Failure	500					{object}	responses.ErrorResponse				"database_error | internal_error"
 //
 //	@Security	BearerAccessToken
 //
@@ -768,8 +769,9 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) e
 //	@Param			include_previous_versions	query		string	false	"Include previous versions of each returned signal (default: false)"	example(true)
 //
 //	@Success		200							{array}		handlers.SearchSignalResponse
-//	@Failure		400							{object}	responses.ErrorResponse
-//	@Failure		400							{object}	responses.ErrorResponse
+//	@Failure		400							{object}	responses.ErrorResponse	"invalid_url_param"
+//	@Failure		404							{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500							{object}	responses.ErrorResponse	"database_error"
 //
 //	@Router			/api/public/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search [get]
 //
@@ -902,7 +904,9 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 //	@Param			include_previous_versions	query		string	false	"Include previous versions of each returned signal (default: false)"	example(true)
 //
 //	@Success		200							{array}		handlers.SearchSignalResponse
-//	@Failure		400							{object}	responses.ErrorResponse
+//	@Failure		400							{object}	responses.ErrorResponse	"invalid_url_param"
+//	@Failure		401							{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		500							{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
 //
@@ -1053,10 +1057,12 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 //	@Param			request				body	handlers.WithdrawSignalRequest	true	"Withdrawal request"
 //
 //	@Success		204
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		401	{object}	responses.ErrorResponse
-//	@Failure		403	{object}	responses.ErrorResponse
-//	@Failure		404	{object}	responses.ErrorResponse
+//	@Failure		400	{object}	responses.ErrorResponse	"malformed_body"
+//	@Failure		401	{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		409	{object}	responses.ErrorResponse	"resource_already_exists"
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
 //
