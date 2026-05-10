@@ -320,13 +320,13 @@ func runDatabaseMigrations(t *testing.T, pool *pgxpool.Pool) error {
 	defer db.Close()
 
 	if err := goose.SetDialect("postgres"); err != nil {
-		return fmt.Errorf("failed to set goose dialect: %w", err)
+		return fmt.Errorf("failed to set goose dialect: %v", err)
 	}
 
 	// Apply migrations from the sql/schema directory
 	migrationDir := "../../sql/schema"
 	if err := goose.Up(db, migrationDir); err != nil {
-		return fmt.Errorf("failed to apply migrations: %w", err)
+		return fmt.Errorf("failed to apply migrations: %v", err)
 	}
 
 	return nil

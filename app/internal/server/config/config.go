@@ -134,7 +134,7 @@ func NewServerConfig() (*ServerEnvironment, *CORSConfigs, error) {
 
 	_, err := env.UnmarshalFromEnviron(&cfg)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to unmarshal environment variables: %w", err)
+		return nil, nil, fmt.Errorf("failed to unmarshal environment variables: %v", err)
 	}
 
 	// default to host/port if not set (the env must be set for production - checked in the validateConfig function)
@@ -157,7 +157,7 @@ func NewServerConfig() (*ServerEnvironment, *CORSConfigs, error) {
 	// Initialize CORS configurations
 	corsConfigs, err := CreateCORSConfigs(&cfg)
 	if err != nil {
-		return nil, nil, fmt.Errorf("CORS configuration failed: %w", err)
+		return nil, nil, fmt.Errorf("CORS configuration failed: %v", err)
 	}
 
 	return &cfg, corsConfigs, nil
@@ -270,7 +270,7 @@ func CreateCORSConfigs(cfg *ServerEnvironment) (*CORSConfigs, error) {
 
 	publicMiddleware, err := cors.NewMiddleware(publicConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create public CORS middleware: %w", err)
+		return nil, fmt.Errorf("failed to create public CORS middleware: %v", err)
 	}
 
 	protectedConfig := cors.Config{
@@ -291,7 +291,7 @@ func CreateCORSConfigs(cfg *ServerEnvironment) (*CORSConfigs, error) {
 
 	protectedMiddleware, err := cors.NewMiddleware(protectedConfig)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create protected CORS middleware: %w", err)
+		return nil, fmt.Errorf("failed to create protected CORS middleware: %v", err)
 	}
 
 	corsConfigs := &CORSConfigs{

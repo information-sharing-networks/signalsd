@@ -233,7 +233,7 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 		if errors.Is(err, pgx.ErrNoRows) {
 			return AccessTokenResponse{}, fmt.Errorf("user not found: %v", accountID)
 		}
-		return AccessTokenResponse{}, fmt.Errorf("database error getting user %v: %w", accountID, err)
+		return AccessTokenResponse{}, fmt.Errorf("database error getting user %v: %v", accountID, err)
 	}
 
 	// this should be caught by the middleware, but double check here in case of bugs elsewhere
@@ -248,7 +248,7 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 	// get all the isns on the site
 	dbIsnList, err := a.queries.GetIsns(ctx)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return AccessTokenResponse{}, fmt.Errorf("database error getting ISNs: %w", err)
+		return AccessTokenResponse{}, fmt.Errorf("database error getting ISNs: %v", err)
 	}
 
 	// create a list of all the isns and their signal types
@@ -265,7 +265,7 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 		// get the signal types for this isn
 		dbSignalTypes, err := a.queries.GetSignalTypesByIsnID(ctx, dbIsn.ID)
 		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			return AccessTokenResponse{}, fmt.Errorf("database error getting signal_types: %w", err)
+			return AccessTokenResponse{}, fmt.Errorf("database error getting signal_types: %v", err)
 		}
 
 		signalTypes := make([]signalTypeDetails, 0)
@@ -297,7 +297,7 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 	// get the isns this account's has been granted access to.
 	isnsAccessibleByAccount, err := a.queries.GetIsnAccountsByAccountID(ctx, accountID)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return AccessTokenResponse{}, fmt.Errorf("database error getting ISN accounts: %w", err)
+		return AccessTokenResponse{}, fmt.Errorf("database error getting ISN accounts: %v", err)
 	}
 
 	// build isnPerms: filter the isnList to the ISNs this account can access, with their permissions
@@ -387,7 +387,7 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 
 	email, err := a.queries.GetEmailByAccountID(ctx, accountID)
 	if err != nil {
-		return AccessTokenResponse{}, fmt.Errorf("database error getting email for the account: %w", err)
+		return AccessTokenResponse{}, fmt.Errorf("database error getting email for the account: %v", err)
 	}
 
 	// create a new signed token
@@ -395,7 +395,7 @@ func (a *AuthService) CreateAccessToken(ctx context.Context) (AccessTokenRespons
 
 	signedAccessToken, err := accessToken.SignedString([]byte(a.secretKey))
 	if err != nil {
-		return AccessTokenResponse{}, fmt.Errorf("failed to sign JWT: %w", err)
+		return AccessTokenResponse{}, fmt.Errorf("failed to sign JWT: %v", err)
 	}
 
 	return AccessTokenResponse{

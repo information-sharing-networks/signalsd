@@ -35,7 +35,7 @@ func (c *Cache) Load(ctx context.Context) error {
 
 	publicSignalTypes, err := c.db.GetInUsePublicIsnSignalTypes(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get public ISN signal types from database: %w", err)
+		return fmt.Errorf("failed to get public ISN signal types from database: %v", err)
 	}
 
 	for _, row := range publicSignalTypes {

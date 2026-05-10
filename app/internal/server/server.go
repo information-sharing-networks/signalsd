@@ -138,7 +138,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 		err := httpServer.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
-			serverErrors <- fmt.Errorf("server failed to start: %w", err)
+			serverErrors <- fmt.Errorf("server failed to start: %v", err)
 		}
 	}()
 
@@ -160,7 +160,7 @@ func (s *Server) Start(ctx context.Context) error {
 	if err != nil {
 		s.logger.Warn("HTTP server shutdown error",
 			slog.String("error", err.Error()))
-		return fmt.Errorf("HTTP server shutdown failed: %w", err)
+		return fmt.Errorf("HTTP server shutdown failed: %v", err)
 	}
 
 	s.logger.Info("HTTP server shutdown complete")

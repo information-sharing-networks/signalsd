@@ -43,7 +43,7 @@ func (c *Cache) Load(ctx context.Context) error {
 
 	signalTypes, err := c.db.GetSignalTypes(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get signal types from database: %w", err)
+		return fmt.Errorf("failed to get signal types from database: %v", err)
 	}
 
 	schemas := make(map[string]*jsonschema.Schema)
@@ -134,7 +134,7 @@ func (c *Cache) ValidateSignal(ctx context.Context, queries *database.Queries, s
 	}
 
 	if err := schema.Validate(data); err != nil {
-		return fmt.Errorf("schema validation failed: %w", err)
+		return fmt.Errorf("schema validation failed: %v", err)
 	}
 
 	// json successfully validates against schema
@@ -204,12 +204,12 @@ func ValidateAndCompileSchema(schemaURL, content string) (*jsonschema.Schema, er
 	// Compile the schema using the Compiler API
 	compiler := jsonschema.NewCompiler()
 	if err := compiler.AddResource(schemaURL, schemaData); err != nil {
-		return nil, fmt.Errorf("failed to add schema resource: %w", err)
+		return nil, fmt.Errorf("failed to add schema resource: %v", err)
 	}
 
 	schema, err := compiler.Compile(schemaURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to compile schema: %w", err)
+		return nil, fmt.Errorf("failed to compile schema: %v", err)
 	}
 
 	return schema, nil

@@ -66,7 +66,7 @@ func NewCache(db *database.Queries) *Cache {
 func (c *Cache) Load(ctx context.Context) error {
 	rows, err := c.db.GetSignalRoutingConfigs(ctx)
 	if err != nil {
-		return fmt.Errorf("routing cache: failed to load rules: %w", err)
+		return fmt.Errorf("routing cache: failed to load rules: %v", err)
 	}
 
 	configs := make(map[string]signalRoutingConfig) // key = signal type path

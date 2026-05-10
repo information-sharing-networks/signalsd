@@ -37,11 +37,11 @@ func NewConfig() (*Config, error) {
 
 	_, err := env.UnmarshalFromEnviron(&cfg)
 	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal environment variables: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal environment variables: %v", err)
 	}
 
 	if err := validateUIConfig(&cfg); err != nil {
-		return nil, fmt.Errorf("configuration validation failed: %w", err)
+		return nil, fmt.Errorf("configuration validation failed: %v", err)
 	}
 
 	return &cfg, nil

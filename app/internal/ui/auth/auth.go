@@ -66,7 +66,7 @@ func (a *AuthService) RefreshToken(refreshTokenCookie *http.Cookie) (*types.Acce
 
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/oauth/token", a.apiBaseURL), strings.NewReader(form.Encode()))
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, nil, fmt.Errorf("failed to create request: %v", err)
 	}
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -76,7 +76,7 @@ func (a *AuthService) RefreshToken(refreshTokenCookie *http.Cookie) (*types.Acce
 
 	res, err := a.httpClient.Do(req)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to make request: %w", err)
+		return nil, nil, fmt.Errorf("failed to make request: %v", err)
 	}
 	defer res.Body.Close()
 
@@ -90,7 +90,7 @@ func (a *AuthService) RefreshToken(refreshTokenCookie *http.Cookie) (*types.Acce
 
 	var accessTokenDetails types.AccessTokenDetails
 	if err := json.NewDecoder(res.Body).Decode(&accessTokenDetails); err != nil {
-		return nil, nil, fmt.Errorf("failed to decode response: %w", err)
+		return nil, nil, fmt.Errorf("failed to decode response: %v", err)
 	}
 
 	// Extract the new refresh token cookie from the API response
@@ -117,7 +117,7 @@ func (a *AuthService) RevokeToken(refreshTokenCookie *http.Cookie) error {
 
 	req, err := http.NewRequest("POST", fmt.Sprintf("%s/oauth/revoke", a.apiBaseURL), strings.NewReader(form.Encode()))
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return fmt.Errorf("failed to create request: %v", err)
 	}
 
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -125,7 +125,7 @@ func (a *AuthService) RevokeToken(refreshTokenCookie *http.Cookie) error {
 
 	res, err := a.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to make request: %w", err)
+		return fmt.Errorf("failed to make request: %v", err)
 	}
 	defer res.Body.Close()
 
@@ -181,7 +181,7 @@ func (a *AuthService) SetAuthCookies(w http.ResponseWriter, accessTokenDetails *
 
 	accessTokenDetailsJSON, err := json.Marshal(accessTokenDetails) // #nosec G117 - legitimate API call, not logging secrets
 	if err != nil {
-		return fmt.Errorf("failed to marshal access token details: %w", err)
+		return fmt.Errorf("failed to marshal access token details: %v", err)
 	}
 
 	// Base64 encode to avoid cookie encoding issues

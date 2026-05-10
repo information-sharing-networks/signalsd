@@ -55,7 +55,7 @@ func ValidateGithubFileURL(rawURL string, fileType string) error {
 	pattern := `^https://github\.com/[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+/.+$`
 	matched, err := regexp.MatchString(pattern, rawURL)
 	if err != nil {
-		return fmt.Errorf("internal error validating URL pattern: %w", err)
+		return fmt.Errorf("internal error validating URL pattern: %v", err)
 	}
 	if !matched {
 		return fmt.Errorf("URL must be a valid GitHub file URL (e.g., https://github.com/user/repo/blob/main/file)")
@@ -96,12 +96,12 @@ func CheckGithubFileExists(rawURL string) error {
 	// #nosec G107 -- avoid false postive security linter warning - URL is validated to be GitHub-only before this function is called (see ValidateGithubFileURL)
 	req, err := http.NewRequest("HEAD", rawURL, nil)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return fmt.Errorf("failed to create request: %v", err)
 	}
 
 	res, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to check file existence: %w", err)
+		return fmt.Errorf("failed to check file existence: %v", err)
 	}
 	defer res.Body.Close()
 
@@ -131,7 +131,7 @@ func FetchFileContentFromGithub(rawURL string) (string, error) {
 	// #nosec G107 -- avoid false postive security linter warning - URL is validated to be GitHub-only before this function is called (see ValidateGithubFileURL)
 	res, err := client.Get(rawURL)
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch content: %w", err)
+		return "", fmt.Errorf("failed to fetch content: %v", err)
 	}
 	defer res.Body.Close()
 
@@ -141,7 +141,7 @@ func FetchFileContentFromGithub(rawURL string) (string, error) {
 
 	bodyBytes, err := io.ReadAll(res.Body)
 	if err != nil {
-		return "", fmt.Errorf("failed to read response: %w", err)
+		return "", fmt.Errorf("failed to read response: %v", err)
 	}
 
 	return string(bodyBytes), nil

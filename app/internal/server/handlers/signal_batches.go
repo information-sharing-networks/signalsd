@@ -137,17 +137,17 @@ func (s *SignalsBatchHandler) getBatchStatusDetails(ctx context.Context, batchID
 
 	signalBatch, err := s.queries.GetSignalBatchByID(ctx, batchID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get batch: %w", err)
+		return nil, fmt.Errorf("failed to get batch: %v", err)
 	}
 
 	loadedRows, err := s.queries.GetLoadedSignalsSummaryByBatchID(ctx, batchID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get successful signals: %w", err)
+		return nil, fmt.Errorf("failed to get successful signals: %v", err)
 	}
 
 	failedRows, err := s.queries.GetFailedSignalsByBatchID(ctx, batchID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get batch failures: %w", err)
+		return nil, fmt.Errorf("failed to get batch failures: %v", err)
 	}
 
 	// key on isn_slug + signal_type + version so a batch spanning multiple ISNs shows correctly

@@ -230,7 +230,7 @@ func (s *Server) Start(ctx context.Context) error {
 	// Wait for context cancellation or server error
 	select {
 	case err := <-serverErr:
-		return fmt.Errorf("server failed to start: %w", err)
+		return fmt.Errorf("server failed to start: %v", err)
 	case <-ctx.Done():
 		s.logger.Info("Shutting down UI server...")
 
