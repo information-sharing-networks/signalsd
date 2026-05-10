@@ -3854,16 +3854,23 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "error_code": {
+                    "description": "Standard app error code",
                     "allOf": [
                         {
                             "$ref": "#/definitions/apperrors.ErrorCode"
                         }
                     ],
-                    "example": "example_error_code"
+                    "example": "access_token_expired"
                 },
                 "message": {
+                    "description": "Client message",
                     "type": "string",
-                    "example": "message describing the error"
+                    "example": "access token expired, please use the /oauth/token endpoint to renew it"
+                },
+                "request_id": {
+                    "description": "request tracking id",
+                    "type": "string",
+                    "example": "a1b2c3d4"
                 }
             }
         },

@@ -1,0 +1,123 @@
+package apperrors
+
+import (
+	"fmt"
+	"net/http"
+)
+
+// HTTPError holds the error information used when processing handler errors
+type HTTPError struct {
+	// Status is the HTTP status code
+	Status int
+
+	// Code is the internal app error code
+	Code ErrorCode
+
+	// Message is the sanitised client message
+	Message string
+
+	// Err is the underlying Go error. It is logged but not sent to the client.
+	// Pass nil when there is no wrapped error (e.g validation failures)
+	Err error
+}
+
+func (e *HTTPError) Error() string {
+	if e.Err != nil {
+		return fmt.Sprintf("%s: %s: %v", e.Code, e.Message, e.Err)
+	}
+	return fmt.Sprintf("%s: %s", e.Code, e.Message)
+}
+
+func (e *HTTPError) Unwrap() error { return e.Err }
+
+func InternalError(message string, err error) *HTTPError {
+	return &HTTPError{Status: http.StatusInternalServerError, Code: ErrCodeInternalError, Message: message, Err: err}
+}
+
+func DatabaseError(message string, err error) *HTTPError {
+	return &HTTPError{Status: http.StatusInternalServerError, Code: ErrCodeDatabaseError, Message: message, Err: err}
+}
+
+func MalformedBody(message string, err error) *HTTPError {
+	return &HTTPError{Status: http.StatusBadRequest, Code: ErrCodeMalformedBody, Message: message, Err: err}
+}
+
+func InvalidRequest(message string, err error) *HTTPError {
+	return &HTTPError{Status: http.StatusBadRequest, Code: ErrCodeInvalidRequest, Message: message, Err: err}
+}
+
+func InvalidURLParam(message string, err error) *HTTPError {
+	return &HTTPError{Status: http.StatusBadRequest, Code: ErrCodeInvalidURLParam, Message: message, Err: err}
+}
+
+func NotFound(message string, err error) *HTTPError {
+	return &HTTPError{Status: http.StatusNotFound, Code: ErrCodeResourceNotFound, Message: message, Err: err}
+}
+
+func Forbidden(message string, err error) *HTTPError {
+	return &HTTPError{Status: http.StatusForbidden, Code: ErrCodeForbidden, Message: message, Err: err}
+}
+
+func AlreadyExists(message string, err error) *HTTPError {
+	return &HTTPError{Status: http.StatusConflict, Code: ErrCodeResourceAlreadyExists, Message: message, Err: err}
+}
+
+func AuthenticationFailure(message string, err error) *HTTPError {
+	return &HTTPError{Status: http.StatusUnauthorized, Code: ErrCodeAuthenticationFailure, Message: message, Err: err}
+}
+
+// OAuthError is returned by OAuth 2.0 endpoints (/oauth/token, /oauth/revoke).
+// responses.Render writes it as an RFC 6749 §5.2 compliant response
+type OAuthError struct {
+	// Status is the HTTP status code
+	Status int
+
+	// OauthCode is the RFC 6749 §5.2 error code (e.g. "invalid_grant")
+	OAuthCode string
+
+	// human-readable description (sent to client for 4xx; log-only for 5xx)
+	Description string
+
+	// AppCode is the internal app error code (logged)
+	AppCode ErrorCode // internal app code (logged)
+
+	// Err is the wrapped go error (logged)
+	Err error
+}
+
+func (e *OAuthError) Error() string {
+	if e.Err != nil {
+		return fmt.Sprintf("%s: %s: %v", e.OAuthCode, e.Description, e.Err)
+	}
+	return fmt.Sprintf("%s: %s", e.OAuthCode, e.Description)
+}
+
+func (e *OAuthError) Unwrap() error { return e.Err }
+
+// OAuth canonical constructors. Pass nil for err when there is no wrapped error.
+
+// OAuthServerError responds with 500 + server_error.
+// Description is logged but never sent to the client.
+func OAuthServerError(description string, appCode ErrorCode, err error) *OAuthError {
+	return &OAuthError{Status: http.StatusInternalServerError, OAuthCode: "server_error", Description: description, AppCode: appCode, Err: err}
+}
+
+// OAuthInvalidRequest responds with 400 + invalid_request.
+func OAuthInvalidRequest(description string, appCode ErrorCode, err error) *OAuthError {
+	return &OAuthError{Status: http.StatusBadRequest, OAuthCode: "invalid_request", Description: description, AppCode: appCode, Err: err}
+}
+
+// OAuthInvalidClient responds with 401 + invalid_client.
+func OAuthInvalidClient(description string, appCode ErrorCode, err error) *OAuthError {
+	return &OAuthError{Status: http.StatusUnauthorized, OAuthCode: "invalid_client", Description: description, AppCode: appCode, Err: err}
+}
+
+// OAuthInvalidGrant responds with 400 + invalid_grant.
+func OAuthInvalidGrant(description string, appCode ErrorCode, err error) *OAuthError {
+	return &OAuthError{Status: http.StatusBadRequest, OAuthCode: "invalid_grant", Description: description, AppCode: appCode, Err: err}
+}
+
+// OAuthUnsupportedGrantType responds with 400 + unsupported_grant_type.
+func OAuthUnsupportedGrantType(description string, appCode ErrorCode, err error) *OAuthError {
+	return &OAuthError{Status: http.StatusBadRequest, OAuthCode: "unsupported_grant_type", Description: description, AppCode: appCode, Err: err}
+}

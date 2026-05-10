@@ -12,6 +12,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/publicisns"
+	"github.com/information-sharing-networks/signalsd/app/internal/responses"
 	"github.com/information-sharing-networks/signalsd/app/internal/router"
 	"github.com/information-sharing-networks/signalsd/app/internal/schemas"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
@@ -214,10 +215,10 @@ func (s *Server) registerAdminRoutes() {
 				r.Use(s.authService.RequireAuthByGrantType)
 
 				// get new access tokens
-				r.Post("/token", tokens.RefreshAccessToken)
+				r.Post("/token", responses.Wrap(tokens.RefreshAccessToken))
 
 				// revoke a client secret (service accounts) or refresh token (web users)
-				r.Post("/revoke", tokens.RevokeToken)
+				r.Post("/revoke", responses.Wrap(tokens.RevokeToken))
 			})
 		})
 
@@ -230,29 +231,29 @@ func (s *Server) registerAdminRoutes() {
 				r.Group(func(r chi.Router) {
 					r.Use(s.authService.RequireValidAccessToken)
 
-					r.Put("/password/reset", users.UpdatePassword)
+					r.Put("/password/reset", responses.Wrap(users.UpdatePassword))
 				})
 
 				r.Group(func(r chi.Router) {
 					r.Use(s.authService.RequireValidAccessToken)
 					r.Use(s.authService.RequireRole("siteadmin", "isnadmin"))
 
-					r.Post("/service-accounts/register", serviceAccounts.RegisterServiceAccount)
-					r.Post("/service-accounts/reissue-credentials", serviceAccounts.ReissueServiceAccountCredentials)
+					r.Post("/service-accounts/register", responses.Wrap(serviceAccounts.RegisterServiceAccount))
+					r.Post("/service-accounts/reissue-credentials", responses.Wrap(serviceAccounts.ReissueServiceAccountCredentials))
 				})
 
 				r.Group(func(r chi.Router) {
 					r.Use(s.authService.RequireValidClientCredentials)
 
-					r.Post("/service-accounts/rotate-secret", tokens.RotateServiceAccountSecret)
+					r.Post("/service-accounts/rotate-secret", responses.Wrap(tokens.RotateServiceAccountSecret))
 				})
 
 				// no authentication required
-				r.Post("/register", users.RegisterUser)
-				r.Post("/login", login.Login)
+				r.Post("/register", responses.Wrap(users.RegisterUser))
+				r.Post("/login", responses.Wrap(login.Login))
 				r.Get("/service-accounts/setup/{setup_id}", serviceAccounts.SetupServiceAccount)
 				r.Get("/password-reset/{token_id}", users.PasswordResetTokenPage)
-				r.Post("/password-reset/{token_id}", users.PasswordResetToken)
+				r.Post("/password-reset/{token_id}", responses.Wrap(users.PasswordResetToken))
 			})
 
 			// isn admin endpoints
@@ -268,26 +269,26 @@ func (s *Server) registerAdminRoutes() {
 						r.Use(s.authService.RequireRole("siteadmin", "isnadmin"))
 
 						// ISN management
-						r.Post("/", isn.CreateIsn)
-						r.Put("/{isn_slug}", isn.UpdateIsn)
+						r.Post("/", responses.Wrap(isn.CreateIsn))
+						r.Put("/{isn_slug}", responses.Wrap(isn.UpdateIsn))
 
 						// add signal types to an ISN
-						r.Post("/{isn_slug}/signal-types/add", signalTypes.AddSignalTypeToISN)
+						r.Post("/{isn_slug}/signal-types/add", responses.Wrap(signalTypes.AddSignalTypeToISN))
 
 						// ISN signal type status management
-						r.Put("/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}", signalTypes.UpdateIsnSignalTypeStatus)
+						r.Put("/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}", responses.Wrap(signalTypes.UpdateIsnSignalTypeStatus))
 
 						// ISN account permissions
-						r.Put("/{isn_slug}/accounts/{account_id}", isnAccount.UpdateIsnAccountPermission)
-						r.Get("/{isn_slug}/accounts", isnAccount.GetIsnAccounts)
+						r.Put("/{isn_slug}/accounts/{account_id}", responses.Wrap(isnAccount.UpdateIsnAccountPermission))
+						r.Get("/{isn_slug}/accounts", responses.Wrap(isnAccount.GetIsnAccounts))
 
 					})
 
 					// view ISN and signal type details
-					r.Get("/", isn.GetIsns)
-					r.Get("/{isn_slug}", isn.GetIsn)
-					r.Get("/{isn_slug}/signal-types", signalTypes.GetSignalTypes)
-					r.Get("/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}", signalTypes.GetSignalType)
+					r.Get("/", responses.Wrap(isn.GetIsns))
+					r.Get("/{isn_slug}", responses.Wrap(isn.GetIsn))
+					r.Get("/{isn_slug}/signal-types", responses.Wrap(signalTypes.GetSignalTypes))
+					r.Get("/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}", responses.Wrap(signalTypes.GetSignalType))
 				})
 
 			})
@@ -301,7 +302,7 @@ func (s *Server) registerAdminRoutes() {
 				r.Use(s.authService.RequireDevEnv)
 
 				// delete all users and content
-				r.Post("/reset", admin.ResetEnv)
+				r.Post("/reset", responses.Wrap(admin.ResetEnv))
 			})
 
 			// siteadmin operations
@@ -311,27 +312,27 @@ func (s *Server) registerAdminRoutes() {
 				r.Use(s.authService.RequireRole("siteadmin"))
 
 				// ISN admin role management
-				r.Put("/accounts/{account_id}/isn-admin-role", users.GrantUserIsnAdminRole)
-				r.Delete("/accounts/{account_id}/isn-admin-role", users.RevokeUserIsnAdminRole)
+				r.Put("/accounts/{account_id}/isn-admin-role", responses.Wrap(users.GrantUserIsnAdminRole))
+				r.Delete("/accounts/{account_id}/isn-admin-role", responses.Wrap(users.RevokeUserIsnAdminRole))
 
 				// Site admin role management
-				r.Put("/accounts/{account_id}/site-admin-role", users.GrantUserSiteAdminRole)
-				r.Delete("/accounts/{account_id}/site-admin-role", users.RevokeUserSiteAdminRole)
+				r.Put("/accounts/{account_id}/site-admin-role", responses.Wrap(users.GrantUserSiteAdminRole))
+				r.Delete("/accounts/{account_id}/site-admin-role", responses.Wrap(users.RevokeUserSiteAdminRole))
 
 				// ISN ownership transfer
-				r.Put("/isn/{isn_slug}/transfer-ownership", isn.TransferIsnOwnership)
+				r.Put("/isn/{isn_slug}/transfer-ownership", responses.Wrap(isn.TransferIsnOwnership))
 
 				// signal types management
-				r.Get("/signal-types", signalTypes.GetSignalTypes)
-				r.Post("/signal-types", signalTypes.CreateSignalType)
-				r.Post("/signal-types/{signal_type_slug}/schemas", signalTypes.RegisterNewSignalTypeSchema)
-				r.Put("/signal-types/{signal_type_slug}/v{sem_ver}", signalTypes.UpdateSignalType)
-				r.Delete("/signal-types/{signal_type_slug}/v{sem_ver}", signalTypes.DeleteSignalType)
+				r.Get("/signal-types", responses.Wrap(signalTypes.GetSignalTypes))
+				r.Post("/signal-types", responses.Wrap(signalTypes.CreateSignalType))
+				r.Post("/signal-types/{signal_type_slug}/schemas", responses.Wrap(signalTypes.RegisterNewSignalTypeSchema))
+				r.Put("/signal-types/{signal_type_slug}/v{sem_ver}", responses.Wrap(signalTypes.UpdateSignalType))
+				r.Delete("/signal-types/{signal_type_slug}/v{sem_ver}", responses.Wrap(signalTypes.DeleteSignalType))
 
 				// Signals Routing Rules management
-				r.Get("/signal-types/{signal_type_slug}/v{sem_ver}/routes", isnRouter.GetSignalRoutingConfig)
-				r.Put("/signal-types/{signal_type_slug}/v{sem_ver}/routes", isnRouter.UpdateSignalRoutingConfig)
-				r.Delete("/signal-types/{signal_type_slug}/v{sem_ver}/routes", isnRouter.DeleteSignalRoutingConfig)
+				r.Get("/signal-types/{signal_type_slug}/v{sem_ver}/routes", responses.Wrap(isnRouter.GetSignalRoutingConfig))
+				r.Put("/signal-types/{signal_type_slug}/v{sem_ver}/routes", responses.Wrap(isnRouter.UpdateSignalRoutingConfig))
+				r.Delete("/signal-types/{signal_type_slug}/v{sem_ver}/routes", responses.Wrap(isnRouter.DeleteSignalRoutingConfig))
 			})
 
 			// shared site-admin and isn-admin operations
@@ -341,11 +342,11 @@ func (s *Server) registerAdminRoutes() {
 				r.Use(s.authService.RequireRole("siteadmin", "isnadmin"))
 
 				// Account management
-				r.Post("/accounts/{account_id}/disable", admin.DisableAccount)
-				r.Post("/accounts/{account_id}/enable", admin.EnableAccount)
-				r.Get("/users", admin.GetUsers)
-				r.Get("/service-accounts", admin.GetServiceAccounts)
-				r.Post("/users/{user_id}/generate-password-reset-link", admin.GeneratePasswordResetLink)
+				r.Post("/accounts/{account_id}/disable", responses.Wrap(admin.DisableAccount))
+				r.Post("/accounts/{account_id}/enable", responses.Wrap(admin.EnableAccount))
+				r.Get("/users", responses.Wrap(admin.GetUsers))
+				r.Get("/service-accounts", responses.Wrap(admin.GetServiceAccounts))
+				r.Post("/users/{user_id}/generate-password-reset-link", responses.Wrap(admin.GeneratePasswordResetLink))
 			})
 		})
 	})
@@ -364,12 +365,12 @@ func (s *Server) registerSignalWriteRoutes() {
 		r.Use(s.authService.RequireAccessPermission("write"))
 
 		// direct ISN signal post and withdrawal
-		r.Post("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals", signals.CreateSignals)
-		r.Put("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/withdraw", signals.WithdrawSignal)
+		r.Post("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals", responses.Wrap(signals.CreateSignals))
+		r.Put("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/withdraw", responses.Wrap(signals.WithdrawSignal))
 
 		// batch status endpoints
-		r.Get("/api/batches/search", signalBatches.SearchBatches)
-		r.Get("/api/batches/{batch_ref}/status", signalBatches.GetSignalBatchStatus)
+		r.Get("/api/batches/search", responses.Wrap(signalBatches.SearchBatches))
+		r.Get("/api/batches/{batch_ref}/status", responses.Wrap(signalBatches.GetSignalBatchStatus))
 	})
 
 	// Router signal endpoint: ISN is resolved by routing rules, not from the URL.
@@ -379,7 +380,7 @@ func (s *Server) registerSignalWriteRoutes() {
 		r.Use(middleware.CORS(s.corsConfigs.Protected))
 		r.Use(middleware.RequestSizeLimit(s.config.MaxSignalPayloadSize))
 		r.Use(s.authService.RequireValidAccessToken)
-		r.Post("/api/router/signal-types/{signal_type_slug}/v{sem_ver}/signals", routerSignals.RouteSignals)
+		r.Post("/api/router/signal-types/{signal_type_slug}/v{sem_ver}/signals", responses.Wrap(routerSignals.RouteSignals))
 	})
 }
 
@@ -390,7 +391,7 @@ func (s *Server) registerSignalReadRoutes() {
 	// Public ISN signal search - no authentication required
 	s.router.Group(func(r chi.Router) {
 		r.Use(middleware.CORS(s.corsConfigs.Public))
-		r.Get("/api/public/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search", signals.SearchPublicSignals)
+		r.Get("/api/public/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search", responses.Wrap(signals.SearchPublicSignals))
 	})
 
 	// Private ISN signal search - any ISN member (read or write) may call this endpoint.
@@ -399,7 +400,7 @@ func (s *Server) registerSignalReadRoutes() {
 		r.Use(middleware.CORS(s.corsConfigs.Protected))
 		r.Use(s.authService.RequireValidAccessToken)
 		r.Use(s.authService.RequireIsnMembership)
-		r.Get("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search", signals.SearchPrivateSignals)
+		r.Get("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search", responses.Wrap(signals.SearchPrivateSignals))
 	})
 
 }
@@ -414,16 +415,16 @@ func (s *Server) registerCommonRoutes() {
 		r.Use(middleware.CORS(s.corsConfigs.Public))
 
 		// Readiness - checks if the service is ready to accept traffic (includes database connectivity)
-		r.Get("/ready", admin.Readiness)
+		r.Get("/ready", responses.Wrap(admin.Readiness))
 
 		// Liveness - checks if the service is running (basic health check)
-		r.Get("/live", admin.Liveness)
+		r.Get("/live", responses.Wrap(admin.Liveness))
 	})
 
 	// Version information
 	s.router.Route("/version", func(r chi.Router) {
 		r.Use(middleware.CORS(s.corsConfigs.Public))
-		r.Get("/", admin.Version)
+		r.Get("/", responses.Wrap(admin.Version))
 	})
 }
 

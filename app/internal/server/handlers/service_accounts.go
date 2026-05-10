@@ -94,23 +94,17 @@ type SetupPageData struct {
 //	@Security	BearerAccessToken
 //
 //	@Router		/api/auth/service-accounts/register [post]
-func (s *ServiceAccountHandler) RegisterServiceAccount(w http.ResponseWriter, r *http.Request) {
+func (s *ServiceAccountHandler) RegisterServiceAccount(w http.ResponseWriter, r *http.Request) error {
 	var req CreateServiceAccountRequest
 
 	defer r.Body.Close()
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
-		return
+		return apperrors.MalformedBody("invalid JSON body", err)
 	}
 
 	if req.ClientContactEmail == "" || req.ClientOrganization == "" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "client_organization, client_contact_email are required")
-		return
+		return apperrors.MalformedBody("client_organization, client_contact_email are required", nil)
 	}
 
 	// Check if service account already exists
@@ -119,38 +113,22 @@ func (s *ServiceAccountHandler) RegisterServiceAccount(w http.ResponseWriter, r 
 		ClientContactEmail: req.ClientContactEmail,
 	})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 	if exists {
-		responses.RespondWithError(w, r, http.StatusConflict, apperrors.ErrCodeResourceAlreadyExists, "service account already exists for this organization and email combination")
-		return
+		return apperrors.AlreadyExists("service account already exists for this organization and email combination", nil)
 	}
 
 	// Create new service account - generate client_id
 	clientID, err := utils.GenerateClientID(req.ClientOrganization)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "internal server error")
-		return
+		return apperrors.InternalError("internal server error", err)
 	}
 
 	// transaction
 	tx, err := s.pool.BeginTx(r.Context(), pgx.TxOptions{})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	defer func() {
@@ -171,12 +149,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccount(w http.ResponseWriter, r 
 	// create serviceAccount
 	serviceAccount, err := txQueries.CreateServiceAccountAccount(r.Context())
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	serviceAccountID := serviceAccount.ID
@@ -189,30 +162,19 @@ func (s *ServiceAccountHandler) RegisterServiceAccount(w http.ResponseWriter, r 
 		ClientOrganization: req.ClientOrganization,
 	})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// Generate the actual client secret (this gets stored temporarily)
 	clientSecret, err := s.authService.GenerateSecureToken(32)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "internal server error")
-		return
+		return apperrors.InternalError("internal server error", err)
 	}
 
 	// Create one-time secret record (used to complete the set up the service account)
 	id, err := uuid.NewV7()
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "internal error")
-		return
+		return apperrors.InternalError("internal error", nil)
 
 	}
 	expiresAt := time.Now().Add(signalsd.OneTimeSecretExpiry)
@@ -223,21 +185,11 @@ func (s *ServiceAccountHandler) RegisterServiceAccount(w http.ResponseWriter, r 
 		ExpiresAt:               expiresAt,
 	})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	if err := tx.Commit(r.Context()); err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// Generate the one-time setup URL using forwarded headers
@@ -261,7 +213,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccount(w http.ResponseWriter, r 
 		ExpiresIn: int(signalsd.OneTimeSecretExpiry.Seconds()),
 	}
 
-	responses.RespondWithJSON(w, http.StatusCreated, response)
+	return responses.JSON(w, http.StatusCreated, response)
 }
 
 // ReissueServiceAccountCredentials godocs
@@ -288,39 +240,27 @@ func (s *ServiceAccountHandler) RegisterServiceAccount(w http.ResponseWriter, r 
 //	@Security	BearerAccessToken
 //
 //	@Router		/api/auth/service-accounts/reissue-credentials [post]
-func (s *ServiceAccountHandler) ReissueServiceAccountCredentials(w http.ResponseWriter, r *http.Request) {
+func (s *ServiceAccountHandler) ReissueServiceAccountCredentials(w http.ResponseWriter, r *http.Request) error {
 	var req ReissueServiceAccountCredentialsRequest
 
 	defer r.Body.Close()
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
-		return
+		return apperrors.MalformedBody("invalid JSON body", err)
 	}
 
 	if req.ClientID == "" {
 
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "client_id is required")
-		return
+		return apperrors.MalformedBody("client_id is required", nil)
 	}
 
 	// Check if service account exists
 	serviceAccount, err := s.queries.GetServiceAccountByClientID(r.Context(), req.ClientID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "service account not found for this organization and email combination")
-			return
+			return apperrors.NotFound("service account not found for this organization and email combination", nil)
 		}
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	clientID := serviceAccount.ClientID
@@ -330,13 +270,11 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentials(w http.Response
 	_, err = s.queries.RevokeAllClientSecretsForAccount(r.Context(), serviceAccount.AccountID)
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("client_id", clientID),
 			slog.String("account_id", serviceAccountID.String()),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	_, err = s.queries.DeleteOneTimeClientSecretsByOrgAndEmail(r.Context(), database.DeleteOneTimeClientSecretsByOrgAndEmailParams{
@@ -345,24 +283,17 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentials(w http.Response
 	})
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("client_id", clientID),
 			slog.String("account_id", serviceAccountID.String()),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// transaction
 	tx, err := s.pool.BeginTx(r.Context(), pgx.TxOptions{})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	defer func() {
@@ -379,20 +310,14 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentials(w http.Response
 	// Generate the actual client secret (this gets stored temporarily)
 	clientSecret, err := s.authService.GenerateSecureToken(32)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "internal server error")
-		return
+		return apperrors.InternalError("internal server error", err)
 	}
 
 	// Create one-time secret record
 	expiresAt := time.Now().Add(signalsd.OneTimeSecretExpiry)
 	id, err := uuid.NewV7()
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "internal error")
-		return
+		return apperrors.InternalError("internal error", nil)
 
 	}
 	oneTimeSecretID, err := txQueries.CreateOneTimeClientSecret(r.Context(), database.CreateOneTimeClientSecretParams{
@@ -402,21 +327,11 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentials(w http.Response
 		ExpiresAt:               expiresAt,
 	})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	if err := tx.Commit(r.Context()); err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// Generate the one-time setup URL using forwarded headers
@@ -442,7 +357,7 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentials(w http.Response
 		ExpiresIn:          int(signalsd.OneTimeSecretExpiry.Seconds()),
 	}
 
-	responses.RespondWithJSON(w, http.StatusOK, response)
+	return responses.JSON(w, http.StatusOK, response)
 }
 
 // SetupServiceAccount godoc

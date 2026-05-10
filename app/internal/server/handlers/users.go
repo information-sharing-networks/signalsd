@@ -66,63 +66,44 @@ type UpdatePasswordRequest struct {
 //	@Failure		409	{object}	responses.ErrorResponse	"Conflict with possible error code: resource_already_exists"
 //
 //	@Router			/api/auth/register [post]
-func (u *UserHandler) RegisterUser(w http.ResponseWriter, r *http.Request) {
+func (u *UserHandler) RegisterUser(w http.ResponseWriter, r *http.Request) error {
 	var req CreateUserRequest
 
 	defer r.Body.Close()
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
-		return
+		return apperrors.MalformedBody("invalid JSON body", err)
 	}
 
 	if req.Email == "" || req.Password == "" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must supply {email} and {password}")
-		return
+		return apperrors.MalformedBody("you must supply {email} and {password}", nil)
 	}
 
 	exists, err := u.queries.ExistsUserWithEmail(r.Context(), req.Email)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 	if exists {
-		responses.RespondWithError(w, r, http.StatusConflict, apperrors.ErrCodeResourceAlreadyExists, "a user already exists with this email address")
-		return
+		return apperrors.AlreadyExists("a user already exists with this email address", nil)
 	}
 
 	if len(req.Password) < signalsd.MinimumPasswordLength {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodePasswordTooShort, fmt.Sprintf("password must be at least %d chars", signalsd.MinimumPasswordLength))
-		return
+		return &apperrors.HTTPError{
+			Status:  http.StatusBadRequest,
+			Code:    apperrors.ErrCodePasswordTooShort,
+			Message: fmt.Sprintf("password must be at least %d chars", signalsd.MinimumPasswordLength),
+		}
 	}
 
 	hashedPassword, err := u.authService.HashPassword(req.Password)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "internal server error")
-		return
+		return apperrors.InternalError("internal server error", err)
 	}
 
 	// create the account record followed by the user (note transaction needed to ensure both records are created together)
 	tx, err := u.pool.BeginTx(r.Context(), pgx.TxOptions{})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	defer func() {
@@ -139,23 +120,13 @@ func (u *UserHandler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 
 	account, err := txQueries.CreateUserAccount(r.Context())
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// first user is granted the owner role
 	isFirstUser, err := txQueries.IsFirstUser(r.Context())
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 	if isFirstUser {
 		_, err = txQueries.CreateSiteAdminUser(r.Context(), database.CreateSiteAdminUserParams{
@@ -171,21 +142,11 @@ func (u *UserHandler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	if err := tx.Commit(r.Context()); err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// log the new user id in the final request log context
@@ -193,7 +154,7 @@ func (u *UserHandler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 		slog.String("new_account_id", account.ID.String()),
 	)
 
-	responses.RespondWithStatusCodeOnly(w, http.StatusCreated)
+	return responses.NoContent(w, http.StatusCreated)
 }
 
 // UpdatePassword godoc
@@ -211,14 +172,13 @@ func (u *UserHandler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 //	@Security	BearerAccessToken
 //
 //	@Router		/api/auth/password/reset [put]
-func (u *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
+func (u *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) error {
 	req := UpdatePasswordRequest{}
 
 	// this request was already authenticated by the middleware
 	userAccountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
-		return
+		return apperrors.InternalError("did not receive userAccountID from middleware", nil)
 	}
 
 	defer r.Body.Close()
@@ -226,28 +186,20 @@ func (u *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	decoder.DisallowUnknownFields()
 	err := decoder.Decode(&req)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
-		return
+		return apperrors.MalformedBody("invalid JSON body", err)
 	}
 
 	if req.NewPassword == "" || req.CurrentPassword == "" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must supply current and new password in the request")
-		return
+		return apperrors.MalformedBody("you must supply current and new password in the request", nil)
 	}
 
 	user, err := u.queries.GetUserWithPasswordByID(r.Context(), userAccountID)
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("account_id", userAccountID.String()),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "internal server error")
-		return
+		return apperrors.InternalError("internal server error", err)
 	}
 
 	// Verify the current password against the stored hash
@@ -256,23 +208,20 @@ func (u *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("account_id", userAccountID.String()),
 		)
-		responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "Current password is incorrect")
-		return
+		return apperrors.AuthenticationFailure("Current password is incorrect", nil)
 	}
 
 	if len(req.NewPassword) < signalsd.MinimumPasswordLength {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodePasswordTooShort, fmt.Sprintf("password must be at least %d chars", signalsd.MinimumPasswordLength))
-		return
+		return &apperrors.HTTPError{
+			Status:  http.StatusBadRequest,
+			Code:    apperrors.ErrCodePasswordTooShort,
+			Message: fmt.Sprintf("password must be at least %d chars", signalsd.MinimumPasswordLength),
+		}
 	}
 
 	newPasswordHash, err := u.authService.HashPassword(req.NewPassword)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "internal server error")
-		return
+		return apperrors.InternalError("internal server error", err)
 	}
 
 	rowsAffected, err := u.queries.UpdatePassword(r.Context(), database.UpdatePasswordParams{
@@ -281,19 +230,16 @@ func (u *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("account_id", user.AccountID.String()),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "database error")
-		return
+		return apperrors.InternalError("database error", err)
 	}
 	if rowsAffected != 1 {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "error updating user")
-		return
+		return apperrors.DatabaseError("error updating user", nil)
 	}
 
-	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
+	return responses.NoContent(w, http.StatusNoContent)
 
 }
 
@@ -331,69 +277,56 @@ func (u *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 //	@Router			/api/admin/accounts/{account_id}/isn-admin-role [put]
 //
 //	this handler must use the RequireRole (siteadmin) middleware
-func (u *UserHandler) GrantUserIsnAdminRole(w http.ResponseWriter, r *http.Request) {
+func (u *UserHandler) GrantUserIsnAdminRole(w http.ResponseWriter, r *http.Request) error {
 
 	// get user account id for user making request
 	userAccountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
-		return
+		return apperrors.InternalError("did not receive userAccountID from middleware", nil)
 	}
 
 	// get target account
 	targetAccountIDString := r.PathValue("account_id")
 	targetAccountID, err := uuid.Parse(targetAccountIDString)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "invalid account ID format")
-		return
+		return apperrors.InvalidRequest("invalid account ID format", err)
 	}
 	targetAccount, err := u.queries.GetAccountByID(r.Context(), targetAccountID)
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("target_account_id", targetAccountID.String()),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// prevent owners trying to make themselves admin
 	if userAccountID == targetAccountID {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "the owner account is not permitted to change its own role to admin")
-		return
+		return apperrors.Forbidden("the owner account is not permitted to change its own role to admin", nil)
 	}
 
 	if targetAccount.AccountType != "user" {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "Service accounts can't be granted admin rights")
-		return
+		return apperrors.Forbidden("Service accounts can't be granted admin rights", nil)
 	}
 
 	if targetAccount.AccountRole == "isnadmin" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "this account is already an admin")
-		return
+		return apperrors.InvalidRequest("this account is already an admin", nil)
 	}
 
 	//update user role
 	rowsUpdated, err := u.queries.UpdateUserAccountToIsnAdmin(r.Context(), targetAccountID)
 	if err != nil || rowsUpdated == 0 {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("target_account_id", targetAccountID.String()),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 	logger.ContextWithLogAttrs(r.Context(),
 		slog.String("target_account_id", targetAccountID.String()),
 	)
 
-	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
+	return responses.NoContent(w, http.StatusNoContent)
 }
 
 // RevokeUserIsnAdminRole godocs
@@ -414,69 +347,56 @@ func (u *UserHandler) GrantUserIsnAdminRole(w http.ResponseWriter, r *http.Reque
 //	@Router			/api/admin/accounts/{account_id}/isn-admin-role [delete]
 //
 //	this handler must use the RequireRole (siteadmin) middleware
-func (u *UserHandler) RevokeUserIsnAdminRole(w http.ResponseWriter, r *http.Request) {
+func (u *UserHandler) RevokeUserIsnAdminRole(w http.ResponseWriter, r *http.Request) error {
 
 	// get user account id for user making request
 	userAccountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
-		return
+		return apperrors.InternalError("did not receive userAccountID from middleware", nil)
 	}
 
 	// get target account
 	targetAccountIDString := r.PathValue("account_id")
 	targetAccountID, err := uuid.Parse(targetAccountIDString)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "invalid account ID format")
-		return
+		return apperrors.InvalidRequest("invalid account ID format", err)
 	}
 	targetAccount, err := u.queries.GetAccountByID(r.Context(), targetAccountID)
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("target_account_id", targetAccountID.String()),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// prevent admins trying to update their own role
 	if userAccountID == targetAccountID {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "admin accounts are not permitted to change their own role")
-		return
+		return apperrors.Forbidden("admin accounts are not permitted to change their own role", nil)
 	}
 
 	if targetAccount.AccountType != "user" {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "Service accounts can't be granted admin rights")
-		return
+		return apperrors.Forbidden("Service accounts can't be granted admin rights", nil)
 	}
 
 	if targetAccount.AccountRole != "siteadmin" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "this account is not an site admin")
-		return
+		return apperrors.InvalidRequest("this account is not an site admin", nil)
 	}
 
 	//update user role
 	rowsUpdated, err := u.queries.UpdateUserAccountToMember(r.Context(), targetAccountID)
 	if err != nil || rowsUpdated == 0 {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("target_account_id", targetAccountID.String()),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 	logger.ContextWithLogAttrs(r.Context(),
 		slog.String("target_account_id", targetAccountID.String()),
 	)
 
-	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
+	return responses.NoContent(w, http.StatusNoContent)
 }
 
 // GrantUserSiteAdminRole godocs
@@ -507,70 +427,57 @@ func (u *UserHandler) RevokeUserIsnAdminRole(w http.ResponseWriter, r *http.Requ
 //	@Router			/api/admin/accounts/{account_id}/site-admin-role [put]
 //
 //	this handler must use the RequireRole (siteadmin) middleware
-func (u *UserHandler) GrantUserSiteAdminRole(w http.ResponseWriter, r *http.Request) {
+func (u *UserHandler) GrantUserSiteAdminRole(w http.ResponseWriter, r *http.Request) error {
 
 	// get user account id for user making request
 	userAccountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
-		return
+		return apperrors.InternalError("did not receive userAccountID from middleware", nil)
 	}
 
 	// get target account
 	targetAccountIDString := r.PathValue("account_id")
 	targetAccountID, err := uuid.Parse(targetAccountIDString)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "invalid account ID format")
-		return
+		return apperrors.InvalidRequest("invalid account ID format", err)
 	}
 
 	targetAccount, err := u.queries.GetAccountByID(r.Context(), targetAccountID)
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("target_account_id", targetAccountID.String()),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// prevent accounts trying to update their own role
 	if userAccountID == targetAccountID {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "accounts are not permitted to change their own role")
-		return
+		return apperrors.Forbidden("accounts are not permitted to change their own role", nil)
 	}
 
 	if targetAccount.AccountType != "user" {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "this end point should not be used by service accounts")
-		return
+		return apperrors.Forbidden("this end point should not be used by service accounts", nil)
 	}
 
 	if targetAccount.AccountRole == "siteadmin" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "this account is already a site admin")
-		return
+		return apperrors.InvalidRequest("this account is already a site admin", nil)
 	}
 
 	//update user role
 	rowsUpdated, err := u.queries.UpdateUserAccountToSiteAdmin(r.Context(), targetAccountID)
 	if err != nil || rowsUpdated == 0 {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("target_account_id", targetAccountID.String()),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 	logger.ContextWithLogAttrs(r.Context(),
 		slog.String("target_account_id", targetAccountID.String()),
 	)
 
-	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
+	return responses.NoContent(w, http.StatusNoContent)
 }
 
 // RevokeUserSiteAdminRole godocs
@@ -591,71 +498,58 @@ func (u *UserHandler) GrantUserSiteAdminRole(w http.ResponseWriter, r *http.Requ
 //	@Router			/api/admin/accounts/{account_id}/site-admin-role [delete]
 //
 //	this handler must use the RequireRole (siteadmin) middleware
-func (u *UserHandler) RevokeUserSiteAdminRole(w http.ResponseWriter, r *http.Request) {
+func (u *UserHandler) RevokeUserSiteAdminRole(w http.ResponseWriter, r *http.Request) error {
 
 	// get user account id for user making request
 	userAccountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
-		return
+		return apperrors.InternalError("did not receive userAccountID from middleware", nil)
 	}
 
 	// get target account
 	targetAccountIDString := r.PathValue("account_id")
 	targetAccountID, err := uuid.Parse(targetAccountIDString)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "invalid account ID format")
-		return
+		return apperrors.InvalidRequest("invalid account ID format", err)
 	}
 
 	targetAccount, err := u.queries.GetAccountByID(r.Context(), targetAccountID)
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("target_account_id", targetAccountID.String()),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// prevent site admins trying to revoke their own role
 	if userAccountID == targetAccountID {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "site admin accounts are not permitted to change their own role")
-		return
+		return apperrors.Forbidden("site admin accounts are not permitted to change their own role", nil)
 	}
 
 	if targetAccount.AccountType != "user" {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "Service accounts can't be granted admin rights")
-		return
+		return apperrors.Forbidden("Service accounts can't be granted admin rights", nil)
 	}
 
 	if targetAccount.AccountRole != "siteadmin" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "this account is not a site admin")
-		return
+		return apperrors.InvalidRequest("this account is not a site admin", nil)
 	}
 
 	//update user role to member
 	rowsUpdated, err := u.queries.UpdateUserAccountToMember(r.Context(), targetAccountID)
 	if err != nil || rowsUpdated == 0 {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("target_account_id", targetAccountID.String()),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	logger.ContextWithLogAttrs(r.Context(),
 		slog.String("target_account_id", targetAccountID.String()),
 	)
 
-	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
+	return responses.NoContent(w, http.StatusNoContent)
 }
 
 // Password reset types
@@ -782,15 +676,14 @@ func (u *UserHandler) PasswordResetTokenPage(w http.ResponseWriter, r *http.Requ
 //	@Failure		410	{object}	responses.ErrorResponse
 //
 //	@Router			/api/auth/password-reset/{token_id} [post]
-func (u *UserHandler) PasswordResetToken(w http.ResponseWriter, r *http.Request) {
+func (u *UserHandler) PasswordResetToken(w http.ResponseWriter, r *http.Request) error {
 	// Extract token from URL path
 	tokenIDString := r.PathValue("token_id")
 
 	// Parse token as UUID
 	tokenID, err := uuid.Parse(tokenIDString)
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "invalid token format")
-		return
+		return apperrors.InvalidURLParam("invalid token format", nil)
 	}
 
 	// Parse request body
@@ -798,33 +691,25 @@ func (u *UserHandler) PasswordResetToken(w http.ResponseWriter, r *http.Request)
 	defer r.Body.Close()
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
-		return
+		return apperrors.MalformedBody("invalid JSON body", err)
 	}
 
 	// Validate the new password
 	if req.NewPassword == "" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "new-password is required")
-		return
+		return apperrors.MalformedBody("new-password is required", nil)
 	}
 
 	if len(req.NewPassword) < signalsd.MinimumPasswordLength {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodePasswordTooShort, fmt.Sprintf("password must be at least %d characters", signalsd.MinimumPasswordLength))
-		return
+		return &apperrors.HTTPError{
+			Status:  http.StatusBadRequest,
+			Code:    apperrors.ErrCodePasswordTooShort,
+			Message: fmt.Sprintf("password must be at least %d characters", signalsd.MinimumPasswordLength),
+		}
 	}
 
 	tx, err := u.pool.BeginTx(r.Context(), pgx.TxOptions{})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	defer func() {
@@ -841,32 +726,24 @@ func (u *UserHandler) PasswordResetToken(w http.ResponseWriter, r *http.Request)
 	resetToken, err := txQueries.GetPasswordResetToken(r.Context(), tokenID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "password reset token not found or already used")
-			return
+			return apperrors.NotFound("password reset token not found or already used", nil)
 		}
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// Check if token has expired
 	if time.Now().After(resetToken.ExpiresAt) {
-		responses.RespondWithError(w, r, http.StatusGone, apperrors.ErrCodeResourceExpired, "password reset token has expired")
-		return
+		return &apperrors.HTTPError{
+			Status:  http.StatusGone,
+			Code:    apperrors.ErrCodeResourceExpired,
+			Message: "password reset token has expired",
+		}
 	}
 
 	// Hash the new password
 	hashedPassword, err := u.authService.HashPassword(req.NewPassword)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "internal server error")
-		return
+		return apperrors.InternalError("internal server error", err)
 	}
 
 	// Update the password in the database
@@ -876,38 +753,25 @@ func (u *UserHandler) PasswordResetToken(w http.ResponseWriter, r *http.Request)
 	})
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("user_id", resetToken.UserAccountID.String()),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	if rowsAffected != 1 {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "password update affected unexpected number of rows")
-		return
+		return apperrors.DatabaseError("password update affected unexpected number of rows", nil)
 	}
 
 	// Delete the password reset token
 	_, err = txQueries.DeletePasswordResetToken(r.Context(), tokenID)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// Commit the transaction
 	if err := tx.Commit(r.Context()); err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	logger.ContextWithLogAttrs(r.Context(),
@@ -915,7 +779,7 @@ func (u *UserHandler) PasswordResetToken(w http.ResponseWriter, r *http.Request)
 		slog.String("admin_account_id", resetToken.CreatedByAdminID.String()),
 	)
 
-	responses.RespondWithStatusCodeOnly(w, http.StatusOK)
+	return responses.NoContent(w, http.StatusOK)
 }
 
 // renderErrorPage renders a simple HTML error page using templ

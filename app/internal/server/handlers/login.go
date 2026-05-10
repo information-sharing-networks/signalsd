@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/responses"
+	"github.com/jackc/pgx/v5"
 )
 
 type LoginHandler struct {
@@ -53,59 +55,32 @@ type LoginRequest struct {
 //	@Failure		500		{object}	responses.ErrorResponse
 //
 //	@Router			/api/auth/login [post]
-func (l *LoginHandler) Login(w http.ResponseWriter, r *http.Request) {
+func (l *LoginHandler) Login(w http.ResponseWriter, r *http.Request) error {
 	var req LoginRequest
 
 	defer r.Body.Close()
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
-		return
+		return apperrors.MalformedBody("invalid JSON body", err)
 	}
 
-	exists, err := l.queries.ExistsUserWithEmail(r.Context(), req.Email)
-	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
-	}
-	if !exists {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeResourceNotFound, "no user found with this email address")
-		return
-	}
-
+	// check if the email is registered
 	user, err := l.queries.GetUserByEmail(r.Context(), req.Email)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperrors.AuthenticationFailure("incorrect email or password", nil)
+		}
+		return apperrors.DatabaseError("database error", err)
 	}
 
-	err = l.authService.CheckPasswordHash(user.HashedPassword, req.Password)
-	if err != nil {
-		responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "Incorrect email or password")
-		return
+	if err := l.authService.CheckPasswordHash(user.HashedPassword, req.Password); err != nil {
+		return apperrors.AuthenticationFailure("incorrect email or password", nil)
 	}
 
 	// check if the user account is active
 	account, err := l.queries.GetAccountByID(r.Context(), user.AccountID)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// add the account_id to the request log context
@@ -114,12 +89,7 @@ func (l *LoginHandler) Login(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if !account.IsActive {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", "account is disabled"),
-		)
-
-		responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "account is disabled")
-		return
+		return apperrors.AuthenticationFailure("account is disabled", nil)
 	}
 
 	// new access token
@@ -127,23 +97,23 @@ func (l *LoginHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	accessTokenResponse, err := l.authService.CreateAccessToken(ctx)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenInvalid, "error creating access token")
-		return
+		return &apperrors.HTTPError{
+			Status:  http.StatusInternalServerError,
+			Code:    apperrors.ErrCodeTokenInvalid,
+			Message: "error creating access token",
+			Err:     err,
+		}
 	}
 
 	// new refresh token
 	refreshToken, err := l.authService.RotateRefreshToken(ctx)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeTokenInvalid, "error creating refresh token")
-		return
+		return &apperrors.HTTPError{
+			Status:  http.StatusInternalServerError,
+			Code:    apperrors.ErrCodeTokenInvalid,
+			Message: "error creating refresh token",
+			Err:     err,
+		}
 	}
 
 	// include the new refresh token in a http-only cookie
@@ -151,5 +121,5 @@ func (l *LoginHandler) Login(w http.ResponseWriter, r *http.Request) {
 
 	http.SetCookie(w, newCookie)
 
-	responses.RespondWithJSON(w, http.StatusOK, accessTokenResponse)
+	return responses.JSON(w, http.StatusOK, accessTokenResponse)
 }

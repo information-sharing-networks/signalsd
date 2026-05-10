@@ -86,41 +86,28 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, p
 //	@Failure	500				{object}	responses.OAuthErrorResponse	"server_error"
 //
 //	@Router		/oauth/token [post]
-func (a *TokenHandler) RefreshAccessToken(w http.ResponseWriter, r *http.Request) {
-
+func (a *TokenHandler) RefreshAccessToken(w http.ResponseWriter, r *http.Request) error {
 	accountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
-		responses.RespondWithOAuthError(w, r, http.StatusInternalServerError, responses.OAuthErrServerError, "did not receive userAccountID from middleware", apperrors.ErrCodeInternalError)
-		return
+		return apperrors.OAuthServerError("did not receive userAccountID from middleware", apperrors.ErrCodeInternalError, nil)
 	}
 
 	accountType, ok := auth.ContextAccountType(r.Context())
 	if !ok {
-		responses.RespondWithOAuthError(w, r, http.StatusInternalServerError, responses.OAuthErrServerError, "did not receive accountType from middleware", apperrors.ErrCodeInternalError)
-		return
+		return apperrors.OAuthServerError("did not receive accountType from middleware", apperrors.ErrCodeInternalError, nil)
 	}
 
 	// create new access token refresh
 	accessTokenResponse, err := a.authService.CreateAccessToken(r.Context())
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithOAuthError(w, r, http.StatusInternalServerError, responses.OAuthErrServerError, "error creating access token", apperrors.ErrCodeTokenInvalid)
-		return
+		return apperrors.OAuthServerError("error creating access token", apperrors.ErrCodeTokenInvalid, err)
 	}
 
 	// rotate the refresh token (web users only)
 	if accountType == "user" {
 		newRefreshToken, err := a.authService.RotateRefreshToken(r.Context())
 		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
-			)
-
-			responses.RespondWithOAuthError(w, r, http.StatusInternalServerError, responses.OAuthErrServerError, "error creating refresh token", apperrors.ErrCodeTokenInvalid)
-			return
+			return apperrors.OAuthServerError("error creating refresh token", apperrors.ErrCodeTokenInvalid, err)
 		}
 
 		reqLogger := logger.ContextRequestLogger(r.Context())
@@ -136,7 +123,7 @@ func (a *TokenHandler) RefreshAccessToken(w http.ResponseWriter, r *http.Request
 		http.SetCookie(w, newCookie)
 	}
 
-	responses.RespondWithJSON(w, http.StatusOK, accessTokenResponse)
+	return responses.JSON(w, http.StatusOK, accessTokenResponse)
 }
 
 // RevokeToken godoc
@@ -188,93 +175,50 @@ func (a *TokenHandler) RefreshAccessToken(w http.ResponseWriter, r *http.Request
 //	@Failure	500	{object}	responses.OAuthErrorResponse	"server_error"
 //
 //	@Router		/oauth/revoke [post]
-func (a *TokenHandler) RevokeToken(w http.ResponseWriter, r *http.Request) {
+func (a *TokenHandler) RevokeToken(w http.ResponseWriter, r *http.Request) error {
 	accountType, ok := auth.ContextAccountType(r.Context())
 	if !ok {
-		responses.RespondWithOAuthError(w, r, http.StatusInternalServerError, responses.OAuthErrServerError, "could not get account type from context", apperrors.ErrCodeInternalError)
-		return
+		return apperrors.OAuthServerError("could not get account type from context", apperrors.ErrCodeInternalError, nil)
 	}
 
 	if accountType == "user" {
-		a.RevokeRefreshToken(w, r)
-		return
+		return a.RevokeRefreshToken(w, r)
 	}
 	// service accounts
-	a.RevokeClientSecret(w, r)
+	return a.RevokeClientSecret(w, r)
 }
 
-// RevokeClientSecret revokes ALL client secrets for a service account - called by the wrapper handler for /oauth/revoke (RevokeTokenHandler)
+// RevokeClientSecret revokes ALL client secrets for a service account - called by the wrapper handler for /oauth/revoke (RevokeToken)
 // This effectively disables the service account until an admin re-registers it via POST /api/auth/service-accounts/register
-func (a *TokenHandler) RevokeClientSecret(w http.ResponseWriter, r *http.Request) {
-
+// TODO this is currently handled on /oauth/revoke but probably belongs on a differnt endpoint
+func (a *TokenHandler) RevokeClientSecret(w http.ResponseWriter, r *http.Request) error {
 	serverAccountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
-		responses.RespondWithOAuthError(w, r, http.StatusInternalServerError, responses.OAuthErrServerError, "middleware did not supply a serverAccountID", apperrors.ErrCodeInternalError)
-		return
+		return apperrors.OAuthServerError("middleware did not supply a serverAccountID", apperrors.ErrCodeInternalError, nil)
 	}
 
-	// Revoke all client secrets for this account (disables the service account)
-	rowsUpdated, err := a.queries.RevokeAllClientSecretsForAccount(r.Context(), serverAccountID)
-	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithOAuthError(w, r, http.StatusInternalServerError, responses.OAuthErrServerError, "database error", apperrors.ErrCodeDatabaseError)
-		return
+	// Revoke all client secrets for this account (disables the service account).
+	if _, err := a.queries.RevokeAllClientSecretsForAccount(r.Context(), serverAccountID); err != nil {
+		return apperrors.OAuthServerError("database error", apperrors.ErrCodeDatabaseError, err)
 	}
 
-	if rowsUpdated == 0 {
-		responses.RespondWithOAuthError(w, r, http.StatusNotFound, responses.OAuthErrInvalidGrant, "no client secrets found to revoke", apperrors.ErrCodeTokenInvalid)
-		return
-	}
-
-	responses.RespondWithStatusCodeOnly(w, http.StatusOK)
+	return responses.NoContent(w, http.StatusOK)
 }
 
-// RevokeRefreshToken revokes a specific refresh token for web users (logout) - called by the wrapper handler for /oauth/revoke (RevokeTokenHandler)
+// RevokeRefreshToken revokes a specific refresh token for web users (logout) - called by the wrapper handler for /oauth/revoke (RevokeToken)
 // Users can log back in immediately via /auth/login to get a new refresh token
-func (a *TokenHandler) RevokeRefreshToken(w http.ResponseWriter, r *http.Request) {
-
+func (a *TokenHandler) RevokeRefreshToken(w http.ResponseWriter, r *http.Request) error {
 	userAccountId, ok := auth.ContextAccountID(r.Context())
 	if !ok {
-		responses.RespondWithOAuthError(w, r, http.StatusInternalServerError, responses.OAuthErrServerError, "middleware did not supply a userAccountID", apperrors.ErrCodeInternalError)
-		return
+		return apperrors.OAuthServerError("middleware did not supply a userAccountID", apperrors.ErrCodeInternalError, nil)
 	}
 	hashedRefreshToken, ok := auth.ContextHashedRefreshToken(r.Context())
 	if !ok {
-		responses.RespondWithOAuthError(w, r, http.StatusInternalServerError, responses.OAuthErrServerError, "middleware did not supply a refresh token", apperrors.ErrCodeInternalError)
-		return
+		return apperrors.OAuthServerError("middleware did not supply a refresh token", apperrors.ErrCodeInternalError, nil)
 	}
 
-	reqLogger := logger.ContextRequestLogger(r.Context())
-
-	rowsAffected, err := a.queries.RevokeRefreshToken(r.Context(), hashedRefreshToken)
-	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithOAuthError(w, r, http.StatusInternalServerError, responses.OAuthErrServerError, "database error", apperrors.ErrCodeDatabaseError)
-		return
-	}
-	if rowsAffected == 0 {
-		reqLogger.Debug("Error revoking refresh token",
-			slog.String("component", "RevokeRefreshTokenHandler"),
-			slog.String("account_id", userAccountId.String()),
-			slog.String("error", "refresh token not found"),
-		)
-
-		responses.RespondWithOAuthError(w, r, http.StatusNotFound, responses.OAuthErrInvalidGrant, "refresh token not found", apperrors.ErrCodeTokenInvalid)
-		return
-	}
-	if rowsAffected != 1 {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.Int64("error_rows_affected", rowsAffected),
-		)
-
-		responses.RespondWithOAuthError(w, r, http.StatusInternalServerError, responses.OAuthErrServerError, "database error", apperrors.ErrCodeDatabaseError)
-		return
+	if _, err := a.queries.RevokeRefreshToken(r.Context(), hashedRefreshToken); err != nil {
+		return apperrors.OAuthServerError("database error", apperrors.ErrCodeDatabaseError, err)
 	}
 
 	// add log attributes for final request log
@@ -282,8 +226,8 @@ func (a *TokenHandler) RevokeRefreshToken(w http.ResponseWriter, r *http.Request
 		slog.String("component", "RevokeRefreshTokenHandler"),
 		slog.String("account_id", userAccountId.String()),
 	)
-	responses.RespondWithStatusCodeOnly(w, http.StatusOK)
-
+	// RFC 7009 §2.2: return 200 if suceeds or if the client submitted an invalid token.
+	return responses.NoContent(w, http.StatusOK)
 }
 
 // RotateServiceAccountSecret godoc
@@ -313,47 +257,30 @@ func (a *TokenHandler) RevokeRefreshToken(w http.ResponseWriter, r *http.Request
 //	@Failure	500				{object}	responses.ErrorResponse			"Internal server error"
 //
 //	@Router		/api/auth/service-accounts/rotate-secret [post]
-func (a *TokenHandler) RotateServiceAccountSecret(w http.ResponseWriter, r *http.Request) {
-
+func (a *TokenHandler) RotateServiceAccountSecret(w http.ResponseWriter, r *http.Request) error {
 	// Get service account ID from context (set by RequireClientCredentials middleware)
 	serviceAccountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "middleware did not supply service account ID")
-		return
+		return apperrors.InternalError("middleware did not supply service account ID", nil)
 	}
 
 	// Get service account details to return client_id
 	serviceAccount, err := a.queries.GetServiceAccountByAccountID(r.Context(), serviceAccountID)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "failed to get service account details")
-		return
+		return apperrors.DatabaseError("failed to get service account details", err)
 	}
 
 	// Generate new client secret
 	newPlaintextSecret, err := a.authService.GenerateSecureToken(32)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "failed to generate secure token")
-		return
+		return apperrors.InternalError("failed to generate secure token", err)
 	}
 	hashedSecret := a.authService.HashToken(newPlaintextSecret)
 	expiresAt := time.Now().Add(signalsd.ClientSecretExpiry)
 
 	tx, err := a.pool.BeginTx(r.Context(), pgx.TxOptions{})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "failed to begin transaction")
-		return
+		return apperrors.DatabaseError("failed to begin transaction", err)
 	}
 
 	defer func() {
@@ -361,7 +288,6 @@ func (a *TokenHandler) RotateServiceAccountSecret(w http.ResponseWriter, r *http
 			logger.ContextWithLogAttrs(r.Context(),
 				slog.String("error", err.Error()),
 			)
-
 		}
 	}()
 
@@ -369,12 +295,7 @@ func (a *TokenHandler) RotateServiceAccountSecret(w http.ResponseWriter, r *http
 
 	_, err = txQueries.ScheduleRevokeAllClientSecretsForAccount(r.Context(), serviceAccountID)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "failed to schedule revocation of old secrets")
-		return
+		return apperrors.DatabaseError("failed to schedule revocation of old secrets", err)
 	}
 
 	_, err = txQueries.CreateClientSecret(r.Context(), database.CreateClientSecretParams{
@@ -383,33 +304,21 @@ func (a *TokenHandler) RotateServiceAccountSecret(w http.ResponseWriter, r *http
 		ExpiresAt:               expiresAt,
 	})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "failed to create new secret")
-		return
+		return apperrors.DatabaseError("failed to create new secret", err)
 	}
 
 	if err := tx.Commit(r.Context()); err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "failed to commit transaction")
-		return
+		return apperrors.DatabaseError("failed to commit transaction", err)
 	}
 
 	logger.ContextWithLogAttrs(r.Context(),
 		slog.String("client_id", serviceAccount.ClientID),
 	)
 
-	response := ServiceAccountRotateResponse{
+	return responses.JSON(w, http.StatusOK, ServiceAccountRotateResponse{
 		ClientID:     serviceAccount.ClientID,
 		ClientSecret: newPlaintextSecret,
 		ExpiresAt:    expiresAt.Format(time.RFC3339),
 		ExpiresIn:    int(signalsd.ClientSecretExpiry.Seconds()),
-	}
-
-	responses.RespondWithJSON(w, http.StatusOK, response)
+	})
 }

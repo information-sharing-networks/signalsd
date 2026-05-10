@@ -960,9 +960,16 @@ definitions:
       error_code:
         allOf:
         - $ref: '#/definitions/apperrors.ErrorCode'
-        example: example_error_code
+        description: Standard app error code
+        example: access_token_expired
       message:
-        example: message describing the error
+        description: Client message
+        example: access token expired, please use the /oauth/token endpoint to renew
+          it
+        type: string
+      request_id:
+        description: request tracking id
+        example: a1b2c3d4
         type: string
     type: object
   responses.OAuthErrorResponse:

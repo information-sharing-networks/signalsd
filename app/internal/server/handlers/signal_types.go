@@ -114,7 +114,7 @@ type SignalTypeDetail struct {
 //	@Router			/api/admin/signal-types [post]
 //
 // Should only be used with RequireRole (siteadmin) middleware
-func (s *SignalTypeHandler) CreateSignalType(w http.ResponseWriter, r *http.Request) {
+func (s *SignalTypeHandler) CreateSignalType(w http.ResponseWriter, r *http.Request) error {
 	var req CreateSignalTypeRequest
 	var slug string
 	var semVer string
@@ -122,12 +122,7 @@ func (s *SignalTypeHandler) CreateSignalType(w http.ResponseWriter, r *http.Requ
 	defer r.Body.Close()
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
-		return
+		return apperrors.MalformedBody("invalid JSON body", err)
 	}
 
 	// validate fields
@@ -136,8 +131,7 @@ func (s *SignalTypeHandler) CreateSignalType(w http.ResponseWriter, r *http.Requ
 		req.BumpType == "" ||
 		req.ReadmeURL == "" ||
 		req.Detail == "" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must supply all the fields: schema URL, title, version, readme URL and detail")
-		return
+		return apperrors.MalformedBody("you must supply all the fields: schema URL, title, version, readme URL and detail", nil)
 	}
 
 	req.SchemaURL = strings.TrimSpace(req.SchemaURL)
@@ -146,33 +140,27 @@ func (s *SignalTypeHandler) CreateSignalType(w http.ResponseWriter, r *http.Requ
 	// check for valid github url formats
 	if err := utils.ValidateGithubFileURL(req.SchemaURL, "schema"); err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("schema_url", req.SchemaURL),
 		)
 
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid schema URL")
-		return
+		return apperrors.MalformedBody("invalid schema URL", err)
 	}
 	if err := utils.ValidateGithubFileURL(req.ReadmeURL, "readme"); err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("readme_url", req.ReadmeURL),
 		)
 
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid readme URL")
-		return
+		return apperrors.MalformedBody("invalid readme URL", err)
 	}
 
 	// Check that the readme file exists on GitHub
 	if req.ReadmeURL != signalsd.SkipReadmeURL {
 		if err := utils.CheckGithubFileExists(req.ReadmeURL); err != nil {
 			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
 				slog.String("readme_url", req.ReadmeURL),
 			)
 
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "readme file not accessible")
-			return
+			return apperrors.MalformedBody("readme file not accessible", err)
 		}
 	}
 
@@ -180,42 +168,35 @@ func (s *SignalTypeHandler) CreateSignalType(w http.ResponseWriter, r *http.Requ
 	slug, err = utils.GenerateSlug(req.Title)
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("title", req.Title),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "internal server error")
-		return
+		return apperrors.InternalError("internal server error", err)
 	}
 
 	// check if there is already a signal type with this slug (the query below returns currentSignalType.semver == "0.0.0" if there is no existing version)
 	currentSignalType, err := s.queries.GetLatestSlugVersion(r.Context(), slug)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("slug", slug),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "database error")
-		return
+		return apperrors.InternalError("database error", err)
 	}
 
 	//  if this slug has already been used then reject the request
 	if currentSignalType.SemVer != "0.0.0" {
-		responses.RespondWithError(w, r, http.StatusConflict, apperrors.ErrCodeResourceAlreadyExists, "This signal type slug is already in use")
-		return
+		return apperrors.AlreadyExists("This signal type slug is already in use", nil)
 	}
 
 	//  increment the semver using the supplied bump instruction supplied in the req
 	semVer, err = utils.IncrementSemVer(req.BumpType, currentSignalType.SemVer)
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("current_version", currentSignalType.SemVer),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "internal server error")
-		return
+		return apperrors.InternalError("internal server error", err)
 	}
 
 	// Fetch and compile the schema
@@ -227,24 +208,20 @@ func (s *SignalTypeHandler) CreateSignalType(w http.ResponseWriter, r *http.Requ
 		schemaContent, err = utils.FetchFileContentFromGithub(req.SchemaURL)
 		if err != nil {
 			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
 				slog.String("schema_url", req.SchemaURL),
 			)
 
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "could not fetch schema from GitHub")
-			return
+			return apperrors.MalformedBody("could not fetch schema from GitHub", err)
 		}
 	}
 
 	_, err = schemas.ValidateAndCompileSchema(req.SchemaURL, schemaContent)
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("schema_url", req.SchemaURL),
 		)
 
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON schema")
-		return
+		return apperrors.MalformedBody("invalid JSON schema", err)
 	}
 
 	// create signal type
@@ -260,15 +237,13 @@ func (s *SignalTypeHandler) CreateSignalType(w http.ResponseWriter, r *http.Requ
 	})
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("slug", slug),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
-	responses.RespondWithJSON(w, http.StatusCreated, NewSignalTypeResponse{
+	return responses.JSON(w, http.StatusCreated, NewSignalTypeResponse{
 		Slug:   returnedSignalType.Slug,
 		SemVer: returnedSignalType.SemVer,
 	})
@@ -300,7 +275,7 @@ func (s *SignalTypeHandler) CreateSignalType(w http.ResponseWriter, r *http.Requ
 //	@Router			/api/admin/signal-types/{signal_type_slug}/schemas [post]
 //
 // Should only be used with RequiresRole (siteadmin) middleware
-func (s *SignalTypeHandler) RegisterNewSignalTypeSchema(w http.ResponseWriter, r *http.Request) {
+func (s *SignalTypeHandler) RegisterNewSignalTypeSchema(w http.ResponseWriter, r *http.Request) error {
 
 	slug := r.PathValue("signal_type_slug")
 
@@ -311,12 +286,7 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchema(w http.ResponseWriter, r
 	defer r.Body.Close()
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
-		return
+		return apperrors.MalformedBody("invalid JSON body", err)
 	}
 
 	// validate fields
@@ -324,8 +294,7 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchema(w http.ResponseWriter, r
 		req.BumpType == "" ||
 		req.ReadmeURL == "" ||
 		req.Detail == "" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must supply all the fields: schema URL, slug, version, readme URL and detail")
-		return
+		return apperrors.MalformedBody("you must supply all the fields: schema URL, slug, version, readme URL and detail", nil)
 	}
 
 	req.SchemaURL = strings.TrimSpace(req.SchemaURL)
@@ -334,51 +303,39 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchema(w http.ResponseWriter, r
 	// check for valid github url formats
 	if err := utils.ValidateGithubFileURL(req.SchemaURL, "schema"); err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("schema_url", req.SchemaURL),
 		)
 
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid schema URL")
-		return
+		return apperrors.MalformedBody("invalid schema URL", err)
 	}
 	if err := utils.ValidateGithubFileURL(req.ReadmeURL, "readme"); err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("readme_url", req.ReadmeURL),
 		)
 
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid readme URL")
-		return
+		return apperrors.MalformedBody("invalid readme URL", err)
 	}
 
 	// Check that the readme file exists on GitHub
 	if req.ReadmeURL != signalsd.SkipReadmeURL {
 		if err := utils.CheckGithubFileExists(req.ReadmeURL); err != nil {
 			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
 				slog.String("readme_url", req.ReadmeURL),
 			)
 
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "readme file not accessible")
-			return
+			return apperrors.MalformedBody("readme file not accessible", err)
 		}
 	}
 
 	//  if this is the first version then the query below returns currentSignalType.semver == "0.0.0"
 	currentSignalType, err := s.queries.GetLatestSlugVersion(r.Context(), slug)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "database error")
-		return
+		return apperrors.InternalError("database error", err)
 	}
 
 	// if there is no existing schemas for this signal type, reject the request.
 	if currentSignalType.SemVer == "0.0.0" {
-		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "signal type not found")
-		return
+		return apperrors.NotFound("signal type not found", nil)
 	}
 	//... check the signal type was not previously registered with this schema
 	exists, err := s.queries.ExistsSignalTypeWithSlugAndSchema(r.Context(), database.ExistsSignalTypeWithSlugAndSchemaParams{
@@ -387,28 +344,23 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchema(w http.ResponseWriter, r
 	})
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("slug", slug),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "database error")
-		return
+		return apperrors.InternalError("database error", err)
 	}
 	if exists {
-		responses.RespondWithError(w, r, http.StatusConflict, apperrors.ErrCodeResourceAlreadyExists, "This schema has already been registered for this signal type")
-		return
+		return apperrors.AlreadyExists("This schema has already been registered for this signal type", nil)
 	}
 
 	//  increment the semver using the supplied bump instruction supplied in the req
 	semVer, err = utils.IncrementSemVer(req.BumpType, currentSignalType.SemVer)
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("current_version", currentSignalType.SemVer),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "internal server error")
-		return
+		return apperrors.InternalError("internal server error", err)
 	}
 
 	// Fetch and compile the schema
@@ -420,24 +372,20 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchema(w http.ResponseWriter, r
 		schemaContent, err = utils.FetchFileContentFromGithub(req.SchemaURL)
 		if err != nil {
 			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
 				slog.String("schema_url", req.SchemaURL),
 			)
 
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "could not fetch schema from GitHub")
-			return
+			return apperrors.MalformedBody("could not fetch schema from GitHub", err)
 		}
 	}
 
 	_, err = schemas.ValidateAndCompileSchema(req.SchemaURL, schemaContent)
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("schema_url", req.SchemaURL),
 		)
 
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON schema")
-		return
+		return apperrors.MalformedBody("invalid JSON schema", err)
 	}
 
 	// create signal type
@@ -453,15 +401,13 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchema(w http.ResponseWriter, r
 	})
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("slug", slug),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
-	responses.RespondWithJSON(w, http.StatusCreated, NewSignalTypeResponse{
+	return responses.JSON(w, http.StatusCreated, NewSignalTypeResponse{
 		Slug:   returnedSignalType.Slug,
 		SemVer: returnedSignalType.SemVer,
 	})
@@ -491,7 +437,7 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchema(w http.ResponseWriter, r
 //	@Router			/api/admin/signal-types/{signal_type_slug}/v{sem_ver} [put]
 //
 // Should only be used with RequiresRole (siteadmin) middleware
-func (s *SignalTypeHandler) UpdateSignalType(w http.ResponseWriter, r *http.Request) {
+func (s *SignalTypeHandler) UpdateSignalType(w http.ResponseWriter, r *http.Request) error {
 
 	var req = UpdateSignalTypeRequest{}
 
@@ -505,16 +451,13 @@ func (s *SignalTypeHandler) UpdateSignalType(w http.ResponseWriter, r *http.Requ
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No signal type found for %s/v%s", slug, semVer))
-			return
+			return apperrors.NotFound(fmt.Sprintf("No signal type found for %s/v%s", slug, semVer), nil)
 		}
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("signal_type_slug", slug),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	//check body
@@ -523,41 +466,31 @@ func (s *SignalTypeHandler) UpdateSignalType(w http.ResponseWriter, r *http.Requ
 	decoder.DisallowUnknownFields()
 	err = decoder.Decode(&req)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
-		return
+		return apperrors.MalformedBody("invalid JSON body", err)
 	}
 
 	if req.Detail == nil &&
 		req.ReadmeURL == nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "no updateable fields found in body of request")
-		return
+		return apperrors.MalformedBody("no updateable fields found in body of request", nil)
 	}
 	// prepare struct for update
 	if req.ReadmeURL != nil {
 		if err := utils.ValidateGithubFileURL(*req.ReadmeURL, "readme"); err != nil {
 			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
 				slog.String("readme_url", *req.ReadmeURL),
 			)
 
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid readme URL")
-			return
+			return apperrors.MalformedBody("invalid readme URL", err)
 		}
 
 		// Check that the readme file exists on GitHub
 		if *req.ReadmeURL != signalsd.SkipReadmeURL {
 			if err := utils.CheckGithubFileExists(*req.ReadmeURL); err != nil {
 				logger.ContextWithLogAttrs(r.Context(),
-					slog.String("error", err.Error()),
 					slog.String("readme_url", *req.ReadmeURL),
 				)
 
-				responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "readme file not accessible")
-				return
+				return apperrors.MalformedBody("readme file not accessible", err)
 			}
 		}
 
@@ -576,18 +509,15 @@ func (s *SignalTypeHandler) UpdateSignalType(w http.ResponseWriter, r *http.Requ
 	})
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("signal_type_id", signalType.ID.String()),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 	if rowsAffected != 1 {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error - more than one signal type deleted")
-		return
+		return apperrors.DatabaseError("database error - more than one signal type deleted", nil)
 	}
-	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
+	return responses.NoContent(w, http.StatusNoContent)
 }
 
 // DeleteSignalType godoc
@@ -611,7 +541,7 @@ func (s *SignalTypeHandler) UpdateSignalType(w http.ResponseWriter, r *http.Requ
 //	@Router			/api/admin/signal-types/{signal_type_slug}/v{sem_ver} [delete]
 //
 // Should only be used with RequireRole (siteadmin) middleware
-func (s *SignalTypeHandler) DeleteSignalType(w http.ResponseWriter, r *http.Request) {
+func (s *SignalTypeHandler) DeleteSignalType(w http.ResponseWriter, r *http.Request) error {
 
 	signalTypeSlug := r.PathValue("signal_type_slug")
 	semVer := r.PathValue("sem_ver")
@@ -623,53 +553,48 @@ func (s *SignalTypeHandler) DeleteSignalType(w http.ResponseWriter, r *http.Requ
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No signal type found for %s/v%s", signalTypeSlug, semVer))
-			return
+			return apperrors.NotFound(fmt.Sprintf("No signal type found for %s/v%s", signalTypeSlug, semVer), nil)
 		}
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("signal_type_slug", signalTypeSlug),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// check if signal type is being used by any signals
 	hasSignals, err := s.queries.CheckSignalTypeHasSignals(r.Context(), signalType.ID)
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("signal_type_id", signalType.ID.String()),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	if hasSignals {
-		responses.RespondWithError(w, r, http.StatusConflict, apperrors.ErrCodeResourceInUse, fmt.Sprintf("Cannot delete signal type %s/v%s: it is being used by existing signals", signalTypeSlug, semVer))
-		return
+		return &apperrors.HTTPError{
+			Status:  http.StatusConflict,
+			Code:    apperrors.ErrCodeResourceInUse,
+			Message: fmt.Sprintf("Cannot delete signal type %s/v%s: it is being used by existing signals", signalTypeSlug, semVer),
+		}
 	}
 
 	// delete the signal type
 	rowsAffected, err := s.queries.DeleteSignalType(r.Context(), signalType.ID)
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("signal_type_id", signalType.ID.String()),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	if rowsAffected == 0 {
-		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("Signal type %s/v%s not found", signalTypeSlug, semVer))
-		return
+		return apperrors.NotFound(fmt.Sprintf("Signal type %s/v%s not found", signalTypeSlug, semVer), nil)
 	}
 
-	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
+	return responses.NoContent(w, http.StatusNoContent)
 }
 
 // GetSignalType godoc
@@ -689,7 +614,7 @@ func (s *SignalTypeHandler) DeleteSignalType(w http.ResponseWriter, r *http.Requ
 //	@Failure		500					{object}	responses.ErrorResponse
 //
 //	@Router			/api/admin/signal-types/{signal_type_slug}/v{sem_ver} [get]
-func (s *SignalTypeHandler) GetSignalType(w http.ResponseWriter, r *http.Request) {
+func (s *SignalTypeHandler) GetSignalType(w http.ResponseWriter, r *http.Request) error {
 
 	signalTypeSlug := r.PathValue("signal_type_slug")
 	semVer := r.PathValue("sem_ver")
@@ -701,16 +626,13 @@ func (s *SignalTypeHandler) GetSignalType(w http.ResponseWriter, r *http.Request
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No signal type found for %s/v%s", signalTypeSlug, semVer))
-			return
+			return apperrors.NotFound(fmt.Sprintf("No signal type found for %s/v%s", signalTypeSlug, semVer), nil)
 		}
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("signal_type_slug", signalTypeSlug),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	schemaURL := dbSignalType.SchemaURL
@@ -734,7 +656,7 @@ func (s *SignalTypeHandler) GetSignalType(w http.ResponseWriter, r *http.Request
 		Detail:    dbSignalType.Detail,
 		SemVer:    dbSignalType.SemVer,
 	}
-	responses.RespondWithJSON(w, http.StatusOK, signalType)
+	return responses.JSON(w, http.StatusOK, signalType)
 }
 
 // GetSignalTypes godoc
@@ -748,19 +670,14 @@ func (s *SignalTypeHandler) GetSignalType(w http.ResponseWriter, r *http.Request
 //	@Success		200	{array}	handlers.SignalTypeDetail
 //
 //	@Router			/api/admin/signal-types [get]
-func (s *SignalTypeHandler) GetSignalTypes(w http.ResponseWriter, r *http.Request) {
+func (s *SignalTypeHandler) GetSignalTypes(w http.ResponseWriter, r *http.Request) error {
 
 	var dbSignalTypes []database.SignalType
 	var err error
 
 	dbSignalTypes, err = s.queries.GetSignalTypes(r.Context())
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	signalTypes := make([]SignalTypeDetail, len(dbSignalTypes))
@@ -787,7 +704,7 @@ func (s *SignalTypeHandler) GetSignalTypes(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	responses.RespondWithJSON(w, http.StatusOK, signalTypes)
+	return responses.JSON(w, http.StatusOK, signalTypes)
 }
 
 // AddSignalTypeToISN godoc
@@ -814,23 +731,18 @@ func (s *SignalTypeHandler) GetSignalTypes(w http.ResponseWriter, r *http.Reques
 //	@Router			/api/isn/{isn_slug}/signal-types/add [post]
 //
 // Should only be used with RequireRole (siteadmin, isnadmin) middleware
-func (s *SignalTypeHandler) AddSignalTypeToISN(w http.ResponseWriter, r *http.Request) {
+func (s *SignalTypeHandler) AddSignalTypeToISN(w http.ResponseWriter, r *http.Request) error {
 	var req AddSignalTypeToIsnRequest
 
 	defer r.Body.Close()
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
-		return
+		return apperrors.MalformedBody("invalid JSON body", err)
 	}
 
 	// Validate required fields
 	if req.SignalTypeSlug == "" || req.SemVer == "" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "signal_type_slug and sem_ver are required")
-		return
+		return apperrors.MalformedBody("signal_type_slug and sem_ver are required", nil)
 	}
 
 	isnSlug := r.PathValue("isn_slug")
@@ -839,33 +751,27 @@ func (s *SignalTypeHandler) AddSignalTypeToISN(w http.ResponseWriter, r *http.Re
 	isn, err := s.queries.GetIsnBySlug(r.Context(), isnSlug)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
-			return
+			return apperrors.NotFound("ISN not found", nil)
 		}
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("isn_slug", isnSlug),
 		)
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// If the requester is an ISN admin, they must own this ISN.
 	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
-		return
+		return apperrors.InternalError("could not get claims from context", nil)
 	}
 
 	userAccountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
-		return
+		return apperrors.InternalError("did not receive userAccountID from middleware", nil)
 	}
 
 	if claims.Role == "isnadmin" && isn.UserAccountID != userAccountID {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you must be the ISN owner to add signal types")
-		return
+		return apperrors.Forbidden("you must be the ISN owner to add signal types", nil)
 	}
 	// Get signal type by slug and version (globally)
 	signalType, err := s.queries.GetSignalTypeBySlugAndVersion(r.Context(), database.GetSignalTypeBySlugAndVersionParams{
@@ -874,16 +780,13 @@ func (s *SignalTypeHandler) AddSignalTypeToISN(w http.ResponseWriter, r *http.Re
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("Signal type %s/v%s not found", req.SignalTypeSlug, req.SemVer))
-			return
+			return apperrors.NotFound(fmt.Sprintf("Signal type %s/v%s not found", req.SignalTypeSlug, req.SemVer), nil)
 		}
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("signal_type_slug", req.SignalTypeSlug),
 			slog.String("sem_ver", req.SemVer),
 		)
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// add signal type to ISN
@@ -893,15 +796,14 @@ func (s *SignalTypeHandler) AddSignalTypeToISN(w http.ResponseWriter, r *http.Re
 	})
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("isn_id", isn.ID.String()),
 			slog.String("signal_type_id", signalType.ID.String()),
 		)
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+	return nil
 }
 
 // UpdateIsnSignalTypeStatus godoc
@@ -932,7 +834,7 @@ func (s *SignalTypeHandler) AddSignalTypeToISN(w http.ResponseWriter, r *http.Re
 //	@Router			/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver} [put]
 //
 // Should only be used with RequireRole (isnadmin,siteadmin) middleware
-func (s *SignalTypeHandler) UpdateIsnSignalTypeStatus(w http.ResponseWriter, r *http.Request) {
+func (s *SignalTypeHandler) UpdateIsnSignalTypeStatus(w http.ResponseWriter, r *http.Request) error {
 	var req = UpdateSignalTypeRequest{}
 
 	isnSlug := r.PathValue("isn_slug")
@@ -943,33 +845,27 @@ func (s *SignalTypeHandler) UpdateIsnSignalTypeStatus(w http.ResponseWriter, r *
 	isn, err := s.queries.GetIsnBySlug(r.Context(), isnSlug)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
-			return
+			return apperrors.NotFound("ISN not found", nil)
 		}
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("isn_slug", isnSlug),
 		)
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// If the requester is an ISN admin, they must own this ISN.
 	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
-		return
+		return apperrors.InternalError("could not get claims from context", nil)
 	}
 
 	userAccountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
-		return
+		return apperrors.InternalError("did not receive userAccountID from middleware", nil)
 	}
 
 	if claims.Role == "isnadmin" && isn.UserAccountID != userAccountID {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you must be the ISN owner to update signal types")
-		return
+		return apperrors.Forbidden("you must be the ISN owner to update signal types", nil)
 	}
 
 	// Get signal type by slug and version
@@ -979,16 +875,13 @@ func (s *SignalTypeHandler) UpdateIsnSignalTypeStatus(w http.ResponseWriter, r *
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "Signal type not found")
-			return
+			return apperrors.NotFound("Signal type not found", nil)
 		}
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("signal_type_slug", signalTypeSlug),
 			slog.String("sem_ver", semVer),
 		)
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// Check body
@@ -997,18 +890,12 @@ func (s *SignalTypeHandler) UpdateIsnSignalTypeStatus(w http.ResponseWriter, r *
 	decoder.DisallowUnknownFields()
 	err = decoder.Decode(&req)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
-		return
+		return apperrors.MalformedBody("invalid JSON body", err)
 	}
 
 	// Validate that is_in_use is present
 	if req.IsInUse == nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "is_in_use field is required")
-		return
+		return apperrors.MalformedBody("is_in_use field is required", nil)
 	}
 
 	// Update isn_signal_types
@@ -1019,19 +906,17 @@ func (s *SignalTypeHandler) UpdateIsnSignalTypeStatus(w http.ResponseWriter, r *
 	})
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("isn_id", isn.ID.String()),
 			slog.String("signal_type_id", signalType.ID.String()),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	if rowsAffected == 0 {
-		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "Signal type not available on this ISN")
-		return
+		return apperrors.NotFound("Signal type not available on this ISN", nil)
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+	return nil
 }

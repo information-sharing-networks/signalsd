@@ -74,7 +74,7 @@ type SignalRoutingConfigResponse struct {
 //	@Router			/api/admin/signal-types/{signal_type_slug}/v{sem_ver}/routes [get]
 //
 // Should only be used with RequireRole (siteadmin) middleware.
-func (h *RoutingConfigHandler) GetSignalRoutingConfig(w http.ResponseWriter, r *http.Request) {
+func (h *RoutingConfigHandler) GetSignalRoutingConfig(w http.ResponseWriter, r *http.Request) error {
 	slug := r.PathValue("signal_type_slug")
 	semVer := r.PathValue("sem_ver")
 
@@ -84,19 +84,14 @@ func (h *RoutingConfigHandler) GetSignalRoutingConfig(w http.ResponseWriter, r *
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("no routing rule found for %s/v%s", slug, semVer))
-			return
+			return apperrors.NotFound(fmt.Sprintf("no routing rule found for %s/v%s", slug, semVer), nil)
 		}
-		logger.ContextWithLogAttrs(r.Context(), slog.String("error", err.Error()))
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	dbRules, err := h.queries.GetIsnRoutesByFieldID(r.Context(), routesConfig.ID)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(), slog.String("error", err.Error()))
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	res := SignalRoutingConfigResponse{}
@@ -116,7 +111,7 @@ func (h *RoutingConfigHandler) GetSignalRoutingConfig(w http.ResponseWriter, r *
 		}
 	}
 	res.RoutingRules = rules
-	responses.RespondWithJSON(w, http.StatusOK, res)
+	return responses.JSON(w, http.StatusOK, res)
 }
 
 // UpdateSignalRoutingConfig godoc
@@ -148,52 +143,45 @@ func (h *RoutingConfigHandler) GetSignalRoutingConfig(w http.ResponseWriter, r *
 //	@Router			/api/admin/signal-types/{signal_type_slug}/v{sem_ver}/routes [put]
 //
 // Should only be used with RequireRole (siteadmin) middleware.
-func (h *RoutingConfigHandler) UpdateSignalRoutingConfig(w http.ResponseWriter, r *http.Request) {
+func (h *RoutingConfigHandler) UpdateSignalRoutingConfig(w http.ResponseWriter, r *http.Request) error {
 	slug := r.PathValue("signal_type_slug")
 	semVer := r.PathValue("sem_ver")
 
 	defer r.Body.Close()
 	var req UpdateSignalRoutingConfigRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
-		return
+		return apperrors.MalformedBody("invalid JSON body", nil)
 	}
 
 	if req.RoutingField == "" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "routing_field is required")
-		return
+		return apperrors.MalformedBody("routing_field is required", nil)
 	}
 
 	// prevent the use of chars with special meaning in gjson
 	if strings.ContainsAny(req.RoutingField, `*?#@|!()[]%<>=`) {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "routing_field must be a plain JSON path (e.g. payload.portOfEntry) - wildcards and gjson operators are not supported")
-		return
+		return apperrors.MalformedBody("routing_field must be a plain JSON path (e.g. payload.portOfEntry) - wildcards and gjson operators are not supported", nil)
 	}
 
 	// prevent numeric path segments (gjson array index access e.g. payload.0.item)
 	for seg := range strings.SplitSeq(req.RoutingField, ".") {
 		if _, err := strconv.Atoi(seg); err == nil {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "routing_field must not contain numeric segments - routing by array index is not supported")
-			return
+			return apperrors.MalformedBody("routing_field must not contain numeric segments - routing by array index is not supported", nil)
 		}
 	}
 
 	if len(req.RoutingRules) == 0 {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "at least one mapping is required")
-		return
+		return apperrors.MalformedBody("at least one mapping is required", nil)
 	}
 
 	// Validate routes
 	for i, rule := range req.RoutingRules {
 
 		if rule.MatchPattern == "" || rule.IsnSlug == "" {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("mapping[%d]: match_pattern and isn_slug are required", i))
-			return
+			return apperrors.MalformedBody(fmt.Sprintf("mapping[%d]: match_pattern and isn_slug are required", i), nil)
 		}
 
 		if !signalsd.ValidRouteMatchingOperators[rule.Operator] {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("invalid route matching operator %s", rule.Operator))
-			return
+			return apperrors.MalformedBody(fmt.Sprintf("invalid route matching operator %s", rule.Operator), nil)
 		}
 	}
 
@@ -204,12 +192,9 @@ func (h *RoutingConfigHandler) UpdateSignalRoutingConfig(w http.ResponseWriter, 
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("signal type %s/v%s not found", slug, semVer))
-			return
+			return apperrors.NotFound(fmt.Sprintf("signal type %s/v%s not found", slug, semVer), nil)
 		}
-		logger.ContextWithLogAttrs(r.Context(), slog.String("error", err.Error()))
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// Validate the routing field against the cached schema for this signal type.
@@ -218,13 +203,10 @@ func (h *RoutingConfigHandler) UpdateSignalRoutingConfig(w http.ResponseWriter, 
 	signalTypePath := fmt.Sprintf("%s/v%s", slug, semVer)
 	fieldExists, err := h.schemaCache.FieldPathExistsInSchema(signalTypePath, req.RoutingField)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(), slog.String("error", err.Error()))
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "schema cache error")
-		return
+		return apperrors.InternalError("schema cache error", err)
 	}
 	if !fieldExists {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("routing_field %q is not defined in the schema for %s", req.RoutingField, signalTypePath))
-		return
+		return apperrors.MalformedBody(fmt.Sprintf("routing_field %q is not defined in the schema for %s", req.RoutingField, signalTypePath), nil)
 	}
 
 	// check slugs exist and get the ids
@@ -233,12 +215,9 @@ func (h *RoutingConfigHandler) UpdateSignalRoutingConfig(w http.ResponseWriter, 
 		isn, err := h.queries.GetIsnBySlug(r.Context(), rule.IsnSlug)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("mapping[%d]: ISN %q not found", i, rule.IsnSlug))
-				return
+				return apperrors.NotFound(fmt.Sprintf("mapping[%d]: ISN %q not found", i, rule.IsnSlug), nil)
 			}
-			logger.ContextWithLogAttrs(r.Context(), slog.String("error", err.Error()))
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-			return
+			return apperrors.DatabaseError("database error", err)
 		}
 		isnIDs[i] = isn
 	}
@@ -246,12 +225,7 @@ func (h *RoutingConfigHandler) UpdateSignalRoutingConfig(w http.ResponseWriter, 
 	//  start transaction
 	tx, err := h.pool.BeginTx(r.Context(), pgx.TxOptions{})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	defer func() {
@@ -267,9 +241,7 @@ func (h *RoutingConfigHandler) UpdateSignalRoutingConfig(w http.ResponseWriter, 
 
 	// Delete the old routes
 	if _, err := txQueries.DeleteSignalRoutingConfigBySignalTypeID(r.Context(), signalType.ID); err != nil {
-		logger.ContextWithLogAttrs(r.Context(), slog.String("error", err.Error()))
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// create the new routing field entry
@@ -278,9 +250,7 @@ func (h *RoutingConfigHandler) UpdateSignalRoutingConfig(w http.ResponseWriter, 
 		RoutingField: req.RoutingField,
 	})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(), slog.String("error", err.Error()))
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	for i, rule := range req.RoutingRules {
@@ -292,19 +262,15 @@ func (h *RoutingConfigHandler) UpdateSignalRoutingConfig(w http.ResponseWriter, 
 			IsnID:                 isnIDs[i].ID,
 			RuleSequence:          rule.Sequence,
 		}); err != nil {
-			logger.ContextWithLogAttrs(r.Context(), slog.String("error", err.Error()))
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-			return
+			return apperrors.DatabaseError("database error", err)
 		}
 	}
 
 	if err := tx.Commit(r.Context()); err != nil {
-		logger.ContextWithLogAttrs(r.Context(), slog.String("error", err.Error()))
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
-	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
+	return responses.NoContent(w, http.StatusNoContent)
 }
 
 // DeleteSignalRoutingConfig godoc
@@ -324,7 +290,7 @@ func (h *RoutingConfigHandler) UpdateSignalRoutingConfig(w http.ResponseWriter, 
 //	@Router			/api/admin/signal-types/{signal_type_slug}/v{sem_ver}/routes [delete]
 //
 // Should only be used with RequireRole (siteadmin) middleware.
-func (h *RoutingConfigHandler) DeleteSignalRoutingConfig(w http.ResponseWriter, r *http.Request) {
+func (h *RoutingConfigHandler) DeleteSignalRoutingConfig(w http.ResponseWriter, r *http.Request) error {
 	slug := r.PathValue("signal_type_slug")
 	semVer := r.PathValue("sem_ver")
 
@@ -334,12 +300,9 @@ func (h *RoutingConfigHandler) DeleteSignalRoutingConfig(w http.ResponseWriter, 
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("signal type %s/v%s not found", slug, semVer))
-			return
+			return apperrors.NotFound(fmt.Sprintf("signal type %s/v%s not found", slug, semVer), nil)
 		}
-		logger.ContextWithLogAttrs(r.Context(), slog.String("error", err.Error()))
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// check there is a routing config
@@ -349,19 +312,14 @@ func (h *RoutingConfigHandler) DeleteSignalRoutingConfig(w http.ResponseWriter, 
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("no routing rule found for %s/v%s", slug, semVer))
-			return
+			return apperrors.NotFound(fmt.Sprintf("no routing rule found for %s/v%s", slug, semVer), nil)
 		}
-		logger.ContextWithLogAttrs(r.Context(), slog.String("error", err.Error()))
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	_, err = h.queries.DeleteSignalRoutingConfigBySignalTypeID(r.Context(), signalType.ID)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(), slog.String("error", err.Error()))
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// refresh the cache for this instance (polling will catch-up the other instances eventually)
@@ -369,5 +327,5 @@ func (h *RoutingConfigHandler) DeleteSignalRoutingConfig(w http.ResponseWriter, 
 		logger.ContextWithLogAttrs(r.Context(), slog.String("router_cache_reload_error", err.Error()))
 	}
 
-	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
+	return responses.NoContent(w, http.StatusNoContent)
 }

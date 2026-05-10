@@ -83,27 +83,24 @@ type BatchSearchParams struct {
 //
 //	@Security	BearerAccessToken
 //	@Router		/api/batches/{batch_ref}/status [get]
-func (s *SignalsBatchHandler) GetSignalBatchStatus(w http.ResponseWriter, r *http.Request) {
+func (s *SignalsBatchHandler) GetSignalBatchStatus(w http.ResponseWriter, r *http.Request) error {
 
 	batchRef := r.PathValue("batch_ref")
 
 	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
-		return
+		return apperrors.InternalError("could not get claims from context", nil)
 	}
 
 	// Site admins may supply ?account_id= to view another account's batch; everyone else sees their own.
 	resolvedAccountID := claims.AccountID
 	if accountIDString := r.URL.Query().Get("account_id"); accountIDString != "" {
 		if claims.Role != "siteadmin" {
-			responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "only site admins can view other accounts' batches")
-			return
+			return apperrors.Forbidden("only site admins can view other accounts' batches", nil)
 		}
 		parsed, err := uuid.Parse(accountIDString)
 		if err != nil {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "invalid account_id format")
-			return
+			return apperrors.InvalidRequest("invalid account_id format", nil)
 		}
 		resolvedAccountID = parsed
 	}
@@ -114,30 +111,25 @@ func (s *SignalsBatchHandler) GetSignalBatchStatus(w http.ResponseWriter, r *htt
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "batch not found")
-			return
+			return apperrors.NotFound("batch not found", nil)
 		}
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("batch_ref", batchRef),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	response, err := s.getBatchStatusDetails(r.Context(), signalBatch.ID)
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("batch_ref", batchRef),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
-	responses.RespondWithJSON(w, http.StatusOK, response)
+	return responses.JSON(w, http.StatusOK, response)
 }
 
 // getBatchStatusDetails returns the full status for a batch across all ISNs and signal types.
@@ -220,12 +212,11 @@ func (s *SignalsBatchHandler) getBatchStatusDetails(ctx context.Context, batchID
 //	@Failure		500				{object}	responses.ErrorResponse
 //	@Security		BearerAccessToken
 //	@Router			/api/batches/search [get]
-func (s *SignalsBatchHandler) SearchBatches(w http.ResponseWriter, r *http.Request) {
+func (s *SignalsBatchHandler) SearchBatches(w http.ResponseWriter, r *http.Request) error {
 
 	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
-		return
+		return apperrors.InternalError("could not get claims from context", nil)
 	}
 
 	var searchParams BatchSearchParams
@@ -233,8 +224,7 @@ func (s *SignalsBatchHandler) SearchBatches(w http.ResponseWriter, r *http.Reque
 	if v := r.URL.Query().Get("created_after"); v != "" {
 		t, err := utils.ParseDateTime(v)
 		if err != nil {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
-			return
+			return apperrors.InvalidURLParam(err.Error(), nil)
 		}
 		searchParams.CreatedAfter = &t
 	}
@@ -242,20 +232,17 @@ func (s *SignalsBatchHandler) SearchBatches(w http.ResponseWriter, r *http.Reque
 	if v := r.URL.Query().Get("created_before"); v != "" {
 		t, err := utils.ParseDateTime(v)
 		if err != nil {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, err.Error())
-			return
+			return apperrors.InvalidURLParam(err.Error(), nil)
 		}
 		searchParams.CreatedBefore = &t
 	}
 
 	if (searchParams.CreatedAfter != nil) != (searchParams.CreatedBefore != nil) {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "supply both created_after and created_before, or neither")
-		return
+		return apperrors.InvalidURLParam("supply both created_after and created_before, or neither", nil)
 	}
 
 	if searchParams.CreatedAfter == nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "at least one date range filter must be provided")
-		return
+		return apperrors.InvalidURLParam("at least one date range filter must be provided", nil)
 	}
 
 	isAdmin := claims.Role == "siteadmin"
@@ -271,9 +258,7 @@ func (s *SignalsBatchHandler) SearchBatches(w http.ResponseWriter, r *http.Reque
 		CreatedBefore:       searchParams.CreatedBefore,
 	})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(), slog.String("error", err.Error()))
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	batchStatusList := make([]BatchStatusResponse, 0, len(batches))
@@ -281,14 +266,12 @@ func (s *SignalsBatchHandler) SearchBatches(w http.ResponseWriter, r *http.Reque
 		statusResponse, err := s.getBatchStatusDetails(r.Context(), batch.BatchID)
 		if err != nil {
 			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
 				slog.String("batch_id", batch.BatchID.String()),
 			)
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-			return
+			return apperrors.DatabaseError("database error", err)
 		}
 		batchStatusList = append(batchStatusList, *statusResponse)
 	}
 
-	responses.RespondWithJSON(w, http.StatusOK, batchStatusList)
+	return responses.JSON(w, http.StatusOK, batchStatusList)
 }

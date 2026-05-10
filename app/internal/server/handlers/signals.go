@@ -439,7 +439,7 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 //
 // this function should be called after the RequireAccessPermission middleware has checked the account has write permission for the ISN
 // (the middleware also checks the isn and signal type are in use)
-func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) {
+func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) error {
 
 	isnSlug := r.PathValue("isn_slug")
 	signalTypeSlug := r.PathValue("signal_type_slug")
@@ -448,14 +448,12 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) {
 
 	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
-		return
+		return apperrors.InternalError("could not get claims from context", nil)
 	}
 
 	accountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get accountID from context")
-		return
+		return apperrors.InternalError("could not get accountID from context", nil)
 	}
 
 	defer r.Body.Close()
@@ -464,37 +462,30 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) {
 
 	// unmarshal the req body
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
-		return
+		return apperrors.MalformedBody("invalid JSON body", nil)
 	}
 
 	// check for mandatory fields in request
 	if req.BatchRef == "" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "batch_ref is required")
-		return
+		return apperrors.MalformedBody("batch_ref is required", nil)
 	}
 	if !batchRefRegexp.MatchString(req.BatchRef) {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "batch_ref must be less than 128 characters and can only contain alphanumeric characters, hyphens, and underscores")
-		return
+		return apperrors.MalformedBody("batch_ref must be less than 128 characters and can only contain alphanumeric characters, hyphens, and underscores", nil)
 	}
 
 	if req.Signals == nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "request must contain a 'signals' array")
-		return
+		return apperrors.MalformedBody("request must contain a 'signals' array", nil)
 	}
 	if len(req.Signals) == 0 {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "request must contain must contain at least one signal in the 'signals' array")
-		return
+		return apperrors.MalformedBody("request must contain must contain at least one signal in the 'signals' array", nil)
 	}
 
 	for i, signal := range req.Signals {
 		if signal.LocalRef == "" {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("signal[%d] is missing required field 'local_ref'", i))
-			return
+			return apperrors.MalformedBody(fmt.Sprintf("signal[%d] is missing required field 'local_ref'", i), nil)
 		}
 		if len(signal.Content) == 0 {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("signal[%d] (local_ref=%q) is missing required field 'content'", i, signal.LocalRef))
-			return
+			return apperrors.MalformedBody(fmt.Sprintf("signal[%d] (local_ref=%q) is missing required field 'content'", i, signal.LocalRef), nil)
 		}
 	}
 
@@ -506,11 +497,7 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) {
 		AccountID: accountID,
 	})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	logger.ContextWithLogAttrs(r.Context(),
@@ -759,7 +746,7 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) {
 		// All signals processed successfully
 		httpStatus = http.StatusOK
 	}
-	responses.RespondWithJSON(w, httpStatus, createSignalsResponse)
+	return responses.JSON(w, httpStatus, createSignalsResponse)
 }
 
 // SearchPublicSignals godocs
@@ -787,17 +774,12 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) {
 //	@Router			/api/public/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search [get]
 //
 // This function can be called without authentication. It will only return signals from public ISNs.
-func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Request) {
+func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Request) error {
 
 	// Parse all search parameters
 	searchParams, err := parseSearchParams(r)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "invalid search parameters")
-		return
+		return apperrors.InvalidURLParam("invalid search parameters", err)
 	}
 
 	signalTypePath := fmt.Sprintf("%v/v%v", searchParams.signalTypeSlug, searchParams.semVer)
@@ -809,18 +791,12 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 			slog.String("isn_slug", searchParams.isnSlug),
 		)
 
-		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "signal type not available on this ISN")
-		return
+		return apperrors.NotFound("signal type not available on this ISN", nil)
 	}
 
 	// Validate search parameters
 	if err := validateSearchParams(searchParams); err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "invalid search parameters")
-		return
+		return apperrors.InvalidURLParam("invalid search parameters", err)
 	}
 
 	returnedSignals, err := s.queries.GetSignalsWithOptionalFilters(r.Context(), database.GetSignalsWithOptionalFiltersParams{
@@ -836,12 +812,10 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 	})
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("isn_slug", searchParams.isnSlug),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	response := make([]SearchSignalWithCorrelationsAndVersions, 0, len(returnedSignals))
@@ -863,24 +837,14 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 		// create a map of signal_id to their correlated signals
 		correlatedSignalBySignalID, err = s.getCorrelatedSignals(r.Context(), signalIDs, searchParams)
 		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
-			)
-
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-			return
+			return apperrors.DatabaseError("database error", err)
 		}
 	}
 	var previousVersionsBySignalID map[uuid.UUID][]PreviousSignalVersion
 	if searchParams.includePreviousSignalVersions {
 		previousVersionsBySignalID, err = s.getPreviousSignalVersions(r.Context(), signalIDs)
 		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
-			)
-
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-			return
+			return apperrors.DatabaseError("database error", err)
 		}
 	}
 
@@ -916,7 +880,7 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 
 		response = append(response, signal)
 	}
-	responses.RespondWithJSON(w, http.StatusOK, response)
+	return responses.JSON(w, http.StatusOK, response)
 }
 
 // SearchPrivateSignals godocs
@@ -946,35 +910,24 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 //
 // This function should be called after the RequireAccessPermission middleware has checked the account has read permission for the ISN
 // (the middleware also checks the isn and signal type are in use)
-func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Request) {
+func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Request) error {
 
 	// Parse all search parameters
 	searchParams, err := parseSearchParams(r)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "invalid search parameters")
-		return
+		return apperrors.InvalidURLParam("invalid search parameters", err)
 	}
 
 	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthenticationFailure, "authentication required for private ISN access")
-		return
+		return apperrors.AuthenticationFailure("authentication required for private ISN access", nil)
 	}
 
 	// ISN and signal type in-use checks are now performed by RequireIsnPermission middleware
 
 	// Validate search parameters
 	if err := validateSearchParams(searchParams); err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "invalid search parameters")
-		return
+		return apperrors.InvalidURLParam("invalid search parameters", err)
 	}
 
 	returnedSignals, err := s.queries.GetSignalsWithOptionalFilters(r.Context(), database.GetSignalsWithOptionalFiltersParams{
@@ -990,12 +943,10 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 	})
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("isn_slug", searchParams.isnSlug),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// Apply permission-based filtering for write-only accounts
@@ -1039,24 +990,14 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 		// create a map of signal_id to their correlated signals
 		correlatedSignalBySignalID, err = s.getCorrelatedSignals(r.Context(), signalIDs, searchParams)
 		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
-			)
-
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-			return
+			return apperrors.DatabaseError("database error", err)
 		}
 	}
 	var previousVersionsBySignalID map[uuid.UUID][]PreviousSignalVersion
 	if searchParams.includePreviousSignalVersions {
 		previousVersionsBySignalID, err = s.getPreviousSignalVersions(r.Context(), signalIDs)
 		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
-			)
-
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-			return
+			return apperrors.DatabaseError("database error", err)
 		}
 	}
 
@@ -1092,7 +1033,7 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 		}
 		response = append(response, signal)
 	}
-	responses.RespondWithJSON(w, http.StatusOK, response)
+	return responses.JSON(w, http.StatusOK, response)
 }
 
 // WithdrawSignal godoc
@@ -1120,7 +1061,7 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/withdraw [put]
-func (s *SignalsHandler) WithdrawSignal(w http.ResponseWriter, r *http.Request) {
+func (s *SignalsHandler) WithdrawSignal(w http.ResponseWriter, r *http.Request) error {
 
 	isnSlug := r.PathValue("isn_slug")
 	signalTypeSlug := r.PathValue("signal_type_slug")
@@ -1128,25 +1069,18 @@ func (s *SignalsHandler) WithdrawSignal(w http.ResponseWriter, r *http.Request) 
 
 	accountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get accountID from context")
-		return
+		return apperrors.InternalError("could not get accountID from context", nil)
 	}
 
 	// Parse request body
 	var req WithdrawSignalRequest
 	defer r.Body.Close()
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
-		return
+		return apperrors.MalformedBody("invalid JSON body", err)
 	}
 
 	if req.LocalRef == nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must supply a local_ref")
-		return
+		return apperrors.MalformedBody("you must supply a local_ref", nil)
 	}
 
 	// Get the signal
@@ -1158,22 +1092,18 @@ func (s *SignalsHandler) WithdrawSignal(w http.ResponseWriter, r *http.Request) 
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "signal not found")
-			return
+			return apperrors.NotFound("signal not found", nil)
 		}
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("local_ref", *req.LocalRef),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// Check if signal is already withdrawn
 	if signal.IsWithdrawn {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeResourceAlreadyExists, "signal is already withdrawn")
-		return
+		return apperrors.AlreadyExists("signal is already withdrawn", nil)
 	}
 
 	// Withdraw the signal - query enforces is_in_use at ISN and signal type level as defence against stale claims
@@ -1187,17 +1117,14 @@ func (s *SignalsHandler) WithdrawSignal(w http.ResponseWriter, r *http.Request) 
 
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("local_ref", *req.LocalRef),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	if rowsAffected == 0 {
-		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "signal not found or ISN/signal type no longer active")
-		return
+		return apperrors.NotFound("signal not found or ISN/signal type no longer active", nil)
 	}
 
 	logger.ContextWithLogAttrs(r.Context(),
@@ -1206,5 +1133,5 @@ func (s *SignalsHandler) WithdrawSignal(w http.ResponseWriter, r *http.Request) 
 		slog.String("withdrawn_by", accountID.String()),
 	)
 
-	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
+	return responses.NoContent(w, http.StatusNoContent)
 }
