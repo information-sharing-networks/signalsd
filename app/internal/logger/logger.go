@@ -197,6 +197,9 @@ func RequestLogging(logger *slog.Logger) func(http.Handler) http.Handler {
 			switch {
 			case ww.Status() >= 500:
 				logger.LogAttrs(r.Context(), slog.LevelError, "request completed", logAttrs...)
+			case ww.Status() == 499:
+				// client disconnected before response
+				logger.LogAttrs(r.Context(), slog.LevelInfo, "request completed", logAttrs...)
 			case ww.Status() >= 400:
 				logger.LogAttrs(r.Context(), slog.LevelWarn, "request completed", logAttrs...)
 			default:

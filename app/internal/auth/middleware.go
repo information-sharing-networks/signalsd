@@ -32,12 +32,12 @@ func (a *AuthService) RequireValidAccessToken(next http.Handler) http.Handler {
 
 		accessToken, err := a.GetAccessTokenFromHeader(r.Header)
 		if err != nil {
-			// Add context for final request log
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
-			)
-
-			responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthorizationFailure, "unauthorized")
+			responses.RenderError(w, r, &apperrors.HTTPError{
+				Status:  http.StatusUnauthorized,
+				Code:    apperrors.ErrCodeAuthorizationFailure,
+				Message: "unauthorized",
+				Err:     err,
+			})
 			return
 		}
 
@@ -52,20 +52,22 @@ func (a *AuthService) RequireValidAccessToken(next http.Handler) http.Handler {
 			if errors.Is(err, jwt.ErrTokenExpired) {
 				logger.ContextWithLogAttrs(r.Context(),
 					slog.String("account_id", claims.AccountID.String()),
-					slog.String("error", err.Error()),
 				)
-
-				responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAccessTokenExpired, "access token expired, please use the /oauth/token endpoint to renew it")
-				return
-			} else {
-				logger.ContextWithLogAttrs(r.Context(),
-					slog.String("account_id", claims.AccountID.String()),
-					slog.String("error", err.Error()),
-				)
-
-				responses.RespondWithError(w, r, http.StatusUnauthorized, apperrors.ErrCodeAuthorizationFailure, "unauthorized")
+				responses.RenderError(w, r, &apperrors.HTTPError{
+					Status:  http.StatusUnauthorized,
+					Code:    apperrors.ErrCodeAccessTokenExpired,
+					Message: "access token expired, please use the /oauth/token endpoint to renew it",
+					Err:     err,
+				})
 				return
 			}
+			responses.RenderError(w, r, &apperrors.HTTPError{
+				Status:  http.StatusUnauthorized,
+				Code:    apperrors.ErrCodeAuthorizationFailure,
+				Message: "unauthorized",
+				Err:     err,
+			})
+			return
 		}
 
 		accountIDString := claims.Subject
@@ -74,10 +76,9 @@ func (a *AuthService) RequireValidAccessToken(next http.Handler) http.Handler {
 		if err != nil {
 			logger.ContextWithLogAttrs(r.Context(),
 				slog.String("account_id", claims.AccountID.String()),
-				slog.String("error", err.Error()),
 			)
 
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "unauthorized - error processing access token")
+			responses.RenderError(w, r, apperrors.InternalError("unauthorized - error processing access token", err))
 			return
 		}
 
@@ -121,7 +122,7 @@ func (a *AuthService) RequireAuthByGrantType(next http.Handler) http.Handler {
 		case "refresh_token":
 			a.RequireValidRefreshToken(next).ServeHTTP(w, r)
 		default:
-			responses.RespondWithOAuthError(w, r, http.StatusBadRequest, responses.OAuthErrUnsupportedGrantType, "grant_type must be client_credentials or refresh_token", apperrors.ErrCodeInvalidRequest)
+			responses.RenderError(w, r, apperrors.OAuthUnsupportedGrantType("grant_type must be client_credentials or refresh_token", apperrors.ErrCodeInvalidRequest, nil))
 			return
 		}
 	})
@@ -139,14 +140,10 @@ func (a *AuthService) RequireValidRefreshToken(next http.Handler) http.Handler {
 		cookie, err := r.Cookie(signalsd.RefreshTokenCookieName)
 		if err != nil {
 			if err == http.ErrNoCookie {
-				responses.RespondWithOAuthError(w, r, http.StatusBadRequest, responses.OAuthErrInvalidGrant, "refresh_token cookie not found", apperrors.ErrCodeRefreshTokenInvalid)
+				responses.RenderError(w, r, apperrors.OAuthInvalidGrant("refresh_token cookie not found", apperrors.ErrCodeRefreshTokenInvalid, nil))
 				return
 			}
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
-			)
-
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "internal server error")
+			responses.RenderError(w, r, apperrors.InternalError("internal server error", err))
 			return
 		}
 
@@ -157,14 +154,10 @@ func (a *AuthService) RequireValidRefreshToken(next http.Handler) http.Handler {
 		refreshTokenRow, err := a.queries.GetValidRefreshTokenByHashedToken(r.Context(), hashedToken)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				responses.RespondWithOAuthError(w, r, http.StatusBadRequest, responses.OAuthErrInvalidGrant, "session expired, please log in again", apperrors.ErrCodeRefreshTokenInvalid)
+				responses.RenderError(w, r, apperrors.OAuthInvalidGrant("session expired, please log in again", apperrors.ErrCodeRefreshTokenInvalid, nil))
 				return
 			}
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
-			)
-
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
+			responses.RenderError(w, r, apperrors.DatabaseError("database error", err))
 			return
 		}
 
@@ -214,7 +207,7 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 		}
 
 		if clientID == "" || clientSecret == "" {
-			responses.RespondWithOAuthError(w, r, http.StatusBadRequest, responses.OAuthErrInvalidRequest, "client_id and client_secret are required", apperrors.ErrCodeInvalidRequest)
+			responses.RenderError(w, r, apperrors.OAuthInvalidRequest("client_id and client_secret are required", apperrors.ErrCodeInvalidRequest, nil))
 			return
 		}
 
@@ -224,7 +217,7 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 				slog.String("invalid_client_id", clientID),
 			)
 
-			responses.RespondWithOAuthError(w, r, http.StatusUnauthorized, responses.OAuthErrInvalidClient, "invalid client_id", apperrors.ErrCodeAuthenticationFailure)
+			responses.RenderError(w, r, apperrors.OAuthInvalidClient("invalid client_id", apperrors.ErrCodeAuthenticationFailure, nil))
 			return
 		}
 
@@ -234,18 +227,16 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 			if err == sql.ErrNoRows {
 				logger.ContextWithLogAttrs(r.Context(),
 					slog.String("client_id", clientID),
-					slog.String("error", err.Error()),
 				)
 
-				responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "account not found")
+				responses.RenderError(w, r, apperrors.InternalError("account not found", err))
 				return
 			}
 			logger.ContextWithLogAttrs(r.Context(),
 				slog.String("client_id", clientID),
-				slog.String("error", err.Error()),
 			)
 
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "database error")
+			responses.RenderError(w, r, apperrors.InternalError("database error", err))
 			return
 		}
 
@@ -255,7 +246,7 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 				slog.String("account_id", serviceAccount.AccountID.String()),
 			)
 
-			responses.RespondWithOAuthError(w, r, http.StatusUnauthorized, responses.OAuthErrInvalidClient, "account is disabled", apperrors.ErrCodeAuthorizationFailure)
+			responses.RenderError(w, r, apperrors.OAuthInvalidClient("account is disabled", apperrors.ErrCodeAuthorizationFailure, nil))
 			return
 		}
 
@@ -268,7 +259,7 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 				slog.String("client_id", clientID),
 			)
 
-			responses.RespondWithOAuthError(w, r, http.StatusUnauthorized, responses.OAuthErrInvalidClient, "invalid client secret", apperrors.ErrCodeAuthenticationFailure)
+			responses.RenderError(w, r, apperrors.OAuthInvalidClient("invalid client secret", apperrors.ErrCodeAuthenticationFailure, nil))
 			return
 		}
 
@@ -305,7 +296,7 @@ func (a *AuthService) RequireRole(allowedRoles ...string) func(http.Handler) htt
 
 			claims, ok := ContextClaims(r.Context())
 			if !ok {
-				responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
+				responses.RenderError(w, r, apperrors.InternalError("could not get claims from context", nil))
 				return
 			}
 			for _, role := range allowedRoles {
@@ -327,7 +318,7 @@ func (a *AuthService) RequireRole(allowedRoles ...string) func(http.Handler) htt
 				slog.Any("expected_roles", allowedRoles),
 				slog.String("got_role", claims.Role),
 			)
-			responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, fmt.Sprintf("account does not have required role - must be one of %v", strings.Join(allowedRoles, ", ")))
+			responses.RenderError(w, r, apperrors.Forbidden(fmt.Sprintf("account does not have required role - must be one of %v", strings.Join(allowedRoles, ", ")), nil))
 		})
 	}
 }
@@ -348,13 +339,13 @@ func (a *AuthService) RequireAccessPermission(permissions ...string) func(http.H
 
 			claims, ok := ContextClaims(r.Context())
 			if !ok {
-				responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
+				responses.RenderError(w, r, apperrors.InternalError("could not get claims from context", nil))
 				return
 			}
 
 			isnSlug := r.PathValue("isn_slug")
 			if isnSlug == "" {
-				responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInvalidRequest, "no isn_slug parameter ")
+				responses.RenderError(w, r, apperrors.InternalError("no isn_slug parameter", nil))
 				return
 			}
 
@@ -387,9 +378,13 @@ func (a *AuthService) RequireAccessPermission(permissions ...string) func(http.H
 
 			if lastErr != nil {
 				if permErr, ok := lastErr.(*PermissionError); ok {
-					responses.RespondWithError(w, r, permErr.Status, permErr.Code, permErr.Message)
+					responses.RenderError(w, r, &apperrors.HTTPError{
+						Status:  permErr.Status,
+						Code:    permErr.Code,
+						Message: permErr.Message,
+					})
 				} else {
-					responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "permission check failed")
+					responses.RenderError(w, r, apperrors.InternalError("permission check failed", nil))
 				}
 				return
 			}
@@ -416,29 +411,29 @@ func (a *AuthService) RequireIsnMembership(next http.Handler) http.Handler {
 
 		claims, ok := ContextClaims(r.Context())
 		if !ok {
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
+			responses.RenderError(w, r, apperrors.InternalError("could not get claims from context", nil))
 			return
 		}
 
 		isnSlug := r.PathValue("isn_slug")
 		if isnSlug == "" {
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInvalidRequest, "no isn_slug parameter")
+			responses.RenderError(w, r, apperrors.InternalError("no isn_slug parameter", nil))
 			return
 		}
 
 		perms, ok := claims.IsnPerms[isnSlug]
 		if !ok {
-			responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "account does not have access to this isn")
+			responses.RenderError(w, r, apperrors.Forbidden("account does not have access to this isn", nil))
 			return
 		}
 
 		if !perms.CanRead && !perms.CanWrite {
-			responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "account does not have access to this isn")
+			responses.RenderError(w, r, apperrors.Forbidden("account does not have access to this isn", nil))
 			return
 		}
 
 		if !perms.InUse {
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not in use")
+			responses.RenderError(w, r, apperrors.NotFound("ISN not in use", nil))
 			return
 		}
 
@@ -449,11 +444,11 @@ func (a *AuthService) RequireIsnMembership(next http.Handler) http.Handler {
 			signalTypePath := fmt.Sprintf("%s/v%s", signalTypeSlug, semVer)
 			signalType, found := perms.SignalTypes[signalTypePath]
 			if !found {
-				responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "signal type not found on this ISN")
+				responses.RenderError(w, r, apperrors.NotFound("signal type not found on this ISN", nil))
 				return
 			}
 			if !signalType.InUse {
-				responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "signal type not in use")
+				responses.RenderError(w, r, apperrors.NotFound("signal type not in use", nil))
 				return
 			}
 		}
@@ -474,7 +469,7 @@ func (a *AuthService) RequireDevEnv(next http.Handler) http.Handler {
 				slog.String("environment", a.environment),
 			)
 
-			responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "this api can only be used in the dev environment")
+			responses.RenderError(w, r, apperrors.Forbidden("this api can only be used in the dev environment", nil))
 			return
 		}
 

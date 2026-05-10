@@ -72,24 +72,24 @@ type IsnAccount struct {
 //	@Param			account_id	path	string										true	"account id"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
 //	@Success		200
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		403	{object}	responses.ErrorResponse
-//	@Failure		404	{object}	responses.ErrorResponse
+//	@Failure		400	{object}	responses.ErrorResponse	"invalid_request | malformed_body"
+//	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/isn/{isn_slug}/accounts/{account_id}  [put]
 //
 //	this handler must use the RequireRole (siteadmin,admin) middleware
-func (i *IsnAccountHandler) UpdateIsnAccountPermission(w http.ResponseWriter, r *http.Request) {
+func (i *IsnAccountHandler) UpdateIsnAccountPermission(w http.ResponseWriter, r *http.Request) error {
 
 	req := UpdateIsnAccountPermissionRequest{}
 
 	// get account id for the account making request
 	userAccountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
-		return
+		return apperrors.InternalError("did not receive userAccountID from middleware", nil)
 	}
 
 	// get isn
@@ -98,57 +98,47 @@ func (i *IsnAccountHandler) UpdateIsnAccountPermission(w http.ResponseWriter, r 
 	isn, err := i.queries.GetIsnBySlug(r.Context(), isnSlug)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
-			return
+			return apperrors.NotFound("ISN not found", nil)
 		}
 
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("isn_slug", isnSlug),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 	// If the requester is an ISN admin, they must own this ISN.
 	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
-		return
+		return apperrors.InternalError("could not get claims from context", nil)
 	}
 
 	if claims.Role == "isnadmin" && isn.UserAccountID != userAccountID {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you must be the ISN owner to grant permissions")
-		return
+		return apperrors.Forbidden("you must be the ISN owner to grant permissions", nil)
 	}
 
 	// get target account
 	targetAccountIDString := r.PathValue("account_id")
 	targetAccountID, err := uuid.Parse(targetAccountIDString)
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "invalid account ID format")
-		return
+		return apperrors.InvalidRequest("invalid account ID format", nil)
 	}
 
 	targetAccount, err := i.queries.GetAccountByID(r.Context(), targetAccountID)
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("target_account_id", targetAccountID.String()),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// deny users making uncessary attempts to grant perms to themeselves
 	if userAccountID == targetAccountID {
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("operation", "grant_isn_account"),
-			slog.String("error", "accounts cannot grant ISN permissions to themselves"),
 		)
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "accounts cannot grant ISN permissions to themselves")
-		return
+		return apperrors.InvalidRequest("accounts cannot grant ISN permissions to themselves", nil)
 	}
 
 	// validate request body
@@ -158,13 +148,11 @@ func (i *IsnAccountHandler) UpdateIsnAccountPermission(w http.ResponseWriter, r 
 	decoder.DisallowUnknownFields()
 	err = decoder.Decode(&req)
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
-		return
+		return apperrors.MalformedBody("invalid JSON body", nil)
 	}
 
 	if req.CanRead == nil || req.CanWrite == nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you must supply values for both can_read and can_write")
-		return
+		return apperrors.MalformedBody("you must supply values for both can_read and can_write", nil)
 	}
 
 	_, err = i.queries.UpsertIsnAccount(r.Context(), database.UpsertIsnAccountParams{
@@ -175,13 +163,11 @@ func (i *IsnAccountHandler) UpdateIsnAccountPermission(w http.ResponseWriter, r 
 	})
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("target_account_id", targetAccountID.String()),
 			slog.String("isn_slug", isnSlug),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 	logger.ContextWithLogAttrs(r.Context(),
 		slog.Bool("can_read", *req.CanRead),
@@ -190,7 +176,7 @@ func (i *IsnAccountHandler) UpdateIsnAccountPermission(w http.ResponseWriter, r 
 		slog.String("isn_slug", isnSlug),
 	)
 
-	responses.RespondWithStatusCodeOnly(w, http.StatusOK)
+	return responses.NoContent(w, http.StatusOK)
 }
 
 // GetIsnAccounts godoc
@@ -203,22 +189,22 @@ func (i *IsnAccountHandler) UpdateIsnAccountPermission(w http.ResponseWriter, r 
 //	@Param			isn_slug	path		string	true	"ISN slug"	example(sample-isn)
 //
 //	@Success		200			{array}		handlers.IsnAccount
-//	@Failure		400			{object}	responses.ErrorResponse
-//	@Failure		403			{object}	responses.ErrorResponse
-//	@Failure		404			{object}	responses.ErrorResponse
+//	@Failure		400			{object}	responses.ErrorResponse	"invalid_url_param"
+//	@Failure		403			{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		404			{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500			{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/isn/{isn_slug}/accounts [get]
 //
 // this handler must use the RequireRole (siteadmin,admin) middleware
-func (i *IsnAccountHandler) GetIsnAccounts(w http.ResponseWriter, r *http.Request) {
+func (i *IsnAccountHandler) GetIsnAccounts(w http.ResponseWriter, r *http.Request) error {
 
 	// get user account id for user making request
 	userAccountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
-		return
+		return apperrors.InternalError("did not receive userAccountID from middleware", nil)
 	}
 
 	// check isn exists
@@ -227,40 +213,33 @@ func (i *IsnAccountHandler) GetIsnAccounts(w http.ResponseWriter, r *http.Reques
 	isn, err := i.queries.GetIsnBySlug(r.Context(), isnSlug)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
-			return
+			return apperrors.NotFound("ISN not found", nil)
 		}
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("isn_slug", isnSlug),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// If the requester is an ISN admin, they must own this ISN.
 	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
-		return
+		return apperrors.InternalError("could not get claims from context", nil)
 	}
 
 	if claims.Role == "isnadmin" && isn.UserAccountID != userAccountID {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you must be the ISN owner to access this resource")
-		return
+		return apperrors.Forbidden("you must be the ISN owner to access this resource", nil)
 	}
 
 	// Get all accounts with access to this ISN
 	dbAccounts, err := i.queries.GetAccountsByIsnID(r.Context(), isn.ID)
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("isn_slug", isnSlug),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// Convert database structs to our response structs
@@ -286,5 +265,5 @@ func (i *IsnAccountHandler) GetIsnAccounts(w http.ResponseWriter, r *http.Reques
 	logger.ContextWithLogAttrs(r.Context(),
 		slog.Int("count", len(accounts)),
 		slog.String("isn_slug", isnSlug))
-	responses.RespondWithJSON(w, http.StatusOK, accounts)
+	return responses.JSON(w, http.StatusOK, accounts)
 }

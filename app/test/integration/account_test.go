@@ -139,7 +139,6 @@ func TestServiceAccountRegistration(t *testing.T) {
 	// Start server
 	testEnv := startInProcessServer(t, publicBaseURL)
 
-
 	t.Log("Creating test data...")
 
 	// Create test accounts with different roles
@@ -347,7 +346,6 @@ func TestServiceAccountReissue(t *testing.T) {
 	// Start server
 	testEnv := startInProcessServer(t, publicBaseURL)
 
-
 	t.Log("Creating test data...")
 
 	// Create test accounts with different roles
@@ -501,7 +499,6 @@ func TestUserLogin(t *testing.T) {
 	// Start server
 	testEnv := startInProcessServer(t, "")
 
-
 	t.Log("Creating test data...")
 
 	// Create test users with passwords
@@ -649,7 +646,7 @@ func TestUserLogin(t *testing.T) {
 			{
 				name:           "nonexistent_email",
 				requestBody:    loginDetails{"nonexistent@login.test", "anypassword"},
-				expectedStatus: http.StatusBadRequest,
+				expectedStatus: http.StatusUnauthorized,
 			},
 			{
 				name:           "case_insensitive_email_match",
@@ -693,7 +690,7 @@ func TestUserLogin(t *testing.T) {
 			{
 				name:           "missing_email",
 				requestBody:    loginDetails{Password: ownerPassword},
-				expectedStatus: http.StatusBadRequest,
+				expectedStatus: http.StatusUnauthorized,
 			},
 			{
 				name:           "missing_password",
@@ -703,7 +700,7 @@ func TestUserLogin(t *testing.T) {
 			{
 				name:           "empty_email",
 				requestBody:    loginDetails{Email: "", Password: ownerPassword},
-				expectedStatus: http.StatusBadRequest,
+				expectedStatus: http.StatusUnauthorized,
 			},
 			{
 				name:           "empty_password",
@@ -778,7 +775,6 @@ func TestUserRegistration(t *testing.T) {
 
 	// Start server
 	testEnv := startInProcessServer(t, "")
-
 
 	t.Log("Testing user registration endpoint...")
 
@@ -1046,7 +1042,6 @@ func TestPasswordResetFlow(t *testing.T) {
 	// Start test server
 	testEnv := startInProcessServer(t, publicBaseURL)
 
-
 	// Create test accounts
 	adminAccount := createTestAccount(t, ctx, testEnv.queries, "isnadmin", "user", "admin@example.com")
 	userAccount := createTestAccount(t, ctx, testEnv.queries, "member", "user", "user@example.com")
@@ -1268,7 +1263,6 @@ func TestSelfServePasswordChange(t *testing.T) {
 
 	// Start test server
 	testEnv := startInProcessServer(t, "")
-
 
 	t.Run("successful password change with correct current password", func(t *testing.T) {
 		// Create test user

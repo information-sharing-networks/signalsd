@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -118,8 +117,9 @@ type IsnAndLinkedInfo struct {
 //	@Param			request	body		handlers.CreateIsnRequest	true	"ISN configuration"
 //
 //	@Success		201		{object}	handlers.CreateIsnResponse
-//	@Failure		400		{object}	responses.ErrorResponse
-//	@Failure		409		{object}	responses.ErrorResponse
+//	@Failure		400		{object}	responses.ErrorResponse	"malformed_body"
+//	@Failure		409		{object}	responses.ErrorResponse	"resource_already_exists"
+//	@Failure		500		{object}	responses.ErrorResponse	"database_error | internal_error"
 //
 //	@Security		BearerAccessToken
 //	@Security		RefreshTokenCookieAuth
@@ -127,26 +127,20 @@ type IsnAndLinkedInfo struct {
 //	@Router			/api/isn/ [post]
 //
 // Use with RequireRole (isnadmin,siteadmin)
-func (i *IsnHandler) CreateIsn(w http.ResponseWriter, r *http.Request) {
+func (i *IsnHandler) CreateIsn(w http.ResponseWriter, r *http.Request) error {
 	var req CreateIsnRequest
 
 	var slug string
 
 	userAccountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
-		return
+		return apperrors.InternalError("did not receive userAccountID from middleware", nil)
 	}
 
 	defer r.Body.Close()
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
-		return
+		return apperrors.MalformedBody("invalid JSON body", err)
 	}
 
 	// validate fields
@@ -154,25 +148,18 @@ func (i *IsnHandler) CreateIsn(w http.ResponseWriter, r *http.Request) {
 		req.Detail == nil ||
 		req.IsInUse == nil ||
 		req.Visibility == nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "you have not supplied all the required fields in the payload")
-		return
+		return apperrors.MalformedBody("you have not supplied all the required fields in the payload", nil)
 	}
 
 	// generate slug and check it is not already in use
 	slug, err := utils.GenerateSlug(req.Title)
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not create slug from title")
-		return
+		return apperrors.InternalError("could not create slug from title", nil)
 	}
 
 	tx, err := i.pool.BeginTx(r.Context(), pgx.TxOptions{})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	defer func() {
@@ -188,17 +175,14 @@ func (i *IsnHandler) CreateIsn(w http.ResponseWriter, r *http.Request) {
 
 	exists, err := txQueries.ExistsIsnWithSlug(r.Context(), slug)
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "database error")
-		return
+		return apperrors.InternalError("database error", nil)
 	}
 	if exists {
-		responses.RespondWithError(w, r, http.StatusConflict, apperrors.ErrCodeResourceAlreadyExists, fmt.Sprintf("the {%s} slug is already in use - pick a new title for your ISN", slug))
-		return
+		return apperrors.AlreadyExists(fmt.Sprintf("the {%s} slug is already in use - pick a new title for your ISN", slug), nil)
 	}
 
 	if !signalsd.ValidVisibilities[*req.Visibility] {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("invalid visiblity value: %s", *req.Visibility))
-		return
+		return apperrors.MalformedBody(fmt.Sprintf("invalid visiblity value: %s", *req.Visibility), nil)
 	}
 
 	// create isn
@@ -212,21 +196,14 @@ func (i *IsnHandler) CreateIsn(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("slug", slug),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	if err := tx.Commit(r.Context()); err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	resourceURL := fmt.Sprintf("%s/api/isn/%s",
@@ -234,7 +211,7 @@ func (i *IsnHandler) CreateIsn(w http.ResponseWriter, r *http.Request) {
 		slug,
 	)
 
-	responses.RespondWithJSON(w, http.StatusCreated, CreateIsnResponse{
+	return responses.JSON(w, http.StatusCreated, CreateIsnResponse{
 		ID:          returnedIsn.ID,
 		Slug:        returnedIsn.Slug,
 		ResourceURL: resourceURL,
@@ -255,23 +232,23 @@ func (i *IsnHandler) CreateIsn(w http.ResponseWriter, r *http.Request) {
 //	@Param			request		body	handlers.UpdateIsnRequest	true	"ISN configuration"
 //
 //	@Success		204
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		401	{object}	responses.ErrorResponse
-//	@Failure		403	{object}	responses.ErrorResponse
-//	@Failure		404	{object}	responses.ErrorResponse
+//	@Failure		400	{object}	responses.ErrorResponse	"malformed_body"
+//	@Failure		401	{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/isn/{isn_slug} [put]
 //
 // Use with RequireRole (isnadmin,siteadmin) middleware
-func (i *IsnHandler) UpdateIsn(w http.ResponseWriter, r *http.Request) {
+func (i *IsnHandler) UpdateIsn(w http.ResponseWriter, r *http.Request) error {
 	var req UpdateIsnRequest
 
 	userAccountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "did not receive userAccountID from middleware")
-		return
+		return apperrors.InternalError("did not receive userAccountID from middleware", nil)
 	}
 
 	isnSlug := r.PathValue("isn_slug")
@@ -280,28 +257,23 @@ func (i *IsnHandler) UpdateIsn(w http.ResponseWriter, r *http.Request) {
 	isn, err := i.queries.GetIsnBySlug(r.Context(), isnSlug)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
-			return
+			return apperrors.NotFound("ISN not found", nil)
 		}
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("isn_slug", isnSlug),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// If the requester is an ISN admin, they must own this ISN.
 	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
-		return
+		return apperrors.InternalError("could not get claims from context", nil)
 	}
 
 	if claims.Role == "isnadmin" && isn.UserAccountID != userAccountID {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you must be the ISN owner to update this ISN")
-		return
+		return apperrors.Forbidden("you must be the ISN owner to update this ISN", nil)
 	}
 
 	defer r.Body.Close()
@@ -309,12 +281,7 @@ func (i *IsnHandler) UpdateIsn(w http.ResponseWriter, r *http.Request) {
 	decoder.DisallowUnknownFields()
 	err = decoder.Decode(&req)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
-		return
+		return apperrors.MalformedBody("invalid JSON body", err)
 	}
 
 	// set up values for update
@@ -336,15 +303,13 @@ func (i *IsnHandler) UpdateIsn(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("isn_slug", isnSlug),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
-	responses.RespondWithStatusCodeOnly(w, http.StatusNoContent)
+	return responses.NoContent(w, http.StatusNoContent)
 }
 
 // GetIsns godoc
@@ -354,10 +319,11 @@ func (i *IsnHandler) UpdateIsn(w http.ResponseWriter, r *http.Request) {
 //	@Param			include_inactive	query	bool	false	"Include inactive ISNs"	default(false)
 //	@Tags			ISN Configuration
 //
-//	@Success		200	{array}	handlers.Isn
+//	@Success		200	{array}		handlers.Isn
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Router			/api/isn [get]
-func (s *IsnHandler) GetIsns(w http.ResponseWriter, r *http.Request) {
+func (s *IsnHandler) GetIsns(w http.ResponseWriter, r *http.Request) error {
 
 	includeInactive := r.URL.Query().Get("include_inactive") == "true"
 
@@ -371,12 +337,7 @@ func (s *IsnHandler) GetIsns(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	isns := make([]Isn, len(dbIsns))
@@ -394,7 +355,7 @@ func (s *IsnHandler) GetIsns(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	responses.RespondWithJSON(w, http.StatusOK, isns)
+	return responses.JSON(w, http.StatusOK, isns)
 }
 
 // GetIsn godoc
@@ -406,11 +367,12 @@ func (s *IsnHandler) GetIsns(w http.ResponseWriter, r *http.Request) {
 //	@Tags			ISN Configuration
 //
 //	@Success		200	{object}	handlers.IsnAndLinkedInfo
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		404	{object}	responses.ErrorResponse
+//	@Failure		400	{object}	responses.ErrorResponse	"invalid_url_param"
+//	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Router			/api/isn/{isn_slug} [get]
-func (s *IsnHandler) GetIsn(w http.ResponseWriter, r *http.Request) {
+func (s *IsnHandler) GetIsn(w http.ResponseWriter, r *http.Request) error {
 
 	slug := r.PathValue("isn_slug")
 
@@ -418,28 +380,23 @@ func (s *IsnHandler) GetIsn(w http.ResponseWriter, r *http.Request) {
 	dbIsn, err := s.queries.GetIsnBySlug(r.Context(), slug)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No isn found for %s", slug))
-			return
+			return apperrors.NotFound(fmt.Sprintf("No isn found for %s", slug), nil)
 		}
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("isn_slug", slug),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// get the owner of the isn
 	dbUser, err := s.queries.GetUserByIsnID(r.Context(), dbIsn.ID)
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("isn_id", dbIsn.ID.String()),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// Convert database structs to our response structs
@@ -463,14 +420,12 @@ func (s *IsnHandler) GetIsn(w http.ResponseWriter, r *http.Request) {
 	var signalTypes *[]SignalType
 	dbSignalTypes, err := s.queries.GetSignalTypesByIsnID(r.Context(), dbIsn.ID)
 	if err != nil {
-		if !errors.Is(err, sql.ErrNoRows) {
+		if !errors.Is(err, pgx.ErrNoRows) {
 			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
 				slog.String("isn_id", dbIsn.ID.String()),
 			)
 
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-			return
+			return apperrors.DatabaseError("database error", err)
 		}
 		// If no rows found, signalTypes remains nil
 	} else {
@@ -498,7 +453,7 @@ func (s *IsnHandler) GetIsn(w http.ResponseWriter, r *http.Request) {
 		User:        user,
 		SignalTypes: signalTypes,
 	}
-	responses.RespondWithJSON(w, http.StatusOK, res)
+	return responses.JSON(w, http.StatusOK, res)
 }
 
 // TransferIsnOwnership godoc
@@ -513,9 +468,10 @@ func (s *IsnHandler) GetIsn(w http.ResponseWriter, r *http.Request) {
 //	@Param			request		body	handlers.TransferIsnOwnershipRequest	true	"Transfer details"
 //
 //	@Success		200
-//	@Failure		400	{object}	responses.ErrorResponse
-//	@Failure		403	{object}	responses.ErrorResponse
-//	@Failure		404	{object}	responses.ErrorResponse
+//	@Failure		400	{object}	responses.ErrorResponse	"malformed_body | invalid_request"
+//	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
 //	@Security		RefreshTokenCookieAuth
@@ -523,7 +479,7 @@ func (s *IsnHandler) GetIsn(w http.ResponseWriter, r *http.Request) {
 //	@Router			/api/admin/isn/{isn_slug}/transfer-ownership [put]
 //
 // Use with RequireRole (siteadmin)
-func (i *IsnHandler) TransferIsnOwnership(w http.ResponseWriter, r *http.Request) {
+func (i *IsnHandler) TransferIsnOwnership(w http.ResponseWriter, r *http.Request) error {
 	var req TransferIsnOwnershipRequest
 
 	isnSlug := r.PathValue("isn_slug")
@@ -532,77 +488,60 @@ func (i *IsnHandler) TransferIsnOwnership(w http.ResponseWriter, r *http.Request
 	isn, err := i.queries.GetIsnBySlug(r.Context(), isnSlug)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "ISN not found")
-			return
+			return apperrors.NotFound("ISN not found", nil)
 		}
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("isn_slug", isnSlug),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	defer r.Body.Close()
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
-		return
+		return apperrors.MalformedBody("invalid JSON body", err)
 	}
 
 	// validate new account ID
 	newAdminAccountID, err := uuid.Parse(req.NewAdminAccountID)
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("new_admin_account_id", req.NewAdminAccountID),
 		)
 
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid new admin account ID")
-		return
+		return apperrors.MalformedBody("invalid new admin account ID", err)
 	}
 
 	// check if new owner account exists and is an admin
 	newAdminAccount, err := i.queries.GetAccountByID(r.Context(), newAdminAccountID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "new owner account not found")
-			return
+			return apperrors.InvalidRequest("new owner account not found", nil)
 		}
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("new_admin_account_id", newAdminAccountID.String()),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// verify new owner is an isn admin or owner
 	if newAdminAccount.AccountType != "user" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "new owner must be a user account")
-		return
+		return apperrors.InvalidRequest("new owner must be a user account", nil)
 	}
 
 	if newAdminAccount.AccountRole != "isnadmin" && newAdminAccount.AccountRole != "siteadmin" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "new owner must be an admin")
-		return
+		return apperrors.InvalidRequest("new owner must be an admin", nil)
 	}
 
 	// check if account is active
 	if !newAdminAccount.IsActive {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "new owner account is not active")
-		return
+		return apperrors.InvalidRequest("new owner account is not active", nil)
 	}
 
 	// prevent transferring to the same account
 	if isn.UserAccountID == newAdminAccountID {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "ISN is already owned by this account")
-		return
+		return apperrors.InvalidRequest("ISN is already owned by this account", nil)
 	}
 
 	// update ISN ownership
@@ -612,17 +551,14 @@ func (i *IsnHandler) TransferIsnOwnership(w http.ResponseWriter, r *http.Request
 	})
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("isn_id", isn.ID.String()),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	if rowsAffected == 0 {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "no rows updated during ownership transfer")
-		return
+		return apperrors.DatabaseError("no rows updated during ownership transfer", nil)
 	}
 
 	logger.ContextWithLogAttrs(r.Context(),
@@ -631,5 +567,5 @@ func (i *IsnHandler) TransferIsnOwnership(w http.ResponseWriter, r *http.Request
 		slog.String("to_user_id", newAdminAccountID.String()),
 	)
 
-	responses.RespondWithStatusCodeOnly(w, http.StatusOK)
+	return responses.NoContent(w, http.StatusOK)
 }

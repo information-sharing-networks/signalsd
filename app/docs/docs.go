@@ -51,19 +51,25 @@ const docTemplate = `{
                         "description": "OK"
                     },
                     "400": {
-                        "description": "Invalid account ID format",
+                        "description": "invalid_url_param",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Authentication failed ",
+                        "description": "authentication_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Account not found",
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -98,25 +104,31 @@ const docTemplate = `{
                         "description": "OK"
                     },
                     "400": {
-                        "description": "Invalid account ID format",
+                        "description": "invalid_url_param",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Authentication failed ",
+                        "description": "authentication_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "Insufficient permissions ",
+                        "description": "forbidden",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Account not found",
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -151,13 +163,19 @@ const docTemplate = `{
                         "description": "No Content"
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "invalid_request",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "Forbidden",
+                        "description": "forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -190,13 +208,19 @@ const docTemplate = `{
                         "description": "No Content"
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "invalid_request",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "Forbidden",
+                        "description": "forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -231,13 +255,19 @@ const docTemplate = `{
                         "description": "No Content"
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "invalid_request",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "Forbidden",
+                        "description": "forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -270,13 +300,19 @@ const docTemplate = `{
                         "description": "No Content"
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "invalid_request",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "Forbidden",
+                        "description": "forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -323,19 +359,25 @@ const docTemplate = `{
                         "description": "OK"
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "malformed_body | invalid_request",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "Forbidden",
+                        "description": "forbidden",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -355,7 +397,13 @@ const docTemplate = `{
                         "description": "OK"
                     },
                     "403": {
-                        "description": "Forbidden",
+                        "description": "forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -415,14 +463,32 @@ const docTemplate = `{
                             }
                         }
                     },
+                    "400": {
+                        "description": "invalid_request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
                     "401": {
-                        "description": "Authentication failed",
+                        "description": "authentication_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "Insufficient permissions",
+                        "description": "forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -445,6 +511,12 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/handlers.SignalTypeDetail"
                             }
+                        }
+                    },
+                    "500": {
+                        "description": "database_error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -479,19 +551,25 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "malformed_body",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "Forbidden",
+                        "description": "forbidden",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "409": {
-                        "description": "Conflict",
+                        "description": "resource_already_exists",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error | internal_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -538,19 +616,31 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "malformed_body",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "Forbidden",
+                        "description": "forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "resource_not_found",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "409": {
-                        "description": "Conflict",
+                        "description": "resource_already_exists",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error | internal_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -590,20 +680,14 @@ const docTemplate = `{
                             "$ref": "#/definitions/handlers.SignalTypeDetail"
                         }
                     },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
                     "404": {
-                        "description": "Not Found",
+                        "description": "resource_not_found",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "database_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -653,25 +737,31 @@ const docTemplate = `{
                         "description": "No Content"
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "malformed_body",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "authentication_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "Forbidden",
+                        "description": "forbidden",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -711,26 +801,20 @@ const docTemplate = `{
                     "204": {
                         "description": "No Content"
                     },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
                     "404": {
-                        "description": "Not Found",
+                        "description": "resource_not_found",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "409": {
-                        "description": "Conflict",
+                        "description": "resource_in_use",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "database_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -776,7 +860,13 @@ const docTemplate = `{
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -823,13 +913,19 @@ const docTemplate = `{
                         "description": "No Content"
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "malformed_body",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error | internal_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -870,7 +966,13 @@ const docTemplate = `{
                         "description": "No Content"
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -914,25 +1016,31 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Invalid request - cannot provide both id and email parameters",
+                        "description": "invalid_request",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Authentication failed",
+                        "description": "authentication_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "Insufficient permissions",
+                        "description": "forbidden",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "User not found",
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -970,25 +1078,31 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "invalid_url_param",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "authentication_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "Forbidden - admin role required",
+                        "description": "forbidden",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "User not found",
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error | internal_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1022,19 +1136,19 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "malformed_body",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "authentication_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "database_error | token_creation_failed",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1064,19 +1178,19 @@ const docTemplate = `{
                         "description": "OK"
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "invalid_url_param",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "resource_not_found",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "410": {
-                        "description": "Gone",
+                        "description": "resource_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1113,19 +1227,25 @@ const docTemplate = `{
                         "description": "OK"
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "invalid_url_param | malformed_body | password_too_short",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "resource_not_found",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "410": {
-                        "description": "Gone",
+                        "description": "resource_expired",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error | internal_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1161,13 +1281,19 @@ const docTemplate = `{
                         "description": "No Content"
                     },
                     "400": {
-                        "description": "Bad request with possible error codes: malformed_body, password_too_short",
+                        "description": "malformed_body | password_too_short",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized with possible error code: authentication_error",
+                        "description": "authentication_error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error | internal_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1198,13 +1324,19 @@ const docTemplate = `{
                         "description": "Created"
                     },
                     "400": {
-                        "description": "Bad request with possible error codes: malformed_body, password_too_short",
+                        "description": "malformed_body | password_too_short",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "409": {
-                        "description": "Conflict with possible error code: resource_already_exists",
+                        "description": "resource_already_exists",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error | internal_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1243,19 +1375,25 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "malformed_body",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "authentication_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "409": {
-                        "description": "Conflict",
+                        "description": "resource_already_exists",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error | internal_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1294,19 +1432,25 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "malformed_body",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "authentication_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error | internal_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1360,7 +1504,7 @@ const docTemplate = `{
                         }
                     },
                     "500": {
-                        "description": "Internal server error",
+                        "description": "database_error | internal_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1390,19 +1534,19 @@ const docTemplate = `{
                         "description": "Created"
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "invalid_url_param",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "resource_not_found",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "410": {
-                        "description": "Gone",
+                        "description": "resource_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1449,13 +1593,13 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "invalid_url_param",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "database_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1499,25 +1643,25 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "invalid_request",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "Forbidden",
+                        "description": "forbidden",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "resource_not_found",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "500": {
-                        "description": "Internal Server Error",
+                        "description": "database_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1549,6 +1693,12 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/handlers.Isn"
                             }
+                        }
+                    },
+                    "500": {
+                        "description": "database_error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -1588,13 +1738,19 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "malformed_body",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "409": {
-                        "description": "Conflict",
+                        "description": "resource_already_exists",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error | internal_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1627,13 +1783,19 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "invalid_url_param",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1675,25 +1837,31 @@ const docTemplate = `{
                         "description": "No Content"
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "malformed_body",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "authentication_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "Forbidden",
+                        "description": "forbidden",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1734,19 +1902,25 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "invalid_url_param",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "Forbidden",
+                        "description": "forbidden",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1798,19 +1972,25 @@ const docTemplate = `{
                         "description": "OK"
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "invalid_request | malformed_body",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "Forbidden",
+                        "description": "forbidden",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1854,25 +2034,31 @@ const docTemplate = `{
                         "description": "No Content"
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "malformed_body",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "authentication_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "Forbidden",
+                        "description": "forbidden",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1932,25 +2118,31 @@ const docTemplate = `{
                         "description": "No Content"
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "malformed_body",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "authentication_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "Forbidden",
+                        "description": "forbidden",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -2019,25 +2211,25 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Invalid request format (error_code = malformed_body)",
+                        "description": "malformed_body",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized request (invalid credentials, error_code = authentication_error)",
+                        "description": "authentication_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "Forbidden (no permission to write to ISN, error_code = forbidden)",
+                        "description": "forbidden",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found (mistyped url or signal_type marked 'not in use')",
+                        "description": "resource_not_found",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -2046,6 +2238,12 @@ const docTemplate = `{
                         "description": "Valid request format but all signals failed processing - returns detailed error information",
                         "schema": {
                             "$ref": "#/definitions/handlers.SignalSubmissionResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error | internal_error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -2132,7 +2330,19 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "invalid_url_param",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -2192,25 +2402,37 @@ const docTemplate = `{
                         "description": "No Content"
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "malformed_body",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized",
+                        "description": "authentication_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "403": {
-                        "description": "Forbidden",
+                        "description": "forbidden",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found",
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "resource_already_exists",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -2294,7 +2516,19 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Bad Request",
+                        "description": "invalid_url_param",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -2355,19 +2589,19 @@ const docTemplate = `{
                         }
                     },
                     "400": {
-                        "description": "Invalid request format (error_code = malformed_body)",
+                        "description": "malformed_body",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "Unauthorized request (invalid credentials, error_code = authentication_error)",
+                        "description": "authentication_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "404": {
-                        "description": "Not Found (mistyped url or signal_type marked 'not in use')",
+                        "description": "resource_not_found",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -2376,6 +2610,12 @@ const docTemplate = `{
                         "description": "Valid request format but all signals failed processing - returns detailed error information",
                         "schema": {
                             "$ref": "#/definitions/handlers.SignalSubmissionResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     }
                 }
@@ -2582,6 +2822,7 @@ const docTemplate = `{
                 "all_signals_failed_processing",
                 "authentication_error",
                 "authorization_error",
+                "client_closed",
                 "database_error",
                 "forbidden",
                 "invalid_correlation_id",
@@ -2599,13 +2840,15 @@ const docTemplate = `{
                 "resource_expired",
                 "resource_in_use",
                 "resource_not_found",
-                "token_invalid"
+                "timeout",
+                "token_creation_failed"
             ],
             "x-enum-varnames": [
                 "ErrCodeAccessTokenExpired",
                 "ErrCodeAllSignalsFailedProcessing",
                 "ErrCodeAuthenticationFailure",
                 "ErrCodeAuthorizationFailure",
+                "ErrCodeClientClosed",
                 "ErrCodeDatabaseError",
                 "ErrCodeForbidden",
                 "ErrCodeInvalidCorrelationID",
@@ -2623,7 +2866,8 @@ const docTemplate = `{
                 "ErrCodeResourceExpired",
                 "ErrCodeResourceInUse",
                 "ErrCodeResourceNotFound",
-                "ErrCodeTokenInvalid"
+                "ErrCodeTimeout",
+                "ErrCodeFailedToCreateToken"
             ]
         },
         "auth.AccessTokenResponse": {
@@ -3854,16 +4098,23 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "error_code": {
+                    "description": "Standard app error code",
                     "allOf": [
                         {
                             "$ref": "#/definitions/apperrors.ErrorCode"
                         }
                     ],
-                    "example": "example_error_code"
+                    "example": "error_code"
                 },
                 "message": {
+                    "description": "Client message",
                     "type": "string",
-                    "example": "message describing the error"
+                    "example": "client message"
+                },
+                "request_id": {
+                    "description": "request tracking id",
+                    "type": "string",
+                    "example": "a1b2c3d4"
                 }
             }
         },

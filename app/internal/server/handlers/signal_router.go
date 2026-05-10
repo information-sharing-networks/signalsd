@@ -144,9 +144,10 @@ type resolvedSignal struct {
 //	@Success		200					{object}	handlers.SignalSubmissionResponse	"All signals processed successfully"
 //	@Success		207					{object}	handlers.SignalSubmissionResponse	"Partial success - some signals succeeded, some failed"
 //	@Success		422					{object}	handlers.SignalSubmissionResponse	"Valid request format but all signals failed processing - returns detailed error information"
-//	@Failure		400					{object}	responses.ErrorResponse				"Invalid request format (error_code = malformed_body)
-//	@Failure		401					{object}	responses.ErrorResponse				"Unauthorized request (invalid credentials, error_code = authentication_error)"
-//	@Failure		404					{object}	responses.ErrorResponse				"Not Found (mistyped url or signal_type marked 'not in use')
+//	@Failure		400					{object}	responses.ErrorResponse				"malformed_body"
+//	@Failure		401					{object}	responses.ErrorResponse				"authentication_error"
+//	@Failure		404					{object}	responses.ErrorResponse				"resource_not_found"
+//	@Failure		500					{object}	responses.ErrorResponse				"database_error"
 //
 //	@Security		BearerAccessToken
 //
@@ -155,21 +156,19 @@ type resolvedSignal struct {
 // This handler should be used with RequireValidAccessToken middleware.
 // Note that it can't be used with RequireAccessPermission since the target ISNs are not known until
 // the code in the hanlder runs (therefore the handler checks access permissions against the claims directly)
-func (s *SignalRouter) RouteSignals(w http.ResponseWriter, r *http.Request) {
+func (s *SignalRouter) RouteSignals(w http.ResponseWriter, r *http.Request) error {
 	signalTypeSlug := r.PathValue("signal_type_slug")
 	semVer := r.PathValue("sem_ver")
 	signalTypePath := fmt.Sprintf("%s/v%s", signalTypeSlug, semVer)
 
 	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
-		return
+		return apperrors.InternalError("could not get claims from context", nil)
 	}
 
 	accountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get accountID from context")
-		return
+		return apperrors.InternalError("could not get accountID from context", nil)
 	}
 
 	defer r.Body.Close()
@@ -178,37 +177,30 @@ func (s *SignalRouter) RouteSignals(w http.ResponseWriter, r *http.Request) {
 
 	// unmarshal the req body
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "invalid JSON body")
-		return
+		return apperrors.MalformedBody("invalid JSON body", nil)
 	}
 
 	// check for mandatory fields in request
 	if req.BatchRef == "" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "batch_ref is required")
-		return
+		return apperrors.MalformedBody("batch_ref is required", nil)
 	}
 	if !batchRefRegexp.MatchString(req.BatchRef) {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "batch_ref must be less than 128 characters and can only contain alphanumeric characters, hyphens, and underscores")
-		return
+		return apperrors.MalformedBody("batch_ref must be less than 128 characters and can only contain alphanumeric characters, hyphens, and underscores", nil)
 	}
 
 	if req.Signals == nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "request must contain a 'signals' array")
-		return
+		return apperrors.MalformedBody("request must contain a 'signals' array", nil)
 	}
 	if len(req.Signals) == 0 {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, "request must contain must contain at least one signal in the 'signals' array")
-		return
+		return apperrors.MalformedBody("request must contain must contain at least one signal in the 'signals' array", nil)
 	}
 
 	for i, signal := range req.Signals {
 		if signal.LocalRef == "" {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("signal[%d] is missing required field 'local_ref'", i))
-			return
+			return apperrors.MalformedBody(fmt.Sprintf("signal[%d] is missing required field 'local_ref'", i), nil)
 		}
 		if len(signal.Content) == 0 {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeMalformedBody, fmt.Sprintf("signal[%d] (local_ref=%q) is missing required field 'content'", i, signal.LocalRef))
-			return
+			return apperrors.MalformedBody(fmt.Sprintf("signal[%d] (local_ref=%q) is missing required field 'content'", i, signal.LocalRef), nil)
 		}
 	}
 
@@ -218,11 +210,7 @@ func (s *SignalRouter) RouteSignals(w http.ResponseWriter, r *http.Request) {
 		AccountID: accountID,
 	})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	var routed []resolvedSignal
@@ -243,9 +231,7 @@ func (s *SignalRouter) RouteSignals(w http.ResponseWriter, r *http.Request) {
 					})
 					continue
 				}
-				logger.ContextWithLogAttrs(r.Context(), slog.String("error", err.Error()))
-				responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-				return
+				return apperrors.DatabaseError("database error", err)
 			}
 			routed = append(routed, resolvedSignal{signal: signal, isnSlug: isnRow.Slug, isnID: isnRow.ID})
 		} else {
@@ -433,7 +419,7 @@ func (s *SignalRouter) RouteSignals(w http.ResponseWriter, r *http.Request) {
 		httpStatus = http.StatusMultiStatus
 	}
 
-	responses.RespondWithJSON(w, httpStatus, SignalSubmissionResponse{
+	return responses.JSON(w, httpStatus, SignalSubmissionResponse{
 		BatchRef:          batch.BatchRef,
 		AccountID:         accountID,
 		Results:           results,

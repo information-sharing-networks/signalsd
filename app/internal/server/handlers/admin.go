@@ -68,22 +68,19 @@ type AccountStatusResponse struct {
 //	@Tags			Site Admin
 //
 //	@Success		200
-//	@Failure		403	{object}	responses.ErrorResponse
+//	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Router			/api/admin/reset [post]
-func (a *AdminHandler) ResetEnv(w http.ResponseWriter, r *http.Request) {
+func (a *AdminHandler) ResetEnv(w http.ResponseWriter, r *http.Request) error {
 
 	deletedAccountsCount, err := a.queries.DeleteAccounts(r.Context())
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(fmt.Appendf(nil, "%d accounts deleted", deletedAccountsCount))
+	return nil
 }
 
 // Readiness godoc
@@ -97,7 +94,7 @@ func (a *AdminHandler) ResetEnv(w http.ResponseWriter, r *http.Request) {
 //	@Failure		503	{string}	string	"Service Unavailable - Database connection failed"
 //
 //	@Router			/health/ready [get]
-func (a *AdminHandler) Readiness(w http.ResponseWriter, r *http.Request) {
+func (a *AdminHandler) Readiness(w http.ResponseWriter, r *http.Request) error {
 	ctx, cancel := context.WithTimeout(r.Context(), signalsd.ReadinessTimeout)
 	defer cancel()
 
@@ -111,6 +108,7 @@ func (a *AdminHandler) Readiness(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)
 		_, _ = w.Write([]byte("Service Unavailable"))
 	}
+	return nil
 }
 
 // Liveness godoc
@@ -123,10 +121,11 @@ func (a *AdminHandler) Readiness(w http.ResponseWriter, r *http.Request) {
 //	@Success		200	{string}	string	"OK - Service is alive"
 //
 //	@Router			/health/live [get]
-func (a *AdminHandler) Liveness(w http.ResponseWriter, r *http.Request) {
+func (a *AdminHandler) Liveness(w http.ResponseWriter, r *http.Request) error {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("OK"))
+	return nil
 }
 
 // Version godoc
@@ -138,8 +137,8 @@ func (a *AdminHandler) Liveness(w http.ResponseWriter, r *http.Request) {
 //	@Success		200	{object}	version.Info
 //
 //	@Router			/version [get]
-func (a *AdminHandler) Version(w http.ResponseWriter, r *http.Request) {
-	responses.RespondWithJSON(w, http.StatusOK, version.Get())
+func (a *AdminHandler) Version(w http.ResponseWriter, r *http.Request) error {
+	return responses.JSON(w, http.StatusOK, version.Get())
 }
 
 // DisableAccount godoc
@@ -164,31 +163,26 @@ func (a *AdminHandler) Version(w http.ResponseWriter, r *http.Request) {
 //	@Param			account_id	path	string	true	"Account ID to disable"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
 //	@Success		200
-//	@Failure		400	{object}	responses.ErrorResponse	"Invalid account ID format"
-//	@Failure		401	{object}	responses.ErrorResponse	"Authentication failed "
-//	@Failure		404	{object}	responses.ErrorResponse	"Account not found"
+//	@Failure		400	{object}	responses.ErrorResponse	"invalid_url_param"
+//	@Failure		401	{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/admin/accounts/{account_id}/disable [post]
-func (a *AdminHandler) DisableAccount(w http.ResponseWriter, r *http.Request) {
+func (a *AdminHandler) DisableAccount(w http.ResponseWriter, r *http.Request) error {
 	accountIDString := r.PathValue("account_id")
 
 	accountID, err := uuid.Parse(accountIDString)
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "invalid account ID format")
-		return
+		return apperrors.InvalidURLParam("invalid account ID format", nil)
 	}
 
 	// Start transaction
 	tx, err := a.pool.BeginTx(r.Context(), pgx.TxOptions{})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	defer func() {
@@ -205,30 +199,15 @@ func (a *AdminHandler) DisableAccount(w http.ResponseWriter, r *http.Request) {
 	account, err := txQueries.GetAccountByID(r.Context(), accountID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", "account not found"),
-			)
-
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "account not found")
-			return
+			return apperrors.NotFound("account not found", nil)
 		}
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// Disable the account
 	rowsAffected, err := txQueries.DisableAccount(r.Context(), accountID)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	if rowsAffected == 0 {
@@ -236,8 +215,7 @@ func (a *AdminHandler) DisableAccount(w http.ResponseWriter, r *http.Request) {
 			slog.String("error_code", "account not found or already disabled"),
 		)
 
-		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "account not found or already disabled")
-		return
+		return apperrors.NotFound("account not found or already disabled", nil)
 	}
 
 	// Revoke tokens based on account type
@@ -246,23 +224,13 @@ func (a *AdminHandler) DisableAccount(w http.ResponseWriter, r *http.Request) {
 		// Revoke all client secrets for service accounts
 		_, err = txQueries.RevokeAllClientSecretsForAccount(r.Context(), accountID)
 		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
-			)
-
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-			return
+			return apperrors.DatabaseError("database error", err)
 		}
 
 		// Delete any one-time client secrets
 		serviceAccount, err := txQueries.GetServiceAccountByAccountID(r.Context(), accountID)
 		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
-			)
-
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-			return
+			return apperrors.DatabaseError("database error", err)
 		}
 
 		_, err = txQueries.DeleteOneTimeClientSecretsByOrgAndEmail(r.Context(), database.DeleteOneTimeClientSecretsByOrgAndEmailParams{
@@ -270,36 +238,21 @@ func (a *AdminHandler) DisableAccount(w http.ResponseWriter, r *http.Request) {
 			ClientContactEmail: serviceAccount.ClientContactEmail,
 		})
 		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
-			)
-
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-			return
+			return apperrors.DatabaseError("database error", err)
 		}
 
 	case "user":
 		// Revoke all refresh tokens for user accounts
 		_, err = txQueries.RevokeAllRefreshTokensForUser(r.Context(), accountID)
 		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
-			)
-
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-			return
+			return apperrors.DatabaseError("database error", err)
 		}
 
 	}
 
 	// Commit transaction
 	if err := tx.Commit(r.Context()); err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	response := AccountStatusResponse{
@@ -307,7 +260,7 @@ func (a *AdminHandler) DisableAccount(w http.ResponseWriter, r *http.Request) {
 		AccountType: account.AccountType,
 		Status:      "disabled",
 	}
-	responses.RespondWithJSON(w, http.StatusOK, response)
+	return responses.JSON(w, http.StatusOK, response)
 }
 
 // EnableAccount godoc
@@ -326,15 +279,16 @@ func (a *AdminHandler) DisableAccount(w http.ResponseWriter, r *http.Request) {
 //	@Param			account_id	path	string	true	"Account ID to enable"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
 //	@Success		200
-//	@Failure		400	{object}	responses.ErrorResponse	"Invalid account ID format"
-//	@Failure		401	{object}	responses.ErrorResponse	"Authentication failed "
-//	@Failure		403	{object}	responses.ErrorResponse	"Insufficient permissions "
-//	@Failure		404	{object}	responses.ErrorResponse	"Account not found"
+//	@Failure		400	{object}	responses.ErrorResponse	"invalid_url_param"
+//	@Failure		401	{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/admin/accounts/{account_id}/enable [post]
-func (a *AdminHandler) EnableAccount(w http.ResponseWriter, r *http.Request) {
+func (a *AdminHandler) EnableAccount(w http.ResponseWriter, r *http.Request) error {
 	accountIDString := r.PathValue("account_id")
 
 	// Parse account ID as UUID
@@ -344,46 +298,25 @@ func (a *AdminHandler) EnableAccount(w http.ResponseWriter, r *http.Request) {
 			slog.String("account_id_string", accountIDString),
 		)
 
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "invalid account ID format")
-		return
+		return apperrors.InvalidURLParam("invalid account ID format", nil)
 	}
 
 	account, err := a.queries.GetAccountByID(r.Context(), accountID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", "account not found"),
-			)
-
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "account not found")
-			return
+			return apperrors.NotFound("account not found", nil)
 		}
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// Enable the account
 	rowsAffected, err := a.queries.EnableAccount(r.Context(), accountID)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	if rowsAffected == 0 {
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", "account not found or already enabled"),
-		)
-
-		responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "account not found or already enabled")
-		return
+		return apperrors.NotFound("account not found or already enabled", nil)
 	}
 
 	response := AccountStatusResponse{
@@ -391,7 +324,7 @@ func (a *AdminHandler) EnableAccount(w http.ResponseWriter, r *http.Request) {
 		AccountType: account.AccountType,
 		Status:      "enabled",
 	}
-	responses.RespondWithJSON(w, http.StatusOK, response)
+	return responses.JSON(w, http.StatusOK, response)
 }
 
 // GetUsers godoc
@@ -407,15 +340,16 @@ func (a *AdminHandler) EnableAccount(w http.ResponseWriter, r *http.Request) {
 //	@Param			email	query		string					false	"user email address"	example(user@example.com)
 //	@Success		200		{array}		handlers.UserDetails	"All users (when no query params)"
 //	@Success		200		{object}	handlers.UserDetails	"Specific user (when query params provided)"
-//	@Failure		400		{object}	responses.ErrorResponse	"Invalid request - cannot provide both id and email parameters"
-//	@Failure		401		{object}	responses.ErrorResponse	"Authentication failed"
-//	@Failure		403		{object}	responses.ErrorResponse	"Insufficient permissions"
-//	@Failure		404		{object}	responses.ErrorResponse	"User not found"
+//	@Failure		400		{object}	responses.ErrorResponse	"invalid_request"
+//	@Failure		401		{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		403		{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		404		{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500		{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/admin/users [get]
-func (a *AdminHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
+func (a *AdminHandler) GetUsers(w http.ResponseWriter, r *http.Request) error {
 
 	accountIdParam := r.URL.Query().Get("id")
 	emailParam := r.URL.Query().Get("email")
@@ -424,12 +358,7 @@ func (a *AdminHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 	if accountIdParam == "" && emailParam == "" {
 		dbUsers, err := a.queries.GetUsers(r.Context())
 		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
-			)
-
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-			return
+			return apperrors.DatabaseError("database error", err)
 		}
 
 		users := make([]UserDetails, len(dbUsers))
@@ -443,14 +372,12 @@ func (a *AdminHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		responses.RespondWithJSON(w, http.StatusOK, users)
-		return
+		return responses.JSON(w, http.StatusOK, users)
 	}
 
 	// If query parameters provided
 	if accountIdParam != "" && emailParam != "" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "Cannot provide both 'id' and 'email' query parameters")
-		return
+		return apperrors.InvalidRequest("Cannot provide both 'id' and 'email' query parameters", nil)
 	}
 
 	var user UserDetails
@@ -459,22 +386,15 @@ func (a *AdminHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 		// Lookup by ID
 		userAccountID, err := uuid.Parse(accountIdParam)
 		if err != nil {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "invalid user ID format")
-			return
+			return apperrors.InvalidRequest("invalid user ID format", nil)
 		}
 
 		dbUser, err := a.queries.GetUserByID(r.Context(), userAccountID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No user found for ID %v", userAccountID))
-				return
+				return apperrors.NotFound(fmt.Sprintf("No user found for ID %v", userAccountID), nil)
 			}
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
-			)
-
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-			return
+			return apperrors.DatabaseError("database error", err)
 		}
 
 		// Convert GetUserByIDRow to UserDetails
@@ -486,24 +406,20 @@ func (a *AdminHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 			UpdatedAt: dbUser.UpdatedAt,
 		}
 
-		responses.RespondWithJSON(w, http.StatusOK, user)
-		return
+		return responses.JSON(w, http.StatusOK, user)
 	}
 
 	// Lookup by email
 	dbUser, err := a.queries.GetUserByEmail(r.Context(), emailParam)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, fmt.Sprintf("No user found for email %v", emailParam))
-			return
+			return apperrors.NotFound(fmt.Sprintf("No user found for email %v", emailParam), nil)
 		}
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("email", emailParam),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// Convert User to UserDetails
@@ -515,7 +431,7 @@ func (a *AdminHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 		UpdatedAt: dbUser.UpdatedAt,
 	}
 
-	responses.RespondWithJSON(w, http.StatusOK, user)
+	return responses.JSON(w, http.StatusOK, user)
 }
 
 // GetServiceAccounts godoc
@@ -538,13 +454,16 @@ func (a *AdminHandler) GetUsers(w http.ResponseWriter, r *http.Request) {
 //	@Param		client_organization	query		string	false	"Service Account Organization (must be used with client_email)"			example(Example Org)
 //
 //	@Success	200					{array}		handlers.ServiceAccountDetails
-//	@Failure	401					{object}	responses.ErrorResponse	"Authentication failed"
-//	@Failure	403					{object}	responses.ErrorResponse	"Insufficient permissions"
+//	@Failure	400					{object}	responses.ErrorResponse	"invalid_request"
+//	@Failure	401					{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure	403					{object}	responses.ErrorResponse	"forbidden"
+//	@Failure	404					{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure	500					{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security	BearerAccessToken
 //
 //	@Router		/api/admin/service-accounts [get]
-func (a *AdminHandler) GetServiceAccounts(w http.ResponseWriter, r *http.Request) {
+func (a *AdminHandler) GetServiceAccounts(w http.ResponseWriter, r *http.Request) error {
 
 	accountIDString := r.URL.Query().Get("id")
 	clientID := r.URL.Query().Get("client_id")
@@ -556,12 +475,7 @@ func (a *AdminHandler) GetServiceAccounts(w http.ResponseWriter, r *http.Request
 		// Get all service accounts
 		dbServiceAccounts, err := a.queries.GetServiceAccounts(r.Context())
 		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
-			)
-
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-			return
+			return apperrors.DatabaseError("database error", err)
 		}
 
 		// Convert database structs to our response structs
@@ -581,8 +495,7 @@ func (a *AdminHandler) GetServiceAccounts(w http.ResponseWriter, r *http.Request
 			slog.Int("count", len(serviceAccounts)),
 		)
 
-		responses.RespondWithJSON(w, http.StatusOK, serviceAccounts)
-		return
+		return responses.JSON(w, http.StatusOK, serviceAccounts)
 	}
 
 	// Validate query parameter combinations
@@ -598,14 +511,12 @@ func (a *AdminHandler) GetServiceAccounts(w http.ResponseWriter, r *http.Request
 	}
 
 	if paramCount > 1 {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "Cannot provide multiple query parameter combinations. Use only one of: 'id', 'client_id', or 'client_email & client_organization'")
-		return
+		return apperrors.InvalidRequest("Cannot provide multiple query parameter combinations. Use only one of: 'id', 'client_id', or 'client_email & client_organization'", nil)
 	}
 
 	// Validate that email and organization are used together
 	if (clientEmail != "" && clientOrganization == "") || (clientEmail == "" && clientOrganization != "") {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "Both 'client_email' and 'client_organization' parameters are required when querying by email/organization")
-		return
+		return apperrors.InvalidRequest("Both 'client_email' and 'client_organization' parameters are required when querying by email/organization", nil)
 	}
 
 	// query by account id
@@ -613,23 +524,16 @@ func (a *AdminHandler) GetServiceAccounts(w http.ResponseWriter, r *http.Request
 
 		accountID, err := uuid.Parse(accountIDString)
 		if err != nil {
-			responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidRequest, "Invalid account ID format")
-			return
+			return apperrors.InvalidRequest("Invalid account ID format", nil)
 		}
 
 		dbServiceAccount, err := a.queries.GetServiceAccountByAccountID(r.Context(), accountID)
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "service account not found")
-				return
+				return apperrors.NotFound("service account not found", nil)
 			}
 
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
-			)
-
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-			return
+			return apperrors.DatabaseError("database error", err)
 		}
 		serviceAccountDetails := ServiceAccountDetails{
 			AccountID:          dbServiceAccount.AccountID,
@@ -639,8 +543,7 @@ func (a *AdminHandler) GetServiceAccounts(w http.ResponseWriter, r *http.Request
 			ClientContactEmail: dbServiceAccount.ClientContactEmail,
 			ClientOrganization: dbServiceAccount.ClientOrganization,
 		}
-		responses.RespondWithJSON(w, http.StatusOK, serviceAccountDetails)
-		return
+		return responses.JSON(w, http.StatusOK, serviceAccountDetails)
 	}
 
 	// query by email and organization
@@ -651,16 +554,10 @@ func (a *AdminHandler) GetServiceAccounts(w http.ResponseWriter, r *http.Request
 		})
 		if err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
-				responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "service account not found")
-				return
+				return apperrors.NotFound("service account not found", nil)
 			}
 
-			logger.ContextWithLogAttrs(r.Context(),
-				slog.String("error", err.Error()),
-			)
-
-			responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-			return
+			return apperrors.DatabaseError("database error", err)
 		}
 		serviceAccountDetails := ServiceAccountDetails{
 			AccountID:          dbServiceAccount.AccountID,
@@ -670,24 +567,17 @@ func (a *AdminHandler) GetServiceAccounts(w http.ResponseWriter, r *http.Request
 			ClientContactEmail: dbServiceAccount.ClientContactEmail,
 			ClientOrganization: dbServiceAccount.ClientOrganization,
 		}
-		responses.RespondWithJSON(w, http.StatusOK, serviceAccountDetails)
-		return
+		return responses.JSON(w, http.StatusOK, serviceAccountDetails)
 	}
 
 	// query by clientId
 	dbServiceAccount, err := a.queries.GetServiceAccountByClientID(r.Context(), clientID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "service account not found")
-			return
+			return apperrors.NotFound("service account not found", nil)
 		}
 
-		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
-		)
-
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 	serviceAccountDetails := ServiceAccountDetails{
 		AccountID:          dbServiceAccount.AccountID,
@@ -697,7 +587,7 @@ func (a *AdminHandler) GetServiceAccounts(w http.ResponseWriter, r *http.Request
 		ClientContactEmail: dbServiceAccount.ClientContactEmail,
 		ClientOrganization: dbServiceAccount.ClientOrganization,
 	}
-	responses.RespondWithJSON(w, http.StatusOK, serviceAccountDetails)
+	return responses.JSON(w, http.StatusOK, serviceAccountDetails)
 }
 
 // Password reset link generation types
@@ -725,87 +615,76 @@ type GeneratePasswordResetLinkResponse struct {
 //	@Param			user_id	path		string	true	"User Account ID"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
 //	@Success		200		{object}	handlers.GeneratePasswordResetLinkResponse
-//	@Failure		400		{object}	responses.ErrorResponse
-//	@Failure		401		{object}	responses.ErrorResponse	"Unauthorized"
-//	@Failure		403		{object}	responses.ErrorResponse	"Forbidden - admin role required"
-//	@Failure		404		{object}	responses.ErrorResponse	"User not found"
+//	@Failure		400		{object}	responses.ErrorResponse	"invalid_url_param"
+//	@Failure		401		{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		403		{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		404		{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500		{object}	responses.ErrorResponse	"database_error | internal_error"
 //
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/admin/users/{user_id}/generate-password-reset-link [post]
 //
 //	this handler must use the RequireRole (isnadmin/siteadmin) middleware
-func (a *AdminHandler) GeneratePasswordResetLink(w http.ResponseWriter, r *http.Request) {
+func (a *AdminHandler) GeneratePasswordResetLink(w http.ResponseWriter, r *http.Request) error {
 
 	// Get account ID from context (set by middleware)
 	accountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "account ID not found in context")
-		return
+		return apperrors.InternalError("account ID not found in context", nil)
 	}
 
 	// verify the account generating the request is an admin
 	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "could not get claims from context")
-		return
+		return apperrors.InternalError("could not get claims from context", nil)
 	}
 
 	if claims.Role != "siteadmin" && claims.Role != "isnadmin" {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "you do not have permission to generate password reset links")
-		return
+		return apperrors.Forbidden("you do not have permission to generate password reset links", nil)
 	}
 
 	// Get user ID from URL parameter
 	tagetUserIDStr := r.PathValue("user_id")
 	if tagetUserIDStr == "" {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "user_id parameter is required")
-		return
+		return apperrors.InvalidURLParam("user_id parameter is required", nil)
 	}
 
 	tagetUserID, err := uuid.Parse(tagetUserIDStr)
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam, "invalid user_id format")
-		return
+		return apperrors.InvalidURLParam("invalid user_id format", nil)
 	}
 
 	// Verify targetUser exists
 	targetUser, err := a.queries.GetUserByID(r.Context(), tagetUserID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			responses.RespondWithError(w, r, http.StatusNotFound, apperrors.ErrCodeResourceNotFound, "user not found")
-			return
+			return apperrors.NotFound("user not found", nil)
 		}
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("user_id", tagetUserID.String()),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// admins can only update members
 	if claims.Role == "isnadmin" && targetUser.UserRole != "member" {
-		responses.RespondWithError(w, r, http.StatusForbidden, apperrors.ErrCodeForbidden, "ISN admins cannot generate password reset for other admins")
-		return
+		return apperrors.Forbidden("ISN admins cannot generate password reset for other admins", nil)
 	}
 
 	// Delete any existing password reset tokens for this user (following service account pattern)
 	_, err = a.queries.DeletePasswordResetTokensForUser(r.Context(), tagetUserID)
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("user_id", tagetUserID.String()),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 	id, err := uuid.NewV7()
 	if err != nil {
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeInternalError, "internal error")
-		return
+		return apperrors.InternalError("internal error", nil)
 
 	}
 	// Create password reset token record
@@ -818,12 +697,10 @@ func (a *AdminHandler) GeneratePasswordResetLink(w http.ResponseWriter, r *http.
 	})
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
-			slog.String("error", err.Error()),
 			slog.String("user_id", tagetUserID.String()),
 		)
 
-		responses.RespondWithError(w, r, http.StatusInternalServerError, apperrors.ErrCodeDatabaseError, "database error")
-		return
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	// Generate the one-time password reset URL using forwarded headers
@@ -848,5 +725,5 @@ func (a *AdminHandler) GeneratePasswordResetLink(w http.ResponseWriter, r *http.
 		ExpiresIn: int(signalsd.PasswordResetExpiry.Seconds()),
 	}
 
-	responses.RespondWithJSON(w, http.StatusOK, response)
+	return responses.JSON(w, http.StatusOK, response)
 }

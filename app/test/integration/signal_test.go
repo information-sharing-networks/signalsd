@@ -997,7 +997,7 @@ func TestSignalSearch(t *testing.T) {
 				}
 
 				// Verify error response only contains expected fields
-				expectedFields := map[string]bool{"error_code": true, "message": true}
+				expectedFields := map[string]bool{"error_code": true, "message": true, "request_id": true}
 				for field := range errorResponse {
 					if !expectedFields[field] {
 						t.Errorf("Unexpected field '%s' in error response - potential data leakage. Response: %+v", field, errorResponse)

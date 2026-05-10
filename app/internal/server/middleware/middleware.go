@@ -69,8 +69,11 @@ func RequestSizeLimit(maxBytes int64) func(http.Handler) http.Handler {
 				)
 
 				errorMsg := fmt.Sprintf("Request body exceeds maximum size of %d bytes", maxBytes)
-				responses.RespondWithError(w, r, 413, // Request Entity Too Large
-					apperrors.ErrCodeRequestTooLarge, errorMsg)
+				responses.RenderError(w, r, &apperrors.HTTPError{
+					Status:  http.StatusRequestEntityTooLarge,
+					Code:    apperrors.ErrCodeRequestTooLarge,
+					Message: errorMsg,
+				})
 				return
 			}
 
@@ -109,8 +112,11 @@ func RateLimit(requestsPerSecond int32, burst int32) func(http.Handler) http.Han
 					slog.String("remote_addr", r.RemoteAddr),
 				)
 
-				responses.RespondWithError(w, r, http.StatusTooManyRequests,
-					apperrors.ErrCodeRateLimitExceeded, "Rate limit exceeded")
+				responses.RenderError(w, r, &apperrors.HTTPError{
+					Status:  http.StatusTooManyRequests,
+					Code:    apperrors.ErrCodeRateLimitExceeded,
+					Message: "Rate limit exceeded",
+				})
 				return
 			}
 			next.ServeHTTP(w, r)
