@@ -31,7 +31,7 @@ func (s *Server) APISignalTypeSlugs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	signalTypes, err := s.apiClient.GetSignalTypes(accessTokenDetails.AccessToken)
+	signalTypes, err := s.apiClient.GetSignalTypes(r.Context(), accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get signal types", slog.String("error", err.Error()))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -80,7 +80,7 @@ func (s *Server) APISignalTypeVersions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	signalTypes, err := s.apiClient.GetSignalTypes(accessTokenDetails.AccessToken)
+	signalTypes, err := s.apiClient.GetSignalTypes(r.Context(), accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get signal types", slog.String("error", err.Error()))
 		w.WriteHeader(http.StatusInternalServerError)

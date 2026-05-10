@@ -4,6 +4,7 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -25,15 +26,16 @@ type ServiceAccount struct {
 }
 
 // GetServiceAccounts returns all service accounts, sorted by client organisation name.
-func (c *Client) GetServiceAccounts(accessToken string) ([]ServiceAccount, error) {
+func (c *Client) GetServiceAccounts(ctx context.Context, accessToken string) ([]ServiceAccount, error) {
 	url := fmt.Sprintf("%s/api/admin/service-accounts", c.baseURL)
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, NewClientInternalError(err, "creating service account request")
 	}
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+	setRequestID(req, ctx)
 
 	res, err := c.httpClient.Do(req)
 	if err != nil {
@@ -76,7 +78,7 @@ type CreateServiceAccountResponse struct {
 	ExpiresIn int       `json:"expires_in" example:"172800"`
 }
 
-func (c *Client) CreateServiceAccount(accessToken string, req CreateServiceAccountRequest) (*CreateServiceAccountResponse, error) {
+func (c *Client) CreateServiceAccount(ctx context.Context, accessToken string, req CreateServiceAccountRequest) (*CreateServiceAccountResponse, error) {
 	url := fmt.Sprintf("%s/api/auth/service-accounts/register", c.baseURL)
 
 	jsonData, err := json.Marshal(req)
@@ -84,13 +86,14 @@ func (c *Client) CreateServiceAccount(accessToken string, req CreateServiceAccou
 		return nil, NewClientInternalError(err, "marshaling create service json ")
 	}
 
-	httpReq, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, NewClientInternalError(err, "creating service account request")
 	}
 
 	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 	httpReq.Header.Set("Content-type", "application/json")
+	setRequestID(httpReq, ctx)
 
 	res, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -124,7 +127,7 @@ type ReissueServiceAccountResponse struct {
 }
 
 // ReissueServiceAccountCredentials reissues credentials for an existing service account
-func (c *Client) ReissueServiceAccountCredentials(accessToken string, reissueServiceAccountRequest ReissueServiceAccountRequest) (*ReissueServiceAccountResponse, error) {
+func (c *Client) ReissueServiceAccountCredentials(ctx context.Context, accessToken string, reissueServiceAccountRequest ReissueServiceAccountRequest) (*ReissueServiceAccountResponse, error) {
 	url := fmt.Sprintf("%s/api/auth/service-accounts/reissue-credentials", c.baseURL)
 
 	jsonData, err := json.Marshal(reissueServiceAccountRequest)
@@ -132,13 +135,14 @@ func (c *Client) ReissueServiceAccountCredentials(accessToken string, reissueSer
 		return nil, NewClientInternalError(err, "marshaling reissue service account request")
 	}
 
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, NewClientInternalError(err, "creating reissue service account request")
 	}
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 	req.Header.Set("Content-Type", "application/json")
+	setRequestID(req, ctx)
 
 	res, err := c.httpClient.Do(req)
 	if err != nil {
@@ -165,18 +169,18 @@ type ServiceAccountLookupResponse struct {
 
 // LookupServiceAccountByClientID looks up a service account by client ID using the admin endpoint
 // Note: This requires admin permissions
-func (c *Client) LookupServiceAccountByClientID(accessToken, clientID string) (*ServiceAccountLookupResponse, error) {
+func (c *Client) LookupServiceAccountByClientID(ctx context.Context, accessToken, clientID string) (*ServiceAccountLookupResponse, error) {
 	// Use the admin service accounts endpoint to get all service accounts, then filter by client_id
-	// This is similar to how the user lookup works but for service accounts
 
 	url := fmt.Sprintf("%s/api/admin/service-accounts?client_id=%s", c.baseURL, clientID)
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, NewClientInternalError(err, "creating service account lookup request")
 	}
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+	setRequestID(req, ctx)
 
 	res, err := c.httpClient.Do(req)
 	if err != nil {
@@ -195,7 +199,6 @@ func (c *Client) LookupServiceAccountByClientID(accessToken, clientID string) (*
 		return nil, NewClientApiError(res)
 	}
 
-	// Parse the service accounts list response
 	var serviceAccount ServiceAccountLookupResponse
 
 	if err := json.NewDecoder(res.Body).Decode(&serviceAccount); err != nil {

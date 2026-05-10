@@ -68,7 +68,7 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
 	// Authenticate with signalsd API using the client
-	accessTokenDetails, refreshTokenCookie, clientError := s.apiClient.Login(email, password)
+	accessTokenDetails, refreshTokenCookie, clientError := s.apiClient.Login(r.Context(), email, password)
 	if clientError != nil {
 		reqLogger.Error("Authentication failed", slog.String("error", clientError.Error()))
 
@@ -138,7 +138,7 @@ func (s *Server) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Register user with signalsd API
-	err := s.apiClient.RegisterUser(email, password)
+	err := s.apiClient.RegisterUser(r.Context(), email, password)
 	if err != nil {
 		reqLogger.Error("Registration failed", slog.String("error", err.Error()))
 		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)

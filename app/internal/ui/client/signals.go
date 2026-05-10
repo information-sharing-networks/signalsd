@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -56,7 +57,7 @@ type SearchSignalWithCorrelationsAndVersions struct {
 type SignalSearchResponse []SearchSignalWithCorrelationsAndVersions
 
 // SearchSignals use the signalsd API to search for signals
-func (c *Client) SearchSignals(accessToken string, params SignalSearchParams, visibility string) (*SignalSearchResponse, error) {
+func (c *Client) SearchSignals(ctx context.Context, accessToken string, params SignalSearchParams, visibility string) (*SignalSearchResponse, error) {
 	// Build URL based on ISN visibility (public ISNs use /api/public/, private use /api/)
 	var url string
 	if visibility == "public" {
@@ -67,7 +68,7 @@ func (c *Client) SearchSignals(accessToken string, params SignalSearchParams, vi
 			c.baseURL, params.IsnSlug, params.SignalTypeSlug, params.SemVer)
 	}
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, NewClientInternalError(err, "creating search request")
 	}
@@ -104,6 +105,7 @@ func (c *Client) SearchSignals(accessToken string, params SignalSearchParams, vi
 	if visibility == "private" {
 		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 	}
+	setRequestID(req, ctx)
 
 	res, err := c.httpClient.Do(req)
 	if err != nil {

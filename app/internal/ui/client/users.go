@@ -2,6 +2,7 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -20,15 +21,16 @@ type User struct {
 }
 
 // GetUsers returns all user accounts
-func (c *Client) GetUsers(accessToken string) ([]User, error) {
+func (c *Client) GetUsers(ctx context.Context, accessToken string) ([]User, error) {
 	url := fmt.Sprintf("%s/api/admin/users", c.baseURL)
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, NewClientInternalError(err, "creating get users request")
 	}
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+	setRequestID(req, ctx)
 
 	res, err := c.httpClient.Do(req)
 	if err != nil {
@@ -49,7 +51,7 @@ func (c *Client) GetUsers(accessToken string) ([]User, error) {
 }
 
 // RegisterUser creates a new user account using the signalsd API
-func (c *Client) RegisterUser(email, password string) error {
+func (c *Client) RegisterUser(ctx context.Context, email, password string) error {
 	registerReq := struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
@@ -64,12 +66,13 @@ func (c *Client) RegisterUser(email, password string) error {
 	}
 
 	url := fmt.Sprintf("%s/api/auth/register", c.baseURL)
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return NewClientInternalError(err, "creating registration request")
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+	setRequestID(req, ctx)
 
 	res, err := c.httpClient.Do(req)
 	if err != nil {
@@ -91,15 +94,16 @@ type UserLookupResponse struct {
 
 // LookupUserByEmail looks up a user by email address using the admin endpoint
 // Note: This requires admin permissions
-func (c *Client) LookupUserByEmail(accessToken, email string) (*UserLookupResponse, error) {
+func (c *Client) LookupUserByEmail(ctx context.Context, accessToken, email string) (*UserLookupResponse, error) {
 	url := fmt.Sprintf("%s/api/admin/users?email=%s", c.baseURL, email)
 
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, NewClientInternalError(err, "creating user lookup request")
 	}
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+	setRequestID(req, ctx)
 
 	res, err := c.httpClient.Do(req)
 	if err != nil {
@@ -136,22 +140,23 @@ type GeneratePasswordResetLinkResponse struct {
 }
 
 // GeneratePasswordResetLink generates a password reset link for the user associated witht the supplied email
-func (c *Client) GeneratePasswordResetLink(accessToken, email string) (*GeneratePasswordResetLinkResponse, error) {
+func (c *Client) GeneratePasswordResetLink(ctx context.Context, accessToken, email string) (*GeneratePasswordResetLinkResponse, error) {
 
-	user, err := c.LookupUserByEmail(accessToken, email)
+	user, err := c.LookupUserByEmail(ctx, accessToken, email)
 	if err != nil {
 		return nil, NewClientInternalError(err, "looking up user by email")
 	}
 
 	url := fmt.Sprintf("%s/api/admin/users/%s/generate-password-reset-link", c.baseURL, user.AccountID)
 
-	req, err := http.NewRequest("POST", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, nil)
 	if err != nil {
 		return nil, NewClientInternalError(err, "creating generate password reset link request")
 	}
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 	req.Header.Set("Content-Type", "application/json")
+	setRequestID(req, ctx)
 
 	res, err := c.httpClient.Do(req)
 	if err != nil {
@@ -172,20 +177,21 @@ func (c *Client) GeneratePasswordResetLink(accessToken, email string) (*Generate
 }
 
 // GrantAdminRole grants admin role to a user account
-func (c *Client) GrantAdminRole(accessToken, userEmail string) error {
-	user, err := c.LookupUserByEmail(accessToken, userEmail)
+func (c *Client) GrantAdminRole(ctx context.Context, accessToken, userEmail string) error {
+	user, err := c.LookupUserByEmail(ctx, accessToken, userEmail)
 	if err != nil {
 		return err
 	}
 
 	url := fmt.Sprintf("%s/api/admin/accounts/%s/isn-admin-role", c.baseURL, user.AccountID)
 
-	httpReq, err := http.NewRequest("PUT", url, nil)
+	httpReq, err := http.NewRequestWithContext(ctx, "PUT", url, nil)
 	if err != nil {
 		return NewClientInternalError(err, "creating grant admin role request")
 	}
 
 	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+	setRequestID(httpReq, ctx)
 
 	res, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -201,20 +207,21 @@ func (c *Client) GrantAdminRole(accessToken, userEmail string) error {
 }
 
 // RevokeAdminRole revokes ISN admin role from a user account
-func (c *Client) RevokeAdminRole(accessToken, userEmail string) error {
-	user, err := c.LookupUserByEmail(accessToken, userEmail)
+func (c *Client) RevokeAdminRole(ctx context.Context, accessToken, userEmail string) error {
+	user, err := c.LookupUserByEmail(ctx, accessToken, userEmail)
 	if err != nil {
 		return err
 	}
 
 	url := fmt.Sprintf("%s/api/admin/accounts/%s/isn-admin-role", c.baseURL, user.AccountID)
 
-	httpReq, err := http.NewRequest("DELETE", url, nil)
+	httpReq, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
 	if err != nil {
 		return NewClientInternalError(err, "creating revoke admin role request")
 	}
 
 	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+	setRequestID(httpReq, ctx)
 
 	res, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -230,20 +237,21 @@ func (c *Client) RevokeAdminRole(accessToken, userEmail string) error {
 }
 
 // GrantSiteAdminRole grants site admin role to a user account
-func (c *Client) GrantSiteAdminRole(accessToken, userEmail string) error {
-	user, err := c.LookupUserByEmail(accessToken, userEmail)
+func (c *Client) GrantSiteAdminRole(ctx context.Context, accessToken, userEmail string) error {
+	user, err := c.LookupUserByEmail(ctx, accessToken, userEmail)
 	if err != nil {
 		return err
 	}
 
 	url := fmt.Sprintf("%s/api/admin/accounts/%s/site-admin-role", c.baseURL, user.AccountID)
 
-	httpReq, err := http.NewRequest("PUT", url, nil)
+	httpReq, err := http.NewRequestWithContext(ctx, "PUT", url, nil)
 	if err != nil {
 		return NewClientInternalError(err, "creating grant site admin role request")
 	}
 
 	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+	setRequestID(httpReq, ctx)
 
 	res, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -259,20 +267,21 @@ func (c *Client) GrantSiteAdminRole(accessToken, userEmail string) error {
 }
 
 // RevokeSiteAdminRole revokes site admin role from a user account
-func (c *Client) RevokeSiteAdminRole(accessToken, userEmail string) error {
-	user, err := c.LookupUserByEmail(accessToken, userEmail)
+func (c *Client) RevokeSiteAdminRole(ctx context.Context, accessToken, userEmail string) error {
+	user, err := c.LookupUserByEmail(ctx, accessToken, userEmail)
 	if err != nil {
 		return err
 	}
 
 	url := fmt.Sprintf("%s/api/admin/accounts/%s/site-admin-role", c.baseURL, user.AccountID)
 
-	httpReq, err := http.NewRequest("DELETE", url, nil)
+	httpReq, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
 	if err != nil {
 		return NewClientInternalError(err, "creating revoke site admin role request")
 	}
 
 	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+	setRequestID(httpReq, ctx)
 
 	res, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -288,15 +297,16 @@ func (c *Client) RevokeSiteAdminRole(accessToken, userEmail string) error {
 }
 
 // DisableAccount disables an account
-func (c *Client) DisableAccount(accessToken, accountID string) error {
+func (c *Client) DisableAccount(ctx context.Context, accessToken, accountID string) error {
 	url := fmt.Sprintf("%s/api/admin/accounts/%s/disable", c.baseURL, accountID)
 
-	httpReq, err := http.NewRequest("POST", url, nil)
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, nil)
 	if err != nil {
 		return NewClientInternalError(err, "creating disable account request")
 	}
 
 	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+	setRequestID(httpReq, ctx)
 
 	res, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -312,15 +322,16 @@ func (c *Client) DisableAccount(accessToken, accountID string) error {
 }
 
 // EnableAccount enables an account
-func (c *Client) EnableAccount(accessToken, accountID string) error {
+func (c *Client) EnableAccount(ctx context.Context, accessToken, accountID string) error {
 	url := fmt.Sprintf("%s/api/admin/accounts/%s/enable", c.baseURL, accountID)
 
-	httpReq, err := http.NewRequest("POST", url, nil)
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, nil)
 	if err != nil {
 		return NewClientInternalError(err, "creating enable account request")
 	}
 
 	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+	setRequestID(httpReq, ctx)
 
 	res, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -336,7 +347,7 @@ func (c *Client) EnableAccount(accessToken, accountID string) error {
 }
 
 // UpdatePassword updates the user's password (self-service)
-func (c *Client) UpdatePassword(accessToken, currentPassword, newPassword string) error {
+func (c *Client) UpdatePassword(ctx context.Context, accessToken, currentPassword, newPassword string) error {
 	updatePasswordReq := struct {
 		CurrentPassword string `json:"current_password"`
 		NewPassword     string `json:"new-password"`
@@ -352,13 +363,14 @@ func (c *Client) UpdatePassword(accessToken, currentPassword, newPassword string
 
 	url := fmt.Sprintf("%s/api/auth/password/reset", c.baseURL)
 
-	httpReq, err := http.NewRequest("PUT", url, bytes.NewBuffer(jsonData))
+	httpReq, err := http.NewRequestWithContext(ctx, "PUT", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return NewClientInternalError(err, "creating update password request")
 	}
 
 	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 	httpReq.Header.Set("Content-Type", "application/json")
+	setRequestID(httpReq, ctx)
 
 	res, err := c.httpClient.Do(httpReq)
 	if err != nil {

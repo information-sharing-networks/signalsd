@@ -61,6 +61,21 @@
 //
 // When a handler needs data from the backend service it should use the UI client package to call the signalsd API.
 //
+// # Request IDs and Logging
+//
+// Every inbound HTTP request is assigned a request ID by chi's RequestID middleware.
+// The ID appears in the final request log as the request_id field.
+//
+// When a handler calls the signalsd API via the client package, it must pass r.Context()
+// as the first argument. The client forwards the request ID as an X-Request-Id header on
+// the outbound call. Chi's RequestID middleware on the receiving end reuses the header value
+// rather than generating a new ID, so both the UI and API log entries share the same
+// request_id and can be correlated in the logs.
+//
+// To add fields to the final request log from within a handler, use [logger.ContextWithLogAttrs].
+// The [auth.AddAccountIDToLogContext] middleware already does this for account_id on all
+// authenticated routes — do not add account_id manually in handlers on those routes.
+//
 // # Inline JS
 //
 // Note the Content Security Policy on this app blocks inline javascripts and stylesheets —

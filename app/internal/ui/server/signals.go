@@ -87,7 +87,7 @@ func (s *Server) GetLatestCorrelatedSignals(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Perform search using ISN visibility to determine endpoint
-	searchResp, err := s.apiClient.SearchSignals(accessTokenDetails.AccessToken, params, "private")
+	searchResp, err := s.apiClient.SearchSignals(r.Context(), accessTokenDetails.AccessToken, params, "private")
 	if err != nil {
 		reqLogger.Error("Signal search failed", slog.String("error", err.Error()))
 		return
@@ -161,7 +161,7 @@ func (s *Server) SearchSignals(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Perform search using ISN visibility to determine endpoint
-	searchResp, err := s.apiClient.SearchSignals(accessTokenDetails.AccessToken, params, isnPerms[params.IsnSlug].Visibility)
+	searchResp, err := s.apiClient.SearchSignals(r.Context(), accessTokenDetails.AccessToken, params, isnPerms[params.IsnSlug].Visibility)
 	if err != nil {
 		reqLogger.Error("Signal search failed", slog.String("error", err.Error()))
 

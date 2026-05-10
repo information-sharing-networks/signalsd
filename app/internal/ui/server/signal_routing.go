@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -30,7 +31,7 @@ func (s *Server) ManageSignalRoutingPage(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Signal types are site-level — load all registered types (deduplicated by slug).
-	signalTypes, err := s.apiClient.GetSignalTypes(accessTokenDetails.AccessToken)
+	signalTypes, err := s.apiClient.GetSignalTypes(r.Context(), accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("failed to get signal types", slog.String("error", err.Error()))
 		templ.Handler(templates.ErrorAlert("Failed to load signal types. Please try again.")).ServeHTTP(w, r)
@@ -50,8 +51,8 @@ func (s *Server) ManageSignalRoutingPage(w http.ResponseWriter, r *http.Request)
 }
 
 // loadIsnOptions fetches all active ISNs and converts them to IsnOption for template use.
-func (s *Server) loadIsnOptions(accessToken string) ([]types.IsnOption, error) {
-	isns, err := s.apiClient.GetIsns(accessToken, false)
+func (s *Server) loadIsnOptions(ctx context.Context, accessToken string) ([]types.IsnOption, error) {
+	isns, err := s.apiClient.GetIsns(ctx, accessToken, false)
 	if err != nil {
 		return nil, err
 	}
@@ -72,14 +73,14 @@ func (s *Server) renderRoutingForm(w http.ResponseWriter, r *http.Request, slug,
 		return
 	}
 
-	existing, err := s.apiClient.GetIsnRouting(accessTokenDetails.AccessToken, slug, semVer)
+	existing, err := s.apiClient.GetIsnRouting(r.Context(), accessTokenDetails.AccessToken, slug, semVer)
 	if err != nil {
 		reqLogger.Error("failed to load routing rules", slog.String("error", err.Error()))
 		templ.Handler(templates.ErrorAlert("Failed to load routing rules. Please try again.")).ServeHTTP(w, r)
 		return
 	}
 
-	isnOptions, err := s.loadIsnOptions(accessTokenDetails.AccessToken)
+	isnOptions, err := s.loadIsnOptions(r.Context(), accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("failed to load ISNs", slog.String("error", err.Error()))
 		templ.Handler(templates.ErrorAlert("Failed to load ISNs. Please try again.")).ServeHTTP(w, r)
@@ -87,7 +88,7 @@ func (s *Server) renderRoutingForm(w http.ResponseWriter, r *http.Request, slug,
 	}
 
 	var schemaURL, readmeURL string
-	signalTypes, err := s.apiClient.GetSignalTypes(accessTokenDetails.AccessToken)
+	signalTypes, err := s.apiClient.GetSignalTypes(r.Context(), accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("failed to load signal types", slog.String("error", err.Error()))
 		templ.Handler(templates.ErrorAlert("Failed to load signal type details. Please try again.")).ServeHTTP(w, r)
@@ -176,7 +177,7 @@ func (s *Server) SaveSignalRoutingConfig(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	result, err := s.apiClient.UpdateSignalRoutingConfig(accessTokenDetails.AccessToken, slug, semVer, client.UpdateSignalRoutingConfigRequest{
+	result, err := s.apiClient.UpdateSignalRoutingConfig(r.Context(), accessTokenDetails.AccessToken, slug, semVer, client.UpdateSignalRoutingConfigRequest{
 		RoutingField: routingField,
 		RoutingRules: routingRules,
 	})
@@ -216,7 +217,7 @@ func (s *Server) DeleteSignalRoutingConfig(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	if err := s.apiClient.DeleteSignalRoutingConfig(accessTokenDetails.AccessToken, slug, semVer); err != nil {
+	if err := s.apiClient.DeleteSignalRoutingConfig(r.Context(), accessTokenDetails.AccessToken, slug, semVer); err != nil {
 		reqLogger.Error("failed to delete routing rules", slog.String("error", err.Error()))
 		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)
 		return
@@ -279,7 +280,7 @@ func (s *Server) AddRoutingRow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	isnOptions, err := s.loadIsnOptions(accessTokenDetails.AccessToken)
+	isnOptions, err := s.loadIsnOptions(r.Context(), accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("failed to load ISNs", slog.String("error", err.Error()))
 		templ.Handler(templates.ErrorAlert("Failed to load ISNs. Please try again.")).ServeHTTP(w, r)

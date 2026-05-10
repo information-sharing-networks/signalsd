@@ -4,6 +4,7 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -37,7 +38,7 @@ type UpdateIsnStatusRequest struct {
 }
 
 // CreateIsn creates a new ISN using the signalsd API
-func (c *Client) CreateIsn(accessToken string, req CreateIsnRequest) (*CreateIsnResponse, error) {
+func (c *Client) CreateIsn(ctx context.Context, accessToken string, req CreateIsnRequest) (*CreateIsnResponse, error) {
 
 	url := fmt.Sprintf("%s/api/isn", c.baseURL)
 
@@ -47,13 +48,14 @@ func (c *Client) CreateIsn(accessToken string, req CreateIsnRequest) (*CreateIsn
 		return nil, NewClientInternalError(err, "marshaling create isn request")
 	}
 
-	httpReq, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, NewClientInternalError(err, "create isn request")
 	}
 
 	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 	httpReq.Header.Set("Content-Type", "application/json")
+	setRequestID(httpReq, ctx)
 
 	res, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -74,19 +76,20 @@ func (c *Client) CreateIsn(accessToken string, req CreateIsnRequest) (*CreateIsn
 }
 
 // GetIsns fetches all ISNs for the Site, optionally including inactive ones
-func (c *Client) GetIsns(accessToken string, includeInactive bool) ([]IsnDetails, error) {
+func (c *Client) GetIsns(ctx context.Context, accessToken string, includeInactive bool) ([]IsnDetails, error) {
 	url := fmt.Sprintf("%s/api/isn", c.baseURL)
 
 	if includeInactive {
 		url += "?include_inactive=true"
 	}
 
-	httpReq, err := http.NewRequest("GET", url, nil)
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, NewClientInternalError(err, "creating get isns request")
 	}
 
 	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+	setRequestID(httpReq, ctx)
 
 	res, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -107,7 +110,7 @@ func (c *Client) GetIsns(accessToken string, includeInactive bool) ([]IsnDetails
 }
 
 // UpdateIsnStatus updates the is_in_use status of an ISN
-func (c *Client) UpdateIsnStatus(accessToken, isnSlug string, isInUse bool) error {
+func (c *Client) UpdateIsnStatus(ctx context.Context, accessToken, isnSlug string, isInUse bool) error {
 	url := fmt.Sprintf("%s/api/isn/%s", c.baseURL, isnSlug)
 
 	req := UpdateIsnStatusRequest{
@@ -119,13 +122,14 @@ func (c *Client) UpdateIsnStatus(accessToken, isnSlug string, isInUse bool) erro
 		return NewClientInternalError(err, "marshaling update isn status request")
 	}
 
-	httpReq, err := http.NewRequest("PUT", url, bytes.NewBuffer(jsonData))
+	httpReq, err := http.NewRequestWithContext(ctx, "PUT", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return NewClientInternalError(err, "creating update isn status request")
 	}
 
 	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 	httpReq.Header.Set("Content-Type", "application/json")
+	setRequestID(httpReq, ctx)
 
 	res, err := c.httpClient.Do(httpReq)
 	if err != nil {

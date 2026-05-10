@@ -39,7 +39,7 @@ func (s *Server) ManageIsnAccountsPage(w http.ResponseWriter, r *http.Request) {
 	isns := getIsnOptions(isnPerms, true, false)
 
 	// Fetch users for dropdown
-	rawUsers, err := s.apiClient.GetUsers(accessTokenDetails.AccessToken)
+	rawUsers, err := s.apiClient.GetUsers(r.Context(), accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get users list", slog.String("error", err.Error()))
 		templ.Handler(templates.ErrorAlert("Failed to load users. Please try again.")).ServeHTTP(w, r)
@@ -47,7 +47,7 @@ func (s *Server) ManageIsnAccountsPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch service accounts for dropdown
-	rawServiceAccounts, err := s.apiClient.GetServiceAccounts(accessTokenDetails.AccessToken)
+	rawServiceAccounts, err := s.apiClient.GetServiceAccounts(r.Context(), accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get service accounts list", slog.String("error", err.Error()))
 		templ.Handler(templates.ErrorAlert("Failed to load service accounts. Please try again.")).ServeHTTP(w, r)
@@ -110,7 +110,7 @@ func (s *Server) ManageIsnAccounts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call the API to add the account to the ISN
-	err := s.apiClient.UpdateIsnAccounts(accessTokenDetails.AccessToken, isnSlug, accountType, accountIdentifier, permission)
+	err := s.apiClient.UpdateIsnAccounts(r.Context(), accessTokenDetails.AccessToken, isnSlug, accountType, accountIdentifier, permission)
 	if err != nil {
 		reqLogger.Error("Failed to add account to ISN", slog.String("component", "templates.handleAddIsnAccount"), slog.String("error", err.Error()))
 		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)
@@ -154,7 +154,7 @@ func (s *Server) TransferOwnershipPage(w http.ResponseWriter, r *http.Request) {
 	isns := getIsnOptions(isnPerms, true, false)
 
 	// Fetch users for dropdown
-	rawUsers, err := s.apiClient.GetUsers(accessTokenDetails.AccessToken)
+	rawUsers, err := s.apiClient.GetUsers(r.Context(), accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get users list", slog.String("error", err.Error()))
 		templ.Handler(templates.ErrorAlert("Failed to load users. Please try again.")).ServeHTTP(w, r)
@@ -196,7 +196,7 @@ func (s *Server) TransferOwnership(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call the API to transfer ownership
-	err := s.apiClient.TransferIsnOwnership(accessTokenDetails.AccessToken, isnSlug, newOwnerEmail)
+	err := s.apiClient.TransferIsnOwnership(r.Context(), accessTokenDetails.AccessToken, isnSlug, newOwnerEmail)
 	if err != nil {
 		reqLogger.Error("Failed to transfer ISN ownership", slog.String("error", err.Error()))
 		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)

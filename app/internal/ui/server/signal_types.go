@@ -42,7 +42,7 @@ func (s *Server) RegisterNewSignalTypeSchemaPage(w http.ResponseWriter, r *http.
 	}
 
 	// Get all signal types
-	signalTypes, err := s.apiClient.GetSignalTypes(accessTokenDetails.AccessToken)
+	signalTypes, err := s.apiClient.GetSignalTypes(r.Context(), accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get signal types", slog.String("error", err.Error()))
 		templ.Handler(templates.ErrorAlert("Failed to load signal types. Please try again.")).ServeHTTP(w, r)
@@ -121,7 +121,7 @@ func (s *Server) CreateSignalType(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call the API to create the signal type
-	response, err := s.apiClient.CreateSignalType(accessTokenDetails.AccessToken, createReq)
+	response, err := s.apiClient.CreateSignalType(r.Context(), accessTokenDetails.AccessToken, createReq)
 	if err != nil {
 		reqLogger.Error("Failed to create signal type", slog.String("error", err.Error()))
 		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)
@@ -177,7 +177,7 @@ func (s *Server) RegisterNewSignalTypeSchema(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Call the API to create the new version
-	response, err := s.apiClient.RegisterNewSignalTypeSchema(accessTokenDetails.AccessToken, createReq)
+	response, err := s.apiClient.RegisterNewSignalTypeSchema(r.Context(), accessTokenDetails.AccessToken, createReq)
 	if err != nil {
 		reqLogger.Error("Failed to register new schema for signal type", slog.String("error", err.Error()))
 		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)
@@ -227,7 +227,7 @@ func (s *Server) AddSignalTypeToIsn(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call the API to add the signal type to the ISN
-	err := s.apiClient.AddSignalTypeToIsn(accessTokenDetails.AccessToken, isnSlug, associateReq)
+	err := s.apiClient.AddSignalTypeToIsn(r.Context(), accessTokenDetails.AccessToken, isnSlug, associateReq)
 	if err != nil {
 		reqLogger.Error("Failed to add signal type to the ISN", slog.String("error", err.Error()))
 		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)
@@ -347,7 +347,7 @@ func (s *Server) ManageIsnSignalTypesStatus(w http.ResponseWriter, r *http.Reque
 	}
 
 	// Call the API to update ISN signal type status
-	err := s.apiClient.UpdateIsnSignalTypeStatus(accessTokenDetails.AccessToken, isnSlug, signalTypeSlug, semVer, isInUse)
+	err := s.apiClient.UpdateIsnSignalTypeStatus(r.Context(), accessTokenDetails.AccessToken, isnSlug, signalTypeSlug, semVer, isInUse)
 	if err != nil {
 		reqLogger.Error("Failed to update ISN signal type status", slog.String("error", err.Error()))
 		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)
@@ -374,7 +374,7 @@ func (s *Server) ListSignalTypesPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch all signal types for the report
-	signalTypes, err := s.apiClient.GetSignalTypes(accessTokenDetails.AccessToken)
+	signalTypes, err := s.apiClient.GetSignalTypes(r.Context(), accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get signal types", slog.String("error", err.Error()))
 		templ.Handler(templates.ErrorAlert("Failed to load signal types. Please try again.")).ServeHTTP(w, r)

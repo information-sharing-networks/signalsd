@@ -2,6 +2,7 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -31,14 +32,15 @@ type SignalRoutingConfigResponse struct {
 
 // GetIsnRouting fetches the routing rule for a signal type version.
 // Returns nil, nil when no routing rule exists (404).
-func (c *Client) GetIsnRouting(accessToken, slug, semVer string) (*SignalRoutingConfigResponse, error) {
+func (c *Client) GetIsnRouting(ctx context.Context, accessToken, slug, semVer string) (*SignalRoutingConfigResponse, error) {
 	url := fmt.Sprintf("%s/api/admin/signal-types/%s/v%s/routes", c.baseURL, slug, semVer)
 
-	httpReq, err := http.NewRequest("GET", url, nil)
+	httpReq, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, NewClientInternalError(err, "creating get ISN routing request")
 	}
 	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+	setRequestID(httpReq, ctx)
 
 	res, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -61,7 +63,7 @@ func (c *Client) GetIsnRouting(accessToken, slug, semVer string) (*SignalRouting
 }
 
 // UpdateSignalRoutingConfig replaces the routing rule and all routes for a signal type version.
-func (c *Client) UpdateSignalRoutingConfig(accessToken, slug, semVer string, req UpdateSignalRoutingConfigRequest) (*SignalRoutingConfigResponse, error) {
+func (c *Client) UpdateSignalRoutingConfig(ctx context.Context, accessToken, slug, semVer string, req UpdateSignalRoutingConfigRequest) (*SignalRoutingConfigResponse, error) {
 	url := fmt.Sprintf("%s/api/admin/signal-types/%s/v%s/routes", c.baseURL, slug, semVer)
 
 	jsonData, err := json.Marshal(req)
@@ -69,12 +71,13 @@ func (c *Client) UpdateSignalRoutingConfig(accessToken, slug, semVer string, req
 		return nil, NewClientInternalError(err, "marshaling put ISN routing request")
 	}
 
-	httpReq, err := http.NewRequest("PUT", url, bytes.NewBuffer(jsonData))
+	httpReq, err := http.NewRequestWithContext(ctx, "PUT", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, NewClientInternalError(err, "creating put ISN routing request")
 	}
 	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 	httpReq.Header.Set("Content-Type", "application/json")
+	setRequestID(httpReq, ctx)
 
 	res, err := c.httpClient.Do(httpReq)
 	if err != nil {
@@ -94,14 +97,15 @@ func (c *Client) UpdateSignalRoutingConfig(accessToken, slug, semVer string, req
 }
 
 // DeleteSignalRoutingConfig removes all routing rules for a signal type version.
-func (c *Client) DeleteSignalRoutingConfig(accessToken, slug, semVer string) error {
+func (c *Client) DeleteSignalRoutingConfig(ctx context.Context, accessToken, slug, semVer string) error {
 	url := fmt.Sprintf("%s/api/admin/signal-types/%s/v%s/routes", c.baseURL, slug, semVer)
 
-	httpReq, err := http.NewRequest("DELETE", url, nil)
+	httpReq, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
 	if err != nil {
 		return NewClientInternalError(err, "creating delete ISN routing request")
 	}
 	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+	setRequestID(httpReq, ctx)
 
 	res, err := c.httpClient.Do(httpReq)
 	if err != nil {

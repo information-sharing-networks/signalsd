@@ -4,6 +4,7 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -16,18 +17,18 @@ type TransferIsnOwnershipRequest struct {
 
 // UpdateIsnAccounts grants or revokes permissions to access an ISN
 // permission should be "read", "write", or "read-write"
-func (c *Client) UpdateIsnAccounts(accessToken, isnSlug, accountType, accountIdentifier, permission string) error {
+func (c *Client) UpdateIsnAccounts(ctx context.Context, accessToken, isnSlug, accountType, accountIdentifier, permission string) error {
 	var accountID string
 
 	switch accountType {
 	case "user":
-		user, err := c.LookupUserByEmail(accessToken, accountIdentifier)
+		user, err := c.LookupUserByEmail(ctx, accessToken, accountIdentifier)
 		if err != nil {
 			return err
 		}
 		accountID = user.AccountID
 	case "service-account":
-		serviceAccount, err := c.LookupServiceAccountByClientID(accessToken, accountIdentifier)
+		serviceAccount, err := c.LookupServiceAccountByClientID(ctx, accessToken, accountIdentifier)
 		if err != nil {
 			return err
 		}
@@ -53,13 +54,14 @@ func (c *Client) UpdateIsnAccounts(accessToken, isnSlug, accountType, accountIde
 		return NewClientInternalError(err, "marshaling add account request")
 	}
 
-	req, err := http.NewRequest("PUT", url, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, "PUT", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return NewClientInternalError(err, "creating add account request")
 	}
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 	req.Header.Set("Content-Type", "application/json")
+	setRequestID(req, ctx)
 
 	res, err := c.httpClient.Do(req)
 	if err != nil {
@@ -75,9 +77,9 @@ func (c *Client) UpdateIsnAccounts(accessToken, isnSlug, accountType, accountIde
 }
 
 // TransferIsnOwnership transfers ownership of an ISN to another admin account
-func (c *Client) TransferIsnOwnership(accessToken, isnSlug, newOwnerEmail string) error {
+func (c *Client) TransferIsnOwnership(ctx context.Context, accessToken, isnSlug, newOwnerEmail string) error {
 	// First, lookup the new owner by email to get their account ID
-	user, err := c.LookupUserByEmail(accessToken, newOwnerEmail)
+	user, err := c.LookupUserByEmail(ctx, accessToken, newOwnerEmail)
 	if err != nil {
 		return err
 	}
@@ -93,13 +95,14 @@ func (c *Client) TransferIsnOwnership(accessToken, isnSlug, newOwnerEmail string
 		return NewClientInternalError(err, "marshaling transfer ownership request")
 	}
 
-	httpReq, err := http.NewRequest("PUT", url, bytes.NewBuffer(jsonData))
+	httpReq, err := http.NewRequestWithContext(ctx, "PUT", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return NewClientInternalError(err, "creating transfer ownership request")
 	}
 
 	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 	httpReq.Header.Set("Content-Type", "application/json")
+	setRequestID(httpReq, ctx)
 
 	res, err := c.httpClient.Do(httpReq)
 	if err != nil {

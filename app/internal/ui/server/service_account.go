@@ -37,7 +37,7 @@ func (s *Server) ReissueServiceAccountCredentialsPage(w http.ResponseWriter, r *
 	}
 
 	// Get service accounts from API
-	serviceAccounts, err := s.apiClient.GetServiceAccounts(accessTokenDetails.AccessToken)
+	serviceAccounts, err := s.apiClient.GetServiceAccounts(r.Context(), accessTokenDetails.AccessToken)
 	if err != nil {
 		s.renderErrorAlert(w, r, "Failed to load service accounts. Please try again.", "Failed to get service accounts: "+err.Error())
 		return
@@ -80,7 +80,7 @@ func (s *Server) CreateServiceAccount(w http.ResponseWriter, r *http.Request) {
 		ClientContactEmail: email,
 	}
 
-	res, err := s.apiClient.CreateServiceAccount(accessTokenDetails.AccessToken, req)
+	res, err := s.apiClient.CreateServiceAccount(r.Context(), accessTokenDetails.AccessToken, req)
 	if err != nil {
 		reqLogger.Error("Failed to create service account", slog.String("error", err.Error()))
 		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)
@@ -120,7 +120,7 @@ func (s *Server) ReissueServiceAccountCredentials(w http.ResponseWriter, r *http
 		ClientID: clientID,
 	}
 
-	res, err := s.apiClient.ReissueServiceAccountCredentials(accessTokenDetails.AccessToken, req)
+	res, err := s.apiClient.ReissueServiceAccountCredentials(r.Context(), accessTokenDetails.AccessToken, req)
 	if err != nil {
 		reqLogger.Error("Failed to reissue service account credentials", slog.String("error", err.Error()))
 		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)

@@ -2,6 +2,7 @@ package client
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -12,7 +13,7 @@ import (
 )
 
 // Login authenticates a user with the signalsd API
-func (c *Client) Login(email, password string) (*types.AccessTokenDetails, *http.Cookie, error) {
+func (c *Client) Login(ctx context.Context, email, password string) (*types.AccessTokenDetails, *http.Cookie, error) {
 	loginReq := auth.LoginRequest{
 		Email:    email,
 		Password: password,
@@ -24,12 +25,13 @@ func (c *Client) Login(email, password string) (*types.AccessTokenDetails, *http
 	}
 
 	url := fmt.Sprintf("%s/api/auth/login", c.baseURL)
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, nil, NewClientInternalError(err, "creating login request")
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+	setRequestID(req, ctx)
 
 	res, err := c.httpClient.Do(req)
 	if err != nil {

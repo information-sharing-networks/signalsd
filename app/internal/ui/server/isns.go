@@ -63,7 +63,7 @@ func (s *Server) CreateIsn(w http.ResponseWriter, r *http.Request) {
 		Visibility: visibility,
 	}
 
-	res, err := s.apiClient.CreateIsn(accessTokenDetails.AccessToken, req)
+	res, err := s.apiClient.CreateIsn(r.Context(), accessTokenDetails.AccessToken, req)
 	if err != nil {
 		reqLogger.Error("Failed to create ISN", slog.String("error", err.Error()))
 		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)
@@ -141,7 +141,7 @@ func (s *Server) ManageIsnStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call the API to update ISN status
-	err := s.apiClient.UpdateIsnStatus(accessTokenDetails.AccessToken, isnSlug, isInUse)
+	err := s.apiClient.UpdateIsnStatus(r.Context(), accessTokenDetails.AccessToken, isnSlug, isInUse)
 	if err != nil {
 		reqLogger.Error("Failed to update ISN status", slog.String("error", err.Error()))
 		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)

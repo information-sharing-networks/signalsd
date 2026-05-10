@@ -67,7 +67,7 @@ func (s *Server) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Call the API to update password
-	err := s.apiClient.UpdatePassword(accessTokenDetails.AccessToken, currentPassword, newPassword)
+	err := s.apiClient.UpdatePassword(r.Context(), accessTokenDetails.AccessToken, currentPassword, newPassword)
 	if err != nil {
 		reqLogger.Error("Failed to update password", slog.String("error", err.Error()))
 		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)
@@ -92,7 +92,7 @@ func (s *Server) GeneratePasswordResetLinkPage(w http.ResponseWriter, r *http.Re
 	}
 
 	// Get users from API
-	rawUsers, err := s.apiClient.GetUsers(accessTokenDetails.AccessToken)
+	rawUsers, err := s.apiClient.GetUsers(r.Context(), accessTokenDetails.AccessToken)
 	if err != nil {
 		s.renderErrorAlert(w, r, "Failed to load users. Please try again.", "Failed to get users: "+err.Error())
 		return
@@ -137,7 +137,7 @@ func (s *Server) GeneratePasswordResetLink(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	res, err := s.apiClient.GeneratePasswordResetLink(accessTokenDetails.AccessToken, email)
+	res, err := s.apiClient.GeneratePasswordResetLink(r.Context(), accessTokenDetails.AccessToken, email)
 	if err != nil {
 		reqLogger.Error("Failed to generate password reset link for user", slog.String("error", err.Error()))
 		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)
@@ -172,7 +172,7 @@ func (s *Server) ManageIsnAdminRolesPage(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Fetch users for dropdown
-	rawUsers, err := s.apiClient.GetUsers(accessTokenDetails.AccessToken)
+	rawUsers, err := s.apiClient.GetUsers(r.Context(), accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get users list", slog.String("error", err.Error()))
 		templ.Handler(templates.ErrorAlert("Failed to load users. Please try again.")).ServeHTTP(w, r)
@@ -199,7 +199,7 @@ func (s *Server) ManageAccountStatusPage(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Fetch users for dropdown
-	rawUsers, err := s.apiClient.GetUsers(accessTokenDetails.AccessToken)
+	rawUsers, err := s.apiClient.GetUsers(r.Context(), accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get users list", slog.String("error", err.Error()))
 		templ.Handler(templates.ErrorAlert("Failed to load users. Please try again.")).ServeHTTP(w, r)
@@ -207,7 +207,7 @@ func (s *Server) ManageAccountStatusPage(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Fetch service accounts for dropdown
-	rawServiceAccounts, err := s.apiClient.GetServiceAccounts(accessTokenDetails.AccessToken)
+	rawServiceAccounts, err := s.apiClient.GetServiceAccounts(r.Context(), accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get service accounts list", slog.String("error", err.Error()))
 		templ.Handler(templates.ErrorAlert("Failed to load service accounts. Please try again.")).ServeHTTP(w, r)
@@ -266,8 +266,7 @@ func (s *Server) ManageAccountStatus(w http.ResponseWriter, r *http.Request) {
 
 	switch accountType {
 	case "user":
-		// For users, the identifier is the email
-		user, err := s.apiClient.LookupUserByEmail(accessTokenDetails.AccessToken, accountIdentifier)
+		user, err := s.apiClient.LookupUserByEmail(r.Context(), accessTokenDetails.AccessToken, accountIdentifier)
 		if err != nil {
 			reqLogger.Error("Failed to lookup user", slog.String("error", err.Error()))
 			templ.Handler(templates.ErrorAlert("User not found.")).ServeHTTP(w, r)
@@ -275,7 +274,7 @@ func (s *Server) ManageAccountStatus(w http.ResponseWriter, r *http.Request) {
 		}
 		accountID = user.AccountID
 	case "service-account":
-		serviceAccount, err := s.apiClient.LookupServiceAccountByClientID(accessTokenDetails.AccessToken, accountIdentifier)
+		serviceAccount, err := s.apiClient.LookupServiceAccountByClientID(r.Context(), accessTokenDetails.AccessToken, accountIdentifier)
 		if err != nil {
 			reqLogger.Error("Failed to lookup service account", slog.String("error", err.Error()))
 			templ.Handler(templates.ErrorAlert("Service account not found.")).ServeHTTP(w, r)
@@ -289,10 +288,10 @@ func (s *Server) ManageAccountStatus(w http.ResponseWriter, r *http.Request) {
 
 	switch action {
 	case "disable":
-		err = s.apiClient.DisableAccount(accessTokenDetails.AccessToken, accountID)
+		err = s.apiClient.DisableAccount(r.Context(), accessTokenDetails.AccessToken, accountID)
 		successMsg = "Account disabled successfully"
 	case "enable":
-		err = s.apiClient.EnableAccount(accessTokenDetails.AccessToken, accountID)
+		err = s.apiClient.EnableAccount(r.Context(), accessTokenDetails.AccessToken, accountID)
 		successMsg = "Account enabled successfully"
 	default:
 		templ.Handler(templates.ErrorAlert("Invalid action. Please select a valid action.")).ServeHTTP(w, r)
@@ -325,7 +324,7 @@ func (s *Server) MangeSiteAdminRolesPage(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Fetch users for dropdown
-	rawUsers, err := s.apiClient.GetUsers(accessTokenDetails.AccessToken)
+	rawUsers, err := s.apiClient.GetUsers(r.Context(), accessTokenDetails.AccessToken)
 	if err != nil {
 		reqLogger.Error("Failed to get users list", slog.String("error", err.Error()))
 		templ.Handler(templates.ErrorAlert("Failed to load users. Please try again.")).ServeHTTP(w, r)
@@ -377,10 +376,10 @@ func (s *Server) ManageAdminRoles(w http.ResponseWriter, r *http.Request) {
 	var successMsg string
 
 	if action == "grant" {
-		err = s.apiClient.GrantAdminRole(accessTokenDetails.AccessToken, userEmail)
+		err = s.apiClient.GrantAdminRole(r.Context(), accessTokenDetails.AccessToken, userEmail)
 		successMsg = "Admin role granted successfully to " + userEmail
 	} else {
-		err = s.apiClient.RevokeAdminRole(accessTokenDetails.AccessToken, userEmail)
+		err = s.apiClient.RevokeAdminRole(r.Context(), accessTokenDetails.AccessToken, userEmail)
 		successMsg = "Admin role revoked successfully from " + userEmail
 	}
 
@@ -429,10 +428,10 @@ func (s *Server) ManageSiteAdminRoles(w http.ResponseWriter, r *http.Request) {
 	var successMsg string
 
 	if action == "grant" {
-		err = s.apiClient.GrantSiteAdminRole(accessTokenDetails.AccessToken, userEmail)
+		err = s.apiClient.GrantSiteAdminRole(r.Context(), accessTokenDetails.AccessToken, userEmail)
 		successMsg = "Site admin role granted successfully to " + userEmail
 	} else {
-		err = s.apiClient.RevokeSiteAdminRole(accessTokenDetails.AccessToken, userEmail)
+		err = s.apiClient.RevokeSiteAdminRole(r.Context(), accessTokenDetails.AccessToken, userEmail)
 		successMsg = "Site admin role revoked successfully from " + userEmail
 	}
 
