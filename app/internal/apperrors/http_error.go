@@ -28,8 +28,6 @@ func (e *HTTPError) Error() string {
 	return fmt.Sprintf("%s: %s", e.Code, e.Message)
 }
 
-func (e *HTTPError) Unwrap() error { return e.Err }
-
 // InternalError responds with 500 + internal_error.
 func InternalError(message string, err error) *HTTPError {
 	return &HTTPError{Status: http.StatusInternalServerError, Code: ErrCodeInternalError, Message: message, Err: err}
@@ -121,8 +119,6 @@ func (e *OAuthError) Error() string {
 	}
 	return fmt.Sprintf("%s: %s", e.OAuthCode, e.Description)
 }
-
-func (e *OAuthError) Unwrap() error { return e.Err }
 
 // OAuth constructors. Pass nil for err when there is no wrapped error.
 
