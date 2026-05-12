@@ -282,5 +282,5 @@ The app currently deploys to AWS - the containers run on ECS Fargate and the dat
 The app was deployed on GCP (CloudRun) and Neon Postgress until April 2026.  The Github Workflows are retained for reference but no longer run.
 
 Overviews of the process to create the GCP and AWS infrastruture are here
-- [AWS Deploy](depoy-AWS.md)
+- [AWS Deploy](deploy-AWS.md)
 - [GCP Deploy](deploy-GCP.md)
