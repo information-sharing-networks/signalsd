@@ -345,11 +345,7 @@ func (a *AuthService) RequireAccessPermission(permissions ...string) func(http.H
 				case "write":
 					lastErr = CheckIsnWritePermission(claims, isnSlug, signalTypePath)
 				default:
-					lastErr = &PermissionError{
-						Status:  http.StatusInternalServerError,
-						Code:    apperrors.ErrCodeInternalError,
-						Message: fmt.Sprintf("unknown permission %q", permission),
-					}
+					lastErr = apperrors.InternalError(fmt.Sprintf("unknown permission %q", permission), nil)
 				}
 				if lastErr == nil {
 					break
@@ -357,15 +353,7 @@ func (a *AuthService) RequireAccessPermission(permissions ...string) func(http.H
 			}
 
 			if lastErr != nil {
-				if permErr, ok := lastErr.(*PermissionError); ok {
-					responses.RenderError(w, r, &apperrors.HTTPError{
-						Status:  permErr.Status,
-						Code:    permErr.Code,
-						Message: permErr.Message,
-					})
-				} else {
-					responses.RenderError(w, r, apperrors.InternalError("permission check failed", nil))
-				}
+				responses.RenderError(w, r, lastErr)
 				return
 			}
 
