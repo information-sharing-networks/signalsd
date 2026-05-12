@@ -78,13 +78,20 @@ func ValidateGithubFileURL(rawURL string, fileType string) error {
 }
 
 // CheckGithubFileExists checks if a file exists on GitHub without downloading the content
+//
+// The function will handle both https://raw.githubusercontent.com/*" and https://github.com/*/blob/*" links
+//
+// Note the repository must be public
 func CheckGithubFileExists(rawURL string) error {
+	// sanity check - use ValidateGithubFileURL to check the url is in a format supported by the app
+	if !strings.HasPrefix(rawURL, "https://github.com/") {
+		return fmt.Errorf("URL must be a GitHub URL")
+	}
+
 	// Convert GitHub blob URLs to raw URLs
 	// Example: https://github.com/org/repo/blob/main/file.json -> https://raw.githubusercontent.com/org/repo/main/file.json
-	if strings.HasPrefix(rawURL, "https://github.com/") {
-		rawURL = strings.Replace(rawURL, "https://github.com/", "https://raw.githubusercontent.com/", 1)
-		rawURL = strings.Replace(rawURL, "/blob/", "/", 1)
-	}
+	rawURL = strings.Replace(rawURL, "https://github.com/", "https://raw.githubusercontent.com/", 1)
+	rawURL = strings.Replace(rawURL, "/blob/", "/", 1)
 
 	client := &http.Client{
 		Timeout: 10 * time.Second,
@@ -93,7 +100,6 @@ func CheckGithubFileExists(rawURL string) error {
 		},
 	}
 
-	// #nosec G107 -- avoid false postive security linter warning - URL is validated to be GitHub-only before this function is called (see ValidateGithubFileURL)
 	req, err := http.NewRequest("HEAD", rawURL, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %v", err)
@@ -112,14 +118,21 @@ func CheckGithubFileExists(rawURL string) error {
 	return nil
 }
 
-// FetchFileContentFromGithub fetches content from GitHub URL specified in the signal type schema field
+// FetchFileContentFromGithub fetches content from GitHub URL specified in the signal type schema field.
+// Use this when storing the JSON schema for a new signal type.
+//
+// Before calling this function, use ValidateGithubFileURL and CheckGithubFileExists to first checking the url
+// is a publically available file on GithHub.
 func FetchFileContentFromGithub(rawURL string) (string, error) {
+	// sanity check (avoids G107 sec warnings)
+	if !strings.HasPrefix(rawURL, "https://github.com/") {
+		return "", fmt.Errorf("URL must be a GitHub URL")
+	}
+
 	// Convert GitHub blob URLs to raw URLs
 	// Example: https://github.com/org/repo/blob/main/file.json -> https://raw.githubusercontent.com/org/repo/main/file.json
-	if strings.HasPrefix(rawURL, "https://github.com/") {
-		rawURL = strings.Replace(rawURL, "https://github.com/", "https://raw.githubusercontent.com/", 1)
-		rawURL = strings.Replace(rawURL, "/blob/", "/", 1)
-	}
+	rawURL = strings.Replace(rawURL, "https://github.com/", "https://raw.githubusercontent.com/", 1)
+	rawURL = strings.Replace(rawURL, "/blob/", "/", 1)
 
 	client := &http.Client{
 		Timeout: 10 * time.Second,
@@ -128,7 +141,6 @@ func FetchFileContentFromGithub(rawURL string) (string, error) {
 		},
 	}
 
-	// #nosec G107 -- avoid false postive security linter warning - URL is validated to be GitHub-only before this function is called (see ValidateGithubFileURL)
 	res, err := client.Get(rawURL)
 	if err != nil {
 		return "", fmt.Errorf("failed to fetch content: %v", err)

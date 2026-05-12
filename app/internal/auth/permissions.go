@@ -1,5 +1,7 @@
 package auth
 
+// manage isn permission checks
+
 import (
 	"fmt"
 
