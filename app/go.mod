@@ -20,7 +20,6 @@ require (
 	github.com/pressly/goose/v3 v3.27.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/spf13/cobra v1.10.2
-	github.com/swaggo/swag v1.16.6
 	github.com/tidwall/gjson v1.18.0
 	github.com/tidwall/match v1.2.0
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20250803194717-c247dead11de
@@ -125,6 +124,7 @@ require (
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/sqlc-dev/sqlc v1.30.0 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect
+	github.com/swaggo/swag v1.16.6 // indirect
 	github.com/tdewolff/parse/v2 v2.8.12 // indirect
 	github.com/tdewolff/test v1.0.12 // indirect
 	github.com/tetratelabs/wazero v1.11.0 // indirect
