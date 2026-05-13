@@ -24,7 +24,6 @@ import (
 
 	"github.com/information-sharing-networks/signalsd/app/internal/version"
 
-	_ "github.com/information-sharing-networks/signalsd/app/docs"
 	// the fallback CA certs are required since the service deploys to a scratch docker image that does not include them (the certs are used when the app does external https requests to validate github hosted schemas)
 	_ "golang.org/x/crypto/x509roots/fallback"
 )
