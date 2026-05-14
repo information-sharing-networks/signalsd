@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     container_name: signalsd-db
     volumes:
-      - db-data-dev:/var/lib/postgresql/data
+      - db-data-dev:/var/lib/postgresql
     ports:
       - "15432:5432"
     environment:
