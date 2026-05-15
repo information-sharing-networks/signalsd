@@ -19,7 +19,6 @@ require (
 	github.com/lmittmann/tint v1.1.3
 	github.com/pressly/goose/v3 v3.27.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
-	github.com/spf13/cobra v1.10.2
 	github.com/tidwall/gjson v1.19.0
 	github.com/tidwall/match v1.2.0
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20250803194717-c247dead11de
@@ -121,6 +120,7 @@ require (
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/spf13/afero v1.15.0 // indirect
 	github.com/spf13/cast v1.10.0 // indirect
+	github.com/spf13/cobra v1.10.2 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/sqlc-dev/sqlc v1.30.0 // indirect
 	github.com/stoewer/go-strcase v1.2.0 // indirect

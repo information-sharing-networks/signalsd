@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"log/slog"
@@ -13,24 +14,22 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/server"
 	"github.com/information-sharing-networks/signalsd/app/internal/version"
-	"github.com/spf13/cobra"
 )
 
 func main() {
-	cmd := &cobra.Command{
-		Use:               "signalsd-ui",
-		CompletionOptions: cobra.CompletionOptions{DisableDefaultCmd: true},
-		Short:             "Signalsd web user interface",
-		Long:              `Web UI for managing Information Sharing Networks`,
-		RunE: func(cmd *cobra.Command, args []string) error {
-			return run()
-		},
+	showVersion := flag.Bool("version", false, "print version and exit")
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: signalsd-ui [--version]\n\nWeb UI for managing Information Sharing Networks\n")
+	}
+	flag.Parse()
+
+	if *showVersion {
+		v := version.Get()
+		fmt.Printf("%s (built %s, commit %s)\n", v.Version, v.BuildDate, v.GitCommit)
+		return
 	}
 
-	v := version.Get()
-	cmd.Version = fmt.Sprintf("%s (built %s, commit %s)", v.Version, v.BuildDate, v.GitCommit)
-
-	if err := cmd.Execute(); err != nil {
+	if err := run(); err != nil {
 		os.Exit(1)
 	}
 }

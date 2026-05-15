@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"log/slog"
@@ -19,10 +20,8 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/schemas"
 	"github.com/information-sharing-networks/signalsd/app/internal/server"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/spf13/cobra"
-
 	"github.com/information-sharing-networks/signalsd/app/internal/version"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	// the fallback CA certs are required since the service deploys to a scratch docker image that does not include them (the certs are used when the app does external https requests to validate github hosted schemas)
 	_ "golang.org/x/crypto/x509roots/fallback"
@@ -171,11 +170,7 @@ import (
 //	@tag.name			HTMX Actions
 //	@tag.description	HTMX action handlers (/ui-api/*) return HTML partials
 
-func main() {
-	rootCmd := &cobra.Command{
-		Use:   "signalsd",
-		Short: "Signalsd service for ISNs",
-		Long: `Signalsd provides APIs for operating a Signals Information Sharing Network
+const usageText = `Signalsd provides APIs for operating a Signals Information Sharing Network
 
 To start the service, use the 'run' command with a service mode:
 
@@ -184,39 +179,63 @@ To start the service, use the 'run' command with a service mode:
   signalsd run admin         # Admin endpoints only
   signalsd run signals       # Signal exchange service (read + write)
   signalsd run signals-read  # Signal read operations only
-  signalsd run signals-write # Signal write operations only`,
+  signalsd run signals-write # Signal write operations only
+
+Usage:
+  signalsd run MODE
+
+Flags:
+  --version   version for signalsd
+`
+
+func main() {
+	showVersion := flag.Bool("version", false, "print version")
+	flag.Usage = func() { fmt.Fprint(os.Stderr, usageText) }
+	flag.Parse()
+
+	if *showVersion {
+		v := version.Get()
+		fmt.Printf("%s (built %s, commit %s)\n", v.Version, v.BuildDate, v.GitCommit)
+		return
 	}
 
-	// Add the 'run' subcommand
-	runCmd := &cobra.Command{
-		Use:               "run MODE",
-		CompletionOptions: cobra.CompletionOptions{DisableDefaultCmd: true},
-		Short:             "Run signalsd in the specified mode",
-		Long: `Run signalsd in the specified service mode.
-
-Available modes:
-  all           - Single service with all endpoints + UI
-  api           - API endpoints only (no UI)
-  admin         - Admin endpoints only
-  signals       - Signal exchange service (read + write)
-  signals-read  - Signal read operations only
-  signals-write - Signal write operations only`,
-		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			mode := args[0]
-			if !signalsd.ValidServiceModes[mode] {
-				return fmt.Errorf("invalid service mode '%s'. Valid modes: all, api, admin, signals, signals-read, signals-write", mode)
-			}
-			return run(mode)
-		},
+	if flag.NArg() < 1 {
+		flag.Usage()
+		os.Exit(2)
 	}
 
-	rootCmd.AddCommand(runCmd)
+	switch flag.Arg(0) {
+	case "run":
+		runSubcmd(flag.Args()[1:])
+	default:
+		fmt.Fprintf(os.Stderr, "unknown command: %q\n\n", flag.Arg(0))
+		flag.Usage()
+		os.Exit(2)
+	}
+}
 
-	v := version.Get()
-	rootCmd.Version = fmt.Sprintf("%s (built %s, commit %s)", v.Version, v.BuildDate, v.GitCommit)
+func runSubcmd(args []string) {
+	fs := flag.NewFlagSet("run", flag.ContinueOnError)
+	fs.Usage = func() { fmt.Fprint(os.Stderr, usageText) }
+	if err := fs.Parse(args); err != nil {
+		if err == flag.ErrHelp {
+			os.Exit(0)
+		}
+		os.Exit(2)
+	}
 
-	if err := rootCmd.Execute(); err != nil {
+	if fs.NArg() != 1 {
+		fs.Usage()
+		os.Exit(2)
+	}
+
+	mode := fs.Arg(0)
+	if !signalsd.ValidServiceModes[mode] {
+		fmt.Fprintf(os.Stderr, "invalid mode %q\nValid modes: all, api, admin, signals, signals-read, signals-write\n", mode)
+		os.Exit(2)
+	}
+
+	if err := run(mode); err != nil {
 		os.Exit(1)
 	}
 }
