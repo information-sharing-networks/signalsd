@@ -7,33 +7,33 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Netflix/go-env"
+	env "github.com/caarlos0/env/v11"
 	"github.com/jub0bs/cors"
 )
 
 // Environment variables with defaults
 type ServerEnvironment struct {
-	Environment          string        `env:"ENVIRONMENT,default=dev"`
-	Host                 string        `env:"HOST,default=0.0.0.0"`
-	Port                 int           `env:"PORT,default=8080"`
+	Environment          string        `env:"ENVIRONMENT"          envDefault:"dev"`
+	Host                 string        `env:"HOST"                 envDefault:"0.0.0.0"`
+	Port                 int           `env:"PORT"                 envDefault:"8080"`
 	PublicBaseURL        string        `env:"PUBLIC_BASE_URL"` // base url for user facing links (defaults to Host/Port values = see below)
-	SecretKey            string        `env:"SECRET_KEY,required=true"`
-	LogLevel             string        `env:"LOG_LEVEL,default=debug"`
-	DatabaseURL          string        `env:"DATABASE_URL,required=true"`
-	ReadTimeout          time.Duration `env:"READ_TIMEOUT,default=15s"`
-	WriteTimeout         time.Duration `env:"WRITE_TIMEOUT,default=15s"`
-	IdleTimeout          time.Duration `env:"IDLE_TIMEOUT,default=60s"`
-	AllowedOrigins       []string      `env:"ALLOWED_ORIGINS,separator=|"`
-	MaxSignalPayloadSize int64         `env:"MAX_SIGNAL_PAYLOAD_SIZE,default=5242880"` // 5MB
-	MaxAPIRequestSize    int64         `env:"MAX_API_REQUEST_SIZE,default=65536"`      // 64KB
-	RateLimitRPS         int32         `env:"RATE_LIMIT_RPS,default=2500"`
-	RateLimitBurst       int32         `env:"RATE_LIMIT_BURST,default=5000"`
-	ServiceMode          string        `env:"SERVICE_MODE"`                 // Set by CLI argument, not env var
-	DBMaxConnections     int32         `env:"DB_MAX_CONNECTIONS,default=4"` // pgx pool defaults
-	DBMinConnections     int32         `env:"DB_MIN_CONNECTIONS,default=0"`
-	DBMaxConnLifetime    time.Duration `env:"DB_MAX_CONN_LIFETIME,default=60m"`
-	DBMaxConnIdleTime    time.Duration `env:"DB_MAX_CONN_IDLE_TIME,default=30m"`
-	DBConnectTimeout     time.Duration `env:"DB_CONNECT_TIMEOUT,default=5s"`
+	SecretKey            string        `env:"SECRET_KEY,required"`
+	LogLevel             string        `env:"LOG_LEVEL"            envDefault:"debug"`
+	DatabaseURL          string        `env:"DATABASE_URL,required"`
+	ReadTimeout          time.Duration `env:"READ_TIMEOUT"         envDefault:"15s"`
+	WriteTimeout         time.Duration `env:"WRITE_TIMEOUT"        envDefault:"15s"`
+	IdleTimeout          time.Duration `env:"IDLE_TIMEOUT"         envDefault:"60s"`
+	AllowedOrigins       []string      `env:"ALLOWED_ORIGINS"      envSeparator:"|"`
+	MaxSignalPayloadSize int64         `env:"MAX_SIGNAL_PAYLOAD_SIZE" envDefault:"5242880"` // 5MB
+	MaxAPIRequestSize    int64         `env:"MAX_API_REQUEST_SIZE"    envDefault:"65536"`   // 64KB
+	RateLimitRPS         int32         `env:"RATE_LIMIT_RPS"       envDefault:"2500"`
+	RateLimitBurst       int32         `env:"RATE_LIMIT_BURST"     envDefault:"5000"`
+	ServiceMode          string        `env:"SERVICE_MODE"`                        // Set by CLI argument, not env var
+	DBMaxConnections     int32         `env:"DB_MAX_CONNECTIONS"   envDefault:"4"` // pgx pool defaults
+	DBMinConnections     int32         `env:"DB_MIN_CONNECTIONS"   envDefault:"0"`
+	DBMaxConnLifetime    time.Duration `env:"DB_MAX_CONN_LIFETIME" envDefault:"60m"`
+	DBMaxConnIdleTime    time.Duration `env:"DB_MAX_CONN_IDLE_TIME" envDefault:"30m"`
+	DBConnectTimeout     time.Duration `env:"DB_CONNECT_TIMEOUT"   envDefault:"5s"`
 }
 
 // CORSConfigs holds the CORS middleware instances for different endpoint types
@@ -132,9 +132,8 @@ var ValidRouteMatchingOperators = map[string]bool{
 func NewServerConfig() (*ServerEnvironment, *CORSConfigs, error) {
 	var cfg ServerEnvironment
 
-	_, err := env.UnmarshalFromEnviron(&cfg)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to unmarshal environment variables: %v", err)
+	if err := env.Parse(&cfg); err != nil {
+		return nil, nil, fmt.Errorf("failed to parse environment variables: %v", err)
 	}
 
 	// default to host/port if not set (the env must be set for production - checked in the validateConfig function)
