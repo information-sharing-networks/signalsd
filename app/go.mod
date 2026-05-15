@@ -11,7 +11,6 @@ require (
 
 require (
 	github.com/a-h/templ v0.3.1020
-	github.com/alecthomas/chroma/v2 v2.24.1
 	github.com/caarlos0/env/v11 v11.4.1
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/jackc/pgx/v5 v5.9.2
@@ -38,6 +37,7 @@ require (
 	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/a-h/parse v0.0.0-20250122154542-74294addb73e // indirect
 	github.com/air-verse/air v1.64.5 // indirect
+	github.com/alecthomas/chroma/v2 v2.24.1 // indirect
 	github.com/andybalholm/brotli v1.2.1 // indirect
 	github.com/anthropics/anthropic-sdk-go v1.26.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
