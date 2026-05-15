@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
-	"github.com/alecthomas/chroma/v2/quick"
-	"bytes"
 )
 
 templ SearchSignalsPage(environment string, isns []types.IsnOption, perms map[string]types.IsnPerm, results []client.SearchSignalWithCorrelationsAndVersions) {
@@ -96,7 +94,7 @@ templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions,  p
 								</code>
 							</pre>
 							<div style="display: none;" class="json-content pretty-printed">
-								@templ.Raw(HighlightJSON(signal.Content)) 
+								@templ.Raw(PrettyPrintJSON(signal.Content)) 
 							</div>
 							<button
 								type="button"
@@ -191,7 +189,7 @@ templ CorrelatedSignalsTable(signal client.SearchSignalWithCorrelationsAndVersio
 							<button class="open-modal-btn btn btn-primary" data-correlated-signal-id={ correlated.SignalID }>View</button>
 							<dialog class="modal" id={ fmt.Sprintf("modal-%s", correlated.SignalID) }>
 								<h3> { correlated.LocalRef }</h3>
-								<pre>{ prettyPrintJSON(correlated.Content) }</pre>
+								<pre>{ PrettyPrintJSON(correlated.Content) }</pre>
 								<button class="close-modal-btn btn btn-primary" data-correlated-signal-id={ correlated.SignalID }>Close</button>
 							</dialog>
 						</td>
@@ -271,22 +269,8 @@ templ AccountIDField() {
 	</div>
 }
 
-/* code highlgiht json */
-func HighlightJSON(jsonElement json.RawMessage) string {
-	prettyPrintJSON := prettyPrintJSON(jsonElement)
-	var buf bytes.Buffer
-
-	err := quick.Highlight(&buf, string(prettyPrintJSON), "json", "html", "trac")
-	if err != nil {
-		return ""
-	}
-
-	return buf.String()
-}
-
-
 /* pretty print json */
-func prettyPrintJSON(jsonElement []byte) string {
+func PrettyPrintJSON(jsonElement []byte) string {
 	var obj any
 	if err:= json.Unmarshal([]byte(jsonElement), &obj); err != nil {
 		return string(jsonElement)
