@@ -61,7 +61,7 @@ templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions,  p
 		} else {
 			<div class="card-body margin-top-6">
 				for _, signal := range signals {
-					<div class="signal-card" id={ signal.SignalID }>
+					<div class="signal-card compact" id={ signal.SignalID }>
 
 						<!-- Signal Header -->
 						<div class="signal-header">
@@ -93,9 +93,7 @@ templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions,  p
 									{ string(signal.Content) }
 								</code>
 							</pre>
-							<div style="display: none;" class="json-content pretty-printed">
-								@templ.Raw(PrettyPrintJSON(signal.Content)) 
-							</div>
+							<pre style="display: none;" class="json-content pretty-printed">@templ.Raw(PrettyPrintJSON(signal.Content))</pre>
 							<button
 								type="button"
 								data-signal-id={ signal.SignalID }

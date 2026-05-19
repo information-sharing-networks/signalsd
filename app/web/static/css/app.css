@@ -660,6 +660,10 @@ table tbody tr:hover {
   white-space: pre-wrap;
 }
 
+.json-content.pretty-printed {
+  color: #16a34a;
+}
+
 .pretty-print-btn {
   height: 40px;
   display: flex;
