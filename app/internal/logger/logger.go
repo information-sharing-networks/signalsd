@@ -178,7 +178,7 @@ func RequestLogging(logger *slog.Logger) func(http.Handler) http.Handler {
 				slog.String("request_id", requestID),
 				slog.String("method", r.Method),
 				slog.String("path", r.URL.Path),
-				slog.String("remote_addr", r.RemoteAddr),
+				slog.String("remote_addr", middleware.GetClientIP(r.Context())),
 			}
 
 			// Add any attributes that were added to the context during request processing

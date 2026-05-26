@@ -12,7 +12,7 @@ require (
 require (
 	github.com/a-h/templ v0.3.1020
 	github.com/caarlos0/env/v11 v11.4.1
-	github.com/go-chi/chi/v5 v5.2.5
+	github.com/go-chi/chi/v5 v5.3.0
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/jub0bs/cors v1.0.2
 	github.com/lmittmann/tint v1.1.3
