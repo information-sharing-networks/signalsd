@@ -15,7 +15,7 @@ type Config struct {
 	LogLevel     string        `env:"LOG_LEVEL"    envDefault:"debug"`
 	ReadTimeout  time.Duration `env:"READ_TIMEOUT"  envDefault:"15s"`
 	WriteTimeout time.Duration `env:"WRITE_TIMEOUT" envDefault:"15s"`
-	IdleTimeout  time.Duration `env:"IDLE_TIMEOUT"  envDefault:"60s"`
+	IdleTimeout  time.Duration `env:"IDLE_TIMEOUT"  envDefault:"65s"` // must exceed ALB idle timeout (default 60s) so ALB closes first
 	APIBaseURL   string        `env:"API_BASE_URL"  envDefault:"http://localhost:8080"`
 }
 

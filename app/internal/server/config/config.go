@@ -22,7 +22,7 @@ type ServerEnvironment struct {
 	DatabaseURL          string        `env:"DATABASE_URL,required"`
 	ReadTimeout          time.Duration `env:"READ_TIMEOUT"         envDefault:"15s"`
 	WriteTimeout         time.Duration `env:"WRITE_TIMEOUT"        envDefault:"15s"`
-	IdleTimeout          time.Duration `env:"IDLE_TIMEOUT"         envDefault:"60s"`
+	IdleTimeout          time.Duration `env:"IDLE_TIMEOUT"         envDefault:"65s"` // must exceed ALB idle timeout (default 60s) so ALB closes first
 	AllowedOrigins       []string      `env:"ALLOWED_ORIGINS"      envSeparator:"|"`
 	MaxSignalPayloadSize int64         `env:"MAX_SIGNAL_PAYLOAD_SIZE" envDefault:"5242880"` // 5MB
 	MaxAPIRequestSize    int64         `env:"MAX_API_REQUEST_SIZE"    envDefault:"65536"`   // 64KB
