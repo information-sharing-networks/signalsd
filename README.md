@@ -3,8 +3,9 @@
 [Technical Overview](#technical-overview)
 
 ![ci](https://github.com/information-sharing-networks/signalsd/actions/workflows/ci.yml/badge.svg)
- ![cd-staging](https://github.com/information-sharing-networks/signalsd/actions/workflows/cd-staging-aws.yml/badge.svg)
- ![cd-production](https://github.com/information-sharing-networks/signalsd/actions/workflows/cd-production-aws.yml/badge.svg)
+![cd-staging](https://github.com/information-sharing-networks/signalsd/actions/workflows/cd-staging-aws.yml/badge.svg)
+![cd-production](https://github.com/information-sharing-networks/signalsd/actions/workflows/cd-production-aws.yml/badge.svg)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/information-sharing-networks/signalsd)
 
 # Information Sharing Networks
 Information Sharing Networks (ISNs) give organisations a way to start sharing data with each other without having to build bespoke technology from scratch every time.
