@@ -9,14 +9,15 @@ import (
 
 // UI server config - used when the ui is run in standalone mode
 type Config struct {
-	Environment  string        `env:"ENVIRONMENT" envDefault:"dev"`
-	Host         string        `env:"HOST"         envDefault:"0.0.0.0"`
-	Port         int           `env:"PORT"         envDefault:"3000"`
-	LogLevel     string        `env:"LOG_LEVEL"    envDefault:"debug"`
-	ReadTimeout  time.Duration `env:"READ_TIMEOUT"  envDefault:"15s"`
-	WriteTimeout time.Duration `env:"WRITE_TIMEOUT" envDefault:"15s"`
-	IdleTimeout  time.Duration `env:"IDLE_TIMEOUT"  envDefault:"65s"` // must exceed ALB idle timeout (default 60s) so ALB closes first
-	APIBaseURL   string        `env:"API_BASE_URL"  envDefault:"http://localhost:8080"`
+	Environment    string        `env:"ENVIRONMENT" envDefault:"dev"`
+	Host           string        `env:"HOST"         envDefault:"0.0.0.0"`
+	Port           int           `env:"PORT"         envDefault:"3000"`
+	LogLevel       string        `env:"LOG_LEVEL"    envDefault:"debug"`
+	ReadTimeout    time.Duration `env:"READ_TIMEOUT"  envDefault:"15s"`
+	WriteTimeout   time.Duration `env:"WRITE_TIMEOUT" envDefault:"15s"`
+	IdleTimeout    time.Duration `env:"IDLE_TIMEOUT"  envDefault:"65s"` // must exceed ALB idle timeout (default 60s) so ALB closes first
+	APIBaseURL     string        `env:"API_BASE_URL"      envDefault:"http://localhost:8080"`
+	TrustedProxies int           `env:"TRUSTED_PROXIES"   envDefault:"1"` // number of reverse proxies in front of the service (e.g. 1 for a single ALB)
 }
 
 var validEnvs = map[string]bool{

@@ -34,6 +34,7 @@ type ServerEnvironment struct {
 	DBMaxConnLifetime    time.Duration `env:"DB_MAX_CONN_LIFETIME" envDefault:"60m"`
 	DBMaxConnIdleTime    time.Duration `env:"DB_MAX_CONN_IDLE_TIME" envDefault:"30m"`
 	DBConnectTimeout     time.Duration `env:"DB_CONNECT_TIMEOUT"   envDefault:"5s"`
+	TrustedProxies       int           `env:"TRUSTED_PROXIES"      envDefault:"1"` // number of reverse proxies in front of the service (e.g. 1 for a single ALB)
 }
 
 // CORSConfigs holds the CORS middleware instances for different endpoint types
@@ -183,6 +184,9 @@ func validateConfig(cfg *ServerEnvironment) error {
 
 	if cfg.Port < 1 || cfg.Port > 65535 {
 		return fmt.Errorf("PORT must be between 1 and 65535")
+	}
+	if cfg.TrustedProxies < 1 {
+		return fmt.Errorf("TRUSTED_PROXIES must be at least 1")
 	}
 	if !validEnvs[cfg.Environment] {
 		return fmt.Errorf("invalid ENVIRONMENT: %s", cfg.Environment)

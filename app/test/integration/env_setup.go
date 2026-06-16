@@ -87,6 +87,7 @@ func startInProcessServer(t *testing.T, publicBaseURL string) *testEnv {
 		MaxAPIRequestSize:    65536,
 		RateLimitRPS:         2500,
 		RateLimitBurst:       5000,
+		TrustedProxies:       1,
 		DBMaxConnections:     4,
 		DBMinConnections:     0,
 		DBMaxConnLifetime:    60 * time.Minute,

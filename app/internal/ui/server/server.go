@@ -197,10 +197,7 @@ func (s *Server) RegisterRoutes() {
 // setupMiddleware creates the routes when running the ui in standalone mode.
 func (s *Server) setupMiddleware() {
 	s.router.Use(chimiddleware.RequestID)
-	// Assumes 1 trusted proxy (AWS ALB) - If the infrastructure changes
-	// (e.g. a CDN is added), this value must be updated
-	// or the wrong IP will be extracted from X-Forwarded-For.
-	s.router.Use(chimiddleware.ClientIPFromXFFTrustedProxies(1))
+	s.router.Use(chimiddleware.ClientIPFromXFFTrustedProxies(s.config.TrustedProxies))
 	s.router.Use(logger.RequestLogging(s.logger))
 	s.router.Use(chimiddleware.Recoverer)
 	// Cancel r.Context() just before WriteTimeout drops the TCP connection,

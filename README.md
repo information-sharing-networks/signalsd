@@ -137,6 +137,7 @@ RATE_LIMIT_RPS=2500                   #  Requests per second (set to 0 to disabl
 RATE_LIMIT_BURST=5000                 #  Burst allowance 
 MAX_SIGNAL_PAYLOAD_SIZE=5242880       #  Max payload size (default: 5MB)
 MAX_API_REQUEST_SIZE=65536            #  Max API request size (default: 64KB)
+TRUSTED_PROXIES=1                     #  Number of reverse proxies in front of the service 
 
 # Database Connection Pool (the default used are the same as those used by pgx )
 DB_MAX_CONNECTIONS=4
@@ -147,6 +148,11 @@ DB_CONNECT_TIMEOUT=5s
 ```
 **Note**
 DATABASE_URL and SECRET_KEY contain sensitive information - production versions should be managed via a secrets management system (for local docker environments these values are hardcoded in `docker-compose.yml`)
+
+Set `TRUSTED_PROXIES` to match the number of proxy hops between the internet and the server
+For a single load balancer (e.g. AWS ALB) the default of `1` is correct.
+Add `1` for each additional proxy layer (e.g. a CDN in front of the ALB would require `2`).
+This is used by the [chi](https://github.com/go-chi/chi) router's `ClientIPFromXFFTrustedProxies` middleware for correct client IP extraction from the `X-Forwarded-For` header
 
 ### Development Tools
 

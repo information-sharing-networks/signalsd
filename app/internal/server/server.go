@@ -177,8 +177,12 @@ func (s *Server) DatabaseShutdown() {
 // setupMiddleware sets up the middleware that applies to all server requests
 // note that the payload size limit is set on a per-route basis (see registerRoutes)
 func (s *Server) setupMiddleware() {
+	if s.config.TrustedProxies < 1 {
+		panic("config.TrustedProxies must be >= 1; set TRUSTED_PROXIES env var or assign it when building ServerEnvironment directly")
+	}
 	s.router.Use(chimiddleware.Recoverer)
 	s.router.Use(chimiddleware.RequestID)
+	s.router.Use(chimiddleware.ClientIPFromXFFTrustedProxies(s.config.TrustedProxies))
 	s.router.Use(logger.RequestLogging(s.logger))
 	s.router.Use(chimiddleware.StripSlashes)
 	s.router.Use(middleware.SecurityHeaders(s.config.Environment))
