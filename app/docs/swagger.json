@@ -1451,7 +1451,7 @@
         },
         "/api/auth/service-accounts/rotate-secret": {
             "post": {
-                "description": "Self-service endpoint for service accounts to rotate their client secret.\nThis endpoint accepts expired (but not revoked) credentials, so a service account that\nmissed a rotation deadline can still self-serve recovery without admin intervention.\nThe old secret remains valid for 5 minutes after rotation to prevent race conditions\nin distributed deployments or when network issues prevent clients receiving the new secret immediately.\n\n**Use Cases:**\n- Regular credential rotation for security compliance\n- Suspected credential compromise requiring immediate rotation\n\nnote that by default client secrets expire automatically after 1 year.",
+                "description": "Self-service endpoint for service accounts to rotate their client secret.\nThis endpoint accepts expired (but not revoked) credentials, so a service account that\nmissed a rotation deadline can still self-serve recovery without admin intervention.\nThe old secret remains valid for 5 minutes after rotation to prevent race conditions\nin distributed deployments or when network issues prevent clients receiving the new secret immediately.\n\n**Use Cases:**\n- Regular credential rotation for security compliance\n- Recovery from a missed rotation deadline (expired secret)\n- Suspected credential compromise requiring immediate rotation\n\nClient secrets expire after 1 year by default.",
                 "consumes": [
                     "application/x-www-form-urlencoded"
                 ],
@@ -1489,7 +1489,7 @@
                         }
                     },
                     "401": {
-                        "description": "invalid_client",
+                        "description": "invalid_client — wrong client_id, revoked secret, or disabled account. Note: expired secrets are accepted on this endpoint; a 401 here means the secret has been explicitly revoked and an admin must reissue credentials.",
                         "schema": {
                             "$ref": "#/definitions/responses.OAuthErrorResponse"
                         }
@@ -2773,7 +2773,7 @@
                         }
                     },
                     "401": {
-                        "description": "invalid_client",
+                        "description": "invalid_client — wrong, expired, or revoked client secret. If your secret has expired, use POST /api/auth/service-accounts/rotate-secret to self-serve a new.",
                         "schema": {
                             "$ref": "#/definitions/responses.OAuthErrorResponse"
                         }

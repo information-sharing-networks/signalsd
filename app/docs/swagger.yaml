@@ -2211,9 +2211,10 @@ paths:
 
         **Use Cases:**
         - Regular credential rotation for security compliance
+        - Recovery from a missed rotation deadline (expired secret)
         - Suspected credential compromise requiring immediate rotation
 
-        note that by default client secrets expire automatically after 1 year.
+        Client secrets expire after 1 year by default.
       parameters:
       - description: Client ID
         in: formData
@@ -2235,7 +2236,10 @@ paths:
           schema:
             $ref: '#/definitions/responses.OAuthErrorResponse'
         "401":
-          description: invalid_client
+          description: 'invalid_client — wrong client_id, revoked secret, or disabled
+            account. Note: expired secrets are accepted on this endpoint; a 401 here
+            means the secret has been explicitly revoked and an admin must reissue
+            credentials.'
           schema:
             $ref: '#/definitions/responses.OAuthErrorResponse'
         "500":
@@ -3340,7 +3344,9 @@ paths:
           schema:
             $ref: '#/definitions/responses.OAuthErrorResponse'
         "401":
-          description: invalid_client
+          description: invalid_client — wrong, expired, or revoked client secret.
+            If your secret has expired, use POST /api/auth/service-accounts/rotate-secret
+            to self-serve a new.
           schema:
             $ref: '#/definitions/responses.OAuthErrorResponse'
         "500":

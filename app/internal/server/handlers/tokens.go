@@ -82,7 +82,7 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, p
 //
 //	@Success	200				{object}	auth.AccessTokenResponse
 //	@Failure	400				{object}	responses.OAuthErrorResponse	"unsupported_grant_type · invalid_request · invalid_grant"
-//	@Failure	401				{object}	responses.OAuthErrorResponse	"invalid_client"
+//	@Failure	401				{object}	responses.OAuthErrorResponse	"invalid_client — wrong, expired, or revoked client secret. If your secret has expired, use POST /api/auth/service-accounts/rotate-secret to self-serve a new."
 //	@Failure	500				{object}	responses.OAuthErrorResponse	"server_error"
 //
 //	@Router		/oauth/token [post]
@@ -241,9 +241,10 @@ func (a *TokenHandler) RevokeRefreshToken(w http.ResponseWriter, r *http.Request
 //	@Description
 //	@Description	**Use Cases:**
 //	@Description	- Regular credential rotation for security compliance
+//	@Description	- Recovery from a missed rotation deadline (expired secret)
 //	@Description	- Suspected credential compromise requiring immediate rotation
 //	@Description
-//	@Description	note that by default client secrets expire automatically after 1 year.
+//	@Description	Client secrets expire after 1 year by default.
 //
 //	@Tags			auth
 //
@@ -254,7 +255,7 @@ func (a *TokenHandler) RevokeRefreshToken(w http.ResponseWriter, r *http.Request
 //
 //	@Success		200				{object}	ServiceAccountRotateResponse
 //	@Failure		400				{object}	responses.OAuthErrorResponse	"invalid_request (missing client_id or client_secret)"
-//	@Failure		401				{object}	responses.OAuthErrorResponse	"invalid_client"
+//	@Failure		401				{object}	responses.OAuthErrorResponse	"invalid_client — wrong client_id, revoked secret, or disabled account. Note: expired secrets are accepted on this endpoint; a 401 here means the secret has been explicitly revoked and an admin must reissue credentials."
 //	@Failure		500				{object}	responses.ErrorResponse			"database_error | internal_error"
 //
 //	@Router			/api/auth/service-accounts/rotate-secret [post]
