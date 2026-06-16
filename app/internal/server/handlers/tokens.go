@@ -234,29 +234,30 @@ func (a *TokenHandler) RevokeRefreshToken(w http.ResponseWriter, r *http.Request
 //
 //	@Summary		Rotate Service Account Client Secret
 //	@Description	Self-service endpoint for service accounts to rotate their client secret.
-//	@Description	This endpoint requires current valid client_id and client_secret for authentication.
-//	@Description	The old secret remains valid for 5 minutes to prevent race conditions when multiple instances are involved and to stop clients being locked out where network issues prevent them from receiving the new secret immediately.
-//
-// y.
-//
+//	@Description	This endpoint accepts expired (but not revoked) credentials, so a service account that
+//	@Description	missed a rotation deadline can still self-serve recovery without admin intervention.
+//	@Description	The old secret remains valid for 5 minutes after rotation to prevent race conditions
+//	@Description	in distributed deployments or when network issues prevent clients receiving the new secret immediately.
 //	@Description
 //	@Description	**Use Cases:**
 //	@Description	- Regular credential rotation for security compliance
 //	@Description	- Suspected credential compromise requiring immediate rotation
 //	@Description
-//	@Tags		auth
+//	@Description	note that by default client secrets expire automatically after 1 year.
 //
-//	@Accept		x-www-form-urlencoded
+//	@Tags			auth
 //
-//	@Param		client_id		formData	string	true	"Client ID"
-//	@Param		client_secret	formData	string	true	"Client secret"
+//	@Accept			x-www-form-urlencoded
 //
-//	@Success	200				{object}	ServiceAccountRotateResponse
-//	@Failure	400				{object}	responses.OAuthErrorResponse	"invalid_request (missing client_id or client_secret)"
-//	@Failure	401				{object}	responses.OAuthErrorResponse	"invalid_client"
-//	@Failure	500				{object}	responses.ErrorResponse			"database_error | internal_error"
+//	@Param			client_id		formData	string	true	"Client ID"
+//	@Param			client_secret	formData	string	true	"Client secret"
 //
-//	@Router		/api/auth/service-accounts/rotate-secret [post]
+//	@Success		200				{object}	ServiceAccountRotateResponse
+//	@Failure		400				{object}	responses.OAuthErrorResponse	"invalid_request (missing client_id or client_secret)"
+//	@Failure		401				{object}	responses.OAuthErrorResponse	"invalid_client"
+//	@Failure		500				{object}	responses.ErrorResponse			"database_error | internal_error"
+//
+//	@Router			/api/auth/service-accounts/rotate-secret [post]
 func (a *TokenHandler) RotateServiceAccountSecret(w http.ResponseWriter, r *http.Request) error {
 	// Get service account ID from context (set by RequireClientCredentials middleware)
 	serviceAccountID, ok := auth.ContextAccountID(r.Context())

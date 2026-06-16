@@ -80,10 +80,17 @@ FROM one_time_client_secrets
 WHERE id = $1;
 
 -- name: GetValidClientSecretByHashedSecret :one
+-- used for authentication: does not return expired or revoked credentials
 SELECT * FROM client_secrets
 WHERE hashed_secret = $1
 AND revoked_at IS NULL
 AND expires_at > NOW();
+
+-- name: GetNonRevokedClientSecretByHashedSecret :one
+-- used for rotation: allows expired but not revoked credentials
+SELECT * FROM client_secrets
+WHERE hashed_secret = $1
+AND revoked_at IS NULL;
 
 -- name: GetServiceAccountByClientID :one
 SELECT sa.* FROM service_accounts sa

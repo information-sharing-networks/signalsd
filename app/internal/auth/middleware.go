@@ -176,13 +176,13 @@ func (a *AuthService) RequireValidRefreshToken(next http.Handler) http.Handler {
 	})
 }
 
-// RequireValidClientCredentials checks the client crentials used to authenticate service accounts.
+// RequireValidClientCredentials checks the client credentials used to authenticate service accounts.
 //
-// The Client ID/Client Secret is extraced from the request body.
-// No bearer token required - authenticaton is done using the client credentials alone.
+// The Client ID/Client Secret is extracted from the request body.
+// No bearer token required - authentication is done using the client credentials alone.
 //
 // This middleware adds the client_id to the log attributes in context so they
-// are included in the request log for any requests authenticated with client credentials
+// are included in the request log for any requests authenticated with client credentials.
 func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -231,6 +231,7 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 			return
 		}
 
+		// check for disabled accounts
 		if !account.IsActive {
 			logger.ContextWithLogAttrs(r.Context(),
 				slog.String("client_id", clientID),
@@ -241,7 +242,7 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 			return
 		}
 
-		// check the client secret
+		// check the secret is valid
 		hashedSecret := a.HashToken(clientSecret)
 
 		_, err = a.queries.GetValidClientSecretByHashedSecret(r.Context(), hashedSecret)
@@ -263,7 +264,100 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 			slog.String("account_id", serviceAccount.AccountID.String()),
 		)
 
-		// Add context for final request log
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("client_id", clientID),
+			slog.String("account_id", serviceAccount.AccountID.String()),
+		)
+
+		ctx := ContextWithAccountID(r.Context(), serviceAccount.AccountID)
+		ctx = ContextWithAccountType(ctx, "service_account")
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// RequireNonRevokedClientCredentials is like RequireValidClientCredentials but also accepts expired secrets.
+//
+// Used for the secret rotation endpoint so that service accounts can recover from a missed rotation
+// deadline without out-of-band admin intervention.
+func (a *AuthService) RequireNonRevokedClientCredentials(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		var clientID, clientSecret string
+
+		// support HTTP Basic Auth or form body (RFC 6749)
+		if id, secret, ok := r.BasicAuth(); ok {
+			clientID = id
+			clientSecret = secret
+		} else {
+			clientID = r.PostFormValue("client_id")
+			clientSecret = r.PostFormValue("client_secret")
+		}
+
+		if clientID == "" || clientSecret == "" {
+			responses.RenderError(w, r, apperrors.OAuthInvalidRequest("client_id and client_secret are required", apperrors.ErrCodeInvalidRequest, nil))
+			return
+		}
+
+		serviceAccount, err := a.queries.GetServiceAccountByClientID(r.Context(), clientID)
+		if err != nil {
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("invalid_client_id", clientID),
+			)
+
+			responses.RenderError(w, r, apperrors.OAuthInvalidClient("invalid client_id", apperrors.ErrCodeAuthenticationFailure, nil))
+			return
+		}
+
+		account, err := a.queries.GetAccountByID(r.Context(), serviceAccount.AccountID)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				logger.ContextWithLogAttrs(r.Context(),
+					slog.String("client_id", clientID),
+				)
+
+				responses.RenderError(w, r, apperrors.InternalError("account not found", err))
+				return
+			}
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("client_id", clientID),
+			)
+
+			responses.RenderError(w, r, apperrors.InternalError("database error", err))
+			return
+		}
+
+		// check for disabled accounts
+		if !account.IsActive {
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("client_id", clientID),
+				slog.String("account_id", serviceAccount.AccountID.String()),
+			)
+
+			responses.RenderError(w, r, apperrors.OAuthInvalidClient("account is disabled", apperrors.ErrCodeAuthorizationFailure, nil))
+			return
+		}
+
+		// check the secret is valid
+		hashedSecret := a.HashToken(clientSecret)
+
+		_, err = a.queries.GetNonRevokedClientSecretByHashedSecret(r.Context(), hashedSecret)
+		if err != nil {
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("client_id", clientID),
+			)
+
+			responses.RenderError(w, r, apperrors.OAuthInvalidClient("invalid client secret", apperrors.ErrCodeAuthenticationFailure, nil))
+			return
+		}
+
+		reqLogger := logger.ContextRequestLogger(r.Context())
+
+		reqLogger.Debug("Client credentials validation successful",
+			slog.String("component", "signalsd.RequireNonRevokedClientCredentials"),
+			slog.String("client_id", clientID),
+			slog.String("account_id", serviceAccount.AccountID.String()),
+		)
+
 		logger.ContextWithLogAttrs(r.Context(),
 			slog.String("client_id", clientID),
 			slog.String("account_id", serviceAccount.AccountID.String()),

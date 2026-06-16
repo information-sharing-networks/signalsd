@@ -2202,14 +2202,18 @@ paths:
     post:
       consumes:
       - application/x-www-form-urlencoded
-      description: |
+      description: |-
         Self-service endpoint for service accounts to rotate their client secret.
-        This endpoint requires current valid client_id and client_secret for authentication.
-        The old secret remains valid for 5 minutes to prevent race conditions when multiple instances are involved and to stop clients being locked out where network issues prevent them from receiving the new secret immediately.
+        This endpoint accepts expired (but not revoked) credentials, so a service account that
+        missed a rotation deadline can still self-serve recovery without admin intervention.
+        The old secret remains valid for 5 minutes after rotation to prevent race conditions
+        in distributed deployments or when network issues prevent clients receiving the new secret immediately.
 
         **Use Cases:**
         - Regular credential rotation for security compliance
         - Suspected credential compromise requiring immediate rotation
+
+        note that by default client secrets expire automatically after 1 year.
       parameters:
       - description: Client ID
         in: formData

@@ -251,7 +251,7 @@ func (s *Server) registerAdminRoutes() {
 				})
 
 				r.Group(func(r chi.Router) {
-					r.Use(s.authService.RequireValidClientCredentials)
+					r.Use(s.authService.RequireNonRevokedClientCredentials)
 
 					r.Post("/service-accounts/rotate-secret", responses.Wrap(tokens.RotateServiceAccountSecret))
 				})

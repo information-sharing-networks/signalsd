@@ -1451,7 +1451,7 @@
         },
         "/api/auth/service-accounts/rotate-secret": {
             "post": {
-                "description": "Self-service endpoint for service accounts to rotate their client secret.\nThis endpoint requires current valid client_id and client_secret for authentication.\nThe old secret remains valid for 5 minutes to prevent race conditions when multiple instances are involved and to stop clients being locked out where network issues prevent them from receiving the new secret immediately.\n\n**Use Cases:**\n- Regular credential rotation for security compliance\n- Suspected credential compromise requiring immediate rotation\n",
+                "description": "Self-service endpoint for service accounts to rotate their client secret.\nThis endpoint accepts expired (but not revoked) credentials, so a service account that\nmissed a rotation deadline can still self-serve recovery without admin intervention.\nThe old secret remains valid for 5 minutes after rotation to prevent race conditions\nin distributed deployments or when network issues prevent clients receiving the new secret immediately.\n\n**Use Cases:**\n- Regular credential rotation for security compliance\n- Suspected credential compromise requiring immediate rotation\n\nnote that by default client secrets expire automatically after 1 year.",
                 "consumes": [
                     "application/x-www-form-urlencoded"
                 ],

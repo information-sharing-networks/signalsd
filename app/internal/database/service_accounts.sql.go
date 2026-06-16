@@ -168,6 +168,27 @@ func (q *Queries) ExistsServiceAccountWithOrganizationAndEmail(ctx context.Conte
 	return exists, err
 }
 
+const GetNonRevokedClientSecretByHashedSecret = `-- name: GetNonRevokedClientSecretByHashedSecret :one
+SELECT hashed_secret, created_at, updated_at, service_account_account_id, expires_at, revoked_at FROM client_secrets
+WHERE hashed_secret = $1
+AND revoked_at IS NULL
+`
+
+// used for rotation: allows expired but not revoked credentials
+func (q *Queries) GetNonRevokedClientSecretByHashedSecret(ctx context.Context, hashedSecret string) (ClientSecret, error) {
+	row := q.db.QueryRow(ctx, GetNonRevokedClientSecretByHashedSecret, hashedSecret)
+	var i ClientSecret
+	err := row.Scan(
+		&i.HashedSecret,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.ServiceAccountAccountID,
+		&i.ExpiresAt,
+		&i.RevokedAt,
+	)
+	return i, err
+}
+
 const GetOneTimeClientSecret = `-- name: GetOneTimeClientSecret :one
 SELECT created_at, service_account_account_id, plaintext_secret, expires_at
 FROM one_time_client_secrets
@@ -295,6 +316,7 @@ AND revoked_at IS NULL
 AND expires_at > NOW()
 `
 
+// used for authentication: does not return expired or revoked credentials
 func (q *Queries) GetValidClientSecretByHashedSecret(ctx context.Context, hashedSecret string) (ClientSecret, error) {
 	row := q.db.QueryRow(ctx, GetValidClientSecretByHashedSecret, hashedSecret)
 	var i ClientSecret
