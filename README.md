@@ -128,6 +128,7 @@ HOST=0.0.0.0                          #  Bind address (default: 0.0.0.0)
 PORT=8080                             #  Server port (default: 8080)
 ENVIRONMENT=dev                       #  Options: dev, prod, test, perf, staging (default: dev)
 LOG_LEVEL=debug                       #  Options: debug, info, warn, error (default: debug)
+TRUSTED_PROXIES=1                     #  Number of reverse proxies in front of the service 
 
 # Performance Tuning 
 READ_TIMEOUT=15s                      #  HTTP read timeout 
@@ -137,7 +138,6 @@ RATE_LIMIT_RPS=2500                   #  Requests per second (set to 0 to disabl
 RATE_LIMIT_BURST=5000                 #  Burst allowance 
 MAX_SIGNAL_PAYLOAD_SIZE=5242880       #  Max payload size (default: 5MB)
 MAX_API_REQUEST_SIZE=65536            #  Max API request size (default: 64KB)
-TRUSTED_PROXIES=1                     #  Number of reverse proxies in front of the service 
 
 # Database Connection Pool (the default used are the same as those used by pgx )
 DB_MAX_CONNECTIONS=4
