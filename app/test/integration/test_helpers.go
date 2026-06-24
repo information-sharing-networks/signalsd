@@ -148,7 +148,7 @@ const (
 )
 
 // createTestSignalType creates a signal type and associates it with an ISN
-// the simple schema expect content to have a single field called test, e.g "{ "test": "Hello, world!" }"
+// the simple schema expects content to have a single field called test, e.g "{ "test": "Hello, world!" }"
 // signal types default to version 1.0.0 if no version is supplied
 func createTestSignalType(t *testing.T, ctx context.Context, queries *database.Queries, isnID uuid.UUID, title string, version string) database.SignalType {
 	t.Helper()
@@ -182,6 +182,18 @@ func createTestSignalType(t *testing.T, ctx context.Context, queries *database.Q
 	}
 
 	return signalType
+}
+
+// addSignalTypeToIsn registers an existing signal type on an additional ISN.
+// Use this after createTestSignalType when the same signal type needs to appear on more than one ISN.
+func addSignalTypeToIsn(t *testing.T, ctx context.Context, queries *database.Queries, isnID, signalTypeID uuid.UUID) {
+	t.Helper()
+	if err := queries.AddSignalTypeToIsn(ctx, database.AddSignalTypeToIsnParams{
+		IsnID:        isnID,
+		SignalTypeID: signalTypeID,
+	}); err != nil {
+		t.Fatalf("Failed to add signal type %s to ISN %s: %v", signalTypeID, isnID, err)
+	}
 }
 
 // grantPermission creates a permission grant between an account and ISN

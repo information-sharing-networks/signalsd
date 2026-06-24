@@ -170,11 +170,13 @@ WITH ver AS (
     SELECT 
         st.id AS signal_type_id,
         COALESCE(
-            (SELECT MAX(sv.version_number) 
-             FROM signal_versions sv 
+            (SELECT MAX(sv.version_number)
+             FROM signal_versions sv
              JOIN signals s
                 ON s.id = sv.signal_id
-             WHERE s.local_ref = $4)
+             WHERE s.local_ref = $4
+                AND s.account_id = $1
+                AND s.signal_type_id = st.id)
             , 0) + 1 as version_number
     FROM signal_types st
     WHERE st.slug = $5
@@ -450,6 +452,7 @@ LEFT OUTER JOIN
 WHERE
     s.correlation_id = ANY($1)
     AND s.correlation_id != s.id  -- exclude self-referencing signals
+    AND s.isn_id = i.id
     AND i.is_in_use = true
     AND ist.is_in_use = true
     AND ($2::boolean = true OR s.is_withdrawn = false)
@@ -547,6 +550,7 @@ LEFT OUTER JOIN
     service_accounts si ON si.account_id = a.id
 WHERE
     i.slug = $1
+    AND s.isn_id = i.id
     AND st.slug = $2
     AND st.sem_ver = $3
     AND i.is_in_use = true
@@ -642,6 +646,7 @@ SELECT EXISTS(
     JOIN isn i ON i.id = ist.isn_id
     WHERE s.id = $1
         AND i.slug = $2
+        AND s.isn_id = i.id
 ) AS is_valid
 `
 
@@ -675,25 +680,31 @@ const WithdrawSignalByLocalRef = `-- name: WithdrawSignalByLocalRef :execrows
 UPDATE signals
 SET is_withdrawn = true, updated_at = NOW()
 WHERE account_id = $1
+    AND isn_id = (
+        SELECT i.id
+        FROM isn i
+        JOIN isn_signal_types ist ON ist.isn_id = i.id
+        JOIN signal_types st ON st.id = ist.signal_type_id
+        WHERE i.slug = $2
+            AND st.slug = $3
+            AND st.sem_ver = $4
+            AND i.is_in_use = true
+            AND ist.is_in_use = true
+    )
     AND signal_type_id = (
         SELECT st.id
         FROM signal_types st
-        JOIN isn_signal_types ist ON ist.signal_type_id = st.id
-        JOIN isn i ON i.id = ist.isn_id
-        WHERE st.slug = $2
-            AND st.sem_ver = $3
-            AND i.slug = $4
-            AND i.is_in_use = true
-            AND ist.is_in_use = true
+        WHERE st.slug = $3
+            AND st.sem_ver = $4
     )
     AND local_ref = $5
 `
 
 type WithdrawSignalByLocalRefParams struct {
 	AccountID uuid.UUID `json:"account_id"`
+	IsnSlug   string    `json:"isn_slug"`
 	Slug      string    `json:"slug"`
 	SemVer    string    `json:"sem_ver"`
-	IsnSlug   string    `json:"isn_slug"`
 	LocalRef  string    `json:"local_ref"`
 }
 
@@ -702,9 +713,9 @@ type WithdrawSignalByLocalRefParams struct {
 func (q *Queries) WithdrawSignalByLocalRef(ctx context.Context, arg WithdrawSignalByLocalRefParams) (int64, error) {
 	result, err := q.db.Exec(ctx, WithdrawSignalByLocalRef,
 		arg.AccountID,
+		arg.IsnSlug,
 		arg.Slug,
 		arg.SemVer,
-		arg.IsnSlug,
 		arg.LocalRef,
 	)
 	if err != nil {

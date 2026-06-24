@@ -53,6 +53,9 @@ type testEnv struct {
 // startInProcessServer starts the signalsd server in-process for testing.
 // A new database is created for each test and the server is configured to use it.
 // Server shutdown is registered via t.Cleanup automatically.
+//
+// the publicBaseURL param is only required for tests that require end user facing links (like password reset).
+// Supply "" otherwise
 func startInProcessServer(t *testing.T, publicBaseURL string) *testEnv {
 	t.Helper()
 

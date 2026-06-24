@@ -110,11 +110,13 @@ WITH ver AS (
     SELECT 
         st.id AS signal_type_id,
         COALESCE(
-            (SELECT MAX(sv.version_number) 
-             FROM signal_versions sv 
+            (SELECT MAX(sv.version_number)
+             FROM signal_versions sv
              JOIN signals s
                 ON s.id = sv.signal_id
-             WHERE s.local_ref = sqlc.arg(local_ref))
+             WHERE s.local_ref = sqlc.arg(local_ref)
+                AND s.account_id = sqlc.arg(account_id)
+                AND s.signal_type_id = st.id)
             , 0) + 1 as version_number
     FROM signal_types st
     WHERE st.slug = sqlc.arg(signal_type_slug)
@@ -150,21 +152,27 @@ SET is_withdrawn = true, updated_at = NOW()
 WHERE id = sqlc.arg(id);
 
 -- name: WithdrawSignalByLocalRef :execrows
--- only withdraws if the ISN and signal type are in use 
+-- only withdraws if the ISN and signal type are in use
 -- Only withdraws signals if ISN and signal type are in use (this is a defence against stale access tokens).
 UPDATE signals
 SET is_withdrawn = true, updated_at = NOW()
 WHERE account_id = sqlc.arg(account_id)
+    AND isn_id = (
+        SELECT i.id
+        FROM isn i
+        JOIN isn_signal_types ist ON ist.isn_id = i.id
+        JOIN signal_types st ON st.id = ist.signal_type_id
+        WHERE i.slug = sqlc.arg(isn_slug)
+            AND st.slug = sqlc.arg(slug)
+            AND st.sem_ver = sqlc.arg(sem_ver)
+            AND i.is_in_use = true
+            AND ist.is_in_use = true
+    )
     AND signal_type_id = (
         SELECT st.id
         FROM signal_types st
-        JOIN isn_signal_types ist ON ist.signal_type_id = st.id
-        JOIN isn i ON i.id = ist.isn_id
         WHERE st.slug = sqlc.arg(slug)
             AND st.sem_ver = sqlc.arg(sem_ver)
-            AND i.slug = sqlc.arg(isn_slug)
-            AND i.is_in_use = true
-            AND ist.is_in_use = true
     )
     AND local_ref = sqlc.arg(local_ref);
 
@@ -235,6 +243,7 @@ SELECT EXISTS(
     JOIN isn i ON i.id = ist.isn_id
     WHERE s.id = sqlc.arg(correlation_id)
         AND i.slug = sqlc.arg(isn_slug)
+        AND s.isn_id = i.id
 ) AS is_valid;
 
 -- name: GetSignalCorrelationDetails :one
@@ -291,6 +300,7 @@ LEFT OUTER JOIN
 WHERE
     s.correlation_id = ANY(sqlc.slice(correlation_ids))
     AND s.correlation_id != s.id  -- exclude self-referencing signals
+    AND s.isn_id = i.id
     AND i.is_in_use = true
     AND ist.is_in_use = true
     AND (sqlc.narg('include_withdrawn')::boolean = true OR s.is_withdrawn = false)
