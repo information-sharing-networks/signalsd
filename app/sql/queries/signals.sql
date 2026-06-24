@@ -202,6 +202,7 @@ LEFT OUTER JOIN
     service_accounts si ON si.account_id = a.id
 WHERE
     i.slug = sqlc.arg(isn_slug)
+    AND s.isn_id = i.id
     AND st.slug = sqlc.arg(signal_type_slug)
     AND st.sem_ver = sqlc.arg(sem_ver)
     AND i.is_in_use = true
