@@ -2247,7 +2247,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Search for signals by date or account in private ISNs (authentication required - only accounts with read or write permissions to the ISN can access signals).\n\nNote the endpoint returns the latest version of each signal.",
+                "description": "Search for signals by date or account in private ISNs (authentication required - only accounts with read or write permissions to the ISN can access signals).\n\nNote the endpoint returns the latest version of each signal.\n\nWrite-only accounts can only see signals created by their own account (searches that filter on another account_id return no results).",
                 "tags": [
                     "Signal Exchange"
                 ],

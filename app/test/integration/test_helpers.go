@@ -5,6 +5,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"testing"
 	"time"
 
@@ -282,4 +283,24 @@ func (env *testEnv) createAuthToken(t *testing.T, accountID uuid.UUID) string {
 		t.Fatalf("Failed to create access token: %v", err)
 	}
 	return tokenResponse.AccessToken
+}
+
+// searchPrivateSignalsWithAccountID searches for signals on a private ISN filtered by an explicit account_id
+func searchPrivateSignalsWithAccountID(t *testing.T, baseURL, isnSlug, signalTypeSlug, semVer, token, accountID string) *http.Response {
+	t.Helper()
+
+	url := fmt.Sprintf("%s/api/isn/%s/signal-types/%s/v%s/signals/search?account_id=%s",
+		baseURL, isnSlug, signalTypeSlug, semVer, accountID)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Failed to search private signals: %v", err)
+	}
+	return resp
 }

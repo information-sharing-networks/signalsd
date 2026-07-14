@@ -893,6 +893,8 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 //	@Description	Search for signals by date or account in private ISNs (authentication required - only accounts with read or write permissions to the ISN can access signals).
 //	@Description
 //	@Description	Note the endpoint returns the latest version of each signal.
+//	@Description
+//	@Description	Write-only accounts can only see signals created by their own account (searches that filter on another account_id return no results).
 //
 //	@Param			start_date					query		string	false	"Start date"															example(2006-01-02T15:05:00Z)
 //	@Param			end_date					query		string	false	"End date"																example(2006-01-02T15:15:00Z)
@@ -934,6 +936,20 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 		return apperrors.InvalidURLParam("invalid search parameters", err)
 	}
 
+	// Write-only accounts can only see signals they created - restrict the query to their own account
+	// (searches that filter on another account_id return no results)
+	isnPerms := claims.IsnPerms[searchParams.isnSlug]
+	if !isnPerms.CanRead && isnPerms.CanWrite {
+		accountID, ok := auth.ContextAccountID(r.Context())
+		if !ok {
+			return apperrors.AuthenticationFailure("could not determine account from access token", nil)
+		}
+		if searchParams.accountID != nil && *searchParams.accountID != accountID {
+			return responses.JSON(w, http.StatusOK, []SearchSignalWithCorrelationsAndVersions{})
+		}
+		searchParams.accountID = &accountID
+	}
+
 	returnedSignals, err := s.queries.GetSignalsWithOptionalFilters(r.Context(), database.GetSignalsWithOptionalFiltersParams{
 		IsnSlug:          searchParams.isnSlug,
 		SignalTypeSlug:   searchParams.signalTypeSlug,
@@ -951,28 +967,6 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 		)
 
 		return apperrors.DatabaseError("database error", err)
-	}
-
-	// Apply permission-based filtering for write-only accounts
-	// Write-only accounts can only see signals they created
-	accountID, _ := auth.ContextAccountID(r.Context())
-	isnPerms := claims.IsnPerms[searchParams.isnSlug]
-	if !isnPerms.CanRead && isnPerms.CanWrite {
-		// Build a set of signal IDs created by this account
-		createdSignalIDs := make(map[uuid.UUID]bool)
-		for _, signal := range returnedSignals {
-			if signal.AccountID == accountID {
-				createdSignalIDs[signal.SignalID] = true
-			}
-		}
-
-		filtered := make([]database.GetSignalsWithOptionalFiltersRow, 0, len(returnedSignals))
-		for _, signal := range returnedSignals {
-			if signal.AccountID == accountID {
-				filtered = append(filtered, signal)
-			}
-		}
-		returnedSignals = filtered
 	}
 
 	response := make([]SearchSignalWithCorrelationsAndVersions, 0, len(returnedSignals))

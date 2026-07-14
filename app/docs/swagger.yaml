@@ -2799,6 +2799,8 @@ paths:
         Search for signals by date or account in private ISNs (authentication required - only accounts with read or write permissions to the ISN can access signals).
 
         Note the endpoint returns the latest version of each signal.
+
+        Write-only accounts can only see signals created by their own account (searches that filter on another account_id return no results).
       parameters:
       - description: Start date
         example: "2006-01-02T15:05:00Z"

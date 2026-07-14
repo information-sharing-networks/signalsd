@@ -1192,6 +1192,42 @@ func TestWriteOnlyAccountVisibility(t *testing.T) {
 			}
 		}
 	})
+
+	t.Run("write-only account filtering on another account_id gets no results", func(t *testing.T) {
+		response := searchPrivateSignalsWithAccountID(t, testEnv.baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer, token1, account2.ID.String())
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusOK {
+			t.Fatalf("Search failed: %d", response.StatusCode)
+		}
+
+		var signals []map[string]any
+		if err := json.NewDecoder(response.Body).Decode(&signals); err != nil {
+			t.Fatalf("Failed to decode response: %v", err)
+		}
+
+		if len(signals) != 0 {
+			t.Errorf("Expected 0 signals, got %d", len(signals))
+		}
+	})
+
+	t.Run("write-only account can filter on its own account_id", func(t *testing.T) {
+		response := searchPrivateSignalsWithAccountID(t, testEnv.baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer, token1, account1.ID.String())
+		defer response.Body.Close()
+
+		if response.StatusCode != http.StatusOK {
+			t.Fatalf("Search failed: %d", response.StatusCode)
+		}
+
+		var signals []map[string]any
+		if err := json.NewDecoder(response.Body).Decode(&signals); err != nil {
+			t.Fatalf("Failed to decode response: %v", err)
+		}
+
+		if len(signals) != 1 {
+			t.Errorf("Expected 1 signal, got %d", len(signals))
+		}
+	})
 }
 
 // TestCorrelatedAndPreviousVersionsSearch tests the include_correlated and include_previous_versions functionality
