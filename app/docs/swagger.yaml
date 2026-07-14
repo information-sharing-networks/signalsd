@@ -609,13 +609,6 @@ definitions:
       version_number:
         type: integer
     type: object
-  handlers.SearchSignalResponse:
-    properties:
-      signals:
-        items:
-          $ref: '#/definitions/handlers.SearchSignalWithCorrelationsAndVersions'
-        type: array
-    type: object
   handlers.SearchSignalWithCorrelationsAndVersions:
     properties:
       account_id:
@@ -2849,7 +2842,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handlers.SearchSignalResponse'
+              $ref: '#/definitions/handlers.SearchSignalWithCorrelationsAndVersions'
             type: array
         "400":
           description: invalid_url_param
@@ -3035,7 +3028,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/handlers.SearchSignalResponse'
+              $ref: '#/definitions/handlers.SearchSignalWithCorrelationsAndVersions'
             type: array
         "400":
           description: invalid_url_param

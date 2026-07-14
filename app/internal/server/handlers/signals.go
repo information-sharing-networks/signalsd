@@ -196,10 +196,6 @@ type SearchSignalWithCorrelationsAndVersions struct {
 	PreviousSignalVersions []PreviousSignalVersion `json:"previous_signal_versions,omitempty"`
 }
 
-type SearchSignalResponse struct {
-	Signals []SearchSignalWithCorrelationsAndVersions `json:"signals"`
-}
-
 // parseSearchParams parses all search parameters from the signal search request
 func parseSearchParams(r *http.Request) (SearchParams, error) {
 	searchParams := SearchParams{
@@ -768,7 +764,7 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) e
 //	@Param			include_correlated			query		string	false	"Include signals that link to each returned signal (default: false)"	example(true)
 //	@Param			include_previous_versions	query		string	false	"Include previous versions of each returned signal (default: false)"	example(true)
 //
-//	@Success		200							{array}		handlers.SearchSignalResponse
+//	@Success		200							{array}		handlers.SearchSignalWithCorrelationsAndVersions
 //	@Failure		400							{object}	responses.ErrorResponse	"invalid_url_param"
 //	@Failure		404							{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		500							{object}	responses.ErrorResponse	"database_error"
@@ -905,7 +901,7 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 //	@Param			include_correlated			query		string	false	"Include signals that link to each returned signal (default: false)"	example(true)
 //	@Param			include_previous_versions	query		string	false	"Include previous versions of each returned signal (default: false)"	example(true)
 //
-//	@Success		200							{array}		handlers.SearchSignalResponse
+//	@Success		200							{array}		handlers.SearchSignalWithCorrelationsAndVersions
 //	@Failure		400							{object}	responses.ErrorResponse	"invalid_url_param"
 //	@Failure		401							{object}	responses.ErrorResponse	"authentication_error"
 //	@Failure		500							{object}	responses.ErrorResponse	"database_error"

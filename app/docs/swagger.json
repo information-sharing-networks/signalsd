@@ -2316,7 +2316,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handlers.SearchSignalResponse"
+                                "$ref": "#/definitions/handlers.SearchSignalWithCorrelationsAndVersions"
                             }
                         }
                     },
@@ -2502,7 +2502,7 @@
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/handlers.SearchSignalResponse"
+                                "$ref": "#/definitions/handlers.SearchSignalWithCorrelationsAndVersions"
                             }
                         }
                     },
@@ -3602,17 +3602,6 @@
                 },
                 "version_number": {
                     "type": "integer"
-                }
-            }
-        },
-        "handlers.SearchSignalResponse": {
-            "type": "object",
-            "properties": {
-                "signals": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/handlers.SearchSignalWithCorrelationsAndVersions"
-                    }
                 }
             }
         },
