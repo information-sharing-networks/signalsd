@@ -100,7 +100,7 @@ func ParseLogLevel(level string) slog.Level {
 func InitLogger(logLevel slog.Level, environment string) *slog.Logger {
 	if environment == "dev" || environment == "test" {
 		return slog.New(
-			tint.NewHandler(os.Stderr, &tint.Options{
+			tint.NewTextHandler(os.Stderr, &tint.Options{
 				Level:      logLevel,
 				TimeFormat: time.Kitchen,
 			}),
