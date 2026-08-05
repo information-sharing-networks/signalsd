@@ -54,6 +54,18 @@ type ServiceAccountDetails struct {
 	ClientOrganization string    `json:"client_organization" example:"Example Organization"`
 }
 
+// newServiceAccountDetails converts a service account database record into the API response struct
+func newServiceAccountDetails(serviceAccount database.ServiceAccount) ServiceAccountDetails {
+	return ServiceAccountDetails{
+		AccountID:          serviceAccount.AccountID,
+		CreatedAt:          serviceAccount.CreatedAt,
+		UpdatedAt:          serviceAccount.UpdatedAt,
+		ClientID:           serviceAccount.ClientID,
+		ClientContactEmail: serviceAccount.ClientContactEmail,
+		ClientOrganization: serviceAccount.ClientOrganization,
+	}
+}
+
 type AccountStatusResponse struct {
 	AccountID   uuid.UUID `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
 	AccountType string    `json:"account_type" example:"user" enums:"user,service-account"`
@@ -481,14 +493,7 @@ func (a *AdminHandler) GetServiceAccounts(w http.ResponseWriter, r *http.Request
 		// Convert database structs to our response structs
 		serviceAccounts := make([]ServiceAccountDetails, len(dbServiceAccounts))
 		for i, dbServiceAccount := range dbServiceAccounts {
-			serviceAccounts[i] = ServiceAccountDetails{
-				AccountID:          dbServiceAccount.AccountID,
-				CreatedAt:          dbServiceAccount.CreatedAt,
-				UpdatedAt:          dbServiceAccount.UpdatedAt,
-				ClientID:           dbServiceAccount.ClientID,
-				ClientContactEmail: dbServiceAccount.ClientContactEmail,
-				ClientOrganization: dbServiceAccount.ClientOrganization,
-			}
+			serviceAccounts[i] = newServiceAccountDetails(dbServiceAccount)
 		}
 
 		logger.ContextWithLogAttrs(r.Context(),
@@ -535,15 +540,8 @@ func (a *AdminHandler) GetServiceAccounts(w http.ResponseWriter, r *http.Request
 
 			return apperrors.DatabaseError("database error", err)
 		}
-		serviceAccountDetails := ServiceAccountDetails{
-			AccountID:          dbServiceAccount.AccountID,
-			CreatedAt:          dbServiceAccount.CreatedAt,
-			UpdatedAt:          dbServiceAccount.UpdatedAt,
-			ClientID:           dbServiceAccount.ClientID,
-			ClientContactEmail: dbServiceAccount.ClientContactEmail,
-			ClientOrganization: dbServiceAccount.ClientOrganization,
-		}
-		return responses.JSON(w, http.StatusOK, serviceAccountDetails)
+
+		return responses.JSON(w, http.StatusOK, newServiceAccountDetails(dbServiceAccount))
 	}
 
 	// query by email and organization
@@ -559,15 +557,8 @@ func (a *AdminHandler) GetServiceAccounts(w http.ResponseWriter, r *http.Request
 
 			return apperrors.DatabaseError("database error", err)
 		}
-		serviceAccountDetails := ServiceAccountDetails{
-			AccountID:          dbServiceAccount.AccountID,
-			CreatedAt:          dbServiceAccount.CreatedAt,
-			UpdatedAt:          dbServiceAccount.UpdatedAt,
-			ClientID:           dbServiceAccount.ClientID,
-			ClientContactEmail: dbServiceAccount.ClientContactEmail,
-			ClientOrganization: dbServiceAccount.ClientOrganization,
-		}
-		return responses.JSON(w, http.StatusOK, serviceAccountDetails)
+
+		return responses.JSON(w, http.StatusOK, newServiceAccountDetails(dbServiceAccount))
 	}
 
 	// query by clientId
@@ -579,15 +570,8 @@ func (a *AdminHandler) GetServiceAccounts(w http.ResponseWriter, r *http.Request
 
 		return apperrors.DatabaseError("database error", err)
 	}
-	serviceAccountDetails := ServiceAccountDetails{
-		AccountID:          dbServiceAccount.AccountID,
-		CreatedAt:          dbServiceAccount.CreatedAt,
-		UpdatedAt:          dbServiceAccount.UpdatedAt,
-		ClientID:           dbServiceAccount.ClientID,
-		ClientContactEmail: dbServiceAccount.ClientContactEmail,
-		ClientOrganization: dbServiceAccount.ClientOrganization,
-	}
-	return responses.JSON(w, http.StatusOK, serviceAccountDetails)
+
+	return responses.JSON(w, http.StatusOK, newServiceAccountDetails(dbServiceAccount))
 }
 
 // Password reset link generation types
