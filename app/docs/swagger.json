@@ -1105,7 +1105,7 @@
             "post": {
                 "description": "The response body includes an access token which can be used to access the protected enpoints, assuming the account has the appropriate permissions.\nThe access_token is valid for 30 minutes.\n\nAs part of the login response, the server sets a http-only cookie on the client that will allow it to refresh the token (use the /oauth/token endpoint with a grant_type=refresh_token param)\nThe refresh_token lasts 30 days unless it is revoked earlier.\n- To renew the refresh_token, log in again.\n- To revoke the refresh_token, call the /oauth/revoke endpoint.\n\nThe account's role and permissions are encoded as part of the jwt access token and this information is also provided in the response body.",
                 "tags": [
-                    "auth"
+                    "User Authentication"
                 ],
                 "summary": "Login",
                 "parameters": [
@@ -1151,7 +1151,7 @@
             "get": {
                 "description": "Renders a password reset form for users with a valid reset token.\nThe reset token is validated and if valid, displays a form for the user to enter a new password.\n\nDo not call this endpoint directly, it will be called when the user clicks on the URL created by the *Generate password reset link* endpoint.",
                 "tags": [
-                    "auth"
+                    "User Authentication"
                 ],
                 "summary": "Display Password Reset Form",
                 "parameters": [
@@ -1191,7 +1191,7 @@
             "post": {
                 "description": "Endpoint to handle password requests received from the PasswordResetTokenPageHandler (do not call the endpoint directly)\nThe handler validates the token, updates the user password, and consumes the one-time-use token.\nAny user in possession of the token can use it to reset the password of the associated account\nOne time tokens can only be issued by admins.",
                 "tags": [
-                    "auth"
+                    "User Authentication"
                 ],
                 "summary": "Process Password Reset Token",
                 "parameters": [
@@ -1253,7 +1253,7 @@
                 ],
                 "description": "Self-service endpoint for users to reset their password.  Requires a valid access token and the current password\n",
                 "tags": [
-                    "Account Management"
+                    "User Authentication"
                 ],
                 "summary": "Password Reset (self service)",
                 "parameters": [
@@ -1296,7 +1296,7 @@
             "post": {
                 "description": "The first user created is granted the \"siteadmin\" role and has super-user access to the site.\n\nWeb users can register directly and default to standard member roles.\nNew members can't access any information beyond the public data on the site until an admin grants them access to an ISN.\n\nThe site owner can grant other users the admin role.\nAdmins can create ISNs and service accounts and grant other accounts permissions to read or write to ISNs they created.",
                 "tags": [
-                    "auth"
+                    "User Authentication"
                 ],
                 "summary": "Register User",
                 "parameters": [
@@ -1344,7 +1344,7 @@
                 ],
                 "description": "Registring a new service account creates a one-time link with the client credentials in it - this must be used by the client within 48 hrs.\n\nNote that where an organization needs more than one service account they must supply unique contact emails for each account.\n\nTo reissue credentials for an existing service account, use the **Reissue Service Account Credentials** endpoint.\n\nYou have to be an admin to use this end point\n",
                 "tags": [
-                    "Account Management"
+                    "Service Accounts"
                 ],
                 "summary": "Register Service Account",
                 "parameters": [
@@ -1401,7 +1401,7 @@
                 ],
                 "description": "Reissue credentials for an existing service account.\nThis creates a new one-time link with fresh client credentials - this must be used by the client within 48 hrs.\n\nThis endpoint revokes all existing client secrets and one-time setup URLs for the service account, then generates new credentials.\n\nThe client_id will remain the same, but a new client_secret will be generated.\n\nYou have to be an site or ISN admin to use this endpoint\n",
                 "tags": [
-                    "Account Management"
+                    "Service Accounts"
                 ],
                 "summary": "Reissue Service Account Credentials",
                 "parameters": [
@@ -1456,7 +1456,7 @@
                     "application/x-www-form-urlencoded"
                 ],
                 "tags": [
-                    "auth"
+                    "Service Accounts"
                 ],
                 "summary": "Rotate Service Account Client Secret",
                 "parameters": [
@@ -1507,7 +1507,7 @@
             "get": {
                 "description": "Exchange one-time setup token for permanent client credentials (the one-time request url is created when a new service account is registered).\nthe endpoint renders a html page that the user can use to copy their client credentials.\nThe setup url is only valid for 48 hours.\n",
                 "tags": [
-                    "Account Management"
+                    "Service Accounts"
                 ],
                 "summary": "Complete Service Account Setup",
                 "parameters": [
@@ -2665,9 +2665,9 @@
                     "application/x-www-form-urlencoded"
                 ],
                 "tags": [
-                    "auth"
+                    "OAuth 2.0"
                 ],
-                "summary": "Revoke Token",
+                "summary": "Revoke Credentials (OAuth 2.0 revocation endpoint)",
                 "parameters": [
                     {
                         "enum": [
@@ -2726,14 +2726,14 @@
         },
         "/oauth/token": {
             "post": {
-                "description": "Issues a new access token. The request body must be `application/x-www-form-urlencoded` (RFC 6749).\n\n---\n\n**Service Accounts — `client_credentials` grant**\n\nInclude in the request body:\n- `grant_type=client_credentials`\n- `client_id=\u003cyour_client_id\u003e`\n- `client_secret=\u003cyour_client_secret\u003e`\n\nAlternatively, credentials may be supplied via HTTP Basic Auth (`Authorization: Basic base64(client_id:client_secret)`).\n\nReturns a new access token in the response body. Access tokens expire after 30 minutes.\n\n---\n\n**Web Users — `refresh_token` grant**\n\nInclude in the request body:\n- `grant_type=refresh_token`\n\nThe refresh token is read automatically from the `refresh_token` HTTP-only cookie set during login.\nNo additional form fields are required.\n\nReturns a new access token in the response body. The rotated refresh token is set as a new HTTP-only cookie.\nAccess tokens expire after 30 minutes. Refresh tokens expire after 30 days — if the refresh token\nhas expired the user must log in again.\n",
+                "description": "Issues a new access token. The request body must be `application/x-www-form-urlencoded` (RFC 6749).\n\nService accounts use the `client_credentials` grant, web users use the `refresh_token` grant - see below.\n\n---\n\n**Service Accounts — `client_credentials` grant**\n\nInclude in the request body:\n- `grant_type=client_credentials`\n- `client_id=\u003cyour_client_id\u003e`\n- `client_secret=\u003cyour_client_secret\u003e`\n\nAlternatively, credentials may be supplied via HTTP Basic Auth (`Authorization: Basic base64(client_id:client_secret)`).\n\nReturns a new access token in the response body. Access tokens expire after 30 minutes.\n\n---\n\n**Web Users — `refresh_token` grant**\n\nInclude in the request body:\n- `grant_type=refresh_token`\n\nThe refresh token is read automatically from the `refresh_token` HTTP-only cookie set during login.\nNo additional form fields are required.\n\nReturns a new access token in the response body. The rotated refresh token is set as a new HTTP-only cookie.\nAccess tokens expire after 30 minutes. Refresh tokens expire after 30 days — if the refresh token\nhas expired the user must log in again.\n",
                 "consumes": [
                     "application/x-www-form-urlencoded"
                 ],
                 "tags": [
-                    "auth"
+                    "OAuth 2.0"
                 ],
-                "summary": "Refresh Access Token",
+                "summary": "Get Access Token (OAuth 2.0 token endpoint)",
                 "parameters": [
                     {
                         "enum": [
@@ -4150,16 +4150,28 @@
     },
     "tags": [
         {
-            "description": "Authentication and authorization endpoints.",
-            "name": "auth"
+            "description": "Access token issuance and revocation. The signalsd backend acts as an OAuth 2.0 Authorization Server: service accounts use the client_credentials grant, web users use the refresh_token grant. Start here if you are connecting a system to the API.",
+            "name": "OAuth 2.0"
         },
         {
-            "description": "Site adminstration tools. These endpoints can only be used by the accounts that have a siteadmin or isnadmin role",
-            "name": "Site Admin"
+            "description": "Registration, login and password reset for web users. Use the OAuth 2.0 endpoints to obtain access tokens.",
+            "name": "User Authentication"
         },
         {
-            "description": "Manage user accounts and service accounts",
-            "name": "Account Management"
+            "description": "Register service accounts and manage their credentials (used for system-to-system access). Use the OAuth 2.0 endpoints to exchange service account credentials for an access token.",
+            "name": "Service Accounts"
+        },
+        {
+            "description": "Submit, withdraw and search signals, and track the status of submitted batches",
+            "name": "Signal Exchange"
+        },
+        {
+            "description": "Configure the rules used to route signals of the same type to different ISNs based on their content",
+            "name": "Signals Routing"
+        },
+        {
+            "description": "Define the format of the data being shared in an ISN",
+            "name": "Signal Types"
         },
         {
             "description": "Create and manage Information Sharing Networks (ISNs) - these endpoints can only be used by the accounts that have a siteadmin or isnadmin role Note that ISN admins can only view or update details for ISNs they created.",
@@ -4170,12 +4182,12 @@
             "name": "ISN Permissions"
         },
         {
-            "description": "Define the format of the data being shared in an ISN",
-            "name": "Signal Types"
+            "description": "Manage user accounts and service accounts",
+            "name": "Account Management"
         },
         {
-            "description": "Manage service account end points",
-            "name": "Service Accounts"
+            "description": "Site adminstration tools. These endpoints can only be used by the accounts that have a siteadmin or isnadmin role",
+            "name": "Site Admin"
         }
     ]
 }

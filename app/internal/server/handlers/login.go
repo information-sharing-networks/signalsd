@@ -45,7 +45,7 @@ type LoginRequest struct {
 //	@Description
 //	@Description	The account's role and permissions are encoded as part of the jwt access token and this information is also provided in the response body.
 //
-//	@Tags			auth
+//	@Tags			User Authentication
 //
 //	@Param			request	body		handlers.LoginRequest	true	"email and password"
 //

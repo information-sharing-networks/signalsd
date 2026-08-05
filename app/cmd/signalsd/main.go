@@ -143,14 +143,23 @@ import (
 //	@name						Authorization
 //	@description				Bearer {JWT access token}
 
-//	@tag.name			auth
-//	@tag.description	Authentication and authorization endpoints.
+//	@tag.name			OAuth 2.0
+//	@tag.description	Access token issuance and revocation. The signalsd backend acts as an OAuth 2.0 Authorization Server: service accounts use the client_credentials grant, web users use the refresh_token grant. Start here if you are connecting a system to the API.
 
-//	@tag.name			Site Admin
-//	@tag.description	Site adminstration tools. These endpoints can only be used by the accounts that have a siteadmin or isnadmin role
+//	@tag.name			User Authentication
+//	@tag.description	Registration, login and password reset for web users. Use the OAuth 2.0 endpoints to obtain access tokens.
 
-//	@tag.name			Account Management
-//	@tag.description	Manage user accounts and service accounts
+//	@tag.name			Service Accounts
+//	@tag.description	Register service accounts and manage their credentials (used for system-to-system access). Use the OAuth 2.0 endpoints to exchange service account credentials for an access token.
+
+//	@tag.name			Signal Exchange
+//	@tag.description	Submit, withdraw and search signals, and track the status of submitted batches
+
+//	@tag.name			Signals Routing
+//	@tag.description	Configure the rules used to route signals of the same type to different ISNs based on their content
+
+//	@tag.name			Signal Types
+//	@tag.description	Define the format of the data being shared in an ISN
 
 //	@tag.name			ISN Configuration
 //	@tag.description	Create and manage Information Sharing Networks (ISNs) - these endpoints can only be used by the accounts that have a siteadmin or isnadmin role Note that ISN admins can only view or update details for ISNs they created.
@@ -158,11 +167,11 @@ import (
 //	@tag.name			ISN Permissions
 //	@tag.description	Grant accounts read or write access to an ISN
 
-//	@tag.name			Signal Types
-//	@tag.description	Define the format of the data being shared in an ISN
+//	@tag.name			Account Management
+//	@tag.description	Manage user accounts and service accounts
 
-//	@tag.name			Service Accounts
-//	@tag.description	Manage service account end points
+//	@tag.name			Site Admin
+//	@tag.description	Site adminstration tools. These endpoints can only be used by the accounts that have a siteadmin or isnadmin role
 
 //	@tag.name			UI Pages
 //	@tag.description	Browser-based management interface. Page handlers return full HTML

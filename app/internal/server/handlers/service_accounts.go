@@ -82,7 +82,7 @@ type SetupPageData struct {
 //	@Description
 //	@Description	You have to be an admin to use this end point
 //	@Description
-//	@Tags		Account Management
+//	@Tags		Service Accounts
 //
 //	@Param		request	body		handlers.CreateServiceAccountRequest	true	"service account details"
 //
@@ -229,7 +229,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccount(w http.ResponseWriter, r 
 //	@Description
 //	@Description	You have to be an site or ISN admin to use this endpoint
 //	@Description
-//	@Tags		Account Management
+//	@Tags		Service Accounts
 //
 //	@Param		request	body		handlers.ReissueServiceAccountCredentialsRequest	true	"service account details"
 //
@@ -369,7 +369,7 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentials(w http.Response
 //	@Description	the endpoint renders a html page that the user can use to copy their client credentials.
 //	@Description	The setup url is only valid for 48 hours.
 //	@Description
-//	@Tags		Account Management
+//	@Tags		Service Accounts
 //
 //	@Param		setup_id	path	string	true	"One-time setup ID"	example(550e8400-e29b-41d4-a716-446655440000)
 //

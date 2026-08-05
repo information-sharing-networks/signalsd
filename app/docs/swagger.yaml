@@ -1964,7 +1964,7 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       summary: Login
       tags:
-      - auth
+      - User Authentication
   /api/auth/password-reset/{token_id}:
     get:
       description: |-
@@ -1996,7 +1996,7 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       summary: Display Password Reset Form
       tags:
-      - auth
+      - User Authentication
     post:
       description: |-
         Endpoint to handle password requests received from the PasswordResetTokenPageHandler (do not call the endpoint directly)
@@ -2037,7 +2037,7 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       summary: Process Password Reset Token
       tags:
-      - auth
+      - User Authentication
   /api/auth/password/reset:
     put:
       description: |
@@ -2068,7 +2068,7 @@ paths:
       - BearerAccessToken: []
       summary: Password Reset (self service)
       tags:
-      - Account Management
+      - User Authentication
   /api/auth/register:
     post:
       description: |-
@@ -2103,7 +2103,7 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       summary: Register User
       tags:
-      - auth
+      - User Authentication
   /api/auth/service-accounts/register:
     post:
       description: |
@@ -2146,7 +2146,7 @@ paths:
       - BearerAccessToken: []
       summary: Register Service Account
       tags:
-      - Account Management
+      - Service Accounts
   /api/auth/service-accounts/reissue-credentials:
     post:
       description: |
@@ -2190,7 +2190,7 @@ paths:
       - BearerAccessToken: []
       summary: Reissue Service Account Credentials
       tags:
-      - Account Management
+      - Service Accounts
   /api/auth/service-accounts/rotate-secret:
     post:
       consumes:
@@ -2241,7 +2241,7 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       summary: Rotate Service Account Client Secret
       tags:
-      - auth
+      - Service Accounts
   /api/auth/service-accounts/setup/{setup_id}:
     get:
       description: |
@@ -2272,7 +2272,7 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       summary: Complete Service Account Setup
       tags:
-      - Account Management
+      - Service Accounts
   /api/batches/{batch_ref}/status:
     get:
       description: |
@@ -3276,15 +3276,17 @@ paths:
           description: server_error
           schema:
             $ref: '#/definitions/responses.OAuthErrorResponse'
-      summary: Revoke Token
+      summary: Revoke Credentials (OAuth 2.0 revocation endpoint)
       tags:
-      - auth
+      - OAuth 2.0
   /oauth/token:
     post:
       consumes:
       - application/x-www-form-urlencoded
       description: |
         Issues a new access token. The request body must be `application/x-www-form-urlencoded` (RFC 6749).
+
+        Service accounts use the `client_credentials` grant, web users use the `refresh_token` grant - see below.
 
         ---
 
@@ -3348,9 +3350,9 @@ paths:
           description: server_error
           schema:
             $ref: '#/definitions/responses.OAuthErrorResponse'
-      summary: Refresh Access Token
+      summary: Get Access Token (OAuth 2.0 token endpoint)
       tags:
-      - auth
+      - OAuth 2.0
   /version:
     get:
       description: Returns the current API version details
@@ -3372,20 +3374,34 @@ securityDefinitions:
     type: apiKey
 swagger: "2.0"
 tags:
-- description: Authentication and authorization endpoints.
-  name: auth
-- description: Site adminstration tools. These endpoints can only be used by the accounts
-    that have a siteadmin or isnadmin role
-  name: Site Admin
-- description: Manage user accounts and service accounts
-  name: Account Management
+- description: 'Access token issuance and revocation. The signalsd backend acts as
+    an OAuth 2.0 Authorization Server: service accounts use the client_credentials
+    grant, web users use the refresh_token grant. Start here if you are connecting
+    a system to the API.'
+  name: OAuth 2.0
+- description: Registration, login and password reset for web users. Use the OAuth
+    2.0 endpoints to obtain access tokens.
+  name: User Authentication
+- description: Register service accounts and manage their credentials (used for system-to-system
+    access). Use the OAuth 2.0 endpoints to exchange service account credentials for
+    an access token.
+  name: Service Accounts
+- description: Submit, withdraw and search signals, and track the status of submitted
+    batches
+  name: Signal Exchange
+- description: Configure the rules used to route signals of the same type to different
+    ISNs based on their content
+  name: Signals Routing
+- description: Define the format of the data being shared in an ISN
+  name: Signal Types
 - description: Create and manage Information Sharing Networks (ISNs) - these endpoints
     can only be used by the accounts that have a siteadmin or isnadmin role Note that
     ISN admins can only view or update details for ISNs they created.
   name: ISN Configuration
 - description: Grant accounts read or write access to an ISN
   name: ISN Permissions
-- description: Define the format of the data being shared in an ISN
-  name: Signal Types
-- description: Manage service account end points
-  name: Service Accounts
+- description: Manage user accounts and service accounts
+  name: Account Management
+- description: Site adminstration tools. These endpoints can only be used by the accounts
+    that have a siteadmin or isnadmin role
+  name: Site Admin

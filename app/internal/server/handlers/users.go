@@ -50,7 +50,7 @@ type UpdatePasswordRequest struct {
 // RegisterUser godoc
 //
 //	@Summary		Register User
-//	@Tags			auth
+//	@Tags			User Authentication
 //
 //	@Param			request	body	handlers.CreateUserRequest	true	"user details"
 //	@Description	The first user created is granted the "siteadmin" role and has super-user access to the site.
@@ -159,7 +159,7 @@ func (u *UserHandler) RegisterUser(w http.ResponseWriter, r *http.Request) error
 //	@Summary		Password Reset (self service)
 //	@Description	Self-service endpoint for users to reset their password.  Requires a valid access token and the current password
 //	@Description
-//	@Tags		Account Management
+//	@Tags		User Authentication
 //
 //	@Param		request	body	handlers.UpdatePasswordRequest	true	"user details"
 //	@Success	204
@@ -569,7 +569,7 @@ type PasswordResetPageData struct {
 //	@Description	The reset token is validated and if valid, displays a form for the user to enter a new password.
 //	@Description
 //	@Description	Do not call this endpoint directly, it will be called when the user clicks on the URL created by the *Generate password reset link* endpoint.
-//	@Tags			auth
+//	@Tags			User Authentication
 //
 //	@Param			token_id	path	string	true	"Password reset token ID"	example(550e8400-e29b-41d4-a716-446655440000)
 //
@@ -663,7 +663,7 @@ func (u *UserHandler) PasswordResetTokenPage(w http.ResponseWriter, r *http.Requ
 //	@Description	Any user in possession of the token can use it to reset the password of the associated account
 //	@Description	One time tokens can only be issued by admins.
 //
-//	@Tags			auth
+//	@Tags			User Authentication
 //
 //	@Param			token_id	path	string							true	"Password reset token ID"	example(550e8400-e29b-41d4-a716-446655440000)
 //	@Param			request		body	handlers.PasswordResetRequest	true	"New password"

@@ -42,9 +42,11 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, p
 
 // RefreshAccessToken godoc
 //
-//	@Summary	Refresh Access Token
+//	@Summary	Get Access Token (OAuth 2.0 token endpoint)
 //	@Description
 //	@Description	Issues a new access token. The request body must be `application/x-www-form-urlencoded` (RFC 6749).
+//	@Description
+//	@Description	Service accounts use the `client_credentials` grant, web users use the `refresh_token` grant - see below.
 //	@Description
 //	@Description	---
 //	@Description
@@ -73,7 +75,7 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, p
 //	@Description	Access tokens expire after 30 minutes. Refresh tokens expire after 30 days — if the refresh token
 //	@Description	has expired the user must log in again.
 //	@Description
-//	@Tags		auth
+//	@Tags		OAuth 2.0
 //	@Accept		x-www-form-urlencoded
 //
 //	@Param		grant_type		formData	string	true	"Grant type"	Enums(client_credentials, refresh_token)
@@ -128,7 +130,7 @@ func (a *TokenHandler) RefreshAccessToken(w http.ResponseWriter, r *http.Request
 
 // RevokeToken godoc
 //
-//	@Summary	Revoke Token
+//	@Summary	Revoke Credentials (OAuth 2.0 revocation endpoint)
 //	@Description
 //	@Description	Revokes credentials to prevent them being used to obtain new access tokens.
 //	@Description	The request body must be `application/x-www-form-urlencoded` (RFC 6749).
@@ -161,7 +163,7 @@ func (a *TokenHandler) RefreshAccessToken(w http.ResponseWriter, r *http.Request
 //	@Description
 //	@Description	Revokes the current refresh token. The user must log in again to obtain a new one.
 //	@Description
-//	@Tags		auth
+//	@Tags		OAuth 2.0
 //	@Accept		x-www-form-urlencoded
 //
 //	@Param		grant_type		formData	string	true	"Grant type"	Enums(client_credentials, refresh_token)
@@ -246,7 +248,7 @@ func (a *TokenHandler) RevokeRefreshToken(w http.ResponseWriter, r *http.Request
 //	@Description
 //	@Description	Client secrets expire after 1 year by default.
 //
-//	@Tags			auth
+//	@Tags			Service Accounts
 //
 //	@Accept			x-www-form-urlencoded
 //
