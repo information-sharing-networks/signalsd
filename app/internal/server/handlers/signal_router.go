@@ -390,19 +390,10 @@ func (s *SignalRouter) RouteSignals(w http.ResponseWriter, r *http.Request) erro
 	}
 
 	// Log per-signal failures to the processing failures table
-	for _, failed := range routeFailures {
-		_, _ = s.queries.CreateSignalProcessingFailureDetail(r.Context(), database.CreateSignalProcessingFailureDetailParams{
-			SignalBatchID: batch.ID, SignalTypeSlug: signalTypeSlug, SignalTypeSemVer: semVer,
-			LocalRef: failed.LocalRef, ErrorCode: failed.ErrorCode, ErrorMessage: failed.ErrorMessage,
-		})
-	}
+	recordSignalProcessingFailures(r.Context(), s.queries, batch.ID, signalTypeSlug, semVer, routeFailures)
+
 	for _, isnResult := range isnResults {
-		for _, failed := range isnResult.FailedSignals {
-			_, _ = s.queries.CreateSignalProcessingFailureDetail(r.Context(), database.CreateSignalProcessingFailureDetailParams{
-				SignalBatchID: batch.ID, SignalTypeSlug: signalTypeSlug, SignalTypeSemVer: semVer,
-				LocalRef: failed.LocalRef, ErrorCode: failed.ErrorCode, ErrorMessage: failed.ErrorMessage,
-			})
-		}
+		recordSignalProcessingFailures(r.Context(), s.queries, batch.ID, signalTypeSlug, semVer, isnResult.FailedSignals)
 	}
 
 	// Assemble response
