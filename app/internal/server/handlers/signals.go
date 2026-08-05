@@ -602,7 +602,7 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) e
 				// log the failure
 				result.FailedSignals = append(result.FailedSignals, FailedSignal{
 					LocalRef:     signal.LocalRef,
-					ErrorCode:    string(apperrors.ErrCodeInternalError),
+					ErrorCode:    string(apperrors.ErrCodeDatabaseError),
 					ErrorMessage: "Failed to validate correlation_id",
 				})
 				continue
@@ -654,9 +654,10 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) e
 			}
 
 			// record database errors in the failed signals array
+			// (the signals router reports the same failure with the same error_code - see RouteSignals)
 			result.FailedSignals = append(result.FailedSignals, FailedSignal{
 				LocalRef:     signal.LocalRef,
-				ErrorCode:    string(apperrors.ErrCodeMalformedBody),
+				ErrorCode:    string(apperrors.ErrCodeDatabaseError),
 				ErrorMessage: errMsg,
 			})
 			continue
