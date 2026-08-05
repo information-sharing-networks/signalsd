@@ -7,6 +7,9 @@
 //   - SecurityHeaders: sets defensive HTTP response headers (CSP, X-Frame-Options,
 //     X-Content-Type-Options, Referrer-Policy). Adds HSTS in prod/staging environments.
 //
+//   - NoCache: sets Cache-Control: no-cache so browsers revalidate before reusing a cached
+//     response. Used for the API documentation and OpenAPI specs, which change on every deployment.
+//
 //   - RequestSizeLimit: rejects bodies that exceed a configured byte limit via a 413
 //     response, and advertises the limit in the Signalsd-Max-Request-Size header.
 //

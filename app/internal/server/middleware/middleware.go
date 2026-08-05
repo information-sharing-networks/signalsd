@@ -21,6 +21,18 @@ func CORS(middleware *cors.Middleware) func(http.Handler) http.Handler {
 	}
 }
 
+// NoCache requires browsers to revalidate before reusing a cached response.
+//
+// Used for the API documentation and the OpenAPI specs, which are baked into the container image and
+// therefore change with every deployment
+func NoCache(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-cache")
+
+		next.ServeHTTP(w, r)
+	})
+}
+
 func SecurityHeaders(environment string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

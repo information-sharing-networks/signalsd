@@ -452,6 +452,9 @@ func (s *Server) registerApiDocoRoutes() {
 	s.router.Route("/", func(r chi.Router) {
 		r.Use(middleware.CORS(s.corsConfigs.Public))
 
+		// the docs and specs are replaced on every deployment
+		r.Use(middleware.NoCache)
+
 		// When UI is integrated (mode "all"), the UI handles the root route
 		if s.config.ServiceMode != "all" {
 			// Redirect root to API documentation for API-only modes
