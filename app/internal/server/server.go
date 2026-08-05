@@ -98,7 +98,7 @@ func NewServer(
 		server.registerSignalReadRoutes()
 		server.registerSignalWriteRoutes()
 		server.registerApiDocoRoutes()
-	case "isnadmin":
+	case "admin":
 		server.registerAdminRoutes()
 		server.registerApiDocoRoutes()
 	case "signals":
@@ -108,6 +108,8 @@ func NewServer(
 		server.registerSignalReadRoutes()
 	case "signals-write":
 		server.registerSignalWriteRoutes()
+	default:
+		panic(fmt.Sprintf("no routes registered for service mode %q", server.config.ServiceMode))
 	}
 	return server
 }
