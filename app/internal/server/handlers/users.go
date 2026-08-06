@@ -53,13 +53,13 @@ type UpdatePasswordRequest struct {
 //	@Tags			User Authentication
 //
 //	@Param			request	body	handlers.CreateUserRequest	true	"user details"
-//	@Description	The first user created is granted the "siteadmin" role and has super-user access to the site.
+//	@Description	Registers a web user with an email address and a password.
 //	@Description
-//	@Description	Web users can register directly and default to standard member roles.
+//	@Description	The first user created is granted the "siteadmin" role and has super-user access to the site. Everyone who registers after that gets the "member" role.
 //	@Description	New members can't access any information beyond the public data on the site until an admin grants them access to an ISN.
 //	@Description
-//	@Description	The site owner can grant other users the admin role.
-//	@Description	Admins can create ISNs and service accounts and grant other accounts permissions to read or write to ISNs they created.
+//	@Description	Site admins can grant other users the "isnadmin" role.
+//	@Description	ISN admins can create ISNs and service accounts, and grant other accounts permission to read or write to the ISNs they created.
 //
 //	@Success		201
 //	@Failure		400	{object}	responses.ErrorResponse	"malformed_body | password_too_short"
@@ -156,8 +156,12 @@ func (u *UserHandler) RegisterUser(w http.ResponseWriter, r *http.Request) error
 
 // UpdatePassword godoc
 //
-//	@Summary		Password Reset (self service)
-//	@Description	Self-service endpoint for users to reset their password.  Requires a valid access token and the current password
+//	@Summary		Change Password (self service)
+//	@Description	Changes the password of the signed-in user.
+//	@Description
+//	@Description	The caller must supply a valid access token and their current password. The new password must be at least 11 characters.
+//	@Description
+//	@Description	Users who have forgotten their password can't use this endpoint, since they have no current password to supply - an admin has to issue them a one-time reset link instead (see *Generate Password Reset Link* under Account Management).
 //	@Description
 //	@Tags		User Authentication
 //
@@ -564,19 +568,20 @@ type PasswordResetPageData struct {
 
 // PasswordResetTokenPage godoc
 //
-//	@Summary		Display Password Reset Form
-//	@Description	Renders a password reset form for users with a valid reset token.
-//	@Description	The reset token is validated and if valid, displays a form for the user to enter a new password.
+//	@Summary		Password Reset Form
+//	@Description	Serves the HTML form a user fills in to choose a new password after an admin has issued them a reset link.
 //	@Description
-//	@Description	Do not call this endpoint directly, it will be called when the user clicks on the URL created by the *Generate password reset link* endpoint.
-//	@Tags			User Authentication
+//	@Description	This is the page a user lands on when they open the link returned by *Generate Password Reset Link* (Account Management).
+//	@Description
+//	@Description	The `token_id` in the URL is validated before the form is rendered. The form then posts the new password back to the same URL (see *Submit New Password*).
+//	@Description
+//	@Description	Reset links expire 30 minutes after they are generated and can only be used once.
+//	@Tags			One-time Links (browser pages)
 //
-//	@Param			token_id	path	string	true	"Password reset token ID"	example(550e8400-e29b-41d4-a716-446655440000)
+//	@Param			token_id	path	string	true	"Password reset token ID, taken from the reset link"	example(550e8400-e29b-41d4-a716-446655440000)
 //
-//	@Success		200
-//	@Failure		400	{object}	responses.ErrorResponse	"invalid_url_param"
-//	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
-//	@Failure		410	{object}	responses.ErrorResponse	"resource_expired"
+//	@Success		200			"HTML password reset form"
+//	@Failure		400			"HTML error page - if the token is unknown, already used or expired the endpoint returns 400 with an HTML body."
 //
 //	@Router			/api/auth/password-reset/{token_id} [get]
 func (u *UserHandler) PasswordResetTokenPage(w http.ResponseWriter, r *http.Request) {
@@ -657,22 +662,25 @@ func (u *UserHandler) PasswordResetTokenPage(w http.ResponseWriter, r *http.Requ
 
 // PasswordResetToken godoc
 //
-//	@Summary		Process Password Reset Token
-//	@Description	Endpoint to handle password requests received from the PasswordResetTokenPageHandler (do not call the endpoint directly)
-//	@Description	The handler validates the token, updates the user password, and consumes the one-time-use token.
-//	@Description	Any user in possession of the token can use it to reset the password of the associated account
-//	@Description	One time tokens can only be issued by admins.
+//	@Summary		Submit New Password
+//	@Description	Sets a new password using a one-time reset token, then consumes the token.
+//	@Description
+//	@Description	This is the submission target of the form served by *Password Reset Form* at the same URL, posted by the form's own JavaScript.
+//	@Description
+//	@Description	On success the token is deleted so the link can't be reused, and the user can log in with the new password.
+//	@Description
+//	@Description	Note that no access token is required - possession of the reset token is what authorises the change. Reset tokens can only be issued by admins (see *Generate Password Reset Link* under Account Management).
 //
-//	@Tags			User Authentication
+//	@Tags			One-time Links (browser pages)
 //
-//	@Param			token_id	path	string							true	"Password reset token ID"	example(550e8400-e29b-41d4-a716-446655440000)
+//	@Param			token_id	path	string							true	"Password reset token ID, taken from the reset link"	example(550e8400-e29b-41d4-a716-446655440000)
 //	@Param			request		body	handlers.PasswordResetRequest	true	"New password"
 //
-//	@Success		200
-//	@Failure		400	{object}	responses.ErrorResponse	"invalid_url_param | malformed_body | password_too_short"
-//	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
-//	@Failure		410	{object}	responses.ErrorResponse	"resource_expired"
-//	@Failure		500	{object}	responses.ErrorResponse	"database_error | internal_error"
+//	@Success		200			"Password updated (empty body)"
+//	@Failure		400			{object}	responses.ErrorResponse	"invalid_url_param | malformed_body | password_too_short"
+//	@Failure		404			{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		410			{object}	responses.ErrorResponse	"resource_expired"
+//	@Failure		500			{object}	responses.ErrorResponse	"database_error | internal_error"
 //
 //	@Router			/api/auth/password-reset/{token_id} [post]
 func (u *UserHandler) PasswordResetToken(w http.ResponseWriter, r *http.Request) error {

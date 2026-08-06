@@ -118,6 +118,7 @@ func (h *RoutingConfigHandler) GetSignalRoutingConfig(w http.ResponseWriter, r *
 // UpdateSignalRoutingConfig godoc
 //
 //	@Summary		Update Signals Routing Config
+//	@Tags			Signals Routing
 //
 //	@Description	Replaces the route config for the specified signal type path
 //	@Description

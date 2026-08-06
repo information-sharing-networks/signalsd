@@ -74,7 +74,7 @@ type SetupPageData struct {
 // RegisterServiceAccount godocs
 //
 //	@Summary		Register Service Account
-//	@Description	Registring a new service account creates a one-time link with the client credentials in it - this must be used by the client within 48 hrs.
+//	@Description	Registering a new service account creates a one-time setup link. Send it to whoever is operating the service account - opening it in a browser shows them their client credentials. The link expires after 48 hours and can only be used once.
 //	@Description
 //	@Description	Note that where an organization needs more than one service account they must supply unique contact emails for each account.
 //	@Description
@@ -221,7 +221,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccount(w http.ResponseWriter, r 
 //
 //	@Summary		Reissue Service Account Credentials
 //	@Description	Reissue credentials for an existing service account.
-//	@Description	This creates a new one-time link with fresh client credentials - this must be used by the client within 48 hrs.
+//	@Description	This creates a new one-time setup link carrying fresh client credentials. Send it to whoever operates the service account - opening it in a browser shows them the new credentials (see *Service Account Setup Page* under One-time Links). The link expires after 48 hours and can only be used once.
 //	@Description
 //	@Description	This endpoint revokes all existing client secrets and one-time setup URLs for the service account, then generates new credentials.
 //	@Description
@@ -364,20 +364,19 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentials(w http.Response
 
 // SetupServiceAccount godoc
 //
-//	@Summary		Complete Service Account Setup
-//	@Description	Exchange one-time setup token for permanent client credentials (the one-time request url is created when a new service account is registered).
-//	@Description	the endpoint renders a html page that the user can use to copy their client credentials.
-//	@Description	The setup url is only valid for 48 hours.
+//	@Summary		Service Account Setup Page
+//	@Description	Exchanges a one-time setup ID for client credentials and renders an HTML page where the user can copy them.
 //	@Description
-//	@Tags		Service Accounts
+//	@Description	This is the page reached by opening the link returned by *Register Service Account* or *Reissue Service Account Credentials*.
+//	@Description
+//	@Description	Setup links expire 48 hours after they are issued and can only be used once - opening the page consumes the setup ID and revokes any client secret the service account was previously using. The client secret shown on the page is valid for one year and is not recoverable afterwards, so it has to be copied at this point.
+//	@Description
+//	@Tags		One-time Links (browser pages)
 //
-//	@Param		setup_id	path	string	true	"One-time setup ID"	example(550e8400-e29b-41d4-a716-446655440000)
+//	@Param		setup_id	path	string	true	"One-time setup ID, taken from the setup link"	example(550e8400-e29b-41d4-a716-446655440000)
 //
-//	@Success	201
-//
-//	@Failure	400	{object}	responses.ErrorResponse	"invalid_url_param"
-//	@Failure	404	{object}	responses.ErrorResponse	"resource_not_found"
-//	@Failure	410	{object}	responses.ErrorResponse	"resource_expired"
+//	@Success	201			"HTML page displaying the client_id and client_secret"
+//	@Failure	400			"HTML error page - if the token is unknown, already used or expired the endpoint returns 400 with an HTML body."
 //
 //	@Router		/api/auth/service-accounts/setup/{setup_id} [get]
 func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *http.Request) {

@@ -588,8 +588,8 @@ type GeneratePasswordResetLinkResponse struct {
 //	@Summary		Generate Password Reset Link
 //	@Description	Allows admins to generate a one-time password reset link for a user (use this endpoint when a user has forgotten their password)
 //	@Description
-//	@Description	The generated link can be used to reset the password of the associated account using the page rendered by the PasswordResetTokenPageHandler.
-//	@Description	The generated link expires in 30 minutes and can only be used once.
+//	@Description	Send the `reset_url` from the response to the user. Opening it in a browser serves the password reset form (see *Password Reset Form* under One-time Links), where they can choose a new password.
+//	@Description	The link expires in 30 minutes and can only be used once. Generating a new link for a user invalidates any link they were issued previously.
 //	@Description
 //	@Description	ISN Admins can create links on behalf of users with a member role.  Accounts with the site admin role can create links for ISN admins and members.
 //	@Description

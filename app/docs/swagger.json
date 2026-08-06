@@ -871,6 +871,9 @@
                     }
                 ],
                 "description": "Replaces the route config for the specified signal type path\n\nthe routing_field must be a plain Dot Notation path -\nunder the covers the service uses gjson paths, however the special patern matching symbols (*?#@|!()[]%\u003c\u003e=) are not currently allowed.\n\nWhen using the 'matches' and 'not matches' operator, any occurance of '*' and '?' in the matching pattern will be treated as a wildcard.\nThe pattern is always compared to the full contents of the specified routing field.\n\nPatterns are matched in order according to the supplied sequence number (smallest sequence first)\nand the first match is accepted. Where the routing field is an array, as long as one or more elements match\nthe match is accepted.",
+                "tags": [
+                    "Signals Routing"
+                ],
                 "summary": "Update Signals Routing Config",
                 "parameters": [
                     {
@@ -1046,7 +1049,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Allows admins to generate a one-time password reset link for a user (use this endpoint when a user has forgotten their password)\n\nThe generated link can be used to reset the password of the associated account using the page rendered by the PasswordResetTokenPageHandler.\nThe generated link expires in 30 minutes and can only be used once.\n\nISN Admins can create links on behalf of users with a member role.  Accounts with the site admin role can create links for ISN admins and members.\n\n**Note:** anyone in possession of the link can reset the password of the associated account. The link should be treated as sensitive and handled accordingly.",
+                "description": "Allows admins to generate a one-time password reset link for a user (use this endpoint when a user has forgotten their password)\n\nSend the `reset_url` from the response to the user. Opening it in a browser serves the password reset form (see *Password Reset Form* under One-time Links), where they can choose a new password.\nThe link expires in 30 minutes and can only be used once. Generating a new link for a user invalidates any link they were issued previously.\n\nISN Admins can create links on behalf of users with a member role.  Accounts with the site admin role can create links for ISN admins and members.\n\n**Note:** anyone in possession of the link can reset the password of the associated account. The link should be treated as sensitive and handled accordingly.",
                 "tags": [
                     "Account Management"
                 ],
@@ -1149,16 +1152,16 @@
         },
         "/api/auth/password-reset/{token_id}": {
             "get": {
-                "description": "Renders a password reset form for users with a valid reset token.\nThe reset token is validated and if valid, displays a form for the user to enter a new password.\n\nDo not call this endpoint directly, it will be called when the user clicks on the URL created by the *Generate password reset link* endpoint.",
+                "description": "Serves the HTML form a user fills in to choose a new password after an admin has issued them a reset link.\n\nThis is the page a user lands on when they open the link returned by *Generate Password Reset Link* (Account Management).\n\nThe `token_id` in the URL is validated before the form is rendered. The form then posts the new password back to the same URL (see *Submit New Password*).\n\nReset links expire 30 minutes after they are generated and can only be used once.",
                 "tags": [
-                    "User Authentication"
+                    "One-time Links (browser pages)"
                 ],
-                "summary": "Display Password Reset Form",
+                "summary": "Password Reset Form",
                 "parameters": [
                     {
                         "type": "string",
                         "example": "550e8400-e29b-41d4-a716-446655440000",
-                        "description": "Password reset token ID",
+                        "description": "Password reset token ID, taken from the reset link",
                         "name": "token_id",
                         "in": "path",
                         "required": true
@@ -1166,39 +1169,24 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "HTML password reset form"
                     },
                     "400": {
-                        "description": "invalid_url_param",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "resource_not_found",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "410": {
-                        "description": "resource_expired",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
+                        "description": "HTML error page - if the token is unknown, already used or expired the endpoint returns 400 with an HTML body."
                     }
                 }
             },
             "post": {
-                "description": "Endpoint to handle password requests received from the PasswordResetTokenPageHandler (do not call the endpoint directly)\nThe handler validates the token, updates the user password, and consumes the one-time-use token.\nAny user in possession of the token can use it to reset the password of the associated account\nOne time tokens can only be issued by admins.",
+                "description": "Sets a new password using a one-time reset token, then consumes the token.\n\nThis is the submission target of the form served by *Password Reset Form* at the same URL, posted by the form's own JavaScript.\n\nOn success the token is deleted so the link can't be reused, and the user can log in with the new password.\n\nNote that no access token is required - possession of the reset token is what authorises the change. Reset tokens can only be issued by admins (see *Generate Password Reset Link* under Account Management).",
                 "tags": [
-                    "User Authentication"
+                    "One-time Links (browser pages)"
                 ],
-                "summary": "Process Password Reset Token",
+                "summary": "Submit New Password",
                 "parameters": [
                     {
                         "type": "string",
                         "example": "550e8400-e29b-41d4-a716-446655440000",
-                        "description": "Password reset token ID",
+                        "description": "Password reset token ID, taken from the reset link",
                         "name": "token_id",
                         "in": "path",
                         "required": true
@@ -1215,7 +1203,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK"
+                        "description": "Password updated (empty body)"
                     },
                     "400": {
                         "description": "invalid_url_param | malformed_body | password_too_short",
@@ -1251,11 +1239,11 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Self-service endpoint for users to reset their password.  Requires a valid access token and the current password\n",
+                "description": "Changes the password of the signed-in user.\n\nThe caller must supply a valid access token and their current password. The new password must be at least 11 characters.\n\nUsers who have forgotten their password can't use this endpoint, since they have no current password to supply - an admin has to issue them a one-time reset link instead (see *Generate Password Reset Link* under Account Management).\n",
                 "tags": [
                     "User Authentication"
                 ],
-                "summary": "Password Reset (self service)",
+                "summary": "Change Password (self service)",
                 "parameters": [
                     {
                         "description": "user details",
@@ -1294,7 +1282,7 @@
         },
         "/api/auth/register": {
             "post": {
-                "description": "The first user created is granted the \"siteadmin\" role and has super-user access to the site.\n\nWeb users can register directly and default to standard member roles.\nNew members can't access any information beyond the public data on the site until an admin grants them access to an ISN.\n\nThe site owner can grant other users the admin role.\nAdmins can create ISNs and service accounts and grant other accounts permissions to read or write to ISNs they created.",
+                "description": "Registers a web user with an email address and a password.\n\nThe first user created is granted the \"siteadmin\" role and has super-user access to the site. Everyone who registers after that gets the \"member\" role.\nNew members can't access any information beyond the public data on the site until an admin grants them access to an ISN.\n\nSite admins can grant other users the \"isnadmin\" role.\nISN admins can create ISNs and service accounts, and grant other accounts permission to read or write to the ISNs they created.",
                 "tags": [
                     "User Authentication"
                 ],
@@ -1342,7 +1330,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Registring a new service account creates a one-time link with the client credentials in it - this must be used by the client within 48 hrs.\n\nNote that where an organization needs more than one service account they must supply unique contact emails for each account.\n\nTo reissue credentials for an existing service account, use the **Reissue Service Account Credentials** endpoint.\n\nYou have to be an admin to use this end point\n",
+                "description": "Registering a new service account creates a one-time setup link. Send it to whoever is operating the service account - opening it in a browser shows them their client credentials. The link expires after 48 hours and can only be used once.\n\nNote that where an organization needs more than one service account they must supply unique contact emails for each account.\n\nTo reissue credentials for an existing service account, use the **Reissue Service Account Credentials** endpoint.\n\nYou have to be an admin to use this end point\n",
                 "tags": [
                     "Service Accounts"
                 ],
@@ -1399,7 +1387,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Reissue credentials for an existing service account.\nThis creates a new one-time link with fresh client credentials - this must be used by the client within 48 hrs.\n\nThis endpoint revokes all existing client secrets and one-time setup URLs for the service account, then generates new credentials.\n\nThe client_id will remain the same, but a new client_secret will be generated.\n\nYou have to be an site or ISN admin to use this endpoint\n",
+                "description": "Reissue credentials for an existing service account.\nThis creates a new one-time setup link carrying fresh client credentials. Send it to whoever operates the service account - opening it in a browser shows them the new credentials (see *Service Account Setup Page* under One-time Links). The link expires after 48 hours and can only be used once.\n\nThis endpoint revokes all existing client secrets and one-time setup URLs for the service account, then generates new credentials.\n\nThe client_id will remain the same, but a new client_secret will be generated.\n\nYou have to be an site or ISN admin to use this endpoint\n",
                 "tags": [
                     "Service Accounts"
                 ],
@@ -1505,16 +1493,16 @@
         },
         "/api/auth/service-accounts/setup/{setup_id}": {
             "get": {
-                "description": "Exchange one-time setup token for permanent client credentials (the one-time request url is created when a new service account is registered).\nthe endpoint renders a html page that the user can use to copy their client credentials.\nThe setup url is only valid for 48 hours.\n",
+                "description": "Exchanges a one-time setup ID for client credentials and renders an HTML page where the user can copy them.\n\nThis is the page reached by opening the link returned by *Register Service Account* or *Reissue Service Account Credentials*.\n\nSetup links expire 48 hours after they are issued and can only be used once - opening the page consumes the setup ID and revokes any client secret the service account was previously using. The client secret shown on the page is valid for one year and is not recoverable afterwards, so it has to be copied at this point.\n",
                 "tags": [
-                    "Service Accounts"
+                    "One-time Links (browser pages)"
                 ],
-                "summary": "Complete Service Account Setup",
+                "summary": "Service Account Setup Page",
                 "parameters": [
                     {
                         "type": "string",
                         "example": "550e8400-e29b-41d4-a716-446655440000",
-                        "description": "One-time setup ID",
+                        "description": "One-time setup ID, taken from the setup link",
                         "name": "setup_id",
                         "in": "path",
                         "required": true
@@ -1522,25 +1510,10 @@
                 ],
                 "responses": {
                     "201": {
-                        "description": "Created"
+                        "description": "HTML page displaying the client_id and client_secret"
                     },
                     "400": {
-                        "description": "invalid_url_param",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "resource_not_found",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "410": {
-                        "description": "resource_expired",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
+                        "description": "HTML error page - if the token is unknown, already used or expired the endpoint returns 400 with an HTML body."
                     }
                 }
             }
@@ -4154,7 +4127,7 @@
             "name": "OAuth 2.0"
         },
         {
-            "description": "Registration, login and password reset for web users. Use the OAuth 2.0 endpoints to obtain access tokens.",
+            "description": "Registration, login and password management for web users. A signed-in user can change their own password here; users who have forgotten their password are sent a one-time link by an admin instead (see *Generate Password Reset Link* under Account Management. Use the OAuth 2.0 endpoints to obtain access tokens.",
             "name": "User Authentication"
         },
         {
@@ -4188,6 +4161,10 @@
         {
             "description": "Site adminstration tools. These endpoints can only be used by the accounts that have a siteadmin or isnadmin role",
             "name": "Site Admin"
+        },
+        {
+            "description": "These endpoints should not be called directly. Some admin endpoints,  for insance *Register Service Account* and *Generate Password Reset Link*, return a one time link URL that the user then opens in their browser to interact with the auth system. These endpoints return the HTML used to in the one-time links. The URLs do not need an access token - the link is itself the credential - and should be treated as secrets.",
+            "name": "One-time Links (browser pages)"
         }
     ]
 }

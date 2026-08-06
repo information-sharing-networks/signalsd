@@ -147,7 +147,7 @@ import (
 //	@tag.description	Access token issuance and revocation. The signalsd backend acts as an OAuth 2.0 Authorization Server: service accounts use the client_credentials grant, web users use the refresh_token grant. Start here if you are connecting a system to the API.
 
 //	@tag.name			User Authentication
-//	@tag.description	Registration, login and password reset for web users. Use the OAuth 2.0 endpoints to obtain access tokens.
+//	@tag.description	Registration, login and password management for web users. A signed-in user can change their own password here; users who have forgotten their password are sent a one-time link by an admin instead (see *Generate Password Reset Link* under Account Management. Use the OAuth 2.0 endpoints to obtain access tokens.
 
 //	@tag.name			Service Accounts
 //	@tag.description	Register service accounts and manage their credentials (used for system-to-system access). Use the OAuth 2.0 endpoints to exchange service account credentials for an access token.
@@ -172,6 +172,9 @@ import (
 
 //	@tag.name			Site Admin
 //	@tag.description	Site adminstration tools. These endpoints can only be used by the accounts that have a siteadmin or isnadmin role
+
+//	@tag.name			One-time Links (browser pages)
+//	@tag.description	These endpoints should not be called directly. Some admin endpoints,  for insance *Register Service Account* and *Generate Password Reset Link*, return a one time link URL that the user then opens in their browser to interact with the auth system. These endpoints return the HTML used to in the one-time links. The URLs do not need an access token - the link is itself the credential - and should be treated as secrets.
 
 //	@tag.name			UI Pages
 //	@tag.description	Browser-based management interface. Page handlers return full HTML
