@@ -12,6 +12,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
+	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/responses"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
@@ -242,10 +243,13 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 			return
 		}
 
-		// check the secret is valid
+		// check the secret is valid and belongs to the service account identified by the client_id
 		hashedSecret := a.HashToken(clientSecret)
 
-		_, err = a.queries.GetValidClientSecretByHashedSecret(r.Context(), hashedSecret)
+		_, err = a.queries.GetValidClientSecretByHashedSecret(r.Context(), database.GetValidClientSecretByHashedSecretParams{
+			HashedSecret:            hashedSecret,
+			ServiceAccountAccountID: serviceAccount.AccountID,
+		})
 		if err != nil {
 			logger.ContextWithLogAttrs(r.Context(),
 				slog.String("client_id", clientID),
@@ -337,10 +341,13 @@ func (a *AuthService) RequireNonRevokedClientCredentials(next http.Handler) http
 			return
 		}
 
-		// check the secret is valid
+		// check the secret is valid and belongs to the service account identified by the client_id
 		hashedSecret := a.HashToken(clientSecret)
 
-		_, err = a.queries.GetNonRevokedClientSecretByHashedSecret(r.Context(), hashedSecret)
+		_, err = a.queries.GetNonRevokedClientSecretByHashedSecret(r.Context(), database.GetNonRevokedClientSecretByHashedSecretParams{
+			HashedSecret:            hashedSecret,
+			ServiceAccountAccountID: serviceAccount.AccountID,
+		})
 		if err != nil {
 			logger.ContextWithLogAttrs(r.Context(),
 				slog.String("client_id", clientID),

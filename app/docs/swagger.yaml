@@ -1974,7 +1974,7 @@ paths:
 
         This is the page a user lands on when they open the link returned by *Generate Password Reset Link* (Account Management).
 
-        When the user submits the form the new password is sent back to the same URL and handled by the *Submit New Password* endpoint.
+        The `token_id` in the URL is validated before the form is rendered. The form then posts the new password back to the same URL (see *Submit New Password*).
 
         Reset links expire 30 minutes after they are generated and can only be used once.
       parameters:

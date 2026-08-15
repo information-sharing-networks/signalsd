@@ -171,12 +171,18 @@ func (q *Queries) ExistsServiceAccountWithOrganizationAndEmail(ctx context.Conte
 const GetNonRevokedClientSecretByHashedSecret = `-- name: GetNonRevokedClientSecretByHashedSecret :one
 SELECT hashed_secret, created_at, updated_at, service_account_account_id, expires_at, revoked_at FROM client_secrets
 WHERE hashed_secret = $1
+AND service_account_account_id = $2
 AND revoked_at IS NULL
 `
 
+type GetNonRevokedClientSecretByHashedSecretParams struct {
+	HashedSecret            string    `json:"hashed_secret"`
+	ServiceAccountAccountID uuid.UUID `json:"service_account_account_id"`
+}
+
 // used for rotation: allows expired but not revoked credentials
-func (q *Queries) GetNonRevokedClientSecretByHashedSecret(ctx context.Context, hashedSecret string) (ClientSecret, error) {
-	row := q.db.QueryRow(ctx, GetNonRevokedClientSecretByHashedSecret, hashedSecret)
+func (q *Queries) GetNonRevokedClientSecretByHashedSecret(ctx context.Context, arg GetNonRevokedClientSecretByHashedSecretParams) (ClientSecret, error) {
+	row := q.db.QueryRow(ctx, GetNonRevokedClientSecretByHashedSecret, arg.HashedSecret, arg.ServiceAccountAccountID)
 	var i ClientSecret
 	err := row.Scan(
 		&i.HashedSecret,
@@ -312,13 +318,21 @@ func (q *Queries) GetServiceAccounts(ctx context.Context) ([]ServiceAccount, err
 const GetValidClientSecretByHashedSecret = `-- name: GetValidClientSecretByHashedSecret :one
 SELECT hashed_secret, created_at, updated_at, service_account_account_id, expires_at, revoked_at FROM client_secrets
 WHERE hashed_secret = $1
+AND service_account_account_id = $2
 AND revoked_at IS NULL
 AND expires_at > NOW()
 `
 
+type GetValidClientSecretByHashedSecretParams struct {
+	HashedSecret            string    `json:"hashed_secret"`
+	ServiceAccountAccountID uuid.UUID `json:"service_account_account_id"`
+}
+
 // used for authentication: does not return expired or revoked credentials
-func (q *Queries) GetValidClientSecretByHashedSecret(ctx context.Context, hashedSecret string) (ClientSecret, error) {
-	row := q.db.QueryRow(ctx, GetValidClientSecretByHashedSecret, hashedSecret)
+//
+// the secret must belong to the service account being authenticated.
+func (q *Queries) GetValidClientSecretByHashedSecret(ctx context.Context, arg GetValidClientSecretByHashedSecretParams) (ClientSecret, error) {
+	row := q.db.QueryRow(ctx, GetValidClientSecretByHashedSecret, arg.HashedSecret, arg.ServiceAccountAccountID)
 	var i ClientSecret
 	err := row.Scan(
 		&i.HashedSecret,

@@ -94,7 +94,7 @@ func createTestAccount(t *testing.T, ctx context.Context, queries *database.Quer
 
 		_, err = queries.CreateServiceAccount(ctx, database.CreateServiceAccountParams{
 			AccountID:          serviceAccount.ID,
-			ClientID:           fmt.Sprintf("test-client-%s", serviceAccount.ID.String()[:8]),
+			ClientID:           fmt.Sprintf("test-client-%s", serviceAccount.ID),
 			ClientContactEmail: email,
 			ClientOrganization: "test client org",
 		})
