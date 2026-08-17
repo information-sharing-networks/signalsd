@@ -11,5 +11,6 @@
 //
 // Use the constructors (NotFound, MalformedBody, OAuthInvalidGrant, etc.)
 // rather than building the structs directly. Pass nil for err when there is
-// no underlying Go error to wrap (e.g validation errors)
+// no underlying Go error to wrap (e.g validation errors) - otherwise err will
+// be logged but not exposed to the client.
 package apperrors
