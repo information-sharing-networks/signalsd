@@ -125,25 +125,25 @@ func (e *OAuthError) Error() string {
 // OAuthServerError responds with 500 + server_error.
 // Description is logged but not sent to the client.
 func OAuthServerError(description string, appCode ErrorCode, err error) *OAuthError {
-	return &OAuthError{Status: http.StatusInternalServerError, OAuthCode: "server_error", Description: description, AppCode: appCode, Err: err}
+	return &OAuthError{Status: http.StatusInternalServerError, OAuthCode: OAuthErrServerError, Description: description, AppCode: appCode, Err: err}
 }
 
 // OAuthInvalidRequest responds with 400 + invalid_request.
 func OAuthInvalidRequest(description string, appCode ErrorCode, err error) *OAuthError {
-	return &OAuthError{Status: http.StatusBadRequest, OAuthCode: "invalid_request", Description: description, AppCode: appCode, Err: err}
+	return &OAuthError{Status: http.StatusBadRequest, OAuthCode: OAuthErrInvalidRequest, Description: description, AppCode: appCode, Err: err}
 }
 
 // OAuthInvalidClient responds with 401 + invalid_client.
 func OAuthInvalidClient(description string, appCode ErrorCode, err error) *OAuthError {
-	return &OAuthError{Status: http.StatusUnauthorized, OAuthCode: "invalid_client", Description: description, AppCode: appCode, Err: err}
+	return &OAuthError{Status: http.StatusUnauthorized, OAuthCode: OAuthErrInvalidClient, Description: description, AppCode: appCode, Err: err}
 }
 
 // OAuthInvalidGrant responds with 400 + invalid_grant.
 func OAuthInvalidGrant(description string, appCode ErrorCode, err error) *OAuthError {
-	return &OAuthError{Status: http.StatusBadRequest, OAuthCode: "invalid_grant", Description: description, AppCode: appCode, Err: err}
+	return &OAuthError{Status: http.StatusBadRequest, OAuthCode: OAuthErrInvalidGrant, Description: description, AppCode: appCode, Err: err}
 }
 
 // OAuthUnsupportedGrantType responds with 400 + unsupported_grant_type.
 func OAuthUnsupportedGrantType(description string, appCode ErrorCode, err error) *OAuthError {
-	return &OAuthError{Status: http.StatusBadRequest, OAuthCode: "unsupported_grant_type", Description: description, AppCode: appCode, Err: err}
+	return &OAuthError{Status: http.StatusBadRequest, OAuthCode: OAuthErrUnsupportedGrantType, Description: description, AppCode: appCode, Err: err}
 }

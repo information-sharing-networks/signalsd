@@ -75,6 +75,36 @@ const (
 
 	// ErrCodeFailedToCreateToken used when token generation fails during login or token refresh
 	ErrCodeFailedToCreateToken ErrorCode = "token_creation_failed"
+
+	// OAuth 2.0 error codes (RFC 6749 §5.2)
+
+	// OAuthErrInvalidRequest is returned when the request is missing a required parameter,
+	// includes an unsupported parameter value, repeats a parameter, or is otherwise malformed.
+	OAuthErrInvalidRequest = "invalid_request"
+
+	// OAuthErrInvalidClient is returned when client authentication failed, such as an unknown
+	// client, no client authentication included, or unsupported authentication method.
+	OAuthErrInvalidClient = "invalid_client"
+
+	// OAuthErrInvalidGrant is returned when the authorization code or refresh token is invalid,
+	// expired, revoked, does not match the redirect URI, or was issued to another client.
+	OAuthErrInvalidGrant = "invalid_grant"
+
+	// OAuthErrUnauthorizedClient is returned when the authenticated client is not authorised
+	// to use this authorization grant type.
+	OAuthErrUnauthorizedClient = "unauthorized_client"
+
+	// OAuthErrUnsupportedGrantType is returned when the authorization grant type is not
+	// supported by the authorization server.
+	OAuthErrUnsupportedGrantType = "unsupported_grant_type"
+
+	// OAuthErrInvalidScope is returned when the requested scope is invalid, unknown, malformed,
+	// or exceeds the scope granted by the resource owner.
+	OAuthErrInvalidScope = "invalid_scope"
+
+	// OAuthErrServerError is returned when the server encountered an unexpected condition
+	// that prevented it from fulfilling the request.
+	OAuthErrServerError = "server_error"
 )
 
 func (e ErrorCode) String() string {
