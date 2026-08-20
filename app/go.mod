@@ -1,18 +1,13 @@
 module github.com/information-sharing-networks/signalsd/app
 
-go 1.26.6
-
-require (
-	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/google/uuid v1.6.0
-	golang.org/x/crypto v0.55.0
-	golang.org/x/text v0.41.0
-)
+go 1.27.0
 
 require (
 	github.com/a-h/templ v0.3.1020
 	github.com/caarlos0/env/v11 v11.4.1
 	github.com/go-chi/chi/v5 v5.3.2
+	github.com/golang-jwt/jwt/v5 v5.3.1
+	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/jub0bs/cors v1.1.0
 	github.com/lmittmann/tint v1.2.0
@@ -20,7 +15,9 @@ require (
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/tidwall/gjson v1.19.0
 	github.com/tidwall/match v1.2.0
+	golang.org/x/crypto v0.55.0
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20250803194717-c247dead11de
+	golang.org/x/text v0.41.0
 	golang.org/x/time v0.15.0
 )
 
@@ -163,7 +160,7 @@ require (
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	honnef.co/go/tools v0.7.0 // indirect
+	honnef.co/go/tools v0.8.0 // indirect
 	howett.net/plist v1.0.1 // indirect
 	modernc.org/libc v1.74.3 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
