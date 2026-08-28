@@ -28,6 +28,8 @@ func NewCache(db *database.Queries) *Cache {
 }
 
 // Load loads public ISN slugs and their signal types from database and replaces the cache
+// new versions of the maps are built separately, then swapped while holding the write lock.
+// Readers only ever need the read lock, and they just use whatever map version they were given.
 func (c *Cache) Load(ctx context.Context) error {
 
 	isnSlugs := make(map[string]bool)
@@ -78,15 +80,24 @@ func (c *Cache) StartPolling(ctx context.Context, interval time.Duration) {
 }
 
 func (c *Cache) Len() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
 	return len(c.isnSlugs)
 }
 
 func (c *Cache) Contains(slug string) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
 	return c.isnSlugs[slug]
 }
 
 // HasSignalType checks if a signal type path is available on a public ISN
 func (c *Cache) HasSignalType(isnSlug, signalTypePath string) bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
 	signalTypeMap, exists := c.signalTypes[isnSlug]
 	if !exists {
 		return false
