@@ -20,9 +20,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"uuid"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
@@ -102,10 +102,7 @@ func TestPermissions(t *testing.T) {
 	})
 
 	t.Run("error handling ", func(t *testing.T) {
-		id, err := uuid.NewV7()
-		if err != nil {
-			t.Errorf("could not make uuid (%v)", err)
-		}
+		id := uuid.NewV7()
 
 		t.Run("nonexistent account", func(t *testing.T) {
 			ctx := auth.ContextWithAccountID(context.Background(), id)

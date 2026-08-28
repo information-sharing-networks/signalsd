@@ -8,8 +8,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/tidwall/gjson"
@@ -147,12 +147,12 @@ func (c *Cache) Resolve(signalTypePath string, content json.RawMessage) (isnID u
 	c.mu.RUnlock()
 
 	if !exists {
-		return uuid.Nil, "", false
+		return uuid.Nil(), "", false
 	}
 
 	result := gjson.GetBytes(content, SignalRoutingConfig.routingField)
 	if !result.Exists() {
-		return uuid.Nil, "", false
+		return uuid.Nil(), "", false
 	}
 
 	for _, rule := range SignalRoutingConfig.routingRules {
@@ -161,7 +161,7 @@ func (c *Cache) Resolve(signalTypePath string, content json.RawMessage) (isnID u
 		}
 	}
 
-	return uuid.Nil, "", false
+	return uuid.Nil(), "", false
 }
 
 // matchesResult returns true if the route's criteria match the gjson result.

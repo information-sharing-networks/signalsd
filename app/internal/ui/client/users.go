@@ -7,8 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // User represents a user account as returned by the signalsd API.

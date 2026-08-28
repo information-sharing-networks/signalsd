@@ -2,8 +2,7 @@ package auth
 
 import (
 	"context"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // Common context keys - use a struct to prevent conflicts

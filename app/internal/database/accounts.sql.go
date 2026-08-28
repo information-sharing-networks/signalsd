@@ -8,7 +8,7 @@ package database
 import (
 	"context"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 const CreateServiceAccountAccount = `-- name: CreateServiceAccountAccount :one

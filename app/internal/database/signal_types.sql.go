@@ -9,7 +9,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 const AddSignalTypeToIsn = `-- name: AddSignalTypeToIsn :exec

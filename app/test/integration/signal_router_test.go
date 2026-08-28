@@ -18,8 +18,8 @@ import (
 	"net/http"
 	"testing"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/handlers"
@@ -187,10 +187,7 @@ func TestRouteSignals(t *testing.T) {
 	t.Run("record_level_failures", func(t *testing.T) {
 
 		// Unroutable signals: no matching rule or bad correlation ID.
-		missingCorrelationID, err := uuid.NewV7()
-		if err != nil {
-			t.Fatalf("could not make uuid (%v)", err)
-		}
+		missingCorrelationID := uuid.NewV7()
 		unroutableTests := []struct {
 			name              string
 			signal            map[string]any
@@ -422,10 +419,10 @@ func TestRouteSignals(t *testing.T) {
 				if stored.LocalRef != localRef {
 					t.Errorf("local_ref: want %q, got %q", localRef, stored.LocalRef)
 				}
-				if stored.SignalID == uuid.Nil {
+				if stored.SignalID == uuid.Nil() {
 					t.Error("signal_id should not be nil")
 				}
-				if stored.SignalVersionID == uuid.Nil {
+				if stored.SignalVersionID == uuid.Nil() {
 					t.Error("signal_version_id should not be nil")
 				}
 				if stored.VersionNumber != 1 {

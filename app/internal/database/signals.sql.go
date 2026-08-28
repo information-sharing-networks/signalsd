@@ -10,7 +10,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/google/uuid"
+	"uuid"
 )
 
 const CreateOrUpdateSignalWithCorrelationID = `-- name: CreateOrUpdateSignalWithCorrelationID :one

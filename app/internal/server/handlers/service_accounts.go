@@ -8,8 +8,8 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
@@ -173,11 +173,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccount(w http.ResponseWriter, r 
 	}
 
 	// Create one-time secret record (used to complete the set up the service account)
-	id, err := uuid.NewV7()
-	if err != nil {
-		return apperrors.InternalError("internal error", nil)
-
-	}
+	id := uuid.NewV7()
 	expiresAt := time.Now().Add(signalsd.OneTimeSecretExpiry)
 	oneTimeSecretID, err := txQueries.CreateOneTimeClientSecret(r.Context(), database.CreateOneTimeClientSecretParams{
 		ID:                      id,
@@ -317,11 +313,7 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentials(w http.Response
 
 	// Create one-time secret record
 	expiresAt := time.Now().Add(signalsd.OneTimeSecretExpiry)
-	id, err := uuid.NewV7()
-	if err != nil {
-		return apperrors.InternalError("internal error", nil)
-
-	}
+	id := uuid.NewV7()
 	oneTimeSecretID, err := txQueries.CreateOneTimeClientSecret(r.Context(), database.CreateOneTimeClientSecretParams{
 		ID:                      id,
 		ServiceAccountAccountID: serviceAccountID,

@@ -7,8 +7,8 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
@@ -666,11 +666,7 @@ func (a *AdminHandler) GeneratePasswordResetLink(w http.ResponseWriter, r *http.
 
 		return apperrors.DatabaseError("database error", err)
 	}
-	id, err := uuid.NewV7()
-	if err != nil {
-		return apperrors.InternalError("internal error", nil)
-
-	}
+	id := uuid.NewV7()
 	// Create password reset token record
 	expiresAt := time.Now().Add(signalsd.PasswordResetExpiry)
 	tokenID, err := a.queries.CreatePasswordResetToken(r.Context(), database.CreatePasswordResetTokenParams{

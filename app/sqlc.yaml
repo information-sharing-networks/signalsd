@@ -13,11 +13,11 @@ sql:
             go_type: "encoding/json.RawMessage"
           - db_type: "uuid"
             go_type:
-              import: "github.com/google/uuid"
+              import: "uuid"
               type: "UUID"
           - db_type: "uuid"
             go_type:
-              import: "github.com/google/uuid"
+              import: "uuid"
               type: "UUID"
               pointer: true
             nullable: true

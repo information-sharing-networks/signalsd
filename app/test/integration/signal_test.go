@@ -22,8 +22,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"uuid"
 
-	"github.com/google/uuid"
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 )
@@ -374,10 +374,7 @@ func TestSignalSubmission(t *testing.T) {
 		adminSignalID := getSignalIDFromCreateSignalResponse(t, adminResponseBody)
 		ownerSignalID := getSignalIDFromCreateSignalResponse(t, ownerResponseBody)
 
-		randomCorrelationID, err := uuid.NewV7()
-		if err != nil {
-			t.Fatalf("could not make uuid (%v)", err)
-		}
+		randomCorrelationID := uuid.NewV7()
 
 		// tests run as admin - can write to their own isn but not to the siteadmin isn
 		tests := []struct {

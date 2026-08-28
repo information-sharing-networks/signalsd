@@ -11,8 +11,7 @@ import (
 	"slices"
 	"strings"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 )
 
 // ServiceAccount represents a service account as returned by the signalsd API.
