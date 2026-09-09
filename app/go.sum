@@ -289,8 +289,8 @@ github.com/jonboulle/clockwork v0.5.0 h1:Hyh9A8u51kptdkR+cqRpT1EebBwTn1oK9YfGYbd
 github.com/jonboulle/clockwork v0.5.0/go.mod h1:3mZlmanh0g2NDKO5TWZVJAfofYk64M7XN3SzBPjZF60=
 github.com/josharian/intern v1.0.0 h1:vlS4z54oSdjm0bgjRigI+G1HpF+tI+9rE5LLzOg8HmY=
 github.com/josharian/intern v1.0.0/go.mod h1:5DoeVV0s6jJacbCEi61lwdGj/aVlrQvzHFFd8Hwg//Y=
-github.com/jub0bs/cors v1.1.0 h1:J2T1piN72BluTfX712WtHEgDFyHbpB+6ZsXuepqmbnM=
-github.com/jub0bs/cors v1.1.0/go.mod h1:/Stm+nFPJIU+vlbe3XHuQwl+VEwbokf/nhZ6F1w2pJw=
+github.com/jub0bs/cors v1.1.1 h1:bMakI0h75DyJmSg0owVobw2LyJbIh/13a2K9/ui6hrw=
+github.com/jub0bs/cors v1.1.1/go.mod h1:/Stm+nFPJIU+vlbe3XHuQwl+VEwbokf/nhZ6F1w2pJw=
 github.com/klauspost/compress v1.19.1 h1:VsB4HPswih7mmZ8WleSFQ75c/Ui1M4trX5oAsJnhSlk=
 github.com/klauspost/compress v1.19.1/go.mod h1:cwPg85FWrGar70rWktvGQj8/hthj3wpl0PGDogxkrSQ=
 github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORNo=
