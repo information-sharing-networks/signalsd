@@ -78,6 +78,7 @@ Tests signal creation, search, and security controls via HTTP requests.
 - ✅ Cross-ISN data leakage prevention (`shared_signal_type_test.go`)
 - ✅ Signal router and routing config (`signal_router_test.go`, `signal_routing_test.go`)
 - ✅ Document signal types (`document_signal_type_test.go`)
+- ✅ Postgres document store (`document_store_test.go`)
 - ✅ Site-wide signal type details and the signal types added to each ISN (`signal_type_test.go`)
 
 

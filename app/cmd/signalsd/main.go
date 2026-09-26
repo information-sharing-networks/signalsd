@@ -14,6 +14,7 @@ import (
 
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
+	"github.com/information-sharing-networks/signalsd/app/internal/documents"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/publicisns"
 	"github.com/information-sharing-networks/signalsd/app/internal/router"
@@ -274,6 +275,8 @@ func run(mode string) error {
 		slog.Duration("WRITE_TIMEOUT", cfg.WriteTimeout),
 		slog.Duration("IDLE_TIMEOUT", cfg.IdleTimeout),
 		slog.Int64("MAX_SIGNAL_PAYLOAD_SIZE", cfg.MaxSignalPayloadSize),
+		slog.Int64("MAX_DOCUMENT_SIZE", cfg.MaxDocumentSize),
+		slog.String("DOCUMENT_STORE", cfg.DocumentStore),
 		slog.Int("RATE_LIMIT_RPS", int(cfg.RateLimitRPS)),
 		slog.Int("RATE_LIMIT_BURST", int(cfg.RateLimitBurst)),
 		slog.Int("DB_MAX_CONNECTIONS", int(cfg.DBMaxConnections)),
@@ -353,6 +356,17 @@ func run(mode string) error {
 	}
 	appLogger.Info("Loaded ISN router cache", slog.Int("count", signalRouterCache.Len()))
 
+	// set up the document store - holds the content of document signals (e.g. PDFs)
+	// S3 support is TODO
+	var documentStore documents.Store
+	switch cfg.DocumentStore {
+	case signalsd.DocumentStorePostgres:
+		documentStore = documents.NewPostgresStore(queries)
+	default:
+		appLogger.Error("unexpected DOCUMENT_STORE", slog.String("DOCUMENT_STORE", cfg.DocumentStore))
+		os.Exit(1)
+	}
+
 	// set up the site level rate limiter (disable if RPS <= 0) - note there are payload size limits in addition to rate limiting and these are set when the routes are created in the server package
 	if cfg.RateLimitRPS <= 0 {
 		appLogger.Warn("rate limiting disabled")
@@ -375,6 +389,7 @@ func run(mode string) error {
 		schemaCache,
 		publicIsnCache,
 		signalRouterCache,
+		documentStore,
 	)
 
 	// Set up graceful shutdown handling

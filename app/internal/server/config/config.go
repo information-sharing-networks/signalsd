@@ -24,8 +24,10 @@ type ServerEnvironment struct {
 	WriteTimeout         time.Duration `env:"WRITE_TIMEOUT"        envDefault:"15s"`
 	IdleTimeout          time.Duration `env:"IDLE_TIMEOUT"         envDefault:"65s"` // must exceed ALB idle timeout (default 60s) so ALB closes first
 	AllowedOrigins       []string      `env:"ALLOWED_ORIGINS"      envSeparator:"|"`
-	MaxSignalPayloadSize int64         `env:"MAX_SIGNAL_PAYLOAD_SIZE" envDefault:"5242880"` // 5MB
-	MaxAPIRequestSize    int64         `env:"MAX_API_REQUEST_SIZE"    envDefault:"65536"`   // 64KB
+	MaxSignalPayloadSize int64         `env:"MAX_SIGNAL_PAYLOAD_SIZE" envDefault:"5242880"`  // 5MB
+	MaxAPIRequestSize    int64         `env:"MAX_API_REQUEST_SIZE"    envDefault:"65536"`    // 64KB
+	MaxDocumentSize      int64         `env:"MAX_DOCUMENT_SIZE"       envDefault:"20971520"` // 20MB
+	DocumentStore        string        `env:"DOCUMENT_STORE"          envDefault:"postgres"` // where document content is stored (see ValidDocumentStores)
 	RateLimitRPS         int32         `env:"RATE_LIMIT_RPS"       envDefault:"2500"`
 	RateLimitBurst       int32         `env:"RATE_LIMIT_BURST"     envDefault:"5000"`
 	ServiceMode          string        `env:"SERVICE_MODE"`                        // Set by CLI argument, not env var
@@ -80,6 +82,9 @@ const (
 	// Code should switch on the content kind explicitly and reject unknown kinds (more kinds may be added later).
 	ContentKindJSON     = "json"
 	ContentKindDocument = "document"
+
+	// document stores (see ValidDocumentStores)
+	DocumentStorePostgres = "postgres"
 )
 
 // common maps - used to validate enum values
@@ -132,6 +137,11 @@ var ValidServiceModes = map[string]bool{ // service modes for CLI
 var ValidContentKinds = map[string]bool{
 	ContentKindJSON:     true,
 	ContentKindDocument: true,
+}
+
+// ValidDocumentStores is the list of supported backends for storing document content
+var ValidDocumentStores = map[string]bool{
+	DocumentStorePostgres: true,
 }
 
 // ValidRouteMatchingOperators list the limited set of operations supported for isn routes
@@ -203,6 +213,12 @@ func validateConfig(cfg *ServerEnvironment) error {
 	}
 	if !validEnvs[cfg.Environment] {
 		return fmt.Errorf("invalid ENVIRONMENT: %s", cfg.Environment)
+	}
+	if !ValidDocumentStores[cfg.DocumentStore] {
+		return fmt.Errorf("invalid DOCUMENT_STORE: %s", cfg.DocumentStore)
+	}
+	if cfg.MaxDocumentSize < 1 {
+		return fmt.Errorf("MAX_DOCUMENT_SIZE must be at least 1")
 	}
 
 	// Validate database pool configuration

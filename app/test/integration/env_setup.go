@@ -28,6 +28,7 @@ import (
 
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
+	"github.com/information-sharing-networks/signalsd/app/internal/documents"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/publicisns"
 	"github.com/information-sharing-networks/signalsd/app/internal/router"
@@ -37,6 +38,10 @@ import (
 )
 
 const testSecretKey = "test-secret-key-12345"
+
+// testMaxDocumentSize is the MAX_DOCUMENT_SIZE used in the tests.
+// It is much smaller than the default (20MB) to keep the document tests fast.
+const testMaxDocumentSize = 1024 * 1024 // 1MB
 
 // testEnv provides access to test db and server for integration tests
 type testEnv struct {
@@ -48,6 +53,7 @@ type testEnv struct {
 	publicIsnCache *publicisns.Cache
 	routerCache    *router.Cache
 	schemaCache    *schemas.Cache
+	documentStore  documents.Store
 }
 
 // startInProcessServer starts the signalsd server in-process for testing.
@@ -88,6 +94,8 @@ func startInProcessServer(t *testing.T, publicBaseURL string) *testEnv {
 		AllowedOrigins:       []string{"*"},
 		MaxSignalPayloadSize: 5242880,
 		MaxAPIRequestSize:    65536,
+		MaxDocumentSize:      testMaxDocumentSize,
+		DocumentStore:        signalsd.DocumentStorePostgres,
 		RateLimitRPS:         2500,
 		RateLimitBurst:       5000,
 		TrustedProxies:       1,
@@ -137,6 +145,8 @@ func startInProcessServer(t *testing.T, publicBaseURL string) *testEnv {
 		t.Logf("Warning: Failed to load router cache: %v", err)
 	}
 
+	testEnv.documentStore = documents.NewPostgresStore(testEnv.queries)
+
 	appLogger := logger.InitLogger(logLevel, environment)
 
 	serverInstance := server.NewServer(
@@ -149,6 +159,7 @@ func startInProcessServer(t *testing.T, publicBaseURL string) *testEnv {
 		testEnv.schemaCache,
 		testEnv.publicIsnCache,
 		testEnv.routerCache,
+		testEnv.documentStore,
 	)
 
 	// Create a cancellable context for server shutdown

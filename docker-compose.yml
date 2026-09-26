@@ -71,6 +71,8 @@ services:
       - RATE_LIMIT_BURST
       - MAX_SIGNAL_PAYLOAD_SIZE
       - MAX_API_REQUEST_SIZE
+      - MAX_DOCUMENT_SIZE
+      - DOCUMENT_STORE
       - ALLOWED_ORIGINS
       - TRUSTED_PROXIES
     working_dir: /signalsd

@@ -11,6 +11,7 @@ import (
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
+	"github.com/information-sharing-networks/signalsd/app/internal/documents"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/publicisns"
 	"github.com/information-sharing-networks/signalsd/app/internal/responses"
@@ -57,6 +58,9 @@ type Server struct {
 	// signalRouterCache holds the compiled Signals Routing Rules. It is loaded at startup and
 	// refreshed by polling the database every CachePollInterval.
 	signalRouterCache *router.Cache
+
+	// documentStore holds the content of document signals - the backend is configured via the DOCUMENT_STORE environment variable
+	documentStore documents.Store
 }
 
 func NewServer(
@@ -69,6 +73,7 @@ func NewServer(
 	schemaCache *schemas.Cache,
 	publicIsnCache *publicisns.Cache,
 	signalRouterCache *router.Cache,
+	documentStore documents.Store,
 ) *Server {
 	server := &Server{
 		pool:              pool,
@@ -81,6 +86,7 @@ func NewServer(
 		schemaCache:       schemaCache,
 		publicIsnCache:    publicIsnCache,
 		signalRouterCache: signalRouterCache,
+		documentStore:     documentStore,
 	}
 
 	server.setupMiddleware()
