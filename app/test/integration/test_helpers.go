@@ -148,10 +148,11 @@ const (
 	testSchemaContent    = `{"type": "object", "properties": {"test": {"type": "string"}}, "required": ["test"], "additionalProperties": false }`
 )
 
-// createTestSignalType creates a signal type and associates it with an ISN
-// the simple schema expects content to have a single field called test, e.g "{ "test": "Hello, world!" }"
+// createTestSignalType creates a signal type with the supplied content kind (json, document) and associates it with an ISN.
+// json signal types use the simple test schema, which expects content to have a single field called test, e.g "{ "test": "Hello, world!" }"
+// document signal types have no schema.
 // signal types default to version 1.0.0 if no version is supplied
-func createTestSignalType(t *testing.T, ctx context.Context, queries *database.Queries, isnID uuid.UUID, title string, version string) database.SignalType {
+func createTestSignalType(t *testing.T, ctx context.Context, queries *database.Queries, isnID uuid.UUID, title string, version string, contentKind string) database.SignalType {
 	t.Helper()
 
 	slug, _ := utils.GenerateSlug(title)
@@ -160,14 +161,22 @@ func createTestSignalType(t *testing.T, ctx context.Context, queries *database.Q
 		version = "1.0.0"
 	}
 
+	schemaURL := testSchemaURL
+	schemaContent := testSchemaContent
+	if contentKind == signalsd.ContentKindDocument {
+		schemaURL = signalsd.SkipValidationURL
+		schemaContent = "{}"
+	}
+
 	signalType, err := queries.CreateSignalType(ctx, database.CreateSignalTypeParams{
 		Slug:          slug,
-		SchemaURL:     testSchemaURL,
+		SchemaURL:     schemaURL,
 		ReadmeURL:     testReadmeURL,
 		Title:         title,
 		Detail:        testSignalTypeDetail,
 		SemVer:        version,
-		SchemaContent: testSchemaContent,
+		SchemaContent: schemaContent,
+		ContentKind:   contentKind,
 	})
 	if err != nil {
 		t.Fatalf("Failed to create signal type %s/%s: %v", slug, version, err)

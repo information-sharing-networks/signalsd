@@ -50,9 +50,9 @@ func TestPermissions(t *testing.T) {
 	publicISN := createTestISN(t, ctx, testEnv.queries, "public-isn", "Public ISN", adminAccount.ID, "public")
 
 	// Create signal types
-	_ = createTestSignalType(t, ctx, testEnv.queries, siteAdminISN.ID, "siteadmin ISN signal", "")
-	_ = createTestSignalType(t, ctx, testEnv.queries, adminISN.ID, "admin ISN signal", "")
-	_ = createTestSignalType(t, ctx, testEnv.queries, publicISN.ID, "public ISN signal", "")
+	_ = createTestSignalType(t, ctx, testEnv.queries, siteAdminISN.ID, "siteadmin ISN signal", "", signalsd.ContentKindJSON)
+	_ = createTestSignalType(t, ctx, testEnv.queries, adminISN.ID, "admin ISN signal", "", signalsd.ContentKindJSON)
+	_ = createTestSignalType(t, ctx, testEnv.queries, publicISN.ID, "public ISN signal", "", signalsd.ContentKindJSON)
 
 	// Grant permission to ISNs
 	// note there is no need to  grant permissions to owners (automatically get write access to all isns)

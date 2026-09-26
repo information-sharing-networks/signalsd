@@ -185,6 +185,9 @@ SELECT
     COALESCE(u.email, si.client_contact_email) AS email,
     s.id as signal_id,
     s.local_ref,
+    st.slug AS signal_type_slug,
+    st.sem_ver,
+    st.content_kind,
     s.created_at signal_created_at,
     lsv.id AS signal_version_id,
     lsv.version_number,
@@ -219,6 +222,8 @@ WHERE
     AND (sqlc.narg('account_id')::uuid IS NULL OR a.id = sqlc.narg('account_id')::uuid)
     AND (sqlc.narg('signal_id')::uuid IS NULL OR s.id = sqlc.narg('signal_id')::uuid)
     AND (sqlc.narg('local_ref')::text IS NULL OR s.local_ref = sqlc.narg('local_ref')::text)
+    -- signals correlated to the supplied signal (excluding the signal itself)
+    AND (sqlc.narg('correlation_id')::uuid IS NULL OR (s.correlation_id = sqlc.narg('correlation_id')::uuid AND s.id != sqlc.narg('correlation_id')::uuid))
     AND (sqlc.narg('start_date')::timestamptz IS NULL OR lsv.created_at >= sqlc.narg('start_date')::timestamptz)
     AND (sqlc.narg('end_date')::timestamptz IS NULL OR lsv.created_at <= sqlc.narg('end_date')::timestamptz)
 ORDER BY
@@ -268,12 +273,16 @@ WHERE s.account_id = $1
 -- name: GetSignalsByCorrelationIDs :many
 -- Get all signals that correlate to the provided signal IDs (for embedding correlated signals)
 -- Signals for inactive isns or signal types (is_in_use = false) are not returned
+-- supply account_id to restrict the results to signals created by that account (used for write-only accounts)
 SELECT
     a.id AS account_id,
     a.account_type,
     COALESCE(u.email, si.client_contact_email) AS email,
     s.id as signal_id,
     s.local_ref,
+    st.slug AS signal_type_slug,
+    st.sem_ver,
+    st.content_kind,
     s.created_at signal_created_at,
     lsv.id AS signal_version_id,
     lsv.version_number,
@@ -304,6 +313,7 @@ WHERE
     AND i.is_in_use = true
     AND ist.is_in_use = true
     AND (sqlc.narg('include_withdrawn')::boolean = true OR s.is_withdrawn = false)
+    AND (sqlc.narg('account_id')::uuid IS NULL OR s.account_id = sqlc.narg('account_id')::uuid)
 ORDER BY
     s.correlation_id,
     s.local_ref,

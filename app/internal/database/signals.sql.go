@@ -426,6 +426,9 @@ SELECT
     COALESCE(u.email, si.client_contact_email) AS email,
     s.id as signal_id,
     s.local_ref,
+    st.slug AS signal_type_slug,
+    st.sem_ver,
+    st.content_kind,
     s.created_at signal_created_at,
     lsv.id AS signal_version_id,
     lsv.version_number,
@@ -456,6 +459,7 @@ WHERE
     AND i.is_in_use = true
     AND ist.is_in_use = true
     AND ($2::boolean = true OR s.is_withdrawn = false)
+    AND ($3::uuid IS NULL OR s.account_id = $3::uuid)
 ORDER BY
     s.correlation_id,
     s.local_ref,
@@ -466,6 +470,7 @@ ORDER BY
 type GetSignalsByCorrelationIDsParams struct {
 	CorrelationIds   []uuid.UUID `json:"correlation_ids"`
 	IncludeWithdrawn *bool       `json:"include_withdrawn"`
+	AccountID        *uuid.UUID  `json:"account_id"`
 }
 
 type GetSignalsByCorrelationIDsRow struct {
@@ -474,6 +479,9 @@ type GetSignalsByCorrelationIDsRow struct {
 	Email                string          `json:"email"`
 	SignalID             uuid.UUID       `json:"signal_id"`
 	LocalRef             string          `json:"local_ref"`
+	SignalTypeSlug       string          `json:"signal_type_slug"`
+	SemVer               string          `json:"sem_ver"`
+	ContentKind          string          `json:"content_kind"`
 	SignalCreatedAt      time.Time       `json:"signal_created_at"`
 	SignalVersionID      uuid.UUID       `json:"signal_version_id"`
 	VersionNumber        int32           `json:"version_number"`
@@ -485,8 +493,9 @@ type GetSignalsByCorrelationIDsRow struct {
 
 // Get all signals that correlate to the provided signal IDs (for embedding correlated signals)
 // Signals for inactive isns or signal types (is_in_use = false) are not returned
+// supply account_id to restrict the results to signals created by that account (used for write-only accounts)
 func (q *Queries) GetSignalsByCorrelationIDs(ctx context.Context, arg GetSignalsByCorrelationIDsParams) ([]GetSignalsByCorrelationIDsRow, error) {
-	rows, err := q.db.Query(ctx, GetSignalsByCorrelationIDs, arg.CorrelationIds, arg.IncludeWithdrawn)
+	rows, err := q.db.Query(ctx, GetSignalsByCorrelationIDs, arg.CorrelationIds, arg.IncludeWithdrawn, arg.AccountID)
 	if err != nil {
 		return nil, err
 	}
@@ -500,6 +509,9 @@ func (q *Queries) GetSignalsByCorrelationIDs(ctx context.Context, arg GetSignals
 			&i.Email,
 			&i.SignalID,
 			&i.LocalRef,
+			&i.SignalTypeSlug,
+			&i.SemVer,
+			&i.ContentKind,
 			&i.SignalCreatedAt,
 			&i.SignalVersionID,
 			&i.VersionNumber,
@@ -525,6 +537,9 @@ SELECT
     COALESCE(u.email, si.client_contact_email) AS email,
     s.id as signal_id,
     s.local_ref,
+    st.slug AS signal_type_slug,
+    st.sem_ver,
+    st.content_kind,
     s.created_at signal_created_at,
     lsv.id AS signal_version_id,
     lsv.version_number,
@@ -559,8 +574,10 @@ WHERE
     AND ($5::uuid IS NULL OR a.id = $5::uuid)
     AND ($6::uuid IS NULL OR s.id = $6::uuid)
     AND ($7::text IS NULL OR s.local_ref = $7::text)
-    AND ($8::timestamptz IS NULL OR lsv.created_at >= $8::timestamptz)
-    AND ($9::timestamptz IS NULL OR lsv.created_at <= $9::timestamptz)
+    -- signals correlated to the supplied signal (excluding the signal itself)
+    AND ($8::uuid IS NULL OR (s.correlation_id = $8::uuid AND s.id != $8::uuid))
+    AND ($9::timestamptz IS NULL OR lsv.created_at >= $9::timestamptz)
+    AND ($10::timestamptz IS NULL OR lsv.created_at <= $10::timestamptz)
 ORDER BY
     s.updated_at ASC
 `
@@ -573,6 +590,7 @@ type GetSignalsWithOptionalFiltersParams struct {
 	AccountID        *uuid.UUID `json:"account_id"`
 	SignalID         *uuid.UUID `json:"signal_id"`
 	LocalRef         *string    `json:"local_ref"`
+	CorrelationID    *uuid.UUID `json:"correlation_id"`
 	StartDate        *time.Time `json:"start_date"`
 	EndDate          *time.Time `json:"end_date"`
 }
@@ -583,6 +601,9 @@ type GetSignalsWithOptionalFiltersRow struct {
 	Email                string          `json:"email"`
 	SignalID             uuid.UUID       `json:"signal_id"`
 	LocalRef             string          `json:"local_ref"`
+	SignalTypeSlug       string          `json:"signal_type_slug"`
+	SemVer               string          `json:"sem_ver"`
+	ContentKind          string          `json:"content_kind"`
 	SignalCreatedAt      time.Time       `json:"signal_created_at"`
 	SignalVersionID      uuid.UUID       `json:"signal_version_id"`
 	VersionNumber        int32           `json:"version_number"`
@@ -603,6 +624,7 @@ func (q *Queries) GetSignalsWithOptionalFilters(ctx context.Context, arg GetSign
 		arg.AccountID,
 		arg.SignalID,
 		arg.LocalRef,
+		arg.CorrelationID,
 		arg.StartDate,
 		arg.EndDate,
 	)
@@ -619,6 +641,9 @@ func (q *Queries) GetSignalsWithOptionalFilters(ctx context.Context, arg GetSign
 			&i.Email,
 			&i.SignalID,
 			&i.LocalRef,
+			&i.SignalTypeSlug,
+			&i.SemVer,
+			&i.ContentKind,
 			&i.SignalCreatedAt,
 			&i.SignalVersionID,
 			&i.VersionNumber,

@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
+	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/handlers"
 )
 
@@ -104,7 +105,7 @@ func TestSignalRoutingConfig(t *testing.T) {
 
 	// isn and signal type
 	isn := createTestISN(t, ctx, testEnv.queries, "test-isn", "Test ISN", siteAdminAccount.ID, "private")
-	signalType := createTestSignalType(t, ctx, testEnv.queries, isn.ID, "test signal type", "")
+	signalType := createTestSignalType(t, ctx, testEnv.queries, isn.ID, "test signal type", "", signalsd.ContentKindJSON)
 
 	// refresh schema cache so the handler can validate the routing field against the signal type schema
 	if err := testEnv.schemaCache.Load(ctx); err != nil {

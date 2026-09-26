@@ -518,7 +518,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Signal types specify a record that can be shared on the site\n- Each type has a unique title and this is used to create a URL-friendly slug\n- The title and slug fields can't be changed and must be unique for the site\n- The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading\n\nSchema URL Requirements\n- Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)\n- To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json\n\nReadme URL requirements\n- Must be a link to a file ending .md on a public github repo.\n- Use the special URL: https://github.com/skip/readme/main/readme.md to indicate there is no readme\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas\n- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (, 0.1.0 or 0.0.1)\n\nAfter creating a signal type, use the AddSignalTypeToIsn endpoint to link it to one or more ISNs.\n\nSignal type definitions are referred to like this: /api/signal-types/{signal_type_slug}/v{sem_ver}\n\nNote: this endpoint can only be used by site admins",
+                "description": "Signal types specify a record that can be shared on the site\n- Each type has a unique title and this is used to create a URL-friendly slug\n- The title and slug fields can't be changed and must be unique for the site\n- The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading\n\nContent kinds\n- json (default): signals are JSON validated against the signal type's schema\n- document: signals are files (e.g. a PDF bill of lading) Document signal types do not have a schema - omit schema_url\n\nJSON Schema URL Requirements\n- Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)\n- To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json\n\nReadme URL requirements\n- Must be a link to a file ending .md on a public github repo.\n- Use the special URL: https://github.com/skip/readme/main/readme.md to indicate there is no readme\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas\n- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (, 0.1.0 or 0.0.1)\n\nAfter creating a signal type, use the AddSignalTypeToIsn endpoint to link it to one or more ISNs.\n\nSignal type definitions are referred to like this: /api/signal-types/{signal_type_slug}/v{sem_ver}\n\nNote: this endpoint can only be used by site admins",
                 "tags": [
                     "Signal Types"
                 ],
@@ -2220,7 +2220,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Search for signals by date or account in private ISNs (authentication required - only accounts with read or write permissions to the ISN can access signals).\n\nNote the endpoint returns the latest version of each signal.\n\nWrite-only accounts can only see signals created by their own account (searches that filter on another account_id return no results).",
+                "description": "Search for signals by date or account in private ISNs (authentication required - only accounts with read or write permissions to the ISN can access signals).\n\nNote the endpoint returns the latest version of each signal.\n\nWrite-only accounts can only see signals created by their own account (searches that filter on another account_id return no results).\nThis also applies to correlated signals returned with include_correlated=true.",
                 "tags": [
                     "Signal Exchange"
                 ],
@@ -2259,6 +2259,13 @@
                         "example": "item_id_#1",
                         "description": "Local reference",
                         "name": "local_ref",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19",
+                        "description": "Return signals correlated with this signal ID",
+                        "name": "correlation_id",
                         "in": "query"
                     },
                     {
@@ -2445,6 +2452,13 @@
                         "example": "item_id_#1",
                         "description": "Local reference",
                         "name": "local_ref",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19",
+                        "description": "Return signals correlated with this signal ID",
+                        "name": "correlation_id",
                         "in": "query"
                     },
                     {
@@ -3124,6 +3138,15 @@
                     ],
                     "example": "patch"
                 },
+                "content_kind": {
+                    "description": "optional (default json): json signals are validated against the schema, document signals are files (e.g. PDFs)",
+                    "type": "string",
+                    "enum": [
+                        "json",
+                        "document"
+                    ],
+                    "example": "json"
+                },
                 "detail": {
                     "description": "description",
                     "type": "string",
@@ -3135,7 +3158,7 @@
                     "example": "https://github.com/user/project/blob/2025.01.01/readme.md"
                 },
                 "schema_url": {
-                    "description": "JSON schema URL: must be a GitHub URL ending in .json, OR use https://github.com/skip/validation/main/schema.json to disable validation",
+                    "description": "JSON schema URL: must be a GitHub URL ending in .json, OR use https://github.com/skip/validation/main/schema.json to disable validation. Not used for document signal types",
                     "type": "string",
                     "example": "https://github.com/user/project/blob/2025.01.01/schema.json"
                 },
@@ -3548,6 +3571,14 @@
                 "content": {
                     "type": "object"
                 },
+                "content_kind": {
+                    "type": "string",
+                    "enum": [
+                        "json",
+                        "document"
+                    ],
+                    "example": "json"
+                },
                 "correlated_to_signal_id": {
                     "type": "string"
                 },
@@ -3561,11 +3592,19 @@
                 "local_ref": {
                     "type": "string"
                 },
+                "sem_ver": {
+                    "type": "string",
+                    "example": "0.0.1"
+                },
                 "signal_created_at": {
                     "type": "string"
                 },
                 "signal_id": {
                     "type": "string"
+                },
+                "signal_type_slug": {
+                    "type": "string",
+                    "example": "sample-signal-type"
                 },
                 "signal_version_id": {
                     "type": "string"
@@ -3589,6 +3628,14 @@
                 },
                 "content": {
                     "type": "object"
+                },
+                "content_kind": {
+                    "type": "string",
+                    "enum": [
+                        "json",
+                        "document"
+                    ],
+                    "example": "json"
                 },
                 "correlated_signals": {
                     "type": "array",
@@ -3615,11 +3662,19 @@
                         "$ref": "#/definitions/handlers.PreviousSignalVersion"
                     }
                 },
+                "sem_ver": {
+                    "type": "string",
+                    "example": "0.0.1"
+                },
                 "signal_created_at": {
                     "type": "string"
                 },
                 "signal_id": {
                     "type": "string"
+                },
+                "signal_type_slug": {
+                    "type": "string",
+                    "example": "sample-signal-type"
                 },
                 "signal_version_id": {
                     "type": "string"
@@ -3837,6 +3892,14 @@
         "handlers.SignalTypeDetail": {
             "type": "object",
             "properties": {
+                "content_kind": {
+                    "type": "string",
+                    "enum": [
+                        "json",
+                        "document"
+                    ],
+                    "example": "json"
+                },
                 "created_at": {
                     "type": "string",
                     "example": "2025-06-03T13:47:47.331787+01:00"

@@ -274,6 +274,14 @@ definitions:
         - patch
         example: patch
         type: string
+      content_kind:
+        description: 'optional (default json): json signals are validated against
+          the schema, document signals are files (e.g. PDFs)'
+        enum:
+        - json
+        - document
+        example: json
+        type: string
       detail:
         description: description
         example: description
@@ -284,7 +292,8 @@ definitions:
         type: string
       schema_url:
         description: 'JSON schema URL: must be a GitHub URL ending in .json, OR use
-          https://github.com/skip/validation/main/schema.json to disable validation'
+          https://github.com/skip/validation/main/schema.json to disable validation.
+          Not used for document signal types'
         example: https://github.com/user/project/blob/2025.01.01/schema.json
         type: string
       title:
@@ -589,6 +598,12 @@ definitions:
         type: string
       content:
         type: object
+      content_kind:
+        enum:
+        - json
+        - document
+        example: json
+        type: string
       correlated_to_signal_id:
         type: string
       email:
@@ -598,9 +613,15 @@ definitions:
         type: boolean
       local_ref:
         type: string
+      sem_ver:
+        example: 0.0.1
+        type: string
       signal_created_at:
         type: string
       signal_id:
+        type: string
+      signal_type_slug:
+        example: sample-signal-type
         type: string
       signal_version_id:
         type: string
@@ -617,6 +638,12 @@ definitions:
         type: string
       content:
         type: object
+      content_kind:
+        enum:
+        - json
+        - document
+        example: json
+        type: string
       correlated_signals:
         items:
           $ref: '#/definitions/handlers.SearchSignal'
@@ -634,9 +661,15 @@ definitions:
         items:
           $ref: '#/definitions/handlers.PreviousSignalVersion'
         type: array
+      sem_ver:
+        example: 0.0.1
+        type: string
       signal_created_at:
         type: string
       signal_id:
+        type: string
+      signal_type_slug:
+        example: sample-signal-type
         type: string
       signal_version_id:
         type: string
@@ -798,6 +831,12 @@ definitions:
     type: object
   handlers.SignalTypeDetail:
     properties:
+      content_kind:
+        enum:
+        - json
+        - document
+        example: json
+        type: string
       created_at:
         example: "2025-06-03T13:47:47.331787+01:00"
         type: string
@@ -1490,7 +1529,11 @@ paths:
         - The title and slug fields can't be changed and must be unique for the site
         - The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading
 
-        Schema URL Requirements
+        Content kinds
+        - json (default): signals are JSON validated against the signal type's schema
+        - document: signals are files (e.g. a PDF bill of lading) Document signal types do not have a schema - omit schema_url
+
+        JSON Schema URL Requirements
         - Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)
         - To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json
 
@@ -2790,6 +2833,7 @@ paths:
         Note the endpoint returns the latest version of each signal.
 
         Write-only accounts can only see signals created by their own account (searches that filter on another account_id return no results).
+        This also applies to correlated signals returned with include_correlated=true.
       parameters:
       - description: Start date
         example: "2006-01-02T15:05:00Z"
@@ -2815,6 +2859,11 @@ paths:
         example: item_id_#1
         in: query
         name: local_ref
+        type: string
+      - description: Return signals correlated with this signal ID
+        example: 4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19
+        in: query
+        name: correlation_id
         type: string
       - description: 'Include withdrawn signals (default: false)'
         example: "true"
@@ -3001,6 +3050,11 @@ paths:
         example: item_id_#1
         in: query
         name: local_ref
+        type: string
+      - description: Return signals correlated with this signal ID
+        example: 4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19
+        in: query
+        name: correlation_id
         type: string
       - description: 'Include withdrawn signals (default: false)'
         example: "true"

@@ -28,6 +28,13 @@ type ClientSecret struct {
 	RevokedAt               *time.Time `json:"revoked_at"`
 }
 
+type DocumentContent struct {
+	AccountID uuid.UUID `json:"account_id"`
+	Sha256    string    `json:"sha256"`
+	CreatedAt time.Time `json:"created_at"`
+	Content   []byte    `json:"content"`
+}
+
 type Isn struct {
 	ID            uuid.UUID `json:"id"`
 	CreatedAt     time.Time `json:"created_at"`
@@ -163,6 +170,7 @@ type SignalType struct {
 	Detail        string    `json:"detail"`
 	SemVer        string    `json:"sem_ver"`
 	SchemaContent string    `json:"schema_content"`
+	ContentKind   string    `json:"content_kind"`
 }
 
 type SignalVersion struct {

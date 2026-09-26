@@ -18,6 +18,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/publicisns"
 	"github.com/information-sharing-networks/signalsd/app/internal/responses"
 	"github.com/information-sharing-networks/signalsd/app/internal/schemas"
+	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/utils"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -184,6 +185,7 @@ type SearchParams struct {
 	endDate                       *time.Time
 	localRef                      *string
 	signalID                      *uuid.UUID
+	correlationID                 *uuid.UUID
 	includeWithdrawn              bool
 	includeCorrelated             bool
 	includePreviousSignalVersions bool
@@ -198,6 +200,9 @@ type SearchSignal struct {
 	Email                string          `json:"email,omitempty"` // not included in public ISN searches
 	SignalID             uuid.UUID       `json:"signal_id"`
 	LocalRef             string          `json:"local_ref"`
+	SignalTypeSlug       string          `json:"signal_type_slug" example:"sample-signal-type"`
+	SemVer               string          `json:"sem_ver" example:"0.0.1"`
+	ContentKind          string          `json:"content_kind" example:"json" enums:"json,document"`
 	SignalCreatedAt      time.Time       `json:"signal_created_at"`
 	SignalVersionID      uuid.UUID       `json:"signal_version_id"`
 	VersionNumber        int32           `json:"version_number"`
@@ -269,6 +274,15 @@ func parseSearchParams(r *http.Request) (SearchParams, error) {
 		searchParams.signalID = &signalID
 	}
 
+	// correlation_id
+	if correlationIDString := r.URL.Query().Get("correlation_id"); correlationIDString != "" {
+		correlationID, err := uuid.Parse(correlationIDString)
+		if err != nil {
+			return searchParams, fmt.Errorf("correlation_id is not a valid UUID")
+		}
+		searchParams.correlationID = &correlationID
+	}
+
 	// local_ref
 	if localRef := r.URL.Query().Get("local_ref"); localRef != "" {
 		searchParams.localRef = &localRef
@@ -302,8 +316,9 @@ func validateSearchParams(params SearchParams) error {
 	hasAccount := params.accountID != nil
 	hasSignalID := params.signalID != nil
 	hasLocalRef := params.localRef != nil
+	hasCorrelationID := params.correlationID != nil
 
-	if !hasDateRange && !hasAccount && !hasSignalID && !hasLocalRef {
+	if !hasDateRange && !hasAccount && !hasSignalID && !hasLocalRef && !hasCorrelationID {
 		return fmt.Errorf("you must supply a search parameter")
 	}
 
@@ -340,7 +355,10 @@ func (s *SignalsHandler) getPreviousSignalVersions(ctx context.Context, signalID
 }
 
 // getCorrelatedSignals fetches all signals that have a correlated_id that references one of the provided signal IDs - returns a map of signal_id to correlated signals
-func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []uuid.UUID, params SearchParams) (map[uuid.UUID][]SearchSignal, error) {
+//
+// restrictToAccountID limits the results to signals created by that account (used for write-only accounts, nil = no restriction).
+// Email addresses are only included when includeEmail is true (they are not shown in public ISNs).
+func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []uuid.UUID, params SearchParams, restrictToAccountID *uuid.UUID, includeEmail bool) (map[uuid.UUID][]SearchSignal, error) {
 	if len(signalIDs) == 0 {
 		return make(map[uuid.UUID][]SearchSignal), nil
 	}
@@ -348,6 +366,7 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 	correlatedSignals, err := s.queries.GetSignalsByCorrelationIDs(ctx, database.GetSignalsByCorrelationIDsParams{
 		CorrelationIds:   signalIDs,
 		IncludeWithdrawn: &params.includeWithdrawn,
+		AccountID:        restrictToAccountID,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -359,11 +378,19 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 	// Group correlated signals by their correlation_id
 	result := make(map[uuid.UUID][]SearchSignal)
 	for _, signal := range correlatedSignals {
+		email := ""
+		if includeEmail {
+			email = signal.Email
+		}
 		correlatedSignal := SearchSignal{
 			AccountID:            signal.AccountID,
-			Email:                signal.Email,
+			AccountType:          signal.AccountType,
+			Email:                email,
 			SignalID:             signal.SignalID,
 			LocalRef:             signal.LocalRef,
+			SignalTypeSlug:       signal.SignalTypeSlug,
+			SemVer:               signal.SemVer,
+			ContentKind:          signal.ContentKind,
 			SignalCreatedAt:      signal.SignalCreatedAt,
 			SignalVersionID:      signal.SignalVersionID,
 			VersionNumber:        signal.VersionNumber,
@@ -469,6 +496,11 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) e
 	semVer := r.PathValue("sem_ver")
 	signalTypePath := fmt.Sprintf("%v/v%v", signalTypeSlug, semVer)
 
+	// only json signal types can be submitted to this endpoint
+	if err := s.schemaCache.CheckContentKind(signalTypePath, signalsd.ContentKindJSON); err != nil {
+		return apperrors.InvalidURLParam(err.Error(), nil)
+	}
+
 	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
 		return apperrors.InternalError("could not get claims from context", nil)
@@ -544,7 +576,7 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) e
 	// Validate all signals against schema - record validation failures
 	validSignals := make([]Signal, 0)
 	for _, signal := range req.Signals {
-		err = s.schemaCache.ValidateSignal(r.Context(), s.queries, signalTypePath, signal.Content)
+		err = s.schemaCache.ValidateJSONSignal(r.Context(), s.queries, signalTypePath, signal.Content)
 		if err != nil {
 			errMsg := fmt.Sprintf("validation failed: %v", err)
 			// Add to failed signals list
@@ -768,6 +800,7 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) e
 //	@Param			account_id					query		string	false	"Account ID"															example(def87f89-dab6-4607-95f7-593d61cb5742)
 //	@Param			signal_id					query		string	false	"Signal ID"																example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
 //	@Param			local_ref					query		string	false	"Local reference"														example(item_id_#1)
+//	@Param			correlation_id				query		string	false	"Return signals correlated with this signal ID"							example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
 //	@Param			include_withdrawn			query		string	false	"Include withdrawn signals (default: false)"							example(true)
 //	@Param			include_correlated			query		string	false	"Include signals that link to each returned signal (default: false)"	example(true)
 //	@Param			include_previous_versions	query		string	false	"Include previous versions of each returned signal (default: false)"	example(true)
@@ -813,6 +846,7 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 		EndDate:          searchParams.endDate,
 		AccountID:        searchParams.accountID,
 		SignalID:         searchParams.signalID,
+		CorrelationID:    searchParams.correlationID,
 		LocalRef:         searchParams.localRef,
 		IncludeWithdrawn: &searchParams.includeWithdrawn,
 	})
@@ -841,7 +875,7 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 	if searchParams.includeCorrelated {
 
 		// create a map of signal_id to their correlated signals
-		correlatedSignalBySignalID, err = s.getCorrelatedSignals(r.Context(), signalIDs, searchParams)
+		correlatedSignalBySignalID, err = s.getCorrelatedSignals(r.Context(), signalIDs, searchParams, nil, false)
 		if err != nil {
 			return apperrors.DatabaseError("database error", err)
 		}
@@ -858,9 +892,13 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 		signal := SearchSignalWithCorrelationsAndVersions{
 			SearchSignal: SearchSignal{
 				AccountID:            returnedSignal.AccountID,
+				AccountType:          returnedSignal.AccountType,
 				Email:                "", // do not show email addresses in public ISNs
 				SignalID:             returnedSignal.SignalID,
 				LocalRef:             returnedSignal.LocalRef,
+				SignalTypeSlug:       returnedSignal.SignalTypeSlug,
+				SemVer:               returnedSignal.SemVer,
+				ContentKind:          returnedSignal.ContentKind,
 				SignalCreatedAt:      returnedSignal.SignalCreatedAt,
 				SignalVersionID:      returnedSignal.SignalVersionID,
 				VersionNumber:        returnedSignal.VersionNumber,
@@ -899,12 +937,14 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 //	@Description	Note the endpoint returns the latest version of each signal.
 //	@Description
 //	@Description	Write-only accounts can only see signals created by their own account (searches that filter on another account_id return no results).
+//	@Description	This also applies to correlated signals returned with include_correlated=true.
 //
 //	@Param			start_date					query		string	false	"Start date"															example(2006-01-02T15:05:00Z)
 //	@Param			end_date					query		string	false	"End date"																example(2006-01-02T15:15:00Z)
 //	@Param			account_id					query		string	false	"Account ID"															example(def87f89-dab6-4607-95f7-593d61cb5742)
 //	@Param			signal_id					query		string	false	"Signal ID"																example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
 //	@Param			local_ref					query		string	false	"Local reference"														example(item_id_#1)
+//	@Param			correlation_id				query		string	false	"Return signals correlated with this signal ID"							example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
 //	@Param			include_withdrawn			query		string	false	"Include withdrawn signals (default: false)"							example(true)
 //	@Param			include_correlated			query		string	false	"Include signals that link to each returned signal (default: false)"	example(true)
 //	@Param			include_previous_versions	query		string	false	"Include previous versions of each returned signal (default: false)"	example(true)
@@ -942,6 +982,8 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 
 	// Write-only accounts can only see signals they created - restrict the query to their own account
 	// (searches that filter on another account_id return no results)
+	// the same restriction applies to correlated signals
+	var writeOnlyAccountID *uuid.UUID
 	isnPerms := claims.IsnPerms[searchParams.isnSlug]
 	if !isnPerms.CanRead && isnPerms.CanWrite {
 		accountID, ok := auth.ContextAccountID(r.Context())
@@ -952,6 +994,7 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 			return responses.JSON(w, http.StatusOK, []SearchSignalWithCorrelationsAndVersions{})
 		}
 		searchParams.accountID = &accountID
+		writeOnlyAccountID = &accountID
 	}
 
 	returnedSignals, err := s.queries.GetSignalsWithOptionalFilters(r.Context(), database.GetSignalsWithOptionalFiltersParams{
@@ -962,6 +1005,7 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 		EndDate:          searchParams.endDate,
 		AccountID:        searchParams.accountID,
 		SignalID:         searchParams.signalID,
+		CorrelationID:    searchParams.correlationID,
 		LocalRef:         searchParams.localRef,
 		IncludeWithdrawn: &searchParams.includeWithdrawn,
 	})
@@ -990,7 +1034,7 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 	if searchParams.includeCorrelated {
 
 		// create a map of signal_id to their correlated signals
-		correlatedSignalBySignalID, err = s.getCorrelatedSignals(r.Context(), signalIDs, searchParams)
+		correlatedSignalBySignalID, err = s.getCorrelatedSignals(r.Context(), signalIDs, searchParams, writeOnlyAccountID, true)
 		if err != nil {
 			return apperrors.DatabaseError("database error", err)
 		}
@@ -1007,9 +1051,13 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 		signal := SearchSignalWithCorrelationsAndVersions{
 			SearchSignal: SearchSignal{
 				AccountID:            returnedSignal.AccountID,
+				AccountType:          returnedSignal.AccountType,
 				Email:                returnedSignal.Email,
 				SignalID:             returnedSignal.SignalID,
 				LocalRef:             returnedSignal.LocalRef,
+				SignalTypeSlug:       returnedSignal.SignalTypeSlug,
+				SemVer:               returnedSignal.SemVer,
+				ContentKind:          returnedSignal.ContentKind,
 				SignalCreatedAt:      returnedSignal.SignalCreatedAt,
 				SignalVersionID:      returnedSignal.SignalVersionID,
 				VersionNumber:        returnedSignal.VersionNumber,

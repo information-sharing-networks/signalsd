@@ -20,21 +20,26 @@ func SkipValidation(url string) bool {
 }
 
 // Cache stores compiled JSON schemas indexed by signal type path: {signal_type_slug}/v{sem_ver}
-// The mutex protects the cache from concurrent access when multiple http go routines are validating signals
 // Initialised on startup and refreshed by polling (see server.go)
 type Cache struct {
-	db         *database.Queries
-	mu         sync.RWMutex
-	schemas    map[string]*jsonschema.Schema
-	schemaURLs map[string]string // tracks schema URLs for each signal type path
+	db *database.Queries
+	// mu protects the cache from concurrent access when multiple http go routines are validating signals
+	mu sync.RWMutex
+	// schemas the compiled schema by path
+	schemas map[string]*jsonschema.Schema
+	// schemaURLs the schema URLs by path
+	schemaURLs map[string]string
+	// contentKinds the singal content type (json, document etc)
+	contentKinds map[string]string
 }
 
 // NewCache creates a new schema cache instance
 func NewCache(db *database.Queries) *Cache {
 	return &Cache{
-		db:         db,
-		schemas:    make(map[string]*jsonschema.Schema),
-		schemaURLs: make(map[string]string),
+		db:           db,
+		schemas:      make(map[string]*jsonschema.Schema),
+		schemaURLs:   make(map[string]string),
+		contentKinds: make(map[string]string),
 	}
 }
 
@@ -48,6 +53,7 @@ func (c *Cache) Load(ctx context.Context) error {
 
 	schemas := make(map[string]*jsonschema.Schema)
 	schemaURLs := make(map[string]string)
+	contentKinds := make(map[string]string)
 
 	var loadErrors []string
 
@@ -63,6 +69,7 @@ func (c *Cache) Load(ctx context.Context) error {
 			schemas[signalTypePath] = schema
 			// Store the schema URL for this signal type path
 			schemaURLs[signalTypePath] = signalType.SchemaURL
+			contentKinds[signalTypePath] = signalType.ContentKind
 		}
 
 	}
@@ -74,6 +81,7 @@ func (c *Cache) Load(ctx context.Context) error {
 	c.mu.Lock()
 	c.schemas = schemas
 	c.schemaURLs = schemaURLs
+	c.contentKinds = contentKinds
 	c.mu.Unlock()
 
 	return nil
@@ -106,8 +114,25 @@ func (c *Cache) Len() int {
 	return len(c.schemas)
 }
 
-// ValidateSignal validates the JSON payload for a signal against its schema
-func (c *Cache) ValidateSignal(ctx context.Context, queries *database.Queries, signalTypePath string, rawJSON json.RawMessage) error {
+// CheckContentKind returns an error if the signal type is not in the cache or does not have the expected content kind (json, document).
+// Use this to reject signals sent to the wrong endpoint (e.g. json signals sent to a document signal type).
+func (c *Cache) CheckContentKind(signalTypePath, expected string) error {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	contentKind, ok := c.contentKinds[signalTypePath]
+	if !ok {
+		return fmt.Errorf("signal type %s not found", signalTypePath)
+	}
+	if contentKind != expected {
+		return fmt.Errorf("signal type %s has content kind %q - this endpoint only accepts %s signals", signalTypePath, contentKind, expected)
+	}
+	return nil
+}
+
+// ValidateJSONSignal validates the JSON payload for a signal against its schema
+// Only json signal types can be validated - an error is returned for other content kinds.
+func (c *Cache) ValidateJSONSignal(ctx context.Context, queries *database.Queries, signalTypePath string, rawJSON json.RawMessage) error {
 
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -115,6 +140,10 @@ func (c *Cache) ValidateSignal(ctx context.Context, queries *database.Queries, s
 	schemaURL, exists := c.schemaURLs[signalTypePath]
 	if !exists {
 		return fmt.Errorf("no schema found in the cache for this signal type")
+	}
+
+	if contentKind := c.contentKinds[signalTypePath]; contentKind != signalsd.ContentKindJSON {
+		return fmt.Errorf("signal type %s has content kind %q - only json signals can be validated", signalTypePath, contentKind)
 	}
 
 	// Try cache first

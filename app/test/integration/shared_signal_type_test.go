@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
+	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 )
 
 func TestSharedSignalTypeIsolation(t *testing.T) {
@@ -25,7 +26,7 @@ func TestSharedSignalTypeIsolation(t *testing.T) {
 	betaISN := createTestISN(t, ctx, testEnv.queries, "beta-shared-isn", "Beta ISN", account.ID, "private")
 
 	// create the signal type and register with Alpha
-	sharedSignalType := createTestSignalType(t, ctx, testEnv.queries, alphaISN.ID, "Shared Signal Type", "")
+	sharedSignalType := createTestSignalType(t, ctx, testEnv.queries, alphaISN.ID, "Shared Signal Type", "", signalsd.ContentKindJSON)
 	// add to Beta
 	addSignalTypeToIsn(t, ctx, testEnv.queries, betaISN.ID, sharedSignalType.ID)
 

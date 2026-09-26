@@ -26,6 +26,7 @@ import (
 
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
+	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 )
 
 // TestSignalSubmission tests the signal submission process end-to-end including:
@@ -49,8 +50,8 @@ func TestSignalSubmission(t *testing.T) {
 	siteAdminISN := createTestISN(t, ctx, testEnv.queries, "siteadmin-isn", "SiteAdmin ISN", siteAdminAccount.ID, "private")
 	adminISN := createTestISN(t, ctx, testEnv.queries, "admin-isn", "Admin ISN", adminAccount.ID, "private")
 
-	siteAdminSignalType := createTestSignalType(t, ctx, testEnv.queries, siteAdminISN.ID, "siteadmin ISN signal", "")
-	adminSignalType := createTestSignalType(t, ctx, testEnv.queries, adminISN.ID, "admin ISN signal", "")
+	siteAdminSignalType := createTestSignalType(t, ctx, testEnv.queries, siteAdminISN.ID, "siteadmin ISN signal", "", signalsd.ContentKindJSON)
+	adminSignalType := createTestSignalType(t, ctx, testEnv.queries, adminISN.ID, "admin ISN signal", "", signalsd.ContentKindJSON)
 
 	grantPermission(t, ctx, testEnv.queries, adminISN.ID, memberAccount.ID, "read")
 
@@ -553,8 +554,8 @@ func TestIsInUseStatus(t *testing.T) {
 	siteAdminISN := createTestISN(t, ctx, testEnv.queries, "siteadmin-isn", "SiteAdmin ISN", siteAdminAccount.ID, "private")
 	adminISN := createTestISN(t, ctx, testEnv.queries, "admin-isn", "Admin ISN", adminAccount.ID, "private")
 
-	siteAdminSignalType := createTestSignalType(t, ctx, testEnv.queries, siteAdminISN.ID, "siteadmin ISN signal", "")
-	adminSignalType := createTestSignalType(t, ctx, testEnv.queries, adminISN.ID, "admin ISN signal", "")
+	siteAdminSignalType := createTestSignalType(t, ctx, testEnv.queries, siteAdminISN.ID, "siteadmin ISN signal", "", signalsd.ContentKindJSON)
+	adminSignalType := createTestSignalType(t, ctx, testEnv.queries, adminISN.ID, "admin ISN signal", "", signalsd.ContentKindJSON)
 
 	// all accounts need read/write to all ISNs to make the test work
 
@@ -763,9 +764,9 @@ func TestSignalSearch(t *testing.T) {
 	adminISN := createTestISN(t, ctx, testEnv.queries, "admin-search-isn", "Admin search ISN", adminAccount.ID, "private")
 	publicISN := createTestISN(t, ctx, testEnv.queries, "public-search-isn", "Public search ISN", adminAccount.ID, "public")
 
-	siteAdminSignalType := createTestSignalType(t, ctx, testEnv.queries, siteAdminISN.ID, "siteadmin ISN search signal", "")
-	adminSignalType := createTestSignalType(t, ctx, testEnv.queries, adminISN.ID, "admin ISN search signal", "")
-	publicSignalType := createTestSignalType(t, ctx, testEnv.queries, publicISN.ID, "public ISN search signal", "")
+	siteAdminSignalType := createTestSignalType(t, ctx, testEnv.queries, siteAdminISN.ID, "siteadmin ISN search signal", "", signalsd.ContentKindJSON)
+	adminSignalType := createTestSignalType(t, ctx, testEnv.queries, adminISN.ID, "admin ISN search signal", "", signalsd.ContentKindJSON)
+	publicSignalType := createTestSignalType(t, ctx, testEnv.queries, publicISN.ID, "public ISN search signal", "", signalsd.ContentKindJSON)
 
 	// Grant write permissions to ISN owners so they can submit signals
 	grantPermission(t, ctx, testEnv.queries, siteAdminISN.ID, siteAdminAccount.ID, "write")
@@ -1099,7 +1100,7 @@ func TestWriteOnlyAccountVisibility(t *testing.T) {
 
 	// Create a shared ISN
 	sharedISN := createTestISN(t, ctx, testEnv.queries, "shared-writeonly-isn", "Shared Write-Only ISN", account1.ID, "private")
-	signalType := createTestSignalType(t, ctx, testEnv.queries, sharedISN.ID, "shared signal type", "")
+	signalType := createTestSignalType(t, ctx, testEnv.queries, sharedISN.ID, "shared signal type", "", signalsd.ContentKindJSON)
 
 	// Grant write-only permission to both accounts - they can search but only see their own signals
 	grantPermission(t, ctx, testEnv.queries, sharedISN.ID, account1.ID, "write")
@@ -1240,7 +1241,7 @@ func TestCorrelatedAndPreviousVersionsSearch(t *testing.T) {
 
 	siteAdminISN := createTestISN(t, ctx, testEnv.queries, "siteadmin-correlated-isn", "SiteAdmin correlated ISN", siteAdminAccount.ID, "private")
 
-	siteAdminSignalType := createTestSignalType(t, ctx, testEnv.queries, siteAdminISN.ID, "SiteAdmin correlated signal", "")
+	siteAdminSignalType := createTestSignalType(t, ctx, testEnv.queries, siteAdminISN.ID, "SiteAdmin correlated signal", "", signalsd.ContentKindJSON)
 
 	ownerAuthToken := testEnv.createAuthToken(t, siteAdminAccount.ID)
 
@@ -1415,6 +1416,252 @@ func TestCorrelatedAndPreviousVersionsSearch(t *testing.T) {
 		}
 
 	})
+}
+
+// TestCorrelationSearch tests searching for signals linked to a master signal:
+// - correlated signals of a different signal type are returned with their signal type slug and sem_ver
+// - the correlation_id filter returns only the signals linked to the supplied signal
+// - write-only accounts only see their own correlated signals
+// - email addresses of correlated signals are not shown in public ISNs
+func TestCorrelationSearch(t *testing.T) {
+	ctx := context.Background()
+
+	testEnv := startInProcessServer(t, "")
+
+	t.Log("Creating test data...")
+
+	adminAccount := createTestAccount(t, ctx, testEnv.queries, "siteadmin", "user", "admin@correlation-search.com")
+	writer1Account := createTestAccount(t, ctx, testEnv.queries, "member", "user", "writer1@correlation-search.com")
+	writer2Account := createTestAccount(t, ctx, testEnv.queries, "member", "user", "writer2@correlation-search.com")
+	readerAccount := createTestAccount(t, ctx, testEnv.queries, "member", "user", "reader@correlation-search.com")
+
+	privateISN := createTestISN(t, ctx, testEnv.queries, "correlation-search-isn", "Correlation search ISN", adminAccount.ID, "private")
+	consignmentType := createTestSignalType(t, ctx, testEnv.queries, privateISN.ID, "consignment", "", signalsd.ContentKindJSON)
+	billOfLadingType := createTestSignalType(t, ctx, testEnv.queries, privateISN.ID, "bill of lading", "", signalsd.ContentKindJSON)
+
+	grantPermission(t, ctx, testEnv.queries, privateISN.ID, writer1Account.ID, "write")
+	grantPermission(t, ctx, testEnv.queries, privateISN.ID, writer2Account.ID, "write")
+	grantPermission(t, ctx, testEnv.queries, privateISN.ID, readerAccount.ID, "read")
+
+	publicISN := createTestISN(t, ctx, testEnv.queries, "correlation-search-public-isn", "Correlation search public ISN", adminAccount.ID, "public")
+	publicSignalType := createTestSignalType(t, ctx, testEnv.queries, publicISN.ID, "public correlation signal", "", signalsd.ContentKindJSON)
+
+	if err := testEnv.schemaCache.Load(ctx); err != nil {
+		t.Fatalf("Failed to refresh schema cache: %v", err)
+	}
+	if err := testEnv.publicIsnCache.Load(ctx); err != nil {
+		t.Fatalf("Failed to refresh public ISN cache: %v", err)
+	}
+
+	adminToken := testEnv.createAuthToken(t, adminAccount.ID)
+	writer1Token := testEnv.createAuthToken(t, writer1Account.ID)
+	writer2Token := testEnv.createAuthToken(t, writer2Account.ID)
+	readerToken := testEnv.createAuthToken(t, readerAccount.ID)
+
+	consignmentEndpoint := testSignalEndpoint{
+		isnSlug:          privateISN.Slug,
+		signalTypeSlug:   consignmentType.Slug,
+		signalTypeSemVer: consignmentType.SemVer,
+	}
+	billOfLadingEndpoint := testSignalEndpoint{
+		isnSlug:          privateISN.Slug,
+		signalTypeSlug:   billOfLadingType.Slug,
+		signalTypeSemVer: billOfLadingType.SemVer,
+	}
+	publicEndpoint := testSignalEndpoint{
+		isnSlug:          publicISN.Slug,
+		signalTypeSlug:   publicSignalType.Slug,
+		signalTypeSemVer: publicSignalType.SemVer,
+	}
+
+	// writer 1 creates a consignment, and both writers link a bill of lading to it
+	consignmentID := submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayload("consignment-001"), writer1Token, consignmentEndpoint)
+	submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayloadWithCorrelatedID("bol-writer1", consignmentID), writer1Token, billOfLadingEndpoint)
+	submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayloadWithCorrelatedID("bol-writer2", consignmentID), writer2Token, billOfLadingEndpoint)
+
+	// unrelated bill of lading - should never be returned
+	submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayload("bol-unrelated"), writer1Token, billOfLadingEndpoint)
+
+	// public ISN: master signal with a correlated signal
+	publicMasterID := submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayload("public-master"), adminToken, publicEndpoint)
+	submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayloadWithCorrelatedID("public-linked", publicMasterID), adminToken, publicEndpoint)
+
+	t.Run("correlated signals include their signal type", func(t *testing.T) {
+		signals := searchSignalsWithParams(t, testEnv.baseURL, consignmentEndpoint, false, readerToken, http.StatusOK, map[string]string{
+			"signal_id":          consignmentID,
+			"include_correlated": "true",
+		})
+		if len(signals) != 1 {
+			t.Fatalf("Expected 1 signal, got %d", len(signals))
+		}
+		if got := signals[0]["signal_type_slug"]; got != consignmentType.Slug {
+			t.Errorf("Expected signal_type_slug %s, got %v", consignmentType.Slug, got)
+		}
+		if got := signals[0]["sem_ver"]; got != consignmentType.SemVer {
+			t.Errorf("Expected sem_ver %s, got %v", consignmentType.SemVer, got)
+		}
+		if got := signals[0]["account_type"]; got != "user" {
+			t.Errorf("Expected account_type user, got %v", got)
+		}
+		if got := signals[0]["content_kind"]; got != "json" {
+			t.Errorf("Expected content_kind json, got %v", got)
+		}
+
+		correlated, _ := signals[0]["correlated_signals"].([]any)
+		if len(correlated) != 2 {
+			t.Fatalf("Expected 2 correlated signals, got %d", len(correlated))
+		}
+		for _, c := range correlated {
+			signal := c.(map[string]any)
+			if got := signal["signal_type_slug"]; got != billOfLadingType.Slug {
+				t.Errorf("Expected correlated signal_type_slug %s, got %v", billOfLadingType.Slug, got)
+			}
+			if got := signal["sem_ver"]; got != billOfLadingType.SemVer {
+				t.Errorf("Expected correlated sem_ver %s, got %v", billOfLadingType.SemVer, got)
+			}
+			if got := signal["account_type"]; got != "user" {
+				t.Errorf("Expected correlated account_type user, got %v", got)
+			}
+			if got := signal["content_kind"]; got != "json" {
+				t.Errorf("Expected correlated content_kind json, got %v", got)
+			}
+		}
+	})
+
+	t.Run("correlation_id filter returns linked signals only", func(t *testing.T) {
+		signals := searchSignalsWithParams(t, testEnv.baseURL, billOfLadingEndpoint, false, readerToken, http.StatusOK, map[string]string{
+			"correlation_id": consignmentID,
+		})
+		gotRefs := map[string]bool{}
+		for _, s := range signals {
+			gotRefs[s["local_ref"].(string)] = true
+		}
+		if len(signals) != 2 || !gotRefs["bol-writer1"] || !gotRefs["bol-writer2"] {
+			t.Errorf("Expected bol-writer1 and bol-writer2, got %v", gotRefs)
+		}
+	})
+
+	t.Run("correlation_id filter excludes the master signal", func(t *testing.T) {
+		signals := searchSignalsWithParams(t, testEnv.baseURL, consignmentEndpoint, false, readerToken, http.StatusOK, map[string]string{
+			"correlation_id": consignmentID,
+		})
+		if len(signals) != 0 {
+			t.Errorf("Expected 0 signals, got %d", len(signals))
+		}
+	})
+
+	t.Run("invalid correlation_id is rejected", func(t *testing.T) {
+		searchSignalsWithParams(t, testEnv.baseURL, billOfLadingEndpoint, false, readerToken, http.StatusBadRequest, map[string]string{
+			"correlation_id": "not-a-uuid",
+		})
+	})
+
+	t.Run("write-only account only sees its own correlated signals", func(t *testing.T) {
+		signals := searchSignalsWithParams(t, testEnv.baseURL, consignmentEndpoint, false, writer1Token, http.StatusOK, map[string]string{
+			"signal_id":          consignmentID,
+			"include_correlated": "true",
+		})
+		if len(signals) != 1 {
+			t.Fatalf("Expected 1 signal, got %d", len(signals))
+		}
+		correlated, _ := signals[0]["correlated_signals"].([]any)
+		if len(correlated) != 1 {
+			t.Fatalf("Expected 1 correlated signal, got %d", len(correlated))
+		}
+		if got := correlated[0].(map[string]any)["local_ref"]; got != "bol-writer1" {
+			t.Errorf("Expected correlated signal bol-writer1, got %v", got)
+		}
+	})
+
+	t.Run("write-only account correlation_id filter only returns its own signals", func(t *testing.T) {
+		signals := searchSignalsWithParams(t, testEnv.baseURL, billOfLadingEndpoint, false, writer2Token, http.StatusOK, map[string]string{
+			"correlation_id": consignmentID,
+		})
+		if len(signals) != 1 || signals[0]["local_ref"] != "bol-writer2" {
+			t.Errorf("Expected only bol-writer2, got %v", signals)
+		}
+	})
+
+	t.Run("public search does not show email of correlated signals", func(t *testing.T) {
+		signals := searchSignalsWithParams(t, testEnv.baseURL, publicEndpoint, true, "", http.StatusOK, map[string]string{
+			"signal_id":          publicMasterID,
+			"include_correlated": "true",
+		})
+		if len(signals) != 1 {
+			t.Fatalf("Expected 1 signal, got %d", len(signals))
+		}
+		correlated, _ := signals[0]["correlated_signals"].([]any)
+		if len(correlated) != 1 {
+			t.Fatalf("Expected 1 correlated signal, got %d", len(correlated))
+		}
+		if email, ok := correlated[0].(map[string]any)["email"]; ok && email != "" {
+			t.Errorf("Found email %v on a correlated signal in a public ISN search", email)
+		}
+	})
+}
+
+// submitSignalAndGetID submits a single signal and returns its signal ID
+func submitSignalAndGetID(t *testing.T, baseURL string, payload map[string]any, token string, endpoint testSignalEndpoint) string {
+	t.Helper()
+
+	response := submitCreateSignalRequest(t, baseURL, payload, token, endpoint)
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(response.Body)
+		t.Fatalf("Failed to submit signal: %d %s", response.StatusCode, body)
+	}
+
+	var responseBody map[string]any
+	if err := json.NewDecoder(response.Body).Decode(&responseBody); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
+	return getSignalIDFromCreateSignalResponse(t, responseBody)
+}
+
+// searchSignalsWithParams calls the public or private search endpoint with the supplied query params,
+// checks the response status and returns the decoded signals (nil if the status is not 200)
+func searchSignalsWithParams(t *testing.T, baseURL string, endpoint testSignalEndpoint, public bool, token string, expectedStatus int, params map[string]string) []map[string]any {
+	t.Helper()
+
+	prefix := "/api"
+	if public {
+		prefix = "/api/public"
+	}
+	searchURL := fmt.Sprintf("%s%s/isn/%s/signal-types/%s/v%s/signals/search",
+		baseURL, prefix, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
+
+	req, err := http.NewRequest("GET", searchURL, nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+	q := req.URL.Query()
+	for k, v := range params {
+		q.Add(k, v)
+	}
+	req.URL.RawQuery = q.Encode()
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	response, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Failed to search signals: %v", err)
+	}
+	defer response.Body.Close()
+
+	if response.StatusCode != expectedStatus {
+		body, _ := io.ReadAll(response.Body)
+		t.Fatalf("Expected status %d, got %d: %s", expectedStatus, response.StatusCode, body)
+	}
+	if response.StatusCode != http.StatusOK {
+		return nil
+	}
+
+	var signals []map[string]any
+	if err := json.NewDecoder(response.Body).Decode(&signals); err != nil {
+		t.Fatalf("Failed to decode search response: %v", err)
+	}
+	return signals
 }
 
 type testSignalEndpoint struct {

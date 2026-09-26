@@ -54,9 +54,10 @@ INSERT INTO signal_types (
     title,
     detail,
     sem_ver,
-    schema_content
-    ) VALUES (gen_random_uuid(), now(), now(), $1, $2, $3, $4, $5, $6, $7)
-RETURNING id, created_at, updated_at, slug, schema_url, readme_url, title, detail, sem_ver, schema_content
+    schema_content,
+    content_kind
+    ) VALUES (gen_random_uuid(), now(), now(), $1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, created_at, updated_at, slug, schema_url, readme_url, title, detail, sem_ver, schema_content, content_kind
 `
 
 type CreateSignalTypeParams struct {
@@ -67,6 +68,7 @@ type CreateSignalTypeParams struct {
 	Detail        string `json:"detail"`
 	SemVer        string `json:"sem_ver"`
 	SchemaContent string `json:"schema_content"`
+	ContentKind   string `json:"content_kind"`
 }
 
 func (q *Queries) CreateSignalType(ctx context.Context, arg CreateSignalTypeParams) (SignalType, error) {
@@ -78,6 +80,7 @@ func (q *Queries) CreateSignalType(ctx context.Context, arg CreateSignalTypePara
 		arg.Detail,
 		arg.SemVer,
 		arg.SchemaContent,
+		arg.ContentKind,
 	)
 	var i SignalType
 	err := row.Scan(
@@ -91,6 +94,7 @@ func (q *Queries) CreateSignalType(ctx context.Context, arg CreateSignalTypePara
 		&i.Detail,
 		&i.SemVer,
 		&i.SchemaContent,
+		&i.ContentKind,
 	)
 	return i, err
 }
@@ -169,7 +173,7 @@ func (q *Queries) GetInUsePublicIsnSignalTypes(ctx context.Context) ([]GetInUseP
 }
 
 const GetInUseSignalTypesByIsnID = `-- name: GetInUseSignalTypesByIsnID :many
-SELECT st.id, st.created_at, st.updated_at, st.slug, st.schema_url, st.readme_url, st.title, st.detail, st.sem_ver, st.schema_content
+SELECT st.id, st.created_at, st.updated_at, st.slug, st.schema_url, st.readme_url, st.title, st.detail, st.sem_ver, st.schema_content, st.content_kind
 FROM isn i
 JOIN isn_signal_types ist ON ist.isn_id = i.id
 JOIN signal_types st ON st.id = ist.signal_type_id
@@ -199,6 +203,7 @@ func (q *Queries) GetInUseSignalTypesByIsnID(ctx context.Context, id uuid.UUID) 
 			&i.Detail,
 			&i.SemVer,
 			&i.SchemaContent,
+			&i.ContentKind,
 		); err != nil {
 			return nil, err
 		}
@@ -213,7 +218,8 @@ func (q *Queries) GetInUseSignalTypesByIsnID(ctx context.Context, id uuid.UUID) 
 const GetLatestSlugVersion = `-- name: GetLatestSlugVersion :one
 SELECT '0.0.0' AS sem_ver,
        '' AS schema_url,
-       '' AS title
+       '' AS title,
+       '' AS content_kind
 WHERE NOT EXISTS
     (SELECT 1
      FROM signal_types st1
@@ -221,7 +227,8 @@ WHERE NOT EXISTS
 UNION ALL
 SELECT st2.sem_ver,
        st2.schema_url,
-       st2.title
+       st2.title,
+       st2.content_kind
 FROM signal_types st2
 WHERE st2.slug = $1
   AND st2.sem_ver =
@@ -231,22 +238,28 @@ WHERE st2.slug = $1
 `
 
 type GetLatestSlugVersionRow struct {
-	SemVer    string `json:"sem_ver"`
-	SchemaURL string `json:"schema_url"`
-	Title     string `json:"title"`
+	SemVer      string `json:"sem_ver"`
+	SchemaURL   string `json:"schema_url"`
+	Title       string `json:"title"`
+	ContentKind string `json:"content_kind"`
 }
 
-// if there are no signals defs for the supplied slug, this query returns an empty string for schema_url and a sem_ver of '0.0.0'
+// if there are no signals defs for the supplied slug, this query returns an empty string for schema_url, title and content_kind and a sem_ver of '0.0.0'
 func (q *Queries) GetLatestSlugVersion(ctx context.Context, slug string) (GetLatestSlugVersionRow, error) {
 	row := q.db.QueryRow(ctx, GetLatestSlugVersion, slug)
 	var i GetLatestSlugVersionRow
-	err := row.Scan(&i.SemVer, &i.SchemaURL, &i.Title)
+	err := row.Scan(
+		&i.SemVer,
+		&i.SchemaURL,
+		&i.Title,
+		&i.ContentKind,
+	)
 	return i, err
 }
 
 const GetSignalTypeByIsnIdAndSlug = `-- name: GetSignalTypeByIsnIdAndSlug :one
 
-SELECT st.id, st.created_at, st.updated_at, st.slug, st.schema_url, st.readme_url, st.title, st.detail, st.sem_ver, st.schema_content
+SELECT st.id, st.created_at, st.updated_at, st.slug, st.schema_url, st.readme_url, st.title, st.detail, st.sem_ver, st.schema_content, st.content_kind
 FROM signal_types st
 JOIN isn_signal_types ist ON st.id = ist.signal_type_id
 WHERE ist.isn_id = $1
@@ -274,12 +287,13 @@ func (q *Queries) GetSignalTypeByIsnIdAndSlug(ctx context.Context, arg GetSignal
 		&i.Detail,
 		&i.SemVer,
 		&i.SchemaContent,
+		&i.ContentKind,
 	)
 	return i, err
 }
 
 const GetSignalTypeBySlug = `-- name: GetSignalTypeBySlug :one
-SELECT st.id, st.created_at, st.updated_at, st.slug, st.schema_url, st.readme_url, st.title, st.detail, st.sem_ver, st.schema_content
+SELECT st.id, st.created_at, st.updated_at, st.slug, st.schema_url, st.readme_url, st.title, st.detail, st.sem_ver, st.schema_content, st.content_kind
 FROM signal_types st
 WHERE st.slug = $1
 `
@@ -298,12 +312,13 @@ func (q *Queries) GetSignalTypeBySlug(ctx context.Context, slug string) (SignalT
 		&i.Detail,
 		&i.SemVer,
 		&i.SchemaContent,
+		&i.ContentKind,
 	)
 	return i, err
 }
 
 const GetSignalTypeBySlugAndVersion = `-- name: GetSignalTypeBySlugAndVersion :one
-SELECT st.id, st.created_at, st.updated_at, st.slug, st.schema_url, st.readme_url, st.title, st.detail, st.sem_ver, st.schema_content
+SELECT st.id, st.created_at, st.updated_at, st.slug, st.schema_url, st.readme_url, st.title, st.detail, st.sem_ver, st.schema_content, st.content_kind
 FROM signal_types st
 WHERE st.slug = $1
 AND st.sem_ver = $2
@@ -328,12 +343,13 @@ func (q *Queries) GetSignalTypeBySlugAndVersion(ctx context.Context, arg GetSign
 		&i.Detail,
 		&i.SemVer,
 		&i.SchemaContent,
+		&i.ContentKind,
 	)
 	return i, err
 }
 
 const GetSignalTypes = `-- name: GetSignalTypes :many
-SELECT st.id, st.created_at, st.updated_at, st.slug, st.schema_url, st.readme_url, st.title, st.detail, st.sem_ver, st.schema_content
+SELECT st.id, st.created_at, st.updated_at, st.slug, st.schema_url, st.readme_url, st.title, st.detail, st.sem_ver, st.schema_content, st.content_kind
 FROM signal_types st
 `
 
@@ -357,6 +373,7 @@ func (q *Queries) GetSignalTypes(ctx context.Context) ([]SignalType, error) {
 			&i.Detail,
 			&i.SemVer,
 			&i.SchemaContent,
+			&i.ContentKind,
 		); err != nil {
 			return nil, err
 		}
@@ -369,7 +386,7 @@ func (q *Queries) GetSignalTypes(ctx context.Context) ([]SignalType, error) {
 }
 
 const GetSignalTypesByIsnID = `-- name: GetSignalTypesByIsnID :many
-SELECT st.id, st.created_at, st.updated_at, st.slug, st.schema_url, st.readme_url, st.title, st.detail, st.sem_ver, st.schema_content, ist.is_in_use
+SELECT st.id, st.created_at, st.updated_at, st.slug, st.schema_url, st.readme_url, st.title, st.detail, st.sem_ver, st.schema_content, st.content_kind, ist.is_in_use
 FROM signal_types st
 JOIN isn_signal_types ist ON st.id = ist.signal_type_id
 WHERE ist.isn_id = $1
@@ -386,6 +403,7 @@ type GetSignalTypesByIsnIDRow struct {
 	Detail        string    `json:"detail"`
 	SemVer        string    `json:"sem_ver"`
 	SchemaContent string    `json:"schema_content"`
+	ContentKind   string    `json:"content_kind"`
 	IsInUse       bool      `json:"is_in_use"`
 }
 
@@ -411,6 +429,7 @@ func (q *Queries) GetSignalTypesByIsnID(ctx context.Context, isnID uuid.UUID) ([
 			&i.Detail,
 			&i.SemVer,
 			&i.SchemaContent,
+			&i.ContentKind,
 			&i.IsInUse,
 		); err != nil {
 			return nil, err

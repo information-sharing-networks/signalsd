@@ -73,6 +73,13 @@ const (
 
 	// SkipReadmeURL is used to indicate there is no readme for the signal type
 	SkipReadmeURL = "https://github.com/skip/readme/main/readme.md"
+
+	// content kinds - determine how the content of a signal type is handled:
+	// json signals are validated against the signal type schema and stored inline,
+	// document signals are opaque, byte-exact files held in the document store.
+	// Code should switch on the content kind explicitly and reject unknown kinds (more kinds may be added later).
+	ContentKindJSON     = "json"
+	ContentKindDocument = "document"
 )
 
 // common maps - used to validate enum values
@@ -119,6 +126,12 @@ var ValidServiceModes = map[string]bool{ // service modes for CLI
 	"signals-read": true,
 	// write-only signal operations
 	"signals-write": true,
+}
+
+// ValidContentKinds is the list of supported signal type content kinds
+var ValidContentKinds = map[string]bool{
+	ContentKindJSON:     true,
+	ContentKindDocument: true,
 }
 
 // ValidRouteMatchingOperators list the limited set of operations supported for isn routes

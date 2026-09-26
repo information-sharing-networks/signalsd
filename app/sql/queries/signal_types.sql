@@ -9,8 +9,9 @@ INSERT INTO signal_types (
     title,
     detail,
     sem_ver,
-    schema_content
-    ) VALUES (gen_random_uuid(), now(), now(), $1, $2, $3, $4, $5, $6, $7)
+    schema_content,
+    content_kind
+    ) VALUES (gen_random_uuid(), now(), now(), $1, $2, $3, $4, $5, $6, $7, $8)
 RETURNING *;
 
 -- name: UpdateSignalTypeDetails :execrows
@@ -50,11 +51,12 @@ WHERE ist.isn_id = $1
 AND st.slug = $2
 AND st.sem_ver = $3;
 
--- if there are no signals defs for the supplied slug, this query returns an empty string for schema_url and a sem_ver of '0.0.0'
+-- if there are no signals defs for the supplied slug, this query returns an empty string for schema_url, title and content_kind and a sem_ver of '0.0.0'
 -- name: GetLatestSlugVersion :one
 SELECT '0.0.0' AS sem_ver,
        '' AS schema_url,
-       '' AS title
+       '' AS title,
+       '' AS content_kind
 WHERE NOT EXISTS
     (SELECT 1
      FROM signal_types st1
@@ -62,7 +64,8 @@ WHERE NOT EXISTS
 UNION ALL
 SELECT st2.sem_ver,
        st2.schema_url,
-       st2.title
+       st2.title,
+       st2.content_kind
 FROM signal_types st2
 WHERE st2.slug = $1
   AND st2.sem_ver =

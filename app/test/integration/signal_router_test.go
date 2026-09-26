@@ -22,6 +22,7 @@ import (
 
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
+	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/handlers"
 )
 
@@ -56,7 +57,7 @@ func TestRouteSignals(t *testing.T) {
 	isnB := createTestISN(t, ctx, testEnv.queries, "isn-b", "ISN B", siteAdminAccount.ID, "private")
 
 	// create the signal type and add it to isn-a
-	signalType := createTestSignalType(t, ctx, testEnv.queries, isnA.ID, "router test signal", "")
+	signalType := createTestSignalType(t, ctx, testEnv.queries, isnA.ID, "router test signal", "", signalsd.ContentKindJSON)
 
 	// add the signal type to isn-b
 	if err := testEnv.queries.AddSignalTypeToIsn(ctx, database.AddSignalTypeToIsnParams{

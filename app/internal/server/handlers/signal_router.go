@@ -21,6 +21,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/responses"
 	"github.com/information-sharing-networks/signalsd/app/internal/router"
 	"github.com/information-sharing-networks/signalsd/app/internal/schemas"
+	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -160,6 +161,12 @@ func (s *SignalRouter) RouteSignals(w http.ResponseWriter, r *http.Request) erro
 	signalTypeSlug := r.PathValue("signal_type_slug")
 	semVer := r.PathValue("sem_ver")
 	signalTypePath := fmt.Sprintf("%s/v%s", signalTypeSlug, semVer)
+
+	// TODO to decide handling of routing correlated signals.
+	// only json signal types can be submitted to this endpoint
+	if err := s.schemaCache.CheckContentKind(signalTypePath, signalsd.ContentKindJSON); err != nil {
+		return apperrors.InvalidURLParam(err.Error(), nil)
+	}
 
 	claims, ok := auth.ContextClaims(r.Context())
 	if !ok {
@@ -304,7 +311,7 @@ func (s *SignalRouter) RouteSignals(w http.ResponseWriter, r *http.Request) erro
 			continue
 		}
 
-		if err := s.schemaCache.ValidateSignal(r.Context(), s.queries, signalTypePath, rs.signal.Content); err != nil {
+		if err := s.schemaCache.ValidateJSONSignal(r.Context(), s.queries, signalTypePath, rs.signal.Content); err != nil {
 			result.FailedSignals = append(result.FailedSignals, FailedSignal{
 				LocalRef: rs.signal.LocalRef, ErrorCode: string(apperrors.ErrCodeMalformedBody),
 				ErrorMessage: fmt.Sprintf("validation failed: %v", err),

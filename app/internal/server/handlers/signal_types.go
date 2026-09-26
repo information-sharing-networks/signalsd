@@ -30,11 +30,12 @@ func NewSignalTypeHandler(queries *database.Queries) *SignalTypeHandler {
 }
 
 type CreateSignalTypeRequest struct {
-	SchemaURL string `json:"schema_url" example:"https://github.com/user/project/blob/2025.01.01/schema.json"` // JSON schema URL: must be a GitHub URL ending in .json, OR use https://github.com/skip/validation/main/schema.json to disable validation
-	Title     string `json:"title" example:"Sample Signal @example.org"`                                       // unique title
-	BumpType  string `json:"bump_type" example:"patch" enums:"major,minor,patch"`                              // this is used to increment semver for the signal type
-	ReadmeURL string `json:"readme_url" example:"https://github.com/user/project/blob/2025.01.01/readme.md"`   // README file URL: must be a GitHub URL ending in .md
-	Detail    string `json:"detail" example:"description"`                                                     // description
+	SchemaURL   string `json:"schema_url" example:"https://github.com/user/project/blob/2025.01.01/schema.json"` // JSON schema URL: must be a GitHub URL ending in .json, OR use https://github.com/skip/validation/main/schema.json to disable validation. Not used for document signal types
+	Title       string `json:"title" example:"Sample Signal @example.org"`                                       // unique title
+	BumpType    string `json:"bump_type" example:"patch" enums:"major,minor,patch"`                              // this is used to increment semver for the signal type
+	ReadmeURL   string `json:"readme_url" example:"https://github.com/user/project/blob/2025.01.01/readme.md"`   // README file URL: must be a GitHub URL ending in .md
+	Detail      string `json:"detail" example:"description"`                                                     // description
+	ContentKind string `json:"content_kind" example:"json" enums:"json,document"`                                // optional (default json): json signals are validated against the schema, document signals are files (e.g. PDFs)
 }
 
 type RegisterNewSignalTypeSchemaRequest struct {
@@ -62,15 +63,16 @@ type UpdateSignalTypeRequest struct {
 
 // Response struct for GET handlers
 type SignalTypeDetail struct {
-	ID        uuid.UUID `json:"id" example:"67890684-3b14-42cf-b785-df28ce570400"`
-	CreatedAt time.Time `json:"created_at" example:"2025-06-03T13:47:47.331787+01:00"`
-	UpdatedAt time.Time `json:"updated_at" example:"2025-06-03T13:47:47.331787+01:00"`
-	Slug      string    `json:"slug" example:"sample-signal-type"`
-	SchemaURL string    `json:"schema_url" example:"https://github.com/user/project/blob/2025.01.01/schema.json"`
-	ReadmeURL string    `json:"readme_url" example:"https://github.com/user/project/blob/2025.01.01/readme.md"`
-	Title     string    `json:"title" example:"Sample Signal Type"`
-	Detail    string    `json:"detail" example:"Sample signal type description"`
-	SemVer    string    `json:"sem_ver" example:""`
+	ID          uuid.UUID `json:"id" example:"67890684-3b14-42cf-b785-df28ce570400"`
+	CreatedAt   time.Time `json:"created_at" example:"2025-06-03T13:47:47.331787+01:00"`
+	UpdatedAt   time.Time `json:"updated_at" example:"2025-06-03T13:47:47.331787+01:00"`
+	Slug        string    `json:"slug" example:"sample-signal-type"`
+	SchemaURL   string    `json:"schema_url" example:"https://github.com/user/project/blob/2025.01.01/schema.json"`
+	ReadmeURL   string    `json:"readme_url" example:"https://github.com/user/project/blob/2025.01.01/readme.md"`
+	Title       string    `json:"title" example:"Sample Signal Type"`
+	Detail      string    `json:"detail" example:"Sample signal type description"`
+	SemVer      string    `json:"sem_ver" example:""`
+	ContentKind string    `json:"content_kind" example:"json" enums:"json,document"`
 }
 
 // CreateSignalType godoc
@@ -82,7 +84,11 @@ type SignalTypeDetail struct {
 //	@Description	- The title and slug fields can't be changed and must be unique for the site
 //	@Description	- The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading
 //	@Description
-//	@Description	Schema URL Requirements
+//	@Description	Content kinds
+//	@Description	- json (default): signals are JSON validated against the signal type's schema
+//	@Description	- document: signals are files (e.g. a PDF bill of lading) Document signal types do not have a schema - omit schema_url
+//	@Description
+//	@Description	JSON Schema URL Requirements
 //	@Description	- Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)
 //	@Description	- To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json
 //	@Description
@@ -126,17 +132,33 @@ func (s *SignalTypeHandler) CreateSignalType(w http.ResponseWriter, r *http.Requ
 		return apperrors.MalformedBody("invalid JSON body", err)
 	}
 
+	req.SchemaURL = strings.TrimSpace(req.SchemaURL)
+	req.ReadmeURL = strings.TrimSpace(req.ReadmeURL)
+
+	// content_kind is optional and defaults to json
+	if req.ContentKind == "" {
+		req.ContentKind = signalsd.ContentKindJSON
+	}
+	if !signalsd.ValidContentKinds[req.ContentKind] {
+		return apperrors.MalformedBody(fmt.Sprintf("invalid content_kind %q", req.ContentKind), nil)
+	}
+
+	// documents are not validated against a schema
+	if req.ContentKind == signalsd.ContentKindDocument {
+		if req.SchemaURL != "" && req.SchemaURL != signalsd.SkipValidationURL {
+			return apperrors.MalformedBody("schema_url is not used for document signal types", nil)
+		}
+		req.SchemaURL = signalsd.SkipValidationURL
+	}
+
 	// validate fields
 	if req.SchemaURL == "" ||
 		req.Title == "" ||
 		req.BumpType == "" ||
 		req.ReadmeURL == "" ||
 		req.Detail == "" {
-		return apperrors.MalformedBody("you must supply all the fields: schema URL, title, version, readme URL and detail", nil)
+		return apperrors.MalformedBody("you must supply all the fields: schema URL (json signal types only), title, bump type, readme URL and detail", nil)
 	}
-
-	req.SchemaURL = strings.TrimSpace(req.SchemaURL)
-	req.ReadmeURL = strings.TrimSpace(req.ReadmeURL)
 
 	// check for valid github url formats
 	if err := utils.ValidateGithubFileURL(req.SchemaURL, "schema"); err != nil {
@@ -235,6 +257,7 @@ func (s *SignalTypeHandler) CreateSignalType(w http.ResponseWriter, r *http.Requ
 		Detail:        req.Detail,
 		ReadmeURL:     req.ReadmeURL,
 		SchemaContent: schemaContent,
+		ContentKind:   req.ContentKind,
 	})
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
@@ -340,6 +363,11 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchema(w http.ResponseWriter, r
 	if currentSignalType.SemVer == "0.0.0" {
 		return apperrors.NotFound("signal type not found", nil)
 	}
+
+	// only json signal types have schemas
+	if currentSignalType.ContentKind != signalsd.ContentKindJSON {
+		return apperrors.MalformedBody(fmt.Sprintf("schemas can't be registered for %s signal types", currentSignalType.ContentKind), nil)
+	}
 	//... check the signal type was not previously registered with this schema
 	exists, err := s.queries.ExistsSignalTypeWithSlugAndSchema(r.Context(), database.ExistsSignalTypeWithSlugAndSchemaParams{
 		Slug:      slug,
@@ -401,6 +429,7 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchema(w http.ResponseWriter, r
 		Detail:        req.Detail,
 		ReadmeURL:     req.ReadmeURL,
 		SchemaContent: schemaContent,
+		ContentKind:   currentSignalType.ContentKind,
 	})
 	if err != nil {
 		logger.ContextWithLogAttrs(r.Context(),
@@ -644,15 +673,16 @@ func (s *SignalTypeHandler) GetSignalType(w http.ResponseWriter, r *http.Request
 
 	// Convert database structs to our response structs
 	signalType := SignalTypeDetail{
-		ID:        dbSignalType.ID,
-		CreatedAt: dbSignalType.CreatedAt,
-		UpdatedAt: dbSignalType.UpdatedAt,
-		Slug:      dbSignalType.Slug,
-		SchemaURL: schemaURL,
-		ReadmeURL: readmeURL,
-		Title:     dbSignalType.Title,
-		Detail:    dbSignalType.Detail,
-		SemVer:    dbSignalType.SemVer,
+		ID:          dbSignalType.ID,
+		CreatedAt:   dbSignalType.CreatedAt,
+		UpdatedAt:   dbSignalType.UpdatedAt,
+		Slug:        dbSignalType.Slug,
+		SchemaURL:   schemaURL,
+		ReadmeURL:   readmeURL,
+		Title:       dbSignalType.Title,
+		Detail:      dbSignalType.Detail,
+		SemVer:      dbSignalType.SemVer,
+		ContentKind: dbSignalType.ContentKind,
 	}
 	return responses.JSON(w, http.StatusOK, signalType)
 }
@@ -691,15 +721,16 @@ func (s *SignalTypeHandler) GetSignalTypes(w http.ResponseWriter, r *http.Reques
 			readmeURL = ""
 		}
 		signalTypes[i] = SignalTypeDetail{
-			ID:        dbSignalType.ID,
-			CreatedAt: dbSignalType.CreatedAt,
-			UpdatedAt: dbSignalType.UpdatedAt,
-			Slug:      dbSignalType.Slug,
-			SchemaURL: schemaURL,
-			ReadmeURL: readmeURL,
-			Title:     dbSignalType.Title,
-			Detail:    dbSignalType.Detail,
-			SemVer:    dbSignalType.SemVer,
+			ID:          dbSignalType.ID,
+			CreatedAt:   dbSignalType.CreatedAt,
+			UpdatedAt:   dbSignalType.UpdatedAt,
+			Slug:        dbSignalType.Slug,
+			SchemaURL:   schemaURL,
+			ReadmeURL:   readmeURL,
+			Title:       dbSignalType.Title,
+			Detail:      dbSignalType.Detail,
+			SemVer:      dbSignalType.SemVer,
+			ContentKind: dbSignalType.ContentKind,
 		}
 	}
 
