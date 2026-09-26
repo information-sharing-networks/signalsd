@@ -73,7 +73,7 @@ func TestPermissions(t *testing.T) {
 			"admin-isn":     "read-write",
 			"public-isn":    "read-write",
 		}
-		checkPermissions(t, authService, siteAdminAccount.ID, "siteadmin", expectedPerms, validSignalTypePaths, testEnv.cfg.SecretKey)
+		checkAccessTokenClaims(t, authService, siteAdminAccount.ID, "siteadmin", expectedPerms, validSignalTypePaths, testEnv.cfg.SecretKey)
 	})
 
 	t.Run("admin role permissions", func(t *testing.T) {
@@ -82,7 +82,7 @@ func TestPermissions(t *testing.T) {
 			"admin-isn":  "read-write",
 			"public-isn": "read-write",
 		}
-		checkPermissions(t, authService, adminAccount.ID, "isnadmin", expectedPerms, validSignalTypePaths, testEnv.cfg.SecretKey)
+		checkAccessTokenClaims(t, authService, adminAccount.ID, "isnadmin", expectedPerms, validSignalTypePaths, testEnv.cfg.SecretKey)
 	})
 
 	t.Run("member role permissions", func(t *testing.T) {
@@ -90,7 +90,7 @@ func TestPermissions(t *testing.T) {
 		expectedPerms := map[string]string{
 			"admin-isn": "read",
 		}
-		checkPermissions(t, authService, memberAccount.ID, "member", expectedPerms, validSignalTypePaths, testEnv.cfg.SecretKey)
+		checkAccessTokenClaims(t, authService, memberAccount.ID, "member", expectedPerms, validSignalTypePaths, testEnv.cfg.SecretKey)
 	})
 
 	t.Run("service account permissions", func(t *testing.T) {
@@ -98,7 +98,7 @@ func TestPermissions(t *testing.T) {
 		expectedPerms := map[string]string{
 			"public-isn": "write",
 		}
-		checkPermissions(t, authService, serviceAccount.ID, "member", expectedPerms, validSignalTypePaths, testEnv.cfg.SecretKey)
+		checkAccessTokenClaims(t, authService, serviceAccount.ID, "member", expectedPerms, validSignalTypePaths, testEnv.cfg.SecretKey)
 	})
 
 	t.Run("error handling ", func(t *testing.T) {
@@ -126,9 +126,9 @@ func TestPermissions(t *testing.T) {
 	})
 }
 
-// checkPermissions is a helper that tests the permissions for a given account
+// checkAccessTokenClaims is a helper that tests the permissions for a given account
 // tests are done on the struct returned from CreateAccessToken and the parsed JWT token
-func checkPermissions(t *testing.T,
+func checkAccessTokenClaims(t *testing.T,
 	authService *auth.AuthService,
 	accountID uuid.UUID,
 	expectedRole string,

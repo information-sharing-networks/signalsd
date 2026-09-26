@@ -15,23 +15,10 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
-	"time"
 
-	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/handlers"
 )
-
-// setRoutingConfig updates routing config via the admin API and fatals on failure.
-// Use this for test setup where you just need the config in place.
-func setRoutingConfig(t *testing.T, env *testEnv, token string, st database.SignalType, body handlers.UpdateSignalRoutingConfigRequest) {
-	t.Helper()
-	resp := updateSignalRoutingConfig(t, env.baseURL, token, st.Slug, st.SemVer, body)
-	resp.Body.Close()
-	if resp.StatusCode != http.StatusNoContent {
-		t.Fatalf("setRoutingConfig: want 204, got %d", resp.StatusCode)
-	}
-}
 
 // updateSignalRoutingConfig sends a PUT to the routing config endpoint and returns the raw response.
 // Use this for tests that need to assert specific status codes or error bodies.
@@ -41,7 +28,7 @@ func updateSignalRoutingConfig(t *testing.T, baseURL, token, slug, semVer string
 	if err != nil {
 		t.Fatalf("Failed to marshal request body: %v", err)
 	}
-	req, err := http.NewRequest(http.MethodPut, isnRoutesURL(baseURL, slug, semVer), bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest(http.MethodPut, routingConfigURL(baseURL, slug, semVer), bytes.NewBuffer(jsonData))
 	if err != nil {
 		t.Fatalf("Failed to create request: %v", err)
 	}
@@ -49,7 +36,7 @@ func updateSignalRoutingConfig(t *testing.T, baseURL, token, slug, semVer string
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
-	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("Failed to make request: %v", err)
 	}
@@ -58,14 +45,14 @@ func updateSignalRoutingConfig(t *testing.T, baseURL, token, slug, semVer string
 
 func getSignalRoutingConfig(t *testing.T, baseURL, token, slug, semVer string) *http.Response {
 	t.Helper()
-	req, err := http.NewRequest(http.MethodGet, isnRoutesURL(baseURL, slug, semVer), nil)
+	req, err := http.NewRequest(http.MethodGet, routingConfigURL(baseURL, slug, semVer), nil)
 	if err != nil {
 		t.Fatalf("Failed to create request: %v", err)
 	}
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
-	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("Failed to make request: %v", err)
 	}
@@ -74,21 +61,21 @@ func getSignalRoutingConfig(t *testing.T, baseURL, token, slug, semVer string) *
 
 func deleteSignalRoutingConfig(t *testing.T, baseURL, token, slug, semVer string) *http.Response {
 	t.Helper()
-	req, err := http.NewRequest(http.MethodDelete, isnRoutesURL(baseURL, slug, semVer), nil)
+	req, err := http.NewRequest(http.MethodDelete, routingConfigURL(baseURL, slug, semVer), nil)
 	if err != nil {
 		t.Fatalf("Failed to create request: %v", err)
 	}
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
-	resp, err := (&http.Client{Timeout: 10 * time.Second}).Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("Failed to make request: %v", err)
 	}
 	return resp
 }
 
-func isnRoutesURL(baseURL, slug, semVer string) string {
+func routingConfigURL(baseURL, slug, semVer string) string {
 	return fmt.Sprintf("%s/api/admin/signal-types/%s/v%s/routes", baseURL, slug, semVer)
 }
 
@@ -100,8 +87,8 @@ func TestSignalRoutingConfig(t *testing.T) {
 	siteAdminAccount := createTestAccount(t, ctx, testEnv.queries, "siteadmin", "user", "siteadmin@isn-routes-test.com")
 	memberAccount := createTestAccount(t, ctx, testEnv.queries, "member", "user", "member@isn-routes-test.com")
 
-	siteAdminToken := getAccessToken(t, testEnv.authService, siteAdminAccount.ID)
-	memberToken := getAccessToken(t, testEnv.authService, memberAccount.ID)
+	siteAdminToken := testEnv.getAccessToken(t, siteAdminAccount.ID)
+	memberToken := testEnv.getAccessToken(t, memberAccount.ID)
 
 	// isn and signal type
 	isn := createTestISN(t, ctx, testEnv.queries, "test-isn", "Test ISN", siteAdminAccount.ID, "private")

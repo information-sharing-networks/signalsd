@@ -297,8 +297,8 @@ func (s *Server) registerAdminRoutes() {
 					// view ISN and signal type details
 					r.Get("/", responses.Wrap(isn.GetIsns))
 					r.Get("/{isn_slug}", responses.Wrap(isn.GetIsn))
-					r.Get("/{isn_slug}/signal-types", responses.Wrap(signalTypes.GetSignalTypes))
-					r.Get("/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}", responses.Wrap(signalTypes.GetSignalType))
+					r.Get("/{isn_slug}/signal-types", responses.Wrap(signalTypes.GetIsnSignalTypes))
+					r.Get("/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}", responses.Wrap(signalTypes.GetIsnSignalType))
 				})
 
 			})
@@ -334,6 +334,7 @@ func (s *Server) registerAdminRoutes() {
 
 				// signal types management
 				r.Get("/signal-types", responses.Wrap(signalTypes.GetSignalTypes))
+				r.Get("/signal-types/{signal_type_slug}/v{sem_ver}", responses.Wrap(signalTypes.GetSignalType))
 				r.Post("/signal-types", responses.Wrap(signalTypes.CreateSignalType))
 				r.Post("/signal-types/{signal_type_slug}/schemas", responses.Wrap(signalTypes.RegisterNewSignalTypeSchema))
 				r.Put("/signal-types/{signal_type_slug}/v{sem_ver}", responses.Wrap(signalTypes.UpdateSignalType))

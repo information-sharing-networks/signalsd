@@ -489,7 +489,12 @@
         },
         "/api/admin/signal-types": {
             "get": {
-                "description": "Get details for all the signal types defined on the ISN.\nThis endpoint can only be used by any account registered with the site",
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Get details for all the signal types registered on the site.\n\nUse GET /api/isn/{isn_slug}/signal-types to get the signal types that have been added to an ISN.\n\nNote: this endpoint can only be used by site admins",
                 "tags": [
                     "Signal Types"
                 ],
@@ -502,6 +507,18 @@
                             "items": {
                                 "$ref": "#/definitions/handlers.SignalTypeDetail"
                             }
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "500": {
@@ -641,7 +658,12 @@
         },
         "/api/admin/signal-types/{signal_type_slug}/v{sem_ver}": {
             "get": {
-                "description": "Returns the signal type details.\nThis endpoint can be used by anyone registered with the site",
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Returns the signal type details.\n\nUse GET /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver} to see how a signal type is used on an ISN.\n\nNote: this endpoint can only be used by site admins",
                 "tags": [
                     "Signal Types"
                 ],
@@ -669,6 +691,18 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/handlers.SignalTypeDetail"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "404": {
@@ -1962,6 +1996,66 @@
                 }
             }
         },
+        "/api/isn/{isn_slug}/signal-types": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Get the signal types that have been added to the ISN.\n\nis_in_use shows whether the registered signal type is enabled on this ISN.\nSignal types that are disabled on the ISN are only returned when include_inactive=true.\n\nThis endpoint can be used by any authenticated account.",
+                "tags": [
+                    "ISN Configuration"
+                ],
+                "summary": "Get ISN Signal Types",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn",
+                        "description": "ISN slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "boolean",
+                        "default": false,
+                        "description": "Include signal types that are disabled on the ISN",
+                        "name": "include_inactive",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/handlers.IsnSignalTypeDetail"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/isn/{isn_slug}/signal-types/add": {
             "post": {
                 "security": [
@@ -2031,6 +2125,70 @@
             }
         },
         "/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Get a signal type that has been added to the ISN.\n\nis_in_use shows whether the signal type is enabled on this ISN.\n\nThis endpoint can be used by any authenticated account.",
+                "tags": [
+                    "ISN Configuration"
+                ],
+                "summary": "Get an ISN Signal Type",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn",
+                        "description": "ISN slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "sample-signal-type",
+                        "description": "signal type slug",
+                        "name": "signal_type_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "1.0.0",
+                        "description": "version",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.IsnSignalTypeDetail"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            },
             "put": {
                 "security": [
                     {
@@ -3438,6 +3596,60 @@
                 }
             }
         },
+        "handlers.IsnSignalTypeDetail": {
+            "type": "object",
+            "properties": {
+                "content_kind": {
+                    "type": "string",
+                    "enum": [
+                        "json",
+                        "document"
+                    ],
+                    "example": "json"
+                },
+                "created_at": {
+                    "type": "string",
+                    "example": "2025-06-03T13:47:47.331787+01:00"
+                },
+                "detail": {
+                    "type": "string",
+                    "example": "Sample signal type description"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "67890684-3b14-42cf-b785-df28ce570400"
+                },
+                "is_in_use": {
+                    "description": "whether the signal type is enabled on this ISN",
+                    "type": "boolean",
+                    "example": true
+                },
+                "readme_url": {
+                    "type": "string",
+                    "example": "https://github.com/user/project/blob/2025.01.01/readme.md"
+                },
+                "schema_url": {
+                    "type": "string",
+                    "example": "https://github.com/user/project/blob/2025.01.01/schema.json"
+                },
+                "sem_ver": {
+                    "type": "string",
+                    "example": ""
+                },
+                "slug": {
+                    "type": "string",
+                    "example": "sample-signal-type"
+                },
+                "title": {
+                    "type": "string",
+                    "example": "Sample Signal Type"
+                },
+                "updated_at": {
+                    "type": "string",
+                    "example": "2025-06-03T13:47:47.331787+01:00"
+                }
+            }
+        },
         "handlers.LoginRequest": {
             "type": "object",
             "properties": {
@@ -3847,6 +4059,14 @@
         "handlers.SignalType": {
             "type": "object",
             "properties": {
+                "content_kind": {
+                    "type": "string",
+                    "enum": [
+                        "json",
+                        "document"
+                    ],
+                    "example": "json"
+                },
                 "created_at": {
                     "type": "string",
                     "example": "2025-06-03T13:47:47.331787+01:00"

@@ -60,7 +60,7 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 	}
 
 	// Get client_id for service account
-	serviceAccountDetails, err := testEnv.queries.GetServiceAccountByAccountID(ctx, serviceAccount.ID)
+	serviceAccountRegistrationRequestBody, err := testEnv.queries.GetServiceAccountByAccountID(ctx, serviceAccount.ID)
 	if err != nil {
 		t.Fatalf("Failed to get service account details: %v", err)
 	}
@@ -75,14 +75,14 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 		}{
 			{
 				name:           "valid_credentials",
-				clientID:       serviceAccountDetails.ClientID,
+				clientID:       serviceAccountRegistrationRequestBody.ClientID,
 				clientSecret:   clientSecret,
 				expectedStatus: http.StatusOK,
 				wantErr:        false,
 			},
 			{
 				name:           "invalid_client_secret",
-				clientID:       serviceAccountDetails.ClientID,
+				clientID:       serviceAccountRegistrationRequestBody.ClientID,
 				clientSecret:   "wrong-secret",
 				expectedStatus: http.StatusUnauthorized,
 				wantErr:        true,
@@ -140,7 +140,7 @@ func TestOAuthTokenEndpoint(t *testing.T) {
 			"email":    "user@oauth.test",
 			"password": "password123",
 		}
-		loginResponse := makeLoginRequest(t, testEnv.baseURL, loginPayload)
+		loginResponse := submitLoginRequest(t, testEnv.baseURL, loginPayload)
 		defer loginResponse.Body.Close()
 
 		if loginResponse.StatusCode != http.StatusOK {
@@ -335,8 +335,7 @@ func makeOAuthTokenRequest(t *testing.T, baseURL, grantType string, payload map[
 		})
 	}
 
-	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("Failed to make request: %v", err)
 	}
@@ -369,35 +368,7 @@ func makeOAuthRevokeRequest(t *testing.T, baseURL string, payload map[string]str
 		})
 	}
 
-	client := &http.Client{Timeout: 30 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		t.Fatalf("Failed to make request: %v", err)
-	}
-
-	return resp
-}
-
-// makeLoginRequest makes a POST request to /api/auth/login
-func makeLoginRequest(t *testing.T, baseURL string, payload map[string]string) *http.Response {
-	t.Helper()
-
-	url := fmt.Sprintf("%s/api/auth/login", baseURL)
-
-	body, err := json.Marshal(payload)
-	if err != nil {
-		t.Fatalf("Failed to marshal payload: %v", err)
-	}
-
-	req, err := http.NewRequest("POST", url, strings.NewReader(string(body)))
-	if err != nil {
-		t.Fatalf("Failed to create request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("Failed to make request: %v", err)
 	}
@@ -437,7 +408,7 @@ func TestOAuthRevokeEndpoint(t *testing.T) {
 	}
 
 	// Get client_id for service account
-	serviceAccountDetails, err := testEnv.queries.GetServiceAccountByAccountID(ctx, serviceAccount.ID)
+	serviceAccountRegistrationRequestBody, err := testEnv.queries.GetServiceAccountByAccountID(ctx, serviceAccount.ID)
 	if err != nil {
 		t.Fatalf("Failed to get service account details: %v", err)
 	}
@@ -445,7 +416,7 @@ func TestOAuthRevokeEndpoint(t *testing.T) {
 	t.Run("revoke service_account credentials", func(t *testing.T) {
 		// First get an access token for the service account
 		tokenPayload := map[string]string{
-			"client_id":     serviceAccountDetails.ClientID,
+			"client_id":     serviceAccountRegistrationRequestBody.ClientID,
 			"client_secret": clientSecret,
 		}
 		tokenResponse := makeOAuthTokenRequest(t, testEnv.baseURL, "client_credentials", tokenPayload, "")
@@ -468,7 +439,7 @@ func TestOAuthRevokeEndpoint(t *testing.T) {
 		// Test revoke with valid credentials (service accounts use client credentials, not access token)
 		revokePayload := map[string]string{
 			"grant_type":    "client_credentials",
-			"client_id":     serviceAccountDetails.ClientID,
+			"client_id":     serviceAccountRegistrationRequestBody.ClientID,
 			"client_secret": clientSecret,
 		}
 		revokeResponse := makeOAuthRevokeRequest(t, testEnv.baseURL, revokePayload, "")
@@ -493,7 +464,7 @@ func TestOAuthRevokeEndpoint(t *testing.T) {
 			"email":    "revoke@oauth.test",
 			"password": "password123",
 		}
-		loginResponse := makeLoginRequest(t, testEnv.baseURL, loginPayload)
+		loginResponse := submitLoginRequest(t, testEnv.baseURL, loginPayload)
 		defer loginResponse.Body.Close()
 
 		if loginResponse.StatusCode != http.StatusOK {

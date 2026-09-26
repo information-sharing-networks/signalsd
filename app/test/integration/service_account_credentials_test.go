@@ -77,8 +77,7 @@ func makeRotateSecretRequest(t *testing.T, baseURL, clientID, clientSecret strin
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("Failed to make request: %v", err)
 	}

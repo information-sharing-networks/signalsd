@@ -22,8 +22,13 @@ The integration tests are designed to ensure that signal data is handled correct
 
 **integration test helper files `app/test/integration/`:**
 
-- `setup_test_env.go` - Test environment setup and server lifecycle management
-- `test_helpers.go` - database query test helpers
+- `env_setup.go` - starts the in-process test server and creates a fresh database for each test
+- `helpers_data.go` - records created directly in the database (accounts, ISNs, signal types, permissions)
+- `helpers_auth.go` - access tokens and login requests
+- `helpers_responses.go` - response checks (`expectStatus`, `expectJSONResponse`, `expectErrorCode`)
+- `helpers_signals.go` - the signal APIs (submit, search, withdraw, signal router, routing config)
+
+Helpers used by more than one test file live in a `helpers_*.go` file. Helpers used by a single test file are at the bottom of that file.
 
 ### 1. Authentication & Authorization (`auth_test.go`)
 
@@ -56,18 +61,24 @@ Tests OAuth token generation and revocation via HTTP requests.
 - ✅ Cookie handling and rotation
 - ✅ Error response validation
 
-### 4. Signal Endpoints (`signal_test.go`)
+### 4. Signal Endpoints (`signal_submission_test.go`, `signal_search_test.go`)
 
 Tests signal creation, search, and security controls via HTTP requests.
 
 - ✅ Signal submission (successful and failed scenarios)
 - ✅ Schema validation and correlation handling
 - ✅ Multi-signal payload processing
+- ✅ Disabled ISNs and signal types
 - ✅ Signal search with authorization controls
 - ✅ Public vs private ISN access
 - ✅ Withdrawn signal handling
+- ✅ Write-only account visibility
+- ✅ Previous versions and correlated signals (`include_correlated`, `correlation_id`)
 - ✅ Token validation (expired, malformed, missing)
-- ✅ Cross-ISN data leakage prevention
+- ✅ Cross-ISN data leakage prevention (`shared_signal_type_test.go`)
+- ✅ Signal router and routing config (`signal_router_test.go`, `signal_routing_test.go`)
+- ✅ Document signal types (`document_signal_type_test.go`)
+- ✅ Site-wide signal type details and the signal types added to each ISN (`signal_type_test.go`)
 
 
 ### 5. Batch Management (`batch_test.go`)

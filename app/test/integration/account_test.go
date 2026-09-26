@@ -16,7 +16,6 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	"time"
 	"uuid"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
@@ -24,37 +23,27 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/server/handlers"
 )
 
-type serviceAccountDetails struct {
+type serviceAccountRegistrationRequestBody struct {
 	Organization string `json:"client_organization"`
 	Email        string `json:"client_contact_email"`
 }
 
-type reissueCredentialsRequest struct {
+type reissueCredentialsRequestBody struct {
 	ClientID string `json:"client_id"`
 }
 
-type loginDetails struct {
+type loginRequestBody struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
-type userDetails struct {
+type userRegistrationRequestBody struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
 
-// getAccessToken creates an access token for testing
-func getAccessToken(t *testing.T, authService *auth.AuthService, accountID uuid.UUID) string {
-	ctx := auth.ContextWithAccountID(context.Background(), accountID)
-	tokenResponse, err := authService.CreateAccessToken(ctx)
-	if err != nil {
-		t.Fatalf("Failed to create access token: %v", err)
-	}
-	return tokenResponse.AccessToken
-}
-
-// makeServiceAccountRegRequest makes a POST request to the service account registration endpoint
-func makeServiceAccountRegRequest(t *testing.T, baseURL, token string, requestBody serviceAccountDetails) *http.Response {
+// makeServiceAccountRegistrationRequest makes a POST request to the service account registration endpoint
+func makeServiceAccountRegistrationRequest(t *testing.T, baseURL, token string, requestBody serviceAccountRegistrationRequestBody) *http.Response {
 	requestURL := fmt.Sprintf("%s/api/auth/service-accounts/register", baseURL)
 
 	jsonData, err := json.Marshal(requestBody)
@@ -72,33 +61,7 @@ func makeServiceAccountRegRequest(t *testing.T, baseURL, token string, requestBo
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	response, err := client.Do(req)
-	if err != nil {
-		t.Fatalf("Failed to make request: %v", err)
-	}
-
-	return response
-}
-
-// makeUserLoginRequest makes a POST request to the login endpoint
-func makeUserLoginRequest(t *testing.T, baseURL string, requestBody loginDetails) *http.Response {
-	requestURL := fmt.Sprintf("%s/api/auth/login", baseURL)
-
-	jsonData, err := json.Marshal(requestBody)
-	if err != nil {
-		t.Fatalf("Failed to marshal request body: %v", err)
-	}
-
-	req, err := http.NewRequest("POST", requestURL, bytes.NewBuffer(jsonData))
-	if err != nil {
-		t.Fatalf("Failed to create request: %v", err)
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	response, err := client.Do(req)
+	response, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("Failed to make request: %v", err)
 	}
@@ -107,7 +70,7 @@ func makeUserLoginRequest(t *testing.T, baseURL string, requestBody loginDetails
 }
 
 // makeUserRegistrationRequest makes a POST request to the user registration endpoint
-func makeUserRegistrationRequest(t *testing.T, baseURL string, requestBody userDetails) *http.Response {
+func makeUserRegistrationRequest(t *testing.T, baseURL string, requestBody userRegistrationRequestBody) *http.Response {
 	requestURL := fmt.Sprintf("%s/api/auth/register", baseURL)
 
 	jsonData, err := json.Marshal(requestBody)
@@ -122,8 +85,7 @@ func makeUserRegistrationRequest(t *testing.T, baseURL string, requestBody userD
 
 	req.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	response, err := client.Do(req)
+	response, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("Failed to make request: %v", err)
 	}
@@ -147,39 +109,39 @@ func TestServiceAccountRegistration(t *testing.T) {
 	memberAccount := createTestAccount(t, ctx, testEnv.queries, "member", "user", "member@test.com")
 
 	// Get access tokens
-	ownerToken := getAccessToken(t, testEnv.authService, siteAdminAccount.ID)
-	adminToken := getAccessToken(t, testEnv.authService, adminAccount.ID)
-	memberToken := getAccessToken(t, testEnv.authService, memberAccount.ID)
+	ownerToken := testEnv.getAccessToken(t, siteAdminAccount.ID)
+	adminToken := testEnv.getAccessToken(t, adminAccount.ID)
+	memberToken := testEnv.getAccessToken(t, memberAccount.ID)
 
 	t.Run("permissions tests", func(t *testing.T) {
 		testCases := []struct {
 			name           string
-			requestBody    serviceAccountDetails
+			requestBody    serviceAccountRegistrationRequestBody
 			token          string
 			expectedStatus int
 		}{
 			{
 				name:           "owner_can_register",
-				requestBody:    serviceAccountDetails{"SiteAdmin Organization", "siteadmin@example.com"},
+				requestBody:    serviceAccountRegistrationRequestBody{"SiteAdmin Organization", "siteadmin@example.com"},
 				token:          ownerToken,
 				expectedStatus: http.StatusCreated,
 			},
 			{
 				name:           "admin_can_register",
-				requestBody:    serviceAccountDetails{"Admin Organization", "admin@example.com"},
+				requestBody:    serviceAccountRegistrationRequestBody{"Admin Organization", "admin@example.com"},
 				token:          adminToken,
 				expectedStatus: http.StatusCreated,
 			},
 			{
 				name:           "member_cannot_register",
-				requestBody:    serviceAccountDetails{"Member Organization", "member@example.com"},
+				requestBody:    serviceAccountRegistrationRequestBody{"Member Organization", "member@example.com"},
 				token:          memberToken,
 				expectedStatus: http.StatusForbidden,
 			},
 		}
 		for _, tt := range testCases {
 			t.Run(tt.name, func(t *testing.T) {
-				response := makeServiceAccountRegRequest(t, testEnv.baseURL, tt.token, tt.requestBody)
+				response := makeServiceAccountRegistrationRequest(t, testEnv.baseURL, tt.token, tt.requestBody)
 				defer response.Body.Close()
 
 				if response.StatusCode != tt.expectedStatus {
@@ -221,8 +183,8 @@ func TestServiceAccountRegistration(t *testing.T) {
 		}
 	})
 	t.Run("setup_url test", func(t *testing.T) {
-		requestBody := serviceAccountDetails{"Urltest Organization", "email@example.com"}
-		response := makeServiceAccountRegRequest(t, testEnv.baseURL, ownerToken, requestBody)
+		requestBody := serviceAccountRegistrationRequestBody{"Urltest Organization", "email@example.com"}
+		response := makeServiceAccountRegistrationRequest(t, testEnv.baseURL, ownerToken, requestBody)
 		defer response.Body.Close()
 		if response.StatusCode != http.StatusCreated {
 			t.Fatalf("Expected status %d, got %d", http.StatusCreated, response.StatusCode)
@@ -246,32 +208,32 @@ func TestServiceAccountRegistration(t *testing.T) {
 	t.Run("duplicate_registration_conflict", func(t *testing.T) {
 		testCases := []struct {
 			name           string
-			requestBody    serviceAccountDetails
+			requestBody    serviceAccountRegistrationRequestBody
 			token          string
 			expectedStatus int
 		}{
 			{
 				name:           "cannot_register_duplicate_email/org",
-				requestBody:    serviceAccountDetails{"SiteAdmin Organization", "siteadmin@example.com"},
+				requestBody:    serviceAccountRegistrationRequestBody{"SiteAdmin Organization", "siteadmin@example.com"},
 				token:          ownerToken,
 				expectedStatus: http.StatusConflict,
 			},
 			{
 				name:           "cannot_register_duplicate_email/email_mixed_case",
-				requestBody:    serviceAccountDetails{"SiteAdmin Organization", "SiteAdmin@example.com"},
+				requestBody:    serviceAccountRegistrationRequestBody{"SiteAdmin Organization", "SiteAdmin@example.com"},
 				token:          ownerToken,
 				expectedStatus: http.StatusConflict,
 			},
 			{
 				name:           "cannot_register_duplicate_email/org_case_insensitive",
-				requestBody:    serviceAccountDetails{"SITEADMIN ORGANIZATION", "siteadmin@example.com"},
+				requestBody:    serviceAccountRegistrationRequestBody{"SITEADMIN ORGANIZATION", "siteadmin@example.com"},
 				token:          ownerToken,
 				expectedStatus: http.StatusConflict,
 			},
 		}
 		for _, tt := range testCases {
 			t.Run(tt.name, func(t *testing.T) {
-				response := makeServiceAccountRegRequest(t, testEnv.baseURL, tt.token, tt.requestBody)
+				response := makeServiceAccountRegistrationRequest(t, testEnv.baseURL, tt.token, tt.requestBody)
 				defer response.Body.Close()
 
 				if response.StatusCode != tt.expectedStatus {
@@ -284,38 +246,38 @@ func TestServiceAccountRegistration(t *testing.T) {
 	t.Run("validation tests", func(t *testing.T) {
 		testCases := []struct {
 			name           string
-			requestBody    serviceAccountDetails
+			requestBody    serviceAccountRegistrationRequestBody
 			token          string
 			expectedStatus int
 		}{
 			{
 				name:           "missing organization",
-				requestBody:    serviceAccountDetails{Email: "siteadmin@example.com"},
+				requestBody:    serviceAccountRegistrationRequestBody{Email: "siteadmin@example.com"},
 				token:          ownerToken,
 				expectedStatus: http.StatusBadRequest,
 			},
 			{
 				name:           "missing email",
-				requestBody:    serviceAccountDetails{Organization: "SiteAdmin Organization"},
+				requestBody:    serviceAccountRegistrationRequestBody{Organization: "SiteAdmin Organization"},
 				token:          ownerToken,
 				expectedStatus: http.StatusBadRequest,
 			},
 			{
 				name:           "empty organization",
-				requestBody:    serviceAccountDetails{Email: "siteadmin@example.com", Organization: ""},
+				requestBody:    serviceAccountRegistrationRequestBody{Email: "siteadmin@example.com", Organization: ""},
 				token:          ownerToken,
 				expectedStatus: http.StatusBadRequest,
 			},
 			{
 				name:           "empty email",
-				requestBody:    serviceAccountDetails{Email: "", Organization: "SiteAdmin Organization"},
+				requestBody:    serviceAccountRegistrationRequestBody{Email: "", Organization: "SiteAdmin Organization"},
 				token:          ownerToken,
 				expectedStatus: http.StatusBadRequest,
 			},
 		}
 		for _, tt := range testCases {
 			t.Run(tt.name, func(t *testing.T) {
-				response := makeServiceAccountRegRequest(t, testEnv.baseURL, tt.token, tt.requestBody)
+				response := makeServiceAccountRegistrationRequest(t, testEnv.baseURL, tt.token, tt.requestBody)
 				defer response.Body.Close()
 
 				if response.StatusCode != tt.expectedStatus {
@@ -354,13 +316,13 @@ func TestServiceAccountReissue(t *testing.T) {
 	memberAccount := createTestAccount(t, ctx, testEnv.queries, "member", "user", "member@test.com")
 
 	// Get access tokens
-	ownerToken := getAccessToken(t, testEnv.authService, siteAdminAccount.ID)
-	adminToken := getAccessToken(t, testEnv.authService, adminAccount.ID)
-	memberToken := getAccessToken(t, testEnv.authService, memberAccount.ID)
+	ownerToken := testEnv.getAccessToken(t, siteAdminAccount.ID)
+	adminToken := testEnv.getAccessToken(t, adminAccount.ID)
+	memberToken := testEnv.getAccessToken(t, memberAccount.ID)
 
-	adminServiceAccountDetails := serviceAccountDetails{"Admin Organization", "admin@example.com"}
+	adminServiceAccountDetails := serviceAccountRegistrationRequestBody{"Admin Organization", "admin@example.com"}
 
-	response := makeServiceAccountRegRequest(t, testEnv.baseURL, adminToken, adminServiceAccountDetails)
+	response := makeServiceAccountRegistrationRequest(t, testEnv.baseURL, adminToken, adminServiceAccountDetails)
 	defer response.Body.Close()
 
 	if response.StatusCode != http.StatusCreated {
@@ -380,7 +342,7 @@ func TestServiceAccountReissue(t *testing.T) {
 		t.Fatalf("Could not read client_id from response")
 	}
 
-	requestBody := reissueCredentialsRequest{
+	requestBody := reissueCredentialsRequestBody{
 		ClientID: clientID,
 	}
 
@@ -465,7 +427,7 @@ func TestServiceAccountReissue(t *testing.T) {
 }
 
 // makeServiceAccountReissueRequest makes a POST request to the service account credential reissuing endpoint
-func makeServiceAccountReissueRequest(t *testing.T, baseURL, token string, requestBody reissueCredentialsRequest) *http.Response {
+func makeServiceAccountReissueRequest(t *testing.T, baseURL, token string, requestBody reissueCredentialsRequestBody) *http.Response {
 	requestURL := fmt.Sprintf("%s/api/auth/service-accounts/reissue-credentials", baseURL)
 
 	jsonData, err := json.Marshal(requestBody)
@@ -483,8 +445,7 @@ func makeServiceAccountReissueRequest(t *testing.T, baseURL, token string, reque
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
 
-	client := &http.Client{Timeout: 10 * time.Second}
-	response, err := client.Do(req)
+	response, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("Failed to make request: %v", err)
 	}
@@ -513,28 +474,28 @@ func TestUserLogin(t *testing.T) {
 	t.Run("successful login tests", func(t *testing.T) {
 		testCases := []struct {
 			name            string
-			requestBody     loginDetails
+			requestBody     loginRequestBody
 			expectedStatus  int
 			expectedRole    string
 			expectedAccount uuid.UUID
 		}{
 			{
 				name:            "owner_can_login",
-				requestBody:     loginDetails{"siteadmin@login.test", ownerPassword},
+				requestBody:     loginRequestBody{"siteadmin@login.test", ownerPassword},
 				expectedStatus:  http.StatusOK,
 				expectedRole:    "siteadmin",
 				expectedAccount: siteAdminAccount.ID,
 			},
 			{
 				name:            "admin_can_login",
-				requestBody:     loginDetails{"admin@login.test", adminPassword},
+				requestBody:     loginRequestBody{"admin@login.test", adminPassword},
 				expectedStatus:  http.StatusOK,
 				expectedRole:    "isnadmin",
 				expectedAccount: adminAccount.ID,
 			},
 			{
 				name:            "member_can_login",
-				requestBody:     loginDetails{"member@login.test", memberPassword},
+				requestBody:     loginRequestBody{"member@login.test", memberPassword},
 				expectedStatus:  http.StatusOK,
 				expectedRole:    "member",
 				expectedAccount: memberAccount.ID,
@@ -542,7 +503,7 @@ func TestUserLogin(t *testing.T) {
 		}
 		for _, tt := range testCases {
 			t.Run(tt.name, func(t *testing.T) {
-				response := makeUserLoginRequest(t, testEnv.baseURL, tt.requestBody)
+				response := submitLoginRequest(t, testEnv.baseURL, tt.requestBody)
 				defer response.Body.Close()
 
 				if response.StatusCode != tt.expectedStatus {
@@ -635,28 +596,28 @@ func TestUserLogin(t *testing.T) {
 	t.Run("authentication failure tests", func(t *testing.T) {
 		testCases := []struct {
 			name           string
-			requestBody    loginDetails
+			requestBody    loginRequestBody
 			expectedStatus int
 		}{
 			{
 				name:           "wrong_password",
-				requestBody:    loginDetails{"siteadmin@login.test", "wrongpassword"},
+				requestBody:    loginRequestBody{"siteadmin@login.test", "wrongpassword"},
 				expectedStatus: http.StatusUnauthorized,
 			},
 			{
 				name:           "nonexistent_email",
-				requestBody:    loginDetails{"nonexistent@login.test", "anypassword"},
+				requestBody:    loginRequestBody{"nonexistent@login.test", "anypassword"},
 				expectedStatus: http.StatusUnauthorized,
 			},
 			{
 				name:           "case_insensitive_email_match",
-				requestBody:    loginDetails{"SiteAdmin@login.test", ownerPassword}, // Should work - emails are case insensitive
+				requestBody:    loginRequestBody{"SiteAdmin@login.test", ownerPassword}, // Should work - emails are case insensitive
 				expectedStatus: http.StatusOK,
 			},
 		}
 		for _, tt := range testCases {
 			t.Run(tt.name, func(t *testing.T) {
-				response := makeUserLoginRequest(t, testEnv.baseURL, tt.requestBody)
+				response := submitLoginRequest(t, testEnv.baseURL, tt.requestBody)
 				defer response.Body.Close()
 
 				if response.StatusCode != tt.expectedStatus {
@@ -684,33 +645,33 @@ func TestUserLogin(t *testing.T) {
 	t.Run("validation tests", func(t *testing.T) {
 		testCases := []struct {
 			name           string
-			requestBody    loginDetails
+			requestBody    loginRequestBody
 			expectedStatus int
 		}{
 			{
 				name:           "missing_email",
-				requestBody:    loginDetails{Password: ownerPassword},
+				requestBody:    loginRequestBody{Password: ownerPassword},
 				expectedStatus: http.StatusUnauthorized,
 			},
 			{
 				name:           "missing_password",
-				requestBody:    loginDetails{Email: "siteadmin@login.test"},
+				requestBody:    loginRequestBody{Email: "siteadmin@login.test"},
 				expectedStatus: http.StatusUnauthorized,
 			},
 			{
 				name:           "empty_email",
-				requestBody:    loginDetails{Email: "", Password: ownerPassword},
+				requestBody:    loginRequestBody{Email: "", Password: ownerPassword},
 				expectedStatus: http.StatusUnauthorized,
 			},
 			{
 				name:           "empty_password",
-				requestBody:    loginDetails{Email: "siteadmin@login.test", Password: ""},
+				requestBody:    loginRequestBody{Email: "siteadmin@login.test", Password: ""},
 				expectedStatus: http.StatusUnauthorized,
 			},
 		}
 		for _, tt := range testCases {
 			t.Run(tt.name, func(t *testing.T) {
-				response := makeUserLoginRequest(t, testEnv.baseURL, tt.requestBody)
+				response := submitLoginRequest(t, testEnv.baseURL, tt.requestBody)
 				defer response.Body.Close()
 
 				if response.StatusCode != tt.expectedStatus {
@@ -746,7 +707,7 @@ func TestUserLogin(t *testing.T) {
 		}
 
 		t.Run("disabled_account_cannot_login", func(t *testing.T) {
-			response := makeUserLoginRequest(t, testEnv.baseURL, loginDetails{"disabled@login.test", disabledPassword})
+			response := submitLoginRequest(t, testEnv.baseURL, loginRequestBody{"disabled@login.test", disabledPassword})
 			defer response.Body.Close()
 
 			if response.StatusCode != http.StatusUnauthorized {
@@ -781,21 +742,21 @@ func TestUserRegistration(t *testing.T) {
 	t.Run("successful registration tests", func(t *testing.T) {
 		testCases := []struct {
 			name           string
-			requestBody    userDetails
+			requestBody    userRegistrationRequestBody
 			expectedStatus int
 			expectedRole   string
 			isFirstUser    bool
 		}{
 			{
 				name:           "first_user_becomes_owner",
-				requestBody:    userDetails{"siteadmin@register.test", "validpassword123"},
+				requestBody:    userRegistrationRequestBody{"siteadmin@register.test", "validpassword123"},
 				expectedStatus: http.StatusCreated,
 				expectedRole:   "siteadmin",
 				isFirstUser:    true,
 			},
 			{
 				name:           "second_user_becomes_member",
-				requestBody:    userDetails{"member@register.test", "validpassword123"},
+				requestBody:    userRegistrationRequestBody{"member@register.test", "validpassword123"},
 				expectedStatus: http.StatusCreated,
 				expectedRole:   "member",
 				isFirstUser:    false,
@@ -853,7 +814,7 @@ func TestUserRegistration(t *testing.T) {
 
 	t.Run("duplicate email tests", func(t *testing.T) {
 		// First, register a user
-		firstUser := userDetails{"duplicate@example.com", "validpassword123"}
+		firstUser := userRegistrationRequestBody{"duplicate@example.com", "validpassword123"}
 		response := makeUserRegistrationRequest(t, testEnv.baseURL, firstUser)
 		response.Body.Close()
 
@@ -863,17 +824,17 @@ func TestUserRegistration(t *testing.T) {
 
 		testCases := []struct {
 			name           string
-			requestBody    userDetails
+			requestBody    userRegistrationRequestBody
 			expectedStatus int
 		}{
 			{
 				name:           "cannot_register_duplicate_email",
-				requestBody:    userDetails{"duplicate@example.com", "anotherpassword123"},
+				requestBody:    userRegistrationRequestBody{"duplicate@example.com", "anotherpassword123"},
 				expectedStatus: http.StatusConflict,
 			},
 			{
 				name:           "cannot_register_duplicate_email_case_insensitive",
-				requestBody:    userDetails{"DUPLICATE@example.com", "anotherpassword123"},
+				requestBody:    userRegistrationRequestBody{"DUPLICATE@example.com", "anotherpassword123"},
 				expectedStatus: http.StatusConflict,
 			},
 		}
@@ -914,31 +875,31 @@ func TestUserRegistration(t *testing.T) {
 	t.Run("validation tests", func(t *testing.T) {
 		testCases := []struct {
 			name           string
-			requestBody    userDetails
+			requestBody    userRegistrationRequestBody
 			expectedStatus int
 			expectedError  string
 		}{
 			{
 				name:           "missing_email",
-				requestBody:    userDetails{"", "validpassword123"},
+				requestBody:    userRegistrationRequestBody{"", "validpassword123"},
 				expectedStatus: http.StatusBadRequest,
 				expectedError:  "malformed_body",
 			},
 			{
 				name:           "missing_password",
-				requestBody:    userDetails{"test@register.test", ""},
+				requestBody:    userRegistrationRequestBody{"test@register.test", ""},
 				expectedStatus: http.StatusBadRequest,
 				expectedError:  "malformed_body",
 			},
 			{
 				name:           "password_too_short",
-				requestBody:    userDetails{"test@register.test", "short"},
+				requestBody:    userRegistrationRequestBody{"test@register.test", "short"},
 				expectedStatus: http.StatusBadRequest,
 				expectedError:  "password_too_short",
 			},
 			{
 				name:           "password_exactly_minimum_length",
-				requestBody:    userDetails{"minlength@register.test", "password123"}, // 11 chars
+				requestBody:    userRegistrationRequestBody{"minlength@register.test", "password123"}, // 11 chars
 				expectedStatus: http.StatusCreated,
 				expectedError:  "",
 			},
@@ -1001,8 +962,7 @@ func TestUserRegistration(t *testing.T) {
 
 			req.Header.Set("Content-Type", "application/json")
 
-			client := &http.Client{Timeout: 10 * time.Second}
-			response, err := client.Do(req)
+			response, err := http.DefaultClient.Do(req)
 			if err != nil {
 				t.Fatalf("Failed to make request: %v", err)
 			}
@@ -1047,7 +1007,7 @@ func TestPasswordResetFlow(t *testing.T) {
 	userAccount := createTestAccount(t, ctx, testEnv.queries, "member", "user", "user@example.com")
 
 	t.Run("non admin cannot generate reset link", func(t *testing.T) {
-		userToken := getAccessToken(t, testEnv.authService, userAccount.ID)
+		userToken := testEnv.getAccessToken(t, userAccount.ID)
 
 		url := fmt.Sprintf("%s/api/admin/users/%s/generate-password-reset-link", testEnv.baseURL, userAccount.ID)
 		req, err := http.NewRequest("POST", url, nil)
@@ -1070,7 +1030,7 @@ func TestPasswordResetFlow(t *testing.T) {
 	// 1. Admin generates password reset link
 	t.Run("Admin generates password reset link", func(t *testing.T) {
 		// Get admin access token
-		adminToken := getAccessToken(t, testEnv.authService, adminAccount.ID)
+		adminToken := testEnv.getAccessToken(t, adminAccount.ID)
 
 		// Generate password reset link
 		url := fmt.Sprintf("%s/api/admin/users/%s/generate-password-reset-link", testEnv.baseURL, userAccount.ID)
@@ -1269,7 +1229,7 @@ func TestSelfServePasswordChange(t *testing.T) {
 		userPassword := "original-password-123"
 		userEmail := "user1@password.test"
 		userAccount := createTestUserWithPassword(t, ctx, testEnv.queries, testEnv.authService, "member", userEmail, userPassword)
-		userToken := getAccessToken(t, testEnv.authService, userAccount.ID)
+		userToken := testEnv.getAccessToken(t, userAccount.ID)
 		newPassword := "new-secure-password-456"
 		changeRequest := map[string]string{
 			"current_password": userPassword,
@@ -1365,7 +1325,7 @@ func TestSelfServePasswordChange(t *testing.T) {
 		userPassword := "original-password-456"
 		userEmail := "user2@password.test"
 		userAccount := createTestUserWithPassword(t, ctx, testEnv.queries, testEnv.authService, "member", userEmail, userPassword)
-		userToken := getAccessToken(t, testEnv.authService, userAccount.ID)
+		userToken := testEnv.getAccessToken(t, userAccount.ID)
 
 		wrongPassword := "wrong-password-xyz"
 		newPassword := "another-new-password-789"
@@ -1463,7 +1423,7 @@ func TestSelfServePasswordChange(t *testing.T) {
 		userPassword := "original-password-789"
 		userEmail := "user3@password.test"
 		userAccount := createTestUserWithPassword(t, ctx, testEnv.queries, testEnv.authService, "member", userEmail, userPassword)
-		userToken := getAccessToken(t, testEnv.authService, userAccount.ID)
+		userToken := testEnv.getAccessToken(t, userAccount.ID)
 
 		testCases := []struct {
 			name           string
@@ -1529,7 +1489,7 @@ func TestSelfServePasswordChange(t *testing.T) {
 		userPassword := "original-password-999"
 		userEmail := "user4@password.test"
 		userAccount := createTestUserWithPassword(t, ctx, testEnv.queries, testEnv.authService, "member", userEmail, userPassword)
-		userToken := getAccessToken(t, testEnv.authService, userAccount.ID)
+		userToken := testEnv.getAccessToken(t, userAccount.ID)
 
 		tooShortPassword := "short"
 		changeRequest := map[string]string{

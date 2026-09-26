@@ -2,53 +2,19 @@
 
 package integration
 
+// Test data: records created directly in the database (bypassing the API) to set up the state a test needs.
+
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"testing"
-	"time"
 	"uuid"
 
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/utils"
 )
-
-// createExpiredAccessToken creates an expired JWT access token for testing purposes
-func createExpiredAccessToken(t *testing.T, accountID uuid.UUID, secretKey string) string {
-	t.Helper()
-
-	// Create JWT claims with expired timestamp
-	issuedAt := time.Now().Add(-2 * time.Hour)  // 2 hours ago
-	expiresAt := time.Now().Add(-1 * time.Hour) // 1 hour ago (expired)
-
-	claims := auth.Claims{
-		RegisteredClaims: jwt.RegisteredClaims{
-			Subject:   accountID.String(),
-			IssuedAt:  jwt.NewNumericDate(issuedAt),
-			ExpiresAt: jwt.NewNumericDate(expiresAt),
-			Issuer:    signalsd.TokenIssuerName,
-		},
-		AccountID:   accountID,
-		AccountType: "user",
-		Role:        "member",
-		IsnPerms:    make(map[string]auth.IsnPerm),
-	}
-
-	// Create and sign the token using the same secret key as the auth service
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	signedToken, err := token.SignedString([]byte(secretKey))
-	if err != nil {
-		t.Fatalf("Failed to create expired access token: %v", err)
-	}
-
-	return signedToken
-}
-
-// database helpers
 
 // createTestAccount creates entries in account and user/service_account tables
 func createTestAccount(t *testing.T, ctx context.Context, queries *database.Queries, role, accountType string, email string) database.GetAccountByIDRow {
@@ -283,33 +249,4 @@ func createTestUserWithPassword(t *testing.T, ctx context.Context, queries *data
 		AccountType: account.AccountType,
 		AccountRole: role,
 	}
-}
-
-func (env *testEnv) createAuthToken(t *testing.T, accountID uuid.UUID) string {
-	ctx := auth.ContextWithAccountID(context.Background(), accountID)
-	tokenResponse, err := env.authService.CreateAccessToken(ctx)
-	if err != nil {
-		t.Fatalf("Failed to create access token: %v", err)
-	}
-	return tokenResponse.AccessToken
-}
-
-// searchPrivateSignalsWithAccountID searches for signals on a private ISN filtered by an explicit account_id
-func searchPrivateSignalsWithAccountID(t *testing.T, baseURL, isnSlug, signalTypeSlug, semVer, token, accountID string) *http.Response {
-	t.Helper()
-
-	url := fmt.Sprintf("%s/api/isn/%s/signal-types/%s/v%s/signals/search?account_id=%s",
-		baseURL, isnSlug, signalTypeSlug, semVer, accountID)
-
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		t.Fatalf("Failed to create request: %v", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("Failed to search private signals: %v", err)
-	}
-	return resp
 }

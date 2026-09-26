@@ -172,47 +172,56 @@ func (q *Queries) GetInUsePublicIsnSignalTypes(ctx context.Context) ([]GetInUseP
 	return items, nil
 }
 
-const GetInUseSignalTypesByIsnID = `-- name: GetInUseSignalTypesByIsnID :many
-SELECT st.id, st.created_at, st.updated_at, st.slug, st.schema_url, st.readme_url, st.title, st.detail, st.sem_ver, st.schema_content, st.content_kind
-FROM isn i
-JOIN isn_signal_types ist ON ist.isn_id = i.id
-JOIN signal_types st ON st.id = ist.signal_type_id
-WHERE i.id = $1
-AND i.is_in_use = true
-AND ist.is_in_use = true
+const GetIsnSignalType = `-- name: GetIsnSignalType :one
+SELECT st.id, st.created_at, st.updated_at, st.slug, st.schema_url, st.readme_url, st.title, st.detail, st.sem_ver, st.schema_content, st.content_kind, ist.is_in_use
+FROM signal_types st
+JOIN isn_signal_types ist ON st.id = ist.signal_type_id
+WHERE ist.isn_id = $1
+AND st.slug = $2
+AND st.sem_ver = $3
 `
 
-// only returns active signal_types (is_in_use = true).
-func (q *Queries) GetInUseSignalTypesByIsnID(ctx context.Context, id uuid.UUID) ([]SignalType, error) {
-	rows, err := q.db.Query(ctx, GetInUseSignalTypesByIsnID, id)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []SignalType
-	for rows.Next() {
-		var i SignalType
-		if err := rows.Scan(
-			&i.ID,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.Slug,
-			&i.SchemaURL,
-			&i.ReadmeURL,
-			&i.Title,
-			&i.Detail,
-			&i.SemVer,
-			&i.SchemaContent,
-			&i.ContentKind,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+type GetIsnSignalTypeParams struct {
+	IsnID  uuid.UUID `json:"isn_id"`
+	Slug   string    `json:"slug"`
+	SemVer string    `json:"sem_ver"`
+}
+
+type GetIsnSignalTypeRow struct {
+	ID            uuid.UUID `json:"id"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
+	Slug          string    `json:"slug"`
+	SchemaURL     string    `json:"schema_url"`
+	ReadmeURL     string    `json:"readme_url"`
+	Title         string    `json:"title"`
+	Detail        string    `json:"detail"`
+	SemVer        string    `json:"sem_ver"`
+	SchemaContent string    `json:"schema_content"`
+	ContentKind   string    `json:"content_kind"`
+	IsInUse       bool      `json:"is_in_use"`
+}
+
+// returns the signal type if it has been added to the ISN
+// check the is_in_use flag to see if the signal type is enabled for the ISN
+func (q *Queries) GetIsnSignalType(ctx context.Context, arg GetIsnSignalTypeParams) (GetIsnSignalTypeRow, error) {
+	row := q.db.QueryRow(ctx, GetIsnSignalType, arg.IsnID, arg.Slug, arg.SemVer)
+	var i GetIsnSignalTypeRow
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Slug,
+		&i.SchemaURL,
+		&i.ReadmeURL,
+		&i.Title,
+		&i.Detail,
+		&i.SemVer,
+		&i.SchemaContent,
+		&i.ContentKind,
+		&i.IsInUse,
+	)
+	return i, err
 }
 
 const GetLatestSlugVersion = `-- name: GetLatestSlugVersion :one
@@ -252,41 +261,6 @@ func (q *Queries) GetLatestSlugVersion(ctx context.Context, slug string) (GetLat
 		&i.SemVer,
 		&i.SchemaURL,
 		&i.Title,
-		&i.ContentKind,
-	)
-	return i, err
-}
-
-const GetSignalTypeByIsnIdAndSlug = `-- name: GetSignalTypeByIsnIdAndSlug :one
-
-SELECT st.id, st.created_at, st.updated_at, st.slug, st.schema_url, st.readme_url, st.title, st.detail, st.sem_ver, st.schema_content, st.content_kind
-FROM signal_types st
-JOIN isn_signal_types ist ON st.id = ist.signal_type_id
-WHERE ist.isn_id = $1
-AND st.slug = $2
-AND st.sem_ver = $3
-`
-
-type GetSignalTypeByIsnIdAndSlugParams struct {
-	IsnID  uuid.UUID `json:"isn_id"`
-	Slug   string    `json:"slug"`
-	SemVer string    `json:"sem_ver"`
-}
-
-func (q *Queries) GetSignalTypeByIsnIdAndSlug(ctx context.Context, arg GetSignalTypeByIsnIdAndSlugParams) (SignalType, error) {
-	row := q.db.QueryRow(ctx, GetSignalTypeByIsnIdAndSlug, arg.IsnID, arg.Slug, arg.SemVer)
-	var i SignalType
-	err := row.Scan(
-		&i.ID,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.Slug,
-		&i.SchemaURL,
-		&i.ReadmeURL,
-		&i.Title,
-		&i.Detail,
-		&i.SemVer,
-		&i.SchemaContent,
 		&i.ContentKind,
 	)
 	return i, err

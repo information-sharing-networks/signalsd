@@ -75,16 +75,17 @@ type User struct {
 }
 
 type SignalType struct {
-	ID        uuid.UUID `json:"id" example:"67890684-3b14-42cf-b785-df28ce570400"`
-	CreatedAt time.Time `json:"created_at" example:"2025-06-03T13:47:47.331787+01:00"`
-	UpdatedAt time.Time `json:"updated_at" example:"2025-06-03T13:47:47.331787+01:00"`
-	Slug      string    `json:"slug" example:"sample-signal-type"`
-	SchemaURL string    `json:"schema_url" example:"https://example.com/schema.json"`
-	ReadmeURL string    `json:"readme_url" example:"https://example.com/readme.md"`
-	Title     string    `json:"title" example:"Sample Signal Type"`
-	Detail    string    `json:"detail" example:"Sample signal type description"`
-	SemVer    string    `json:"sem_ver" example:""`
-	IsInUse   bool      `json:"is_in_use" example:"true"`
+	ID          uuid.UUID `json:"id" example:"67890684-3b14-42cf-b785-df28ce570400"`
+	CreatedAt   time.Time `json:"created_at" example:"2025-06-03T13:47:47.331787+01:00"`
+	UpdatedAt   time.Time `json:"updated_at" example:"2025-06-03T13:47:47.331787+01:00"`
+	Slug        string    `json:"slug" example:"sample-signal-type"`
+	SchemaURL   string    `json:"schema_url" example:"https://example.com/schema.json"`
+	ReadmeURL   string    `json:"readme_url" example:"https://example.com/readme.md"`
+	Title       string    `json:"title" example:"Sample Signal Type"`
+	Detail      string    `json:"detail" example:"Sample signal type description"`
+	SemVer      string    `json:"sem_ver" example:""`
+	ContentKind string    `json:"content_kind" example:"json" enums:"json,document"`
+	IsInUse     bool      `json:"is_in_use" example:"true"`
 }
 
 type IsnAndLinkedInfo struct {
@@ -431,17 +432,28 @@ func (s *IsnHandler) GetIsn(w http.ResponseWriter, r *http.Request) error {
 	} else {
 		convertedSignalTypes := make([]SignalType, len(dbSignalTypes))
 		for i, st := range dbSignalTypes {
+			// the placeholder URLs used when there is no schema or readme are not shown
+			schemaURL := st.SchemaURL
+			if schemaURL == signalsd.SkipValidationURL {
+				schemaURL = ""
+			}
+			readmeURL := st.ReadmeURL
+			if readmeURL == signalsd.SkipReadmeURL {
+				readmeURL = ""
+			}
+
 			convertedSignalTypes[i] = SignalType{
-				ID:        st.ID,
-				CreatedAt: st.CreatedAt,
-				UpdatedAt: st.UpdatedAt,
-				Slug:      st.Slug,
-				SchemaURL: st.SchemaURL,
-				ReadmeURL: st.ReadmeURL,
-				Title:     st.Title,
-				Detail:    st.Detail,
-				SemVer:    st.SemVer,
-				IsInUse:   st.IsInUse,
+				ID:          st.ID,
+				CreatedAt:   st.CreatedAt,
+				UpdatedAt:   st.UpdatedAt,
+				Slug:        st.Slug,
+				SchemaURL:   schemaURL,
+				ReadmeURL:   readmeURL,
+				Title:       st.Title,
+				Detail:      st.Detail,
+				SemVer:      st.SemVer,
+				ContentKind: st.ContentKind,
+				IsInUse:     st.IsInUse,
 			}
 		}
 		signalTypes = &convertedSignalTypes

@@ -11,13 +11,10 @@ package integration
 // - Response structure correctness
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
-	"time"
 	"uuid"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
@@ -51,7 +48,7 @@ func TestRouteSignals(t *testing.T) {
 	writerAccount := createTestAccount(t, ctx, testEnv.queries, "member", "user", "writer@router-test.com")
 	readOnlyAccount := createTestAccount(t, ctx, testEnv.queries, "member", "user", "readonly@router-test.com")
 
-	siteAdminToken := testEnv.createAuthToken(t, siteAdminAccount.ID)
+	siteAdminToken := testEnv.getAccessToken(t, siteAdminAccount.ID)
 
 	isnA := createTestISN(t, ctx, testEnv.queries, "isn-a", "ISN A", siteAdminAccount.ID, "private")
 	isnB := createTestISN(t, ctx, testEnv.queries, "isn-b", "ISN B", siteAdminAccount.ID, "private")
@@ -60,12 +57,7 @@ func TestRouteSignals(t *testing.T) {
 	signalType := createTestSignalType(t, ctx, testEnv.queries, isnA.ID, "router test signal", "", signalsd.ContentKindJSON)
 
 	// add the signal type to isn-b
-	if err := testEnv.queries.AddSignalTypeToIsn(ctx, database.AddSignalTypeToIsnParams{
-		IsnID:        isnB.ID,
-		SignalTypeID: signalType.ID,
-	}); err != nil {
-		t.Fatalf("Failed to add signal type to isn-b: %v", err)
-	}
+	addSignalTypeToIsn(t, ctx, testEnv.queries, isnB.ID, signalType.ID)
 
 	grantPermission(t, ctx, testEnv.queries, isnA.ID, writerAccount.ID, "write")
 	grantPermission(t, ctx, testEnv.queries, isnA.ID, readOnlyAccount.ID, "read")
@@ -95,14 +87,14 @@ func TestRouteSignals(t *testing.T) {
 
 	// Request-level failure tests
 	t.Run("request_level_failures", func(t *testing.T) {
-		writerToken := testEnv.createAuthToken(t, writerAccount.ID)
+		writerToken := testEnv.getAccessToken(t, writerAccount.ID)
 
 		tests := []struct {
 			name              string
 			token             string
 			payload           map[string]any
 			expectedStatus    int
-			expectedErrorCode string
+			expectedErrorCode apperrors.ErrorCode
 		}{
 			// check appropriate middleware is in place
 			{
@@ -110,14 +102,14 @@ func TestRouteSignals(t *testing.T) {
 				token:             "",
 				payload:           routerPayload("batch-1", []map[string]any{routerSignal("s1", "value-a")}),
 				expectedStatus:    http.StatusUnauthorized,
-				expectedErrorCode: apperrors.ErrCodeAuthorizationFailure.String(),
+				expectedErrorCode: apperrors.ErrCodeAuthorizationFailure,
 			},
 			{
 				name:              "expired_token",
 				token:             createExpiredAccessToken(t, writerAccount.ID, testEnv.cfg.SecretKey),
 				payload:           routerPayload("batch-1", []map[string]any{routerSignal("s1", "value-a")}),
 				expectedStatus:    http.StatusUnauthorized,
-				expectedErrorCode: apperrors.ErrCodeAccessTokenExpired.String(),
+				expectedErrorCode: apperrors.ErrCodeAccessTokenExpired,
 			},
 			// mandator fields
 			{
@@ -125,61 +117,49 @@ func TestRouteSignals(t *testing.T) {
 				token:             writerToken,
 				payload:           map[string]any{"signals": []map[string]any{routerSignal("s1", "value-a")}},
 				expectedStatus:    http.StatusBadRequest,
-				expectedErrorCode: apperrors.ErrCodeMalformedBody.String(),
+				expectedErrorCode: apperrors.ErrCodeMalformedBody,
 			},
 			{
 				name:              "missing_signals_array",
 				token:             writerToken,
 				payload:           map[string]any{"batch_ref": "batch-1"},
 				expectedStatus:    http.StatusBadRequest,
-				expectedErrorCode: apperrors.ErrCodeMalformedBody.String(),
+				expectedErrorCode: apperrors.ErrCodeMalformedBody,
 			},
 			{
 				name:              "empty_signals_array",
 				token:             writerToken,
 				payload:           routerPayload("batch-1", []map[string]any{}),
 				expectedStatus:    http.StatusBadRequest,
-				expectedErrorCode: apperrors.ErrCodeMalformedBody.String(),
+				expectedErrorCode: apperrors.ErrCodeMalformedBody,
 			},
 			{
 				name:              "invalid_batch_ref_format",
 				token:             writerToken,
 				payload:           routerPayload("invalid batch ref!", []map[string]any{routerSignal("s1", "value-a")}),
 				expectedStatus:    http.StatusBadRequest,
-				expectedErrorCode: apperrors.ErrCodeMalformedBody.String(),
+				expectedErrorCode: apperrors.ErrCodeMalformedBody,
 			},
 			{
 				name:              "missing_local_ref",
 				token:             writerToken,
 				payload:           routerPayload("batch-1", []map[string]any{{"content": map[string]any{"test": "value-a"}}}),
 				expectedStatus:    http.StatusBadRequest,
-				expectedErrorCode: apperrors.ErrCodeMalformedBody.String(),
+				expectedErrorCode: apperrors.ErrCodeMalformedBody,
 			},
 			{
 				name:              "missing_content",
 				token:             writerToken,
 				payload:           routerPayload("batch-1", []map[string]any{{"local_ref": "s1"}}),
 				expectedStatus:    http.StatusBadRequest,
-				expectedErrorCode: apperrors.ErrCodeMalformedBody.String(),
+				expectedErrorCode: apperrors.ErrCodeMalformedBody,
 			},
 		}
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
 				resp := submitRouteSignalsRequest(t, testEnv.baseURL, tt.payload, tt.token, slug, semVer)
-				defer resp.Body.Close()
-
-				if resp.StatusCode != tt.expectedStatus {
-					t.Errorf("status: want %d, got %d", tt.expectedStatus, resp.StatusCode)
-					return
-				}
-				var errResp map[string]any
-				if err := json.NewDecoder(resp.Body).Decode(&errResp); err != nil {
-					t.Fatalf("decode error response: %v", err)
-				}
-				if errResp["error_code"] != tt.expectedErrorCode {
-					t.Errorf("error_code: want %q, got %q", tt.expectedErrorCode, errResp["error_code"])
-				}
+				expectErrorCode(t, resp, tt.expectedStatus, tt.expectedErrorCode)
 			})
 		}
 	})
@@ -207,16 +187,11 @@ func TestRouteSignals(t *testing.T) {
 		}
 		for _, tt := range unroutableTests {
 			t.Run(tt.name, func(t *testing.T) {
-				token := testEnv.createAuthToken(t, siteAdminAccount.ID)
+				token := testEnv.getAccessToken(t, siteAdminAccount.ID)
 				resp := submitRouteSignalsRequest(t, testEnv.baseURL,
 					routerPayload("batch-1", []map[string]any{tt.signal}),
 					token, slug, semVer)
-				defer resp.Body.Close()
-
-				if resp.StatusCode != http.StatusUnprocessableEntity {
-					t.Fatalf("status: want 422, got %d", resp.StatusCode)
-				}
-				result := decodeRouterResponse(t, resp)
+				result := expectSubmissionResponse(t, resp, http.StatusUnprocessableEntity)
 				if len(result.UnroutableSignals) != 1 {
 					t.Fatalf("unroutable_signals: want 1, got %d", len(result.UnroutableSignals))
 				}
@@ -248,16 +223,11 @@ func TestRouteSignals(t *testing.T) {
 		}
 		for _, tt := range permissionTests {
 			t.Run(tt.name, func(t *testing.T) {
-				token := testEnv.createAuthToken(t, tt.accountID)
+				token := testEnv.getAccessToken(t, tt.accountID)
 				resp := submitRouteSignalsRequest(t, testEnv.baseURL,
 					routerPayload("batch-"+tt.name, []map[string]any{routerSignal("s-"+tt.name, tt.testValue)}),
 					token, slug, semVer)
-				defer resp.Body.Close()
-
-				if resp.StatusCode != http.StatusUnprocessableEntity {
-					t.Fatalf("status: want 422, got %d", resp.StatusCode)
-				}
-				result := decodeRouterResponse(t, resp)
+				result := expectSubmissionResponse(t, resp, http.StatusUnprocessableEntity)
 				isnResult := findIsnResult(result.Results, tt.resolvedISN)
 				if isnResult == nil {
 					t.Fatalf("no result entry for %s", tt.resolvedISN)
@@ -287,16 +257,11 @@ func TestRouteSignals(t *testing.T) {
 			})
 
 			// Token must be fresh so claims reflect the disabled state.
-			token := testEnv.createAuthToken(t, siteAdminAccount.ID)
+			token := testEnv.getAccessToken(t, siteAdminAccount.ID)
 			resp := submitRouteSignalsRequest(t, testEnv.baseURL,
 				routerPayload("batch-disabled-st", []map[string]any{routerSignal("s-disabled-st", "value-a")}),
 				token, slug, semVer)
-			defer resp.Body.Close()
-
-			if resp.StatusCode != http.StatusUnprocessableEntity {
-				t.Fatalf("status: want 422, got %d", resp.StatusCode)
-			}
-			result := decodeRouterResponse(t, resp)
+			result := expectSubmissionResponse(t, resp, http.StatusUnprocessableEntity)
 			isnResult := findIsnResult(result.Results, isnA.Slug)
 			if isnResult == nil {
 				t.Fatalf("no result entry for isn-a")
@@ -327,16 +292,11 @@ func TestRouteSignals(t *testing.T) {
 			})
 
 			// Token must be fresh so claims reflect the disabled ISN.
-			token := testEnv.createAuthToken(t, siteAdminAccount.ID)
+			token := testEnv.getAccessToken(t, siteAdminAccount.ID)
 			resp := submitRouteSignalsRequest(t, testEnv.baseURL,
 				routerPayload("batch-disabled-isn", []map[string]any{routerSignal("s-disabled-isn", "value-a")}),
 				token, slug, semVer)
-			defer resp.Body.Close()
-
-			if resp.StatusCode != http.StatusUnprocessableEntity {
-				t.Fatalf("status: want 422, got %d", resp.StatusCode)
-			}
-			result := decodeRouterResponse(t, resp)
+			result := expectSubmissionResponse(t, resp, http.StatusUnprocessableEntity)
 			isnResult := findIsnResult(result.Results, isnA.Slug)
 			if isnResult == nil {
 				t.Fatalf("no result entry for isn-a")
@@ -352,18 +312,13 @@ func TestRouteSignals(t *testing.T) {
 		t.Run("schema_validation_failure", func(t *testing.T) {
 			// Content must match a routing rule but violate the schema.
 			// The test schema requires exactly one "test" field (additionalProperties: false).
-			token := testEnv.createAuthToken(t, siteAdminAccount.ID)
+			token := testEnv.getAccessToken(t, siteAdminAccount.ID)
 			resp := submitRouteSignalsRequest(t, testEnv.baseURL,
 				routerPayload("batch-badschema", []map[string]any{
 					{"local_ref": "s-badschema", "content": map[string]any{"test": "value-a", "extra_field": "not_allowed"}},
 				}),
 				token, slug, semVer)
-			defer resp.Body.Close()
-
-			if resp.StatusCode != http.StatusUnprocessableEntity {
-				t.Fatalf("status: want 422, got %d", resp.StatusCode)
-			}
-			result := decodeRouterResponse(t, resp)
+			result := expectSubmissionResponse(t, resp, http.StatusUnprocessableEntity)
 			isnResult := findIsnResult(result.Results, isnA.Slug)
 			if isnResult == nil {
 				t.Fatalf("no result entry for isn-a")
@@ -391,17 +346,12 @@ func TestRouteSignals(t *testing.T) {
 		}
 		for _, tt := range patternMatchTests {
 			t.Run("pattern_match_"+tt.name, func(t *testing.T) {
-				token := testEnv.createAuthToken(t, siteAdminAccount.ID)
+				token := testEnv.getAccessToken(t, siteAdminAccount.ID)
 				localRef := "s-match-" + tt.name
 				resp := submitRouteSignalsRequest(t, testEnv.baseURL,
 					routerPayload("batch-"+tt.name, []map[string]any{routerSignal(localRef, tt.testValue)}),
 					token, slug, semVer)
-				defer resp.Body.Close()
-
-				if resp.StatusCode != http.StatusOK {
-					t.Fatalf("status: want 200, got %d", resp.StatusCode)
-				}
-				result := decodeRouterResponse(t, resp)
+				result := expectSubmissionResponse(t, resp, http.StatusOK)
 				if result.Summary.StoredCount != 1 || result.Summary.RejectedCount != 0 {
 					t.Errorf("summary: want stored=1 failed=0, got stored=%d failed=%d",
 						result.Summary.StoredCount, result.Summary.RejectedCount)
@@ -433,19 +383,14 @@ func TestRouteSignals(t *testing.T) {
 		}
 
 		t.Run("mixed_batch_routes_to_both_isns", func(t *testing.T) {
-			token := testEnv.createAuthToken(t, siteAdminAccount.ID)
+			token := testEnv.getAccessToken(t, siteAdminAccount.ID)
 			resp := submitRouteSignalsRequest(t, testEnv.baseURL,
 				routerPayload("batch-multi-isn", []map[string]any{
 					routerSignal("s-multi-a", "value-a"),
 					routerSignal("s-multi-b", "value-b"),
 				}),
 				token, slug, semVer)
-			defer resp.Body.Close()
-
-			if resp.StatusCode != http.StatusOK {
-				t.Fatalf("status: want 200, got %d", resp.StatusCode)
-			}
-			result := decodeRouterResponse(t, resp)
+			result := expectSubmissionResponse(t, resp, http.StatusOK)
 			if result.Summary.TotalSubmitted != 2 || result.Summary.StoredCount != 2 || result.Summary.RejectedCount != 0 {
 				t.Errorf("summary: want total=2 stored=2 failed=0, got total=%d stored=%d failed=%d",
 					result.Summary.TotalSubmitted, result.Summary.StoredCount, result.Summary.RejectedCount)
@@ -463,7 +408,7 @@ func TestRouteSignals(t *testing.T) {
 
 		t.Run("multiple_signals_to_same_isn", func(t *testing.T) {
 			// Exercises the isnResults grouping logic when more than one signal lands on the same ISN.
-			token := testEnv.createAuthToken(t, siteAdminAccount.ID)
+			token := testEnv.getAccessToken(t, siteAdminAccount.ID)
 			resp := submitRouteSignalsRequest(t, testEnv.baseURL,
 				routerPayload("batch-multi-same", []map[string]any{
 					routerSignal("s-same-1", "value-a"),
@@ -471,12 +416,7 @@ func TestRouteSignals(t *testing.T) {
 					routerSignal("s-same-3", "value-a"),
 				}),
 				token, slug, semVer)
-			defer resp.Body.Close()
-
-			if resp.StatusCode != http.StatusOK {
-				t.Fatalf("status: want 200, got %d", resp.StatusCode)
-			}
-			result := decodeRouterResponse(t, resp)
+			result := expectSubmissionResponse(t, resp, http.StatusOK)
 			if result.Summary.TotalSubmitted != 3 || result.Summary.StoredCount != 3 {
 				t.Errorf("summary: want total=3 stored=3, got total=%d stored=%d",
 					result.Summary.TotalSubmitted, result.Summary.StoredCount)
@@ -492,16 +432,11 @@ func TestRouteSignals(t *testing.T) {
 
 		t.Run("correlation_id_routing", func(t *testing.T) {
 			// Seed a signal in isn-a via pattern match to get a signal ID.
-			token := testEnv.createAuthToken(t, siteAdminAccount.ID)
+			token := testEnv.getAccessToken(t, siteAdminAccount.ID)
 			seedResp := submitRouteSignalsRequest(t, testEnv.baseURL,
 				routerPayload("batch-corr-seed", []map[string]any{routerSignal("s-corr-seed", "value-a")}),
 				token, slug, semVer)
-			if seedResp.StatusCode != http.StatusOK {
-				seedResp.Body.Close()
-				t.Fatalf("seed signal failed: %d", seedResp.StatusCode)
-			}
-			seedResult := decodeRouterResponse(t, seedResp)
-			seedResp.Body.Close()
+			seedResult := expectSubmissionResponse(t, seedResp, http.StatusOK)
 
 			isnResultA := findIsnResult(seedResult.Results, isnA.Slug)
 			if isnResultA == nil || len(isnResultA.StoredSignals) == 0 {
@@ -515,12 +450,7 @@ func TestRouteSignals(t *testing.T) {
 					routerSignalWithCorrelation("s-corr", correlationID, "value-b"),
 				}),
 				token, slug, semVer)
-			defer corrResp.Body.Close()
-
-			if corrResp.StatusCode != http.StatusOK {
-				t.Fatalf("status: want 200, got %d", corrResp.StatusCode)
-			}
-			corrResult := decodeRouterResponse(t, corrResp)
+			corrResult := expectSubmissionResponse(t, corrResp, http.StatusOK)
 			isnResultA = findIsnResult(corrResult.Results, isnA.Slug)
 			if isnResultA == nil || len(isnResultA.StoredSignals) != 1 {
 				t.Errorf("expected 1 signal stored in isn-a via correlation, got %+v", isnResultA)
@@ -529,19 +459,14 @@ func TestRouteSignals(t *testing.T) {
 
 		t.Run("partial_success_mixed_batch", func(t *testing.T) {
 			// One signal routes and stores OK (isn-a), one has no matching rule.
-			token := testEnv.createAuthToken(t, siteAdminAccount.ID)
+			token := testEnv.getAccessToken(t, siteAdminAccount.ID)
 			resp := submitRouteSignalsRequest(t, testEnv.baseURL,
 				routerPayload("batch-partial", []map[string]any{
 					routerSignal("s-partial-ok", "value-a"),
 					routerSignal("s-partial-fail", "no-match"),
 				}),
 				token, slug, semVer)
-			defer resp.Body.Close()
-
-			if resp.StatusCode != http.StatusMultiStatus {
-				t.Fatalf("status: want 207, got %d", resp.StatusCode)
-			}
-			result := decodeRouterResponse(t, resp)
+			result := expectSubmissionResponse(t, resp, http.StatusMultiStatus)
 			if result.Summary.TotalSubmitted != 2 || result.Summary.StoredCount != 1 || result.Summary.UnroutableCount != 1 {
 				t.Errorf("summary: want total=2 stored=1 unroutable=1, got total=%d stored=%d unroutable=%d",
 					result.Summary.TotalSubmitted, result.Summary.StoredCount, result.Summary.UnroutableCount)
@@ -551,49 +476,6 @@ func TestRouteSignals(t *testing.T) {
 			}
 		})
 	})
-}
-
-// submitRouteSignalsRequest posts to the signal router endpoint.
-func submitRouteSignalsRequest(t *testing.T, baseURL string, payload map[string]any, token string, signalTypeSlug, semVer string) *http.Response {
-	t.Helper()
-	jsonPayload, err := json.Marshal(payload)
-	if err != nil {
-		t.Fatalf("Failed to marshal payload: %v", err)
-	}
-
-	url := fmt.Sprintf("%s/api/router/signal-types/%s/v%s/signals", baseURL, signalTypeSlug, semVer)
-
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(jsonPayload))
-	if err != nil {
-		t.Fatalf("Failed to create request: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-
-	client := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			DisableKeepAlives: true,
-			MaxIdleConns:      0,
-		},
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		t.Fatalf("Failed to submit routed signals: %v", err)
-	}
-	return resp
-}
-
-// decodeRouterResponse decodes a SignalSubmissionResponse from an http.Response body.
-func decodeRouterResponse(t *testing.T, resp *http.Response) handlers.SignalSubmissionResponse {
-	t.Helper()
-	var result handlers.SignalSubmissionResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("Failed to decode router response: %v", err)
-	}
-	return result
 }
 
 // routerPayload builds a minimal valid request body for the router endpoint.

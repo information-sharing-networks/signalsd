@@ -42,9 +42,10 @@ FROM signal_types st
 WHERE st.slug = $1
 AND st.sem_ver = $2;
 
--- name: GetSignalTypeByIsnIdAndSlug :one
-
-SELECT st.*
+-- name: GetIsnSignalType :one
+-- returns the signal type if it has been added to the ISN
+-- check the is_in_use flag to see if the signal type is enabled for the ISN
+SELECT st.*, ist.is_in_use
 FROM signal_types st
 JOIN isn_signal_types ist ON st.id = ist.signal_type_id
 WHERE ist.isn_id = $1
@@ -72,17 +73,6 @@ WHERE st2.slug = $1
     (SELECT max(st3.sem_ver)
      FROM signal_types st3
      WHERE st3.slug = $1);
-
--- name: GetInUseSignalTypesByIsnID :many
--- only returns active signal_types (is_in_use = true).
-SELECT st.*
-FROM isn i
-JOIN isn_signal_types ist ON ist.isn_id = i.id
-JOIN signal_types st ON st.id = ist.signal_type_id
-WHERE i.id = $1
-AND i.is_in_use = true
-AND ist.is_in_use = true;
-
 
 -- name: GetInUsePublicIsnSignalTypes :many
 -- only returns active ISNs (is_in_use = true), and checks the signal type is active on the ISN

@@ -75,6 +75,12 @@ type SignalTypeDetail struct {
 	ContentKind string    `json:"content_kind" example:"json" enums:"json,document"`
 }
 
+// IsnSignalTypeDetail is a signal type that has been added to an ISN
+type IsnSignalTypeDetail struct {
+	SignalTypeDetail
+	IsInUse bool `json:"is_in_use" example:"true"` // whether the signal type is enabled on this ISN
+}
+
 // CreateSignalType godoc
 //
 //	@Summary		Create Signal Type
@@ -629,7 +635,10 @@ func (s *SignalTypeHandler) DeleteSignalType(w http.ResponseWriter, r *http.Requ
 //
 //	@Summary		Get a Signal Type
 //	@Description	Returns the signal type details.
-//	@Description	This endpoint can be used by anyone registered with the site
+//	@Description
+//	@Description	Use GET /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver} to see how a signal type is used on an ISN.
+//	@Description
+//	@Description	Note: this endpoint can only be used by site admins
 //
 //	@Tags			Signal Types
 //
@@ -637,10 +646,16 @@ func (s *SignalTypeHandler) DeleteSignalType(w http.ResponseWriter, r *http.Requ
 //	@Param			sem_ver				path		string	true	"version"			example(1.0.0)
 //
 //	@Success		200					{object}	handlers.SignalTypeDetail
+//	@Failure		401					{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		403					{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		404					{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		500					{object}	responses.ErrorResponse	"database_error"
 //
+//	@Security		BearerAccessToken
+//
 //	@Router			/api/admin/signal-types/{signal_type_slug}/v{sem_ver} [get]
+//
+// Should only be used with RequireRole (siteadmin) middleware
 func (s *SignalTypeHandler) GetSignalType(w http.ResponseWriter, r *http.Request) error {
 
 	signalTypeSlug := r.PathValue("signal_type_slug")
@@ -690,15 +705,24 @@ func (s *SignalTypeHandler) GetSignalType(w http.ResponseWriter, r *http.Request
 // GetSignalTypes godoc
 //
 //	@Summary		Get Signal Types
-//	@Description	Get details for all the signal types defined on the ISN.
-//	@Description	This endpoint can only be used by any account registered with the site
+//	@Description	Get details for all the signal types registered on the site.
+//	@Description
+//	@Description	Use GET /api/isn/{isn_slug}/signal-types to get the signal types that have been added to an ISN.
+//	@Description
+//	@Description	Note: this endpoint can only be used by site admins
 //
 //	@Tags			Signal Types
 //
 //	@Success		200	{array}		handlers.SignalTypeDetail
+//	@Failure		401	{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
+//	@Security		BearerAccessToken
+//
 //	@Router			/api/admin/signal-types [get]
+//
+// Should only be used with RequireRole (siteadmin) middleware
 func (s *SignalTypeHandler) GetSignalTypes(w http.ResponseWriter, r *http.Request) error {
 
 	var dbSignalTypes []database.SignalType
@@ -735,6 +759,170 @@ func (s *SignalTypeHandler) GetSignalTypes(w http.ResponseWriter, r *http.Reques
 	}
 
 	return responses.JSON(w, http.StatusOK, signalTypes)
+}
+
+// GetIsnSignalTypes godoc
+//
+//	@Summary		Get ISN Signal Types
+//	@Description	Get the signal types that have been added to the ISN.
+//	@Description
+//	@Description	is_in_use shows whether the registered signal type is enabled on this ISN.
+//	@Description	Signal types that are disabled on the ISN are only returned when include_inactive=true.
+//	@Description
+//	@Description	This endpoint can be used by any authenticated account.
+//
+//	@Tags			ISN Configuration
+//
+//	@Param			isn_slug			path		string	true	"ISN slug"											example(sample-isn)
+//	@Param			include_inactive	query		bool	false	"Include signal types that are disabled on the ISN"	default(false)
+//
+//	@Success		200					{array}		handlers.IsnSignalTypeDetail
+//	@Failure		401					{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		404					{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500					{object}	responses.ErrorResponse	"database_error"
+//
+//	@Security		BearerAccessToken
+//
+//	@Router			/api/isn/{isn_slug}/signal-types [get]
+func (s *SignalTypeHandler) GetIsnSignalTypes(w http.ResponseWriter, r *http.Request) error {
+
+	isnSlug := r.PathValue("isn_slug")
+	includeInactive := r.URL.Query().Get("include_inactive") == "true"
+
+	isn, err := s.queries.GetIsnBySlug(r.Context(), isnSlug)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperrors.NotFound(fmt.Sprintf("No ISN found for %s", isnSlug), nil)
+		}
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("isn_slug", isnSlug),
+		)
+		return apperrors.DatabaseError("database error", err)
+	}
+
+	dbSignalTypes, err := s.queries.GetSignalTypesByIsnID(r.Context(), isn.ID)
+	if err != nil {
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("isn_id", isn.ID.String()),
+		)
+		return apperrors.DatabaseError("database error", err)
+	}
+
+	signalTypes := make([]IsnSignalTypeDetail, 0, len(dbSignalTypes))
+	for _, dbSignalType := range dbSignalTypes {
+		if !dbSignalType.IsInUse && !includeInactive {
+			continue
+		}
+
+		schemaURL := dbSignalType.SchemaURL
+		if schemaURL == signalsd.SkipValidationURL {
+			schemaURL = ""
+		}
+		readmeURL := dbSignalType.ReadmeURL
+		if readmeURL == signalsd.SkipReadmeURL {
+			readmeURL = ""
+		}
+
+		signalTypes = append(signalTypes, IsnSignalTypeDetail{
+			SignalTypeDetail: SignalTypeDetail{
+				ID:          dbSignalType.ID,
+				CreatedAt:   dbSignalType.CreatedAt,
+				UpdatedAt:   dbSignalType.UpdatedAt,
+				Slug:        dbSignalType.Slug,
+				SchemaURL:   schemaURL,
+				ReadmeURL:   readmeURL,
+				Title:       dbSignalType.Title,
+				Detail:      dbSignalType.Detail,
+				SemVer:      dbSignalType.SemVer,
+				ContentKind: dbSignalType.ContentKind,
+			},
+			IsInUse: dbSignalType.IsInUse,
+		})
+	}
+
+	return responses.JSON(w, http.StatusOK, signalTypes)
+}
+
+// GetIsnSignalType godoc
+//
+//	@Summary		Get an ISN Signal Type
+//	@Description	Get a signal type that has been added to the ISN.
+//	@Description
+//	@Description	is_in_use shows whether the signal type is enabled on this ISN.
+//	@Description
+//	@Description	This endpoint can be used by any authenticated account.
+//
+//	@Tags			ISN Configuration
+//
+//	@Param			isn_slug			path		string	true	"ISN slug"			example(sample-isn)
+//	@Param			signal_type_slug	path		string	true	"signal type slug"	example(sample-signal-type)
+//	@Param			sem_ver				path		string	true	"version"			example(1.0.0)
+//
+//	@Success		200					{object}	handlers.IsnSignalTypeDetail
+//	@Failure		401					{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		404					{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500					{object}	responses.ErrorResponse	"database_error"
+//
+//	@Security		BearerAccessToken
+//
+//	@Router			/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver} [get]
+func (s *SignalTypeHandler) GetIsnSignalType(w http.ResponseWriter, r *http.Request) error {
+
+	isnSlug := r.PathValue("isn_slug")
+	signalTypeSlug := r.PathValue("signal_type_slug")
+	semVer := r.PathValue("sem_ver")
+
+	isn, err := s.queries.GetIsnBySlug(r.Context(), isnSlug)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperrors.NotFound(fmt.Sprintf("No ISN found for %s", isnSlug), nil)
+		}
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("isn_slug", isnSlug),
+		)
+		return apperrors.DatabaseError("database error", err)
+	}
+
+	dbSignalType, err := s.queries.GetIsnSignalType(r.Context(), database.GetIsnSignalTypeParams{
+		IsnID:  isn.ID,
+		Slug:   signalTypeSlug,
+		SemVer: semVer,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperrors.NotFound(fmt.Sprintf("Signal type %s/v%s has not been added to ISN %s", signalTypeSlug, semVer, isnSlug), nil)
+		}
+		logger.ContextWithLogAttrs(r.Context(),
+			slog.String("isn_id", isn.ID.String()),
+			slog.String("signal_type_slug", signalTypeSlug),
+		)
+		return apperrors.DatabaseError("database error", err)
+	}
+
+	schemaURL := dbSignalType.SchemaURL
+	if schemaURL == signalsd.SkipValidationURL {
+		schemaURL = ""
+	}
+	readmeURL := dbSignalType.ReadmeURL
+	if readmeURL == signalsd.SkipReadmeURL {
+		readmeURL = ""
+	}
+
+	return responses.JSON(w, http.StatusOK, IsnSignalTypeDetail{
+		SignalTypeDetail: SignalTypeDetail{
+			ID:          dbSignalType.ID,
+			CreatedAt:   dbSignalType.CreatedAt,
+			UpdatedAt:   dbSignalType.UpdatedAt,
+			Slug:        dbSignalType.Slug,
+			SchemaURL:   schemaURL,
+			ReadmeURL:   readmeURL,
+			Title:       dbSignalType.Title,
+			Detail:      dbSignalType.Detail,
+			SemVer:      dbSignalType.SemVer,
+			ContentKind: dbSignalType.ContentKind,
+		},
+		IsInUse: dbSignalType.IsInUse,
+	})
 }
 
 // AddSignalTypeToISN godoc

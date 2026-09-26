@@ -503,6 +503,46 @@ definitions:
           $ref: '#/definitions/handlers.StoredSignal'
         type: array
     type: object
+  handlers.IsnSignalTypeDetail:
+    properties:
+      content_kind:
+        enum:
+        - json
+        - document
+        example: json
+        type: string
+      created_at:
+        example: "2025-06-03T13:47:47.331787+01:00"
+        type: string
+      detail:
+        example: Sample signal type description
+        type: string
+      id:
+        example: 67890684-3b14-42cf-b785-df28ce570400
+        type: string
+      is_in_use:
+        description: whether the signal type is enabled on this ISN
+        example: true
+        type: boolean
+      readme_url:
+        example: https://github.com/user/project/blob/2025.01.01/readme.md
+        type: string
+      schema_url:
+        example: https://github.com/user/project/blob/2025.01.01/schema.json
+        type: string
+      sem_ver:
+        example: ""
+        type: string
+      slug:
+        example: sample-signal-type
+        type: string
+      title:
+        example: Sample Signal Type
+        type: string
+      updated_at:
+        example: "2025-06-03T13:47:47.331787+01:00"
+        type: string
+    type: object
   handlers.LoginRequest:
     properties:
       email:
@@ -798,6 +838,12 @@ definitions:
     type: object
   handlers.SignalType:
     properties:
+      content_kind:
+        enum:
+        - json
+        - document
+        example: json
+        type: string
       created_at:
         example: "2025-06-03T13:47:47.331787+01:00"
         type: string
@@ -1506,8 +1552,11 @@ paths:
   /api/admin/signal-types:
     get:
       description: |-
-        Get details for all the signal types defined on the ISN.
-        This endpoint can only be used by any account registered with the site
+        Get details for all the signal types registered on the site.
+
+        Use GET /api/isn/{isn_slug}/signal-types to get the signal types that have been added to an ISN.
+
+        Note: this endpoint can only be used by site admins
       responses:
         "200":
           description: OK
@@ -1515,10 +1564,20 @@ paths:
             items:
               $ref: '#/definitions/handlers.SignalTypeDetail'
             type: array
+        "401":
+          description: authentication_error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
         "500":
           description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
       summary: Get Signal Types
       tags:
       - Signal Types
@@ -1676,7 +1735,10 @@ paths:
     get:
       description: |-
         Returns the signal type details.
-        This endpoint can be used by anyone registered with the site
+
+        Use GET /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver} to see how a signal type is used on an ISN.
+
+        Note: this endpoint can only be used by site admins
       parameters:
       - description: signal type slug
         example: sample-signal-type
@@ -1695,6 +1757,14 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/handlers.SignalTypeDetail'
+        "401":
+          description: authentication_error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
         "404":
           description: resource_not_found
           schema:
@@ -1703,6 +1773,8 @@ paths:
           description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
       summary: Get a Signal Type
       tags:
       - Signal Types
@@ -2643,7 +2715,100 @@ paths:
       summary: Grant/Revoke ISN Access
       tags:
       - Account Management
+  /api/isn/{isn_slug}/signal-types:
+    get:
+      description: |-
+        Get the signal types that have been added to the ISN.
+
+        is_in_use shows whether the registered signal type is enabled on this ISN.
+        Signal types that are disabled on the ISN are only returned when include_inactive=true.
+
+        This endpoint can be used by any authenticated account.
+      parameters:
+      - description: ISN slug
+        example: sample-isn
+        in: path
+        name: isn_slug
+        required: true
+        type: string
+      - default: false
+        description: Include signal types that are disabled on the ISN
+        in: query
+        name: include_inactive
+        type: boolean
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.IsnSignalTypeDetail'
+            type: array
+        "401":
+          description: authentication_error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Get ISN Signal Types
+      tags:
+      - ISN Configuration
   /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}:
+    get:
+      description: |-
+        Get a signal type that has been added to the ISN.
+
+        is_in_use shows whether the signal type is enabled on this ISN.
+
+        This endpoint can be used by any authenticated account.
+      parameters:
+      - description: ISN slug
+        example: sample-isn
+        in: path
+        name: isn_slug
+        required: true
+        type: string
+      - description: signal type slug
+        example: sample-signal-type
+        in: path
+        name: signal_type_slug
+        required: true
+        type: string
+      - description: version
+        example: 1.0.0
+        in: path
+        name: sem_ver
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.IsnSignalTypeDetail'
+        "401":
+          description: authentication_error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Get an ISN Signal Type
+      tags:
+      - ISN Configuration
     put:
       description: |-
         Enable or disable a signal type for a specific ISN

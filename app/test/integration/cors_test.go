@@ -22,8 +22,7 @@ func checkOriginIsAllowed(t *testing.T, endpoint, origin string) (bool, string) 
 	req.Header.Set("Origin", origin)
 	req.Header.Set("Access-Control-Request-Method", "GET")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("Failed to make request: %v", err)
 	}

@@ -11,8 +11,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"fmt"
-	"io"
 	"net/http"
 	"testing"
 
@@ -27,10 +25,10 @@ func TestDocumentSignalTypes(t *testing.T) {
 	testEnv := startInProcessServer(t, "")
 
 	siteAdminAccount := createTestAccount(t, ctx, testEnv.queries, "siteadmin", "user", "siteadmin@document-types.com")
-	siteAdminToken := testEnv.createAuthToken(t, siteAdminAccount.ID)
+	siteAdminToken := testEnv.getAccessToken(t, siteAdminAccount.ID)
 
 	t.Run("create document signal type", func(t *testing.T) {
-		response := postAdminJSON(t, testEnv.baseURL+"/api/admin/signal-types", siteAdminToken, handlers.CreateSignalTypeRequest{
+		response := createSignalTypeRequest(t, testEnv.baseURL, siteAdminToken, handlers.CreateSignalTypeRequest{
 			Title:       "Bill of Lading",
 			BumpType:    "major",
 			ReadmeURL:   signalsd.SkipReadmeURL,
@@ -39,17 +37,17 @@ func TestDocumentSignalTypes(t *testing.T) {
 		})
 		expectStatus(t, response, http.StatusCreated)
 
-		signalType := getAdminSignalType(t, testEnv.baseURL, siteAdminToken, "bill-of-lading", "1.0.0")
-		if signalType.ContentKind != signalsd.ContentKindDocument {
-			t.Errorf("Expected content_kind %s, got %s", signalsd.ContentKindDocument, signalType.ContentKind)
+		signalType := expectJSONResponse(t, getSignalTypeRequest(t, testEnv.baseURL, siteAdminToken, "bill-of-lading", "1.0.0"), http.StatusOK)
+		if signalType["content_kind"] != signalsd.ContentKindDocument {
+			t.Errorf("Expected content_kind %s, got %v", signalsd.ContentKindDocument, signalType["content_kind"])
 		}
-		if signalType.SchemaURL != "" {
-			t.Errorf("Expected no schema_url for a document signal type, got %s", signalType.SchemaURL)
+		if signalType["schema_url"] != "" {
+			t.Errorf("Expected no schema_url for a document signal type, got %v", signalType["schema_url"])
 		}
 	})
 
 	t.Run("content kind defaults to json", func(t *testing.T) {
-		response := postAdminJSON(t, testEnv.baseURL+"/api/admin/signal-types", siteAdminToken, handlers.CreateSignalTypeRequest{
+		response := createSignalTypeRequest(t, testEnv.baseURL, siteAdminToken, handlers.CreateSignalTypeRequest{
 			Title:     "Consignment",
 			BumpType:  "major",
 			SchemaURL: signalsd.SkipValidationURL,
@@ -58,14 +56,14 @@ func TestDocumentSignalTypes(t *testing.T) {
 		})
 		expectStatus(t, response, http.StatusCreated)
 
-		signalType := getAdminSignalType(t, testEnv.baseURL, siteAdminToken, "consignment", "1.0.0")
-		if signalType.ContentKind != signalsd.ContentKindJSON {
-			t.Errorf("Expected content_kind %s, got %s", signalsd.ContentKindJSON, signalType.ContentKind)
+		signalType := expectJSONResponse(t, getSignalTypeRequest(t, testEnv.baseURL, siteAdminToken, "consignment", "1.0.0"), http.StatusOK)
+		if signalType["content_kind"] != signalsd.ContentKindJSON {
+			t.Errorf("Expected content_kind %s, got %v", signalsd.ContentKindJSON, signalType["content_kind"])
 		}
 	})
 
 	t.Run("json signal type requires a schema_url", func(t *testing.T) {
-		response := postAdminJSON(t, testEnv.baseURL+"/api/admin/signal-types", siteAdminToken, handlers.CreateSignalTypeRequest{
+		response := createSignalTypeRequest(t, testEnv.baseURL, siteAdminToken, handlers.CreateSignalTypeRequest{
 			Title:       "No schema",
 			BumpType:    "major",
 			ReadmeURL:   signalsd.SkipReadmeURL,
@@ -76,7 +74,7 @@ func TestDocumentSignalTypes(t *testing.T) {
 	})
 
 	t.Run("document signal type rejects a schema_url", func(t *testing.T) {
-		response := postAdminJSON(t, testEnv.baseURL+"/api/admin/signal-types", siteAdminToken, handlers.CreateSignalTypeRequest{
+		response := createSignalTypeRequest(t, testEnv.baseURL, siteAdminToken, handlers.CreateSignalTypeRequest{
 			Title:       "Commercial Invoice",
 			BumpType:    "major",
 			SchemaURL:   testSchemaURL,
@@ -88,7 +86,7 @@ func TestDocumentSignalTypes(t *testing.T) {
 	})
 
 	t.Run("unknown content kind is rejected", func(t *testing.T) {
-		response := postAdminJSON(t, testEnv.baseURL+"/api/admin/signal-types", siteAdminToken, handlers.CreateSignalTypeRequest{
+		response := createSignalTypeRequest(t, testEnv.baseURL, siteAdminToken, handlers.CreateSignalTypeRequest{
 			Title:       "Packing List",
 			BumpType:    "major",
 			SchemaURL:   signalsd.SkipValidationURL,
@@ -100,7 +98,7 @@ func TestDocumentSignalTypes(t *testing.T) {
 	})
 
 	t.Run("schemas can't be registered for document signal types", func(t *testing.T) {
-		response := postAdminJSON(t, testEnv.baseURL+"/api/admin/signal-types/bill-of-lading/schemas", siteAdminToken, handlers.RegisterNewSignalTypeSchemaRequest{
+		response := registerSignalTypeSchemaRequest(t, testEnv.baseURL, siteAdminToken, "bill-of-lading", handlers.RegisterNewSignalTypeSchemaRequest{
 			SchemaURL: signalsd.SkipValidationURL,
 			BumpType:  "minor",
 			ReadmeURL: signalsd.SkipReadmeURL,
@@ -126,7 +124,7 @@ func TestJSONEndpointsRejectDocumentSignalTypes(t *testing.T) {
 		t.Fatalf("Failed to refresh schema cache: %v", err)
 	}
 
-	writerToken := testEnv.createAuthToken(t, writerAccount.ID)
+	writerToken := testEnv.getAccessToken(t, writerAccount.ID)
 
 	endpoint := testSignalEndpoint{
 		isnSlug:          isn.Slug,
@@ -146,24 +144,24 @@ func TestJSONEndpointsRejectDocumentSignalTypes(t *testing.T) {
 
 	t.Run("search works for document signal types", func(t *testing.T) {
 		// no signals can be created yet, but the search should work for document signal types
-		signals := searchSignalsWithParams(t, testEnv.baseURL, endpoint, false, writerToken, http.StatusOK, map[string]string{
+		signals := expectSearchResults(t, searchPrivateSignals(t, testEnv.baseURL, endpoint, writerToken, map[string]string{
 			"local_ref": "json-to-document-001",
-		})
+		}))
 		if len(signals) != 0 {
 			t.Errorf("Expected 0 signals, got %d", len(signals))
 		}
 	})
 }
 
-// postAdminJSON posts a JSON body with authentication and returns the response
-func postAdminJSON(t *testing.T, url string, token string, body any) *http.Response {
+// createSignalTypeRequest posts to the create signal type endpoint: POST /api/admin/signal-types
+func createSignalTypeRequest(t *testing.T, baseURL, token string, request handlers.CreateSignalTypeRequest) *http.Response {
 	t.Helper()
 
-	jsonData, err := json.Marshal(body)
+	jsonData, err := json.Marshal(request)
 	if err != nil {
 		t.Fatalf("Failed to marshal request: %v", err)
 	}
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest(http.MethodPost, baseURL+"/api/admin/signal-types", bytes.NewBuffer(jsonData))
 	if err != nil {
 		t.Fatalf("Failed to create request: %v", err)
 	}
@@ -172,69 +170,29 @@ func postAdminJSON(t *testing.T, url string, token string, body any) *http.Respo
 
 	response, err := http.DefaultClient.Do(req)
 	if err != nil {
-		t.Fatalf("Request failed: %v", err)
+		t.Fatalf("Failed to create signal type: %v", err)
 	}
 	return response
 }
 
-// getAdminSignalType finds a signal type in the admin signal types list
-func getAdminSignalType(t *testing.T, baseURL, token, slug, semVer string) handlers.SignalTypeDetail {
+// registerSignalTypeSchemaRequest posts to the register new schema endpoint: POST /api/admin/signal-types/{slug}/schemas
+func registerSignalTypeSchemaRequest(t *testing.T, baseURL, token, slug string, request handlers.RegisterNewSignalTypeSchemaRequest) *http.Response {
 	t.Helper()
 
-	req, err := http.NewRequest(http.MethodGet, baseURL+"/api/admin/signal-types", nil)
+	jsonData, err := json.Marshal(request)
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
+	req, err := http.NewRequest(http.MethodPost, baseURL+"/api/admin/signal-types/"+slug+"/schemas", bytes.NewBuffer(jsonData))
 	if err != nil {
 		t.Fatalf("Failed to create request: %v", err)
 	}
+	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+token)
 
 	response, err := http.DefaultClient.Do(req)
 	if err != nil {
-		t.Fatalf("Request failed: %v", err)
+		t.Fatalf("Failed to register signal type schema: %v", err)
 	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		t.Fatalf("Expected status 200 getting signal types, got %d", response.StatusCode)
-	}
-
-	var signalTypes []handlers.SignalTypeDetail
-	if err := json.NewDecoder(response.Body).Decode(&signalTypes); err != nil {
-		t.Fatalf("Failed to decode signal types: %v", err)
-	}
-	for _, signalType := range signalTypes {
-		if signalType.Slug == slug && signalType.SemVer == semVer {
-			return signalType
-		}
-	}
-	t.Fatalf("signal type %s/v%s not found", slug, semVer)
-	return handlers.SignalTypeDetail{}
-}
-
-// expectStatus checks the response status and closes the body
-func expectStatus(t *testing.T, response *http.Response, expectedStatus int) {
-	t.Helper()
-	defer response.Body.Close()
-
-	if response.StatusCode != expectedStatus {
-		body, _ := io.ReadAll(response.Body)
-		t.Fatalf("Expected status %d, got %d: %s", expectedStatus, response.StatusCode, body)
-	}
-}
-
-// expectErrorCode checks the response status and error code and closes the body
-func expectErrorCode(t *testing.T, response *http.Response, expectedStatus int, expectedCode apperrors.ErrorCode) {
-	t.Helper()
-	defer response.Body.Close()
-
-	body, _ := io.ReadAll(response.Body)
-	if response.StatusCode != expectedStatus {
-		t.Fatalf("Expected status %d, got %d: %s", expectedStatus, response.StatusCode, body)
-	}
-
-	var errorResponse map[string]any
-	if err := json.Unmarshal(body, &errorResponse); err != nil {
-		t.Fatalf("Failed to decode error response: %v", err)
-	}
-	if errorResponse["error_code"] != string(expectedCode) {
-		t.Errorf("Expected error_code %s, got %v (%s)", expectedCode, errorResponse["error_code"], fmt.Sprint(errorResponse["message"]))
-	}
+	return response
 }
