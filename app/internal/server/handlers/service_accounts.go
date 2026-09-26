@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -100,8 +99,8 @@ func (s *ServiceAccountHandler) RegisterServiceAccount(w http.ResponseWriter, r 
 
 	defer r.Body.Close()
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return apperrors.MalformedBody("invalid JSON body", err)
+	if err := decodeJSONBody(r, &req); err != nil {
+		return err
 	}
 
 	if req.ClientContactEmail == "" || req.ClientOrganization == "" {
@@ -243,8 +242,8 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentials(w http.Response
 
 	defer r.Body.Close()
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return apperrors.MalformedBody("invalid JSON body", err)
+	if err := decodeJSONBody(r, &req); err != nil {
+		return err
 	}
 
 	if req.ClientID == "" {

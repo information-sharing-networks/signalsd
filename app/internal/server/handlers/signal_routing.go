@@ -3,7 +3,6 @@ package handlers
 // these handlers support the management of the rules to route signals to ISNs based on their content
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -152,8 +151,8 @@ func (h *RoutingConfigHandler) UpdateSignalRoutingConfig(w http.ResponseWriter, 
 
 	defer r.Body.Close()
 	var req UpdateSignalRoutingConfigRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return apperrors.MalformedBody("invalid JSON body", nil)
+	if err := decodeJSONBody(r, &req); err != nil {
+		return err
 	}
 
 	if req.RoutingField == "" {

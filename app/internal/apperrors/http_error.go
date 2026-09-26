@@ -43,6 +43,15 @@ func MalformedBody(message string, err error) *HTTPError {
 	return &HTTPError{Status: http.StatusBadRequest, Code: ErrCodeMalformedBody, Message: message, Err: err}
 }
 
+// RequestTooLarge responds with 413 + request_too_large (the request body is larger than limit bytes).
+func RequestTooLarge(limit int64) *HTTPError {
+	return &HTTPError{
+		Status:  http.StatusRequestEntityTooLarge,
+		Code:    ErrCodeRequestTooLarge,
+		Message: fmt.Sprintf("Request body exceeds maximum size of %d bytes", limit),
+	}
+}
+
 // InvalidRequest responds with 400 + invalid_request.
 func InvalidRequest(message string, err error) *HTTPError {
 	return &HTTPError{Status: http.StatusBadRequest, Code: ErrCodeInvalidRequest, Message: message, Err: err}

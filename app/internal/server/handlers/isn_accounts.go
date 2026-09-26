@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -144,11 +143,8 @@ func (i *IsnAccountHandler) UpdateIsnAccountPermission(w http.ResponseWriter, r 
 	// validate request body
 	defer r.Body.Close()
 
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&req)
-	if err != nil {
-		return apperrors.MalformedBody("invalid JSON body", nil)
+	if err := decodeJSONBodyStrict(r, &req); err != nil {
+		return err
 	}
 
 	if req.CanRead == nil || req.CanWrite == nil {

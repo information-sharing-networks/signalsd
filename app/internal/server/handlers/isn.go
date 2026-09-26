@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -140,8 +139,8 @@ func (i *IsnHandler) CreateIsn(w http.ResponseWriter, r *http.Request) error {
 
 	defer r.Body.Close()
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return apperrors.MalformedBody("invalid JSON body", err)
+	if err := decodeJSONBody(r, &req); err != nil {
+		return err
 	}
 
 	// validate fields
@@ -278,11 +277,8 @@ func (i *IsnHandler) UpdateIsn(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	defer r.Body.Close()
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&req)
-	if err != nil {
-		return apperrors.MalformedBody("invalid JSON body", err)
+	if err := decodeJSONBodyStrict(r, &req); err != nil {
+		return err
 	}
 
 	// set up values for update
@@ -510,8 +506,8 @@ func (i *IsnHandler) TransferIsnOwnership(w http.ResponseWriter, r *http.Request
 	}
 
 	defer r.Body.Close()
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return apperrors.MalformedBody("invalid JSON body", err)
+	if err := decodeJSONBody(r, &req); err != nil {
+		return err
 	}
 
 	// validate new account ID

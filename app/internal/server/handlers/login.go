@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -60,8 +59,8 @@ func (l *LoginHandler) Login(w http.ResponseWriter, r *http.Request) error {
 
 	defer r.Body.Close()
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return apperrors.MalformedBody("invalid JSON body", err)
+	if err := decodeJSONBody(r, &req); err != nil {
+		return err
 	}
 
 	// check if the email is registered

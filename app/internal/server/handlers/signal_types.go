@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -134,8 +133,8 @@ func (s *SignalTypeHandler) CreateSignalType(w http.ResponseWriter, r *http.Requ
 	var err error
 	defer r.Body.Close()
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return apperrors.MalformedBody("invalid JSON body", err)
+	if err := decodeJSONBody(r, &req); err != nil {
+		return err
 	}
 
 	req.SchemaURL = strings.TrimSpace(req.SchemaURL)
@@ -317,8 +316,8 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchema(w http.ResponseWriter, r
 
 	defer r.Body.Close()
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return apperrors.MalformedBody("invalid JSON body", err)
+	if err := decodeJSONBody(r, &req); err != nil {
+		return err
 	}
 
 	// validate fields
@@ -501,11 +500,8 @@ func (s *SignalTypeHandler) UpdateSignalType(w http.ResponseWriter, r *http.Requ
 
 	//check body
 	defer r.Body.Close()
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&req)
-	if err != nil {
-		return apperrors.MalformedBody("invalid JSON body", err)
+	if err := decodeJSONBodyStrict(r, &req); err != nil {
+		return err
 	}
 
 	if req.Detail == nil &&
@@ -955,8 +951,8 @@ func (s *SignalTypeHandler) AddSignalTypeToISN(w http.ResponseWriter, r *http.Re
 
 	defer r.Body.Close()
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return apperrors.MalformedBody("invalid JSON body", err)
+	if err := decodeJSONBody(r, &req); err != nil {
+		return err
 	}
 
 	// Validate required fields
@@ -1106,11 +1102,8 @@ func (s *SignalTypeHandler) UpdateIsnSignalTypeStatus(w http.ResponseWriter, r *
 
 	// Check body
 	defer r.Body.Close()
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	err = decoder.Decode(&req)
-	if err != nil {
-		return apperrors.MalformedBody("invalid JSON body", err)
+	if err := decodeJSONBodyStrict(r, &req); err != nil {
+		return err
 	}
 
 	// Validate that is_in_use is present

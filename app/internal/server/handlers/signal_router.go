@@ -7,7 +7,6 @@ package handlers
 // the response and request structs are shared with signals.go (which handles standard signal submission)
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -183,8 +182,8 @@ func (s *SignalRouter) RouteSignals(w http.ResponseWriter, r *http.Request) erro
 	var req CreateSignalsRequest
 
 	// unmarshal the req body
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return apperrors.MalformedBody("invalid JSON body", nil)
+	if err := decodeJSONBody(r, &req); err != nil {
+		return err
 	}
 
 	// check for mandatory fields in request

@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -71,16 +70,13 @@ func RequestSizeLimit(maxBytes int64) func(http.Handler) http.Handler {
 					slog.Int64("max_bytes", maxBytes),
 				)
 
-				errorMsg := fmt.Sprintf("Request body exceeds maximum size of %d bytes", maxBytes)
-				responses.RenderError(w, r, &apperrors.HTTPError{
-					Status:  http.StatusRequestEntityTooLarge,
-					Code:    apperrors.ErrCodeRequestTooLarge,
-					Message: errorMsg,
-				})
+				responses.RenderError(w, r, apperrors.RequestTooLarge(maxBytes))
 				return
 			}
 
-			// Wrap the body reader to enforce the limit (if the body is larger than maxBytes, the error will be picked up in the handler that decodes the request body)
+			// Wrap the body reader to enforce the limit. Requests without a Content-Length only reach the limit when the handler
+			// reads the body - handlers must return 413 request_too_large for the resulting *http.MaxBytesError
+			// (decodeJSONBody in the handlers package does this for JSON bodies)
 			r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
 
 			next.ServeHTTP(w, r)

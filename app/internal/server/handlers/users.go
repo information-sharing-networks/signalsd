@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -72,8 +71,8 @@ func (u *UserHandler) RegisterUser(w http.ResponseWriter, r *http.Request) error
 
 	defer r.Body.Close()
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return apperrors.MalformedBody("invalid JSON body", err)
+	if err := decodeJSONBody(r, &req); err != nil {
+		return err
 	}
 
 	if req.Email == "" || req.Password == "" {
@@ -184,11 +183,8 @@ func (u *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) err
 	}
 
 	defer r.Body.Close()
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
-	err := decoder.Decode(&req)
-	if err != nil {
-		return apperrors.MalformedBody("invalid JSON body", err)
+	if err := decodeJSONBodyStrict(r, &req); err != nil {
+		return err
 	}
 
 	if req.NewPassword == "" || req.CurrentPassword == "" {
@@ -697,8 +693,8 @@ func (u *UserHandler) PasswordResetToken(w http.ResponseWriter, r *http.Request)
 	var req PasswordResetRequest
 	defer r.Body.Close()
 
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return apperrors.MalformedBody("invalid JSON body", err)
+	if err := decodeJSONBody(r, &req); err != nil {
+		return err
 	}
 
 	// Validate the new password

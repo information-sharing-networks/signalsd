@@ -516,8 +516,8 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) e
 	var req CreateSignalsRequest
 
 	// unmarshal the req body
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return apperrors.MalformedBody("invalid JSON body", nil)
+	if err := decodeJSONBody(r, &req); err != nil {
+		return err
 	}
 
 	// check for mandatory fields in request
@@ -1127,8 +1127,8 @@ func (s *SignalsHandler) WithdrawSignal(w http.ResponseWriter, r *http.Request) 
 	// Parse request body
 	var req WithdrawSignalRequest
 	defer r.Body.Close()
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		return apperrors.MalformedBody("invalid JSON body", err)
+	if err := decodeJSONBody(r, &req); err != nil {
+		return err
 	}
 
 	if req.LocalRef == nil {
