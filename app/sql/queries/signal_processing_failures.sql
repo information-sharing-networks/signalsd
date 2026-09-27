@@ -2,6 +2,7 @@
 INSERT INTO signal_processing_failures (
     id,
     signal_batch_id,
+    isn_slug,
     signal_type_slug,
     signal_type_sem_ver,
     local_ref,
@@ -9,11 +10,12 @@ INSERT INTO signal_processing_failures (
     error_message
 ) VALUES (
    uuidv7(),
-    $1, -- signal_batch_id
-    $2, -- signal_type_slug
-    $3, -- signal_type_sem_ver
-    $4, -- local_ref
-    $5, -- error_code
-    $6  -- error_message
+    sqlc.arg(signal_batch_id),
+    sqlc.narg(isn_slug), -- NULL for signals the signal router could not route to an ISN
+    sqlc.arg(signal_type_slug),
+    sqlc.arg(signal_type_sem_ver),
+    sqlc.arg(local_ref),
+    sqlc.arg(error_code),
+    sqlc.arg(error_message)
 )
 RETURNING *;

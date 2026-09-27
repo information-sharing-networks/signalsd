@@ -59,13 +59,14 @@ WHERE
 GROUP BY i.slug, st.slug, st.sem_ver;
 
 -- name: GetFailedSignalsByBatchID :many
--- Unresolved failures: failed local_refs that were not subsequently loaded successfully.
--- ISN slug is derived via signals to avoid depending on isn_id on signal_batches.
+-- Unresolved failures: failed local_refs that were not subsequently loaded successfully
+-- (including failures for signals that were never stored).
+-- isn_slug is NULL for signals the signal router could not route to an ISN.
 SELECT DISTINCT
     sb.id as batch_id,
     sb.created_at as batch_created_at,
     sb.account_id,
-    i.slug as isn_slug,
+    spf.isn_slug,
     spf.signal_type_slug,
     spf.signal_type_sem_ver,
     spf.local_ref,
@@ -73,12 +74,12 @@ SELECT DISTINCT
     spf.error_message
 FROM signal_batches sb
 JOIN signal_processing_failures spf ON spf.signal_batch_id = sb.id
-JOIN signal_types st ON st.slug = spf.signal_type_slug
+-- the signal (if it was ever stored) is only used to check whether the failure was resolved by a later version
+LEFT JOIN signal_types st ON st.slug = spf.signal_type_slug
     AND st.sem_ver = spf.signal_type_sem_ver
-JOIN signals s ON s.local_ref = spf.local_ref
+LEFT JOIN signals s ON s.local_ref = spf.local_ref
     AND s.signal_type_id = st.id
     AND s.account_id = sb.account_id
-JOIN isn i ON i.id = s.isn_id
 WHERE sb.id = $1
 AND NOT EXISTS (
         SELECT 1 FROM signal_versions sv

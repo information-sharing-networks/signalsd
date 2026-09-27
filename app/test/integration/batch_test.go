@@ -18,6 +18,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
+	"github.com/information-sharing-networks/signalsd/app/internal/server/handlers"
 )
 
 func TestBatches(t *testing.T) {
@@ -102,7 +103,9 @@ func TestBatches(t *testing.T) {
 }
 
 // TestBatchEndpoints tests the batch status and search endpoints:
-// accounts can see their own batches, and site admins can see any account's batches
+//   - accounts can see their own batches, and site admins can see any account's batches
+//   - batch status reports unresolved failures, including failures for signals that were never stored and signals
+//     the signal router could not route
 func TestBatchEndpoints(t *testing.T) {
 	ctx := context.Background()
 	testEnv := startInProcessServer(t, "")
@@ -167,10 +170,96 @@ func TestBatchEndpoints(t *testing.T) {
 		}
 	})
 
+	t.Run("failures for signals that were never stored are reported", func(t *testing.T) {
+		payload := map[string]any{
+			"batch_ref": "never-stored-batch",
+			"signals": []map[string]any{
+				{"local_ref": "never-stored-001", "content": map[string]any{"invalid_field": "no test field"}},
+			},
+		}
+		expectSubmissionResponse(t, submitCreateSignalRequest(t, testEnv.baseURL, payload, writerToken, newTestSignalEndpoint(isn, signalType)), http.StatusUnprocessableEntity)
+
+		batchStatus := expectJSONResponse(t, getBatchStatusRequest(t, testEnv.baseURL, writerToken, "never-stored-batch"), http.StatusOK)
+		failures := unresolvedFailures(t, batchStatus, isn.Slug)
+		if len(failures) != 1 || failures[0]["local_ref"] != "never-stored-001" || failures[0]["error_code"] != apperrors.ErrCodeMalformedBody.String() {
+			t.Errorf("Expected an unresolved malformed_body failure for never-stored-001, got %v", batchStatus)
+		}
+	})
+
+	t.Run("failures resolved by a later successful submission are not reported", func(t *testing.T) {
+		invalidPayload := map[string]any{
+			"batch_ref": "resolved-batch",
+			"signals": []map[string]any{
+				{"local_ref": "resolved-001", "content": map[string]any{"invalid_field": "no test field"}},
+			},
+		}
+		validPayload := map[string]any{
+			"batch_ref": "resolved-batch",
+			"signals": []map[string]any{
+				{"local_ref": "resolved-001", "content": map[string]any{"test": "fixed"}},
+			},
+		}
+		endpoint := newTestSignalEndpoint(isn, signalType)
+		expectSubmissionResponse(t, submitCreateSignalRequest(t, testEnv.baseURL, invalidPayload, writerToken, endpoint), http.StatusUnprocessableEntity)
+		expectSubmissionResponse(t, submitCreateSignalRequest(t, testEnv.baseURL, validPayload, writerToken, endpoint), http.StatusOK)
+
+		batchStatus := expectJSONResponse(t, getBatchStatusRequest(t, testEnv.baseURL, writerToken, "resolved-batch"), http.StatusOK)
+		if batchStatus["contains_failures"] != false {
+			t.Errorf("Expected contains_failures false once the failure was resolved, got %v", batchStatus)
+		}
+	})
+
+	t.Run("signals the signal router could not route are reported without an ISN", func(t *testing.T) {
+		// the only routing rule does not match the signal content, so the signal can't be routed
+		setRoutingConfig(t, testEnv, siteAdminToken, signalType, handlers.UpdateSignalRoutingConfigRequest{
+			RoutingField: "test",
+			RoutingRules: []handlers.SignalRoutingRule{
+				{MatchPattern: "*no-match*", Operator: "matches", IsnSlug: isn.Slug, Sequence: 1},
+			},
+		})
+		if err := testEnv.routerCache.Load(ctx); err != nil {
+			t.Fatalf("Failed to refresh router cache: %v", err)
+		}
+
+		payload := map[string]any{
+			"batch_ref": "unroutable-batch",
+			"signals": []map[string]any{
+				{"local_ref": "unroutable-001", "content": map[string]any{"test": "valid content"}},
+			},
+		}
+		expectSubmissionResponse(t, submitRouteSignalsRequest(t, testEnv.baseURL, payload, writerToken, signalType.Slug, signalType.SemVer), http.StatusUnprocessableEntity)
+
+		batchStatus := expectJSONResponse(t, getBatchStatusRequest(t, testEnv.baseURL, writerToken, "unroutable-batch"), http.StatusOK)
+		failures := unresolvedFailures(t, batchStatus, "")
+		if len(failures) != 1 || failures[0]["local_ref"] != "unroutable-001" {
+			t.Errorf("Expected an unresolved failure for unroutable-001 with no ISN, got %v", batchStatus)
+		}
+	})
+
 	t.Run("batch test require authentication", func(t *testing.T) {
 		response := getBatchStatusRequest(t, testEnv.baseURL, "", "test-batch")
 		expectErrorCode(t, response, http.StatusUnauthorized, apperrors.ErrCodeAuthorizationFailure)
 	})
+}
+
+// unresolvedFailures returns the unresolved failures for the ISN in a batch status response ("" for signals the router could not route)
+func unresolvedFailures(t *testing.T, batchStatus map[string]any, isnSlug string) []map[string]any {
+	t.Helper()
+
+	statuses, _ := batchStatus["batch_status"].([]any)
+	for _, s := range statuses {
+		status := s.(map[string]any)
+		if status["isn_slug"] != isnSlug {
+			continue
+		}
+		var failures []map[string]any
+		rows, _ := status["unresolved_failures"].([]any)
+		for _, row := range rows {
+			failures = append(failures, row.(map[string]any))
+		}
+		return failures
+	}
+	return nil
 }
 
 // getRequestWithToken sends a GET request with the access token

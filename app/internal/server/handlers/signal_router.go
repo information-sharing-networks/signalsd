@@ -400,10 +400,11 @@ func (s *SignalRouter) RouteSignals(w http.ResponseWriter, r *http.Request) erro
 	}
 
 	// Log per-signal failures to the processing failures table
-	recordSignalProcessingFailures(r.Context(), s.queries, batch.ID, signalTypeSlug, semVer, routeFailures)
+	// (signals that could not be routed have no ISN)
+	recordSignalProcessingFailures(r.Context(), s.queries, batch.ID, nil, signalTypeSlug, semVer, routeFailures)
 
 	for _, isnResult := range isnResults {
-		recordSignalProcessingFailures(r.Context(), s.queries, batch.ID, signalTypeSlug, semVer, isnResult.FailedSignals)
+		recordSignalProcessingFailures(r.Context(), s.queries, batch.ID, &isnResult.IsnSlug, signalTypeSlug, semVer, isnResult.FailedSignals)
 	}
 
 	// Assemble response

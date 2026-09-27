@@ -204,15 +204,15 @@ func TestDocumentUpload(t *testing.T) {
 	})
 
 	t.Run("a declared sha256 that does not match the file is rejected and recorded against the batch", func(t *testing.T) {
-		// bol-001 was stored above - the batch status endpoint only reports failures for local refs that have been stored
 		response := uploadDocumentRequest(t, testEnv.baseURL, writerToken, billOfLadingEndpoint, documentUpload{
-			batchRef: "mismatch-batch", localRef: "bol-001", sha256: sha256Hex([]byte("something else")), fileName: "bl.pdf", contentType: "application/pdf", content: amendedPDFContent,
+			batchRef: "mismatch-batch", localRef: "bol-mismatch", sha256: sha256Hex([]byte("something else")), fileName: "bl.pdf", contentType: "application/pdf", content: pdfContent,
 		})
 		expectErrorCode(t, response, http.StatusBadRequest, apperrors.ErrCodeMalformedBody)
 
 		batchStatus := expectJSONResponse(t, getBatchStatusRequest(t, testEnv.baseURL, writerToken, "mismatch-batch"), http.StatusOK)
-		if batchStatus["contains_failures"] != true {
-			t.Errorf("Expected the batch to contain failures, got %v", batchStatus)
+		failures := unresolvedFailures(t, batchStatus, isn.Slug)
+		if len(failures) != 1 || failures[0]["local_ref"] != "bol-mismatch" {
+			t.Errorf("Expected an unresolved failure for bol-mismatch, got %v", batchStatus)
 		}
 	})
 

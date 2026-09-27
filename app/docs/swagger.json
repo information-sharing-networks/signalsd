@@ -3293,6 +3293,7 @@
             "type": "object",
             "properties": {
                 "isn_slug": {
+                    "description": "empty for signals the signal router could not route to an ISN",
                     "type": "string"
                 },
                 "rejected_count": {

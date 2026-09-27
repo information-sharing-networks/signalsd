@@ -77,7 +77,7 @@ SELECT DISTINCT
     sb.id as batch_id,
     sb.created_at as batch_created_at,
     sb.account_id,
-    i.slug as isn_slug,
+    spf.isn_slug,
     spf.signal_type_slug,
     spf.signal_type_sem_ver,
     spf.local_ref,
@@ -85,12 +85,11 @@ SELECT DISTINCT
     spf.error_message
 FROM signal_batches sb
 JOIN signal_processing_failures spf ON spf.signal_batch_id = sb.id
-JOIN signal_types st ON st.slug = spf.signal_type_slug
+LEFT JOIN signal_types st ON st.slug = spf.signal_type_slug
     AND st.sem_ver = spf.signal_type_sem_ver
-JOIN signals s ON s.local_ref = spf.local_ref
+LEFT JOIN signals s ON s.local_ref = spf.local_ref
     AND s.signal_type_id = st.id
     AND s.account_id = sb.account_id
-JOIN isn i ON i.id = s.isn_id
 WHERE sb.id = $1
 AND NOT EXISTS (
         SELECT 1 FROM signal_versions sv
@@ -103,7 +102,7 @@ type GetFailedSignalsByBatchIDRow struct {
 	BatchID          uuid.UUID `json:"batch_id"`
 	BatchCreatedAt   time.Time `json:"batch_created_at"`
 	AccountID        uuid.UUID `json:"account_id"`
-	IsnSlug          string    `json:"isn_slug"`
+	IsnSlug          *string   `json:"isn_slug"`
 	SignalTypeSlug   string    `json:"signal_type_slug"`
 	SignalTypeSemVer string    `json:"signal_type_sem_ver"`
 	LocalRef         string    `json:"local_ref"`
@@ -111,8 +110,10 @@ type GetFailedSignalsByBatchIDRow struct {
 	ErrorMessage     string    `json:"error_message"`
 }
 
-// Unresolved failures: failed local_refs that were not subsequently loaded successfully.
-// ISN slug is derived via signals to avoid depending on isn_id on signal_batches.
+// Unresolved failures: failed local_refs that were not subsequently loaded successfully
+// (including failures for signals that were never stored).
+// isn_slug is NULL for signals the signal router could not route to an ISN.
+// the signal (if it was ever stored) is only used to check whether the failure was resolved by a later version
 func (q *Queries) GetFailedSignalsByBatchID(ctx context.Context, id uuid.UUID) ([]GetFailedSignalsByBatchIDRow, error) {
 	rows, err := q.db.Query(ctx, GetFailedSignalsByBatchID, id)
 	if err != nil {

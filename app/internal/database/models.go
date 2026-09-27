@@ -150,6 +150,7 @@ type SignalProcessingFailure struct {
 	LocalRef         string    `json:"local_ref"`
 	ErrorCode        string    `json:"error_code"`
 	ErrorMessage     string    `json:"error_message"`
+	IsnSlug          *string   `json:"isn_slug"`
 }
 
 type SignalRoutingConfig struct {

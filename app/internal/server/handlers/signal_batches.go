@@ -35,7 +35,7 @@ type FailureRow struct {
 
 // BatchStatus summarises stored and failed signals for one ISN + signal type combination within a batch
 type BatchStatus struct {
-	IsnSlug            string       `json:"isn_slug"`
+	IsnSlug            string       `json:"isn_slug"` // empty for signals the signal router could not route to an ISN
 	SignalTypeSlug     string       `json:"signal_type_slug"`
 	SignalTypeVersion  string       `json:"signal_type_version"`
 	StoredCount        int64        `json:"stored_count"`
@@ -165,10 +165,15 @@ func (s *SignalsBatchHandler) getBatchStatusDetails(ctx context.Context, batchID
 	}
 
 	for _, row := range failedRows {
-		key := row.IsnSlug + "/" + row.SignalTypeSlug + "/" + row.SignalTypeSemVer
+		// failures for signals the signal router could not route to an ISN have no ISN (reported with an empty isn_slug)
+		isnSlug := ""
+		if row.IsnSlug != nil {
+			isnSlug = *row.IsnSlug
+		}
+		key := isnSlug + "/" + row.SignalTypeSlug + "/" + row.SignalTypeSemVer
 		status := batchSummary[key]
 		if status.SignalTypeSlug == "" {
-			status.IsnSlug = row.IsnSlug
+			status.IsnSlug = isnSlug
 			status.SignalTypeSlug = row.SignalTypeSlug
 			status.SignalTypeVersion = "v" + row.SignalTypeSemVer
 		}

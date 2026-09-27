@@ -259,7 +259,7 @@ func (h *DocumentsHandler) UploadDocument(w http.ResponseWriter, r *http.Request
 	)
 
 	reject := func(uploadErr *apperrors.HTTPError) error {
-		recordSignalProcessingFailures(ctx, h.queries, batch.ID, signalTypeSlug, semVer, []FailedSignal{{
+		recordSignalProcessingFailures(ctx, h.queries, batch.ID, &isnSlug, signalTypeSlug, semVer, []FailedSignal{{
 			LocalRef:     localRef,
 			ErrorCode:    uploadErr.Code.String(),
 			ErrorMessage: uploadErr.Message,

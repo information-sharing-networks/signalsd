@@ -15,6 +15,7 @@ const CreateSignalProcessingFailureDetail = `-- name: CreateSignalProcessingFail
 INSERT INTO signal_processing_failures (
     id,
     signal_batch_id,
+    isn_slug,
     signal_type_slug,
     signal_type_sem_ver,
     local_ref,
@@ -22,18 +23,20 @@ INSERT INTO signal_processing_failures (
     error_message
 ) VALUES (
    uuidv7(),
-    $1, -- signal_batch_id
-    $2, -- signal_type_slug
-    $3, -- signal_type_sem_ver
-    $4, -- local_ref
-    $5, -- error_code
-    $6  -- error_message
+    $1,
+    $2, -- NULL for signals the signal router could not route to an ISN
+    $3,
+    $4,
+    $5,
+    $6,
+    $7
 )
-RETURNING id, created_at, signal_batch_id, signal_type_slug, signal_type_sem_ver, local_ref, error_code, error_message
+RETURNING id, created_at, signal_batch_id, signal_type_slug, signal_type_sem_ver, local_ref, error_code, error_message, isn_slug
 `
 
 type CreateSignalProcessingFailureDetailParams struct {
 	SignalBatchID    uuid.UUID `json:"signal_batch_id"`
+	IsnSlug          *string   `json:"isn_slug"`
 	SignalTypeSlug   string    `json:"signal_type_slug"`
 	SignalTypeSemVer string    `json:"signal_type_sem_ver"`
 	LocalRef         string    `json:"local_ref"`
@@ -44,6 +47,7 @@ type CreateSignalProcessingFailureDetailParams struct {
 func (q *Queries) CreateSignalProcessingFailureDetail(ctx context.Context, arg CreateSignalProcessingFailureDetailParams) (SignalProcessingFailure, error) {
 	row := q.db.QueryRow(ctx, CreateSignalProcessingFailureDetail,
 		arg.SignalBatchID,
+		arg.IsnSlug,
 		arg.SignalTypeSlug,
 		arg.SignalTypeSemVer,
 		arg.LocalRef,
@@ -60,6 +64,7 @@ func (q *Queries) CreateSignalProcessingFailureDetail(ctx context.Context, arg C
 		&i.LocalRef,
 		&i.ErrorCode,
 		&i.ErrorMessage,
+		&i.IsnSlug,
 	)
 	return i, err
 }

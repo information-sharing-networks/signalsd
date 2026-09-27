@@ -127,13 +127,16 @@ type FailedSignal struct {
 // recordSignalProcessingFailures writes the details of the signals that could not be stored to the
 // signal_processing_failures table (these are reported by the batch status endpoint).
 //
+// isnSlug is the ISN the signals were sent to (nil for signals the signal router could not route to an ISN).
+//
 // The signals in the batch have already been processed by the time this is called, so a failure to write
 // the detail is logged rather than returned - the caller still reports the outcome to the client.
-// Used by both the direct signal post and the signals router.
-func recordSignalProcessingFailures(ctx context.Context, queries *database.Queries, batchID uuid.UUID, signalTypeSlug string, semVer string, failedSignals []FailedSignal) {
+// Used by the direct signal post, the signals router and the document upload.
+func recordSignalProcessingFailures(ctx context.Context, queries *database.Queries, batchID uuid.UUID, isnSlug *string, signalTypeSlug string, semVer string, failedSignals []FailedSignal) {
 	for _, failed := range failedSignals {
 		_, err := queries.CreateSignalProcessingFailureDetail(ctx, database.CreateSignalProcessingFailureDetailParams{
 			SignalBatchID:    batchID,
+			IsnSlug:          isnSlug,
 			SignalTypeSlug:   signalTypeSlug,
 			SignalTypeSemVer: semVer,
 			LocalRef:         failed.LocalRef,
@@ -768,7 +771,7 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) e
 	}
 
 	// Log individual failures for batch tracking
-	recordSignalProcessingFailures(r.Context(), s.queries, batch.ID, signalTypeSlug, semVer, result.FailedSignals)
+	recordSignalProcessingFailures(r.Context(), s.queries, batch.ID, &isnSlug, signalTypeSlug, semVer, result.FailedSignals)
 
 	createSignalsResponse.Results = []IsnResult{result}
 
