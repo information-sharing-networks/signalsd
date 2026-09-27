@@ -1520,7 +1520,7 @@ paths:
   /api/admin/reset:
     post:
       description: |-
-        Delete all registered users and associated data.
+        Delete all registered users, signal types and associated data.
         This endpoint only works on environments configured as 'dev'
       responses:
         "200":

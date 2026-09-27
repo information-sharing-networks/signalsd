@@ -378,7 +378,7 @@
         },
         "/api/admin/reset": {
             "post": {
-                "description": "Delete all registered users and associated data.\nThis endpoint only works on environments configured as 'dev'",
+                "description": "Delete all registered users, signal types and associated data.\nThis endpoint only works on environments configured as 'dev'",
                 "tags": [
                     "Site Admin"
                 ],

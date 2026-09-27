@@ -75,7 +75,7 @@ type AccountStatusResponse struct {
 // ResetEnv godoc
 //
 //	@Summary		Site Reset
-//	@Description	Delete all registered users and associated data.
+//	@Description	Delete all registered users, signal types and associated data.
 //	@Description	This endpoint only works on environments configured as 'dev'
 //	@Tags			Site Admin
 //
@@ -85,13 +85,39 @@ type AccountStatusResponse struct {
 //
 //	@Router			/api/admin/reset [post]
 func (a *AdminHandler) ResetEnv(w http.ResponseWriter, r *http.Request) error {
-
-	deletedAccountsCount, err := a.queries.DeleteAccounts(r.Context())
+	tx, err := a.pool.BeginTx(r.Context(), pgx.TxOptions{})
 	if err != nil {
 		return apperrors.DatabaseError("database error", err)
 	}
+
+	defer func() {
+		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
+			logger.ContextWithLogAttrs(r.Context(),
+				slog.String("rollback_error", err.Error()),
+			)
+		}
+	}()
+
+	txQueries := a.queries.WithTx(tx)
+
+	// deleting the accounts deletes everything the accounts own (users, ISNs, signals, documents...)
+	deletedAccountsCount, err := txQueries.DeleteAccounts(r.Context())
+	if err != nil {
+		return apperrors.DatabaseError("database error", err)
+	}
+
+	// signal types are not owned by an account so are deleted separately (this also deletes their routing configs)
+	deletedSignalTypesCount, err := txQueries.DeleteSignalTypes(r.Context())
+	if err != nil {
+		return apperrors.DatabaseError("database error", err)
+	}
+
+	if err := tx.Commit(r.Context()); err != nil {
+		return apperrors.DatabaseError("database error", err)
+	}
+
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(fmt.Appendf(nil, "%d accounts deleted", deletedAccountsCount))
+	_, _ = w.Write(fmt.Appendf(nil, "%d accounts and %d signal types deleted", deletedAccountsCount, deletedSignalTypesCount))
 	return nil
 }
 

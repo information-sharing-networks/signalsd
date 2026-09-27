@@ -20,3 +20,16 @@ func (q *Queries) DeleteAccounts(ctx context.Context) (int64, error) {
 	}
 	return result.RowsAffected(), nil
 }
+
+const DeleteSignalTypes = `-- name: DeleteSignalTypes :execrows
+DELETE FROM signal_types
+`
+
+// signal types are not owned by an account, so they are not deleted by the DeleteAccounts cascade
+func (q *Queries) DeleteSignalTypes(ctx context.Context) (int64, error) {
+	result, err := q.db.Exec(ctx, DeleteSignalTypes)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
