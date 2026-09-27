@@ -65,6 +65,10 @@ func TestDocumentUpload(t *testing.T) {
 		})
 		upload := expectUploadResponse(t, response, http.StatusOK)
 
+		if upload.IsnSlug != isn.Slug {
+			t.Errorf("Expected isn_slug %s, got %s", isn.Slug, upload.IsnSlug)
+		}
+
 		if upload.SHA256 != sha256Hex(pdfContent) {
 			t.Errorf("Expected sha256 %s, got %s", sha256Hex(pdfContent), upload.SHA256)
 		}

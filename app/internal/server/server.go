@@ -396,17 +396,28 @@ func (s *Server) registerSignalWriteRoutes() {
 		r.Get("/api/batches/{batch_ref}/status", responses.Wrap(signalBatches.GetSignalBatchStatus))
 	})
 
-	// document upload - the handler limits the document to MAX_DOCUMENT_SIZE.
-	// The request size limit allows an extra 64KB for the form fields and multipart headers sent with the document.
+	// document uploads - the request size limit allows for the form fields sent with the document.
 	// Uploads are given DOCUMENT_TRANSFER_TIMEOUT.
 	s.router.Group(func(r chi.Router) {
 		r.Use(middleware.ExtendRequestTimeout(s.config.DocumentTransferTimeout))
 		r.Use(middleware.CORS(s.corsConfigs.Protected))
-		r.Use(middleware.RequestSizeLimit(s.config.MaxDocumentSize + 64*1024))
+		r.Use(middleware.RequestSizeLimit(handlers.MaxUploadRequestSize(s.config.MaxDocumentSize)))
 		r.Use(s.authService.RequireValidAccessToken)
 		r.Use(s.authService.RequireAccessPermission("write"))
 
 		r.Post("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/upload", responses.Wrap(documents.UploadDocument))
+	})
+
+	// router document upload: the ISN is resolved from the correlation_id, not from the URL.
+	// RequireAccessPermission("write") is NOT used here - permission is checked in-handler
+	// after ISN resolution, via auth.CheckIsnWritePermission.
+	s.router.Group(func(r chi.Router) {
+		r.Use(middleware.ExtendRequestTimeout(s.config.DocumentTransferTimeout))
+		r.Use(middleware.CORS(s.corsConfigs.Protected))
+		r.Use(middleware.RequestSizeLimit(handlers.MaxUploadRequestSize(s.config.MaxDocumentSize)))
+		r.Use(s.authService.RequireValidAccessToken)
+
+		r.Post("/api/router/signal-types/{signal_type_slug}/v{sem_ver}/signals/upload", responses.Wrap(documents.RouteDocument))
 	})
 
 	// Router signal endpoint: ISN is resolved by routing rules, not from the URL.

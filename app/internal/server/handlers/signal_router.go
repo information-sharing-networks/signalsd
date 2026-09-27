@@ -63,8 +63,9 @@ type resolvedSignal struct {
 //
 //	@Tags			Signal Exchange
 //
-//	@Description	Submit signals without specifying a target ISN. The router resolves the target ISN
+//	@Description	Submit JSON signals without specifying a target ISN. The router resolves the target ISN
 //	@Description	for each signal using configured routing rules, or via correlation ID if supplied.
+//	@Description	(documents are sent to document signal types with _Upload a Document via Router_)
 //	@Description
 //	@Description	**ISN resolution by correlation ID**
 //	@Description
@@ -162,8 +163,7 @@ func (s *SignalRouter) RouteSignals(w http.ResponseWriter, r *http.Request) erro
 	semVer := r.PathValue("sem_ver")
 	signalTypePath := fmt.Sprintf("%s/v%s", signalTypeSlug, semVer)
 
-	// TODO to decide handling of routing correlated signals.
-	// only json signal types can be submitted to this endpoint
+	// only json signal types can be submitted to this endpoint (documents are routed by DocumentsHandler.RouteDocument)
 	if err := s.schemaCache.CheckContentKind(signalTypePath, signalsd.ContentKindJSON); err != nil {
 		return apperrors.InvalidURLParam(err.Error(), nil)
 	}

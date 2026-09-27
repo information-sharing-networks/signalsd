@@ -32,8 +32,19 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// maxFormFieldSize is the maximum size of the form fields sent with a document (batch_ref, local_ref, correlation_id, sha256)
+// maxFormFieldSize is the maximum size of the form fields sent with a document (batch_ref, local_ref, correlation_id, sha256).
+// Each field is read into memory, so this stops a malicious client using large field values to exhaust the server's memory
 const maxFormFieldSize = 1024
+
+// uploadRequestOverhead allows for the form fields and multipart headers sent with the document -
+// the request size limit for uploads is MAX_DOCUMENT_SIZE plus this
+// (the document itself is limited to MAX_DOCUMENT_SIZE by storeDocument)
+const uploadRequestOverhead = 64 * 1024
+
+// MaxUploadRequestSize is the request size limit for the document upload routes
+func MaxUploadRequestSize(maxDocumentSize int64) int64 {
+	return maxDocumentSize + uploadRequestOverhead
+}
 
 var sha256Regexp = regexp.MustCompile(`^[a-f0-9]{64}$`)
 
@@ -74,6 +85,7 @@ type DocumentMetadata struct {
 
 // DocumentUploadResponse describes the stored document signal version
 type DocumentUploadResponse struct {
+	IsnSlug         string    `json:"isn_slug" example:"sample-isn"` // the ISN the document was stored on
 	BatchRef        string    `json:"batch_ref" example:"daily-sync-2026-04-02"`
 	LocalRef        string    `json:"local_ref" example:"bol-2026-0042"`
 	SignalID        uuid.UUID `json:"signal_id" example:"b8ded113-ac0e-4a2c-a89f-0876fe97b440"`
@@ -141,6 +153,7 @@ type DocumentUploadResponse struct {
 //	@Description	**Optional fields**
 //	@Description	- correlation_id: the ID of a signal of any type in the same ISN that this document relates to (e.g. the consignment a bill of lading belongs to).
 //	@Description	The upload is rejected with 422 invalid_correlation_id if the signal does not exist in the ISN.
+//	@Description	(To send a document to the ISN of the signal it relates to without specifying the ISN, use _Upload a Document via Router_.)
 //	@Description	- sha256: the sha256 of the document as lowercase hex, computed by the sender before uploading. If it does not match the uploaded file the upload is rejected with 400 malformed_body and no version is created.
 //	@Description	Use it to confirm the document stored is exactly the one you sent. If it is omitted, the sha256 computed by the server is returned in the response and can be used to check the upload afterwards.
 //
@@ -170,132 +183,285 @@ type DocumentUploadResponse struct {
 //
 // This function should be called after the RequireAccessPermission middleware has checked the account has write permission for the ISN.
 func (h *DocumentsHandler) UploadDocument(w http.ResponseWriter, r *http.Request) error {
+	isnSlug := r.PathValue("isn_slug")
+
+	upload, err := h.readUploadFields(r)
+	if err != nil {
+		return err
+	}
+
+	if err := h.startBatch(r.Context(), upload); err != nil {
+		return err
+	}
+
+	return h.storeDocument(w, r, upload, isnSlug)
+}
+
+// RouteDocument godoc
+//
+//	@Summary		Upload a Document via Router
+//	@Tags			Signal Exchange
+//
+//	@Description	Upload a document without specifying the target ISN: the document is sent to the ISN of the signal it is correlated with
+//	@Description	(e.g. a bill of lading is sent to the ISN that received its consignment).
+//	@Description
+//	@Description	correlation_id is required - routing rules are not used for documents (they match on fields in JSON signals).
+//	@Description	The upload is rejected with 422 invalid_correlation_id if the correlated signal is not found,
+//	@Description	and with 403 forbidden if the account does not have write permission on the correlated signal's ISN.
+//	@Description
+//	@Description	Other than the ISN resolution, this endpoint behaves the same way as the standard _Upload a Document_ endpoint
+//	@Description	(request format, supported formats, versions and the optional sha256 field).
+//	@Description
+//	@Description	The response includes the isn_slug of the ISN the document was sent to.
+//
+//	@Accept			multipart/form-data
+//	@Param			signal_type_slug	path		string	true	"signal type slug"	example(bill-of-lading)
+//	@Param			sem_ver				path		string	true	"version"			example(1.0.0)
+//	@Param			batch_ref			formData	string	true	"batch reference (up to 128 alphanumeric characters, hyphens and underscores)"
+//	@Param			local_ref			formData	string	true	"your reference for the document"
+//	@Param			correlation_id		formData	string	true	"the ID of the signal this document relates to - the document is sent to the same ISN"
+//	@Param			sha256				formData	string	false	"the sha256 of the document (lowercase hex) - the upload is rejected if it does not match"
+//	@Param			file				formData	file	true	"the document (must be the last part of the request)"
+//
+//	@Success		200					{object}	handlers.DocumentUploadResponse
+//	@Failure		400					{object}	responses.ErrorResponse	"malformed_body | invalid_url_param"
+//	@Failure		401					{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		403					{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		404					{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		413					{object}	responses.ErrorResponse	"request_too_large"
+//	@Failure		415					{object}	responses.ErrorResponse	"unsupported_media_type"
+//	@Failure		422					{object}	responses.ErrorResponse	"invalid_correlation_id"
+//	@Failure		500					{object}	responses.ErrorResponse	"database_error | internal_error"
+//
+//	@Security		BearerAccessToken
+//
+//	@Router			/api/router/signal-types/{signal_type_slug}/v{sem_ver}/signals/upload [post]
+//
+// This handler should be used with RequireValidAccessToken middleware.
+// It can't be used with RequireAccessPermission since the ISN is not in the URL - the handler checks the write permission
+// against the claims once the ISN has been resolved.
+func (h *DocumentsHandler) RouteDocument(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 
-	isnSlug := r.PathValue("isn_slug")
-	signalTypeSlug := r.PathValue("signal_type_slug")
-	semVer := r.PathValue("sem_ver")
-	signalTypePath := fmt.Sprintf("%v/v%v", signalTypeSlug, semVer)
-
-	// only document signal types can be uploaded to this endpoint
-	if err := h.schemaCache.CheckContentKind(signalTypePath, signalsd.ContentKindDocument); err != nil {
-		return apperrors.InvalidURLParam(err.Error(), nil)
-	}
-
-	accountID, ok := auth.ContextAccountID(ctx)
+	claims, ok := auth.ContextClaims(ctx)
 	if !ok {
-		return apperrors.InternalError("could not get accountID from context", nil)
+		return apperrors.InternalError("could not get claims from context", nil)
 	}
 
-	// 1. read the form fields - they must be sent before the file, so the request can be checked before the document is read
+	upload, err := h.readUploadFields(r)
+	if err != nil {
+		return err
+	}
+
+	if upload.correlationID == nil {
+		return apperrors.MalformedBody("correlation_id is required - the document is sent to the ISN of the correlated signal", nil)
+	}
+
+	if err := h.startBatch(ctx, upload); err != nil {
+		return err
+	}
+
+	// resolve the ISN from the correlated signal (failures are recorded without an ISN, as with unroutable json signals)
+	isn, err := h.queries.GetIsnBySignalID(ctx, *upload.correlationID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return h.recordFailure(ctx, upload, nil, apperrors.InvalidCorrelationID(fmt.Sprintf("correlation_id %v not found or its ISN is not in use", *upload.correlationID), nil))
+		}
+		return h.recordFailure(ctx, upload, nil, apperrors.DatabaseError("database error", err))
+	}
+
+	// check the account can write this signal type to the ISN (the checks RequireAccessPermission does for the ISN upload endpoint)
+	if err := auth.CheckIsnWritePermission(claims, isn.Slug, upload.signalTypePath()); err != nil {
+		permissionErr, ok := errors.AsType[*apperrors.HTTPError](err)
+		if !ok {
+			permissionErr = apperrors.InternalError("could not check the ISN permissions", err)
+		}
+		return h.recordFailure(ctx, upload, &isn.Slug, permissionErr)
+	}
+
+	logger.ContextWithLogAttrs(ctx,
+		slog.String("isn_slug", isn.Slug),
+	)
+
+	return h.storeDocument(w, r, upload, isn.Slug)
+}
+
+// documentUpload is an upload request whose form fields have been read.
+// The file has not been read yet - storeDocument reads it from filePart.
+type documentUpload struct {
+	accountID      uuid.UUID
+	signalTypeSlug string
+	semVer         string
+	batchRef       string
+	localRef       string
+	correlationID  *uuid.UUID
+	declaredSHA256 string
+
+	// batch is set by startBatch
+	batch database.UpsertSignalBatchRow
+
+	multipartReader *multipart.Reader
+	filePart        *multipart.Part
+}
+
+func (u *documentUpload) signalTypePath() string {
+	return fmt.Sprintf("%v/v%v", u.signalTypeSlug, u.semVer)
+}
+
+// readUploadFields checks the signal type is a document type and reads the form fields sent before the file.
+// The form fields must be sent before the file, so the request can be checked before the document is read.
+func (h *DocumentsHandler) readUploadFields(r *http.Request) (*documentUpload, error) {
+	upload := &documentUpload{
+		signalTypeSlug: r.PathValue("signal_type_slug"),
+		semVer:         r.PathValue("sem_ver"),
+	}
+
+	// only document signal types can be uploaded
+	if err := h.schemaCache.CheckContentKind(upload.signalTypePath(), signalsd.ContentKindDocument); err != nil {
+		return nil, apperrors.InvalidURLParam(err.Error(), nil)
+	}
+
+	accountID, ok := auth.ContextAccountID(r.Context())
+	if !ok {
+		return nil, apperrors.InternalError("could not get accountID from context", nil)
+	}
+	upload.accountID = accountID
+
 	multipartReader, err := r.MultipartReader()
 	if err != nil {
-		return apperrors.MalformedBody("the request must be multipart/form-data", err)
+		return nil, apperrors.MalformedBody("the request must be multipart/form-data", err)
 	}
+	upload.multipartReader = multipartReader
 
-	var batchRef, localRef, correlationIDValue, declaredSHA256 string
-	var filePart *multipart.Part
-	for filePart == nil {
+	// read the form fields until the file part (or the end of the request) is reached
+	var correlationIDValue string
+	for {
 		part, err := multipartReader.NextPart()
 		if errors.Is(err, io.EOF) {
-			break
+			break // no file was sent
 		}
 		if err != nil {
-			return requestReadError(err)
+			if maxBytesErr, ok := errors.AsType[*http.MaxBytesError](err); ok {
+				return nil, apperrors.RequestTooLarge(maxBytesErr.Limit)
+			}
+			return nil, apperrors.MalformedBody("the request could not be read", err)
 		}
 
 		if part.FormName() == "file" {
-			filePart = part
-			break
+			upload.filePart = part
+			break // the file is read by storeDocument
 		}
 
 		value, err := io.ReadAll(io.LimitReader(part, maxFormFieldSize+1))
 		if err != nil {
-			return requestReadError(err)
+			if maxBytesErr, ok := errors.AsType[*http.MaxBytesError](err); ok {
+				return nil, apperrors.RequestTooLarge(maxBytesErr.Limit)
+			}
+			return nil, apperrors.MalformedBody("the request could not be read", err)
 		}
 		if len(value) > maxFormFieldSize {
-			return apperrors.MalformedBody(fmt.Sprintf("form field %q is longer than %d bytes", part.FormName(), maxFormFieldSize), nil)
+			return nil, apperrors.MalformedBody(fmt.Sprintf("form field %q is longer than %d bytes", part.FormName(), maxFormFieldSize), nil)
 		}
 
 		switch part.FormName() {
 		case "batch_ref":
-			batchRef = string(value)
+			upload.batchRef = string(value)
 		case "local_ref":
-			localRef = string(value)
+			upload.localRef = string(value)
 		case "correlation_id":
 			correlationIDValue = string(value)
 		case "sha256":
-			declaredSHA256 = strings.ToLower(string(value))
+			upload.declaredSHA256 = strings.ToLower(string(value))
 		default:
-			return apperrors.MalformedBody(fmt.Sprintf("unexpected form field %q", part.FormName()), nil)
+			return nil, apperrors.MalformedBody(fmt.Sprintf("unexpected form field %q", part.FormName()), nil)
 		}
 	}
 
-	if batchRef == "" {
-		return apperrors.MalformedBody("batch_ref is required (form fields must be sent before the file)", nil)
+	if upload.batchRef == "" {
+		return nil, apperrors.MalformedBody("batch_ref is required (form fields must be sent before the file)", nil)
 	}
 
-	if !batchRefRegexp.MatchString(batchRef) {
-		return apperrors.MalformedBody("batch_ref must be less than 128 characters and can only contain alphanumeric characters, hyphens, and underscores", nil)
+	if !batchRefRegexp.MatchString(upload.batchRef) {
+		return nil, apperrors.MalformedBody("batch_ref must be less than 128 characters and can only contain alphanumeric characters, hyphens, and underscores", nil)
 	}
 
-	if localRef == "" {
-		return apperrors.MalformedBody("local_ref is required (form fields must be sent before the file)", nil)
+	if upload.localRef == "" {
+		return nil, apperrors.MalformedBody("local_ref is required (form fields must be sent before the file)", nil)
 	}
 
-	var correlationID *uuid.UUID
 	if correlationIDValue != "" {
-		parsed, err := uuid.Parse(correlationIDValue)
+		correlationID, err := uuid.Parse(correlationIDValue)
 		if err != nil {
-			return apperrors.MalformedBody("correlation_id is not a valid UUID", nil)
+			return nil, apperrors.MalformedBody("correlation_id is not a valid UUID", nil)
 		}
-		correlationID = &parsed
+		upload.correlationID = &correlationID
 	}
 
-	if declaredSHA256 != "" && !sha256Regexp.MatchString(declaredSHA256) {
-		return apperrors.MalformedBody("sha256 must be 64 hex characters", nil)
+	if upload.declaredSHA256 != "" && !sha256Regexp.MatchString(upload.declaredSHA256) {
+		return nil, apperrors.MalformedBody("sha256 must be 64 hex characters", nil)
 	}
 
-	if filePart == nil {
-		return apperrors.MalformedBody("file is required", nil)
+	if upload.filePart == nil {
+		return nil, apperrors.MalformedBody("file is required", nil)
 	}
 
-	if filePart.FileName() == "" {
-		return apperrors.MalformedBody("the file part must include a filename", nil)
+	if upload.filePart.FileName() == "" {
+		return nil, apperrors.MalformedBody("the file part must include a filename", nil)
 	}
 
-	// start the batch (a new batch is started if the batch ref has not been received previously).
-	// From here on, rejected uploads are recorded against the batch so they are reported by the batch status endpoint.
+	return upload, nil
+}
+
+// startBatch starts the batch (a new batch is started if the batch ref has not been received previously).
+// From here on, rejected uploads are recorded against the batch so they are reported by the batch status endpoint.
+func (h *DocumentsHandler) startBatch(ctx context.Context, upload *documentUpload) error {
 	batch, err := h.queries.UpsertSignalBatch(ctx, database.UpsertSignalBatchParams{
-		BatchRef:  batchRef,
-		AccountID: accountID,
+		BatchRef:  upload.batchRef,
+		AccountID: upload.accountID,
 	})
 	if err != nil {
 		return apperrors.DatabaseError("database error", err)
 	}
+	upload.batch = batch
 
 	logger.ContextWithLogAttrs(ctx,
 		slog.String("batch_ref", batch.BatchRef),
-		slog.String("local_ref", localRef),
+		slog.String("local_ref", upload.localRef),
 	)
+	return nil
+}
+
+// recordFailure records a rejected upload against the batch and returns the error.
+// isnSlug is nil if the ISN is not known (a routed upload whose ISN could not be resolved).
+func (h *DocumentsHandler) recordFailure(ctx context.Context, upload *documentUpload, isnSlug *string, uploadErr *apperrors.HTTPError) error {
+	recordSignalProcessingFailures(ctx, h.queries, upload.batch.ID, isnSlug, upload.signalTypeSlug, upload.semVer, []FailedSignal{{
+		LocalRef:     upload.localRef,
+		ErrorCode:    uploadErr.Code.String(),
+		ErrorMessage: uploadErr.Message,
+	}})
+	return uploadErr
+}
+
+// storeDocument reads the file, stores it and creates the document signal version on the ISN.
+// The account's write permission on the ISN must have been checked.
+func (h *DocumentsHandler) storeDocument(w http.ResponseWriter, r *http.Request, upload *documentUpload, isnSlug string) error {
+	ctx := r.Context()
 
 	reject := func(uploadErr *apperrors.HTTPError) error {
-		recordSignalProcessingFailures(ctx, h.queries, batch.ID, &isnSlug, signalTypeSlug, semVer, []FailedSignal{{
-			LocalRef:     localRef,
-			ErrorCode:    uploadErr.Code.String(),
-			ErrorMessage: uploadErr.Message,
-		}})
-		return uploadErr
+		return h.recordFailure(ctx, upload, &isnSlug, uploadErr)
 	}
 
 	// limit the size of the document (the request size limit also allows for the form fields and multipart headers)
-	file := bufio.NewReader(http.MaxBytesReader(w, filePart, h.maxDocumentSize))
+	file := bufio.NewReader(http.MaxBytesReader(w, upload.filePart, h.maxDocumentSize))
 
-	// 2. detect the type of document from its content - only supported document formats can be uploaded.
+	// 1. detect the type of document from its content - only supported document formats can be uploaded.
 	// The Content-Type declared by the client is ignored (it can't be trusted, and many clients send application/octet-stream)
 	start, err := file.Peek(512)
 	if err != nil && !errors.Is(err, io.EOF) {
-		return reject(requestReadError(err))
+		if maxBytesErr, ok := errors.AsType[*http.MaxBytesError](err); ok {
+			return reject(apperrors.RequestTooLarge(maxBytesErr.Limit))
+		}
+		return reject(apperrors.MalformedBody("the request could not be read", err))
 	}
 	if len(start) == 0 {
 		return reject(apperrors.MalformedBody("the file is empty", nil))
@@ -311,14 +477,14 @@ func (h *DocumentsHandler) UploadDocument(w http.ResponseWriter, r *http.Request
 	}
 
 	// the filename extension must match the format
-	extension := strings.ToLower(filepath.Ext(filePart.FileName()))
+	extension := strings.ToLower(filepath.Ext(upload.filePart.FileName()))
 	if !slices.Contains(allowedExtensions, extension) {
 		return reject(apperrors.MalformedBody(fmt.Sprintf("the filename extension %q does not match the document format %s (use %s)",
 			extension, mimeType, strings.Join(allowedExtensions, " or ")), nil))
 	}
 
-	// 3. store the document - the store computes the sha256 as it reads
-	key, size, err := h.documentStore.Put(ctx, accountID, file)
+	// 2. store the document - the store computes the sha256 as it reads
+	key, size, err := h.documentStore.Put(ctx, upload.accountID, file)
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
 			return err // the client went away (reported as 499)
@@ -333,23 +499,23 @@ func (h *DocumentsHandler) UploadDocument(w http.ResponseWriter, r *http.Request
 	}
 
 	// the file must be the last part (fields sent after the file would otherwise be ignored)
-	if _, err := multipartReader.NextPart(); !errors.Is(err, io.EOF) {
+	if _, err := upload.multipartReader.NextPart(); !errors.Is(err, io.EOF) {
 		return reject(apperrors.MalformedBody("the file must be the last part of the request", err))
 	}
 
-	// 4. check the declared sha256 (on a mismatch the content stays stored under its real sha256 - this is harmless)
-	if declaredSHA256 != "" && declaredSHA256 != key.SHA256 {
+	// 3. check the declared sha256 (on a mismatch the content stays stored under its real sha256 - this is harmless)
+	if upload.declaredSHA256 != "" && upload.declaredSHA256 != key.SHA256 {
 		return reject(apperrors.MalformedBody(fmt.Sprintf("the declared sha256 does not match the file (the sha256 of the file is %s)", key.SHA256), nil))
 	}
 
 	documentMetadata := DocumentMetadata{
-		Name:      filePart.FileName(),
+		Name:      upload.filePart.FileName(),
 		MimeType:  mimeType,
 		SizeBytes: size,
 		SHA256:    key.SHA256,
 	}
 
-	// 5. create the signal version (the content is always stored before the signal that refers to it)
+	// 4. create the signal version (the content is always stored before the signal that refers to it)
 	tx, err := h.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return reject(apperrors.DatabaseError("database error", err))
@@ -361,15 +527,15 @@ func (h *DocumentsHandler) UploadDocument(w http.ResponseWriter, r *http.Request
 	// if the upload is the same as the latest version (the same file with the same name), return that version rather than creating a new one.
 	// Withdrawn signals and changes to the correlation_id always create a new version (as with json signals).
 	latest, err := queries.GetLatestSignalVersionByLocalRef(ctx, database.GetLatestSignalVersionByLocalRefParams{
-		AccountID:      accountID,
-		SignalTypeSlug: signalTypeSlug,
-		SemVer:         semVer,
-		LocalRef:       localRef,
+		AccountID:      upload.accountID,
+		SignalTypeSlug: upload.signalTypeSlug,
+		SemVer:         upload.semVer,
+		LocalRef:       upload.localRef,
 	})
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return reject(apperrors.DatabaseError("database error", err))
 	}
-	if err == nil && !latest.IsWithdrawn && (correlationID == nil || *correlationID == latest.CorrelationID) {
+	if err == nil && !latest.IsWithdrawn && (upload.correlationID == nil || *upload.correlationID == latest.CorrelationID) {
 		var latestDocumentMetadata DocumentMetadata
 		if err := json.Unmarshal(latest.Content, &latestDocumentMetadata); err != nil {
 			return reject(apperrors.InternalError("could not read the latest version of the document", err))
@@ -377,8 +543,9 @@ func (h *DocumentsHandler) UploadDocument(w http.ResponseWriter, r *http.Request
 		// the mime type and size are determined by the content, so this compares the sha256 and name
 		if latestDocumentMetadata == documentMetadata {
 			return responses.JSON(w, http.StatusOK, DocumentUploadResponse{
-				BatchRef:         batch.BatchRef,
-				LocalRef:         localRef,
+				IsnSlug:          isnSlug,
+				BatchRef:         upload.batch.BatchRef,
+				LocalRef:         upload.localRef,
 				SignalID:         latest.SignalID,
 				SignalVersionID:  latest.SignalVersionID,
 				VersionNumber:    latest.VersionNumber,
@@ -390,33 +557,33 @@ func (h *DocumentsHandler) UploadDocument(w http.ResponseWriter, r *http.Request
 
 	// create or update the signal master record
 	var signalID uuid.UUID
-	if correlationID == nil {
+	if upload.correlationID == nil {
 		signalID, err = queries.CreateSignal(ctx, database.CreateSignalParams{
-			AccountID:      accountID,
-			LocalRef:       localRef,
+			AccountID:      upload.accountID,
+			LocalRef:       upload.localRef,
 			IsnSlug:        isnSlug,
-			SignalTypeSlug: signalTypeSlug,
-			SemVer:         semVer,
+			SignalTypeSlug: upload.signalTypeSlug,
+			SemVer:         upload.semVer,
 		})
 	} else {
 		isValid, validateErr := queries.ValidateCorrelationID(ctx, database.ValidateCorrelationIDParams{
-			CorrelationID: *correlationID,
+			CorrelationID: *upload.correlationID,
 			IsnSlug:       isnSlug,
 		})
 		if validateErr != nil {
 			return reject(apperrors.DatabaseError("database error", validateErr))
 		}
 		if !isValid {
-			return reject(apperrors.InvalidCorrelationID(fmt.Sprintf("invalid correlation_id %v - signal does not exist in this ISN", *correlationID), nil))
+			return reject(apperrors.InvalidCorrelationID(fmt.Sprintf("invalid correlation_id %v - signal does not exist in this ISN", *upload.correlationID), nil))
 		}
 
 		signalID, err = queries.CreateOrUpdateSignalWithCorrelationID(ctx, database.CreateOrUpdateSignalWithCorrelationIDParams{
-			AccountID:      accountID,
-			LocalRef:       localRef,
-			CorrelationID:  *correlationID,
+			AccountID:      upload.accountID,
+			LocalRef:       upload.localRef,
+			CorrelationID:  *upload.correlationID,
 			IsnSlug:        isnSlug,
-			SignalTypeSlug: signalTypeSlug,
-			SemVer:         semVer,
+			SignalTypeSlug: upload.signalTypeSlug,
+			SemVer:         upload.semVer,
 		})
 	}
 	if err != nil {
@@ -434,12 +601,12 @@ func (h *DocumentsHandler) UploadDocument(w http.ResponseWriter, r *http.Request
 	}
 
 	version, err := queries.CreateSignalVersion(ctx, database.CreateSignalVersionParams{
-		AccountID:      accountID,
-		SignalBatchID:  batch.ID,
+		AccountID:      upload.accountID,
+		SignalBatchID:  upload.batch.ID,
 		Content:        content,
-		LocalRef:       localRef,
-		SignalTypeSlug: signalTypeSlug,
-		SemVer:         semVer,
+		LocalRef:       upload.localRef,
+		SignalTypeSlug: upload.signalTypeSlug,
+		SemVer:         upload.semVer,
 	})
 	if err != nil {
 		return reject(apperrors.DatabaseError("database error", err))
@@ -450,8 +617,9 @@ func (h *DocumentsHandler) UploadDocument(w http.ResponseWriter, r *http.Request
 	}
 
 	return responses.JSON(w, http.StatusOK, DocumentUploadResponse{
-		BatchRef:         batch.BatchRef,
-		LocalRef:         localRef,
+		IsnSlug:          isnSlug,
+		BatchRef:         upload.batch.BatchRef,
+		LocalRef:         upload.localRef,
 		SignalID:         signalID,
 		SignalVersionID:  version.ID,
 		VersionNumber:    version.VersionNumber,
@@ -586,13 +754,4 @@ func (h *DocumentsHandler) DownloadDocument(w http.ResponseWriter, r *http.Reque
 		)
 	}
 	return nil
-}
-
-// requestReadError returns 413 request_too_large if reading the request body failed because it is larger than the
-// request size limit, otherwise 400 malformed_body
-func requestReadError(err error) *apperrors.HTTPError {
-	if maxBytesErr, ok := errors.AsType[*http.MaxBytesError](err); ok {
-		return apperrors.RequestTooLarge(maxBytesErr.Limit)
-	}
-	return apperrors.MalformedBody("the request could not be read", err)
 }

@@ -357,6 +357,10 @@ definitions:
       batch_ref:
         example: daily-sync-2026-04-02
         type: string
+      isn_slug:
+        description: the ISN the document was stored on
+        example: sample-isn
+        type: string
       local_ref:
         example: bol-2026-0042
         type: string
@@ -3261,6 +3265,7 @@ paths:
         **Optional fields**
         - correlation_id: the ID of a signal of any type in the same ISN that this document relates to (e.g. the consignment a bill of lading belongs to).
         The upload is rejected with 422 invalid_correlation_id if the signal does not exist in the ISN.
+        (To send a document to the ISN of the signal it relates to without specifying the ISN, use _Upload a Document via Router_.)
         - sha256: the sha256 of the document as lowercase hex, computed by the sender before uploading. If it does not match the uploaded file the upload is rejected with 400 malformed_body and no version is created.
         Use it to confirm the document stored is exactly the one you sent. If it is omitted, the sha256 computed by the server is returned in the response and can be used to check the upload afterwards.
       parameters:
@@ -3542,8 +3547,9 @@ paths:
   /api/router/signal-types/{signal_type_slug}/v{sem_ver}/signals:
     post:
       description: |-
-        Submit signals without specifying a target ISN. The router resolves the target ISN
+        Submit JSON signals without specifying a target ISN. The router resolves the target ISN
         for each signal using configured routing rules, or via correlation ID if supplied.
+        (documents are sent to document signal types with _Upload a Document via Router_)
 
         **ISN resolution by correlation ID**
 
@@ -3671,6 +3677,104 @@ paths:
       security:
       - BearerAccessToken: []
       summary: Submit Signals via Router
+      tags:
+      - Signal Exchange
+  /api/router/signal-types/{signal_type_slug}/v{sem_ver}/signals/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: |-
+        Upload a document without specifying the target ISN: the document is sent to the ISN of the signal it is correlated with
+        (e.g. a bill of lading is sent to the ISN that received its consignment).
+
+        correlation_id is required - routing rules are not used for documents (they match on fields in JSON signals).
+        The upload is rejected with 422 invalid_correlation_id if the correlated signal is not found,
+        and with 403 forbidden if the account does not have write permission on the correlated signal's ISN.
+
+        Other than the ISN resolution, this endpoint behaves the same way as the standard _Upload a Document_ endpoint
+        (request format, supported formats, versions and the optional sha256 field).
+
+        The response includes the isn_slug of the ISN the document was sent to.
+      parameters:
+      - description: signal type slug
+        example: bill-of-lading
+        in: path
+        name: signal_type_slug
+        required: true
+        type: string
+      - description: version
+        example: 1.0.0
+        in: path
+        name: sem_ver
+        required: true
+        type: string
+      - description: batch reference (up to 128 alphanumeric characters, hyphens and
+          underscores)
+        in: formData
+        name: batch_ref
+        required: true
+        type: string
+      - description: your reference for the document
+        in: formData
+        name: local_ref
+        required: true
+        type: string
+      - description: the ID of the signal this document relates to - the document
+          is sent to the same ISN
+        in: formData
+        name: correlation_id
+        required: true
+        type: string
+      - description: the sha256 of the document (lowercase hex) - the upload is rejected
+          if it does not match
+        in: formData
+        name: sha256
+        type: string
+      - description: the document (must be the last part of the request)
+        in: formData
+        name: file
+        required: true
+        type: file
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.DocumentUploadResponse'
+        "400":
+          description: malformed_body | invalid_url_param
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: authentication_error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "413":
+          description: request_too_large
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "415":
+          description: unsupported_media_type
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "422":
+          description: invalid_correlation_id
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error | internal_error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Upload a Document via Router
       tags:
       - Signal Exchange
   /health/live:
