@@ -139,6 +139,7 @@ RATE_LIMIT_BURST=5000                 #  Burst allowance
 MAX_SIGNAL_PAYLOAD_SIZE=5242880       #  Max payload size (default: 5MB)
 MAX_API_REQUEST_SIZE=65536            #  Max API request size (default: 64KB)
 MAX_DOCUMENT_SIZE=20971520            #  Max document size (default: 20MB)
+DOCUMENT_TRANSFER_TIMEOUT=2m          #  Time allowed to upload or download a document - used instead of READ_TIMEOUT/WRITE_TIMEOUT (default: 2m)
 
 # Document storage
 DOCUMENT_STORE=postgres               #  Where document content is stored. Options: postgres (default: postgres)

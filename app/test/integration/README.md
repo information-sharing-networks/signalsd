@@ -80,6 +80,7 @@ Tests signal creation, search, and security controls via HTTP requests.
 - ✅ Document signal types (`document_signal_type_test.go`)
 - ✅ Postgres document store (`document_store_test.go`)
 - ✅ Document upload (`document_upload_test.go`)
+- ✅ Document download and the document transfer timeout (`document_download_test.go`)
 - ✅ Request size limits (`request_size_test.go`)
 - ✅ Site-wide signal type details and the signal types added to each ISN (`signal_type_test.go`)
 

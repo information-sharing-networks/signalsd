@@ -2707,6 +2707,111 @@
                 }
             }
         },
+        "/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}/content": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Download the document stored with a document signal. The latest version is returned unless a version is requested.\n\nUse the signal search endpoints to find documents - the search results include the signal_id, version_number and document metadata (name, mime_type, size_bytes and sha256).\n\nThe document is returned as an attachment with its original filename:\n- Content-Type is the document's mime_type\n- ETag is the document's sha256 (in quotes) - use it to check the document is the one you expected\n\nWithdrawn documents are only returned with include_withdrawn=true.\nWrite-only accounts can only download the documents they uploaded.",
+                "produces": [
+                    "application/pdf",
+                    "image/jpeg",
+                    "image/png",
+                    "text/xml"
+                ],
+                "tags": [
+                    "Signal Exchange"
+                ],
+                "summary": "Download a Document",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn",
+                        "description": "ISN slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "bill-of-lading",
+                        "description": "signal type slug",
+                        "name": "signal_type_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "1.0.0",
+                        "description": "version",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19",
+                        "description": "signal ID",
+                        "name": "signal_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "example": 1,
+                        "description": "the version to download (default: the latest version)",
+                        "name": "version",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "return withdrawn documents (default: false)",
+                        "name": "include_withdrawn",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "the document",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "400": {
+                        "description": "invalid_url_param",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error | internal_error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/public/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search": {
             "get": {
                 "description": "Search for signals in public ISNs (no authentication required).\n\nNote the endpoint returns the latest version of each signal.",

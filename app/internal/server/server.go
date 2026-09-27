@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
@@ -195,9 +194,9 @@ func (s *Server) setupMiddleware() {
 	s.router.Use(chimiddleware.StripSlashes)
 	s.router.Use(middleware.SecurityHeaders(s.config.Environment))
 	s.router.Use(middleware.RateLimit(s.config.RateLimitRPS, s.config.RateLimitBurst))
-	// Cancel r.Context() just before WriteTimeout drops the TCP connection,
-	// so in-flight DB queries and goroutines are abandoned cleanly.
-	s.router.Use(chimiddleware.Timeout(s.config.WriteTimeout - time.Second))
+	// Cancel r.Context() just before WriteTimeout drops the TCP connection, so in-flight DB queries and goroutines
+	// are abandoned cleanly (route groups that need longer use ExtendRequestTimeout)
+	s.router.Use(middleware.RequestTimeout(s.config.WriteTimeout))
 }
 
 func (s *Server) registerAdminRoutes() {
@@ -399,7 +398,9 @@ func (s *Server) registerSignalWriteRoutes() {
 
 	// document upload - the handler limits the document to MAX_DOCUMENT_SIZE.
 	// The request size limit allows an extra 64KB for the form fields and multipart headers sent with the document.
+	// Uploads are given DOCUMENT_TRANSFER_TIMEOUT.
 	s.router.Group(func(r chi.Router) {
+		r.Use(middleware.ExtendRequestTimeout(s.config.DocumentTransferTimeout))
 		r.Use(middleware.CORS(s.corsConfigs.Protected))
 		r.Use(middleware.RequestSizeLimit(s.config.MaxDocumentSize + 64*1024))
 		r.Use(s.authService.RequireValidAccessToken)
@@ -422,6 +423,7 @@ func (s *Server) registerSignalWriteRoutes() {
 // registerSignalReadRoutes registers signal read routes
 func (s *Server) registerSignalReadRoutes() {
 	signals := handlers.NewSignalsHandler(s.queries, s.pool, s.schemaCache, s.publicIsnCache)
+	documents := handlers.NewDocumentsHandler(s.queries, s.pool, s.schemaCache, s.documentStore, s.config.MaxDocumentSize)
 
 	// Public ISN signal search - no authentication required
 	s.router.Group(func(r chi.Router) {
@@ -436,6 +438,17 @@ func (s *Server) registerSignalReadRoutes() {
 		r.Use(s.authService.RequireValidAccessToken)
 		r.Use(s.authService.RequireIsnMembership)
 		r.Get("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search", responses.Wrap(signals.SearchPrivateSignals))
+	})
+
+	// document download - any ISN member may call this endpoint (write-only accounts can only download the documents they
+	// uploaded - checked in the handler).
+	// Downloads are given DOCUMENT_TRANSFER_TIMEOUT.
+	s.router.Group(func(r chi.Router) {
+		r.Use(middleware.ExtendRequestTimeout(s.config.DocumentTransferTimeout))
+		r.Use(middleware.CORS(s.corsConfigs.Protected))
+		r.Use(s.authService.RequireValidAccessToken)
+		r.Use(s.authService.RequireIsnMembership)
+		r.Get("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}/content", responses.Wrap(documents.DownloadDocument))
 	})
 
 }

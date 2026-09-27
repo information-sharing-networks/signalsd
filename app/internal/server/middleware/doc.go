@@ -15,4 +15,9 @@
 //
 //   - RateLimit: enforces a global token-bucket rate limit (requests/sec + burst).
 //     Disabled when requestsPerSecond <= 0.
+//
+//   - RequestTimeout: cancels the request context just before the server's write timeout drops the connection.
+//
+//   - ExtendRequestTimeout: gives the routes in a group a longer timeout than RequestTimeout (used for document uploads
+//     and downloads).
 package middleware

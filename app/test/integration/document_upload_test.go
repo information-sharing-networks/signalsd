@@ -12,22 +12,15 @@ package integration
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
-	"mime/multipart"
 	"net/http"
-	"net/textproto"
 	"testing"
-	"time"
 	"uuid"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	"github.com/information-sharing-networks/signalsd/app/internal/documents"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
-	"github.com/information-sharing-networks/signalsd/app/internal/server/handlers"
 )
 
 func TestDocumentUpload(t *testing.T) {
@@ -420,119 +413,6 @@ func TestDocumentUpload(t *testing.T) {
 	})
 }
 
-// documentUpload describes a document upload request. Empty form fields are not sent.
-type documentUpload struct {
-	batchRef      string
-	localRef      string
-	correlationID string
-	sha256        string
-
-	fileName    string
-	contentType string // the Content-Type of the file part ("" sends no Content-Type)
-	content     []byte
-
-	unexpectedField string // the name of an extra form field to send
-	omitFile        bool   // send the form fields without a file
-	fileFirst       bool   // send the file before the form fields
-}
-
-// uploadDocumentRequest posts a multipart document upload: POST /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/documents
-// fileFirst reorders the file part before the other fields, omitFile skips the file part entirely,
-// and unexpectedField (if set) injects an additional, unsupported form field.
-func uploadDocumentRequest(t *testing.T, baseURL, token string, endpoint testSignalEndpoint, upload documentUpload) *http.Response {
-	t.Helper()
-
-	var body bytes.Buffer
-	writer := multipart.NewWriter(&body)
-
-	writeFilePart := func() {
-		disposition := `form-data; name="file"`
-		if upload.fileName != "" {
-			disposition = fmt.Sprintf(`form-data; name="file"; filename=%q`, upload.fileName)
-		}
-		header := textproto.MIMEHeader{}
-		header.Set("Content-Disposition", disposition)
-		if upload.contentType != "" {
-			header.Set("Content-Type", upload.contentType)
-		}
-		part, err := writer.CreatePart(header)
-		if err != nil {
-			t.Fatalf("Failed to create file part: %v", err)
-		}
-		if _, err := part.Write(upload.content); err != nil {
-			t.Fatalf("Failed to write file part: %v", err)
-		}
-	}
-
-	if upload.fileFirst {
-		writeFilePart()
-	}
-
-	// load the other fields
-	for _, field := range []struct{ name, value string }{
-		{"batch_ref", upload.batchRef},
-		{"local_ref", upload.localRef},
-		{"correlation_id", upload.correlationID},
-		{"sha256", upload.sha256},
-	} {
-		if field.name == "" || field.value == "" {
-			continue
-		}
-		if err := writer.WriteField(field.name, field.value); err != nil {
-			t.Fatalf("Failed to write form field %s: %v", field.name, err)
-		}
-	}
-
-	if upload.unexpectedField != "" {
-		if err := writer.WriteField(upload.unexpectedField, "value"); err != nil {
-			t.Fatalf("Failed to write unexpected field: %v", err)
-		}
-	}
-
-	if !upload.fileFirst && !upload.omitFile {
-		writeFilePart()
-	}
-	if err := writer.Close(); err != nil {
-		t.Fatalf("Failed to close multipart writer: %v", err)
-	}
-
-	url := fmt.Sprintf("%s/api/isn/%s/signal-types/%s/v%s/documents",
-		baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, &body)
-	if err != nil {
-		t.Fatalf("Failed to create request: %v", err)
-	}
-	req.Header.Set("Content-Type", writer.FormDataContentType())
-	req.Header.Set("Authorization", "Bearer "+token)
-
-	response, err := http.DefaultClient.Do(req)
-	if err != nil {
-		t.Fatalf("Failed to upload document: %v", err)
-	}
-	return response
-}
-
-// expectUploadResponse checks the status of a document upload response, closes the body and returns the decoded response
-func expectUploadResponse(t *testing.T, response *http.Response, expectedStatus int) handlers.DocumentUploadResponse {
-	t.Helper()
-	defer response.Body.Close()
-
-	body, _ := io.ReadAll(response.Body)
-	if response.StatusCode != expectedStatus {
-		t.Fatalf("Expected status %d, got %d: %s", expectedStatus, response.StatusCode, body)
-	}
-
-	var upload handlers.DocumentUploadResponse
-	if err := json.Unmarshal(body, &upload); err != nil {
-		t.Fatalf("Failed to decode upload response: %v: %s", err, body)
-	}
-	return upload
-}
-
 // storedCount returns the stored count for the ISN in a batch status response (0 if the ISN is not in the batch)
 func storedCount(batchStatus map[string]any, isnSlug string) int {
 	statuses, _ := batchStatus["batch_status"].([]any)
@@ -544,10 +424,4 @@ func storedCount(batchStatus map[string]any, isnSlug string) int {
 		}
 	}
 	return 0
-}
-
-// sha256Hex returns the lowercase hex sha256 of the content
-func sha256Hex(content []byte) string {
-	hash := sha256.Sum256(content)
-	return hex.EncodeToString(hash[:])
 }

@@ -13,30 +13,31 @@ import (
 
 // Environment variables with defaults
 type ServerEnvironment struct {
-	Environment          string        `env:"ENVIRONMENT"          envDefault:"dev"`
-	Host                 string        `env:"HOST"                 envDefault:"0.0.0.0"`
-	Port                 int           `env:"PORT"                 envDefault:"8080"`
-	PublicBaseURL        string        `env:"PUBLIC_BASE_URL"` // base url for user facing links (defaults to Host/Port values = see below)
-	SecretKey            string        `env:"SECRET_KEY,required"`
-	LogLevel             string        `env:"LOG_LEVEL"            envDefault:"debug"`
-	DatabaseURL          string        `env:"DATABASE_URL,required"`
-	ReadTimeout          time.Duration `env:"READ_TIMEOUT"         envDefault:"15s"`
-	WriteTimeout         time.Duration `env:"WRITE_TIMEOUT"        envDefault:"15s"`
-	IdleTimeout          time.Duration `env:"IDLE_TIMEOUT"         envDefault:"65s"` // must exceed ALB idle timeout (default 60s) so ALB closes first
-	AllowedOrigins       []string      `env:"ALLOWED_ORIGINS"      envSeparator:"|"`
-	MaxSignalPayloadSize int64         `env:"MAX_SIGNAL_PAYLOAD_SIZE" envDefault:"5242880"`  // 5MB
-	MaxAPIRequestSize    int64         `env:"MAX_API_REQUEST_SIZE"    envDefault:"65536"`    // 64KB
-	MaxDocumentSize      int64         `env:"MAX_DOCUMENT_SIZE"       envDefault:"20971520"` // 20MB
-	DocumentStore        string        `env:"DOCUMENT_STORE"          envDefault:"postgres"` // where document content is stored (see ValidDocumentStores)
-	RateLimitRPS         int32         `env:"RATE_LIMIT_RPS"       envDefault:"2500"`
-	RateLimitBurst       int32         `env:"RATE_LIMIT_BURST"     envDefault:"5000"`
-	ServiceMode          string        `env:"SERVICE_MODE"`                        // Set by CLI argument, not env var
-	DBMaxConnections     int32         `env:"DB_MAX_CONNECTIONS"   envDefault:"4"` // pgx pool defaults
-	DBMinConnections     int32         `env:"DB_MIN_CONNECTIONS"   envDefault:"0"`
-	DBMaxConnLifetime    time.Duration `env:"DB_MAX_CONN_LIFETIME" envDefault:"60m"`
-	DBMaxConnIdleTime    time.Duration `env:"DB_MAX_CONN_IDLE_TIME" envDefault:"30m"`
-	DBConnectTimeout     time.Duration `env:"DB_CONNECT_TIMEOUT"   envDefault:"5s"`
-	TrustedProxies       int           `env:"TRUSTED_PROXIES"      envDefault:"1"` // number of reverse proxies in front of the service (e.g. 1 for a single ALB)
+	Environment             string        `env:"ENVIRONMENT"          envDefault:"dev"`
+	Host                    string        `env:"HOST"                 envDefault:"0.0.0.0"`
+	Port                    int           `env:"PORT"                 envDefault:"8080"`
+	PublicBaseURL           string        `env:"PUBLIC_BASE_URL"` // base url for user facing links (defaults to Host/Port values = see below)
+	SecretKey               string        `env:"SECRET_KEY,required"`
+	LogLevel                string        `env:"LOG_LEVEL"            envDefault:"debug"`
+	DatabaseURL             string        `env:"DATABASE_URL,required"`
+	ReadTimeout             time.Duration `env:"READ_TIMEOUT"         envDefault:"15s"`
+	WriteTimeout            time.Duration `env:"WRITE_TIMEOUT"        envDefault:"15s"`
+	IdleTimeout             time.Duration `env:"IDLE_TIMEOUT"         envDefault:"65s"`     // must exceed ALB idle timeout (default 60s) so ALB closes first
+	DocumentTransferTimeout time.Duration `env:"DOCUMENT_TRANSFER_TIMEOUT" envDefault:"2m"` // replaces READ_TIMEOUT and WRITE_TIMEOUT for document uploads and downloads
+	AllowedOrigins          []string      `env:"ALLOWED_ORIGINS"      envSeparator:"|"`
+	MaxSignalPayloadSize    int64         `env:"MAX_SIGNAL_PAYLOAD_SIZE" envDefault:"5242880"`  // 5MB
+	MaxAPIRequestSize       int64         `env:"MAX_API_REQUEST_SIZE"    envDefault:"65536"`    // 64KB
+	MaxDocumentSize         int64         `env:"MAX_DOCUMENT_SIZE"       envDefault:"20971520"` // 20MB
+	DocumentStore           string        `env:"DOCUMENT_STORE"          envDefault:"postgres"` // where document content is stored (see ValidDocumentStores)
+	RateLimitRPS            int32         `env:"RATE_LIMIT_RPS"       envDefault:"2500"`
+	RateLimitBurst          int32         `env:"RATE_LIMIT_BURST"     envDefault:"5000"`
+	ServiceMode             string        `env:"SERVICE_MODE"`                        // Set by CLI argument, not env var
+	DBMaxConnections        int32         `env:"DB_MAX_CONNECTIONS"   envDefault:"4"` // pgx pool defaults
+	DBMinConnections        int32         `env:"DB_MIN_CONNECTIONS"   envDefault:"0"`
+	DBMaxConnLifetime       time.Duration `env:"DB_MAX_CONN_LIFETIME" envDefault:"60m"`
+	DBMaxConnIdleTime       time.Duration `env:"DB_MAX_CONN_IDLE_TIME" envDefault:"30m"`
+	DBConnectTimeout        time.Duration `env:"DB_CONNECT_TIMEOUT"   envDefault:"5s"`
+	TrustedProxies          int           `env:"TRUSTED_PROXIES"      envDefault:"1"` // number of reverse proxies in front of the service (e.g. 1 for a single ALB)
 }
 
 // CORSConfigs holds the CORS middleware instances for different endpoint types
@@ -231,6 +232,9 @@ func validateConfig(cfg *ServerEnvironment) error {
 	}
 	if cfg.MaxDocumentSize < 1 {
 		return fmt.Errorf("MAX_DOCUMENT_SIZE must be at least 1")
+	}
+	if cfg.DocumentTransferTimeout <= time.Second {
+		return fmt.Errorf("DOCUMENT_TRANSFER_TIMEOUT must be more than 1s")
 	}
 
 	// Validate database pool configuration

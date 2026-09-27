@@ -64,6 +64,13 @@ type testEnv struct {
 // Supply "" otherwise
 func startInProcessServer(t *testing.T, publicBaseURL string) *testEnv {
 	t.Helper()
+	return startInProcessServerWithConfig(t, publicBaseURL, nil)
+}
+
+// startInProcessServerWithConfig is the same as startInProcessServer, but calls updateConfig (if not nil) to change the
+// server config before the server is started (e.g. to use shorter timeouts)
+func startInProcessServerWithConfig(t *testing.T, publicBaseURL string, updateConfig func(cfg *signalsd.ServerEnvironment)) *testEnv {
+	t.Helper()
 
 	testEnv := &testEnv{}
 
@@ -79,37 +86,42 @@ func startInProcessServer(t *testing.T, publicBaseURL string) *testEnv {
 	// configure db
 	testEnv.pool = setupTestDatabase(t)
 
-	// Build config directly instead of round-tripping through environment variables
+	// Build config
 	cfg := &signalsd.ServerEnvironment{
-		Environment:          environment,
-		Host:                 "0.0.0.0",
-		Port:                 port,
-		SecretKey:            testSecretKey,
-		DatabaseURL:          testEnv.pool.Config().ConnString(),
-		LogLevel:             logLevel.String(),
-		ServiceMode:          "all",
-		ReadTimeout:          15 * time.Second,
-		WriteTimeout:         15 * time.Second,
-		IdleTimeout:          60 * time.Second,
-		AllowedOrigins:       []string{"*"},
-		MaxSignalPayloadSize: 5242880,
-		MaxAPIRequestSize:    65536,
-		MaxDocumentSize:      testMaxDocumentSize,
-		DocumentStore:        signalsd.DocumentStorePostgres,
-		RateLimitRPS:         2500,
-		RateLimitBurst:       5000,
-		TrustedProxies:       1,
-		DBMaxConnections:     4,
-		DBMinConnections:     0,
-		DBMaxConnLifetime:    60 * time.Minute,
-		DBMaxConnIdleTime:    30 * time.Minute,
-		DBConnectTimeout:     5 * time.Second,
-		PublicBaseURL:        fmt.Sprintf("http://localhost:%d", port),
+		Environment:             environment,
+		Host:                    "0.0.0.0",
+		Port:                    port,
+		SecretKey:               testSecretKey,
+		DatabaseURL:             testEnv.pool.Config().ConnString(),
+		LogLevel:                logLevel.String(),
+		ServiceMode:             "all",
+		ReadTimeout:             15 * time.Second,
+		WriteTimeout:            15 * time.Second,
+		IdleTimeout:             60 * time.Second,
+		DocumentTransferTimeout: 2 * time.Minute,
+		AllowedOrigins:          []string{"*"},
+		MaxSignalPayloadSize:    5242880,
+		MaxAPIRequestSize:       65536,
+		MaxDocumentSize:         testMaxDocumentSize,
+		DocumentStore:           signalsd.DocumentStorePostgres,
+		RateLimitRPS:            2500,
+		RateLimitBurst:          5000,
+		TrustedProxies:          1,
+		DBMaxConnections:        4,
+		DBMinConnections:        0,
+		DBMaxConnLifetime:       60 * time.Minute,
+		DBMaxConnIdleTime:       30 * time.Minute,
+		DBConnectTimeout:        5 * time.Second,
+		PublicBaseURL:           fmt.Sprintf("http://localhost:%d", port),
 	}
 
 	// publicBaseURL is only used when generating end user facing links like password reset
 	if publicBaseURL != "" {
 		cfg.PublicBaseURL = publicBaseURL
+	}
+
+	if updateConfig != nil {
+		updateConfig(cfg)
 	}
 
 	// Allow tests to override allowed origins (e.g. CORS tests)

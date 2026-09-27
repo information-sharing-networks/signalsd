@@ -354,3 +354,23 @@ WHERE s.account_id = sqlc.arg(account_id)
     AND st.slug = sqlc.arg(signal_type_slug)
     AND st.sem_ver = sqlc.arg(sem_ver)
     AND s.local_ref = sqlc.arg(local_ref);
+
+-- name: GetSignalVersion :one
+-- returns a version of a signal on the ISN (the latest version if version_number is null)
+SELECT
+    s.account_id,
+    s.is_withdrawn,
+    sv.version_number,
+    sv.content
+FROM signals s
+JOIN isn i ON i.id = s.isn_id
+JOIN signal_types st ON st.id = s.signal_type_id
+JOIN signal_versions sv ON sv.signal_id = s.id
+    AND sv.account_id = s.account_id
+WHERE s.id = sqlc.arg(signal_id)
+    AND i.slug = sqlc.arg(isn_slug)
+    AND st.slug = sqlc.arg(signal_type_slug)
+    AND st.sem_ver = sqlc.arg(sem_ver)
+    AND (sqlc.narg(version_number)::integer IS NULL OR sv.version_number = sqlc.narg(version_number)::integer)
+ORDER BY sv.version_number DESC
+LIMIT 1;

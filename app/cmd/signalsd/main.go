@@ -274,6 +274,7 @@ func run(mode string) error {
 		slog.Duration("READ_TIMEOUT", cfg.ReadTimeout),
 		slog.Duration("WRITE_TIMEOUT", cfg.WriteTimeout),
 		slog.Duration("IDLE_TIMEOUT", cfg.IdleTimeout),
+		slog.Duration("DOCUMENT_TRANSFER_TIMEOUT", cfg.DocumentTransferTimeout),
 		slog.Int64("MAX_SIGNAL_PAYLOAD_SIZE", cfg.MaxSignalPayloadSize),
 		slog.Int64("MAX_DOCUMENT_SIZE", cfg.MaxDocumentSize),
 		slog.String("DOCUMENT_STORE", cfg.DocumentStore),

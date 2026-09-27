@@ -3187,6 +3187,88 @@ paths:
       summary: Submit Signals
       tags:
       - Signal Exchange
+  /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}/content:
+    get:
+      description: |-
+        Download the document stored with a document signal. The latest version is returned unless a version is requested.
+
+        Use the signal search endpoints to find documents - the search results include the signal_id, version_number and document metadata (name, mime_type, size_bytes and sha256).
+
+        The document is returned as an attachment with its original filename:
+        - Content-Type is the document's mime_type
+        - ETag is the document's sha256 (in quotes) - use it to check the document is the one you expected
+
+        Withdrawn documents are only returned with include_withdrawn=true.
+        Write-only accounts can only download the documents they uploaded.
+      parameters:
+      - description: ISN slug
+        example: sample-isn
+        in: path
+        name: isn_slug
+        required: true
+        type: string
+      - description: signal type slug
+        example: bill-of-lading
+        in: path
+        name: signal_type_slug
+        required: true
+        type: string
+      - description: version
+        example: 1.0.0
+        in: path
+        name: sem_ver
+        required: true
+        type: string
+      - description: signal ID
+        example: 4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19
+        in: path
+        name: signal_id
+        required: true
+        type: string
+      - description: 'the version to download (default: the latest version)'
+        example: 1
+        in: query
+        name: version
+        type: integer
+      - description: 'return withdrawn documents (default: false)'
+        in: query
+        name: include_withdrawn
+        type: boolean
+      produces:
+      - application/pdf
+      - image/jpeg
+      - image/png
+      - text/xml
+      responses:
+        "200":
+          description: the document
+          schema:
+            type: file
+        "400":
+          description: invalid_url_param
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: authentication_error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error | internal_error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Download a Document
+      tags:
+      - Signal Exchange
   /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search:
     get:
       description: |-

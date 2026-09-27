@@ -472,6 +472,60 @@ func (q *Queries) GetSignalCorrelationDetails(ctx context.Context, arg GetSignal
 	return i, err
 }
 
+const GetSignalVersion = `-- name: GetSignalVersion :one
+SELECT
+    s.account_id,
+    s.is_withdrawn,
+    sv.version_number,
+    sv.content
+FROM signals s
+JOIN isn i ON i.id = s.isn_id
+JOIN signal_types st ON st.id = s.signal_type_id
+JOIN signal_versions sv ON sv.signal_id = s.id
+    AND sv.account_id = s.account_id
+WHERE s.id = $1
+    AND i.slug = $2
+    AND st.slug = $3
+    AND st.sem_ver = $4
+    AND ($5::integer IS NULL OR sv.version_number = $5::integer)
+ORDER BY sv.version_number DESC
+LIMIT 1
+`
+
+type GetSignalVersionParams struct {
+	SignalID       uuid.UUID `json:"signal_id"`
+	IsnSlug        string    `json:"isn_slug"`
+	SignalTypeSlug string    `json:"signal_type_slug"`
+	SemVer         string    `json:"sem_ver"`
+	VersionNumber  *int32    `json:"version_number"`
+}
+
+type GetSignalVersionRow struct {
+	AccountID     uuid.UUID       `json:"account_id"`
+	IsWithdrawn   bool            `json:"is_withdrawn"`
+	VersionNumber int32           `json:"version_number"`
+	Content       json.RawMessage `json:"content"`
+}
+
+// returns a version of a signal on the ISN (the latest version if version_number is null)
+func (q *Queries) GetSignalVersion(ctx context.Context, arg GetSignalVersionParams) (GetSignalVersionRow, error) {
+	row := q.db.QueryRow(ctx, GetSignalVersion,
+		arg.SignalID,
+		arg.IsnSlug,
+		arg.SignalTypeSlug,
+		arg.SemVer,
+		arg.VersionNumber,
+	)
+	var i GetSignalVersionRow
+	err := row.Scan(
+		&i.AccountID,
+		&i.IsWithdrawn,
+		&i.VersionNumber,
+		&i.Content,
+	)
+	return i, err
+}
+
 const GetSignalsByCorrelationIDs = `-- name: GetSignalsByCorrelationIDs :many
 SELECT
     a.id AS account_id,

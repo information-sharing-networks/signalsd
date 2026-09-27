@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"uuid"
 
@@ -457,6 +458,134 @@ func (h *DocumentsHandler) UploadDocument(w http.ResponseWriter, r *http.Request
 		DocumentMetadata: documentMetadata,
 		Unchanged:        false,
 	})
+}
+
+// DownloadDocument godoc
+//
+//	@Summary		Download a Document
+//	@Tags			Signal Exchange
+//
+//	@Description	Download the document stored with a document signal. The latest version is returned unless a version is requested.
+//	@Description
+//	@Description	Use the signal search endpoints to find documents - the search results include the signal_id, version_number and document metadata (name, mime_type, size_bytes and sha256).
+//	@Description
+//	@Description	The document is returned as an attachment with its original filename:
+//	@Description	- Content-Type is the document's mime_type
+//	@Description	- ETag is the document's sha256 (in quotes) - use it to check the document is the one you expected
+//	@Description
+//	@Description	Withdrawn documents are only returned with include_withdrawn=true.
+//	@Description	Write-only accounts can only download the documents they uploaded.
+//
+//	@Param			isn_slug			path	string	true	"ISN slug"												example(sample-isn)
+//	@Param			signal_type_slug	path	string	true	"signal type slug"										example(bill-of-lading)
+//	@Param			sem_ver				path	string	true	"version"												example(1.0.0)
+//	@Param			signal_id			path	string	true	"signal ID"												example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
+//	@Param			version				query	integer	false	"the version to download (default: the latest version)"	example(1)
+//	@Param			include_withdrawn	query	boolean	false	"return withdrawn documents (default: false)"
+//
+//	@Produce		application/pdf,image/jpeg,image/png,text/xml
+//	@Success		200	{file}		file					"the document"
+//	@Failure		400	{object}	responses.ErrorResponse	"invalid_url_param"
+//	@Failure		401	{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500	{object}	responses.ErrorResponse	"database_error | internal_error"
+//
+//	@Security		BearerAccessToken
+//
+//	@Router			/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}/content [get]
+//
+// This function should be called after the RequireIsnMembership middleware has checked the account is a member of the ISN.
+// The document is streamed from the document store to the client.
+func (h *DocumentsHandler) DownloadDocument(w http.ResponseWriter, r *http.Request) error {
+	ctx := r.Context()
+
+	isnSlug := r.PathValue("isn_slug")
+	signalTypeSlug := r.PathValue("signal_type_slug")
+	semVer := r.PathValue("sem_ver")
+	signalTypePath := fmt.Sprintf("%v/v%v", signalTypeSlug, semVer)
+
+	// only document signal types have documents to download
+	if err := h.schemaCache.CheckContentKind(signalTypePath, signalsd.ContentKindDocument); err != nil {
+		return apperrors.InvalidURLParam(err.Error(), nil)
+	}
+
+	signalID, err := uuid.Parse(r.PathValue("signal_id"))
+	if err != nil {
+		return apperrors.InvalidURLParam("signal_id is not a valid UUID", nil)
+	}
+
+	var versionNumber *int32
+	if versionValue := r.URL.Query().Get("version"); versionValue != "" {
+		parsed, err := strconv.ParseInt(versionValue, 10, 32)
+		if err != nil || parsed < 1 {
+			return apperrors.InvalidURLParam("version must be a positive whole number", nil)
+		}
+		version := int32(parsed)
+		versionNumber = &version
+	}
+	includeWithdrawn := r.URL.Query().Get("include_withdrawn") == "true"
+
+	claims, ok := auth.ContextClaims(ctx)
+	if !ok {
+		return apperrors.InternalError("could not get claims from context", nil)
+	}
+	accountID, ok := auth.ContextAccountID(ctx)
+	if !ok {
+		return apperrors.InternalError("could not get accountID from context", nil)
+	}
+
+	signalVersion, err := h.queries.GetSignalVersion(ctx, database.GetSignalVersionParams{
+		SignalID:       signalID,
+		IsnSlug:        isnSlug,
+		SignalTypeSlug: signalTypeSlug,
+		SemVer:         semVer,
+		VersionNumber:  versionNumber,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperrors.NotFound("document not found", nil)
+		}
+		return apperrors.DatabaseError("database error", err)
+	}
+
+	// write-only accounts can only download the documents they uploaded (other documents are reported as not found, as in the signal search)
+	isnPerms := claims.IsnPerms[isnSlug]
+	if !isnPerms.CanRead && signalVersion.AccountID != accountID {
+		return apperrors.NotFound("document not found", nil)
+	}
+	if signalVersion.IsWithdrawn && !includeWithdrawn {
+		return apperrors.NotFound("the document has been withdrawn (use include_withdrawn=true to download it)", nil)
+	}
+
+	var documentMetadata DocumentMetadata
+	if err := json.Unmarshal(signalVersion.Content, &documentMetadata); err != nil {
+		return apperrors.InternalError("could not read the document metadata", err)
+	}
+
+	// the content is always stored before the signal version that refers to it, so failing to get it is a server fault
+	document, err := h.documentStore.Get(ctx, documents.Key{AccountID: signalVersion.AccountID, SHA256: documentMetadata.SHA256})
+	if err != nil {
+		return apperrors.InternalError("could not get the document", err)
+	}
+	defer document.Close()
+
+	w.Header().Set("Content-Type", documentMetadata.MimeType)
+	w.Header().Set("Content-Length", strconv.FormatInt(documentMetadata.SizeBytes, 10))
+	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": documentMetadata.Name}))
+	w.Header().Set("ETag", fmt.Sprintf("%q", documentMetadata.SHA256))
+	w.Header().Set("X-Content-Type-Options", "nosniff")  // browsers must not guess a different type
+	w.Header().Set("Cache-Control", "private, no-store") // documents can be withdrawn and access revoked, so they are not cached
+	w.WriteHeader(http.StatusOK)
+
+	// the status has been sent, so an error while streaming the document can only be logged
+	if _, err := io.Copy(w, document); err != nil {
+		logger.ContextRequestLogger(ctx).Warn("document download was not completed",
+			slog.String("signal_id", signalID.String()),
+			slog.String("error", err.Error()),
+		)
+	}
+	return nil
 }
 
 // requestReadError returns 413 request_too_large if reading the request body failed because it is larger than the
