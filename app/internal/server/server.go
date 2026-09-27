@@ -370,9 +370,8 @@ func (s *Server) registerAdminRoutes() {
 
 // registerSignalWriteRoutes registers signal write routes
 func (s *Server) registerSignalWriteRoutes() {
-	signals := handlers.NewSignalsHandler(s.queries, s.pool, s.schemaCache, s.publicIsnCache)
+	signals := handlers.NewSignalsHandler(s.queries, s.pool, s.schemaCache, s.publicIsnCache, s.signalRouterCache)
 	signalBatches := handlers.NewSignalsBatchHandler(s.queries)
-	routerSignals := handlers.NewSignalRouter(s.queries, s.pool, s.schemaCache, s.signalRouterCache)
 	documents := handlers.NewDocumentsHandler(s.queries, s.pool, s.schemaCache, s.documentStore, s.config.MaxDocumentSize)
 
 	s.router.Group(func(r chi.Router) {
@@ -427,13 +426,13 @@ func (s *Server) registerSignalWriteRoutes() {
 		r.Use(middleware.CORS(s.corsConfigs.Protected))
 		r.Use(middleware.RequestSizeLimit(s.config.MaxSignalPayloadSize))
 		r.Use(s.authService.RequireValidAccessToken)
-		r.Post("/api/router/signal-types/{signal_type_slug}/v{sem_ver}/signals", responses.Wrap(routerSignals.RouteSignals))
+		r.Post("/api/router/signal-types/{signal_type_slug}/v{sem_ver}/signals", responses.Wrap(signals.RouteSignals))
 	})
 }
 
 // registerSignalReadRoutes registers signal read routes
 func (s *Server) registerSignalReadRoutes() {
-	signals := handlers.NewSignalsHandler(s.queries, s.pool, s.schemaCache, s.publicIsnCache)
+	signals := handlers.NewSignalsHandler(s.queries, s.pool, s.schemaCache, s.publicIsnCache, s.signalRouterCache)
 	documents := handlers.NewDocumentsHandler(s.queries, s.pool, s.schemaCache, s.documentStore, s.config.MaxDocumentSize)
 
 	// Public ISN signal search - no authentication required

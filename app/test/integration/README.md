@@ -76,7 +76,7 @@ Tests signal creation, search, and security controls via HTTP requests.
 - ✅ Previous versions and correlated signals (`include_correlated`, `correlation_id`)
 - ✅ Token validation (expired, malformed, missing)
 - ✅ Cross-ISN data leakage prevention (`shared_signal_type_test.go`)
-- ✅ Signal router and routing config (`signal_router_test.go`, `signal_routing_test.go`)
+- ✅ Signal router and routing config (`signal_router_test.go`, `signal_routing_config_test.go`)
 - ✅ Document signal types (`document_signal_type_test.go`)
 - ✅ Postgres document store (`document_store_test.go`)
 - ✅ Document upload (`document_upload_test.go`)

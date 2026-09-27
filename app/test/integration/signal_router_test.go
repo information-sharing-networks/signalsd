@@ -269,8 +269,8 @@ func TestRouteSignals(t *testing.T) {
 			if len(isnResult.FailedSignals) != 1 {
 				t.Fatalf("failed_signals: want 1, got %d", len(isnResult.FailedSignals))
 			}
-			if isnResult.FailedSignals[0].ErrorCode != apperrors.ErrCodeInvalidRequest.String() {
-				t.Errorf("error_code: want %q, got %q", apperrors.ErrCodeInvalidRequest.String(), isnResult.FailedSignals[0].ErrorCode)
+			if isnResult.FailedSignals[0].ErrorCode != apperrors.ErrCodeResourceNotFound.String() {
+				t.Errorf("error_code: want %q, got %q", apperrors.ErrCodeResourceNotFound.String(), isnResult.FailedSignals[0].ErrorCode)
 			}
 		})
 
@@ -304,8 +304,8 @@ func TestRouteSignals(t *testing.T) {
 			if len(isnResult.FailedSignals) != 1 {
 				t.Fatalf("failed_signals: want 1, got %d", len(isnResult.FailedSignals))
 			}
-			if isnResult.FailedSignals[0].ErrorCode != apperrors.ErrCodeForbidden.String() {
-				t.Errorf("error_code: want %q, got %q", apperrors.ErrCodeForbidden.String(), isnResult.FailedSignals[0].ErrorCode)
+			if isnResult.FailedSignals[0].ErrorCode != apperrors.ErrCodeResourceNotFound.String() {
+				t.Errorf("error_code: want %q, got %q", apperrors.ErrCodeResourceNotFound.String(), isnResult.FailedSignals[0].ErrorCode)
 			}
 		})
 
