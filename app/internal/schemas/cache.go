@@ -29,7 +29,7 @@ type Cache struct {
 	schemas map[string]*jsonschema.Schema
 	// schemaURLs the schema URLs by path
 	schemaURLs map[string]string
-	// contentKinds the singal content type (json, document etc)
+	// contentKinds the content kind of each signal type by path (json, document etc)
 	contentKinds map[string]string
 }
 

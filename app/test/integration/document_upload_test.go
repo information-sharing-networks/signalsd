@@ -3,9 +3,9 @@
 package integration
 
 // TestDocumentUpload tests POST /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/documents:
-// - storing documents and their descriptors (name, mime_type, size_bytes, sha256)
+// - storing documents and their metadata (name, mime_type, size_bytes, sha256)
 // - versions and unchanged uploads
-// - content type detection and the declared sha256 check
+// - mime type detection and the declared sha256 check
 // - request validation, size limits and permissions
 // - correlation with other signals and recording rejected uploads against the batch
 

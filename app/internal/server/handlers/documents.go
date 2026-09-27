@@ -59,7 +59,7 @@ func NewDocumentsHandler(queries *database.Queries, pool *pgxpool.Pool, schemaCa
 // The document itself is downloaded separately.
 type DocumentMetadata struct {
 
-	// Name is the file name supplied when the document was uploaded (its extension must matche the mime type)
+	// Name is the file name supplied when the document was uploaded (its extension must match the mime type)
 	Name string `json:"name" example:"BL-2026-0042.pdf"`
 
 	// MimeType is the type of document, detected from its content (application/pdf, image/jpeg, image/png or text/xml)

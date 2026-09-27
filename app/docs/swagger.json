@@ -3652,7 +3652,7 @@
                     "example": "application/pdf"
                 },
                 "name": {
-                    "description": "Name is the file name supplied when the document was uploaded (its extension must matche the mime type)",
+                    "description": "Name is the file name supplied when the document was uploaded (its extension must match the mime type)",
                     "type": "string",
                     "example": "BL-2026-0042.pdf"
                 },
