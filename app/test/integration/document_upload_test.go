@@ -2,7 +2,7 @@
 
 package integration
 
-// TestDocumentUpload tests POST /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/documents:
+// TestDocumentUpload tests POST /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/upload:
 // - storing documents and their metadata (name, mime_type, size_bytes, sha256)
 // - versions and unchanged uploads
 // - mime type detection and the declared sha256 check
@@ -377,7 +377,7 @@ func TestDocumentUpload(t *testing.T) {
 	})
 
 	t.Run("a request that is not multipart is rejected", func(t *testing.T) {
-		url := fmt.Sprintf("%s/api/isn/%s/signal-types/%s/v%s/documents", testEnv.baseURL, isn.Slug, billOfLadingType.Slug, billOfLadingType.SemVer)
+		url := fmt.Sprintf("%s/api/isn/%s/signal-types/%s/v%s/signals/upload", testEnv.baseURL, isn.Slug, billOfLadingType.Slug, billOfLadingType.SemVer)
 		response := sendJSONWithContentLength(t, http.MethodPost, url, writerToken, []byte(`{"local_ref": "bol-json"}`))
 		expectErrorCode(t, response, http.StatusBadRequest, apperrors.ErrCodeMalformedBody)
 	})

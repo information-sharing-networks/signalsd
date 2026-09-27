@@ -413,7 +413,7 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 //	@Summary		Submit Signals
 //	@Tags			Signal Exchange
 //
-//	@Description	Submit signals to an ISN
+//	@Description	Submit JSON signals to an ISN (documents are sent to document signal types with Upload a Document)
 //	@Description	- payloads must not mix signals of different types and are subject to the size limits defined on the site.
 //	@Description	- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.
 //	@Description	- If a local reference is received more than once from an account for the specified signal_type a new version of the signal will be stored with a incremented version number.

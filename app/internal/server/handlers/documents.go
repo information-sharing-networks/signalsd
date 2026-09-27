@@ -88,7 +88,7 @@ type DocumentUploadResponse struct {
 //	@Summary		Upload a Document
 //	@Tags			Signal Exchange
 //
-//	@Description	Upload a document (e.g. a PDF bill of lading) to a document signal type.
+//	@Description	Upload a document (e.g. a PDF bill of lading) to a document signal type (JSON signals are sent with Submit Signals).
 //	@Description
 //	@Description	Documents are signals: they have a local_ref, versions, can be correlated with other signals and withdrawn.
 //	@Description	The document details (name, mime_type, size_bytes and sha256) are returned as the signal content by the signal search endpoints.
@@ -166,7 +166,7 @@ type DocumentUploadResponse struct {
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/documents [post]
+//	@Router			/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/upload [post]
 //
 // This function should be called after the RequireAccessPermission middleware has checked the account has write permission for the ISN.
 func (h *DocumentsHandler) UploadDocument(w http.ResponseWriter, r *http.Request) error {

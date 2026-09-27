@@ -236,7 +236,7 @@ func TestDocumentTransferTimeout(t *testing.T) {
 		request := uploadDocumentRequestBody(t, documentUpload{
 			batchRef: "document-timeout-batch", localRef: "bol-slow", fileName: "bl.pdf", content: []byte("%PDF-1.7 sent slowly"),
 		})
-		url := fmt.Sprintf("%s/api/isn/%s/signal-types/%s/v%s/documents", testEnv.baseURL, isn.Slug, documentType.Slug, documentType.SemVer)
+		url := fmt.Sprintf("%s/api/isn/%s/signal-types/%s/v%s/signals/upload", testEnv.baseURL, isn.Slug, documentType.Slug, documentType.SemVer)
 
 		response, err := sendSlowly(url, request.contentType, adminToken, request.body, sendDuration)
 		if err != nil {

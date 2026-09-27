@@ -406,7 +406,7 @@ func (s *Server) registerSignalWriteRoutes() {
 		r.Use(s.authService.RequireValidAccessToken)
 		r.Use(s.authService.RequireAccessPermission("write"))
 
-		r.Post("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/documents", responses.Wrap(documents.UploadDocument))
+		r.Post("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/upload", responses.Wrap(documents.UploadDocument))
 	})
 
 	// Router signal endpoint: ISN is resolved by routing rules, not from the URL.

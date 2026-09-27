@@ -408,13 +408,13 @@ func uploadDocumentRequestBody(t *testing.T, upload documentUpload) multipartReq
 	return multipartRequestBody{body: body.Bytes(), contentType: writer.FormDataContentType()}
 }
 
-// uploadDocumentRequest posts a multipart document upload: POST /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/documents
+// uploadDocumentRequest posts a multipart document upload: POST /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/upload
 func uploadDocumentRequest(t *testing.T, baseURL, token string, endpoint testSignalEndpoint, upload documentUpload) *http.Response {
 	t.Helper()
 
 	request := uploadDocumentRequestBody(t, upload)
 
-	url := fmt.Sprintf("%s/api/isn/%s/signal-types/%s/v%s/documents",
+	url := fmt.Sprintf("%s/api/isn/%s/signal-types/%s/v%s/signals/upload",
 		baseURL, endpoint.isnSlug, endpoint.signalTypeSlug, endpoint.signalTypeSemVer)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

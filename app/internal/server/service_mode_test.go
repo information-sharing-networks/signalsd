@@ -103,8 +103,8 @@ func routeGroup(route string) string {
 	case strings.HasPrefix(path, "/api/batches"):
 		return signalWriteRoutes
 
-	// signal exchange: .../signals and .../documents routes (documents are a kind of signal)
-	case strings.HasPrefix(path, "/api/") && (strings.Contains(path, "/signals") || strings.Contains(path, "/documents")):
+	// signal exchange: the .../signals routes (for both JSON and document signals)
+	case strings.HasPrefix(path, "/api/") && strings.Contains(path, "/signals"):
 		if method == http.MethodGet {
 			return signalReadRoutes
 		}

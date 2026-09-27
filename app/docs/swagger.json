@@ -2272,138 +2272,6 @@
                 }
             }
         },
-        "/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/documents": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAccessToken": []
-                    }
-                ],
-                "description": "Upload a document (e.g. a PDF bill of lading) to a document signal type.\n\nDocuments are signals: they have a local_ref, versions, can be correlated with other signals and withdrawn.\nThe document details (name, mime_type, size_bytes and sha256) are returned as the signal content by the signal search endpoints.\n\n**Request format**\n\nThe request is multipart/form-data with one document per request:\n- send the form fields first (batch_ref, local_ref and any optional fields) - **the file must be the last part**\n- the file part must be named `file` and must include a filename - the filename is stored as the document's name\n\nThe request body looks like this:\n```\n--boundary\nContent-Disposition: form-data; name=\"batch_ref\"\n\ndaily-2026-09-26\n--boundary\nContent-Disposition: form-data; name=\"local_ref\"\n\nbol-0042\n--boundary\nContent-Disposition: form-data; name=\"file\"; filename=\"BL-0042.pdf\"\nContent-Type: application/pdf\n\n(the document bytes)\n--boundary--\n```\n\n**Supported formats**\n\nOnly common business document formats can be uploaded: PDF, JPEG, PNG and XML. Other files are rejected with 415 unsupported_media_type.\nThe format is detected from the content of the file - the Content-Type of the file part is ignored.\nXML documents must start with an XML declaration (\u003c?xml ...?\u003e).\n\nThe filename extension must match the format (.pdf, .jpg or .jpeg, .png, .xml - in any case), otherwise the upload is rejected with 400 malformed_body.\n\n**Versions**\n\nUploads for a local_ref you have already used are compared with its latest version:\n- the same file with the same filename returns the latest version with unchanged=true, and no new version is created - so uploads can be safely retried\n- a different file, or the same file with a different filename, creates a new version (including a file that matches an older version)\n- re-uploading a withdrawn document creates a new version and reactivates it\n- supplying a different correlation_id creates a new version with the new link (omitting correlation_id keeps the existing link)\n\nUnchanged uploads are not counted in the batch they were sent in - the existing version belongs to the batch that stored it.\nThe same file uploaded with a different local_ref is a separate document.\n\nRejected uploads are recorded against the batch (see the batch status endpoint).\n\n**Optional fields**\n- correlation_id: the ID of a signal of any type in the same ISN that this document relates to (e.g. the consignment a bill of lading belongs to).\nThe upload is rejected with 422 invalid_correlation_id if the signal does not exist in the ISN.\n- sha256: the sha256 of the document as lowercase hex, computed by the sender before uploading. If it does not match the uploaded file the upload is rejected with 400 malformed_body and no version is created.\nUse it to confirm the document stored is exactly the one you sent. If it is omitted, the sha256 computed by the server is returned in the response and can be used to check the upload afterwards.",
-                "consumes": [
-                    "multipart/form-data"
-                ],
-                "tags": [
-                    "Signal Exchange"
-                ],
-                "summary": "Upload a Document",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "example": "sample-isn",
-                        "description": "ISN slug",
-                        "name": "isn_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "example": "bill-of-lading",
-                        "description": "signal type slug",
-                        "name": "signal_type_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "example": "1.0.0",
-                        "description": "version",
-                        "name": "sem_ver",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "batch reference (up to 128 alphanumeric characters, hyphens and underscores)",
-                        "name": "batch_ref",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "your reference for the document",
-                        "name": "local_ref",
-                        "in": "formData",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "the ID of a signal in the same ISN that this document relates to",
-                        "name": "correlation_id",
-                        "in": "formData"
-                    },
-                    {
-                        "type": "string",
-                        "description": "the sha256 of the document (lowercase hex) - the upload is rejected if it does not match",
-                        "name": "sha256",
-                        "in": "formData"
-                    },
-                    {
-                        "type": "file",
-                        "description": "the document (must be the last part of the request)",
-                        "name": "file",
-                        "in": "formData",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/handlers.DocumentUploadResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "malformed_body | invalid_url_param",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "authentication_error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "403": {
-                        "description": "forbidden",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "resource_not_found",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "413": {
-                        "description": "request_too_large",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "415": {
-                        "description": "unsupported_media_type",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "422": {
-                        "description": "invalid_correlation_id",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "database_error | internal_error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals": {
             "post": {
                 "security": [
@@ -2411,7 +2279,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Submit signals to an ISN\n- payloads must not mix signals of different types and are subject to the size limits defined on the site.\n- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.\n- If a local reference is received more than once from an account for the specified signal_type a new version of the signal will be stored with a incremented version number.\n- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.\n\n**Batches**\n\nBatches group separate loads for reporting and tracking purposes.\n- Signal loads are tracked under the batch_ref supplied as part of the request. To start a new batch\njust supply a different batch_ref.\n- Batches are stored at the account level and therefore can include signals from different ISNs and Signal Types\n- Use the *Get Batch Status* endpoint to get a report on the status of signals loaded in a batch.\n\n**Authentication**\n\nRequires a valid access token.\nThe claims in the access token list the ISNs and signal_types that the account is permitted to use.\n\n**Error handling**\n\nPartial loads of the data are possible where the request is a valid format but individual signals fail to load\n(e.g schema validation errors, incorrect correlations ids).\nFailures are logged and trackable via the Batch Status endpoint.\nThe response provides an audit trail detailing the submission outcome.\n\nNote the response structure is also used by the Signals Router hanlder which can return results for multiple ISNs -\nconsequently the `Results` field is an array (one element for each ISN in the results).\nThere will only ever be a single entry when using this handler.\n\nErrors that relate to the entire request  - e.g invalid json, authentication, permission and server errors (400, 401, 403, 500) -\nreturn a simple error_code/error_message response rather than a detailed audit log.\nThe individual signal failures are not logged in this case, and the client must resupply the data once the problem is resolved.\n\n**JSON Schema Validation**\n\nthe json contained in the `content` field is validated against the JSON schema specified for the signal type unless validation is disabled on the type definition.\n\nWhen schema validation is disabled, basic checks are still done on the incoming data and the following issues create a 400 error and cause the entire payload to be rejected:\n- invalid json format\n- missing fields (batch_ref must be present; the array of signals must be in a json object called signals; and the content and local_ref must be present for each element of the signals array).\n\n**Signal versions**\n\nNew versions are created when signals are resupplied using the same local_ref, e.g. because the client wants to correct a previously publsihed signal.\nIf a signal has been withdrawn it will be reactivated if you resubmit it using the same local_ref.\n\n**Correlating signals**\n\nCorrelation IDs can be used to link signals together (a `correlation_id` is the `signals_id` of a previosuly submitted signal)\nSignals can only be correlated within the same ISN.\nIf the supplied correlation_id is not found in the same ISN as the signal being submitted,\nthe response will contain a 422 or 207 status code and the error_code for the failed signal will be `invalid_correlation_id`.\n",
+                "description": "Submit JSON signals to an ISN (documents are sent to document signal types with Upload a Document)\n- payloads must not mix signals of different types and are subject to the size limits defined on the site.\n- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.\n- If a local reference is received more than once from an account for the specified signal_type a new version of the signal will be stored with a incremented version number.\n- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.\n\n**Batches**\n\nBatches group separate loads for reporting and tracking purposes.\n- Signal loads are tracked under the batch_ref supplied as part of the request. To start a new batch\njust supply a different batch_ref.\n- Batches are stored at the account level and therefore can include signals from different ISNs and Signal Types\n- Use the *Get Batch Status* endpoint to get a report on the status of signals loaded in a batch.\n\n**Authentication**\n\nRequires a valid access token.\nThe claims in the access token list the ISNs and signal_types that the account is permitted to use.\n\n**Error handling**\n\nPartial loads of the data are possible where the request is a valid format but individual signals fail to load\n(e.g schema validation errors, incorrect correlations ids).\nFailures are logged and trackable via the Batch Status endpoint.\nThe response provides an audit trail detailing the submission outcome.\n\nNote the response structure is also used by the Signals Router hanlder which can return results for multiple ISNs -\nconsequently the `Results` field is an array (one element for each ISN in the results).\nThere will only ever be a single entry when using this handler.\n\nErrors that relate to the entire request  - e.g invalid json, authentication, permission and server errors (400, 401, 403, 500) -\nreturn a simple error_code/error_message response rather than a detailed audit log.\nThe individual signal failures are not logged in this case, and the client must resupply the data once the problem is resolved.\n\n**JSON Schema Validation**\n\nthe json contained in the `content` field is validated against the JSON schema specified for the signal type unless validation is disabled on the type definition.\n\nWhen schema validation is disabled, basic checks are still done on the incoming data and the following issues create a 400 error and cause the entire payload to be rejected:\n- invalid json format\n- missing fields (batch_ref must be present; the array of signals must be in a json object called signals; and the content and local_ref must be present for each element of the signals array).\n\n**Signal versions**\n\nNew versions are created when signals are resupplied using the same local_ref, e.g. because the client wants to correct a previously publsihed signal.\nIf a signal has been withdrawn it will be reactivated if you resubmit it using the same local_ref.\n\n**Correlating signals**\n\nCorrelation IDs can be used to link signals together (a `correlation_id` is the `signals_id` of a previosuly submitted signal)\nSignals can only be correlated within the same ISN.\nIf the supplied correlation_id is not found in the same ISN as the signal being submitted,\nthe response will contain a 422 or 207 status code and the error_code for the failed signal will be `invalid_correlation_id`.\n",
                 "tags": [
                     "Signal Exchange"
                 ],
@@ -2610,6 +2478,138 @@
                     },
                     "500": {
                         "description": "database_error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/upload": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Upload a document (e.g. a PDF bill of lading) to a document signal type (JSON signals are sent with Submit Signals).\n\nDocuments are signals: they have a local_ref, versions, can be correlated with other signals and withdrawn.\nThe document details (name, mime_type, size_bytes and sha256) are returned as the signal content by the signal search endpoints.\n\n**Request format**\n\nThe request is multipart/form-data with one document per request:\n- send the form fields first (batch_ref, local_ref and any optional fields) - **the file must be the last part**\n- the file part must be named `file` and must include a filename - the filename is stored as the document's name\n\nThe request body looks like this:\n```\n--boundary\nContent-Disposition: form-data; name=\"batch_ref\"\n\ndaily-2026-09-26\n--boundary\nContent-Disposition: form-data; name=\"local_ref\"\n\nbol-0042\n--boundary\nContent-Disposition: form-data; name=\"file\"; filename=\"BL-0042.pdf\"\nContent-Type: application/pdf\n\n(the document bytes)\n--boundary--\n```\n\n**Supported formats**\n\nOnly common business document formats can be uploaded: PDF, JPEG, PNG and XML. Other files are rejected with 415 unsupported_media_type.\nThe format is detected from the content of the file - the Content-Type of the file part is ignored.\nXML documents must start with an XML declaration (\u003c?xml ...?\u003e).\n\nThe filename extension must match the format (.pdf, .jpg or .jpeg, .png, .xml - in any case), otherwise the upload is rejected with 400 malformed_body.\n\n**Versions**\n\nUploads for a local_ref you have already used are compared with its latest version:\n- the same file with the same filename returns the latest version with unchanged=true, and no new version is created - so uploads can be safely retried\n- a different file, or the same file with a different filename, creates a new version (including a file that matches an older version)\n- re-uploading a withdrawn document creates a new version and reactivates it\n- supplying a different correlation_id creates a new version with the new link (omitting correlation_id keeps the existing link)\n\nUnchanged uploads are not counted in the batch they were sent in - the existing version belongs to the batch that stored it.\nThe same file uploaded with a different local_ref is a separate document.\n\nRejected uploads are recorded against the batch (see the batch status endpoint).\n\n**Optional fields**\n- correlation_id: the ID of a signal of any type in the same ISN that this document relates to (e.g. the consignment a bill of lading belongs to).\nThe upload is rejected with 422 invalid_correlation_id if the signal does not exist in the ISN.\n- sha256: the sha256 of the document as lowercase hex, computed by the sender before uploading. If it does not match the uploaded file the upload is rejected with 400 malformed_body and no version is created.\nUse it to confirm the document stored is exactly the one you sent. If it is omitted, the sha256 computed by the server is returned in the response and can be used to check the upload afterwards.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "tags": [
+                    "Signal Exchange"
+                ],
+                "summary": "Upload a Document",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-isn",
+                        "description": "ISN slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "bill-of-lading",
+                        "description": "signal type slug",
+                        "name": "signal_type_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "1.0.0",
+                        "description": "version",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "batch reference (up to 128 alphanumeric characters, hyphens and underscores)",
+                        "name": "batch_ref",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "your reference for the document",
+                        "name": "local_ref",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "the ID of a signal in the same ISN that this document relates to",
+                        "name": "correlation_id",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "the sha256 of the document (lowercase hex) - the upload is rejected if it does not match",
+                        "name": "sha256",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "file",
+                        "description": "the document (must be the last part of the request)",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.DocumentUploadResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "malformed_body | invalid_url_param",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "authentication_error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "413": {
+                        "description": "request_too_large",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "415": {
+                        "description": "unsupported_media_type",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "422": {
+                        "description": "invalid_correlation_id",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error | internal_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
