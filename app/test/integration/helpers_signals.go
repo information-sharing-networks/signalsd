@@ -34,6 +34,7 @@ func newTestSignalEndpoint(isn database.Isn, signalType database.SignalType) tes
 }
 
 // createValidSignalPayload creates a payload with one signal that is valid for the test schema
+// the batch reference used is "test-batch"
 // (https://github.com/information-sharing-networks/signal-library/blob/main/signalsd-testing/simple.json)
 func createValidSignalPayload(localRef string) map[string]any {
 	return map[string]any{
@@ -296,6 +297,23 @@ func getSignalTypeRequest(t *testing.T, baseURL, token, slug, semVer string) *ht
 	response, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatalf("Failed to get signal type: %v", err)
+	}
+	return response
+}
+
+// getBatchStatusRequest gets the status of a batch: GET /api/batches/{batch_ref}/status
+func getBatchStatusRequest(t *testing.T, baseURL, token, batchRef string) *http.Response {
+	t.Helper()
+
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/api/batches/%s/status", baseURL, batchRef), nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	response, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Failed to get batch status: %v", err)
 	}
 	return response
 }

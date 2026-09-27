@@ -374,6 +374,7 @@ func (s *Server) registerSignalWriteRoutes() {
 	signals := handlers.NewSignalsHandler(s.queries, s.pool, s.schemaCache, s.publicIsnCache)
 	signalBatches := handlers.NewSignalsBatchHandler(s.queries)
 	routerSignals := handlers.NewSignalRouter(s.queries, s.pool, s.schemaCache, s.signalRouterCache)
+	documents := handlers.NewDocumentsHandler(s.queries, s.pool, s.schemaCache, s.documentStore, s.config.MaxDocumentSize)
 
 	s.router.Group(func(r chi.Router) {
 		r.Use(middleware.CORS(s.corsConfigs.Protected))
@@ -384,10 +385,27 @@ func (s *Server) registerSignalWriteRoutes() {
 		// direct ISN signal post and withdrawal
 		r.Post("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals", responses.Wrap(signals.CreateSignals))
 		r.Put("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/withdraw", responses.Wrap(signals.WithdrawSignal))
+	})
 
-		// batch status endpoints
+	// batch status endpoints - batches belong to an account rather than an ISN, so RequireAccessPermission is not used.
+	// The handlers only return the account's own batches (site admins can view any account's batches).
+	s.router.Group(func(r chi.Router) {
+		r.Use(middleware.CORS(s.corsConfigs.Protected))
+		r.Use(s.authService.RequireValidAccessToken)
+
 		r.Get("/api/batches/search", responses.Wrap(signalBatches.SearchBatches))
 		r.Get("/api/batches/{batch_ref}/status", responses.Wrap(signalBatches.GetSignalBatchStatus))
+	})
+
+	// document upload - the handler limits the document to MAX_DOCUMENT_SIZE.
+	// The request size limit allows an extra 64KB for the form fields and multipart headers sent with the document.
+	s.router.Group(func(r chi.Router) {
+		r.Use(middleware.CORS(s.corsConfigs.Protected))
+		r.Use(middleware.RequestSizeLimit(s.config.MaxDocumentSize + 64*1024))
+		r.Use(s.authService.RequireValidAccessToken)
+		r.Use(s.authService.RequireAccessPermission("write"))
+
+		r.Post("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/documents", responses.Wrap(documents.UploadDocument))
 	})
 
 	// Router signal endpoint: ISN is resolved by routing rules, not from the URL.

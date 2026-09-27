@@ -20,7 +20,7 @@ type Key struct {
 type Store interface {
 	// Put reads the content, stores it and returns its key and size in bytes.
 	// Storing content the account has already stored is a no-op.
-	// The caller must limit the size of the content (e.g middleware.RequestSizeLimit)
+	// The caller must limit the size of the content - e.g. the upload handler wraps the file in http.MaxBytesReader(MAX_DOCUMENT_SIZE)
 	Put(ctx context.Context, accountID uuid.UUID, content io.Reader) (Key, int64, error)
 
 	// Get returns the content stored under the key. The caller must close the reader.

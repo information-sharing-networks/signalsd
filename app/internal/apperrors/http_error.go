@@ -43,6 +43,11 @@ func MalformedBody(message string, err error) *HTTPError {
 	return &HTTPError{Status: http.StatusBadRequest, Code: ErrCodeMalformedBody, Message: message, Err: err}
 }
 
+// InvalidCorrelationID responds with 422 + invalid_correlation_id (the correlated signal does not exist in the ISN).
+func InvalidCorrelationID(message string, err error) *HTTPError {
+	return &HTTPError{Status: http.StatusUnprocessableEntity, Code: ErrCodeInvalidCorrelationID, Message: message, Err: err}
+}
+
 // RequestTooLarge responds with 413 + request_too_large (the request body is larger than limit bytes).
 func RequestTooLarge(limit int64) *HTTPError {
 	return &HTTPError{

@@ -257,6 +257,59 @@ func (q *Queries) GetIsnBySignalID(ctx context.Context, id uuid.UUID) (GetIsnByS
 	return i, err
 }
 
+const GetLatestSignalVersionByLocalRef = `-- name: GetLatestSignalVersionByLocalRef :one
+SELECT
+    s.id AS signal_id,
+    s.correlation_id,
+    s.is_withdrawn,
+    lsv.id AS signal_version_id,
+    lsv.version_number,
+    lsv.content
+FROM signals s
+JOIN signal_types st ON st.id = s.signal_type_id
+JOIN latest_signal_versions lsv ON lsv.signal_id = s.id
+WHERE s.account_id = $1
+    AND st.slug = $2
+    AND st.sem_ver = $3
+    AND s.local_ref = $4
+`
+
+type GetLatestSignalVersionByLocalRefParams struct {
+	AccountID      uuid.UUID `json:"account_id"`
+	SignalTypeSlug string    `json:"signal_type_slug"`
+	SemVer         string    `json:"sem_ver"`
+	LocalRef       string    `json:"local_ref"`
+}
+
+type GetLatestSignalVersionByLocalRefRow struct {
+	SignalID        uuid.UUID       `json:"signal_id"`
+	CorrelationID   uuid.UUID       `json:"correlation_id"`
+	IsWithdrawn     bool            `json:"is_withdrawn"`
+	SignalVersionID uuid.UUID       `json:"signal_version_id"`
+	VersionNumber   int32           `json:"version_number"`
+	Content         json.RawMessage `json:"content"`
+}
+
+// returns the latest version of the account's signal with the supplied local_ref (used to detect unchanged document uploads)
+func (q *Queries) GetLatestSignalVersionByLocalRef(ctx context.Context, arg GetLatestSignalVersionByLocalRefParams) (GetLatestSignalVersionByLocalRefRow, error) {
+	row := q.db.QueryRow(ctx, GetLatestSignalVersionByLocalRef,
+		arg.AccountID,
+		arg.SignalTypeSlug,
+		arg.SemVer,
+		arg.LocalRef,
+	)
+	var i GetLatestSignalVersionByLocalRefRow
+	err := row.Scan(
+		&i.SignalID,
+		&i.CorrelationID,
+		&i.IsWithdrawn,
+		&i.SignalVersionID,
+		&i.VersionNumber,
+		&i.Content,
+	)
+	return i, err
+}
+
 const GetPreviousSignalVersions = `-- name: GetPreviousSignalVersions :many
 SELECT sv.signal_id, id as signal_version_id, sv.created_at, sv.version_number, sv.content
 FROM signal_versions  sv

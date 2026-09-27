@@ -7,7 +7,7 @@
 --
 -- A document is a signal with binary content (e.g a pdf)
 -- the signal type is the document type (e.g. bill-of-lading/v1.0.0).
--- signal_versions.content holds a server-generated descriptor (name, mime_type, size_bytes, sha256).
+-- signal_versions.content holds a server-generated document metadata (name, mime_type, size_bytes, sha256).
 -- The file itself is stored separately (document_contents is used when storage is in postgres)
 -- -------------------------------------------------------------------------
 

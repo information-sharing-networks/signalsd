@@ -349,6 +349,48 @@ definitions:
         example: lkIB53@6O^Y
         type: string
     type: object
+  handlers.DocumentUploadResponse:
+    properties:
+      batch_ref:
+        example: daily-sync-2026-04-02
+        type: string
+      local_ref:
+        example: bol-2026-0042
+        type: string
+      mime_type:
+        description: MimeType is the declared content type, or the detected type if
+          none was supplied by the client
+        example: application/pdf
+        type: string
+      name:
+        description: Name is the file name supplied when the document was uploaded
+        example: BL-2026-0042.pdf
+        type: string
+      sha256:
+        description: SHA256 is the sha256 hash of the document as lowercase hex (computed
+          by the server when the document is uploaded)
+        example: 2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824
+        type: string
+      signal_id:
+        example: b8ded113-ac0e-4a2c-a89f-0876fe97b440
+        type: string
+      signal_version_id:
+        example: 835788bd-789d-4091-96e3-db0f51ccbabc
+        type: string
+      size_bytes:
+        description: SizeBytes is the size of the document in bytes (measured by the
+          server when the document is uploaded)
+        example: 482133
+        type: integer
+      unchanged:
+        description: true if the document is identical to the latest version, in which
+          case no new version is created
+        example: false
+        type: boolean
+      version_number:
+        example: 1
+        type: integer
+    type: object
   handlers.FailedSignal:
     properties:
       error_code:
@@ -2870,6 +2912,134 @@ paths:
       summary: Update ISN Signal Type Status
       tags:
       - ISN Configuration
+  /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/documents:
+    post:
+      consumes:
+      - multipart/form-data
+      description: |-
+        Upload a document (e.g. a PDF bill of lading) to a document signal type.
+
+        Documents are signals: they have a local_ref, versions, can be correlated with other signals and withdrawn.
+        The document details (name, mime_type, size_bytes and sha256) are returned as the signal content by the signal search endpoints.
+
+        **Request format**
+
+        The request is multipart/form-data with one document per request:
+        - send the form fields first (batch_ref, local_ref and any optional fields) - **the file must be the last part**
+        - the file part must be named `file` and must include a filename - the filename is stored as the document's name
+
+        The request body looks like this:
+        ```
+        --boundary
+        Content-Disposition: form-data; name="batch_ref"
+
+        daily-2026-09-26
+        --boundary
+        Content-Disposition: form-data; name="local_ref"
+
+        bol-0042
+        --boundary
+        Content-Disposition: form-data; name="file"; filename="BL-0042.pdf"
+        Content-Type: application/pdf
+
+        (the document bytes)
+        --boundary--
+        ```
+
+        Uploading the same document again for a local_ref does not create a new version: the latest version is returned with unchanged=true.
+        This means uploads can be safely retried.
+
+        Rejected uploads are recorded against the batch (see the batch status endpoint).
+
+        **Optional fields**
+        - correlation_id: the ID of a signal of any type in the same ISN that this document relates to (e.g. the consignment a bill of lading belongs to).
+        The upload is rejected with 422 invalid_correlation_id if the signal does not exist in the ISN.
+        - sha256: the sha256 of the document as lowercase hex, computed by the sender before uploading. If it does not match the uploaded file the upload is rejected with 400 malformed_body and no version is created.
+        Use it to confirm the document stored is exactly the one you sent. If it is omitted, the sha256 computed by the server is returned in the response and can be used to check the upload afterwards.
+        - the Content-Type of the file part: used as the document's mime_type. If it is omitted or is application/octet-stream, the type is detected from the start of the document.
+      parameters:
+      - description: ISN slug
+        example: sample-isn
+        in: path
+        name: isn_slug
+        required: true
+        type: string
+      - description: signal type slug
+        example: bill-of-lading
+        in: path
+        name: signal_type_slug
+        required: true
+        type: string
+      - description: version
+        example: 1.0.0
+        in: path
+        name: sem_ver
+        required: true
+        type: string
+      - description: batch reference (up to 128 alphanumeric characters, hyphens and
+          underscores)
+        in: formData
+        name: batch_ref
+        required: true
+        type: string
+      - description: your reference for the document
+        in: formData
+        name: local_ref
+        required: true
+        type: string
+      - description: the ID of a signal in the same ISN that this document relates
+          to
+        in: formData
+        name: correlation_id
+        type: string
+      - description: the sha256 of the document (lowercase hex) - the upload is rejected
+          if it does not match
+        in: formData
+        name: sha256
+        type: string
+      - description: the document (must be the last part of the request)
+        in: formData
+        name: file
+        required: true
+        type: file
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.DocumentUploadResponse'
+        "400":
+          description: malformed_body | invalid_url_param
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: authentication_error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "413":
+          description: request_too_large
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "422":
+          description: invalid_correlation_id
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error | internal_error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Upload a Document
+      tags:
+      - Signal Exchange
   /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals:
     post:
       description: |
@@ -2974,6 +3144,10 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
           description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "413":
+          description: request_too_large
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "422":
@@ -3374,6 +3548,10 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
           description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "413":
+          description: request_too_large
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "422":

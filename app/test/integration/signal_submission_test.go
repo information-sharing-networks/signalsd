@@ -7,6 +7,7 @@ package integration
 // - TestSignalSubmission: authentication, request validation and per-signal processing results
 // - TestCorrelatedSignalSubmission: correlation_id handling
 // - TestIsInUseStatus: signals can't be written or read when the ISN or signal type is disabled
+// - TestWritesWithTokenIssuedBeforeSignalTypeDisabled: the write queries reject signals when the claims in the access token are out of date
 
 import (
 	"context"
@@ -19,6 +20,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
+	"github.com/information-sharing-networks/signalsd/app/internal/server/handlers"
 )
 
 // TestSignalSubmission checks
@@ -472,5 +474,82 @@ func TestIsInUseStatus(t *testing.T) {
 				}
 			})
 		}
+	})
+}
+
+// TestWritesWithTokenIssuedBeforeSignalTypeDisabled checks signals are not stored when the signal type has been disabled
+// on the ISN after the access token was issued.
+//
+// The access token claims say the signal type is in use until the token expires, so the requests pass the permission checks.
+// The queries that create signals check the ISN and signal type are in use, and the signal is rejected with resource_not_found.
+func TestWritesWithTokenIssuedBeforeSignalTypeDisabled(t *testing.T) {
+	ctx := context.Background()
+
+	testEnv := startInProcessServer(t, "")
+
+	adminAccount := createTestAccount(t, ctx, testEnv.queries, "siteadmin", "user", "admin@stale-token.com")
+	isn := createTestISN(t, ctx, testEnv.queries, "stale-token-isn", "Stale token ISN", adminAccount.ID, "private")
+	jsonSignalType := createTestSignalType(t, ctx, testEnv.queries, isn.ID, "stale token signal", "", signalsd.ContentKindJSON)
+	documentSignalType := createTestSignalType(t, ctx, testEnv.queries, isn.ID, "stale token document", "", signalsd.ContentKindDocument)
+
+	if err := testEnv.schemaCache.Load(ctx); err != nil {
+		t.Fatalf("Failed to refresh schema cache: %v", err)
+	}
+
+	// the token is issued while the signal types are enabled
+	adminToken := testEnv.getAccessToken(t, adminAccount.ID)
+
+	// route every json signal to the ISN
+	setRoutingConfig(t, testEnv, adminToken, jsonSignalType, handlers.UpdateSignalRoutingConfigRequest{
+		RoutingField: "test",
+		RoutingRules: []handlers.SignalRoutingRule{
+			{MatchPattern: "*valid*", Operator: "matches", IsnSlug: isn.Slug, Sequence: 1},
+		},
+	})
+	if err := testEnv.routerCache.Load(ctx); err != nil {
+		t.Fatalf("Failed to refresh router cache: %v", err)
+	}
+
+	// disable both signal types on the ISN after the token was issued
+	for _, signalType := range []database.SignalType{jsonSignalType, documentSignalType} {
+		_, err := testEnv.queries.UpdateIsnSignalTypeStatus(ctx, database.UpdateIsnSignalTypeStatusParams{
+			IsnID:        isn.ID,
+			SignalTypeID: signalType.ID,
+			IsInUse:      false,
+		})
+		if err != nil {
+			t.Fatalf("Failed to disable signal type %s on the ISN: %v", signalType.Slug, err)
+		}
+	}
+
+	t.Run("create signals", func(t *testing.T) {
+		response := submitCreateSignalRequest(t, testEnv.baseURL, createValidSignalPayload("stale-001"), adminToken, newTestSignalEndpoint(isn, jsonSignalType))
+		submission := expectSubmissionResponse(t, response, http.StatusUnprocessableEntity)
+
+		if len(submission.Results) != 1 || len(submission.Results[0].FailedSignals) != 1 {
+			t.Fatalf("Expected 1 failed signal, got %+v", submission)
+		}
+		if errorCode := submission.Results[0].FailedSignals[0].ErrorCode; errorCode != apperrors.ErrCodeResourceNotFound.String() {
+			t.Errorf("Expected error code %s, got %s", apperrors.ErrCodeResourceNotFound, errorCode)
+		}
+	})
+
+	t.Run("signal router", func(t *testing.T) {
+		response := submitRouteSignalsRequest(t, testEnv.baseURL, createValidSignalPayload("stale-002"), adminToken, jsonSignalType.Slug, jsonSignalType.SemVer)
+		submission := expectSubmissionResponse(t, response, http.StatusUnprocessableEntity)
+
+		if len(submission.Results) != 1 || len(submission.Results[0].FailedSignals) != 1 {
+			t.Fatalf("Expected 1 failed signal, got %+v", submission)
+		}
+		if errorCode := submission.Results[0].FailedSignals[0].ErrorCode; errorCode != apperrors.ErrCodeResourceNotFound.String() {
+			t.Errorf("Expected error code %s, got %s", apperrors.ErrCodeResourceNotFound, errorCode)
+		}
+	})
+
+	t.Run("document upload", func(t *testing.T) {
+		response := uploadDocumentRequest(t, testEnv.baseURL, adminToken, newTestSignalEndpoint(isn, documentSignalType), documentUpload{
+			batchRef: "stale-batch", localRef: "stale-003", fileName: "bl.pdf", contentType: "application/pdf", content: []byte("%PDF-1.7 stale"),
+		})
+		expectErrorCode(t, response, http.StatusNotFound, apperrors.ErrCodeResourceNotFound)
 	})
 }

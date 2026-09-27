@@ -477,6 +477,7 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 //	@Failure	401					{object}	responses.ErrorResponse				"authentication_error"
 //	@Failure	403					{object}	responses.ErrorResponse				"forbidden"
 //	@Failure	404					{object}	responses.ErrorResponse				"resource_not_found"
+//	@Failure	413					{object}	responses.ErrorResponse				"request_too_large"
 //	@Failure	500					{object}	responses.ErrorResponse				"database_error | internal_error"
 //
 //	@Security	BearerAccessToken
@@ -680,18 +681,18 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) e
 			}
 
 			// The insert checks that the signal type is enabled for the ISN - if not it returns ErrNoRows
-			errMsg := fmt.Sprintf("failed to create signal master record: %v", signalErr)
-			if errors.Is(signalErr, pgx.ErrNoRows) {
-				errMsg = "failed to create signal master record - no rows affected (possibly the signal type was disabled afer the acccess token was issued)"
-			}
-
-			// record database errors in the failed signals array
-			// (the signals router reports the same failure with the same error_code - see RouteSignals)
-			result.FailedSignals = append(result.FailedSignals, FailedSignal{
+			// the insert checks the ISN and signal type are in use - if not it returns no rows
+			// (possible if they were disabled after the access token was issued).
+			failure := FailedSignal{
 				LocalRef:     signal.LocalRef,
 				ErrorCode:    string(apperrors.ErrCodeDatabaseError),
-				ErrorMessage: errMsg,
-			})
+				ErrorMessage: fmt.Sprintf("failed to create signal master record: %v", signalErr),
+			}
+			if errors.Is(signalErr, pgx.ErrNoRows) {
+				failure.ErrorCode = string(apperrors.ErrCodeResourceNotFound)
+				failure.ErrorMessage = "the ISN or signal type is not in use"
+			}
+			result.FailedSignals = append(result.FailedSignals, failure)
 			continue
 		}
 

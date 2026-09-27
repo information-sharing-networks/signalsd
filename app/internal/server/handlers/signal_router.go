@@ -147,6 +147,7 @@ type resolvedSignal struct {
 //	@Failure		400					{object}	responses.ErrorResponse				"malformed_body"
 //	@Failure		401					{object}	responses.ErrorResponse				"authentication_error"
 //	@Failure		404					{object}	responses.ErrorResponse				"resource_not_found"
+//	@Failure		413					{object}	responses.ErrorResponse				"request_too_large"
 //	@Failure		500					{object}	responses.ErrorResponse				"database_error"
 //
 //	@Security		BearerAccessToken
@@ -350,13 +351,16 @@ func (s *SignalRouter) RouteSignals(w http.ResponseWriter, r *http.Request) erro
 					slog.String("rollback_error", rollbackErr.Error()),
 				)
 			}
-			errMsg := fmt.Sprintf("failed to create signal: %v", signalErr)
-			if errors.Is(signalErr, pgx.ErrNoRows) {
-				errMsg = "failed to create signal - signal type may no longer be active on this ISN"
+			// the insert checks the ISN and signal type are in use - if not it returns no rows
+			// (possible if they were disabled after the access token was issued)
+			failure := FailedSignal{
+				LocalRef: rs.signal.LocalRef, ErrorCode: string(apperrors.ErrCodeDatabaseError), ErrorMessage: fmt.Sprintf("failed to create signal: %v", signalErr),
 			}
-			result.FailedSignals = append(result.FailedSignals, FailedSignal{
-				LocalRef: rs.signal.LocalRef, ErrorCode: string(apperrors.ErrCodeDatabaseError), ErrorMessage: errMsg,
-			})
+			if errors.Is(signalErr, pgx.ErrNoRows) {
+				failure.ErrorCode = string(apperrors.ErrCodeResourceNotFound)
+				failure.ErrorMessage = "the ISN or signal type is not in use"
+			}
+			result.FailedSignals = append(result.FailedSignals, failure)
 			totalRejected++
 			continue
 		}

@@ -79,12 +79,15 @@ Tests signal creation, search, and security controls via HTTP requests.
 - ✅ Signal router and routing config (`signal_router_test.go`, `signal_routing_test.go`)
 - ✅ Document signal types (`document_signal_type_test.go`)
 - ✅ Postgres document store (`document_store_test.go`)
+- ✅ Document upload (`document_upload_test.go`)
+- ✅ Request size limits (`request_size_test.go`)
 - ✅ Site-wide signal type details and the signal types added to each ISN (`signal_type_test.go`)
 
 
 ### 5. Batch Management (`batch_test.go`)
 
 - ✅ Batch creation and automatic closure
+- ✅ Batch status and search endpoints
 - ✅ Service account submission requirements
 - ✅ Batch validation and error handling
 

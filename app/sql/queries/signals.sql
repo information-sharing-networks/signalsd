@@ -337,3 +337,20 @@ WHERE
     -- exclude the latest version 
     AND sv.id != (SELECT id from latest_signal_versions lsv WHERE lsv.signal_id = sv.signal_id)
     ORDER BY sv.created_at;
+
+-- name: GetLatestSignalVersionByLocalRef :one
+-- returns the latest version of the account's signal with the supplied local_ref (used to detect unchanged document uploads)
+SELECT
+    s.id AS signal_id,
+    s.correlation_id,
+    s.is_withdrawn,
+    lsv.id AS signal_version_id,
+    lsv.version_number,
+    lsv.content
+FROM signals s
+JOIN signal_types st ON st.id = s.signal_type_id
+JOIN latest_signal_versions lsv ON lsv.signal_id = s.id
+WHERE s.account_id = sqlc.arg(account_id)
+    AND st.slug = sqlc.arg(signal_type_slug)
+    AND st.sem_ver = sqlc.arg(sem_ver)
+    AND s.local_ref = sqlc.arg(local_ref);

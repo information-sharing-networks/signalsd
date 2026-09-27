@@ -25,7 +25,8 @@ func expectStatus(t *testing.T, response *http.Response, expectedStatus int) {
 	}
 }
 
-// expectJSONResponse checks the response status, closes the body and returns the decoded JSON object
+// expectJSONResponse reads response's body.  Fails the test fatally if the status
+// code doesn't match expectedStatus, otherwise returns the decoded value.
 func expectJSONResponse(t *testing.T, response *http.Response, expectedStatus int) map[string]any {
 	t.Helper()
 	defer response.Body.Close()
