@@ -2,16 +2,20 @@ package handlers
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"mime"
 	"mime/multipart"
 	"net/http"
+	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"uuid"
 
@@ -54,10 +58,10 @@ func NewDocumentsHandler(queries *database.Queries, pool *pgxpool.Pool, schemaCa
 // The document itself is downloaded separately.
 type DocumentMetadata struct {
 
-	// Name is the file name supplied when the document was uploaded
+	// Name is the file name supplied when the document was uploaded (its extension must matche the mime type)
 	Name string `json:"name" example:"BL-2026-0042.pdf"`
 
-	// MimeType is the declared content type, or the detected type if none was supplied by the client
+	// MimeType is the type of document, detected from its content (application/pdf, image/jpeg, image/png or text/xml)
 	MimeType string `json:"mime_type" example:"application/pdf"`
 
 	// SizeBytes is the size of the document in bytes (measured by the server when the document is uploaded)
@@ -75,7 +79,7 @@ type DocumentUploadResponse struct {
 	SignalVersionID uuid.UUID `json:"signal_version_id" example:"835788bd-789d-4091-96e3-db0f51ccbabc"`
 	VersionNumber   int32     `json:"version_number" example:"1"`
 	DocumentMetadata
-	Unchanged bool `json:"unchanged" example:"false"` // true if the document is identical to the latest version, in which case no new version is created
+	Unchanged bool `json:"unchanged" example:"false"` // true if the file and filename are the same as the latest version, in which case that version is returned and no new version is created
 }
 
 // UploadDocument godoc
@@ -112,8 +116,24 @@ type DocumentUploadResponse struct {
 //	@Description	--boundary--
 //	@Description	```
 //	@Description
-//	@Description	Uploading the same document again for a local_ref does not create a new version: the latest version is returned with unchanged=true.
-//	@Description	This means uploads can be safely retried.
+//	@Description	**Supported formats**
+//	@Description
+//	@Description	Only common business document formats can be uploaded: PDF, JPEG, PNG and XML. Other files are rejected with 415 unsupported_media_type.
+//	@Description	The format is detected from the content of the file - the Content-Type of the file part is ignored.
+//	@Description	XML documents must start with an XML declaration (<?xml ...?>).
+//	@Description
+//	@Description	The filename extension must match the format (.pdf, .jpg or .jpeg, .png, .xml - in any case), otherwise the upload is rejected with 400 malformed_body.
+//	@Description
+//	@Description	**Versions**
+//	@Description
+//	@Description	Uploads for a local_ref you have already used are compared with its latest version:
+//	@Description	- the same file with the same filename returns the latest version with unchanged=true, and no new version is created - so uploads can be safely retried
+//	@Description	- a different file, or the same file with a different filename, creates a new version (including a file that matches an older version)
+//	@Description	- re-uploading a withdrawn document creates a new version and reactivates it
+//	@Description	- supplying a different correlation_id creates a new version with the new link (omitting correlation_id keeps the existing link)
+//	@Description
+//	@Description	Unchanged uploads are not counted in the batch they were sent in - the existing version belongs to the batch that stored it.
+//	@Description	The same file uploaded with a different local_ref is a separate document.
 //	@Description
 //	@Description	Rejected uploads are recorded against the batch (see the batch status endpoint).
 //	@Description
@@ -122,7 +142,6 @@ type DocumentUploadResponse struct {
 //	@Description	The upload is rejected with 422 invalid_correlation_id if the signal does not exist in the ISN.
 //	@Description	- sha256: the sha256 of the document as lowercase hex, computed by the sender before uploading. If it does not match the uploaded file the upload is rejected with 400 malformed_body and no version is created.
 //	@Description	Use it to confirm the document stored is exactly the one you sent. If it is omitted, the sha256 computed by the server is returned in the response and can be used to check the upload afterwards.
-//	@Description	- the Content-Type of the file part: used as the document's mime_type. If it is omitted or is application/octet-stream, the type is detected from the start of the document.
 //
 //	@Accept			multipart/form-data
 //	@Param			isn_slug			path		string	true	"ISN slug"			example(sample-isn)
@@ -140,6 +159,7 @@ type DocumentUploadResponse struct {
 //	@Failure		403					{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		404					{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		413					{object}	responses.ErrorResponse	"request_too_large"
+//	@Failure		415					{object}	responses.ErrorResponse	"unsupported_media_type"
 //	@Failure		422					{object}	responses.ErrorResponse	"invalid_correlation_id"
 //	@Failure		500					{object}	responses.ErrorResponse	"database_error | internal_error"
 //
@@ -270,18 +290,30 @@ func (h *DocumentsHandler) UploadDocument(w http.ResponseWriter, r *http.Request
 	// limit the size of the document (the request size limit also allows for the form fields and multipart headers)
 	file := bufio.NewReader(http.MaxBytesReader(w, filePart, h.maxDocumentSize))
 
-	// 2. use the declared content type, or detect it from the start of the document
-	// (application/octet-stream is what most clients send when they don't know the type)
-	mimeType := ""
-	if mediaType, params, err := mime.ParseMediaType(filePart.Header.Get("Content-Type")); err == nil && mediaType != "application/octet-stream" {
-		mimeType = mime.FormatMediaType(mediaType, params)
+	// 2. detect the type of document from its content - only supported document formats can be uploaded.
+	// The Content-Type declared by the client is ignored (it can't be trusted, and many clients send application/octet-stream)
+	start, err := file.Peek(512)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return reject(requestReadError(err))
 	}
-	if mimeType == "" {
-		start, err := file.Peek(512)
-		if err != nil && !errors.Is(err, io.EOF) {
-			return reject(requestReadError(err))
-		}
-		mimeType = http.DetectContentType(start)
+	if len(start) == 0 {
+		return reject(apperrors.MalformedBody("the file is empty", nil))
+	}
+
+	// a UTF-8 byte order mark is removed first: http.DetectContentType treats content that starts with one as text,
+	// but XML written by Windows tools often includes it
+	mimeType, _, err := mime.ParseMediaType(http.DetectContentType(bytes.TrimPrefix(start, []byte("\xef\xbb\xbf"))))
+	allowedExtensions, supported := signalsd.SupportedDocumentFormats[mimeType]
+	if err != nil || !supported {
+		supportedMimeTypes := slices.Sorted(maps.Keys(signalsd.SupportedDocumentFormats))
+		return reject(apperrors.UnsupportedMediaType(fmt.Sprintf("the file is not a supported document format (%s)", strings.Join(supportedMimeTypes, ", ")), nil))
+	}
+
+	// the filename extension must match the format
+	extension := strings.ToLower(filepath.Ext(filePart.FileName()))
+	if !slices.Contains(allowedExtensions, extension) {
+		return reject(apperrors.MalformedBody(fmt.Sprintf("the filename extension %q does not match the document format %s (use %s)",
+			extension, mimeType, strings.Join(allowedExtensions, " or ")), nil))
 	}
 
 	// 3. store the document - the store computes the sha256 as it reads
@@ -297,9 +329,6 @@ func (h *DocumentsHandler) UploadDocument(w http.ResponseWriter, r *http.Request
 			return reject(apperrors.MalformedBody("the file could not be read - the request ended unexpectedly", err))
 		}
 		return reject(apperrors.InternalError("could not store the document", err))
-	}
-	if size == 0 {
-		return reject(apperrors.MalformedBody("the file is empty", nil))
 	}
 
 	// the file must be the last part (fields sent after the file would otherwise be ignored)
@@ -328,7 +357,7 @@ func (h *DocumentsHandler) UploadDocument(w http.ResponseWriter, r *http.Request
 
 	queries := h.queries.WithTx(tx)
 
-	// if the document is the same as the latest version, return that version rather than creating a new one.
+	// if the upload is the same as the latest version (the same file with the same name), return that version rather than creating a new one.
 	// Withdrawn signals and changes to the correlation_id always create a new version (as with json signals).
 	latest, err := queries.GetLatestSignalVersionByLocalRef(ctx, database.GetLatestSignalVersionByLocalRefParams{
 		AccountID:      accountID,
@@ -344,7 +373,8 @@ func (h *DocumentsHandler) UploadDocument(w http.ResponseWriter, r *http.Request
 		if err := json.Unmarshal(latest.Content, &latestDocumentMetadata); err != nil {
 			return reject(apperrors.InternalError("could not read the latest version of the document", err))
 		}
-		if latestDocumentMetadata.SHA256 == key.SHA256 {
+		// the mime type and size are determined by the content, so this compares the sha256 and name
+		if latestDocumentMetadata == documentMetadata {
 			return responses.JSON(w, http.StatusOK, DocumentUploadResponse{
 				BatchRef:         batch.BatchRef,
 				LocalRef:         localRef,

@@ -20,6 +20,7 @@ definitions:
     - password_too_short
     - refresh_token_invalid
     - request_too_large
+    - unsupported_media_type
     - rate_limit_exceeded
     - resource_already_exists
     - resource_expired
@@ -46,6 +47,7 @@ definitions:
     - ErrCodePasswordTooShort
     - ErrCodeRefreshTokenInvalid
     - ErrCodeRequestTooLarge
+    - ErrCodeUnsupportedMediaType
     - ErrCodeRateLimitExceeded
     - ErrCodeResourceAlreadyExists
     - ErrCodeResourceExpired
@@ -359,12 +361,13 @@ definitions:
         example: bol-2026-0042
         type: string
       mime_type:
-        description: MimeType is the declared content type, or the detected type if
-          none was supplied by the client
+        description: MimeType is the type of document, detected from its content (application/pdf,
+          image/jpeg, image/png or text/xml)
         example: application/pdf
         type: string
       name:
         description: Name is the file name supplied when the document was uploaded
+          (its extension must matche the mime type)
         example: BL-2026-0042.pdf
         type: string
       sha256:
@@ -384,8 +387,8 @@ definitions:
         example: 482133
         type: integer
       unchanged:
-        description: true if the document is identical to the latest version, in which
-          case no new version is created
+        description: true if the file and filename are the same as the latest version,
+          in which case that version is returned and no new version is created
         example: false
         type: boolean
       version_number:
@@ -2947,8 +2950,24 @@ paths:
         --boundary--
         ```
 
-        Uploading the same document again for a local_ref does not create a new version: the latest version is returned with unchanged=true.
-        This means uploads can be safely retried.
+        **Supported formats**
+
+        Only common business document formats can be uploaded: PDF, JPEG, PNG and XML. Other files are rejected with 415 unsupported_media_type.
+        The format is detected from the content of the file - the Content-Type of the file part is ignored.
+        XML documents must start with an XML declaration (<?xml ...?>).
+
+        The filename extension must match the format (.pdf, .jpg or .jpeg, .png, .xml - in any case), otherwise the upload is rejected with 400 malformed_body.
+
+        **Versions**
+
+        Uploads for a local_ref you have already used are compared with its latest version:
+        - the same file with the same filename returns the latest version with unchanged=true, and no new version is created - so uploads can be safely retried
+        - a different file, or the same file with a different filename, creates a new version (including a file that matches an older version)
+        - re-uploading a withdrawn document creates a new version and reactivates it
+        - supplying a different correlation_id creates a new version with the new link (omitting correlation_id keeps the existing link)
+
+        Unchanged uploads are not counted in the batch they were sent in - the existing version belongs to the batch that stored it.
+        The same file uploaded with a different local_ref is a separate document.
 
         Rejected uploads are recorded against the batch (see the batch status endpoint).
 
@@ -2957,7 +2976,6 @@ paths:
         The upload is rejected with 422 invalid_correlation_id if the signal does not exist in the ISN.
         - sha256: the sha256 of the document as lowercase hex, computed by the sender before uploading. If it does not match the uploaded file the upload is rejected with 400 malformed_body and no version is created.
         Use it to confirm the document stored is exactly the one you sent. If it is omitted, the sha256 computed by the server is returned in the response and can be used to check the upload afterwards.
-        - the Content-Type of the file part: used as the document's mime_type. If it is omitted or is application/octet-stream, the type is detected from the start of the document.
       parameters:
       - description: ISN slug
         example: sample-isn
@@ -3026,6 +3044,10 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
         "413":
           description: request_too_large
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "415":
+          description: unsupported_media_type
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "422":

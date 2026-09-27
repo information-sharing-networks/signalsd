@@ -55,6 +55,9 @@ const (
 	// ErrCodeRequestTooLarge used when the request body exceeds the configured size limit
 	ErrCodeRequestTooLarge ErrorCode = "request_too_large"
 
+	// ErrCodeUnsupportedMediaType used when an uploaded document is not in a supported format
+	ErrCodeUnsupportedMediaType ErrorCode = "unsupported_media_type"
+
 	// ErrCodeRateLimitExceeded used when the server can't handle a request because the rate limit was reached
 	ErrCodeRateLimitExceeded ErrorCode = "rate_limit_exceeded"
 

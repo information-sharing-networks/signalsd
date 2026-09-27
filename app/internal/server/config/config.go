@@ -144,6 +144,18 @@ var ValidDocumentStores = map[string]bool{
 	DocumentStorePostgres: true,
 }
 
+// SupportedDocumentFormats are the document formats that can be uploaded: the mime type (detected from the content)
+// and the filename extensions allowed for it.
+// Only common business document formats are accepted, to reduce the opportunities to share malicious content.
+//
+// If you change the formats, update the "Supported formats" section of the UploadDocument swagger description.
+var SupportedDocumentFormats = map[string][]string{
+	"application/pdf": {".pdf"},
+	"image/jpeg":      {".jpg", ".jpeg"},
+	"image/png":       {".png"},
+	"text/xml":        {".xml"},
+}
+
 // ValidRouteMatchingOperators list the limited set of operations supported for isn routes
 var ValidRouteMatchingOperators = map[string]bool{
 	"matches":        true,

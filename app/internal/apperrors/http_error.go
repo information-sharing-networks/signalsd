@@ -48,6 +48,11 @@ func InvalidCorrelationID(message string, err error) *HTTPError {
 	return &HTTPError{Status: http.StatusUnprocessableEntity, Code: ErrCodeInvalidCorrelationID, Message: message, Err: err}
 }
 
+// UnsupportedMediaType responds with 415 + unsupported_media_type.
+func UnsupportedMediaType(message string, err error) *HTTPError {
+	return &HTTPError{Status: http.StatusUnsupportedMediaType, Code: ErrCodeUnsupportedMediaType, Message: message, Err: err}
+}
+
 // RequestTooLarge responds with 413 + request_too_large (the request body is larger than limit bytes).
 func RequestTooLarge(limit int64) *HTTPError {
 	return &HTTPError{

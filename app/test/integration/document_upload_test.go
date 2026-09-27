@@ -60,7 +60,7 @@ func TestDocumentUpload(t *testing.T) {
 	pdfContent := []byte("%PDF-BL-2026")
 	fileName := "BL-2026.pdf"
 	mimeType := "application/pdf"
-	amendedPDFContent := []byte("%BL-2026 (amended)")
+	amendedPDFContent := []byte("%PDF-BL-2026 (amended)")
 
 	t.Run("upload stores the document", func(t *testing.T) {
 		response := uploadDocumentRequest(t, testEnv.baseURL, writerToken, billOfLadingEndpoint, documentUpload{
@@ -128,8 +128,7 @@ func TestDocumentUpload(t *testing.T) {
 
 	t.Run("uploading the same document again returns the latest version unchanged", func(t *testing.T) {
 
-		bolContent := []byte("hello")
-		// TODO - how do we handle docs with different names but identical content?
+		bolContent := []byte("%PDF-hello")
 		first := expectUploadResponse(t, uploadDocumentRequest(t, testEnv.baseURL, writerToken, billOfLadingEndpoint, documentUpload{
 			batchRef: "upload-batch", localRef: "bol-unchanged", fileName: "bl.pdf", contentType: "application/pdf", content: bolContent,
 		}), http.StatusOK)
@@ -185,15 +184,85 @@ func TestDocumentUpload(t *testing.T) {
 		}
 	})
 
-	// TODO - remove option to declare mimetype
-	t.Run("the content type is detected when it is not declared", func(t *testing.T) {
-		for _, declaredContentType := range []string{"", "application/octet-stream"} {
-			result := expectUploadResponse(t, uploadDocumentRequest(t, testEnv.baseURL, writerToken, billOfLadingEndpoint, documentUpload{
-				batchRef: "upload-batch", localRef: "bol-detected", fileName: "bl.pdf", contentType: declaredContentType, content: pdfContent,
-			}), http.StatusOK)
-			if result.MimeType != "application/pdf" {
-				t.Errorf("Declared content type %q: expected the detected mime_type application/pdf, got %s", declaredContentType, result.MimeType)
-			}
+	t.Run("uploading the same document with a different filename creates a new version", func(t *testing.T) {
+		expectUploadResponse(t, uploadDocumentRequest(t, testEnv.baseURL, writerToken, billOfLadingEndpoint, documentUpload{
+			batchRef: "upload-batch", localRef: "bol-renamed", fileName: "BL-0042-draft.pdf", contentType: "application/pdf", content: pdfContent,
+		}), http.StatusOK)
+
+		renamed := expectUploadResponse(t, uploadDocumentRequest(t, testEnv.baseURL, writerToken, billOfLadingEndpoint, documentUpload{
+			batchRef: "upload-batch", localRef: "bol-renamed", fileName: "BL-0042.pdf", contentType: "application/pdf", content: pdfContent,
+		}), http.StatusOK)
+		if renamed.Unchanged || renamed.VersionNumber != 2 || renamed.Name != "BL-0042.pdf" {
+			t.Errorf("Expected version 2 named BL-0042.pdf with unchanged=false, got version %d named %s with unchanged=%v", renamed.VersionNumber, renamed.Name, renamed.Unchanged)
+		}
+	})
+
+	t.Run("supported formats are accepted and the mime type is detected from the content", func(t *testing.T) {
+		tests := []struct {
+			name             string
+			fileName         string
+			content          []byte
+			expectedMimeType string
+		}{
+			{"PDF", "bl.pdf", pdfContent, "application/pdf"},
+			{"JPEG", "scan.jpg", []byte("\xff\xd8\xff\xe0\x00\x10JFIF\x00"), "image/jpeg"},
+			{"JPEG with a .jpeg extension", "scan.jpeg", []byte("\xff\xd8\xff\xe0\x00\x10JFIF\x00"), "image/jpeg"},
+			{"PNG", "scan.png", []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"), "image/png"},
+			{"XML", "invoice.xml", []byte(`<?xml version="1.0" encoding="UTF-8"?><Invoice/>`), "text/xml"},
+			{"XML with a byte order mark", "invoice.xml", []byte("\xef\xbb\xbf<?xml version=\"1.0\"?><Invoice/>"), "text/xml"},
+			{"extension in upper case", "BL.PDF", pdfContent, "application/pdf"},
+		}
+		for i, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				// the declared content type is ignored
+				result := expectUploadResponse(t, uploadDocumentRequest(t, testEnv.baseURL, writerToken, billOfLadingEndpoint, documentUpload{
+					batchRef: "upload-batch", localRef: fmt.Sprintf("bol-format-%d", i), fileName: tt.fileName, contentType: "application/octet-stream", content: tt.content,
+				}), http.StatusOK)
+				if result.MimeType != tt.expectedMimeType {
+					t.Errorf("Expected mime_type %s, got %s", tt.expectedMimeType, result.MimeType)
+				}
+			})
+		}
+	})
+
+	t.Run("filenames whose extension does not match the format are rejected", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			fileName string
+			content  []byte
+		}{
+			{"PDF named as an image", "bl.png", pdfContent},
+			{"XML named as a web page", "invoice.html", []byte(`<?xml version="1.0"?><html><script>alert(1)</script></html>`)},
+			{"no extension", "bl", pdfContent},
+		}
+		for i, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				response := uploadDocumentRequest(t, testEnv.baseURL, writerToken, billOfLadingEndpoint, documentUpload{
+					batchRef: "upload-batch", localRef: fmt.Sprintf("bol-extension-%d", i), fileName: tt.fileName, contentType: "application/pdf", content: tt.content,
+				})
+				expectErrorCode(t, response, http.StatusBadRequest, apperrors.ErrCodeMalformedBody)
+			})
+		}
+	})
+
+	t.Run("unsupported formats are rejected, whatever content type is declared", func(t *testing.T) {
+		tests := []struct {
+			name    string
+			content []byte
+		}{
+			{"Windows executable", []byte("MZ\x90\x00\x03\x00\x00\x00\x04\x00")},
+			{"HTML", []byte("<!DOCTYPE html><html><script>alert(1)</script></html>")},
+			{"plain text", []byte("just some text")},
+			{"ZIP", []byte("PK\x03\x04\x14\x00\x00\x00")},
+			{"XML without an XML declaration", []byte("<Invoice/>")},
+		}
+		for i, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				response := uploadDocumentRequest(t, testEnv.baseURL, writerToken, billOfLadingEndpoint, documentUpload{
+					batchRef: "upload-batch", localRef: fmt.Sprintf("bol-unsupported-%d", i), fileName: "bl.pdf", contentType: "application/pdf", content: tt.content,
+				})
+				expectErrorCode(t, response, http.StatusUnsupportedMediaType, apperrors.ErrCodeUnsupportedMediaType)
+			})
 		}
 	})
 
@@ -226,6 +295,60 @@ func TestDocumentUpload(t *testing.T) {
 		signals := expectSearchResults(t, searchPrivateSignals(t, testEnv.baseURL, billOfLadingEndpoint, readerToken, map[string]string{"correlation_id": consignmentID}))
 		if len(signals) != 1 || signals[0]["local_ref"] != "bol-correlated" {
 			t.Errorf("Expected bol-correlated to be linked to the consignment, got %v", signals)
+		}
+	})
+
+	t.Run("re-uploading with the same or no correlation_id is unchanged, a different correlation_id creates a new version", func(t *testing.T) {
+		consignmentA := submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayload("consignment-a"), writerToken, consignmentEndpoint)
+		consignmentB := submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayload("consignment-b"), writerToken, consignmentEndpoint)
+
+		tests := []struct {
+			description       string
+			correlationID     string
+			expectedVersion   int32
+			expectedUnchanged bool
+			expectedLinkedTo  string // the consignment the document should be linked to after the upload
+		}{
+			{"first upload, linked to consignment A", consignmentA, 1, false, consignmentA},
+			{"same correlation_id", consignmentA, 1, true, consignmentA},
+			{"no correlation_id keeps the existing link", "", 1, true, consignmentA},
+			{"different correlation_id", consignmentB, 2, false, consignmentB},
+		}
+		for _, tt := range tests {
+			result := expectUploadResponse(t, uploadDocumentRequest(t, testEnv.baseURL, writerToken, billOfLadingEndpoint, documentUpload{
+				batchRef: "upload-batch", localRef: "bol-relinked", correlationID: tt.correlationID, fileName: "bl.pdf", contentType: "application/pdf", content: pdfContent,
+			}), http.StatusOK)
+			if result.VersionNumber != tt.expectedVersion || result.Unchanged != tt.expectedUnchanged {
+				t.Errorf("%s: expected version %d and unchanged=%v, got version %d and unchanged=%v",
+					tt.description, tt.expectedVersion, tt.expectedUnchanged, result.VersionNumber, result.Unchanged)
+			}
+
+			linked := expectSearchResults(t, searchPrivateSignals(t, testEnv.baseURL, billOfLadingEndpoint, readerToken, map[string]string{"correlation_id": tt.expectedLinkedTo}))
+			if findSignalByLocalRef(linked, "bol-relinked") == nil {
+				t.Errorf("%s: expected bol-relinked to be linked to %s", tt.description, tt.expectedLinkedTo)
+			}
+		}
+	})
+
+	t.Run("unchanged uploads are not counted in the batch they were sent in", func(t *testing.T) {
+		expectUploadResponse(t, uploadDocumentRequest(t, testEnv.baseURL, writerToken, billOfLadingEndpoint, documentUpload{
+			batchRef: "first-batch", localRef: "bol-retried", fileName: "bl.pdf", contentType: "application/pdf", content: pdfContent,
+		}), http.StatusOK)
+		retried := expectUploadResponse(t, uploadDocumentRequest(t, testEnv.baseURL, writerToken, billOfLadingEndpoint, documentUpload{
+			batchRef: "retry-batch", localRef: "bol-retried", fileName: "bl.pdf", contentType: "application/pdf", content: pdfContent,
+		}), http.StatusOK)
+		if !retried.Unchanged {
+			t.Fatal("Expected the retried upload to be unchanged")
+		}
+
+		// the version belongs to the batch that stored it
+		firstBatch := expectJSONResponse(t, getBatchStatusRequest(t, testEnv.baseURL, writerToken, "first-batch"), http.StatusOK)
+		if storedCount(firstBatch, isn.Slug) != 1 {
+			t.Errorf("Expected 1 stored document in first-batch, got %v", firstBatch)
+		}
+		retryBatch := expectJSONResponse(t, getBatchStatusRequest(t, testEnv.baseURL, writerToken, "retry-batch"), http.StatusOK)
+		if storedCount(retryBatch, isn.Slug) != 0 || retryBatch["contains_failures"] != false {
+			t.Errorf("Expected no stored documents and no failures in retry-batch, got %v", retryBatch)
 		}
 	})
 
@@ -269,7 +392,7 @@ func TestDocumentUpload(t *testing.T) {
 	t.Run("a file larger than MAX_DOCUMENT_SIZE is rejected", func(t *testing.T) {
 		// the request is within the request size limit (which allows for the form fields and multipart headers), so the file size limit applies
 		response := uploadDocumentRequest(t, testEnv.baseURL, writerToken, billOfLadingEndpoint, documentUpload{
-			batchRef: "upload-batch", localRef: "bol-too-large", fileName: "bl.pdf", contentType: "application/pdf", content: make([]byte, testMaxDocumentSize+1),
+			batchRef: "upload-batch", localRef: "bol-too-large", fileName: "bl.pdf", contentType: "application/pdf", content: append([]byte("%PDF-1.7\n"), make([]byte, testMaxDocumentSize)...),
 		})
 		expectErrorCode(t, response, http.StatusRequestEntityTooLarge, apperrors.ErrCodeRequestTooLarge)
 	})
@@ -277,7 +400,7 @@ func TestDocumentUpload(t *testing.T) {
 	t.Run("a request larger than the request size limit is rejected", func(t *testing.T) {
 		// the request size limit is MAX_DOCUMENT_SIZE plus an allowance for the form fields, so a request of twice MAX_DOCUMENT_SIZE is over it
 		response := uploadDocumentRequest(t, testEnv.baseURL, writerToken, billOfLadingEndpoint, documentUpload{
-			batchRef: "upload-batch", localRef: "bol-too-large", fileName: "bl.pdf", contentType: "application/pdf", content: make([]byte, 2*testMaxDocumentSize),
+			batchRef: "upload-batch", localRef: "bol-too-large", fileName: "bl.pdf", contentType: "application/pdf", content: append([]byte("%PDF-1.7\n"), make([]byte, 2*testMaxDocumentSize)...),
 		})
 		expectErrorCode(t, response, http.StatusRequestEntityTooLarge, apperrors.ErrCodeRequestTooLarge)
 	})
@@ -408,6 +531,19 @@ func expectUploadResponse(t *testing.T, response *http.Response, expectedStatus 
 		t.Fatalf("Failed to decode upload response: %v: %s", err, body)
 	}
 	return upload
+}
+
+// storedCount returns the stored count for the ISN in a batch status response (0 if the ISN is not in the batch)
+func storedCount(batchStatus map[string]any, isnSlug string) int {
+	statuses, _ := batchStatus["batch_status"].([]any)
+	for _, s := range statuses {
+		status := s.(map[string]any)
+		if status["isn_slug"] == isnSlug {
+			count, _ := status["stored_count"].(float64)
+			return int(count)
+		}
+	}
+	return 0
 }
 
 // sha256Hex returns the lowercase hex sha256 of the content
