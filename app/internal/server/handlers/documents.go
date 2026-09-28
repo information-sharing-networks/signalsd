@@ -642,7 +642,7 @@ func (h *DocumentsHandler) storeDocument(w http.ResponseWriter, r *http.Request,
 //	@Description	- ETag is the document's sha256 (in quotes) - use it to check the document is the one you expected
 //	@Description
 //	@Description	Withdrawn documents are only returned with include_withdrawn=true.
-//	@Description	Write-only accounts can only download the documents they uploaded.
+//	@Description	Write-only accounts can only download the documents they uploaded, and the documents other accounts have correlated to their signals.
 //
 //	@Param			isn_slug			path	string	true	"ISN slug"												example(sample-isn)
 //	@Param			signal_type_slug	path	string	true	"signal type slug"										example(bill-of-lading)
@@ -717,9 +717,10 @@ func (h *DocumentsHandler) DownloadDocument(w http.ResponseWriter, r *http.Reque
 		return apperrors.DatabaseError("database error", err)
 	}
 
-	// write-only accounts can only download the documents they uploaded (other documents are reported as not found, as in the signal search)
+	// write-only accounts can only download the documents they uploaded and the documents correlated to their signals
+	// (other documents are reported as not found, as in the signal search)
 	isnPerms := claims.IsnPerms[isnSlug]
-	if !isnPerms.CanRead && signalVersion.AccountID != accountID {
+	if !isnPerms.CanRead && signalVersion.AccountID != accountID && signalVersion.CorrelatedToAccountID != accountID {
 		return apperrors.NotFound("document not found", nil)
 	}
 	if signalVersion.IsWithdrawn && !includeWithdrawn {

@@ -442,7 +442,7 @@ func (s *Server) registerSignalReadRoutes() {
 	})
 
 	// Private ISN signal search - any ISN member (read or write) may call this endpoint.
-	// Write-only accounts receive only the signals they created; visibility filtering is applied in the handler.
+	// Write-only accounts receive only the signals they created and the signals correlated to them; visibility filtering is applied in the handler.
 	s.router.Group(func(r chi.Router) {
 		r.Use(middleware.CORS(s.corsConfigs.Protected))
 		r.Use(s.authService.RequireValidAccessToken)
@@ -451,7 +451,7 @@ func (s *Server) registerSignalReadRoutes() {
 	})
 
 	// document download - any ISN member may call this endpoint (write-only accounts can only download the documents they
-	// uploaded - checked in the handler).
+	// uploaded and the documents correlated to their signals - checked in the handler).
 	// Downloads are given DOCUMENT_TRANSFER_TIMEOUT.
 	s.router.Group(func(r chi.Router) {
 		r.Use(middleware.ExtendRequestTimeout(s.config.DocumentTransferTimeout))

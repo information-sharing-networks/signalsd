@@ -8,7 +8,7 @@ package integration
 //
 // - TestSignalSearchAccess: who can search which ISNs
 // - TestWithdrawnSignalSearch: withdrawn signals are only returned with include_withdrawn=true
-// - TestWriteOnlyAccountVisibility: write-only accounts only see their own signals
+// - TestWriteOnlyAccountVisibility: write-only accounts only see their own signals (see TestCorrelationSearch for correlated signals)
 // - TestPreviousVersionsSearch: include_previous_versions
 // - TestCorrelationSearch: include_correlated and the correlation_id filter
 
@@ -219,6 +219,7 @@ func TestWithdrawnSignalSearch(t *testing.T) {
 }
 
 // TestWriteOnlyAccountVisibility checks that write-only accounts can only see the signals they created
+// (when no signals are correlated to them)
 func TestWriteOnlyAccountVisibility(t *testing.T) {
 	ctx := context.Background()
 
@@ -264,7 +265,7 @@ func TestWriteOnlyAccountVisibility(t *testing.T) {
 			expectedLocalRef: "account2-signal-001",
 		},
 		{
-			name:   "filtering on another account_id returns no signals",
+			name:   "filtering on another account_id returns no signals (none are correlated to account 1's signals)",
 			token:  token1,
 			params: map[string]string{"account_id": account2.ID.String()},
 		},
@@ -357,7 +358,7 @@ func TestPreviousVersionsSearch(t *testing.T) {
 // TestCorrelationSearch checks searches for signals linked to a master signal:
 // - include_correlated embeds the signals linked to each returned signal, whatever their signal type
 // - the correlation_id filter returns the signals of the searched type that are linked to a signal
-// - write-only accounts only see their own correlated signals
+// - write-only accounts see all the signals correlated to their own signals, and only their own signals correlated to other accounts' signals
 // - email addresses of correlated signals are not shown in public ISNs
 func TestCorrelationSearch(t *testing.T) {
 	ctx := context.Background()
@@ -399,7 +400,10 @@ func TestCorrelationSearch(t *testing.T) {
 	// writer 1 creates a consignment, and both writers link a bill of lading to it
 	consignmentID := submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayload("consignment-001"), writer1Token, consignmentEndpoint)
 	submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayloadWithCorrelatedID("bol-writer1", consignmentID), writer1Token, billOfLadingEndpoint)
-	submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayloadWithCorrelatedID("bol-writer2", consignmentID), writer2Token, billOfLadingEndpoint)
+	bolWriter2ID := submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayloadWithCorrelatedID("bol-writer2", consignmentID), writer2Token, billOfLadingEndpoint)
+
+	// writer 2 links a signal to its own bill of lading (writer 1 can't see it: correlation is one level deep)
+	submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayloadWithCorrelatedID("bol-writer2-annex", bolWriter2ID), writer2Token, billOfLadingEndpoint)
 
 	// a consignment and a bill of lading with nothing linked to them
 	submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayload("consignment-unlinked"), writer1Token, consignmentEndpoint)
@@ -497,7 +501,7 @@ func TestCorrelationSearch(t *testing.T) {
 		expectErrorCode(t, response, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam)
 	})
 
-	t.Run("write-only account only sees its own correlated signals", func(t *testing.T) {
+	t.Run("write-only account sees all the signals correlated to its own signal", func(t *testing.T) {
 		signals := expectSearchResults(t, searchPrivateSignals(t, testEnv.baseURL, consignmentEndpoint, writer1Token, map[string]string{
 			"signal_id":          consignmentID,
 			"include_correlated": "true",
@@ -506,20 +510,64 @@ func TestCorrelationSearch(t *testing.T) {
 			t.Fatalf("Expected 1 signal, got %d", len(signals))
 		}
 		correlated, _ := signals[0]["correlated_signals"].([]any)
-		if len(correlated) != 1 {
-			t.Fatalf("Expected 1 correlated signal, got %d", len(correlated))
-		}
-		if localRef := correlated[0].(map[string]any)["local_ref"]; localRef != "bol-writer1" {
-			t.Errorf("Expected correlated signal bol-writer1, got %v", localRef)
+		if len(correlated) != 2 {
+			t.Fatalf("Expected 2 correlated signals (bol-writer1 and bol-writer2), got %d", len(correlated))
 		}
 	})
 
-	t.Run("write-only account correlation_id filter only returns its own signals", func(t *testing.T) {
+	t.Run("write-only account correlation_id filter returns all the signals correlated to its own signal", func(t *testing.T) {
+		signals := expectSearchResults(t, searchPrivateSignals(t, testEnv.baseURL, billOfLadingEndpoint, writer1Token, map[string]string{
+			"correlation_id": consignmentID,
+		}))
+		if len(signals) != 2 || findSignalByLocalRef(signals, "bol-writer1") == nil || findSignalByLocalRef(signals, "bol-writer2") == nil {
+			t.Errorf("Expected bol-writer1 and bol-writer2, got %v", signals)
+		}
+	})
+
+	t.Run("write-only account account_id filter returns the other account's signals correlated to its own signals", func(t *testing.T) {
+		signals := expectSearchResults(t, searchPrivateSignals(t, testEnv.baseURL, billOfLadingEndpoint, writer1Token, map[string]string{
+			"account_id": writer2Account.ID.String(),
+		}))
+		if len(signals) != 1 || signals[0]["local_ref"] != "bol-writer2" {
+			t.Errorf("Expected only bol-writer2, got %v", signals)
+		}
+	})
+
+	t.Run("write-only account can't see signals correlated to another account's signal", func(t *testing.T) {
+		signals := expectSearchResults(t, searchPrivateSignals(t, testEnv.baseURL, billOfLadingEndpoint, writer1Token, map[string]string{
+			"signal_id":          bolWriter2ID,
+			"include_correlated": "true",
+		}))
+		if len(signals) != 1 {
+			t.Fatalf("Expected 1 signal (bol-writer2), got %d", len(signals))
+		}
+		if correlated := signals[0]["correlated_signals"]; correlated != nil {
+			t.Errorf("Expected no correlated signals (bol-writer2-annex is correlated to writer 2's signal), got %v", correlated)
+		}
+
+		signals = expectSearchResults(t, searchPrivateSignals(t, testEnv.baseURL, billOfLadingEndpoint, writer1Token, map[string]string{
+			"correlation_id": bolWriter2ID,
+		}))
+		if len(signals) != 0 {
+			t.Errorf("Expected 0 signals, got %v", signals)
+		}
+	})
+
+	t.Run("write-only account only sees its own signals correlated to another account's signal", func(t *testing.T) {
 		signals := expectSearchResults(t, searchPrivateSignals(t, testEnv.baseURL, billOfLadingEndpoint, writer2Token, map[string]string{
 			"correlation_id": consignmentID,
 		}))
 		if len(signals) != 1 || signals[0]["local_ref"] != "bol-writer2" {
 			t.Errorf("Expected only bol-writer2, got %v", signals)
+		}
+	})
+
+	t.Run("write-only account can't see the other account's signal its signal is correlated to", func(t *testing.T) {
+		signals := expectSearchResults(t, searchPrivateSignals(t, testEnv.baseURL, consignmentEndpoint, writer2Token, map[string]string{
+			"signal_id": consignmentID,
+		}))
+		if len(signals) != 0 {
+			t.Errorf("Expected 0 signals, got %v", signals)
 		}
 	})
 

@@ -2384,7 +2384,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Search for signals by date or account in private ISNs (authentication required - only accounts with read or write permissions to the ISN can access signals).\n\nNote the endpoint returns the latest version of each signal.\n\nWrite-only accounts can only see signals created by their own account (searches that filter on another account_id return no results).\nThis also applies to correlated signals returned with include_correlated=true.",
+                "description": "Search for signals by date or account in private ISNs (authentication required - only accounts with read or write permissions to the ISN can access signals).\n\nNote the endpoint returns the latest version of each signal.\n\nWrite-only accounts can only see the signals created by their own account, and the signals other accounts have correlated to them.\nThis also applies to correlated signals returned with include_correlated=true.",
                 "tags": [
                     "Signal Exchange"
                 ],
@@ -2714,7 +2714,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Download the document stored with a document signal. The latest version is returned unless a version is requested.\n\nUse the signal search endpoints to find documents - the search results include the signal_id, version_number and document metadata (name, mime_type, size_bytes and sha256).\n\nThe document is returned as an attachment with its original filename:\n- Content-Type is the document's mime_type\n- ETag is the document's sha256 (in quotes) - use it to check the document is the one you expected\n\nWithdrawn documents are only returned with include_withdrawn=true.\nWrite-only accounts can only download the documents they uploaded.",
+                "description": "Download the document stored with a document signal. The latest version is returned unless a version is requested.\n\nUse the signal search endpoints to find documents - the search results include the signal_id, version_number and document metadata (name, mime_type, size_bytes and sha256).\n\nThe document is returned as an attachment with its original filename:\n- Content-Type is the document's mime_type\n- ETag is the document's sha256 (in quotes) - use it to check the document is the one you expected\n\nWithdrawn documents are only returned with include_withdrawn=true.\nWrite-only accounts can only download the documents they uploaded, and the documents other accounts have correlated to their signals.",
                 "produces": [
                     "application/pdf",
                     "image/jpeg",

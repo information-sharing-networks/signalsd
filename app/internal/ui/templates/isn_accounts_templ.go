@@ -63,7 +63,7 @@ func ManageIsnAccountsPage(environment string, isns []types.IsnOption, users []t
 					}()
 				}
 				ctx = templ.InitializeContext(ctx)
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "Granting permissions:<ul><li>Write-only accounts can only see signals they created.</li><li>Read-only accounts cannot create signals but can view any signal on the ISN.</li><li>Typically service accounts that are used to load signals should only be granted write access (this prevents them reading data provided by other accounts).</li></ul>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "Granting permissions:<ul><li>Write-only accounts can only see signals they created, and the signals other accounts have correlated to them.</li><li>Read-only accounts cannot create signals but can view any signal on the ISN.</li><li>Typically service accounts that are used to load signals should only be granted write access (this prevents them reading data provided by other accounts).</li></ul>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

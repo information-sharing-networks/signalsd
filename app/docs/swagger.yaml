@@ -3056,7 +3056,7 @@ paths:
         - ETag is the document's sha256 (in quotes) - use it to check the document is the one you expected
 
         Withdrawn documents are only returned with include_withdrawn=true.
-        Write-only accounts can only download the documents they uploaded.
+        Write-only accounts can only download the documents they uploaded, and the documents other accounts have correlated to their signals.
       parameters:
       - description: ISN slug
         example: sample-isn
@@ -3133,7 +3133,7 @@ paths:
 
         Note the endpoint returns the latest version of each signal.
 
-        Write-only accounts can only see signals created by their own account (searches that filter on another account_id return no results).
+        Write-only accounts can only see the signals created by their own account, and the signals other accounts have correlated to them.
         This also applies to correlated signals returned with include_correlated=true.
       parameters:
       - description: Start date

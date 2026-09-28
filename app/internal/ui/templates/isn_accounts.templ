@@ -17,7 +17,7 @@ templ ManageIsnAccountsPage(environment string, isns []types.IsnOption, users []
                     @NoticeAlert() {
                         Granting permissions:
                         <ul>
-                        <li>Write-only accounts can only see signals they created.</li>
+                        <li>Write-only accounts can only see signals they created, and the signals other accounts have correlated to them.</li>
                         <li>Read-only accounts cannot create signals but can view any signal on the ISN.</li>
                         <li>Typically service accounts that are used to load signals should only be granted write access (this prevents them reading data provided by other accounts).</li>
                         </ul>

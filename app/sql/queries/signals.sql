@@ -179,6 +179,8 @@ WHERE account_id = sqlc.arg(account_id)
 -- name: GetSignalsWithOptionalFilters :many
 -- you must supply the isn_slug,signal_type_slug & sem_ver params - other filters are optional
 -- signals for inactive isns or signal_types are not returned (is_in_use = false)
+-- supply viewer_account_id to restrict the results to the signals that account can see (used for write-only accounts):
+-- its own signals and the signals correlated to its own signals
 SELECT
  a.id AS account_id,
     a.account_type,
@@ -199,6 +201,9 @@ FROM
     latest_signal_versions lsv
 JOIN
     signals s ON s.id = lsv.signal_id
+-- the signal this signal is correlated to (uncorrelated signals are correlated to themselves)
+JOIN
+    signals c ON c.id = s.correlation_id
 JOIN
     accounts a ON a.id = s.account_id
 JOIN
@@ -219,6 +224,7 @@ WHERE
     AND i.is_in_use = true
     AND ist.is_in_use = true
     AND (sqlc.narg('include_withdrawn')::boolean = true OR s.is_withdrawn = false)
+    AND (sqlc.narg('viewer_account_id')::uuid IS NULL OR s.account_id = sqlc.narg('viewer_account_id')::uuid OR c.account_id = sqlc.narg('viewer_account_id')::uuid)
     AND (sqlc.narg('account_id')::uuid IS NULL OR a.id = sqlc.narg('account_id')::uuid)
     AND (sqlc.narg('signal_id')::uuid IS NULL OR s.id = sqlc.narg('signal_id')::uuid)
     AND (sqlc.narg('local_ref')::text IS NULL OR s.local_ref = sqlc.narg('local_ref')::text)
@@ -273,7 +279,8 @@ WHERE s.account_id = $1
 -- name: GetSignalsByCorrelationIDs :many
 -- Get all signals that correlate to the provided signal IDs (for embedding correlated signals)
 -- Signals for inactive isns or signal types (is_in_use = false) are not returned
--- supply account_id to restrict the results to signals created by that account (used for write-only accounts)
+-- supply viewer_account_id to restrict the results to the signals that account can see (used for write-only accounts):
+-- its own signals, and all the signals correlated to its own signals
 SELECT
     a.id AS account_id,
     a.account_type,
@@ -294,6 +301,9 @@ FROM
     latest_signal_versions lsv
 JOIN
     signals s ON s.id = lsv.signal_id
+-- the signal this signal is correlated to
+JOIN
+    signals c ON c.id = s.correlation_id
 JOIN
     accounts a ON a.id = s.account_id
 JOIN
@@ -313,7 +323,7 @@ WHERE
     AND i.is_in_use = true
     AND ist.is_in_use = true
     AND (sqlc.narg('include_withdrawn')::boolean = true OR s.is_withdrawn = false)
-    AND (sqlc.narg('account_id')::uuid IS NULL OR s.account_id = sqlc.narg('account_id')::uuid)
+    AND (sqlc.narg('viewer_account_id')::uuid IS NULL OR s.account_id = sqlc.narg('viewer_account_id')::uuid OR c.account_id = sqlc.narg('viewer_account_id')::uuid)
 ORDER BY
     s.correlation_id,
     s.local_ref,
@@ -357,12 +367,15 @@ WHERE s.account_id = sqlc.arg(account_id)
 
 -- name: GetSignalVersion :one
 -- returns a version of a signal on the ISN (the latest version if version_number is null)
+-- correlated_to_account_id is the account that created the signal this signal is correlated to (used to check what write-only accounts can see)
 SELECT
     s.account_id,
+    c.account_id AS correlated_to_account_id,
     s.is_withdrawn,
     sv.version_number,
     sv.content
 FROM signals s
+JOIN signals c ON c.id = s.correlation_id
 JOIN isn i ON i.id = s.isn_id
 JOIN signal_types st ON st.id = s.signal_type_id
 JOIN signal_versions sv ON sv.signal_id = s.id

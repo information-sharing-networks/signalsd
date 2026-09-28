@@ -147,9 +147,17 @@ func TestDocumentDownload(t *testing.T) {
 		expectDownload(t, downloadDocumentRequest(t, testEnv.baseURL, readerToken, billOfLadingEndpoint, withdrawnUpload.SignalID.String(), "include_withdrawn=true"))
 	})
 
-	t.Run("write-only accounts can only download the documents they uploaded", func(t *testing.T) {
+	t.Run("write-only accounts can only download the documents they uploaded and the documents correlated to their signals", func(t *testing.T) {
 		expectDownload(t, downloadDocumentRequest(t, testEnv.baseURL, writeOnlyToken, billOfLadingEndpoint, writeOnlyUpload.SignalID.String(), ""))
 
+		// the writer uploads a document correlated to the write-only account's consignment
+		writeOnlyConsignmentID := submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayload("consignment-write-only"), writeOnlyToken, consignmentEndpoint)
+		correlatedUpload := expectUploadResponse(t, uploadDocumentRequest(t, testEnv.baseURL, writerToken, billOfLadingEndpoint, documentUpload{
+			batchRef: "download-batch", localRef: "bol-for-write-only", correlationID: writeOnlyConsignmentID, fileName: "BL-0045.pdf", content: version1Content,
+		}), http.StatusOK)
+		expectDownload(t, downloadDocumentRequest(t, testEnv.baseURL, writeOnlyToken, billOfLadingEndpoint, correlatedUpload.SignalID.String(), ""))
+
+		// documents correlated to another account's signal can't be downloaded
 		response := downloadDocumentRequest(t, testEnv.baseURL, writeOnlyToken, billOfLadingEndpoint, documentID, "")
 		expectErrorCode(t, response, http.StatusNotFound, apperrors.ErrCodeResourceNotFound)
 	})

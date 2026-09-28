@@ -202,9 +202,10 @@ func (s *SignalsHandler) getPreviousSignalVersions(ctx context.Context, signalID
 
 // getCorrelatedSignals fetches all signals that have a correlated_id that references one of the provided signal IDs - returns a map of signal_id to correlated signals
 //
-// restrictToAccountID limits the results to signals created by that account (used for write-only accounts, nil = no restriction).
+// viewerAccountID limits the results to the signals that account can see (used for write-only accounts, nil = no restriction):
+// its own signals, and all the signals correlated to its own signals.
 // Email addresses are only included when includeEmail is true (they are not shown in public ISNs).
-func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []uuid.UUID, params SearchParams, restrictToAccountID *uuid.UUID, includeEmail bool) (map[uuid.UUID][]SearchSignal, error) {
+func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []uuid.UUID, params SearchParams, viewerAccountID *uuid.UUID, includeEmail bool) (map[uuid.UUID][]SearchSignal, error) {
 	if len(signalIDs) == 0 {
 		return make(map[uuid.UUID][]SearchSignal), nil
 	}
@@ -212,7 +213,7 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 	correlatedSignals, err := s.queries.GetSignalsByCorrelationIDs(ctx, database.GetSignalsByCorrelationIDsParams{
 		CorrelationIds:   signalIDs,
 		IncludeWithdrawn: &params.includeWithdrawn,
-		AccountID:        restrictToAccountID,
+		ViewerAccountID:  viewerAccountID,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -401,7 +402,7 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 //	@Description
 //	@Description	Note the endpoint returns the latest version of each signal.
 //	@Description
-//	@Description	Write-only accounts can only see signals created by their own account (searches that filter on another account_id return no results).
+//	@Description	Write-only accounts can only see the signals created by their own account, and the signals other accounts have correlated to them.
 //	@Description	This also applies to correlated signals returned with include_correlated=true.
 //
 //	@Param			start_date					query		string	false	"Start date"															example(2006-01-02T15:05:00Z)
@@ -445,9 +446,9 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 		return apperrors.InvalidURLParam("invalid search parameters", err)
 	}
 
-	// Write-only accounts can only see signals they created - restrict the query to their own account
-	// (searches that filter on another account_id return no results)
-	// the same restriction applies to correlated signals
+	// Write-only accounts can only see the signals they created and the signals correlated to them
+	// (the account_id filter still means "created by": filtering on another account returns that account's signals correlated to the viewer's signals).
+	// The same restriction applies to correlated signals
 	var writeOnlyAccountID *uuid.UUID
 	isnPerms := claims.IsnPerms[searchParams.isnSlug]
 	if !isnPerms.CanRead && isnPerms.CanWrite {
@@ -455,10 +456,6 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 		if !ok {
 			return apperrors.AuthenticationFailure("could not determine account from access token", nil)
 		}
-		if searchParams.accountID != nil && *searchParams.accountID != accountID {
-			return responses.JSON(w, http.StatusOK, []SearchSignalWithCorrelationsAndVersions{})
-		}
-		searchParams.accountID = &accountID
 		writeOnlyAccountID = &accountID
 	}
 
@@ -468,6 +465,7 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 		SemVer:           searchParams.semVer,
 		StartDate:        searchParams.startDate,
 		EndDate:          searchParams.endDate,
+		ViewerAccountID:  writeOnlyAccountID,
 		AccountID:        searchParams.accountID,
 		SignalID:         searchParams.signalID,
 		CorrelationID:    searchParams.correlationID,

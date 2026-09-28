@@ -475,10 +475,12 @@ func (q *Queries) GetSignalCorrelationDetails(ctx context.Context, arg GetSignal
 const GetSignalVersion = `-- name: GetSignalVersion :one
 SELECT
     s.account_id,
+    c.account_id AS correlated_to_account_id,
     s.is_withdrawn,
     sv.version_number,
     sv.content
 FROM signals s
+JOIN signals c ON c.id = s.correlation_id
 JOIN isn i ON i.id = s.isn_id
 JOIN signal_types st ON st.id = s.signal_type_id
 JOIN signal_versions sv ON sv.signal_id = s.id
@@ -501,13 +503,15 @@ type GetSignalVersionParams struct {
 }
 
 type GetSignalVersionRow struct {
-	AccountID     uuid.UUID       `json:"account_id"`
-	IsWithdrawn   bool            `json:"is_withdrawn"`
-	VersionNumber int32           `json:"version_number"`
-	Content       json.RawMessage `json:"content"`
+	AccountID             uuid.UUID       `json:"account_id"`
+	CorrelatedToAccountID uuid.UUID       `json:"correlated_to_account_id"`
+	IsWithdrawn           bool            `json:"is_withdrawn"`
+	VersionNumber         int32           `json:"version_number"`
+	Content               json.RawMessage `json:"content"`
 }
 
 // returns a version of a signal on the ISN (the latest version if version_number is null)
+// correlated_to_account_id is the account that created the signal this signal is correlated to (used to check what write-only accounts can see)
 func (q *Queries) GetSignalVersion(ctx context.Context, arg GetSignalVersionParams) (GetSignalVersionRow, error) {
 	row := q.db.QueryRow(ctx, GetSignalVersion,
 		arg.SignalID,
@@ -519,6 +523,7 @@ func (q *Queries) GetSignalVersion(ctx context.Context, arg GetSignalVersionPara
 	var i GetSignalVersionRow
 	err := row.Scan(
 		&i.AccountID,
+		&i.CorrelatedToAccountID,
 		&i.IsWithdrawn,
 		&i.VersionNumber,
 		&i.Content,
@@ -548,6 +553,8 @@ FROM
 JOIN
     signals s ON s.id = lsv.signal_id
 JOIN
+    signals c ON c.id = s.correlation_id
+JOIN
     accounts a ON a.id = s.account_id
 JOIN
     signal_types st on st.id = s.signal_type_id
@@ -566,7 +573,7 @@ WHERE
     AND i.is_in_use = true
     AND ist.is_in_use = true
     AND ($2::boolean = true OR s.is_withdrawn = false)
-    AND ($3::uuid IS NULL OR s.account_id = $3::uuid)
+    AND ($3::uuid IS NULL OR s.account_id = $3::uuid OR c.account_id = $3::uuid)
 ORDER BY
     s.correlation_id,
     s.local_ref,
@@ -577,7 +584,7 @@ ORDER BY
 type GetSignalsByCorrelationIDsParams struct {
 	CorrelationIds   []uuid.UUID `json:"correlation_ids"`
 	IncludeWithdrawn *bool       `json:"include_withdrawn"`
-	AccountID        *uuid.UUID  `json:"account_id"`
+	ViewerAccountID  *uuid.UUID  `json:"viewer_account_id"`
 }
 
 type GetSignalsByCorrelationIDsRow struct {
@@ -600,9 +607,11 @@ type GetSignalsByCorrelationIDsRow struct {
 
 // Get all signals that correlate to the provided signal IDs (for embedding correlated signals)
 // Signals for inactive isns or signal types (is_in_use = false) are not returned
-// supply account_id to restrict the results to signals created by that account (used for write-only accounts)
+// supply viewer_account_id to restrict the results to the signals that account can see (used for write-only accounts):
+// its own signals, and all the signals correlated to its own signals
+// the signal this signal is correlated to
 func (q *Queries) GetSignalsByCorrelationIDs(ctx context.Context, arg GetSignalsByCorrelationIDsParams) ([]GetSignalsByCorrelationIDsRow, error) {
-	rows, err := q.db.Query(ctx, GetSignalsByCorrelationIDs, arg.CorrelationIds, arg.IncludeWithdrawn, arg.AccountID)
+	rows, err := q.db.Query(ctx, GetSignalsByCorrelationIDs, arg.CorrelationIds, arg.IncludeWithdrawn, arg.ViewerAccountID)
 	if err != nil {
 		return nil, err
 	}
@@ -659,6 +668,8 @@ FROM
 JOIN
     signals s ON s.id = lsv.signal_id
 JOIN
+    signals c ON c.id = s.correlation_id
+JOIN
     accounts a ON a.id = s.account_id
 JOIN
     signal_types st on st.id = s.signal_type_id
@@ -678,13 +689,14 @@ WHERE
     AND i.is_in_use = true
     AND ist.is_in_use = true
     AND ($4::boolean = true OR s.is_withdrawn = false)
-    AND ($5::uuid IS NULL OR a.id = $5::uuid)
-    AND ($6::uuid IS NULL OR s.id = $6::uuid)
-    AND ($7::text IS NULL OR s.local_ref = $7::text)
+    AND ($5::uuid IS NULL OR s.account_id = $5::uuid OR c.account_id = $5::uuid)
+    AND ($6::uuid IS NULL OR a.id = $6::uuid)
+    AND ($7::uuid IS NULL OR s.id = $7::uuid)
+    AND ($8::text IS NULL OR s.local_ref = $8::text)
     -- signals correlated to the supplied signal (excluding the signal itself)
-    AND ($8::uuid IS NULL OR (s.correlation_id = $8::uuid AND s.id != $8::uuid))
-    AND ($9::timestamptz IS NULL OR lsv.created_at >= $9::timestamptz)
-    AND ($10::timestamptz IS NULL OR lsv.created_at <= $10::timestamptz)
+    AND ($9::uuid IS NULL OR (s.correlation_id = $9::uuid AND s.id != $9::uuid))
+    AND ($10::timestamptz IS NULL OR lsv.created_at >= $10::timestamptz)
+    AND ($11::timestamptz IS NULL OR lsv.created_at <= $11::timestamptz)
 ORDER BY
     s.updated_at ASC
 `
@@ -694,6 +706,7 @@ type GetSignalsWithOptionalFiltersParams struct {
 	SignalTypeSlug   string     `json:"signal_type_slug"`
 	SemVer           string     `json:"sem_ver"`
 	IncludeWithdrawn *bool      `json:"include_withdrawn"`
+	ViewerAccountID  *uuid.UUID `json:"viewer_account_id"`
 	AccountID        *uuid.UUID `json:"account_id"`
 	SignalID         *uuid.UUID `json:"signal_id"`
 	LocalRef         *string    `json:"local_ref"`
@@ -722,12 +735,16 @@ type GetSignalsWithOptionalFiltersRow struct {
 
 // you must supply the isn_slug,signal_type_slug & sem_ver params - other filters are optional
 // signals for inactive isns or signal_types are not returned (is_in_use = false)
+// supply viewer_account_id to restrict the results to the signals that account can see (used for write-only accounts):
+// its own signals and the signals correlated to its own signals
+// the signal this signal is correlated to (uncorrelated signals are correlated to themselves)
 func (q *Queries) GetSignalsWithOptionalFilters(ctx context.Context, arg GetSignalsWithOptionalFiltersParams) ([]GetSignalsWithOptionalFiltersRow, error) {
 	rows, err := q.db.Query(ctx, GetSignalsWithOptionalFilters,
 		arg.IsnSlug,
 		arg.SignalTypeSlug,
 		arg.SemVer,
 		arg.IncludeWithdrawn,
+		arg.ViewerAccountID,
 		arg.AccountID,
 		arg.SignalID,
 		arg.LocalRef,
