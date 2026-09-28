@@ -39,15 +39,13 @@ SELECT
     false,
     false
 FROM ids
--- deactivated records (is_withdrawn = true) are reactivated by resubmitting them - the update below ensures the updated_at timestamp is only changed if the record is reactivated
+-- deactivated records (is_withdrawn = true) are reactivated by resubmitting them.
+-- updated_at is changed on every resubmission, since a new version is created (search uses it to find the signals that changed since a given time - updated_since)
 -- the only other signals field that can be updated is the correlation_id (handled by CreateOrUpdateSignalWithCorrelationID)
 ON CONFLICT (account_id, signal_type_id, local_ref)
 DO UPDATE SET
     is_withdrawn = false,
-    updated_at = CASE 
-        WHEN signals.is_withdrawn = true THEN now()
-        ELSE signals.updated_at
-    END
+    updated_at = now()
 RETURNING id;
 
 -- name: CreateOrUpdateSignalWithCorrelationID :one
@@ -147,15 +145,18 @@ JOIN signals s
 RETURNING id, version_number;
 
 -- name: WithdrawSignalByID :execrows
+-- updated_at is only changed if the signal was not already withdrawn (so a repeated withdrawal is not reported as a change by updated_since)
 UPDATE signals
-SET is_withdrawn = true, updated_at = NOW()
+SET is_withdrawn = true,
+    updated_at = CASE WHEN is_withdrawn THEN updated_at ELSE NOW() END
 WHERE id = sqlc.arg(id);
 
 -- name: WithdrawSignalByLocalRef :execrows
--- only withdraws if the ISN and signal type are in use
 -- Only withdraws signals if ISN and signal type are in use (this is a defence against stale access tokens).
+-- updated_at is only changed if the signal was not already withdrawn (so a repeated withdrawal is not reported as a change by updated_since)
 UPDATE signals
-SET is_withdrawn = true, updated_at = NOW()
+SET is_withdrawn = true,
+    updated_at = CASE WHEN is_withdrawn THEN updated_at ELSE NOW() END
 WHERE account_id = sqlc.arg(account_id)
     AND isn_id = (
         SELECT i.id
@@ -181,6 +182,7 @@ WHERE account_id = sqlc.arg(account_id)
 -- signals for inactive isns or signal_types are not returned (is_in_use = false)
 -- supply viewer_account_id to restrict the results to the signals that account can see (used for write-only accounts):
 -- its own signals and the signals correlated to its own signals
+-- updated_since returns the signals that were created, given a new version, recorrelated or withdrawn since that time
 SELECT
  a.id AS account_id,
     a.account_type,
@@ -191,6 +193,7 @@ SELECT
     st.sem_ver,
     st.content_kind,
     s.created_at signal_created_at,
+    s.updated_at signal_updated_at,
     lsv.id AS signal_version_id,
     lsv.version_number,
     lsv.created_at version_created_at,
@@ -232,6 +235,7 @@ WHERE
     AND (sqlc.narg('correlation_id')::uuid IS NULL OR (s.correlation_id = sqlc.narg('correlation_id')::uuid AND s.id != sqlc.narg('correlation_id')::uuid))
     AND (sqlc.narg('start_date')::timestamptz IS NULL OR lsv.created_at >= sqlc.narg('start_date')::timestamptz)
     AND (sqlc.narg('end_date')::timestamptz IS NULL OR lsv.created_at <= sqlc.narg('end_date')::timestamptz)
+    AND (sqlc.narg('updated_since')::timestamptz IS NULL OR s.updated_at >= sqlc.narg('updated_since')::timestamptz)
 ORDER BY
     s.updated_at ASC;
 
@@ -291,6 +295,7 @@ SELECT
     st.sem_ver,
     st.content_kind,
     s.created_at signal_created_at,
+    s.updated_at signal_updated_at,
     lsv.id AS signal_version_id,
     lsv.version_number,
     lsv.created_at version_created_at,

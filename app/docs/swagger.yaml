@@ -713,6 +713,10 @@ definitions:
       signal_type_slug:
         example: sample-signal-type
         type: string
+      signal_updated_at:
+        description: when the signal was last created, given a new version, recorrelated
+          or withdrawn (use as the updated_since value for the next poll)
+        type: string
       signal_version_id:
         type: string
       version_created_at:
@@ -760,6 +764,10 @@ definitions:
         type: string
       signal_type_slug:
         example: sample-signal-type
+        type: string
+      signal_updated_at:
+        description: when the signal was last created, given a new version, recorrelated
+          or withdrawn (use as the updated_since value for the next poll)
         type: string
       signal_version_id:
         type: string
@@ -3146,6 +3154,12 @@ paths:
         in: query
         name: end_date
         type: string
+      - description: Signals created, given a new version, recorrelated or withdrawn
+          since this time (use with include_withdrawn=true to poll for changes)
+        example: "2006-01-02T15:05:00Z"
+        in: query
+        name: updated_since
+        type: string
       - description: Account ID
         example: def87f89-dab6-4607-95f7-593d61cb5742
         in: query
@@ -3484,6 +3498,12 @@ paths:
         example: "2006-01-02T15:15:00Z"
         in: query
         name: end_date
+        type: string
+      - description: Signals created, given a new version, recorrelated or withdrawn
+          since this time (use with include_withdrawn=true to poll for changes)
+        example: "2006-01-02T15:05:00Z"
+        in: query
+        name: updated_since
         type: string
       - description: Account ID
         example: def87f89-dab6-4607-95f7-593d61cb5742

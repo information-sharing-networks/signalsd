@@ -2406,6 +2406,13 @@
                     },
                     {
                         "type": "string",
+                        "example": "2006-01-02T15:05:00Z",
+                        "description": "Signals created, given a new version, recorrelated or withdrawn since this time (use with include_withdrawn=true to poll for changes)",
+                        "name": "updated_since",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "example": "def87f89-dab6-4607-95f7-593d61cb5742",
                         "description": "Account ID",
                         "name": "account_id",
@@ -2832,6 +2839,13 @@
                         "example": "2006-01-02T15:15:00Z",
                         "description": "End date",
                         "name": "end_date",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "2006-01-02T15:05:00Z",
+                        "description": "Signals created, given a new version, recorrelated or withdrawn since this time (use with include_withdrawn=true to poll for changes)",
+                        "name": "updated_since",
                         "in": "query"
                     },
                     {
@@ -4250,6 +4264,10 @@
                     "type": "string",
                     "example": "sample-signal-type"
                 },
+                "signal_updated_at": {
+                    "description": "when the signal was last created, given a new version, recorrelated or withdrawn (use as the updated_since value for the next poll)",
+                    "type": "string"
+                },
                 "signal_version_id": {
                     "type": "string"
                 },
@@ -4319,6 +4337,10 @@
                 "signal_type_slug": {
                     "type": "string",
                     "example": "sample-signal-type"
+                },
+                "signal_updated_at": {
+                    "description": "when the signal was last created, given a new version, recorrelated or withdrawn (use as the updated_since value for the next poll)",
+                    "type": "string"
                 },
                 "signal_version_id": {
                     "type": "string"

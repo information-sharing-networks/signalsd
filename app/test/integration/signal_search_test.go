@@ -8,6 +8,7 @@ package integration
 //
 // - TestSignalSearchAccess: who can search which ISNs
 // - TestWithdrawnSignalSearch: withdrawn signals are only returned with include_withdrawn=true
+// - TestUpdatedSinceSearch: polling for changes with updated_since
 // - TestWriteOnlyAccountVisibility: write-only accounts only see their own signals (see TestCorrelationSearch for correlated signals)
 // - TestPreviousVersionsSearch: include_previous_versions
 // - TestCorrelationSearch: include_correlated and the correlation_id filter
@@ -16,6 +17,7 @@ import (
 	"context"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
@@ -215,6 +217,85 @@ func TestWithdrawnSignalSearch(t *testing.T) {
 		if signals[0]["is_withdrawn"] != true {
 			t.Errorf("Expected is_withdrawn=true, got %v", signals[0]["is_withdrawn"])
 		}
+	})
+}
+
+// TestUpdatedSinceSearch checks updated_since returns the signals that were created, given a new version or withdrawn since that time,
+// so clients can poll for changes using the latest signal_updated_at they have seen
+func TestUpdatedSinceSearch(t *testing.T) {
+	ctx := context.Background()
+
+	testEnv := startInProcessServer(t, "")
+
+	adminAccount := createTestAccount(t, ctx, testEnv.queries, "isnadmin", "user", "admin@updated-since.com")
+	isn := createTestISN(t, ctx, testEnv.queries, "updated-since-isn", "Updated since ISN", adminAccount.ID, "private")
+	signalType := createTestSignalType(t, ctx, testEnv.queries, isn.ID, "polled signal", "", signalsd.ContentKindJSON)
+
+	if err := testEnv.schemaCache.Load(ctx); err != nil {
+		t.Fatalf("Failed to refresh schema cache: %v", err)
+	}
+
+	adminToken := testEnv.getAccessToken(t, adminAccount.ID)
+	endpoint := newTestSignalEndpoint(isn, signalType)
+
+	for _, localRef := range []string{"unchanged-001", "new-version-001", "withdrawn-001"} {
+		submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayload(localRef), adminToken, endpoint)
+	}
+
+	// the first poll returns every signal - the last signal_updated_at is the cursor for the next poll
+	signals := expectSearchResults(t, searchPrivateSignals(t, testEnv.baseURL, endpoint, adminToken, map[string]string{
+		"updated_since": "2000-01-01T00:00:00Z",
+	}))
+	if len(signals) != 3 {
+		t.Fatalf("Expected 3 signals, got %d", len(signals))
+	}
+	cursor, err := time.Parse(time.RFC3339Nano, signals[len(signals)-1]["signal_updated_at"].(string))
+	if err != nil {
+		t.Fatalf("Could not parse signal_updated_at: %v", err)
+	}
+	// the next poll starts just after the cursor, so it excludes the signals already seen
+	updatedSince := cursor.Add(time.Microsecond).Format(time.RFC3339Nano)
+
+	submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayload("new-version-001"), adminToken, endpoint)
+	expectStatus(t, withdrawSignal(t, testEnv.baseURL, endpoint, adminToken, "withdrawn-001"), http.StatusNoContent)
+	submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayload("created-001"), adminToken, endpoint)
+
+	t.Run("returns the signals that changed since the cursor, including withdrawals", func(t *testing.T) {
+		signals := expectSearchResults(t, searchPrivateSignals(t, testEnv.baseURL, endpoint, adminToken, map[string]string{
+			"updated_since":     updatedSince,
+			"include_withdrawn": "true",
+		}))
+		if len(signals) != 3 {
+			t.Fatalf("Expected 3 signals (new-version-001, withdrawn-001, created-001), got %v", signals)
+		}
+		if findSignalByLocalRef(signals, "unchanged-001") != nil {
+			t.Error("Expected unchanged-001 to be excluded")
+		}
+		if newVersion := findSignalByLocalRef(signals, "new-version-001"); newVersion == nil || newVersion["version_number"] != float64(2) {
+			t.Errorf("Expected version 2 of new-version-001, got %v", newVersion)
+		}
+		if withdrawn := findSignalByLocalRef(signals, "withdrawn-001"); withdrawn == nil || withdrawn["is_withdrawn"] != true {
+			t.Errorf("Expected withdrawn-001 with is_withdrawn=true, got %v", withdrawn)
+		}
+		if findSignalByLocalRef(signals, "created-001") == nil {
+			t.Error("Expected created-001 to be included")
+		}
+	})
+
+	t.Run("withdrawn signals are excluded without include_withdrawn=true", func(t *testing.T) {
+		signals := expectSearchResults(t, searchPrivateSignals(t, testEnv.baseURL, endpoint, adminToken, map[string]string{
+			"updated_since": updatedSince,
+		}))
+		if len(signals) != 2 || findSignalByLocalRef(signals, "withdrawn-001") != nil {
+			t.Errorf("Expected new-version-001 and created-001, got %v", signals)
+		}
+	})
+
+	t.Run("invalid updated_since is rejected", func(t *testing.T) {
+		response := searchPrivateSignals(t, testEnv.baseURL, endpoint, adminToken, map[string]string{
+			"updated_since": "yesterday",
+		})
+		expectErrorCode(t, response, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam)
 	})
 }
 

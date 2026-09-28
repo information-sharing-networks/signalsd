@@ -131,10 +131,7 @@ FROM ids
 ON CONFLICT (account_id, signal_type_id, local_ref)
 DO UPDATE SET
     is_withdrawn = false,
-    updated_at = CASE 
-        WHEN signals.is_withdrawn = true THEN now()
-        ELSE signals.updated_at
-    END
+    updated_at = now()
 RETURNING id
 `
 
@@ -150,7 +147,8 @@ type CreateSignalParams struct {
 // If a withdrawn signal is received again it is reactivated (is_withdrawn = false).
 // Only creates signals if ISN and signal type are in use (this is a defence against stale access tokens).
 // Returns the new signal_id.
-// deactivated records (is_withdrawn = true) are reactivated by resubmitting them - the update below ensures the updated_at timestamp is only changed if the record is reactivated
+// deactivated records (is_withdrawn = true) are reactivated by resubmitting them.
+// updated_at is changed on every resubmission, since a new version is created (search uses it to find the signals that changed since a given time - updated_since)
 // the only other signals field that can be updated is the correlation_id (handled by CreateOrUpdateSignalWithCorrelationID)
 func (q *Queries) CreateSignal(ctx context.Context, arg CreateSignalParams) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, CreateSignal,
@@ -542,6 +540,7 @@ SELECT
     st.sem_ver,
     st.content_kind,
     s.created_at signal_created_at,
+    s.updated_at signal_updated_at,
     lsv.id AS signal_version_id,
     lsv.version_number,
     lsv.created_at version_created_at,
@@ -597,6 +596,7 @@ type GetSignalsByCorrelationIDsRow struct {
 	SemVer               string          `json:"sem_ver"`
 	ContentKind          string          `json:"content_kind"`
 	SignalCreatedAt      time.Time       `json:"signal_created_at"`
+	SignalUpdatedAt      time.Time       `json:"signal_updated_at"`
 	SignalVersionID      uuid.UUID       `json:"signal_version_id"`
 	VersionNumber        int32           `json:"version_number"`
 	VersionCreatedAt     time.Time       `json:"version_created_at"`
@@ -629,6 +629,7 @@ func (q *Queries) GetSignalsByCorrelationIDs(ctx context.Context, arg GetSignals
 			&i.SemVer,
 			&i.ContentKind,
 			&i.SignalCreatedAt,
+			&i.SignalUpdatedAt,
 			&i.SignalVersionID,
 			&i.VersionNumber,
 			&i.VersionCreatedAt,
@@ -657,6 +658,7 @@ SELECT
     st.sem_ver,
     st.content_kind,
     s.created_at signal_created_at,
+    s.updated_at signal_updated_at,
     lsv.id AS signal_version_id,
     lsv.version_number,
     lsv.created_at version_created_at,
@@ -697,6 +699,7 @@ WHERE
     AND ($9::uuid IS NULL OR (s.correlation_id = $9::uuid AND s.id != $9::uuid))
     AND ($10::timestamptz IS NULL OR lsv.created_at >= $10::timestamptz)
     AND ($11::timestamptz IS NULL OR lsv.created_at <= $11::timestamptz)
+    AND ($12::timestamptz IS NULL OR s.updated_at >= $12::timestamptz)
 ORDER BY
     s.updated_at ASC
 `
@@ -713,6 +716,7 @@ type GetSignalsWithOptionalFiltersParams struct {
 	CorrelationID    *uuid.UUID `json:"correlation_id"`
 	StartDate        *time.Time `json:"start_date"`
 	EndDate          *time.Time `json:"end_date"`
+	UpdatedSince     *time.Time `json:"updated_since"`
 }
 
 type GetSignalsWithOptionalFiltersRow struct {
@@ -725,6 +729,7 @@ type GetSignalsWithOptionalFiltersRow struct {
 	SemVer               string          `json:"sem_ver"`
 	ContentKind          string          `json:"content_kind"`
 	SignalCreatedAt      time.Time       `json:"signal_created_at"`
+	SignalUpdatedAt      time.Time       `json:"signal_updated_at"`
 	SignalVersionID      uuid.UUID       `json:"signal_version_id"`
 	VersionNumber        int32           `json:"version_number"`
 	VersionCreatedAt     time.Time       `json:"version_created_at"`
@@ -737,6 +742,7 @@ type GetSignalsWithOptionalFiltersRow struct {
 // signals for inactive isns or signal_types are not returned (is_in_use = false)
 // supply viewer_account_id to restrict the results to the signals that account can see (used for write-only accounts):
 // its own signals and the signals correlated to its own signals
+// updated_since returns the signals that were created, given a new version, recorrelated or withdrawn since that time
 // the signal this signal is correlated to (uncorrelated signals are correlated to themselves)
 func (q *Queries) GetSignalsWithOptionalFilters(ctx context.Context, arg GetSignalsWithOptionalFiltersParams) ([]GetSignalsWithOptionalFiltersRow, error) {
 	rows, err := q.db.Query(ctx, GetSignalsWithOptionalFilters,
@@ -751,6 +757,7 @@ func (q *Queries) GetSignalsWithOptionalFilters(ctx context.Context, arg GetSign
 		arg.CorrelationID,
 		arg.StartDate,
 		arg.EndDate,
+		arg.UpdatedSince,
 	)
 	if err != nil {
 		return nil, err
@@ -769,6 +776,7 @@ func (q *Queries) GetSignalsWithOptionalFilters(ctx context.Context, arg GetSign
 			&i.SemVer,
 			&i.ContentKind,
 			&i.SignalCreatedAt,
+			&i.SignalUpdatedAt,
 			&i.SignalVersionID,
 			&i.VersionNumber,
 			&i.VersionCreatedAt,
@@ -813,10 +821,12 @@ func (q *Queries) ValidateCorrelationID(ctx context.Context, arg ValidateCorrela
 
 const WithdrawSignalByID = `-- name: WithdrawSignalByID :execrows
 UPDATE signals
-SET is_withdrawn = true, updated_at = NOW()
+SET is_withdrawn = true,
+    updated_at = CASE WHEN is_withdrawn THEN updated_at ELSE NOW() END
 WHERE id = $1
 `
 
+// updated_at is only changed if the signal was not already withdrawn (so a repeated withdrawal is not reported as a change by updated_since)
 func (q *Queries) WithdrawSignalByID(ctx context.Context, id uuid.UUID) (int64, error) {
 	result, err := q.db.Exec(ctx, WithdrawSignalByID, id)
 	if err != nil {
@@ -827,7 +837,8 @@ func (q *Queries) WithdrawSignalByID(ctx context.Context, id uuid.UUID) (int64, 
 
 const WithdrawSignalByLocalRef = `-- name: WithdrawSignalByLocalRef :execrows
 UPDATE signals
-SET is_withdrawn = true, updated_at = NOW()
+SET is_withdrawn = true,
+    updated_at = CASE WHEN is_withdrawn THEN updated_at ELSE NOW() END
 WHERE account_id = $1
     AND isn_id = (
         SELECT i.id
@@ -857,8 +868,8 @@ type WithdrawSignalByLocalRefParams struct {
 	LocalRef  string    `json:"local_ref"`
 }
 
-// only withdraws if the ISN and signal type are in use
 // Only withdraws signals if ISN and signal type are in use (this is a defence against stale access tokens).
+// updated_at is only changed if the signal was not already withdrawn (so a repeated withdrawal is not reported as a change by updated_since)
 func (q *Queries) WithdrawSignalByLocalRef(ctx context.Context, arg WithdrawSignalByLocalRefParams) (int64, error) {
 	result, err := q.db.Exec(ctx, WithdrawSignalByLocalRef,
 		arg.AccountID,
