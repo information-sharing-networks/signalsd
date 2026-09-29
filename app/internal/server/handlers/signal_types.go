@@ -34,7 +34,7 @@ type CreateSignalTypeRequest struct {
 	BumpType    string `json:"bump_type" example:"patch" enums:"major,minor,patch"`                              // this is used to increment semver for the signal type
 	ReadmeURL   string `json:"readme_url" example:"https://github.com/user/project/blob/2025.01.01/readme.md"`   // README file URL: must be a GitHub URL ending in .md
 	Detail      string `json:"detail" example:"description"`                                                     // description
-	ContentKind string `json:"content_kind" example:"json" enums:"json,document"`                                // optional (default json): json signals are validated against the schema, document signals are files (e.g. PDFs)
+	ContentKind string `json:"content_kind" example:"json" enums:"json,document,event"`                          // optional (default json): json signals are validated against the schema, document signals are files (e.g. PDFs), event signals are immutable json signals that record a process waypoint
 }
 
 type RegisterNewSignalTypeSchemaRequest struct {
@@ -71,7 +71,7 @@ type SignalTypeDetail struct {
 	Title       string    `json:"title" example:"Sample Signal Type"`
 	Detail      string    `json:"detail" example:"Sample signal type description"`
 	SemVer      string    `json:"sem_ver" example:""`
-	ContentKind string    `json:"content_kind" example:"json" enums:"json,document"`
+	ContentKind string    `json:"content_kind" example:"json" enums:"json,document,event"`
 }
 
 // IsnSignalTypeDetail is a signal type that has been added to an ISN
@@ -92,6 +92,8 @@ type IsnSignalTypeDetail struct {
 //	@Description	Content kinds
 //	@Description	- json (default): signals are JSON validated against the signal type's schema
 //	@Description	- document: signals are files (e.g. a PDF bill of lading) Document signal types do not have a schema - omit schema_url
+//	@Description	- event: signals are immutable JSON records of a process waypoint (e.g. export health certificate approved), validated against the signal type's schema.
+//	@Description	Events must be correlated to the signal they are about and have an occurred_at timestamp in their content (see Submit Signals)
 //	@Description
 //	@Description	JSON Schema URL Requirements
 //	@Description	- Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)
@@ -162,7 +164,7 @@ func (s *SignalTypeHandler) CreateSignalType(w http.ResponseWriter, r *http.Requ
 		req.BumpType == "" ||
 		req.ReadmeURL == "" ||
 		req.Detail == "" {
-		return apperrors.MalformedBody("you must supply all the fields: schema URL (json signal types only), title, bump type, readme URL and detail", nil)
+		return apperrors.MalformedBody("you must supply all the fields: schema URL (json and event signal types only), title, bump type, readme URL and detail", nil)
 	}
 
 	// check for valid github url formats
@@ -369,8 +371,8 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchema(w http.ResponseWriter, r
 		return apperrors.NotFound("signal type not found", nil)
 	}
 
-	// only json signal types have schemas
-	if currentSignalType.ContentKind != signalsd.ContentKindJSON {
+	// only json and event signal types have schemas
+	if currentSignalType.ContentKind != signalsd.ContentKindJSON && currentSignalType.ContentKind != signalsd.ContentKindEvent {
 		return apperrors.MalformedBody(fmt.Sprintf("schemas can't be registered for %s signal types", currentSignalType.ContentKind), nil)
 	}
 	//... check the signal type was not previously registered with this schema

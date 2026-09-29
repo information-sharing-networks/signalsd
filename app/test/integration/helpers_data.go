@@ -112,10 +112,14 @@ const (
 	testSchemaURL        = "https://github.com/information-sharing-networks/signal-library/blob/main/signalsd-testing/simple.json"
 	testReadmeURL        = "https://github.com/information-sharing-networks/signal-library/blob/main/signalsd-testing/README.md"
 	testSchemaContent    = `{"type": "object", "properties": {"test": {"type": "string"}}, "required": ["test"], "additionalProperties": false }`
+
+	// event signal types use a schema with the occurred_at field required for events and a certificate number, e.g. { "occurred_at": "2026-09-27T14:02:00Z", "certificate_no": "EHC-001" }
+	testEventSchemaContent = `{"type": "object", "properties": {"occurred_at": {"type": "string"}, "certificate_no": {"type": "string"}}, "required": ["occurred_at", "certificate_no"]}`
 )
 
-// createTestSignalType creates a signal type with the supplied content kind (json, document) and associates it with an ISN.
+// createTestSignalType creates a signal type with the supplied content kind (json, document, event) and associates it with an ISN.
 // json signal types use the simple test schema, which expects content to have a single field called test, e.g "{ "test": "Hello, world!" }"
+// event signal types use the event test schema (testEventSchemaContent).
 // document signal types have no schema.
 // signal types default to version 1.0.0 if no version is supplied
 func createTestSignalType(t *testing.T, ctx context.Context, queries *database.Queries, isnID uuid.UUID, title string, version string, contentKind string) database.SignalType {
@@ -129,9 +133,12 @@ func createTestSignalType(t *testing.T, ctx context.Context, queries *database.Q
 
 	schemaURL := testSchemaURL
 	schemaContent := testSchemaContent
-	if contentKind == signalsd.ContentKindDocument {
+	switch contentKind {
+	case signalsd.ContentKindDocument:
 		schemaURL = signalsd.SkipValidationURL
 		schemaContent = "{}"
+	case signalsd.ContentKindEvent:
+		schemaContent = testEventSchemaContent
 	}
 
 	signalType, err := queries.CreateSignalType(ctx, database.CreateSignalTypeParams{

@@ -38,7 +38,7 @@ const maxFormFieldSize = 1024
 
 // uploadRequestOverhead allows for the form fields and multipart headers sent with the document -
 // the request size limit for uploads is MAX_DOCUMENT_SIZE plus this
-// (the document itself is limited to MAX_DOCUMENT_SIZE by storeDocument)
+// (the document itself is limited to MAX_DOCUMENT_SIZE by storeDocumentSignal)
 const uploadRequestOverhead = 64 * 1024
 
 // MaxUploadRequestSize is the request size limit for the document upload routes
@@ -194,7 +194,7 @@ func (h *DocumentsHandler) UploadDocument(w http.ResponseWriter, r *http.Request
 		return err
 	}
 
-	return h.storeDocument(w, r, upload, isnSlug)
+	return h.storeDocumentSignal(w, r, upload, isnSlug)
 }
 
 // RouteDocument godoc
@@ -283,11 +283,11 @@ func (h *DocumentsHandler) RouteDocument(w http.ResponseWriter, r *http.Request)
 		slog.String("isn_slug", isn.Slug),
 	)
 
-	return h.storeDocument(w, r, upload, isn.Slug)
+	return h.storeDocumentSignal(w, r, upload, isn.Slug)
 }
 
 // documentUpload is an upload request whose form fields have been read.
-// The file has not been read yet - storeDocument reads it from filePart.
+// The file has not been read yet - storeDocumentSignal reads it from filePart.
 type documentUpload struct {
 	accountID      uuid.UUID
 	signalTypeSlug string
@@ -317,8 +317,12 @@ func (h *DocumentsHandler) readUploadFields(r *http.Request) (*documentUpload, e
 	}
 
 	// only document signal types can be uploaded
-	if err := h.schemaCache.CheckContentKind(upload.signalTypePath(), signalsd.ContentKindDocument); err != nil {
-		return nil, apperrors.InvalidURLParam(err.Error(), nil)
+	switch contentKind := h.schemaCache.ContentKind(upload.signalTypePath()); contentKind {
+	case signalsd.ContentKindDocument:
+	case "":
+		return nil, apperrors.InvalidURLParam(fmt.Sprintf("signal type %s not found", upload.signalTypePath()), nil)
+	default:
+		return nil, apperrors.InvalidURLParam(fmt.Sprintf("signal type %s is a %s signal type - only document signal types can be uploaded", upload.signalTypePath(), contentKind), nil)
 	}
 
 	accountID, ok := auth.ContextAccountID(r.Context())
@@ -349,7 +353,7 @@ func (h *DocumentsHandler) readUploadFields(r *http.Request) (*documentUpload, e
 
 		if part.FormName() == "file" {
 			upload.filePart = part
-			break // the file is read by storeDocument
+			break // the file is read by storeDocumentSignal
 		}
 
 		value, err := io.ReadAll(io.LimitReader(part, maxFormFieldSize+1))
@@ -442,9 +446,9 @@ func (h *DocumentsHandler) recordFailure(ctx context.Context, upload *documentUp
 	return uploadErr
 }
 
-// storeDocument reads the file, stores it and creates the document signal version on the ISN.
+// storeDocumentSignal reads the file, stores it and creates the document signal version on the ISN.
 // The account's write permission on the ISN must have been checked.
-func (h *DocumentsHandler) storeDocument(w http.ResponseWriter, r *http.Request, upload *documentUpload, isnSlug string) error {
+func (h *DocumentsHandler) storeDocumentSignal(w http.ResponseWriter, r *http.Request, upload *documentUpload, isnSlug string) error {
 	ctx := r.Context()
 
 	reject := func(uploadErr *apperrors.HTTPError) error {
@@ -674,8 +678,12 @@ func (h *DocumentsHandler) DownloadDocument(w http.ResponseWriter, r *http.Reque
 	signalTypePath := fmt.Sprintf("%v/v%v", signalTypeSlug, semVer)
 
 	// only document signal types have documents to download
-	if err := h.schemaCache.CheckContentKind(signalTypePath, signalsd.ContentKindDocument); err != nil {
-		return apperrors.InvalidURLParam(err.Error(), nil)
+	switch contentKind := h.schemaCache.ContentKind(signalTypePath); contentKind {
+	case signalsd.ContentKindDocument:
+	case "":
+		return apperrors.InvalidURLParam(fmt.Sprintf("signal type %s not found", signalTypePath), nil)
+	default:
+		return apperrors.InvalidURLParam(fmt.Sprintf("signal type %s is a %s signal type - only document signal types can be downloaded", signalTypePath, contentKind), nil)
 	}
 
 	signalID, err := uuid.Parse(r.PathValue("signal_id"))

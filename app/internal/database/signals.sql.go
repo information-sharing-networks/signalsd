@@ -13,6 +13,73 @@ import (
 	"uuid"
 )
 
+const CreateEventSignal = `-- name: CreateEventSignal :one
+WITH ids AS (
+    SELECT st.id AS signal_type_id,
+        i.id AS isn_id
+    FROM signal_types st
+    JOIN isn_signal_types ist ON st.id = ist.signal_type_id
+    JOIN isn i ON i.id = ist.isn_id
+    WHERE i.slug = $4
+        AND st.slug = $5
+        AND st.sem_ver = $6
+        AND i.is_in_use = true
+        AND ist.is_in_use = true
+)
+INSERT INTO signals (
+    id,
+    created_at,
+    updated_at,
+    account_id,
+    isn_id,
+    signal_type_id,
+    local_ref,
+    correlation_id,
+    is_withdrawn,
+    is_archived)
+SELECT
+    uuidv7(),
+    now(),
+    now(),
+    $1,
+    ids.isn_id,
+    ids.signal_type_id,
+    $2,
+    $3,
+    false,
+    false
+FROM ids
+ON CONFLICT (account_id, signal_type_id, local_ref) DO NOTHING
+RETURNING id
+`
+
+type CreateEventSignalParams struct {
+	AccountID      uuid.UUID `json:"account_id"`
+	LocalRef       string    `json:"local_ref"`
+	CorrelationID  uuid.UUID `json:"correlation_id"`
+	IsnSlug        string    `json:"isn_slug"`
+	SignalTypeSlug string    `json:"signal_type_slug"`
+	SemVer         string    `json:"sem_ver"`
+}
+
+// Creates the signal master record for an event. Events are immutable, so unlike CreateSignal and CreateOrUpdateSignalWithCorrelationID
+// an existing signal is never updated (not reactivated or recorrelated).
+// Returns no rows if the account already has an event with this local_ref (use GetEventSignalByLocalRef to compare it with the resubmitted event),
+// or if the ISN or signal type is not in use (this is a defence against stale access tokens).
+func (q *Queries) CreateEventSignal(ctx context.Context, arg CreateEventSignalParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, CreateEventSignal,
+		arg.AccountID,
+		arg.LocalRef,
+		arg.CorrelationID,
+		arg.IsnSlug,
+		arg.SignalTypeSlug,
+		arg.SemVer,
+	)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const CreateOrUpdateSignalWithCorrelationID = `-- name: CreateOrUpdateSignalWithCorrelationID :one
 WITH ids AS (
     SELECT st.id AS signal_type_id,
@@ -231,6 +298,62 @@ func (q *Queries) CreateSignalVersion(ctx context.Context, arg CreateSignalVersi
 	)
 	var i CreateSignalVersionRow
 	err := row.Scan(&i.ID, &i.VersionNumber)
+	return i, err
+}
+
+const GetEventSignalByLocalRef = `-- name: GetEventSignalByLocalRef :one
+SELECT
+    s.id AS signal_id,
+    s.correlation_id,
+    s.is_withdrawn,
+    lsv.id AS signal_version_id,
+    lsv.version_number,
+    (lsv.content = $1::jsonb)::boolean AS content_matches
+FROM signals s
+JOIN signal_types st ON st.id = s.signal_type_id
+JOIN latest_signal_versions lsv ON lsv.signal_id = s.id
+WHERE s.account_id = $2
+    AND st.slug = $3
+    AND st.sem_ver = $4
+    AND s.local_ref = $5
+`
+
+type GetEventSignalByLocalRefParams struct {
+	Content        json.RawMessage `json:"content"`
+	AccountID      uuid.UUID       `json:"account_id"`
+	SignalTypeSlug string          `json:"signal_type_slug"`
+	SemVer         string          `json:"sem_ver"`
+	LocalRef       string          `json:"local_ref"`
+}
+
+type GetEventSignalByLocalRefRow struct {
+	SignalID        uuid.UUID `json:"signal_id"`
+	CorrelationID   uuid.UUID `json:"correlation_id"`
+	IsWithdrawn     bool      `json:"is_withdrawn"`
+	SignalVersionID uuid.UUID `json:"signal_version_id"`
+	VersionNumber   int32     `json:"version_number"`
+	ContentMatches  bool      `json:"content_matches"`
+}
+
+// returns the account's event with the supplied local_ref, and whether its content is the same as the supplied content
+// (compared as jsonb, so key order and whitespace are ignored). Used to check resubmitted events are unchanged.
+func (q *Queries) GetEventSignalByLocalRef(ctx context.Context, arg GetEventSignalByLocalRefParams) (GetEventSignalByLocalRefRow, error) {
+	row := q.db.QueryRow(ctx, GetEventSignalByLocalRef,
+		arg.Content,
+		arg.AccountID,
+		arg.SignalTypeSlug,
+		arg.SemVer,
+		arg.LocalRef,
+	)
+	var i GetEventSignalByLocalRefRow
+	err := row.Scan(
+		&i.SignalID,
+		&i.CorrelationID,
+		&i.IsWithdrawn,
+		&i.SignalVersionID,
+		&i.VersionNumber,
+		&i.ContentMatches,
+	)
 	return i, err
 }
 

@@ -535,7 +535,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Signal types specify a record that can be shared on the site\n- Each type has a unique title and this is used to create a URL-friendly slug\n- The title and slug fields can't be changed and must be unique for the site\n- The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading\n\nContent kinds\n- json (default): signals are JSON validated against the signal type's schema\n- document: signals are files (e.g. a PDF bill of lading) Document signal types do not have a schema - omit schema_url\n\nJSON Schema URL Requirements\n- Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)\n- To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json\n\nReadme URL requirements\n- Must be a link to a file ending .md on a public github repo.\n- Use the special URL: https://github.com/skip/readme/main/readme.md to indicate there is no readme\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas\n- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (, 0.1.0 or 0.0.1)\n\nAfter creating a signal type, use the AddSignalTypeToIsn endpoint to link it to one or more ISNs.\n\nSignal type definitions are referred to like this: /api/signal-types/{signal_type_slug}/v{sem_ver}\n\nNote: this endpoint can only be used by site admins",
+                "description": "Signal types specify a record that can be shared on the site\n- Each type has a unique title and this is used to create a URL-friendly slug\n- The title and slug fields can't be changed and must be unique for the site\n- The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading\n\nContent kinds\n- json (default): signals are JSON validated against the signal type's schema\n- document: signals are files (e.g. a PDF bill of lading) Document signal types do not have a schema - omit schema_url\n- event: signals are immutable JSON records of a process waypoint (e.g. export health certificate approved), validated against the signal type's schema.\nEvents must be correlated to the signal they are about and have an occurred_at timestamp in their content (see Submit Signals)\n\nJSON Schema URL Requirements\n- Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)\n- To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json\n\nReadme URL requirements\n- Must be a link to a file ending .md on a public github repo.\n- Use the special URL: https://github.com/skip/readme/main/readme.md to indicate there is no readme\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas\n- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (, 0.1.0 or 0.0.1)\n\nAfter creating a signal type, use the AddSignalTypeToIsn endpoint to link it to one or more ISNs.\n\nSignal type definitions are referred to like this: /api/signal-types/{signal_type_slug}/v{sem_ver}\n\nNote: this endpoint can only be used by site admins",
                 "tags": [
                     "Signal Types"
                 ],
@@ -2279,7 +2279,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Submit JSON signals to an ISN (documents are sent to document signal types with Upload a Document)\n- payloads must not mix signals of different types and are subject to the size limits defined on the site.\n- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.\n- If a local reference is received more than once from an account for the specified signal_type a new version of the signal will be stored with a incremented version number.\n- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.\n\n**Batches**\n\nBatches group separate loads for reporting and tracking purposes.\n- Signal loads are tracked under the batch_ref supplied as part of the request. To start a new batch\njust supply a different batch_ref.\n- Batches are stored at the account level and therefore can include signals from different ISNs and Signal Types\n- Use the *Get Batch Status* endpoint to get a report on the status of signals loaded in a batch.\n\n**Authentication**\n\nRequires a valid access token.\nThe claims in the access token list the ISNs and signal_types that the account is permitted to use.\n\n**Error handling**\n\nPartial loads of the data are possible where the request is a valid format but individual signals fail to load\n(e.g schema validation errors, incorrect correlations ids).\nFailures are logged and trackable via the Batch Status endpoint.\nThe response provides an audit trail detailing the submission outcome.\n\nNote the response structure is also used by the Signals Router endpoint, which can return results for multiple ISNs -\nconsequently the `Results` field is an array (one element for each ISN in the results).\nThere will only ever be a single entry when using this handler.\n\nErrors that relate to the entire request  - e.g invalid json, authentication, permission and server errors (400, 401, 403, 500) -\nreturn a simple error_code/error_message response rather than a detailed audit log.\nThe individual signal failures are not logged in this case, and the client must resupply the data once the problem is resolved.\n\n**JSON Schema Validation**\n\nthe json contained in the `content` field is validated against the JSON schema specified for the signal type unless validation is disabled on the type definition.\n\nWhen schema validation is disabled, basic checks are still done on the incoming data and the following issues create a 400 error and cause the entire payload to be rejected:\n- invalid json format\n- missing fields (batch_ref must be present; the array of signals must be in a json object called signals; and the content and local_ref must be present for each element of the signals array).\n\n**Signal versions**\n\nNew versions are created when signals are resupplied using the same local_ref, e.g. because the client wants to correct a previously publsihed signal.\nIf a signal has been withdrawn it will be reactivated if you resubmit it using the same local_ref.\n\n**Correlating signals**\n\nCorrelation IDs can be used to link signals together (a `correlation_id` is the `signals_id` of a previosuly submitted signal)\nSignals can only be correlated within the same ISN.\nIf the supplied correlation_id is not found in the same ISN as the signal being submitted,\nthe response will contain a 422 or 207 status code and the error_code for the failed signal will be `invalid_correlation_id`.\n",
+                "description": "Submit JSON or event signals to an ISN (documents are sent to document signal types with Upload a Document)\n- payloads must not mix signals of different types and are subject to the size limits defined on the site.\n- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.\n- If a local reference is received more than once from an account for the specified signal_type a new version of the signal will be stored with a incremented version number.\n- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.\n\n**Batches**\n\nBatches group separate loads for reporting and tracking purposes.\n- Signal loads are tracked under the batch_ref supplied as part of the request. To start a new batch\njust supply a different batch_ref.\n- Batches are stored at the account level and therefore can include signals from different ISNs and Signal Types\n- Use the *Get Batch Status* endpoint to get a report on the status of signals loaded in a batch.\n\n**Authentication**\n\nRequires a valid access token.\nThe claims in the access token list the ISNs and signal_types that the account is permitted to use.\n\n**Error handling**\n\nPartial loads of the data are possible where the request is a valid format but individual signals fail to load\n(e.g schema validation errors, incorrect correlations ids).\nFailures are logged and trackable via the Batch Status endpoint.\nThe response provides an audit trail detailing the submission outcome.\n\nNote the response structure is also used by the Signals Router endpoint, which can return results for multiple ISNs -\nconsequently the `Results` field is an array (one element for each ISN in the results).\nThere will only ever be a single entry when using this handler.\n\nErrors that relate to the entire request  - e.g invalid json, authentication, permission and server errors (400, 401, 403, 500) -\nreturn a simple error_code/error_message response rather than a detailed audit log.\nThe individual signal failures are not logged in this case, and the client must resupply the data once the problem is resolved.\n\n**JSON Schema Validation**\n\nthe json contained in the `content` field is validated against the JSON schema specified for the signal type unless validation is disabled on the type definition.\n\nWhen schema validation is disabled, basic checks are still done on the incoming data and the following issues create a 400 error and cause the entire payload to be rejected:\n- invalid json format\n- missing fields (batch_ref must be present; the array of signals must be in a json object called signals; and the content and local_ref must be present for each element of the signals array).\n\n**Signal versions**\n\nNew versions are created when signals are resupplied using the same local_ref, e.g. because the client wants to correct a previously publsihed signal.\nIf a signal has been withdrawn it will be reactivated if you resubmit it using the same local_ref.\n\n**Correlating signals**\n\nCorrelation IDs can be used to link signals together (a `correlation_id` is the `signals_id` of a previosuly submitted signal)\nSignals can only be correlated within the same ISN.\nIf the supplied correlation_id is not found in the same ISN as the signal being submitted,\nthe response will contain a 422 or 207 status code and the error_code for the failed signal will be `invalid_correlation_id`.\n\n**Events**\n\nSignals sent to event signal types record that a process waypoint has been reached for another signal (e.g. an approved export health certificate is available for a consignment).\n- events must have a `correlation_id` - correlate the event to the signal it is about (e.g. the consignment). Requests with events that don't have one are rejected (400)\n- the `content` object must include an `occurred_at` field (directly in `content`, not nested in another object) containing an RFC 3339 timestamp with a time zone offset (e.g. 2026-09-27T14:02:00Z) - the time the waypoint was reached\n- events are immutable: resubmitting an event with the same local_ref, content and correlation_id returns the existing version with `unchanged: true` (so events can be safely resent),\nand resubmitting it with anything different, or after it was withdrawn, fails with `resource_already_exists`.\nTo correct an event, withdraw it and send a new event with a new local_ref.\n- where an event is about a specific version of a signal (e.g. version 3 of a document), name it in a `subject` field in `content`: `{\"signal_id\": \"...\", \"version\": 3}`\n\nExample event: `{\"local_ref\": \"ehc-approved-001\", \"correlation_id\": \"\u003cconsignment signal_id\u003e\", \"content\": {\"occurred_at\": \"2026-09-27T14:02:00Z\", \"subject\": {\"signal_id\": \"\u003cdocument signal_id\u003e\", \"version\": 3}, \"certificate_no\": \"EHC-001\"}}`\n",
                 "tags": [
                     "Signal Exchange"
                 ],
@@ -2936,7 +2936,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Submit JSON signals without specifying a target ISN - the router resolves the ISN for each signal\n(documents are sent to document signal types with _Upload a Document via Router_).\n\n**ISN resolution by correlation ID**\n\nWhere a _correlation ID_ is supplied, the routing rules do not apply and the signal\nis routed to the ISN that received the correlated signal.\n\n**ISN resolution by pattern match**\n\nIf no correlation ID is supplied, the ISN is resolved using the routing rules defined for the _Signal Type_.\nThe rules are applied in the order defined in the _Routing Rules Config_ (first match is accepted).\n\n**Resolution failures**\n\nSignals that can't be routed are listed in `unroutable_signals` (and counted in `unroutable_count`):\n- signals that do not contain the routing field defined in the _Routing Rules Config_, or do not satisfy any of the routing rules\n- signals whose correlation_id is not found (or whose ISN is not in use)\n\nSignals that resolve to an ISN where the account lacks write permission, or where the signal type is not in use,\nare rejected and listed in the `failed_signals` of that ISN's result.\n\n**Usage**\n\nOther than the ISN resolution, this endpoint behaves the same way as the standard _Submit Signals_ endpoint\n(request format, batches, error handling, schema validation, versions and correlation).\nThe response contains a result for each ISN the signals were routed to.",
+                "description": "Submit JSON or event signals without specifying a target ISN - the router resolves the ISN for each signal\n(documents are sent to document signal types with _Upload a Document via Router_).\nEvents always have a correlation ID, so they are always routed to the ISN of the correlated signal.\n\n**ISN resolution by correlation ID**\n\nWhere a _correlation ID_ is supplied, the routing rules do not apply and the signal\nis routed to the ISN that received the correlated signal.\n\n**ISN resolution by pattern match**\n\nIf no correlation ID is supplied, the ISN is resolved using the routing rules defined for the _Signal Type_.\nThe rules are applied in the order defined in the _Routing Rules Config_ (first match is accepted).\n\n**Resolution failures**\n\nSignals that can't be routed are listed in `unroutable_signals` (and counted in `unroutable_count`):\n- signals that do not contain the routing field defined in the _Routing Rules Config_, or do not satisfy any of the routing rules\n- signals whose correlation_id is not found (or whose ISN is not in use)\n\nSignals that resolve to an ISN where the account lacks write permission, or where the signal type is not in use,\nare rejected and listed in the `failed_signals` of that ISN's result.\n\n**Usage**\n\nOther than the ISN resolution, this endpoint behaves the same way as the standard _Submit Signals_ endpoint\n(request format, batches, error handling, schema validation, versions and correlation).\nThe response contains a result for each ISN the signals were routed to.",
                 "tags": [
                     "Signal Exchange"
                 ],
@@ -3688,11 +3688,12 @@
                     "example": "patch"
                 },
                 "content_kind": {
-                    "description": "optional (default json): json signals are validated against the schema, document signals are files (e.g. PDFs)",
+                    "description": "optional (default json): json signals are validated against the schema, document signals are files (e.g. PDFs), event signals are immutable json signals that record a process waypoint",
                     "type": "string",
                     "enum": [
                         "json",
-                        "document"
+                        "document",
+                        "event"
                     ],
                     "example": "json"
                 },
@@ -3730,7 +3731,7 @@
                     "description": "Signals - the list of signals to be loaded",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/handlers.Signal"
+                        "$ref": "#/definitions/handlers.SubmittedSignal"
                     }
                 }
             }
@@ -4049,7 +4050,8 @@
                     "type": "string",
                     "enum": [
                         "json",
-                        "document"
+                        "document",
+                        "event"
                     ],
                     "example": "json"
                 },
@@ -4233,7 +4235,8 @@
                     "type": "string",
                     "enum": [
                         "json",
-                        "document"
+                        "document",
+                        "event"
                     ],
                     "example": "json"
                 },
@@ -4295,7 +4298,8 @@
                     "type": "string",
                     "enum": [
                         "json",
-                        "document"
+                        "document",
+                        "event"
                     ],
                     "example": "json"
                 },
@@ -4401,25 +4405,6 @@
                     "description": "seconds (1 year)",
                     "type": "integer",
                     "example": 31536000
-                }
-            }
-        },
-        "handlers.Signal": {
-            "type": "object",
-            "properties": {
-                "content": {
-                    "description": "Content is the json payload that is validated against the stored signal type schema",
-                    "type": "object"
-                },
-                "correlation_id": {
-                    "description": "CorrelationID is an optional ID for another signal in the same ISN - the submitted signal is linked to the correlated signal",
-                    "type": "string",
-                    "example": "75b45fe1-ecc2-4629-946b-fd9058c3b2ca"
-                },
-                "local_ref": {
-                    "description": "LocalRef is supplied by the sender and uniquely identify each signal\nRepeat deliveries of the same LocalRef are treated as updates to the original signal",
-                    "type": "string",
-                    "example": "item_id_#1"
                 }
             }
         },
@@ -4570,7 +4555,8 @@
                     "type": "string",
                     "enum": [
                         "json",
-                        "document"
+                        "document",
+                        "event"
                     ],
                     "example": "json"
                 },
@@ -4630,10 +4616,34 @@
                     "type": "string",
                     "example": "835788bd-789d-4091-96e3-db0f51ccbabc"
                 },
+                "unchanged": {
+                    "description": "Unchanged is true if an event was resubmitted with the same content and correlation_id - the existing version is returned\nand no new version is created (only used for event signals)",
+                    "type": "boolean",
+                    "example": false
+                },
                 "version_number": {
                     "description": "VersionNumber is the version created by the server\n(where the same localRef is received in subsequent loads the versionNumber is incremented)",
                     "type": "integer",
                     "example": 1
+                }
+            }
+        },
+        "handlers.SubmittedSignal": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "description": "Content is the json payload that is validated against the stored signal type schema",
+                    "type": "object"
+                },
+                "correlation_id": {
+                    "description": "CorrelationID is an optional ID for another signal in the same ISN - the submitted signal is linked to the correlated signal",
+                    "type": "string",
+                    "example": "75b45fe1-ecc2-4629-946b-fd9058c3b2ca"
+                },
+                "local_ref": {
+                    "description": "LocalRef is supplied by the sender and uniquely identify each signal\nRepeat deliveries of the same LocalRef are treated as updates to the original signal",
+                    "type": "string",
+                    "example": "item_id_#1"
                 }
             }
         },

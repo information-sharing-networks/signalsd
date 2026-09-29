@@ -79,10 +79,12 @@ const (
 
 	// content kinds - determine how the content of a signal type is handled:
 	// json signals are validated against the signal type schema and stored inline,
-	// document signals are opaque, byte-exact files held in the document store.
-	// Code should switch on the content kind explicitly and reject unknown kinds (more kinds may be added later).
+	// document signals contain document metadata and are associated with binary files held in the document store,
+	// event signals are json signals that record a process waypoint for the signal they are correlated to.
+	// new kinds should also be added to validContentKinds
 	ContentKindJSON     = "json"
 	ContentKindDocument = "document"
+	ContentKindEvent    = "event"
 
 	// document stores (see ValidDocumentStores)
 	DocumentStorePostgres = "postgres"
@@ -138,6 +140,7 @@ var ValidServiceModes = map[string]bool{ // service modes for CLI
 var ValidContentKinds = map[string]bool{
 	ContentKindJSON:     true,
 	ContentKindDocument: true,
+	ContentKindEvent:    true,
 }
 
 // ValidDocumentStores is the list of supported backends for storing document content

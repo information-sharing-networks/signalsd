@@ -49,7 +49,7 @@ type SearchSignal struct {
 	LocalRef             string          `json:"local_ref"`
 	SignalTypeSlug       string          `json:"signal_type_slug" example:"sample-signal-type"`
 	SemVer               string          `json:"sem_ver" example:"0.0.1"`
-	ContentKind          string          `json:"content_kind" example:"json" enums:"json,document"`
+	ContentKind          string          `json:"content_kind" example:"json" enums:"json,document,event"`
 	SignalCreatedAt      time.Time       `json:"signal_created_at"`
 	SignalUpdatedAt      time.Time       `json:"signal_updated_at"` // when the signal was last created, given a new version, recorrelated or withdrawn (use as the updated_since value for the next poll)
 	SignalVersionID      uuid.UUID       `json:"signal_version_id"`

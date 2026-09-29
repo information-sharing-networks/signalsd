@@ -279,10 +279,12 @@ definitions:
         type: string
       content_kind:
         description: 'optional (default json): json signals are validated against
-          the schema, document signals are files (e.g. PDFs)'
+          the schema, document signals are files (e.g. PDFs), event signals are immutable
+          json signals that record a process waypoint'
         enum:
         - json
         - document
+        - event
         example: json
         type: string
       detail:
@@ -313,7 +315,7 @@ definitions:
       signals:
         description: Signals - the list of signals to be loaded
         items:
-          $ref: '#/definitions/handlers.Signal'
+          $ref: '#/definitions/handlers.SubmittedSignal'
         type: array
     type: object
   handlers.CreateSignalsSummary:
@@ -559,6 +561,7 @@ definitions:
         enum:
         - json
         - document
+        - event
         example: json
         type: string
       created_at:
@@ -692,6 +695,7 @@ definitions:
         enum:
         - json
         - document
+        - event
         example: json
         type: string
       correlated_to_signal_id:
@@ -736,6 +740,7 @@ definitions:
         enum:
         - json
         - document
+        - event
         example: json
         type: string
       correlated_signals:
@@ -812,24 +817,6 @@ definitions:
         description: seconds (1 year)
         example: 31536000
         type: integer
-    type: object
-  handlers.Signal:
-    properties:
-      content:
-        description: Content is the json payload that is validated against the stored
-          signal type schema
-        type: object
-      correlation_id:
-        description: CorrelationID is an optional ID for another signal in the same
-          ISN - the submitted signal is linked to the correlated signal
-        example: 75b45fe1-ecc2-4629-946b-fd9058c3b2ca
-        type: string
-      local_ref:
-        description: |-
-          LocalRef is supplied by the sender and uniquely identify each signal
-          Repeat deliveries of the same LocalRef are treated as updates to the original signal
-        example: item_id_#1
-        type: string
     type: object
   handlers.SignalRoutingConfigResponse:
     properties:
@@ -939,6 +926,7 @@ definitions:
         enum:
         - json
         - document
+        - event
         example: json
         type: string
       created_at:
@@ -984,12 +972,36 @@ definitions:
           of this signal created by the handler
         example: 835788bd-789d-4091-96e3-db0f51ccbabc
         type: string
+      unchanged:
+        description: |-
+          Unchanged is true if an event was resubmitted with the same content and correlation_id - the existing version is returned
+          and no new version is created (only used for event signals)
+        example: false
+        type: boolean
       version_number:
         description: |-
           VersionNumber is the version created by the server
           (where the same localRef is received in subsequent loads the versionNumber is incremented)
         example: 1
         type: integer
+    type: object
+  handlers.SubmittedSignal:
+    properties:
+      content:
+        description: Content is the json payload that is validated against the stored
+          signal type schema
+        type: object
+      correlation_id:
+        description: CorrelationID is an optional ID for another signal in the same
+          ISN - the submitted signal is linked to the correlated signal
+        example: 75b45fe1-ecc2-4629-946b-fd9058c3b2ca
+        type: string
+      local_ref:
+        description: |-
+          LocalRef is supplied by the sender and uniquely identify each signal
+          Repeat deliveries of the same LocalRef are treated as updates to the original signal
+        example: item_id_#1
+        type: string
     type: object
   handlers.TransferIsnOwnershipRequest:
     properties:
@@ -1649,6 +1661,8 @@ paths:
         Content kinds
         - json (default): signals are JSON validated against the signal type's schema
         - document: signals are files (e.g. a PDF bill of lading) Document signal types do not have a schema - omit schema_url
+        - event: signals are immutable JSON records of a process waypoint (e.g. export health certificate approved), validated against the signal type's schema.
+        Events must be correlated to the signal they are about and have an occurred_at timestamp in their content (see Submit Signals)
 
         JSON Schema URL Requirements
         - Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)
@@ -2931,7 +2945,7 @@ paths:
   /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals:
     post:
       description: |
-        Submit JSON signals to an ISN (documents are sent to document signal types with Upload a Document)
+        Submit JSON or event signals to an ISN (documents are sent to document signal types with Upload a Document)
         - payloads must not mix signals of different types and are subject to the size limits defined on the site.
         - The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.
         - If a local reference is received more than once from an account for the specified signal_type a new version of the signal will be stored with a incremented version number.
@@ -2984,6 +2998,18 @@ paths:
         Signals can only be correlated within the same ISN.
         If the supplied correlation_id is not found in the same ISN as the signal being submitted,
         the response will contain a 422 or 207 status code and the error_code for the failed signal will be `invalid_correlation_id`.
+
+        **Events**
+
+        Signals sent to event signal types record that a process waypoint has been reached for another signal (e.g. an approved export health certificate is available for a consignment).
+        - events must have a `correlation_id` - correlate the event to the signal it is about (e.g. the consignment). Requests with events that don't have one are rejected (400)
+        - the `content` object must include an `occurred_at` field (directly in `content`, not nested in another object) containing an RFC 3339 timestamp with a time zone offset (e.g. 2026-09-27T14:02:00Z) - the time the waypoint was reached
+        - events are immutable: resubmitting an event with the same local_ref, content and correlation_id returns the existing version with `unchanged: true` (so events can be safely resent),
+        and resubmitting it with anything different, or after it was withdrawn, fails with `resource_already_exists`.
+        To correct an event, withdraw it and send a new event with a new local_ref.
+        - where an event is about a specific version of a signal (e.g. version 3 of a document), name it in a `subject` field in `content`: `{"signal_id": "...", "version": 3}`
+
+        Example event: `{"local_ref": "ehc-approved-001", "correlation_id": "<consignment signal_id>", "content": {"occurred_at": "2026-09-27T14:02:00Z", "subject": {"signal_id": "<document signal_id>", "version": 3}, "certificate_no": "EHC-001"}}`
       parameters:
       - description: ISN slug
         example: sample-isn
@@ -3567,8 +3593,9 @@ paths:
   /api/router/signal-types/{signal_type_slug}/v{sem_ver}/signals:
     post:
       description: |-
-        Submit JSON signals without specifying a target ISN - the router resolves the ISN for each signal
+        Submit JSON or event signals without specifying a target ISN - the router resolves the ISN for each signal
         (documents are sent to document signal types with _Upload a Document via Router_).
+        Events always have a correlation ID, so they are always routed to the ISN of the correlated signal.
 
         **ISN resolution by correlation ID**
 

@@ -1,11 +1,12 @@
 package handlers
 
-// signal submission: the endpoints that store JSON signals.
+// signal submission: the endpoints that store JSON and event signals.
 // - CreateSignals stores signals on the ISN in the URL
 // - RouteSignals resolves the ISN for each signal (by correlation_id or the signal type's routing rules)
 //
-// Both endpoints share the same steps (readSignalsRequest, startBatch and storeSignal) and differ only in how the ISN
-// is found - the same structure as the document upload endpoints in documents.go.
+// Both endpoints share the same steps (readSignalsRequest, startBatch, then storeJSONSignal or storeEventSignal for each signal)
+// and differ only in how the ISN is found - the same structure as the document upload endpoints in documents.go.
+// Event signals are stored by storeEventSignal (see events.go), which adds the checks that make events immutable.
 
 import (
 	"context"
@@ -26,7 +27,8 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-type Signal struct {
+// SubmittedSignal is a json or event signal sent to the Submit Signals endpoints
+type SubmittedSignal struct {
 
 	// LocalRef is supplied by the sender and uniquely identify each signal
 	// Repeat deliveries of the same LocalRef are treated as updates to the original signal
@@ -46,7 +48,7 @@ type CreateSignalsRequest struct {
 	BatchRef string `json:"batch_ref" example:"daily-sync-2026-04-02"`
 
 	// Signals - the list of signals to be loaded
-	Signals []Signal `json:"signals"`
+	Signals []SubmittedSignal `json:"signals"`
 }
 
 // batcRefRegexp - batch refs must be alphanumeric, hyphens, and underscores only, length 1–128.
@@ -102,6 +104,10 @@ type StoredSignal struct {
 	// VersionNumber is the version created by the server
 	//(where the same localRef is received in subsequent loads the versionNumber is incremented)
 	VersionNumber int32 `json:"version_number" example:"1"`
+
+	// Unchanged is true if an event was resubmitted with the same content and correlation_id - the existing version is returned
+	// and no new version is created (only used for event signals)
+	Unchanged bool `json:"unchanged,omitempty" example:"false"`
 }
 
 type FailedSignal struct {
@@ -164,7 +170,7 @@ type CreateSignalsSummary struct {
 //	@Summary		Submit Signals
 //	@Tags			Signal Exchange
 //
-//	@Description	Submit JSON signals to an ISN (documents are sent to document signal types with Upload a Document)
+//	@Description	Submit JSON or event signals to an ISN (documents are sent to document signal types with Upload a Document)
 //	@Description	- payloads must not mix signals of different types and are subject to the size limits defined on the site.
 //	@Description	- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.
 //	@Description	- If a local reference is received more than once from an account for the specified signal_type a new version of the signal will be stored with a incremented version number.
@@ -218,6 +224,18 @@ type CreateSignalsSummary struct {
 //	@Description	If the supplied correlation_id is not found in the same ISN as the signal being submitted,
 //	@Description	the response will contain a 422 or 207 status code and the error_code for the failed signal will be `invalid_correlation_id`.
 //	@Description
+//	@Description	**Events**
+//	@Description
+//	@Description	Signals sent to event signal types record that a process waypoint has been reached for another signal (e.g. an approved export health certificate is available for a consignment).
+//	@Description	- events must have a `correlation_id` - correlate the event to the signal it is about (e.g. the consignment). Requests with events that don't have one are rejected (400)
+//	@Description	- the `content` object must include an `occurred_at` field (directly in `content`, not nested in another object) containing an RFC 3339 timestamp with a time zone offset (e.g. 2026-09-27T14:02:00Z) - the time the waypoint was reached
+//	@Description	- events are immutable: resubmitting an event with the same local_ref, content and correlation_id returns the existing version with `unchanged: true` (so events can be safely resent),
+//	@Description	and resubmitting it with anything different, or after it was withdrawn, fails with `resource_already_exists`.
+//	@Description	To correct an event, withdraw it and send a new event with a new local_ref.
+//	@Description	- where an event is about a specific version of a signal (e.g. version 3 of a document), name it in a `subject` field in `content`: `{"signal_id": "...", "version": 3}`
+//	@Description
+//	@Description	Example event: `{"local_ref": "ehc-approved-001", "correlation_id": "<consignment signal_id>", "content": {"occurred_at": "2026-09-27T14:02:00Z", "subject": {"signal_id": "<document signal_id>", "version": 3}, "certificate_no": "EHC-001"}}`
+//	@Description
 //
 //	@Param		isn_slug			path		string								true	"ISN slug"			example(sample-isn)
 //	@Param		signal_type_slug	path		string								true	"signal type slug"	example(sample-signal-type)
@@ -266,7 +284,16 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) e
 	}
 
 	for _, signal := range submission.signals {
-		stored, failure := s.storeSignal(ctx, submission, signal, isnSlug)
+		var stored StoredSignal
+		var failure *FailedSignal
+		switch submission.contentKind {
+		case signalsd.ContentKindJSON:
+			stored, failure = s.storeJSONSignal(ctx, submission, signal, isnSlug)
+		case signalsd.ContentKindEvent:
+			stored, failure = s.storeEventSignal(ctx, submission, signal, isnSlug)
+		default:
+			return apperrors.InternalError(fmt.Sprintf("unexpected content kind %q", submission.contentKind), nil)
+		}
 		if failure != nil {
 			result.FailedSignals = append(result.FailedSignals, *failure)
 			continue
@@ -295,8 +322,9 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) e
 //	@Summary		Submit Signals via Router
 //	@Tags			Signal Exchange
 //
-//	@Description	Submit JSON signals without specifying a target ISN - the router resolves the ISN for each signal
+//	@Description	Submit JSON or event signals without specifying a target ISN - the router resolves the ISN for each signal
 //	@Description	(documents are sent to document signal types with _Upload a Document via Router_).
+//	@Description	Events always have a correlation ID, so they are always routed to the ISN of the correlated signal.
 //	@Description
 //	@Description	**ISN resolution by correlation ID**
 //	@Description
@@ -390,7 +418,8 @@ func (s *SignalsHandler) RouteSignals(w http.ResponseWriter, r *http.Request) er
 			isnSlugs = append(isnSlugs, isnSlug)
 		}
 
-		// check the account can write this signal type to the ISN (the checks RequireAccessPermission does for the ISN endpoint)
+		// check the account can write this signal type to the ISN (we can't use the RequireAccessPermission middleware here since
+		// the ISN is only known after each signal has been routed)
 		if err := auth.CheckIsnWritePermission(claims, isnSlug, signalTypePath); err != nil {
 			failure := FailedSignal{LocalRef: signal.LocalRef, ErrorCode: apperrors.ErrCodeInternalError.String(), ErrorMessage: err.Error()}
 			if permissionErr, ok := errors.AsType[*apperrors.HTTPError](err); ok {
@@ -405,7 +434,15 @@ func (s *SignalsHandler) RouteSignals(w http.ResponseWriter, r *http.Request) er
 			continue
 		}
 
-		stored, failure := s.storeSignal(ctx, submission, signal, isnSlug)
+		var stored StoredSignal
+		switch submission.contentKind {
+		case signalsd.ContentKindJSON:
+			stored, failure = s.storeJSONSignal(ctx, submission, signal, isnSlug)
+		case signalsd.ContentKindEvent:
+			stored, failure = s.storeEventSignal(ctx, submission, signal, isnSlug)
+		default:
+			return apperrors.InternalError(fmt.Sprintf("unexpected content kind %q", submission.contentKind), nil)
+		}
 		if failure != nil {
 			result.FailedSignals = append(result.FailedSignals, *failure)
 			totalRejected++
@@ -448,8 +485,9 @@ type signalsSubmission struct {
 	accountID      uuid.UUID
 	signalTypeSlug string
 	semVer         string
+	contentKind    string // json or event
 	batchRef       string
-	signals        []Signal
+	signals        []SubmittedSignal
 
 	// batch is set by startBatch
 	batch database.UpsertSignalBatchRow
@@ -459,7 +497,7 @@ func (s *signalsSubmission) signalTypePath() string {
 	return fmt.Sprintf("%v/v%v", s.signalTypeSlug, s.semVer)
 }
 
-// readSignalsRequest checks the signal type is a json type, then decodes the request body and checks the mandatory fields.
+// readSignalsRequest checks the signal type is a json or event type, then decodes the request body and checks the mandatory fields.
 // A request that fails these checks is rejected as a whole (and is not recorded against a batch).
 func (s *SignalsHandler) readSignalsRequest(r *http.Request) (*signalsSubmission, error) {
 	submission := &signalsSubmission{
@@ -467,9 +505,14 @@ func (s *SignalsHandler) readSignalsRequest(r *http.Request) (*signalsSubmission
 		semVer:         r.PathValue("sem_ver"),
 	}
 
-	// only json signal types can be submitted (documents are uploaded - see documents.go)
-	if err := s.schemaCache.CheckContentKind(submission.signalTypePath(), signalsd.ContentKindJSON); err != nil {
-		return nil, apperrors.InvalidURLParam(err.Error(), nil)
+	// only json and event signal types can be submitted (documents are uploaded - see documents.go)
+	switch contentKind := s.schemaCache.ContentKind(submission.signalTypePath()); contentKind {
+	case signalsd.ContentKindJSON, signalsd.ContentKindEvent:
+		submission.contentKind = contentKind
+	case "":
+		return nil, apperrors.InvalidURLParam(fmt.Sprintf("signal type %s not found", submission.signalTypePath()), nil)
+	default:
+		return nil, apperrors.InvalidURLParam(fmt.Sprintf("signal type %s is a %s signal type - this endpoint only accepts json and event signals", submission.signalTypePath(), contentKind), nil)
 	}
 
 	accountID, ok := auth.ContextAccountID(r.Context())
@@ -506,6 +549,10 @@ func (s *SignalsHandler) readSignalsRequest(r *http.Request) (*signalsSubmission
 		if len(signal.Content) == 0 {
 			return nil, apperrors.MalformedBody(fmt.Sprintf("signal[%d] (local_ref=%q) is missing required field 'content'", i, signal.LocalRef), nil)
 		}
+		// an event is always about the signal it is correlated to (this also means the router always resolves the ISN of an event by its correlation_id)
+		if submission.contentKind == signalsd.ContentKindEvent && signal.CorrelationID == nil {
+			return nil, apperrors.MalformedBody(fmt.Sprintf("signal[%d] (local_ref=%q) is missing field 'correlation_id' (required for event signal types)", i, signal.LocalRef), nil)
+		}
 	}
 
 	submission.batchRef = req.BatchRef
@@ -535,7 +582,7 @@ func (s *SignalsHandler) startBatch(ctx context.Context, submission *signalsSubm
 // resolveIsn returns the ISN a routed signal is sent to: the ISN of the correlated signal if a correlation_id is supplied,
 // otherwise the ISN of the first routing rule that matches the signal content.
 // A signal that can't be routed is returned as a failure.
-func (s *SignalsHandler) resolveIsn(ctx context.Context, signalTypePath string, signal Signal) (string, *FailedSignal, error) {
+func (s *SignalsHandler) resolveIsn(ctx context.Context, signalTypePath string, signal SubmittedSignal) (string, *FailedSignal, error) {
 	if signal.CorrelationID != nil {
 		isn, err := s.queries.GetIsnBySignalID(ctx, *signal.CorrelationID)
 		if err != nil {
@@ -562,13 +609,13 @@ func (s *SignalsHandler) resolveIsn(ctx context.Context, signalTypePath string, 
 	return isnSlug, nil, nil
 }
 
-// storeSignal validates the signal against the signal type's schema and stores it on the ISN
+// storeJSONSignal validates a json signal against the signal type's schema and stores it on the ISN
 // (as a new signal, or a new version of the account's existing signal with the same local_ref).
 // It returns the stored signal, or the reason the signal could not be stored.
 //
 // Each signal is stored in its own transaction, so one failure doesn't affect the other signals in the request.
 // The account's write permission on the ISN must have been checked.
-func (s *SignalsHandler) storeSignal(ctx context.Context, submission *signalsSubmission, signal Signal, isnSlug string) (StoredSignal, *FailedSignal) {
+func (s *SignalsHandler) storeJSONSignal(ctx context.Context, submission *signalsSubmission, signal SubmittedSignal, isnSlug string) (StoredSignal, *FailedSignal) {
 	failed := func(code apperrors.ErrorCode, message string) (StoredSignal, *FailedSignal) {
 		return StoredSignal{}, &FailedSignal{LocalRef: signal.LocalRef, ErrorCode: code.String(), ErrorMessage: message}
 	}

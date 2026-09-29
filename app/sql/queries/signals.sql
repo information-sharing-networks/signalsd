@@ -102,6 +102,67 @@ DO UPDATE SET
     updated_at = now()
 RETURNING id;
 
+-- name: CreateEventSignal :one
+-- Creates the signal master record for an event. Events are immutable, so unlike CreateSignal and CreateOrUpdateSignalWithCorrelationID
+-- an existing signal is never updated (not reactivated or recorrelated).
+-- Returns no rows if the account already has an event with this local_ref (use GetEventSignalByLocalRef to compare it with the resubmitted event),
+-- or if the ISN or signal type is not in use (this is a defence against stale access tokens).
+WITH ids AS (
+    SELECT st.id AS signal_type_id,
+        i.id AS isn_id
+    FROM signal_types st
+    JOIN isn_signal_types ist ON st.id = ist.signal_type_id
+    JOIN isn i ON i.id = ist.isn_id
+    WHERE i.slug = sqlc.arg(isn_slug)
+        AND st.slug = sqlc.arg(signal_type_slug)
+        AND st.sem_ver = sqlc.arg(sem_ver)
+        AND i.is_in_use = true
+        AND ist.is_in_use = true
+)
+INSERT INTO signals (
+    id,
+    created_at,
+    updated_at,
+    account_id,
+    isn_id,
+    signal_type_id,
+    local_ref,
+    correlation_id,
+    is_withdrawn,
+    is_archived)
+SELECT
+    uuidv7(),
+    now(),
+    now(),
+    sqlc.arg(account_id),
+    ids.isn_id,
+    ids.signal_type_id,
+    sqlc.arg(local_ref),
+    sqlc.arg(correlation_id),
+    false,
+    false
+FROM ids
+ON CONFLICT (account_id, signal_type_id, local_ref) DO NOTHING
+RETURNING id;
+
+-- name: GetEventSignalByLocalRef :one
+-- returns the account's event with the supplied local_ref, and whether its content is the same as the supplied content
+-- (compared as jsonb, so key order and whitespace are ignored). Used to check resubmitted events are unchanged.
+SELECT
+    s.id AS signal_id,
+    s.correlation_id,
+    s.is_withdrawn,
+    lsv.id AS signal_version_id,
+    lsv.version_number,
+    (lsv.content = sqlc.arg(content)::jsonb)::boolean AS content_matches
+FROM signals s
+JOIN signal_types st ON st.id = s.signal_type_id
+JOIN latest_signal_versions lsv ON lsv.signal_id = s.id
+WHERE s.account_id = sqlc.arg(account_id)
+    AND st.slug = sqlc.arg(signal_type_slug)
+    AND st.sem_ver = sqlc.arg(sem_ver)
+    AND s.local_ref = sqlc.arg(local_ref);
+
 -- name: CreateSignalVersion :one
 -- if there is already a version of this signal, create a new one with an incremented version_number
 WITH ver AS (

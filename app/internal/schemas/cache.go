@@ -29,7 +29,7 @@ type Cache struct {
 	schemas map[string]*jsonschema.Schema
 	// schemaURLs the schema URLs by path
 	schemaURLs map[string]string
-	// contentKinds the content kind of each signal type by path (json, document etc)
+	// contentKinds the content kind of each signal type by path (json, document, event)
 	contentKinds map[string]string
 }
 
@@ -114,24 +114,17 @@ func (c *Cache) Len() int {
 	return len(c.schemas)
 }
 
-// CheckContentKind returns an error if the signal type is not in the cache or does not have the expected content kind (json, document).
-// Use this to reject signals sent to the wrong endpoint (e.g. json signals sent to a document signal type).
-func (c *Cache) CheckContentKind(signalTypePath, expected string) error {
+// ContentKind returns the content kind of the signal type (json, document or event), or "" if the signal type is not in the cache.
+// Endpoints use it to reject signal types of the kinds they don't handle (e.g. a json signal type sent to a document endpoint).
+func (c *Cache) ContentKind(signalTypePath string) string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	contentKind, ok := c.contentKinds[signalTypePath]
-	if !ok {
-		return fmt.Errorf("signal type %s not found", signalTypePath)
-	}
-	if contentKind != expected {
-		return fmt.Errorf("signal type %s has content kind %q - this endpoint only accepts %s signals", signalTypePath, contentKind, expected)
-	}
-	return nil
+	return c.contentKinds[signalTypePath]
 }
 
 // ValidateJSONSignal validates the JSON payload for a signal against its schema
-// Only json signal types can be validated - an error is returned for other content kinds.
+// Only json and event signal types can be validated - an error is returned for other content kinds.
 func (c *Cache) ValidateJSONSignal(ctx context.Context, queries *database.Queries, signalTypePath string, rawJSON json.RawMessage) error {
 
 	c.mu.RLock()
@@ -142,8 +135,8 @@ func (c *Cache) ValidateJSONSignal(ctx context.Context, queries *database.Querie
 		return fmt.Errorf("no schema found in the cache for this signal type")
 	}
 
-	if contentKind := c.contentKinds[signalTypePath]; contentKind != signalsd.ContentKindJSON {
-		return fmt.Errorf("signal type %s has content kind %q - only json signals can be validated", signalTypePath, contentKind)
+	if contentKind := c.contentKinds[signalTypePath]; contentKind != signalsd.ContentKindJSON && contentKind != signalsd.ContentKindEvent {
+		return fmt.Errorf("signal type %s has content kind %q - only json and event signals can be validated", signalTypePath, contentKind)
 	}
 
 	// Try cache first
