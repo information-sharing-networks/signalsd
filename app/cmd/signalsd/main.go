@@ -110,6 +110,65 @@ import (
 //	@description	**Response Bodies**: All date/time fields in JSON responses use RFC3339 format (ISO 8601):
 //	@description	- Example: "2025-06-03T13:47:47.331787+01:00"
 //	@description
+//	@description	# Signals
+//	@description
+//	@description	## Content kinds
+//	@description	Each signal type has a `content_kind`, which determines how its signals are sent:
+//	@description	- **json**: JSON content, validated against the signal type's schema. Sent with *Submit Signals* (or *Submit Signals via Router*).
+//	@description	- **document**: a file (PDF, JPEG, PNG or XML). Sent with *Upload a Document* and retrieved with *Download a Document*. Search results contain the document's metadata, not the file.
+//	@description	- **event**: an immutable JSON record that a process waypoint has been reached for another signal (e.g. an export health certificate was approved for a consignment). Sent with *Submit Signals* (see Events below).
+//	@description
+//	@description	Search, withdrawal and batches work the same way for every kind, and search results include each signal's `content_kind`.
+//	@description
+//	@description	## Versions and resubmissions
+//	@description	Each signal is identified by the `local_ref` the sender supplies, which must be unique for the account and signal type. When a `local_ref` is sent again:
+//	@description	- **If something changed**, a new version of the signal is stored (json and document signals).
+//	@description	- **If nothing changed** (the same content, and the same or no `correlation_id`), nothing is stored. The response contains the `signal_id`, `signal_version_id` and `version_number` of the existing latest version, with `unchanged: true`, so requests can be safely retried. JSON content is compared as JSON (key order and whitespace are ignored). Documents compare the file and its filename.
+//	@description	- **If the signal was withdrawn**, it is reactivated with a new version (json and document signals).
+//	@description	- **Events are never changed**: resubmitting an event with different content or a different `correlation_id`, or after it was withdrawn, fails with `resource_already_exists`. To correct an event, withdraw it and send a new event with a new `local_ref`.
+//	@description
+//	@description	## Correlation
+//	@description	A signal can be linked to another signal in the same ISN by setting its `correlation_id` to the other signal's `signal_id`. Search with `include_correlated=true` returns the signals linked to each result, and the `correlation_id` search filter returns the signals linked to one signal.
+//	@description
+//	@description	**Correlate to the entity directly.** For example, correlate a consignment's documents and events to the consignment itself, not to each other. Correlation is one level deep: `include_correlated` only returns signals that are correlated directly to the returned signal.
+//	@description
+//	@description	**Correlating is sharing.** Correlating your signal to a signal created by another account is like emailing that account a copy: they can see it (and every account with read access to the ISN already can), with the extra controls that you can withdraw it or send new versions, and they see those changes. Unlike email:
+//	@description	- withdrawing a signal stops further access through the service, but the other account may already have fetched it
+//	@description	- if a new version changes the `correlation_id`, the access moves with it: the new signal's owner can see every version, including earlier ones
+//	@description	- your account and email address are shown with the signal
+//	@description
+//	@description	## Who can see signals
+//	@description	- Accounts with **read** access to an ISN can see every signal in it.
+//	@description	- Accounts with **write-only** access can see the signals they created, and the signals other accounts have correlated to their signals (one level deep).
+//	@description	- Signals in a **public** ISN can be searched by anyone.
+//	@description
+//	@description	Privacy between participants is set by the ISN's permissions. For example, in a network where all participants share their data with a government agency but not with each other, the participants are given write-only access and the agency is given read access.
+//	@description
+//	@description	## Events
+//	@description	Event signals record that a process waypoint has been reached - e.g. `ehc-approved` (an export health certificate was approved) or `departed-origin` - for the signal they are correlated to. Each waypoint is its own event signal type, so recipients choose which events they receive by choosing which event types to search or poll.
+//	@description	- **`correlation_id` is required**: correlate the event to the signal it is about (e.g. the consignment). Requests containing events without one are rejected.
+//	@description	- **`content` must include `occurred_at`**: the time the waypoint was reached, as an RFC 3339 timestamp with a time zone offset (e.g. `2026-09-27T14:02:00Z`). It is a field of the event's `content`, not of the signal itself (alongside `local_ref`).
+//	@description	- **`subject`**: if the event is about a specific version of a signal (e.g. version 3 of a document), name it in a `subject` field in `content`: `{"signal_id": "...", "version": 3}`. Always include the version - later versions of the document may be different.
+//	@description	- **Events are immutable** (see Versions and resubmissions).
+//	@description	- The service doesn't enforce an order: events are accepted in any order and can repeat (e.g. several inspections). To build a timeline, order a signal's correlated events by `occurred_at`.
+//	@description
+//	@description	Example: `{"local_ref": "ehc-approved-001", "correlation_id": "<consignment signal_id>", "content": {"occurred_at": "2026-09-27T14:02:00Z", "subject": {"signal_id": "<document signal_id>", "version": 3}, "certificate_no": "EHC-001"}}`
+//	@description
+//	@description	**Schemas for event types.** An event type's schema validates the event's `content`, as for json signal types, but:
+//	@description	- the service checks `occurred_at` whatever the schema says. The schema must still allow it: declare `occurred_at` (and `subject`, if the type has one) and list it as required, especially if the schema uses `"additionalProperties": false`
+//	@description	- `occurred_at` and `subject` are reserved - don't use them for anything else
+//	@description	- the service doesn't check `subject` yet, so a type whose events have a subject should require it in its schema, as `{"signal_id": <uuid>, "version": <integer>}`
+//	@description
+//	@description	## Polling for changes
+//	@description	To find out about new and changed signals, poll *Signal Search* for each signal type you are interested in:
+//	@description	```
+//	@description	GET /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search?updated_since={cursor}&include_withdrawn=true
+//	@description	```
+//	@description	- `updated_since` returns the signals that were created, given a new version, recorrelated or withdrawn since that time. Results are ordered by `signal_updated_at`, so the last result's `signal_updated_at` is the cursor for the next poll.
+//	@description	- Use `include_withdrawn=true`, so withdrawn signals are returned with `is_withdrawn: true` (otherwise they silently drop out of the results).
+//	@description	- **Overlap your polls**: start each poll a few seconds before the cursor, and ignore results you have already seen (by `signal_id` and `signal_updated_at`). A signal that was being stored while you polled can have a `signal_updated_at` a little before the cursor.
+//	@description	- Search results are not paginated, so poll often enough to keep each result set small.
+//	@description
 //	@description	# UI Endpoints
 //	@description
 //	@description	UI endpoints serve the browser-based management interface.

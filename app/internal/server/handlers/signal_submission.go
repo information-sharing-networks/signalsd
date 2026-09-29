@@ -217,7 +217,7 @@ type CreateSignalsSummary struct {
 //	@Description	New versions are created when signals are resupplied using the same local_ref, e.g. because the client wants to correct a previously publsihed signal.
 //	@Description	If a signal has been withdrawn it will be reactivated if you resubmit it using the same local_ref.
 //	@Description
-//	@Description	A resubmission that doesn't change the signal - the same content, and the same or no correlation_id - returns the latest version with `unchanged: true`, and no new version is created (so signals can be safely resent).
+//	@Description	A resubmission that doesn't change the signal - the same content, and the same or no correlation_id - creates no new version: the response contains the `signal_id`, `signal_version_id` and `version_number` of the existing latest version, with `unchanged: true` (so signals can be safely resent).
 //	@Description	The content is compared as JSON, so differences in key order and whitespace are ignored.
 //	@Description	Unchanged signals are not counted in the batch they were resent in - the existing version belongs to the batch that stored it.
 //	@Description	Resubmitting a withdrawn signal always creates a new version (and reactivates it).
@@ -234,7 +234,7 @@ type CreateSignalsSummary struct {
 //	@Description	Signals sent to event signal types record that a process waypoint has been reached for another signal (e.g. an approved export health certificate is available for a consignment).
 //	@Description	- events must have a `correlation_id` - correlate the event to the signal it is about (e.g. the consignment). Requests with events that don't have one are rejected (400)
 //	@Description	- the `content` object must include an `occurred_at` field (directly in `content`, not nested in another object) containing an RFC 3339 timestamp with a time zone offset (e.g. 2026-09-27T14:02:00Z) - the time the waypoint was reached
-//	@Description	- events are immutable: resubmitting an event with the same local_ref, content and correlation_id returns the existing version with `unchanged: true` (so events can be safely resent),
+//	@Description	- events are immutable: resubmitting an event with the same local_ref, content and correlation_id creates no new version and returns the existing version's `signal_id`, `signal_version_id` and `version_number` with `unchanged: true` (so events can be safely resent),
 //	@Description	and resubmitting it with anything different, or after it was withdrawn, fails with `resource_already_exists`.
 //	@Description	To correct an event, withdraw it and send a new event with a new local_ref.
 //	@Description	- where an event is about a specific version of a signal (e.g. version 3 of a document), name it in a `subject` field in `content`: `{"signal_id": "...", "version": 3}`

@@ -140,7 +140,7 @@ type DocumentUploadResponse struct {
 //	@Description	**Versions**
 //	@Description
 //	@Description	Uploads for a local_ref you have already used are compared with its latest version:
-//	@Description	- the same file with the same filename returns the latest version with unchanged=true, and no new version is created - so uploads can be safely retried
+//	@Description	- the same file with the same filename creates no new version: the response contains the signal_id, signal_version_id and version_number of the existing latest version, with unchanged=true - so uploads can be safely retried
 //	@Description	- a different file, or the same file with a different filename, creates a new version (including a file that matches an older version)
 //	@Description	- re-uploading a withdrawn document creates a new version and reactivates it
 //	@Description	- supplying a different correlation_id creates a new version with the new link (omitting correlation_id keeps the existing link)
