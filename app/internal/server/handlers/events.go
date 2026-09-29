@@ -113,7 +113,7 @@ func (s *SignalsHandler) resubmittedEvent(ctx context.Context, queries *database
 		return StoredSignal{}, &FailedSignal{LocalRef: signal.LocalRef, ErrorCode: code.String(), ErrorMessage: message}
 	}
 
-	existing, err := queries.GetEventSignalByLocalRef(ctx, database.GetEventSignalByLocalRefParams{
+	existing, err := queries.CompareWithLatestSignalVersion(ctx, database.CompareWithLatestSignalVersionParams{
 		Content:        signal.Content,
 		AccountID:      submission.accountID,
 		SignalTypeSlug: submission.signalTypeSlug,

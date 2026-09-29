@@ -256,7 +256,7 @@ func TestUpdatedSinceSearch(t *testing.T) {
 	// the next poll starts just after the cursor, so it excludes the signals already seen
 	updatedSince := cursor.Add(time.Microsecond).Format(time.RFC3339Nano)
 
-	submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayload("new-version-001"), adminToken, endpoint)
+	submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayloadWithContent("new-version-001", "amended content"), adminToken, endpoint)
 	expectStatus(t, withdrawSignal(t, testEnv.baseURL, endpoint, adminToken, "withdrawn-001"), http.StatusNoContent)
 	submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayload("created-001"), adminToken, endpoint)
 
@@ -392,9 +392,9 @@ func TestPreviousVersionsSearch(t *testing.T) {
 	adminToken := testEnv.getAccessToken(t, adminAccount.ID)
 	endpoint := newTestSignalEndpoint(isn, signalType)
 
-	// resubmitting a local_ref creates a new version of the signal
+	// resubmitting a local_ref with different content creates a new version of the signal
 	submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayload("two-versions-001"), adminToken, endpoint)
-	submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayload("two-versions-001"), adminToken, endpoint)
+	submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayloadWithContent("two-versions-001", "amended content"), adminToken, endpoint)
 	submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayload("one-version-001"), adminToken, endpoint)
 
 	t.Run("previous versions are not returned by default", func(t *testing.T) {

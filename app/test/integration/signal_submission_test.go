@@ -6,11 +6,13 @@ package integration
 //
 // - TestSignalSubmission: authentication, request validation and per-signal processing results
 // - TestCorrelatedSignalSubmission: correlation_id handling
+// - TestUnchangedSignalResubmission: resubmissions that don't change a signal return the latest version (no new version is created)
 // - TestIsInUseStatus: signals can't be written or read when the ISN or signal type is disabled
 // - TestWritesWithTokenIssuedBeforeSignalTypeDisabled: the write queries reject signals when the claims in the access token are out of date
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -350,6 +352,95 @@ func TestCorrelatedSignalSubmission(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestUnchangedSignalResubmission checks a json signal resubmitted without changes returns the latest version with unchanged=true
+// (no new version is created), and that changed resubmissions still create new versions
+func TestUnchangedSignalResubmission(t *testing.T) {
+	ctx := context.Background()
+
+	testEnv := startInProcessServer(t, "")
+
+	adminAccount := createTestAccount(t, ctx, testEnv.queries, "isnadmin", "user", "admin@unchanged-resubmission.com")
+	isn := createTestISN(t, ctx, testEnv.queries, "unchanged-resubmission-isn", "Unchanged resubmission ISN", adminAccount.ID, "private")
+	signalType := createTestSignalType(t, ctx, testEnv.queries, isn.ID, "resubmitted signal", "", signalsd.ContentKindJSON)
+
+	if err := testEnv.schemaCache.Load(ctx); err != nil {
+		t.Fatalf("Failed to refresh schema cache: %v", err)
+	}
+
+	adminToken := testEnv.getAccessToken(t, adminAccount.ID)
+	endpoint := newTestSignalEndpoint(isn, signalType)
+
+	// submit returns the stored signal from a submission of one signal
+	submit := func(t *testing.T, payload map[string]any) handlers.StoredSignal {
+		t.Helper()
+		submission := expectSubmissionResponse(t, submitCreateSignalRequest(t, testEnv.baseURL, payload, adminToken, endpoint), http.StatusOK)
+		if len(submission.Results) != 1 || len(submission.Results[0].StoredSignals) != 1 {
+			t.Fatalf("Expected 1 stored signal, got %+v", submission)
+		}
+		return submission.Results[0].StoredSignals[0]
+	}
+
+	masterID := submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayload("master-001"), adminToken, endpoint)
+	otherMasterID := submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayload("master-002"), adminToken, endpoint)
+
+	first := submit(t, createValidSignalPayloadWithCorrelatedID("resubmitted-001", masterID))
+	if first.VersionNumber != 1 || first.Unchanged {
+		t.Fatalf("Expected version 1 (not unchanged), got %+v", first)
+	}
+
+	t.Run("an identical resubmission is unchanged", func(t *testing.T) {
+		resubmitted := submit(t, createValidSignalPayloadWithCorrelatedID("resubmitted-001", masterID))
+		if !resubmitted.Unchanged || resubmitted.SignalVersionID != first.SignalVersionID || resubmitted.VersionNumber != 1 {
+			t.Errorf("Expected the existing version %s with unchanged=true, got %+v", first.SignalVersionID, resubmitted)
+		}
+	})
+
+	t.Run("a resubmission without the correlation_id is unchanged", func(t *testing.T) {
+		resubmitted := submit(t, createValidSignalPayloadWithContent("resubmitted-001", "valid content for simple schema"))
+		if !resubmitted.Unchanged || resubmitted.SignalVersionID != first.SignalVersionID {
+			t.Errorf("Expected the existing version %s with unchanged=true, got %+v", first.SignalVersionID, resubmitted)
+		}
+	})
+
+	t.Run("the same content with different key order and whitespace is unchanged", func(t *testing.T) {
+		payload := createValidSignalPayloadWithCorrelatedID("resubmitted-001", masterID)
+		payload["signals"].([]map[string]any)[0]["content"] = json.RawMessage(`{   "test":    "valid content for simple schema"  }`)
+		if resubmitted := submit(t, payload); !resubmitted.Unchanged {
+			t.Errorf("Expected unchanged=true, got %+v", resubmitted)
+		}
+	})
+
+	t.Run("a resubmission with different content creates a new version", func(t *testing.T) {
+		changed := submit(t, createValidSignalPayloadWithContent("resubmitted-001", "amended content"))
+		if changed.Unchanged || changed.VersionNumber != 2 {
+			t.Errorf("Expected version 2 (not unchanged), got %+v", changed)
+		}
+	})
+
+	t.Run("a resubmission with a different correlation_id creates a new version", func(t *testing.T) {
+		payload := createValidSignalPayloadWithCorrelatedID("resubmitted-001", otherMasterID)
+		payload["signals"].([]map[string]any)[0]["content"] = map[string]any{"test": "amended content"}
+		if recorrelated := submit(t, payload); recorrelated.Unchanged || recorrelated.VersionNumber != 3 {
+			t.Errorf("Expected version 3 (not unchanged), got %+v", recorrelated)
+		}
+	})
+
+	t.Run("resubmitting a withdrawn signal reactivates it with a new version", func(t *testing.T) {
+		expectStatus(t, withdrawSignal(t, testEnv.baseURL, endpoint, adminToken, "resubmitted-001"), http.StatusNoContent)
+
+		payload := createValidSignalPayloadWithCorrelatedID("resubmitted-001", otherMasterID)
+		payload["signals"].([]map[string]any)[0]["content"] = map[string]any{"test": "amended content"}
+		if reactivated := submit(t, payload); reactivated.Unchanged || reactivated.VersionNumber != 4 {
+			t.Errorf("Expected version 4 (not unchanged), got %+v", reactivated)
+		}
+
+		signals := expectSearchResults(t, searchPrivateSignals(t, testEnv.baseURL, endpoint, adminToken, map[string]string{"local_ref": "resubmitted-001"}))
+		if len(signals) != 1 || signals[0]["is_withdrawn"] != false {
+			t.Errorf("Expected the signal to be reactivated, got %v", signals)
+		}
+	})
 }
 
 // TestIsInUseStatus checks that no account can write or read signals when either

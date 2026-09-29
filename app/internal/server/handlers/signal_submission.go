@@ -105,8 +105,8 @@ type StoredSignal struct {
 	//(where the same localRef is received in subsequent loads the versionNumber is incremented)
 	VersionNumber int32 `json:"version_number" example:"1"`
 
-	// Unchanged is true if an event was resubmitted with the same content and correlation_id - the existing version is returned
-	// and no new version is created (only used for event signals)
+	// Unchanged is true if the signal was resubmitted with the same content and correlation_id (or no correlation_id) -
+	// the existing version is returned and no new version is created
 	Unchanged bool `json:"unchanged,omitempty" example:"false"`
 }
 
@@ -173,7 +173,7 @@ type CreateSignalsSummary struct {
 //	@Description	Submit JSON or event signals to an ISN (documents are sent to document signal types with Upload a Document)
 //	@Description	- payloads must not mix signals of different types and are subject to the size limits defined on the site.
 //	@Description	- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.
-//	@Description	- If a local reference is received more than once from an account for the specified signal_type a new version of the signal will be stored with a incremented version number.
+//	@Description	- If a local reference is received more than once from an account for the specified signal_type a new version of the signal will be stored with a incremented version number (unless the signal is unchanged - see Signal versions).
 //	@Description	- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.
 //	@Description
 //	@Description	**Batches**
@@ -216,6 +216,11 @@ type CreateSignalsSummary struct {
 //	@Description
 //	@Description	New versions are created when signals are resupplied using the same local_ref, e.g. because the client wants to correct a previously publsihed signal.
 //	@Description	If a signal has been withdrawn it will be reactivated if you resubmit it using the same local_ref.
+//	@Description
+//	@Description	A resubmission that doesn't change the signal - the same content, and the same or no correlation_id - returns the latest version with `unchanged: true`, and no new version is created (so signals can be safely resent).
+//	@Description	The content is compared as JSON, so differences in key order and whitespace are ignored.
+//	@Description	Unchanged signals are not counted in the batch they were resent in - the existing version belongs to the batch that stored it.
+//	@Description	Resubmitting a withdrawn signal always creates a new version (and reactivates it).
 //	@Description
 //	@Description	**Correlating signals**
 //	@Description
@@ -611,6 +616,7 @@ func (s *SignalsHandler) resolveIsn(ctx context.Context, signalTypePath string, 
 
 // storeJSONSignal validates a json signal against the signal type's schema and stores it on the ISN
 // (as a new signal, or a new version of the account's existing signal with the same local_ref).
+// A resubmission that doesn't change the signal returns the existing version with Unchanged=true, and no new version is created.
 // It returns the stored signal, or the reason the signal could not be stored.
 //
 // Each signal is stored in its own transaction, so one failure doesn't affect the other signals in the request.
@@ -631,6 +637,28 @@ func (s *SignalsHandler) storeJSONSignal(ctx context.Context, submission *signal
 	defer tx.Rollback(ctx) // no-op once the transaction is committed
 
 	queries := s.queries.WithTx(tx)
+
+	// if the resubmission is the same as the latest version (the same content, and the same or no correlation_id), return that version rather than creating a new one.
+	// Withdrawn signals and changes to the correlation_id always create a new version (as with documents).
+	latest, err := queries.CompareWithLatestSignalVersion(ctx, database.CompareWithLatestSignalVersionParams{
+		Content:        signal.Content,
+		AccountID:      submission.accountID,
+		SignalTypeSlug: submission.signalTypeSlug,
+		SemVer:         submission.semVer,
+		LocalRef:       signal.LocalRef,
+	})
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return failed(apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to get the latest version of the signal: %v", err))
+	}
+	if err == nil && latest.ContentMatches && !latest.IsWithdrawn && (signal.CorrelationID == nil || *signal.CorrelationID == latest.CorrelationID) {
+		return StoredSignal{
+			LocalRef:        signal.LocalRef,
+			SignalID:        latest.SignalID,
+			SignalVersionID: latest.SignalVersionID,
+			VersionNumber:   latest.VersionNumber,
+			Unchanged:       true,
+		}, nil
+	}
 
 	// create or update the signal master record
 	var signalID uuid.UUID

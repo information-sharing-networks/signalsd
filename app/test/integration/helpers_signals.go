@@ -53,6 +53,20 @@ func createValidSignalPayload(localRef string) map[string]any {
 	}
 }
 
+// createValidSignalPayloadWithContent creates a payload with one valid signal whose test field is set to testValue
+// (resubmitting a local_ref with a different testValue creates a new version - an identical resubmission is unchanged)
+func createValidSignalPayloadWithContent(localRef string, testValue string) map[string]any {
+	return map[string]any{
+		"batch_ref": "test-batch",
+		"signals": []map[string]any{
+			{
+				"local_ref": localRef,
+				"content":   map[string]any{"test": testValue},
+			},
+		},
+	}
+}
+
 // createValidSignalPayloadWithCorrelatedID creates a payload with one valid signal that is correlated with correlationID
 func createValidSignalPayloadWithCorrelatedID(localRef string, correlationID string) map[string]any {
 	return map[string]any{

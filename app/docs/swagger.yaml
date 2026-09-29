@@ -974,8 +974,8 @@ definitions:
         type: string
       unchanged:
         description: |-
-          Unchanged is true if an event was resubmitted with the same content and correlation_id - the existing version is returned
-          and no new version is created (only used for event signals)
+          Unchanged is true if the signal was resubmitted with the same content and correlation_id (or no correlation_id) -
+          the existing version is returned and no new version is created
         example: false
         type: boolean
       version_number:
@@ -2948,7 +2948,7 @@ paths:
         Submit JSON or event signals to an ISN (documents are sent to document signal types with Upload a Document)
         - payloads must not mix signals of different types and are subject to the size limits defined on the site.
         - The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.
-        - If a local reference is received more than once from an account for the specified signal_type a new version of the signal will be stored with a incremented version number.
+        - If a local reference is received more than once from an account for the specified signal_type a new version of the signal will be stored with a incremented version number (unless the signal is unchanged - see Signal versions).
         - Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.
 
         **Batches**
@@ -2991,6 +2991,11 @@ paths:
 
         New versions are created when signals are resupplied using the same local_ref, e.g. because the client wants to correct a previously publsihed signal.
         If a signal has been withdrawn it will be reactivated if you resubmit it using the same local_ref.
+
+        A resubmission that doesn't change the signal - the same content, and the same or no correlation_id - returns the latest version with `unchanged: true`, and no new version is created (so signals can be safely resent).
+        The content is compared as JSON, so differences in key order and whitespace are ignored.
+        Unchanged signals are not counted in the batch they were resent in - the existing version belongs to the batch that stored it.
+        Resubmitting a withdrawn signal always creates a new version (and reactivates it).
 
         **Correlating signals**
 

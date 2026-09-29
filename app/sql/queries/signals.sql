@@ -105,7 +105,7 @@ RETURNING id;
 -- name: CreateEventSignal :one
 -- Creates the signal master record for an event. Events are immutable, so unlike CreateSignal and CreateOrUpdateSignalWithCorrelationID
 -- an existing signal is never updated (not reactivated or recorrelated).
--- Returns no rows if the account already has an event with this local_ref (use GetEventSignalByLocalRef to compare it with the resubmitted event),
+-- Returns no rows if the account already has an event with this local_ref (use CompareWithLatestSignalVersion to compare it with the resubmitted event),
 -- or if the ISN or signal type is not in use (this is a defence against stale access tokens).
 WITH ids AS (
     SELECT st.id AS signal_type_id,
@@ -145,9 +145,9 @@ FROM ids
 ON CONFLICT (account_id, signal_type_id, local_ref) DO NOTHING
 RETURNING id;
 
--- name: GetEventSignalByLocalRef :one
--- returns the account's event with the supplied local_ref, and whether its content is the same as the supplied content
--- (compared as jsonb, so key order and whitespace are ignored). Used to check resubmitted events are unchanged.
+-- name: CompareWithLatestSignalVersion :one
+-- returns the latest version of the account's signal with the supplied local_ref, and whether its content is the same as the supplied content
+-- (compared as jsonb, so key order and whitespace are ignored). Used to detect unchanged json and event resubmissions.
 SELECT
     s.id AS signal_id,
     s.correlation_id,
