@@ -266,6 +266,8 @@ func (s *Server) registerAdminRoutes() {
 				// no authentication required
 				r.Post("/register", responses.Wrap(users.RegisterUser))
 				r.Post("/login", responses.Wrap(login.Login))
+
+				// one-time links
 				r.Get("/service-accounts/setup/{setup_id}", serviceAccounts.SetupServiceAccount)
 				r.Get("/password-reset/{token_id}", users.PasswordResetTokenPage)
 				r.Post("/password-reset/{token_id}", responses.Wrap(users.PasswordResetToken))

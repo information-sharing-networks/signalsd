@@ -715,9 +715,8 @@ func (a *AdminHandler) GeneratePasswordResetLink(w http.ResponseWriter, r *http.
 		tokenID.String(),
 	)
 
-	// Add reset URL and account ID to final request log context
+	// Add user and admin account IDs to final request log context (the reset URL is not logged - anyone who could read the logs could use it to reset the user's password)
 	logger.ContextWithLogAttrs(r.Context(),
-		slog.String("reset_url", resetURL),
 		slog.String("user_id", tagetUserID.String()),
 		slog.String("admin_account_id", accountID.String()),
 	)

@@ -194,9 +194,8 @@ func (s *ServiceAccountHandler) RegisterServiceAccount(w http.ResponseWriter, r 
 		oneTimeSecretID.String(),
 	)
 
-	// add setup url and account id to final request log context
+	// add account id to final request log context (the setup url is not logged - anyone who could read the logs could use it to get the client secret)
 	logger.ContextWithLogAttrs(r.Context(),
-		slog.String("setup_url", setupURL),
 		slog.String("account_id", serviceAccountID.String()),
 	)
 
@@ -333,9 +332,8 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentials(w http.Response
 		oneTimeSecretID.String(),
 	)
 
-	// add setup url and account id to final request log context
+	// add client id and account id to final request log context (the setup url is not logged - anyone who could read the logs could use it to get the client secret)
 	logger.ContextWithLogAttrs(r.Context(),
-		slog.String("setup_url", setupURL),
 		slog.String("client_id", clientID),
 		slog.String("account_id", serviceAccountID.String()),
 	)
