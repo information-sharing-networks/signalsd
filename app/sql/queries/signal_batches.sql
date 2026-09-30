@@ -51,6 +51,7 @@ WHERE
     AND NOT EXISTS ( -- do not count signals that failed processing and have not been corrected yet
         SELECT 1 FROM signal_processing_failures spf
         WHERE spf.signal_batch_id = $1
+            AND spf.isn_slug = i.slug
             AND spf.local_ref = s.local_ref
             AND spf.signal_type_slug = st.slug
             AND spf.signal_type_sem_ver = st.sem_ver
@@ -75,9 +76,11 @@ SELECT DISTINCT
 FROM signal_batches sb
 JOIN signal_processing_failures spf ON spf.signal_batch_id = sb.id
 -- the signal (if it was ever stored) is only used to check whether the failure was resolved by a later version
+LEFT JOIN isn i ON i.slug = spf.isn_slug
 LEFT JOIN signal_types st ON st.slug = spf.signal_type_slug
     AND st.sem_ver = spf.signal_type_sem_ver
 LEFT JOIN signals s ON s.local_ref = spf.local_ref
+    AND s.isn_id = i.id
     AND s.signal_type_id = st.id
     AND s.account_id = sb.account_id
 WHERE sb.id = $1

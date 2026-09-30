@@ -74,19 +74,17 @@ func (s *SignalsHandler) storeEventSignal(ctx context.Context, submission *signa
 		SemVer:         submission.semVer,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return s.resubmittedEvent(ctx, queries, submission, signal)
+		return s.resubmittedEvent(ctx, queries, submission, signal, isnSlug)
 	}
 	if err != nil {
 		return failed(apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to create signal master record: %v", err))
 	}
 
 	version, err := queries.CreateSignalVersion(ctx, database.CreateSignalVersionParams{
-		AccountID:      submission.accountID,
-		SignalBatchID:  submission.batch.ID,
-		Content:        signal.Content,
-		LocalRef:       signal.LocalRef,
-		SignalTypeSlug: submission.signalTypeSlug,
-		SemVer:         submission.semVer,
+		AccountID:     submission.accountID,
+		SignalBatchID: submission.batch.ID,
+		SignalID:      signalID,
+		Content:       signal.Content,
 	})
 	if err != nil {
 		return failed(apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to create signal version: %v", err))
@@ -105,10 +103,10 @@ func (s *SignalsHandler) storeEventSignal(ctx context.Context, submission *signa
 }
 
 // resubmittedEvent handles an event whose master record could not be created: either the account has already sent an event
-// with this local_ref, or the ISN or signal type is not in use.
+// with this local_ref to the ISN, or the ISN or signal type is not in use.
 // An identical resubmission (same content and correlation_id, and not withdrawn) returns the existing version as unchanged - so events can be safely resent.
 // Any other resubmission is rejected, since events are immutable.
-func (s *SignalsHandler) resubmittedEvent(ctx context.Context, queries *database.Queries, submission *signalsSubmission, signal SubmittedSignal) (StoredSignal, *FailedSignal) {
+func (s *SignalsHandler) resubmittedEvent(ctx context.Context, queries *database.Queries, submission *signalsSubmission, signal SubmittedSignal, isnSlug string) (StoredSignal, *FailedSignal) {
 	failed := func(code apperrors.ErrorCode, message string) (StoredSignal, *FailedSignal) {
 		return StoredSignal{}, &FailedSignal{LocalRef: signal.LocalRef, ErrorCode: code.String(), ErrorMessage: message}
 	}
@@ -116,6 +114,7 @@ func (s *SignalsHandler) resubmittedEvent(ctx context.Context, queries *database
 	existing, err := queries.CompareWithLatestSignalVersion(ctx, database.CompareWithLatestSignalVersionParams{
 		Content:        signal.Content,
 		AccountID:      submission.accountID,
+		IsnSlug:        isnSlug,
 		SignalTypeSlug: submission.signalTypeSlug,
 		SemVer:         submission.semVer,
 		LocalRef:       signal.LocalRef,

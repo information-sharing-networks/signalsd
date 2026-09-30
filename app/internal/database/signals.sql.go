@@ -22,17 +22,20 @@ SELECT
     lsv.version_number,
     (lsv.content = $1::jsonb)::boolean AS content_matches
 FROM signals s
+JOIN isn i ON i.id = s.isn_id
 JOIN signal_types st ON st.id = s.signal_type_id
 JOIN latest_signal_versions lsv ON lsv.signal_id = s.id
 WHERE s.account_id = $2
-    AND st.slug = $3
-    AND st.sem_ver = $4
-    AND s.local_ref = $5
+    AND i.slug = $3
+    AND st.slug = $4
+    AND st.sem_ver = $5
+    AND s.local_ref = $6
 `
 
 type CompareWithLatestSignalVersionParams struct {
 	Content        json.RawMessage `json:"content"`
 	AccountID      uuid.UUID       `json:"account_id"`
+	IsnSlug        string          `json:"isn_slug"`
 	SignalTypeSlug string          `json:"signal_type_slug"`
 	SemVer         string          `json:"sem_ver"`
 	LocalRef       string          `json:"local_ref"`
@@ -47,12 +50,13 @@ type CompareWithLatestSignalVersionRow struct {
 	ContentMatches  bool      `json:"content_matches"`
 }
 
-// returns the latest version of the account's signal with the supplied local_ref, and whether its content is the same as the supplied content
+// returns the latest version of the account's signal with the supplied local_ref on the ISN, and whether its content is the same as the supplied content
 // (compared as jsonb, so key order and whitespace are ignored). Used to detect unchanged json and event resubmissions.
 func (q *Queries) CompareWithLatestSignalVersion(ctx context.Context, arg CompareWithLatestSignalVersionParams) (CompareWithLatestSignalVersionRow, error) {
 	row := q.db.QueryRow(ctx, CompareWithLatestSignalVersion,
 		arg.Content,
 		arg.AccountID,
+		arg.IsnSlug,
 		arg.SignalTypeSlug,
 		arg.SemVer,
 		arg.LocalRef,
@@ -105,7 +109,7 @@ SELECT
     false,
     false
 FROM ids
-ON CONFLICT (account_id, signal_type_id, local_ref) DO NOTHING
+ON CONFLICT (account_id, isn_id, signal_type_id, local_ref) DO NOTHING
 RETURNING id
 `
 
@@ -120,7 +124,7 @@ type CreateEventSignalParams struct {
 
 // Creates the signal master record for an event. Events are immutable, so unlike CreateSignal and CreateOrUpdateSignalWithCorrelationID
 // an existing signal is never updated (not reactivated or recorrelated).
-// Returns no rows if the account already has an event with this local_ref (use CompareWithLatestSignalVersion to compare it with the resubmitted event),
+// Returns no rows if the account already has an event with this local_ref on the ISN (use CompareWithLatestSignalVersion to compare it with the resubmitted event),
 // or if the ISN or signal type is not in use (this is a defence against stale access tokens).
 func (q *Queries) CreateEventSignal(ctx context.Context, arg CreateEventSignalParams) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, CreateEventSignal,
@@ -172,8 +176,8 @@ SELECT
     $3,
     false,
     false
-FROM ids 
-ON CONFLICT (account_id, signal_type_id, local_ref)
+FROM ids
+ON CONFLICT (account_id, isn_id, signal_type_id, local_ref)
 DO UPDATE SET
     correlation_id = CASE
         WHEN signals.correlation_id != EXCLUDED.correlation_id THEN EXCLUDED.correlation_id
@@ -251,7 +255,7 @@ SELECT
     false,
     false
 FROM ids
-ON CONFLICT (account_id, signal_type_id, local_ref)
+ON CONFLICT (account_id, isn_id, signal_type_id, local_ref)
 DO UPDATE SET
     is_withdrawn = false,
     updated_at = now()
@@ -266,7 +270,7 @@ type CreateSignalParams struct {
 	SemVer         string    `json:"sem_ver"`
 }
 
-// This query creates one row in the signals table for every new combination of account_id, signal_type_id, local_ref.
+// This query creates one row in the signals table for every new combination of account_id, isn_id, signal_type_id, local_ref.
 // If a withdrawn signal is received again it is reactivated (is_withdrawn = false).
 // Only creates signals if ISN and signal type are in use (this is a defence against stale access tokens).
 // Returns the new signal_id.
@@ -287,22 +291,6 @@ func (q *Queries) CreateSignal(ctx context.Context, arg CreateSignalParams) (uui
 }
 
 const CreateSignalVersion = `-- name: CreateSignalVersion :one
-WITH ver AS (
-    SELECT 
-        st.id AS signal_type_id,
-        COALESCE(
-            (SELECT MAX(sv.version_number)
-             FROM signal_versions sv
-             JOIN signals s
-                ON s.id = sv.signal_id
-             WHERE s.local_ref = $4
-                AND s.account_id = $1
-                AND s.signal_type_id = st.id)
-            , 0) + 1 as version_number
-    FROM signal_types st
-    WHERE st.slug = $5
-        AND st.sem_ver = $6
-)
 INSERT INTO signal_versions (
     id,
     created_at,
@@ -313,28 +301,26 @@ INSERT INTO signal_versions (
     content
 )
 SELECT
-   uuidv7(),
-    now(), 
+    uuidv7(),
+    now(),
     $1,
     $2,
-    s.id,
-    ver.version_number,
-    $3
-FROM ver 
-JOIN signals s 
-    ON s.signal_type_id = ver.signal_type_id
-    AND s.account_id = $1
-    AND s.local_ref = $4
+    $3,
+    COALESCE(
+        (SELECT MAX(sv.version_number)
+         FROM signal_versions sv
+         WHERE sv.signal_id = $3
+            AND sv.account_id = $1)
+        , 0) + 1,
+    $4
 RETURNING id, version_number
 `
 
 type CreateSignalVersionParams struct {
-	AccountID      uuid.UUID       `json:"account_id"`
-	SignalBatchID  uuid.UUID       `json:"signal_batch_id"`
-	Content        json.RawMessage `json:"content"`
-	LocalRef       string          `json:"local_ref"`
-	SignalTypeSlug string          `json:"signal_type_slug"`
-	SemVer         string          `json:"sem_ver"`
+	AccountID     uuid.UUID       `json:"account_id"`
+	SignalBatchID uuid.UUID       `json:"signal_batch_id"`
+	SignalID      uuid.UUID       `json:"signal_id"`
+	Content       json.RawMessage `json:"content"`
 }
 
 type CreateSignalVersionRow struct {
@@ -342,15 +328,14 @@ type CreateSignalVersionRow struct {
 	VersionNumber int32     `json:"version_number"`
 }
 
-// if there is already a version of this signal, create a new one with an incremented version_number
+// creates a version of the signal (signal_id is the signal master record returned by CreateSignal, CreateOrUpdateSignalWithCorrelationID or CreateEventSignal).
+// if there is already a version of this signal, the new one has an incremented version_number
 func (q *Queries) CreateSignalVersion(ctx context.Context, arg CreateSignalVersionParams) (CreateSignalVersionRow, error) {
 	row := q.db.QueryRow(ctx, CreateSignalVersion,
 		arg.AccountID,
 		arg.SignalBatchID,
+		arg.SignalID,
 		arg.Content,
-		arg.LocalRef,
-		arg.SignalTypeSlug,
-		arg.SemVer,
 	)
 	var i CreateSignalVersionRow
 	err := row.Scan(&i.ID, &i.VersionNumber)
@@ -387,16 +372,19 @@ SELECT
     lsv.version_number,
     lsv.content
 FROM signals s
+JOIN isn i ON i.id = s.isn_id
 JOIN signal_types st ON st.id = s.signal_type_id
 JOIN latest_signal_versions lsv ON lsv.signal_id = s.id
 WHERE s.account_id = $1
-    AND st.slug = $2
-    AND st.sem_ver = $3
-    AND s.local_ref = $4
+    AND i.slug = $2
+    AND st.slug = $3
+    AND st.sem_ver = $4
+    AND s.local_ref = $5
 `
 
 type GetLatestSignalVersionByLocalRefParams struct {
 	AccountID      uuid.UUID `json:"account_id"`
+	IsnSlug        string    `json:"isn_slug"`
 	SignalTypeSlug string    `json:"signal_type_slug"`
 	SemVer         string    `json:"sem_ver"`
 	LocalRef       string    `json:"local_ref"`
@@ -411,10 +399,11 @@ type GetLatestSignalVersionByLocalRefRow struct {
 	Content         json.RawMessage `json:"content"`
 }
 
-// returns the latest version of the account's signal with the supplied local_ref (used to detect unchanged document uploads)
+// returns the latest version of the account's signal with the supplied local_ref on the ISN (used to detect unchanged document uploads)
 func (q *Queries) GetLatestSignalVersionByLocalRef(ctx context.Context, arg GetLatestSignalVersionByLocalRefParams) (GetLatestSignalVersionByLocalRefRow, error) {
 	row := q.db.QueryRow(ctx, GetLatestSignalVersionByLocalRef,
 		arg.AccountID,
+		arg.IsnSlug,
 		arg.SignalTypeSlug,
 		arg.SemVer,
 		arg.LocalRef,
@@ -482,16 +471,18 @@ FROM signals s
 JOIN signal_types st ON st.id = s.signal_type_id
 JOIN isn i ON i.id = s.isn_id
 WHERE s.account_id = $1
-    AND st.slug = $2
-    AND st.sem_ver = $3
-    AND s.local_ref = $4
+    AND i.slug = $2
+    AND st.slug = $3
+    AND st.sem_ver = $4
+    AND s.local_ref = $5
 `
 
 type GetSignalByAccountAndLocalRefParams struct {
-	AccountID uuid.UUID `json:"account_id"`
-	Slug      string    `json:"slug"`
-	SemVer    string    `json:"sem_ver"`
-	LocalRef  string    `json:"local_ref"`
+	AccountID      uuid.UUID `json:"account_id"`
+	IsnSlug        string    `json:"isn_slug"`
+	SignalTypeSlug string    `json:"signal_type_slug"`
+	SemVer         string    `json:"sem_ver"`
+	LocalRef       string    `json:"local_ref"`
 }
 
 type GetSignalByAccountAndLocalRefRow struct {
@@ -513,7 +504,8 @@ type GetSignalByAccountAndLocalRefRow struct {
 func (q *Queries) GetSignalByAccountAndLocalRef(ctx context.Context, arg GetSignalByAccountAndLocalRefParams) (GetSignalByAccountAndLocalRefRow, error) {
 	row := q.db.QueryRow(ctx, GetSignalByAccountAndLocalRef,
 		arg.AccountID,
-		arg.Slug,
+		arg.IsnSlug,
+		arg.SignalTypeSlug,
 		arg.SemVer,
 		arg.LocalRef,
 	)
@@ -550,16 +542,18 @@ JOIN signal_types st ON st.id = s.signal_type_id
 JOIN isn i ON i.id = s.isn_id
 join signals sc on sc.id = s.correlation_id
 WHERE s.account_id = $1
-    AND st.slug = $2
-    AND st.sem_ver = $3
-    AND s.local_ref = $4
+    AND i.slug = $2
+    AND st.slug = $3
+    AND st.sem_ver = $4
+    AND s.local_ref = $5
 `
 
 type GetSignalCorrelationDetailsParams struct {
-	AccountID uuid.UUID `json:"account_id"`
-	Slug      string    `json:"slug"`
-	SemVer    string    `json:"sem_ver"`
-	LocalRef  string    `json:"local_ref"`
+	AccountID      uuid.UUID `json:"account_id"`
+	IsnSlug        string    `json:"isn_slug"`
+	SignalTypeSlug string    `json:"signal_type_slug"`
+	SemVer         string    `json:"sem_ver"`
+	LocalRef       string    `json:"local_ref"`
 }
 
 type GetSignalCorrelationDetailsRow struct {
@@ -576,7 +570,8 @@ type GetSignalCorrelationDetailsRow struct {
 func (q *Queries) GetSignalCorrelationDetails(ctx context.Context, arg GetSignalCorrelationDetailsParams) (GetSignalCorrelationDetailsRow, error) {
 	row := q.db.QueryRow(ctx, GetSignalCorrelationDetails,
 		arg.AccountID,
-		arg.Slug,
+		arg.IsnSlug,
+		arg.SignalTypeSlug,
 		arg.SemVer,
 		arg.LocalRef,
 	)
@@ -692,6 +687,7 @@ WHERE
     s.correlation_id = ANY($1)
     AND s.correlation_id != s.id  -- exclude self-referencing signals
     AND s.isn_id = i.id
+    AND s.isn_id = c.isn_id -- signals can only be correlated within an ISN (defence in depth - submissions check this)
     AND i.is_in_use = true
     AND ist.is_in_use = true
     AND ($2::boolean = true OR s.is_withdrawn = false)

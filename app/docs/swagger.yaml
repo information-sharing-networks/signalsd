@@ -998,8 +998,8 @@ definitions:
         type: string
       local_ref:
         description: |-
-          LocalRef is supplied by the sender and uniquely identify each signal
-          Repeat deliveries of the same LocalRef are treated as updates to the original signal
+          LocalRef is supplied by the sender and uniquely identifies each of the account's signals of this type on the ISN
+          Repeat deliveries of the same LocalRef to the same ISN are treated as updates to the original signal (the same LocalRef sent to another ISN is a separate signal)
         example: item_id_#1
         type: string
     type: object
@@ -1246,7 +1246,7 @@ info:
     Search, withdrawal and batches work the same way for every kind, and search results include each signal's `content_kind`.
 
     ## Versions and resubmissions
-    Each signal is identified by the `local_ref` the sender supplies, which must be unique for the account and signal type. When a `local_ref` is sent again:
+    Each signal is identified by the `local_ref` the sender supplies, which must be unique for the account, ISN and signal type (sending the same `local_ref` to two ISNs creates two independent signals). When a `local_ref` is sent to the same ISN again:
     - **If something changed**, a new version of the signal is stored (json and document signals).
     - **If nothing changed** (the same content, and the same or no `correlation_id`), nothing is stored. The response contains the `signal_id`, `signal_version_id` and `version_number` of the existing latest version, with `unchanged: true`, so requests can be safely retried. JSON content is compared as JSON (key order and whitespace are ignored). Documents compare the file and its filename.
     - **If the signal was withdrawn**, it is reactivated with a new version (json and document signals).
@@ -3006,8 +3006,8 @@ paths:
       description: |
         Submit JSON or event signals to an ISN (documents are sent to document signal types with Upload a Document)
         - payloads must not mix signals of different types and are subject to the size limits defined on the site.
-        - The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.
-        - If a local reference is received more than once from an account for the specified signal_type a new version of the signal will be stored with a incremented version number (unless the signal is unchanged - see Signal versions).
+        - The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account to the ISN (the same local_ref sent to two ISNs identifies two independent signals).
+        - If a local reference is received more than once from an account for the specified ISN and signal_type a new version of the signal will be stored with a incremented version number (unless the signal is unchanged - see Signal versions).
         - Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.
 
         **Batches**
@@ -3355,7 +3355,7 @@ paths:
 
         **Versions**
 
-        Uploads for a local_ref you have already used are compared with its latest version:
+        Uploads for a local_ref you have already used on the ISN are compared with its latest version (the same local_ref uploaded to another ISN is a separate document):
         - the same file with the same filename creates no new version: the response contains the signal_id, signal_version_id and version_number of the existing latest version, with unchanged=true - so uploads can be safely retried
         - a different file, or the same file with a different filename, creates a new version (including a file that matches an older version)
         - re-uploading a withdrawn document creates a new version and reactivates it
@@ -3463,6 +3463,8 @@ paths:
     put:
       description: |-
         Withdraw a signal by local reference
+
+        Only the account's signal with this local reference on this ISN is withdrawn (a signal with the same local reference on another ISN is not affected).
 
         Withdrawn signals are hidden from search results by default but remain in the database.
         Signals can only be withdrawn by the account that created the signal.
@@ -3670,6 +3672,11 @@ paths:
 
         If no correlation ID is supplied, the ISN is resolved using the routing rules defined for the _Signal Type_.
         The rules are applied in the order defined in the _Routing Rules Config_ (first match is accepted).
+
+        **Resubmissions**
+
+        local_ref is unique per ISN, so a resubmitted signal only updates the original if it resolves to the same ISN.
+        If it resolves to a different ISN (e.g. because the routing field changed) it is stored as a new signal on that ISN, and the original signal is not changed - withdraw it if it is no longer needed.
 
         **Resolution failures**
 

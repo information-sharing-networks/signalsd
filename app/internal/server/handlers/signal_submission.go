@@ -30,8 +30,8 @@ import (
 // SubmittedSignal is a json or event signal sent to the Submit Signals endpoints
 type SubmittedSignal struct {
 
-	// LocalRef is supplied by the sender and uniquely identify each signal
-	// Repeat deliveries of the same LocalRef are treated as updates to the original signal
+	// LocalRef is supplied by the sender and uniquely identifies each of the account's signals of this type on the ISN
+	// Repeat deliveries of the same LocalRef to the same ISN are treated as updates to the original signal (the same LocalRef sent to another ISN is a separate signal)
 	LocalRef string `json:"local_ref" example:"item_id_#1"`
 
 	// CorrelationID is an optional ID for another signal in the same ISN - the submitted signal is linked to the correlated signal
@@ -172,8 +172,8 @@ type CreateSignalsSummary struct {
 //
 //	@Description	Submit JSON or event signals to an ISN (documents are sent to document signal types with Upload a Document)
 //	@Description	- payloads must not mix signals of different types and are subject to the size limits defined on the site.
-//	@Description	- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account.
-//	@Description	- If a local reference is received more than once from an account for the specified signal_type a new version of the signal will be stored with a incremented version number (unless the signal is unchanged - see Signal versions).
+//	@Description	- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account to the ISN (the same local_ref sent to two ISNs identifies two independent signals).
+//	@Description	- If a local reference is received more than once from an account for the specified ISN and signal_type a new version of the signal will be stored with a incremented version number (unless the signal is unchanged - see Signal versions).
 //	@Description	- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.
 //	@Description
 //	@Description	**Batches**
@@ -340,6 +340,11 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) e
 //	@Description
 //	@Description	If no correlation ID is supplied, the ISN is resolved using the routing rules defined for the _Signal Type_.
 //	@Description	The rules are applied in the order defined in the _Routing Rules Config_ (first match is accepted).
+//	@Description
+//	@Description	**Resubmissions**
+//	@Description
+//	@Description	local_ref is unique per ISN, so a resubmitted signal only updates the original if it resolves to the same ISN.
+//	@Description	If it resolves to a different ISN (e.g. because the routing field changed) it is stored as a new signal on that ISN, and the original signal is not changed - withdraw it if it is no longer needed.
 //	@Description
 //	@Description	**Resolution failures**
 //	@Description
@@ -615,7 +620,7 @@ func (s *SignalsHandler) resolveIsn(ctx context.Context, signalTypePath string, 
 }
 
 // storeJSONSignal validates a json signal against the signal type's schema and stores it on the ISN
-// (as a new signal, or a new version of the account's existing signal with the same local_ref).
+// (as a new signal, or a new version of the account's existing signal with the same local_ref on the ISN).
 // A resubmission that doesn't change the signal returns the existing version with Unchanged=true, and no new version is created.
 // It returns the stored signal, or the reason the signal could not be stored.
 //
@@ -643,6 +648,7 @@ func (s *SignalsHandler) storeJSONSignal(ctx context.Context, submission *signal
 	latest, err := queries.CompareWithLatestSignalVersion(ctx, database.CompareWithLatestSignalVersionParams{
 		Content:        signal.Content,
 		AccountID:      submission.accountID,
+		IsnSlug:        isnSlug,
 		SignalTypeSlug: submission.signalTypeSlug,
 		SemVer:         submission.semVer,
 		LocalRef:       signal.LocalRef,
@@ -703,12 +709,10 @@ func (s *SignalsHandler) storeJSONSignal(ctx context.Context, submission *signal
 
 	// create the signal version, which holds the content
 	version, err := queries.CreateSignalVersion(ctx, database.CreateSignalVersionParams{
-		AccountID:      submission.accountID,
-		SignalBatchID:  submission.batch.ID,
-		Content:        signal.Content,
-		LocalRef:       signal.LocalRef,
-		SignalTypeSlug: submission.signalTypeSlug,
-		SemVer:         submission.semVer,
+		AccountID:     submission.accountID,
+		SignalBatchID: submission.batch.ID,
+		SignalID:      signalID,
+		Content:       signal.Content,
 	})
 	if err != nil {
 		return failed(apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to create signal version: %v", err))

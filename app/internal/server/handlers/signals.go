@@ -50,6 +50,8 @@ type WithdrawSignalRequest struct {
 //	@Summary		Withdraw a Signal
 //	@Description	Withdraw a signal by local reference
 //	@Description
+//	@Description	Only the account's signal with this local reference on this ISN is withdrawn (a signal with the same local reference on another ISN is not affected).
+//	@Description
 //	@Description	Withdrawn signals are hidden from search results by default but remain in the database.
 //	@Description	Signals can only be withdrawn by the account that created the signal.
 //	@Description	To reactivate a signal resupply it with the same local_ref using the 'create signals' end point.
@@ -96,10 +98,11 @@ func (s *SignalsHandler) WithdrawSignal(w http.ResponseWriter, r *http.Request) 
 
 	// Get the signal
 	signal, err := s.queries.GetSignalByAccountAndLocalRef(r.Context(), database.GetSignalByAccountAndLocalRefParams{
-		AccountID: accountID,
-		Slug:      signalTypeSlug,
-		SemVer:    semVer,
-		LocalRef:  *req.LocalRef,
+		AccountID:      accountID,
+		IsnSlug:        isnSlug,
+		SignalTypeSlug: signalTypeSlug,
+		SemVer:         semVer,
+		LocalRef:       *req.LocalRef,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

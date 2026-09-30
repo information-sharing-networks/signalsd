@@ -339,10 +339,11 @@ func TestCorrelatedSignalSubmission(t *testing.T) {
 
 			// check the correlation was stored
 			storedSignal, err := testEnv.queries.GetSignalCorrelationDetails(ctx, database.GetSignalCorrelationDetailsParams{
-				AccountID: adminAccount.ID,
-				Slug:      adminSignalType.Slug,
-				SemVer:    adminSignalType.SemVer,
-				LocalRef:  tt.localRef,
+				AccountID:      adminAccount.ID,
+				IsnSlug:        adminISN.Slug,
+				SignalTypeSlug: adminSignalType.Slug,
+				SemVer:         adminSignalType.SemVer,
+				LocalRef:       tt.localRef,
 			})
 			if err != nil {
 				t.Fatalf("Failed to get the correlated signal from the database: %v", err)

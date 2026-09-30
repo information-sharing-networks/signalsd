@@ -139,7 +139,7 @@ type DocumentUploadResponse struct {
 //	@Description
 //	@Description	**Versions**
 //	@Description
-//	@Description	Uploads for a local_ref you have already used are compared with its latest version:
+//	@Description	Uploads for a local_ref you have already used on the ISN are compared with its latest version (the same local_ref uploaded to another ISN is a separate document):
 //	@Description	- the same file with the same filename creates no new version: the response contains the signal_id, signal_version_id and version_number of the existing latest version, with unchanged=true - so uploads can be safely retried
 //	@Description	- a different file, or the same file with a different filename, creates a new version (including a file that matches an older version)
 //	@Description	- re-uploading a withdrawn document creates a new version and reactivates it
@@ -532,6 +532,7 @@ func (h *DocumentsHandler) storeDocumentSignal(w http.ResponseWriter, r *http.Re
 	// Withdrawn signals and changes to the correlation_id always create a new version (as with json signals).
 	latest, err := queries.GetLatestSignalVersionByLocalRef(ctx, database.GetLatestSignalVersionByLocalRefParams{
 		AccountID:      upload.accountID,
+		IsnSlug:        isnSlug,
 		SignalTypeSlug: upload.signalTypeSlug,
 		SemVer:         upload.semVer,
 		LocalRef:       upload.localRef,
@@ -605,12 +606,10 @@ func (h *DocumentsHandler) storeDocumentSignal(w http.ResponseWriter, r *http.Re
 	}
 
 	version, err := queries.CreateSignalVersion(ctx, database.CreateSignalVersionParams{
-		AccountID:      upload.accountID,
-		SignalBatchID:  upload.batch.ID,
-		Content:        content,
-		LocalRef:       upload.localRef,
-		SignalTypeSlug: upload.signalTypeSlug,
-		SemVer:         upload.semVer,
+		AccountID:     upload.accountID,
+		SignalBatchID: upload.batch.ID,
+		SignalID:      signalID,
+		Content:       content,
 	})
 	if err != nil {
 		return reject(apperrors.DatabaseError("database error", err))

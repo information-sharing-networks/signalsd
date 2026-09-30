@@ -1,5 +1,5 @@
 -- name: CreateSignal :one
--- This query creates one row in the signals table for every new combination of account_id, signal_type_id, local_ref.
+-- This query creates one row in the signals table for every new combination of account_id, isn_id, signal_type_id, local_ref.
 -- If a withdrawn signal is received again it is reactivated (is_withdrawn = false).
 -- Only creates signals if ISN and signal type are in use (this is a defence against stale access tokens).
 -- Returns the new signal_id.
@@ -42,7 +42,7 @@ FROM ids
 -- deactivated records (is_withdrawn = true) are reactivated by resubmitting them.
 -- updated_at is changed on every resubmission, since a new version is created (search uses it to find the signals that changed since a given time - updated_since)
 -- the only other signals field that can be updated is the correlation_id (handled by CreateOrUpdateSignalWithCorrelationID)
-ON CONFLICT (account_id, signal_type_id, local_ref)
+ON CONFLICT (account_id, isn_id, signal_type_id, local_ref)
 DO UPDATE SET
     is_withdrawn = false,
     updated_at = now()
@@ -88,8 +88,8 @@ SELECT
     sqlc.arg(correlation_id),
     false,
     false
-FROM ids 
-ON CONFLICT (account_id, signal_type_id, local_ref)
+FROM ids
+ON CONFLICT (account_id, isn_id, signal_type_id, local_ref)
 DO UPDATE SET
     correlation_id = CASE
         WHEN signals.correlation_id != EXCLUDED.correlation_id THEN EXCLUDED.correlation_id
@@ -105,7 +105,7 @@ RETURNING id;
 -- name: CreateEventSignal :one
 -- Creates the signal master record for an event. Events are immutable, so unlike CreateSignal and CreateOrUpdateSignalWithCorrelationID
 -- an existing signal is never updated (not reactivated or recorrelated).
--- Returns no rows if the account already has an event with this local_ref (use CompareWithLatestSignalVersion to compare it with the resubmitted event),
+-- Returns no rows if the account already has an event with this local_ref on the ISN (use CompareWithLatestSignalVersion to compare it with the resubmitted event),
 -- or if the ISN or signal type is not in use (this is a defence against stale access tokens).
 WITH ids AS (
     SELECT st.id AS signal_type_id,
@@ -142,11 +142,11 @@ SELECT
     false,
     false
 FROM ids
-ON CONFLICT (account_id, signal_type_id, local_ref) DO NOTHING
+ON CONFLICT (account_id, isn_id, signal_type_id, local_ref) DO NOTHING
 RETURNING id;
 
 -- name: CompareWithLatestSignalVersion :one
--- returns the latest version of the account's signal with the supplied local_ref, and whether its content is the same as the supplied content
+-- returns the latest version of the account's signal with the supplied local_ref on the ISN, and whether its content is the same as the supplied content
 -- (compared as jsonb, so key order and whitespace are ignored). Used to detect unchanged json and event resubmissions.
 SELECT
     s.id AS signal_id,
@@ -156,31 +156,18 @@ SELECT
     lsv.version_number,
     (lsv.content = sqlc.arg(content)::jsonb)::boolean AS content_matches
 FROM signals s
+JOIN isn i ON i.id = s.isn_id
 JOIN signal_types st ON st.id = s.signal_type_id
 JOIN latest_signal_versions lsv ON lsv.signal_id = s.id
 WHERE s.account_id = sqlc.arg(account_id)
+    AND i.slug = sqlc.arg(isn_slug)
     AND st.slug = sqlc.arg(signal_type_slug)
     AND st.sem_ver = sqlc.arg(sem_ver)
     AND s.local_ref = sqlc.arg(local_ref);
 
 -- name: CreateSignalVersion :one
--- if there is already a version of this signal, create a new one with an incremented version_number
-WITH ver AS (
-    SELECT 
-        st.id AS signal_type_id,
-        COALESCE(
-            (SELECT MAX(sv.version_number)
-             FROM signal_versions sv
-             JOIN signals s
-                ON s.id = sv.signal_id
-             WHERE s.local_ref = sqlc.arg(local_ref)
-                AND s.account_id = sqlc.arg(account_id)
-                AND s.signal_type_id = st.id)
-            , 0) + 1 as version_number
-    FROM signal_types st
-    WHERE st.slug = sqlc.arg(signal_type_slug)
-        AND st.sem_ver = sqlc.arg(sem_ver)
-)
+-- creates a version of the signal (signal_id is the signal master record returned by CreateSignal, CreateOrUpdateSignalWithCorrelationID or CreateEventSignal).
+-- if there is already a version of this signal, the new one has an incremented version_number
 INSERT INTO signal_versions (
     id,
     created_at,
@@ -191,18 +178,18 @@ INSERT INTO signal_versions (
     content
 )
 SELECT
-   uuidv7(),
-    now(), 
+    uuidv7(),
+    now(),
     sqlc.arg(account_id),
     sqlc.arg(signal_batch_id),
-    s.id,
-    ver.version_number,
+    sqlc.arg(signal_id),
+    COALESCE(
+        (SELECT MAX(sv.version_number)
+         FROM signal_versions sv
+         WHERE sv.signal_id = sqlc.arg(signal_id)
+            AND sv.account_id = sqlc.arg(account_id))
+        , 0) + 1,
     sqlc.arg(content)
-FROM ver 
-JOIN signals s 
-    ON s.signal_type_id = ver.signal_type_id
-    AND s.account_id = sqlc.arg(account_id)
-    AND s.local_ref = sqlc.arg(local_ref)
 RETURNING id, version_number;
 
 -- name: WithdrawSignalByID :execrows
@@ -305,10 +292,11 @@ SELECT s.*, i.slug as isn_slug, st.slug as signal_type_slug, st.sem_ver
 FROM signals s
 JOIN signal_types st ON st.id = s.signal_type_id
 JOIN isn i ON i.id = s.isn_id
-WHERE s.account_id = $1
-    AND st.slug = $2
-    AND st.sem_ver = $3
-    AND s.local_ref = $4;
+WHERE s.account_id = sqlc.arg(account_id)
+    AND i.slug = sqlc.arg(isn_slug)
+    AND st.slug = sqlc.arg(signal_type_slug)
+    AND st.sem_ver = sqlc.arg(sem_ver)
+    AND s.local_ref = sqlc.arg(local_ref);
 
 -- name: ValidateCorrelationID :one
 SELECT EXISTS(
@@ -336,10 +324,11 @@ FROM signals s
 JOIN signal_types st ON st.id = s.signal_type_id
 JOIN isn i ON i.id = s.isn_id
 join signals sc on sc.id = s.correlation_id
-WHERE s.account_id = $1
-    AND st.slug = $2
-    AND st.sem_ver = $3
-    AND s.local_ref = $4;
+WHERE s.account_id = sqlc.arg(account_id)
+    AND i.slug = sqlc.arg(isn_slug)
+    AND st.slug = sqlc.arg(signal_type_slug)
+    AND st.sem_ver = sqlc.arg(sem_ver)
+    AND s.local_ref = sqlc.arg(local_ref);
 
 -- name: GetSignalsByCorrelationIDs :many
 -- Get all signals that correlate to the provided signal IDs (for embedding correlated signals)
@@ -386,6 +375,7 @@ WHERE
     s.correlation_id = ANY(sqlc.slice(correlation_ids))
     AND s.correlation_id != s.id  -- exclude self-referencing signals
     AND s.isn_id = i.id
+    AND s.isn_id = c.isn_id -- signals can only be correlated within an ISN (defence in depth - submissions check this)
     AND i.is_in_use = true
     AND ist.is_in_use = true
     AND (sqlc.narg('include_withdrawn')::boolean = true OR s.is_withdrawn = false)
@@ -415,7 +405,7 @@ WHERE
     ORDER BY sv.created_at;
 
 -- name: GetLatestSignalVersionByLocalRef :one
--- returns the latest version of the account's signal with the supplied local_ref (used to detect unchanged document uploads)
+-- returns the latest version of the account's signal with the supplied local_ref on the ISN (used to detect unchanged document uploads)
 SELECT
     s.id AS signal_id,
     s.correlation_id,
@@ -424,9 +414,11 @@ SELECT
     lsv.version_number,
     lsv.content
 FROM signals s
+JOIN isn i ON i.id = s.isn_id
 JOIN signal_types st ON st.id = s.signal_type_id
 JOIN latest_signal_versions lsv ON lsv.signal_id = s.id
 WHERE s.account_id = sqlc.arg(account_id)
+    AND i.slug = sqlc.arg(isn_slug)
     AND st.slug = sqlc.arg(signal_type_slug)
     AND st.sem_ver = sqlc.arg(sem_ver)
     AND s.local_ref = sqlc.arg(local_ref);

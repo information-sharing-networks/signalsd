@@ -121,7 +121,7 @@ import (
 //	@description	Search, withdrawal and batches work the same way for every kind, and search results include each signal's `content_kind`.
 //	@description
 //	@description	## Versions and resubmissions
-//	@description	Each signal is identified by the `local_ref` the sender supplies, which must be unique for the account and signal type. When a `local_ref` is sent again:
+//	@description	Each signal is identified by the `local_ref` the sender supplies, which must be unique for the account, ISN and signal type (sending the same `local_ref` to two ISNs creates two independent signals). When a `local_ref` is sent to the same ISN again:
 //	@description	- **If something changed**, a new version of the signal is stored (json and document signals).
 //	@description	- **If nothing changed** (the same content, and the same or no `correlation_id`), nothing is stored. The response contains the `signal_id`, `signal_version_id` and `version_number` of the existing latest version, with `unchanged: true`, so requests can be safely retried. JSON content is compared as JSON (key order and whitespace are ignored). Documents compare the file and its filename.
 //	@description	- **If the signal was withdrawn**, it is reactivated with a new version (json and document signals).
