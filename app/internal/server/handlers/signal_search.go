@@ -292,6 +292,14 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 //
 //	@Router			/api/public/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search [get]
 //
+//	@Description
+//	@Description	**Retrieving a signal from the search results**
+//	@Description
+//	@Description	For json signals (content_kind=json) and events (content_kind=event) the signal is returned in the content field.
+//	@Description
+//	@Description	For document signals (content_kind=document) the content field holds the document metadata (name, mime_type, size_bytes and sha256).
+//	@Description	Downloading the document requires an account on the ISN and an access token - see the private signal search endpoint for how to download a document from the search results.
+//
 // This function can be called without authentication. It will only return signals from public ISNs.
 func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Request) error {
 
@@ -440,6 +448,47 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search [get]
+//
+//	@Description
+//	@Description	**Retrieving a signal from the search results**
+//	@Description
+//	@Description	For json signals (content_kind=json) and events (content_kind=event) the signal is returned in the content field.
+//	@Description
+//	@Description	For document signals (content_kind=document) the content field holds the document metadata (name, mime_type, size_bytes and sha256) and the document is downloaded from the signal's content endpoint:
+//	@Description	```
+//	@Description	GET /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}/content?version={version_number}
+//	@Description	```
+//	@Description	Build the URL from the signal_type_slug, sem_ver, signal_id and version_number in the search result, not from the search URL:
+//	@Description	correlated signals (include_correlated=true) are often a different signal type from the one searched.
+//	@Description	The isn_slug is the ISN that was searched (correlated signals are in the same ISN).
+//	@Description
+//	@Description	For example, searching for a shipment with its correlated signals:
+//	@Description	```
+//	@Description	GET /api/isn/sample-isn/signal-types/shipment/v1.0.0/signals/search?local_ref=SHIP-0042&include_correlated=true
+//	@Description
+//	@Description	[{
+//	@Description	"signal_id": "def87f89-dab6-4607-95f7-593d61cb5742",
+//	@Description	"signal_type_slug": "shipment",
+//	@Description	"sem_ver": "1.0.0",
+//	@Description	"content_kind": "json",
+//	@Description	"content": {...},
+//	@Description	"correlated_signals": [{
+//	@Description	"signal_id": "4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19",
+//	@Description	"version_number": 2,
+//	@Description	"signal_type_slug": "bill-of-lading",
+//	@Description	"sem_ver": "1.0.0",
+//	@Description	"content_kind": "document",
+//	@Description	"content": {"name": "BL-2026-0042.pdf", "mime_type": "application/pdf", ...},
+//	@Description	...
+//	@Description	}],
+//	@Description	...
+//	@Description	}]
+//	@Description	```
+//	@Description	the correlated bill of lading is downloaded with:
+//	@Description	```
+//	@Description	GET /api/isn/sample-isn/signal-types/bill-of-lading/v1.0.0/signals/4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19/content?version=2
+//	@Description	```
+//	@Description	Omit version to download the latest version, and add include_withdrawn=true if the signal is withdrawn.
 //
 // This function should be called after the RequireAccessPermission middleware has checked the account has read permission for the ISN
 // (the middleware also checks the isn and signal type are in use)

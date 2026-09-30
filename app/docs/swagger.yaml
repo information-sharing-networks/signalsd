@@ -3233,6 +3233,46 @@ paths:
 
         Write-only accounts can only see the signals created by their own account, and the signals other accounts have correlated to them.
         This also applies to correlated signals returned with include_correlated=true.
+
+        **Retrieving a signal from the search results**
+
+        For json signals (content_kind=json) and events (content_kind=event) the signal is returned in the content field.
+
+        For document signals (content_kind=document) the content field holds the document metadata (name, mime_type, size_bytes and sha256) and the document is downloaded from the signal's content endpoint:
+        ```
+        GET /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}/content?version={version_number}
+        ```
+        Build the URL from the signal_type_slug, sem_ver, signal_id and version_number in the search result, not from the search URL:
+        correlated signals (include_correlated=true) are often a different signal type from the one searched.
+        The isn_slug is the ISN that was searched (correlated signals are in the same ISN).
+
+        For example, searching for a shipment with its correlated signals:
+        ```
+        GET /api/isn/sample-isn/signal-types/shipment/v1.0.0/signals/search?local_ref=SHIP-0042&include_correlated=true
+
+        [{
+        "signal_id": "def87f89-dab6-4607-95f7-593d61cb5742",
+        "signal_type_slug": "shipment",
+        "sem_ver": "1.0.0",
+        "content_kind": "json",
+        "content": {...},
+        "correlated_signals": [{
+        "signal_id": "4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19",
+        "version_number": 2,
+        "signal_type_slug": "bill-of-lading",
+        "sem_ver": "1.0.0",
+        "content_kind": "document",
+        "content": {"name": "BL-2026-0042.pdf", "mime_type": "application/pdf", ...},
+        ...
+        }],
+        ...
+        }]
+        ```
+        the correlated bill of lading is downloaded with:
+        ```
+        GET /api/isn/sample-isn/signal-types/bill-of-lading/v1.0.0/signals/4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19/content?version=2
+        ```
+        Omit version to download the latest version, and add include_withdrawn=true if the signal is withdrawn.
       parameters:
       - description: Start date
         example: "2006-01-02T15:05:00Z"
@@ -3580,6 +3620,13 @@ paths:
         Search for signals in public ISNs (no authentication required).
 
         Note the endpoint returns the latest version of each signal.
+
+        **Retrieving a signal from the search results**
+
+        For json signals (content_kind=json) and events (content_kind=event) the signal is returned in the content field.
+
+        For document signals (content_kind=document) the content field holds the document metadata (name, mime_type, size_bytes and sha256).
+        Downloading the document requires an account on the ISN and an access token - see the private signal search endpoint for how to download a document from the search results.
       parameters:
       - description: Start date
         example: "2006-01-02T15:05:00Z"
