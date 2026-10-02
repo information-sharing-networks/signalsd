@@ -719,7 +719,8 @@ definitions:
         type: string
       signal_updated_at:
         description: when the signal was last created, given a new version, recorrelated
-          or withdrawn (use as the updated_since value for the next poll)
+          or withdrawn (the cursor when polling - start the next poll 1 minute before
+          the last result's value)
         type: string
       signal_version_id:
         type: string
@@ -772,7 +773,8 @@ definitions:
         type: string
       signal_updated_at:
         description: when the signal was last created, given a new version, recorrelated
-          or withdrawn (use as the updated_since value for the next poll)
+          or withdrawn (the cursor when polling - start the next poll 1 minute before
+          the last result's value)
         type: string
       signal_version_id:
         type: string
@@ -1289,9 +1291,10 @@ info:
     ```
     GET /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search?updated_since={cursor}&include_withdrawn=true
     ```
-    - `updated_since` returns the signals that were created, given a new version, recorrelated or withdrawn since that time. Results are ordered by `signal_updated_at`, so the last result's `signal_updated_at` is the cursor for the next poll.
+    - `updated_since` returns the signals that were created, given a new version, recorrelated or withdrawn since that time. Results are ordered by `signal_updated_at`, so the last result's `signal_updated_at` is your cursor.
     - Use `include_withdrawn=true`, so withdrawn signals are returned with `is_withdrawn: true` (otherwise they silently drop out of the results).
-    - **Overlap your polls**: start each poll a few seconds before the cursor, and ignore results you have already seen (by `signal_id` and `signal_updated_at`). A signal that was being stored while you polled can have a `signal_updated_at` a little before the cursor.
+    - **Polling is at-least-once, so overlap your polls**: set `updated_since` to 1 minute before your cursor, and skip the results you have already seen (the same `signal_id` and `signal_updated_at`).
+    - Why the overlap is needed: `signal_updated_at` is set when the service starts storing a signal, not when it finishes. A signal that was still being stored when you last polled can therefore appear with a `signal_updated_at` a little before your cursor. The 1 minute overlap makes sure your next poll picks it up.
     - Search results are not paginated, so poll often enough to keep each result set small.
 
     # UI Endpoints
@@ -3245,6 +3248,11 @@ paths:
         Write-only accounts can only see the signals created by their own account, and the signals other accounts have correlated to them.
         This also applies to correlated signals returned with include_correlated=true.
 
+        **Polling for changes**
+
+        Use updated_since with include_withdrawn=true. Polling is at-least-once: start each poll 1 minute before the last signal_updated_at you received, and skip the results you have already seen (the same signal_id and signal_updated_at).
+        See *Polling for changes* in the API overview for why the overlap is needed.
+
         **Retrieving a signal from the search results**
 
         For json signals (content_kind=json) and events (content_kind=event) the signal is returned in the content field.
@@ -3296,7 +3304,8 @@ paths:
         name: end_date
         type: string
       - description: Signals created, given a new version, recorrelated or withdrawn
-          since this time (use with include_withdrawn=true to poll for changes)
+          since this time (to poll for changes, use with include_withdrawn=true and
+          set it 1 minute before the last signal_updated_at you received)
         example: "2006-01-02T15:05:00Z"
         in: query
         name: updated_since
@@ -3632,6 +3641,11 @@ paths:
 
         Note the endpoint returns the latest version of each signal.
 
+        **Polling for changes**
+
+        Use updated_since with include_withdrawn=true. Polling is at-least-once: start each poll 1 minute before the last signal_updated_at you received, and skip the results you have already seen (the same signal_id and signal_updated_at).
+        See *Polling for changes* in the API overview for why the overlap is needed.
+
         **Retrieving a signal from the search results**
 
         For json signals (content_kind=json) and events (content_kind=event) the signal is returned in the content field.
@@ -3650,7 +3664,8 @@ paths:
         name: end_date
         type: string
       - description: Signals created, given a new version, recorrelated or withdrawn
-          since this time (use with include_withdrawn=true to poll for changes)
+          since this time (to poll for changes, use with include_withdrawn=true and
+          set it 1 minute before the last signal_updated_at you received)
         example: "2006-01-02T15:05:00Z"
         in: query
         name: updated_since

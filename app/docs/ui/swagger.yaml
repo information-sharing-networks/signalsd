@@ -138,9 +138,10 @@ info:
     ```
     GET /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search?updated_since={cursor}&include_withdrawn=true
     ```
-    - `updated_since` returns the signals that were created, given a new version, recorrelated or withdrawn since that time. Results are ordered by `signal_updated_at`, so the last result's `signal_updated_at` is the cursor for the next poll.
+    - `updated_since` returns the signals that were created, given a new version, recorrelated or withdrawn since that time. Results are ordered by `signal_updated_at`, so the last result's `signal_updated_at` is your cursor.
     - Use `include_withdrawn=true`, so withdrawn signals are returned with `is_withdrawn: true` (otherwise they silently drop out of the results).
-    - **Overlap your polls**: start each poll a few seconds before the cursor, and ignore results you have already seen (by `signal_id` and `signal_updated_at`). A signal that was being stored while you polled can have a `signal_updated_at` a little before the cursor.
+    - **Polling is at-least-once, so overlap your polls**: set `updated_since` to 1 minute before your cursor, and skip the results you have already seen (the same `signal_id` and `signal_updated_at`).
+    - Why the overlap is needed: `signal_updated_at` is set when the service starts storing a signal, not when it finishes. A signal that was still being stored when you last polled can therefore appear with a `signal_updated_at` a little before your cursor. The 1 minute overlap makes sure your next poll picks it up.
     - Search results are not paginated, so poll often enough to keep each result set small.
 
     # UI Endpoints

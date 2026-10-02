@@ -51,7 +51,7 @@ type SearchSignal struct {
 	SemVer               string          `json:"sem_ver" example:"0.0.1"`
 	ContentKind          string          `json:"content_kind" example:"json" enums:"json,document,event"`
 	SignalCreatedAt      time.Time       `json:"signal_created_at"`
-	SignalUpdatedAt      time.Time       `json:"signal_updated_at"` // when the signal was last created, given a new version, recorrelated or withdrawn (use as the updated_since value for the next poll)
+	SignalUpdatedAt      time.Time       `json:"signal_updated_at"` // when the signal was last created, given a new version, recorrelated or withdrawn (the cursor when polling - start the next poll 1 minute before the last result's value)
 	SignalVersionID      uuid.UUID       `json:"signal_version_id"`
 	VersionNumber        int32           `json:"version_number"`
 	VersionCreatedAt     time.Time       `json:"version_created_at"`
@@ -273,17 +273,22 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 //	@Description	Search for signals in public ISNs (no authentication required).
 //	@Description
 //	@Description	Note the endpoint returns the latest version of each signal.
+//	@Description
+//	@Description	**Polling for changes**
+//	@Description
+//	@Description	Use updated_since with include_withdrawn=true. Polling is at-least-once: start each poll 1 minute before the last signal_updated_at you received, and skip the results you have already seen (the same signal_id and signal_updated_at).
+//	@Description	See *Polling for changes* in the API overview for why the overlap is needed.
 //
-//	@Param			start_date					query		string	false	"Start date"																															example(2006-01-02T15:05:00Z)
-//	@Param			end_date					query		string	false	"End date"																																example(2006-01-02T15:15:00Z)
-//	@Param			updated_since				query		string	false	"Signals created, given a new version, recorrelated or withdrawn since this time (use with include_withdrawn=true to poll for changes)"	example(2006-01-02T15:05:00Z)
-//	@Param			account_id					query		string	false	"Account ID"																															example(def87f89-dab6-4607-95f7-593d61cb5742)
-//	@Param			signal_id					query		string	false	"Signal ID"																																example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
-//	@Param			local_ref					query		string	false	"Local reference"																														example(item_id_#1)
-//	@Param			correlation_id				query		string	false	"Return signals correlated with this signal ID"																							example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
-//	@Param			include_withdrawn			query		string	false	"Include withdrawn signals (default: false)"																							example(true)
-//	@Param			include_correlated			query		string	false	"Include signals that link to each returned signal (default: false)"																	example(true)
-//	@Param			include_previous_versions	query		string	false	"Include previous versions of each returned signal (default: false)"																	example(true)
+//	@Param			start_date					query		string	false	"Start date"																																																example(2006-01-02T15:05:00Z)
+//	@Param			end_date					query		string	false	"End date"																																																	example(2006-01-02T15:15:00Z)
+//	@Param			updated_since				query		string	false	"Signals created, given a new version, recorrelated or withdrawn since this time (to poll for changes, use with include_withdrawn=true and set it 1 minute before the last signal_updated_at you received)"	example(2006-01-02T15:05:00Z)
+//	@Param			account_id					query		string	false	"Account ID"																																																example(def87f89-dab6-4607-95f7-593d61cb5742)
+//	@Param			signal_id					query		string	false	"Signal ID"																																																	example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
+//	@Param			local_ref					query		string	false	"Local reference"																																															example(item_id_#1)
+//	@Param			correlation_id				query		string	false	"Return signals correlated with this signal ID"																																								example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
+//	@Param			include_withdrawn			query		string	false	"Include withdrawn signals (default: false)"																																								example(true)
+//	@Param			include_correlated			query		string	false	"Include signals that link to each returned signal (default: false)"																																		example(true)
+//	@Param			include_previous_versions	query		string	false	"Include previous versions of each returned signal (default: false)"																																		example(true)
 //
 //	@Success		200							{array}		handlers.SearchSignalWithCorrelationsAndVersions
 //	@Failure		400							{object}	responses.ErrorResponse	"invalid_url_param"
@@ -428,17 +433,22 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 //	@Description
 //	@Description	Write-only accounts can only see the signals created by their own account, and the signals other accounts have correlated to them.
 //	@Description	This also applies to correlated signals returned with include_correlated=true.
+//	@Description
+//	@Description	**Polling for changes**
+//	@Description
+//	@Description	Use updated_since with include_withdrawn=true. Polling is at-least-once: start each poll 1 minute before the last signal_updated_at you received, and skip the results you have already seen (the same signal_id and signal_updated_at).
+//	@Description	See *Polling for changes* in the API overview for why the overlap is needed.
 //
-//	@Param			start_date					query		string	false	"Start date"																															example(2006-01-02T15:05:00Z)
-//	@Param			end_date					query		string	false	"End date"																																example(2006-01-02T15:15:00Z)
-//	@Param			updated_since				query		string	false	"Signals created, given a new version, recorrelated or withdrawn since this time (use with include_withdrawn=true to poll for changes)"	example(2006-01-02T15:05:00Z)
-//	@Param			account_id					query		string	false	"Account ID"																															example(def87f89-dab6-4607-95f7-593d61cb5742)
-//	@Param			signal_id					query		string	false	"Signal ID"																																example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
-//	@Param			local_ref					query		string	false	"Local reference"																														example(item_id_#1)
-//	@Param			correlation_id				query		string	false	"Return signals correlated with this signal ID"																							example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
-//	@Param			include_withdrawn			query		string	false	"Include withdrawn signals (default: false)"																							example(true)
-//	@Param			include_correlated			query		string	false	"Include signals that link to each returned signal (default: false)"																	example(true)
-//	@Param			include_previous_versions	query		string	false	"Include previous versions of each returned signal (default: false)"																	example(true)
+//	@Param			start_date					query		string	false	"Start date"																																																example(2006-01-02T15:05:00Z)
+//	@Param			end_date					query		string	false	"End date"																																																	example(2006-01-02T15:15:00Z)
+//	@Param			updated_since				query		string	false	"Signals created, given a new version, recorrelated or withdrawn since this time (to poll for changes, use with include_withdrawn=true and set it 1 minute before the last signal_updated_at you received)"	example(2006-01-02T15:05:00Z)
+//	@Param			account_id					query		string	false	"Account ID"																																																example(def87f89-dab6-4607-95f7-593d61cb5742)
+//	@Param			signal_id					query		string	false	"Signal ID"																																																	example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
+//	@Param			local_ref					query		string	false	"Local reference"																																															example(item_id_#1)
+//	@Param			correlation_id				query		string	false	"Return signals correlated with this signal ID"																																								example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
+//	@Param			include_withdrawn			query		string	false	"Include withdrawn signals (default: false)"																																								example(true)
+//	@Param			include_correlated			query		string	false	"Include signals that link to each returned signal (default: false)"																																		example(true)
+//	@Param			include_previous_versions	query		string	false	"Include previous versions of each returned signal (default: false)"																																		example(true)
 //
 //	@Success		200							{array}		handlers.SearchSignalWithCorrelationsAndVersions
 //	@Failure		400							{object}	responses.ErrorResponse	"invalid_url_param"

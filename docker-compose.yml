@@ -53,6 +53,7 @@ services:
     volumes:
       - ./:/signalsd # project dir
       - go-modules:/go/pkg/mod # persist downloaded modules
+      - go-build-cache:/root/.cache/go-build # persist build cache (go tool caches compiled tools here)
     environment:
       # Required - container-specific values
       - DOCKER_ENV=true
@@ -91,7 +92,7 @@ services:
         go tool sqlc generate &&
         echo 'Creating swagger documentation...' &&
         go tool swag init -g ./cmd/signalsd/main.go --tags '!HTMX Actions,!UI Pages' --outputTypes json,yaml &&
-        go tool swag init -g ./cmd/signalsd/main.go --tags 'HTMX Actions,UI Pages' -o ./docs/ui --outputTypes json,yaml
+        go tool swag init -g ./cmd/signalsd/main.go --tags 'HTMX Actions,UI Pages' -o ./docs/ui --outputTypes json,yaml &&
         echo 'Running database migrations...' &&
         go tool goose -dir sql/schema postgres $$DATABASE_URL -env=none up &&
         echo 'Starting signalsd service (live reload)...' &&
@@ -113,3 +114,4 @@ networks:
 volumes:
   db-data-dev:
   go-modules:
+  go-build-cache:
