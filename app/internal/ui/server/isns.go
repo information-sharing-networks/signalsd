@@ -92,7 +92,7 @@ func (s *Server) ManageIsnStatusPage(w http.ResponseWriter, r *http.Request) {
 	// Inactive ISNs are included in the token claims (IsnPerm.InUse flags the current status).
 	// CanAdminister is true for ISNs the user owns and for all ISNs when the user is a siteadmin,
 	// so getIsnOptions with filterByIsnAdmin=true gives exactly the right set for this page.
-	adminIsns := getIsnOptions(accessTokenDetails.IsnPerms, true, false)
+	adminIsns := getIsnOptions(accessTokenDetails.IsnPerms, true)
 
 	templ.Handler(templates.ManageIsnStatusPage(s.config.Environment, adminIsns)).ServeHTTP(w, r)
 }

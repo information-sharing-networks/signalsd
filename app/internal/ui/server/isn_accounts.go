@@ -36,7 +36,7 @@ func (s *Server) ManageIsnAccountsPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Convert permissions to ISN list for dropdown (only ISNs where user has admin rights)
-	isns := getIsnOptions(isnPerms, true, false)
+	isns := getIsnOptions(isnPerms, true)
 
 	// Fetch users for dropdown
 	rawUsers, err := s.apiClient.GetUsers(r.Context(), accessTokenDetails.AccessToken)
@@ -151,7 +151,7 @@ func (s *Server) TransferOwnershipPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert permissions to ISN list for dropdown (only ISNs where user has admin rights)
-	isns := getIsnOptions(isnPerms, true, false)
+	isns := getIsnOptions(isnPerms, true)
 
 	// Fetch users for dropdown
 	rawUsers, err := s.apiClient.GetUsers(r.Context(), accessTokenDetails.AccessToken)

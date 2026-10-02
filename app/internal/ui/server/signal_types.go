@@ -260,7 +260,7 @@ func (s *Server) AddSignalTypeToIsnPage(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	// populate the isn dropdown list with ISNs where the user is an admin
-	isns := getIsnOptions(isnPerms, true, false)
+	isns := getIsnOptions(isnPerms, true)
 
 	templ.Handler(templates.AddSignalTypeToIsnPage(s.config.Environment, isns)).ServeHTTP(w, r)
 }
@@ -289,7 +289,7 @@ func (s *Server) ManageIsnSignalTypesStatusPage(w http.ResponseWriter, r *http.R
 	}
 
 	// Convert permissions to ISN list for dropdown (only ISNs where user has admin rights)
-	isns := getIsnOptions(isnPerms, true, false)
+	isns := getIsnOptions(isnPerms, true)
 
 	templ.Handler(templates.ManageIsnSignalTypesStatusPage(s.config.Environment, isns)).ServeHTTP(w, r)
 }

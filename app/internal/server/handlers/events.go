@@ -40,7 +40,7 @@ func (s *SignalsHandler) storeEventSignal(ctx context.Context, submission *signa
 		return failed(apperrors.ErrCodeMalformedBody, err.Error())
 	}
 
-	if err := s.schemaCache.ValidateJSONSignal(ctx, s.queries, submission.signalTypePath(), signal.Content); err != nil {
+	if err := s.schemaCache.ValidateJSONSignal(submission.signalTypePath(), signal.Content); err != nil {
 		return failed(apperrors.ErrCodeMalformedBody, fmt.Sprintf("validation failed: %v", err))
 	}
 

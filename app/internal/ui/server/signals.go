@@ -39,7 +39,7 @@ func (s *Server) SearchSignalsPage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Convert permissions to ISN list for dropdown
-	isns := getIsnOptions(insPerms, false, false)
+	isns := getIsnOptions(insPerms, false)
 
 	templ.Handler(templates.SearchSignalsPage(s.config.Environment, isns, insPerms, nil)).ServeHTTP(w, r)
 }

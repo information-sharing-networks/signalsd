@@ -125,7 +125,7 @@ func (c *Cache) ContentKind(signalTypePath string) string {
 
 // ValidateJSONSignal validates the JSON payload for a signal against its schema
 // Only json and event signal types can be validated - an error is returned for other content kinds.
-func (c *Cache) ValidateJSONSignal(ctx context.Context, queries *database.Queries, signalTypePath string, rawJSON json.RawMessage) error {
+func (c *Cache) ValidateJSONSignal(signalTypePath string, rawJSON json.RawMessage) error {
 
 	c.mu.RLock()
 	defer c.mu.RUnlock()

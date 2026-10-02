@@ -202,14 +202,10 @@ func (s *Server) TokenSignalTypeVersions(w http.ResponseWriter, r *http.Request)
 
 // getIsnOptions returns ISN slugs from the user's token claims, filtered by permission.
 // If filterByIsnAdmin is true, only ISNs where the user has admin rights are returned.
-// If filterByWritePerm is true, only ISNs where the user has write permission are returned.
-func getIsnOptions(isnPerms map[string]types.IsnPerm, filterByIsnAdmin bool, filterByWritePerm bool) []types.IsnOption {
+func getIsnOptions(isnPerms map[string]types.IsnPerm, filterByIsnAdmin bool) []types.IsnOption {
 	isns := make([]types.IsnOption, 0, len(isnPerms))
 	for isnSlug, perm := range isnPerms {
 		if filterByIsnAdmin && !perm.CanAdminister {
-			continue
-		}
-		if filterByWritePerm && !perm.CanWrite {
 			continue
 		}
 		isns = append(isns, types.IsnOption{Slug: isnSlug})
