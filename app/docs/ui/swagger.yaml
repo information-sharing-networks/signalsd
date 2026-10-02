@@ -159,16 +159,18 @@ info:
 
     ## Role requirements
     - **Public** (`/login`, `/register`): no authentication required
-    - **Authenticated**: any logged-in user (`/dashboard`, `/search`, `/settings`)
-    - **`isnadmin` or `siteadmin`**: ISN account and signal type management
-    - **`siteadmin` only**: ISN creation and ownership transfer, role management, signal type creation
+    - **Authenticated**: any logged-in user (`/dashboard`, `/settings`, and `/search` for accounts with access to an ISN)
+    - **`isnadmin` or `siteadmin`**: the admin dashboard, ISN creation, enabling and disabling ISNs, service account creation
+    - **Admins of at least one ISN**: ISN access, the ISN's signal types, viewing signal type configuration
+    - **`siteadmin` only**: account management (enabling and disabling accounts, password reset links, reissuing service account credentials), ISN ownership transfer, role management, signal type creation and schemas, signal routing rules
   license:
     name: MIT
   title: Signals ISN API
 paths:
   /admin:
     get:
-      description: Admin landing page. Requires isnadmin or siteadmin role.
+      description: Admin landing page. Requires isnadmin or siteadmin role. The site
+        admin only features are not shown to ISN admins.
       responses:
         "200":
           description: HTML page
@@ -188,7 +190,7 @@ paths:
   /admin/accounts/manage:
     get:
       description: Renders the account enable/disable form for users and service accounts.
-        Requires isnadmin or siteadmin role.
+        Requires siteadmin role.
       responses:
         "200":
           description: HTML page
@@ -274,8 +276,7 @@ paths:
       - UI Pages
   /admin/service-accounts/reissue-credentials:
     get:
-      description: Renders the reissue credentials form. Requires isnadmin or siteadmin
-        role.
+      description: Renders the reissue credentials form. Requires siteadmin role.
       responses:
         "200":
           description: HTML page
@@ -323,8 +324,8 @@ paths:
       - UI Pages
   /admin/users/generate-password-reset-link:
     get:
-      description: Renders the password reset link generation form. Requires isnadmin
-        or siteadmin role.
+      description: Renders the password reset link generation form. Requires siteadmin
+        role.
       responses:
         "200":
           description: HTML page
@@ -490,7 +491,7 @@ paths:
   /ui-api/accounts/manage:
     put:
       description: HTMX endpoint. Enables or disables a user or service account. Requires
-        isnadmin or siteadmin role.
+        siteadmin role.
       parameters:
       - description: '''user'' or ''service-account'''
         in: formData
@@ -848,7 +849,7 @@ paths:
   /ui-api/service-accounts/reissue-credentials:
     put:
       description: HTMX endpoint. Issues a new client secret for the selected service
-        account. Requires isnadmin or siteadmin role.
+        account. Requires siteadmin role.
       parameters:
       - description: Client ID of the service account
         in: formData
@@ -1219,7 +1220,7 @@ paths:
   /ui-api/users/generate-password-reset-link:
     put:
       description: HTMX endpoint. Generates a one-time password reset URL for a user.
-        Requires isnadmin or siteadmin role.
+        Requires siteadmin role.
       parameters:
       - description: Selected user in 'email|role' format
         in: formData

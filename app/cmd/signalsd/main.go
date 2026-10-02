@@ -185,9 +185,10 @@ import (
 //	@description
 //	@description	## Role requirements
 //	@description	- **Public** (`/login`, `/register`): no authentication required
-//	@description	- **Authenticated**: any logged-in user (`/dashboard`, `/search`, `/settings`)
-//	@description	- **`isnadmin` or `siteadmin`**: ISN account and signal type management
-//	@description	- **`siteadmin` only**: ISN creation and ownership transfer, role management, signal type creation
+//	@description	- **Authenticated**: any logged-in user (`/dashboard`, `/settings`, and `/search` for accounts with access to an ISN)
+//	@description	- **`isnadmin` or `siteadmin`**: the admin dashboard, ISN creation, enabling and disabling ISNs, service account creation
+//	@description	- **Admins of at least one ISN**: ISN access, the ISN's signal types, viewing signal type configuration
+//	@description	- **`siteadmin` only**: account management (enabling and disabling accounts, password reset links, reissuing service account credentials), ISN ownership transfer, role management, signal type creation and schemas, signal routing rules
 //	@license.name	MIT
 
 //	@servers.url			https://api.example.com
@@ -231,7 +232,7 @@ import (
 //	@tag.description	Manage user accounts and service accounts
 
 //	@tag.name			Site Admin
-//	@tag.description	Site adminstration tools. These endpoints can only be used by the accounts that have a siteadmin or isnadmin role
+//	@tag.description	Service health, version and site tools. The health checks and version endpoints are public. The site reset endpoint only works in environments configured as 'dev'.
 
 //	@tag.name			One-time Links (browser pages)
 //	@tag.description	These endpoints should not be called directly. Some admin endpoints,  for insance *Register Service Account* and *Generate Password Reset Link*, return a one time link URL that the user then opens in their browser to interact with the auth system. These endpoints return the HTML used to in the one-time links. The URLs do not need an access token - the link is itself the credential - and should be treated as secrets.

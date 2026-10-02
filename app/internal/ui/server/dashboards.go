@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/a-h/templ"
+	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
 )
 
@@ -21,10 +22,17 @@ func (s *Server) DashboardPage(w http.ResponseWriter, r *http.Request) {
 // IsnAdminDashboardPage godoc
 //
 //	@Summary		Admin dashboard
-//	@Description	Admin landing page. Requires isnadmin or siteadmin role.
+//	@Description	Admin landing page. Requires isnadmin or siteadmin role. The site admin only features are not shown to ISN admins.
 //	@Tags			UI Pages
 //	@Success		200	"HTML page"
 //	@Router			/admin [get]
 func (s *Server) IsnAdminDashboardPage(w http.ResponseWriter, r *http.Request) {
-	templ.Handler(templates.AdminDashboardPage(s.config.Environment)).ServeHTTP(w, r)
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
+	if !ok {
+		templ.Handler(templates.ErrorAlert("Authentication required. Please log in again.")).ServeHTTP(w, r)
+		return
+	}
+
+	isSiteAdmin := accessTokenDetails.Role == "siteadmin"
+	templ.Handler(templates.AdminDashboardPage(s.config.Environment, isSiteAdmin)).ServeHTTP(w, r)
 }

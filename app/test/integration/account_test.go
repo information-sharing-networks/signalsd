@@ -384,9 +384,10 @@ func TestServiceAccountReissue(t *testing.T) {
 				expectedStatus: http.StatusOK,
 			},
 			{
-				name:           "admin_can_reissue",
+				// reissuing credentials takes over the service account on every ISN it belongs to, so it is site admin only
+				name:           "isn_admin_cannot_reissue",
 				token:          adminToken,
-				expectedStatus: http.StatusOK,
+				expectedStatus: http.StatusForbidden,
 			},
 			{
 				name:           "member_cannot_reissue",
@@ -1003,7 +1004,8 @@ func TestPasswordResetFlow(t *testing.T) {
 	testEnv := startInProcessServer(t, publicBaseURL)
 
 	// Create test accounts
-	adminAccount := createTestAccount(t, ctx, testEnv.queries, "isnadmin", "user", "admin@example.com")
+	// only site admins can generate reset links (ISN admins are checked in TestAccountManagementPermissions)
+	adminAccount := createTestAccount(t, ctx, testEnv.queries, "siteadmin", "user", "admin@example.com")
 	userAccount := createTestAccount(t, ctx, testEnv.queries, "member", "user", "user@example.com")
 
 	t.Run("non admin cannot generate reset link", func(t *testing.T) {

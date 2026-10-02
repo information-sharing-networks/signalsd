@@ -116,10 +116,6 @@ func (s *Server) RegisterRoutes() {
 			//dashboard
 			r.Get("/admin", s.IsnAdminDashboardPage)
 
-			// user management
-			r.Get("/admin/users/generate-password-reset-link", s.GeneratePasswordResetLinkPage)
-			r.Put("/ui-api/users/generate-password-reset-link", s.GeneratePasswordResetLink)
-
 			//isn creation
 			r.Get("/admin/isn/create", s.CreateIsnPage)
 			r.Post("/ui-api/isn/create", s.CreateIsn)
@@ -131,13 +127,6 @@ func (s *Server) RegisterRoutes() {
 			// service accounts
 			r.Get("/admin/service-accounts/create", s.CreateServiceAccountsPage)
 			r.Post("/ui-api/service-accounts/create", s.CreateServiceAccount)
-
-			r.Get("/admin/service-accounts/reissue-credentials", s.ReissueServiceAccountCredentialsPage)
-			r.Put("/ui-api/service-accounts/reissue-credentials", s.ReissueServiceAccountCredentials)
-
-			// Account management (enable/disable accounts)
-			r.Get("/admin/accounts/manage", s.ManageAccountStatusPage)
-			r.Put("/ui-api/accounts/manage", s.ManageAccountStatus)
 		})
 
 		// isn admin routes
@@ -161,6 +150,16 @@ func (s *Server) RegisterRoutes() {
 		// site admin only
 		r.Group(func(r chi.Router) {
 			r.Use(s.authService.RequireRole("siteadmin"))
+
+			// account management - these act on the account on every ISN it belongs to, so they are site admin only
+			r.Get("/admin/accounts/manage", s.ManageAccountStatusPage)
+			r.Put("/ui-api/accounts/manage", s.ManageAccountStatus)
+
+			r.Get("/admin/users/generate-password-reset-link", s.GeneratePasswordResetLinkPage)
+			r.Put("/ui-api/users/generate-password-reset-link", s.GeneratePasswordResetLink)
+
+			r.Get("/admin/service-accounts/reissue-credentials", s.ReissueServiceAccountCredentialsPage)
+			r.Put("/ui-api/service-accounts/reissue-credentials", s.ReissueServiceAccountCredentials)
 
 			// ISN ownership transfer
 			r.Get("/admin/isn/transfer-ownership", s.TransferOwnershipPage)

@@ -80,7 +80,7 @@ func (s *Server) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 // GeneratePasswordResetLinkPage godoc
 //
 //	@Summary		Generate password reset link page
-//	@Description	Renders the password reset link generation form. Requires isnadmin or siteadmin role.
+//	@Description	Renders the password reset link generation form. Requires siteadmin role.
 //	@Tags			UI Pages
 //	@Success		200	"HTML page"
 //	@Router			/admin/users/generate-password-reset-link [get]
@@ -105,7 +105,7 @@ func (s *Server) GeneratePasswordResetLinkPage(w http.ResponseWriter, r *http.Re
 // GeneratePasswordResetLink godoc
 //
 //	@Summary		Generate password reset link
-//	@Description	HTMX endpoint. Generates a one-time password reset URL for a user. Requires isnadmin or siteadmin role.
+//	@Description	HTMX endpoint. Generates a one-time password reset URL for a user. Requires siteadmin role.
 //	@Tags			HTMX Actions
 //	@Param			user-dropdown	formData	string	true	"Selected user in 'email|role' format"
 //	@Success		200				"HTML partial"
@@ -185,7 +185,7 @@ func (s *Server) ManageIsnAdminRolesPage(w http.ResponseWriter, r *http.Request)
 // ManageAccountStatusPage godoc
 //
 //	@Summary		Manage account status page
-//	@Description	Renders the account enable/disable form for users and service accounts. Requires isnadmin or siteadmin role.
+//	@Description	Renders the account enable/disable form for users and service accounts. Requires siteadmin role.
 //	@Tags			UI Pages
 //	@Success		200	"HTML page"
 //	@Router			/admin/accounts/manage [get]
@@ -220,7 +220,7 @@ func (s *Server) ManageAccountStatusPage(w http.ResponseWriter, r *http.Request)
 // ManageAccountStatus godoc
 //
 //	@Summary		Enable or disable an account
-//	@Description	HTMX endpoint. Enables or disables a user or service account. Requires isnadmin or siteadmin role.
+//	@Description	HTMX endpoint. Enables or disables a user or service account. Requires siteadmin role.
 //	@Tags			HTMX Actions
 //	@Param			account-type				formData	string	true	"'user' or 'service-account'"
 //	@Param			action						formData	string	true	"'enable' or 'disable'"

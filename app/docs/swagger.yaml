@@ -1310,9 +1310,10 @@ info:
 
     ## Role requirements
     - **Public** (`/login`, `/register`): no authentication required
-    - **Authenticated**: any logged-in user (`/dashboard`, `/search`, `/settings`)
-    - **`isnadmin` or `siteadmin`**: ISN account and signal type management
-    - **`siteadmin` only**: ISN creation and ownership transfer, role management, signal type creation
+    - **Authenticated**: any logged-in user (`/dashboard`, `/settings`, and `/search` for accounts with access to an ISN)
+    - **`isnadmin` or `siteadmin`**: the admin dashboard, ISN creation, enabling and disabling ISNs, service account creation
+    - **Admins of at least one ISN**: ISN access, the ISN's signal types, viewing signal type configuration
+    - **`siteadmin` only**: account management (enabling and disabling accounts, password reset links, reissuing service account credentials), ISN ownership transfer, role management, signal type creation and schemas, signal routing rules
   license:
     name: MIT
   title: Signals ISN API
@@ -1332,7 +1333,9 @@ paths:
         **Recovery:** Account must be re-enabled by admin via `/admin/accounts/{id}/enable`
         Service accounts will also need a new client secret via `/api/auth/service-accounts/reissue-credentials`
 
-        Only admins can disable accounts.
+        Only site admins can disable accounts (disabling an account removes its access to every ISN it belongs to).
+
+        ISN admins remove an account from their own ISN by revoking its ISN access.
       parameters:
       - description: Account ID to disable
         example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
@@ -1349,6 +1352,10 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
           description: authentication_error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: forbidden
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
@@ -1374,7 +1381,7 @@ paths:
         - **Service Accounts**: will need a new client secret via `/api/auth/service-accounts/reissue_credentials`
         - **Web Users**: Can immediately log in again via `/api/auth/login`
 
-        Only owners and admins can enable accounts.
+        Only site admins can enable accounts.
       parameters:
       - description: Account ID to enable
         example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
@@ -1454,9 +1461,9 @@ paths:
 
         An ISN admin also has access to the following site-level functions:
         - Create service accounts
-        - Disable/Enable accounts
         - View all users and their email addresses
-        - Reset user passwords
+
+        Account management (enabling and disabling accounts, password reset links and reissuing service account credentials) is done by site admins, since it affects the account on every ISN it belongs to.
 
         **This endpoint can only be used by site admin accounts**
       parameters:
@@ -2134,7 +2141,7 @@ paths:
         Send the `reset_url` from the response to the user. Opening it in a browser serves the password reset form (see *Password Reset Form* under One-time Links), where they can choose a new password.
         The link expires in 30 minutes and can only be used once. Generating a new link for a user invalidates any link they were issued previously.
 
-        ISN Admins can create links on behalf of users with a member role.  Accounts with the site admin role can create links for ISN admins and members.
+        Only site admins can generate links, since the link resets the account's password on every ISN it belongs to.
 
         **Note:** anyone in possession of the link can reset the password of the associated account. The link should be treated as sensitive and handled accordingly.
       parameters:
@@ -2406,7 +2413,7 @@ paths:
 
         The client_id will remain the same, but a new client_secret will be generated.
 
-        You have to be an site or ISN admin to use this endpoint
+        Only site admins can use this endpoint.
       parameters:
       - description: service account details
         in: body
@@ -2425,6 +2432,10 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
           description: authentication_error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: forbidden
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
@@ -2749,7 +2760,7 @@ paths:
     get:
       description: |-
         Get a list of all accounts (users and service accounts) that have permissions on the specified ISN.
-        Only ISN admins and site owners can view this information
+        Only ISN admins (for the ISNs they created) and site admins can view this information
       parameters:
       - description: ISN slug
         example: sample-isn
@@ -4124,8 +4135,9 @@ tags:
   name: ISN Permissions
 - description: Manage user accounts and service accounts
   name: Account Management
-- description: Site adminstration tools. These endpoints can only be used by the accounts
-    that have a siteadmin or isnadmin role
+- description: Service health, version and site tools. The health checks and version
+    endpoints are public. The site reset endpoint only works in environments configured
+    as 'dev'.
   name: Site Admin
 - description: These endpoints should not be called directly. Some admin endpoints,  for
     insance *Register Service Account* and *Generate Password Reset Link*, return

@@ -79,8 +79,6 @@ type IsnAccount struct {
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/isn/{isn_slug}/accounts/{account_id}  [put]
-//
-//	this handler must use the RequireRole (siteadmin,admin) middleware
 func (i *IsnAccountHandler) UpdateIsnAccountPermission(w http.ResponseWriter, r *http.Request) error {
 
 	req := UpdateIsnAccountPermissionRequest{}
@@ -180,7 +178,7 @@ func (i *IsnAccountHandler) UpdateIsnAccountPermission(w http.ResponseWriter, r 
 //	@Summary		Get ISN Account Membership
 //	@Tags			ISN Configuration
 //	@Description	Get a list of all accounts (users and service accounts) that have permissions on the specified ISN.
-//	@Description	Only ISN admins and site owners can view this information
+//	@Description	Only ISN admins (for the ISNs they created) and site admins can view this information
 //
 //	@Param			isn_slug	path		string	true	"ISN slug"	example(sample-isn)
 //
@@ -193,8 +191,6 @@ func (i *IsnAccountHandler) UpdateIsnAccountPermission(w http.ResponseWriter, r 
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/isn/{isn_slug}/accounts [get]
-//
-// this handler must use the RequireRole (siteadmin,admin) middleware
 func (i *IsnAccountHandler) GetIsnAccounts(w http.ResponseWriter, r *http.Request) error {
 
 	// get user account id for user making request

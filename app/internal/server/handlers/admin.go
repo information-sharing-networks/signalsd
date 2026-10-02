@@ -195,7 +195,9 @@ func (a *AdminHandler) Version(w http.ResponseWriter, r *http.Request) error {
 //	@Description	**Recovery:** Account must be re-enabled by admin via `/admin/accounts/{id}/enable`
 //	@Description	Service accounts will also need a new client secret via `/api/auth/service-accounts/reissue-credentials`
 //	@Description
-//	@Description	Only admins can disable accounts.
+//	@Description	Only site admins can disable accounts (disabling an account removes its access to every ISN it belongs to).
+//	@Description
+//	@Description	ISN admins remove an account from their own ISN by revoking its ISN access.
 //	@Tags			Account Management
 //
 //	@Param			account_id	path	string	true	"Account ID to disable"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
@@ -203,6 +205,7 @@ func (a *AdminHandler) Version(w http.ResponseWriter, r *http.Request) error {
 //	@Success		200
 //	@Failure		400	{object}	responses.ErrorResponse	"invalid_url_param"
 //	@Failure		401	{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
@@ -311,7 +314,7 @@ func (a *AdminHandler) DisableAccount(w http.ResponseWriter, r *http.Request) er
 //	@Description	- **Service Accounts**: will need a new client secret via `/api/auth/service-accounts/reissue_credentials`
 //	@Description	- **Web Users**: Can immediately log in again via `/api/auth/login`
 //	@Description
-//	@Description	Only owners and admins can enable accounts.
+//	@Description	Only site admins can enable accounts.
 //	@Tags			Account Management
 //
 //	@Param			account_id	path	string	true	"Account ID to enable"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
@@ -617,7 +620,7 @@ type GeneratePasswordResetLinkResponse struct {
 //	@Description	Send the `reset_url` from the response to the user. Opening it in a browser serves the password reset form (see *Password Reset Form* under One-time Links), where they can choose a new password.
 //	@Description	The link expires in 30 minutes and can only be used once. Generating a new link for a user invalidates any link they were issued previously.
 //	@Description
-//	@Description	ISN Admins can create links on behalf of users with a member role.  Accounts with the site admin role can create links for ISN admins and members.
+//	@Description	Only site admins can generate links, since the link resets the account's password on every ISN it belongs to.
 //	@Description
 //	@Description	**Note:** anyone in possession of the link can reset the password of the associated account. The link should be treated as sensitive and handled accordingly.
 //	@Tags			Account Management
@@ -634,24 +637,12 @@ type GeneratePasswordResetLinkResponse struct {
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/admin/users/{user_id}/generate-password-reset-link [post]
-//
-//	this handler must use the RequireRole (isnadmin/siteadmin) middleware
 func (a *AdminHandler) GeneratePasswordResetLink(w http.ResponseWriter, r *http.Request) error {
 
 	// Get account ID from context (set by middleware)
 	accountID, ok := auth.ContextAccountID(r.Context())
 	if !ok {
 		return apperrors.InternalError("account ID not found in context", nil)
-	}
-
-	// verify the account generating the request is an admin
-	claims, ok := auth.ContextClaims(r.Context())
-	if !ok {
-		return apperrors.InternalError("could not get claims from context", nil)
-	}
-
-	if claims.Role != "siteadmin" && claims.Role != "isnadmin" {
-		return apperrors.Forbidden("you do not have permission to generate password reset links", nil)
 	}
 
 	// Get user ID from URL parameter
@@ -676,11 +667,6 @@ func (a *AdminHandler) GeneratePasswordResetLink(w http.ResponseWriter, r *http.
 		)
 
 		return apperrors.DatabaseError("database error", err)
-	}
-
-	// admins can only update members
-	if claims.Role == "isnadmin" && targetUser.UserRole != "member" {
-		return apperrors.Forbidden("ISN admins cannot generate password reset for other admins", nil)
 	}
 
 	// Delete any existing password reset tokens for this user (following service account pattern)

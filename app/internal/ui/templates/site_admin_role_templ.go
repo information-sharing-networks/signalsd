@@ -64,7 +64,7 @@ func MangeSiteAdminRolesPage(environment string, users []types.UserOption) templ
 					}()
 				}
 				ctx = templ.InitializeContext(ctx)
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "Granting the site admin role will give the user full administrative control of the site.<br><br>In addition to having full ISN Admin privileges for all ISNs, site admins can also:<ul><li>Read/write to any ISN</li><li>Grant ISN admin roles to other users</li><li>Transfer ISN ownership between accounts</li><li>Create new signal types and register new schemas</li></ul>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "Granting the site admin role will give the user full administrative control of the site.<br><br>In addition to having full ISN Admin privileges for all ISNs, site admins can also:<ul><li>Read/write to any ISN</li><li>Grant and revoke the site admin and ISN admin roles</li><li>Transfer ISN ownership between accounts</li><li>Enable and disable accounts, generate password reset links and reissue service account credentials</li><li>Create new signal types, register new schemas and manage signal routing rules</li></ul>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -87,7 +87,7 @@ func MangeSiteAdminRolesPage(environment string, users []types.UserOption) templ
 					var templ_7745c5c3_Var4 string
 					templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.ResolveAttributeValue(user.Email)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/site_admin_role.templ`, Line: 46, Col: 37}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/site_admin_role.templ`, Line: 47, Col: 37}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4)
 					if templ_7745c5c3_Err != nil {
@@ -100,7 +100,7 @@ func MangeSiteAdminRolesPage(environment string, users []types.UserOption) templ
 					var templ_7745c5c3_Var5 string
 					templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(user.Email)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/site_admin_role.templ`, Line: 46, Col: 52}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/site_admin_role.templ`, Line: 47, Col: 52}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 					if templ_7745c5c3_Err != nil {
@@ -113,7 +113,7 @@ func MangeSiteAdminRolesPage(environment string, users []types.UserOption) templ
 					var templ_7745c5c3_Var6 string
 					templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(user.UserRole)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/site_admin_role.templ`, Line: 46, Col: 71}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/site_admin_role.templ`, Line: 47, Col: 71}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 					if templ_7745c5c3_Err != nil {

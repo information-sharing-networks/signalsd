@@ -221,7 +221,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccount(w http.ResponseWriter, r 
 //	@Description
 //	@Description	The client_id will remain the same, but a new client_secret will be generated.
 //	@Description
-//	@Description	You have to be an site or ISN admin to use this endpoint
+//	@Description	Only site admins can use this endpoint.
 //	@Description
 //	@Tags		Service Accounts
 //
@@ -230,6 +230,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccount(w http.ResponseWriter, r 
 //	@Success	200		{object}	handlers.ReissueServiceAccountCredentialsResponse
 //	@Failure	400		{object}	responses.ErrorResponse	"malformed_body"
 //	@Failure	401		{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure	403		{object}	responses.ErrorResponse	"forbidden"
 //	@Failure	404		{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure	500		{object}	responses.ErrorResponse	"database_error | internal_error"
 //

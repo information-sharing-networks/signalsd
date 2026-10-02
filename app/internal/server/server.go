@@ -254,6 +254,13 @@ func (s *Server) registerAdminRoutes() {
 					r.Use(s.authService.RequireRole("siteadmin", "isnadmin"))
 
 					r.Post("/service-accounts/register", responses.Wrap(serviceAccounts.RegisterServiceAccount))
+				})
+
+				// reissuing credentials takes over an existing service account - site admi only
+				r.Group(func(r chi.Router) {
+					r.Use(s.authService.RequireValidAccessToken)
+					r.Use(s.authService.RequireRole("siteadmin"))
+
 					r.Post("/service-accounts/reissue-credentials", responses.Wrap(serviceAccounts.ReissueServiceAccountCredentials))
 				})
 
@@ -328,6 +335,11 @@ func (s *Server) registerAdminRoutes() {
 				r.Use(s.authService.RequireValidAccessToken)
 				r.Use(s.authService.RequireRole("siteadmin"))
 
+				// Account management - siteadmin only (these act on the account on every ISN it belongs to)
+				r.Post("/accounts/{account_id}/disable", responses.Wrap(admin.DisableAccount))
+				r.Post("/accounts/{account_id}/enable", responses.Wrap(admin.EnableAccount))
+				r.Post("/users/{user_id}/generate-password-reset-link", responses.Wrap(admin.GeneratePasswordResetLink))
+
 				// ISN admin role management
 				r.Put("/accounts/{account_id}/isn-admin-role", responses.Wrap(users.GrantUserIsnAdminRole))
 				r.Delete("/accounts/{account_id}/isn-admin-role", responses.Wrap(users.RevokeUserIsnAdminRole))
@@ -359,12 +371,9 @@ func (s *Server) registerAdminRoutes() {
 				r.Use(s.authService.RequireValidAccessToken)
 				r.Use(s.authService.RequireRole("siteadmin", "isnadmin"))
 
-				// Account management
-				r.Post("/accounts/{account_id}/disable", responses.Wrap(admin.DisableAccount))
-				r.Post("/accounts/{account_id}/enable", responses.Wrap(admin.EnableAccount))
+				// account lists (used by ISN admins to find the accounts to grant ISN access to)
 				r.Get("/users", responses.Wrap(admin.GetUsers))
 				r.Get("/service-accounts", responses.Wrap(admin.GetServiceAccounts))
-				r.Post("/users/{user_id}/generate-password-reset-link", responses.Wrap(admin.GeneratePasswordResetLink))
 			})
 		})
 	})

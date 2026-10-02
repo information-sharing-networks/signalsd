@@ -25,7 +25,7 @@ func (s *Server) CreateServiceAccountsPage(w http.ResponseWriter, r *http.Reques
 // ReissueServiceAccountCredentialsPage godoc
 //
 //	@Summary		Reissue service account credentials page
-//	@Description	Renders the reissue credentials form. Requires isnadmin or siteadmin role.
+//	@Description	Renders the reissue credentials form. Requires siteadmin role.
 //	@Tags			UI Pages
 //	@Success		200	"HTML page"
 //	@Router			/admin/service-accounts/reissue-credentials [get]
@@ -93,7 +93,7 @@ func (s *Server) CreateServiceAccount(w http.ResponseWriter, r *http.Request) {
 // ReissueServiceAccountCredentials godoc
 //
 //	@Summary		Reissue service account credentials
-//	@Description	HTMX endpoint. Issues a new client secret for the selected service account. Requires isnadmin or siteadmin role.
+//	@Description	HTMX endpoint. Issues a new client secret for the selected service account. Requires siteadmin role.
 //	@Tags			HTMX Actions
 //	@Param			service-account-dropdown	formData	string	true	"Client ID of the service account"
 //	@Success		200							"HTML partial"

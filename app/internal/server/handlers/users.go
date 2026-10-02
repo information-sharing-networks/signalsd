@@ -254,9 +254,9 @@ func (u *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) err
 //	@Description
 //	@Description	An ISN admin also has access to the following site-level functions:
 //	@Description	- Create service accounts
-//	@Description	- Disable/Enable accounts
 //	@Description	- View all users and their email addresses
-//	@Description	- Reset user passwords
+//	@Description
+//	@Description	Account management (enabling and disabling accounts, password reset links and reissuing service account credentials) is done by site admins, since it affects the account on every ISN it belongs to.
 //	@Description
 //	@Description	**This endpoint can only be used by site admin accounts**
 //
@@ -270,8 +270,6 @@ func (u *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) err
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/admin/accounts/{account_id}/isn-admin-role [put]
-//
-//	this handler must use the RequireRole (siteadmin) middleware
 func (u *UserHandler) GrantUserIsnAdminRole(w http.ResponseWriter, r *http.Request) error {
 
 	// get user account id for user making request
@@ -341,8 +339,6 @@ func (u *UserHandler) GrantUserIsnAdminRole(w http.ResponseWriter, r *http.Reque
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/admin/accounts/{account_id}/isn-admin-role [delete]
-//
-//	this handler must use the RequireRole (siteadmin) middleware
 func (u *UserHandler) RevokeUserIsnAdminRole(w http.ResponseWriter, r *http.Request) error {
 
 	// get user account id for user making request
@@ -375,8 +371,8 @@ func (u *UserHandler) RevokeUserIsnAdminRole(w http.ResponseWriter, r *http.Requ
 		return apperrors.Forbidden("Service accounts can't be granted admin rights", nil)
 	}
 
-	if targetAccount.AccountRole != "siteadmin" {
-		return apperrors.InvalidRequest("this account is not an site admin", nil)
+	if targetAccount.AccountRole != "isnadmin" {
+		return apperrors.InvalidRequest("this account is not an ISN admin", nil)
 	}
 
 	//update user role
@@ -422,8 +418,6 @@ func (u *UserHandler) RevokeUserIsnAdminRole(w http.ResponseWriter, r *http.Requ
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/admin/accounts/{account_id}/site-admin-role [put]
-//
-//	this handler must use the RequireRole (siteadmin) middleware
 func (u *UserHandler) GrantUserSiteAdminRole(w http.ResponseWriter, r *http.Request) error {
 
 	// get user account id for user making request
@@ -494,8 +488,6 @@ func (u *UserHandler) GrantUserSiteAdminRole(w http.ResponseWriter, r *http.Requ
 //	@Security		BearerAccessToken
 //
 //	@Router			/api/admin/accounts/{account_id}/site-admin-role [delete]
-//
-//	this handler must use the RequireRole (siteadmin) middleware
 func (u *UserHandler) RevokeUserSiteAdminRole(w http.ResponseWriter, r *http.Request) error {
 
 	// get user account id for user making request

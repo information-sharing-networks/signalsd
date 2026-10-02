@@ -64,7 +64,7 @@ func ManageIsnAdminRolesPage(environment string, users []types.UserOption) templ
 					}()
 				}
 				ctx = templ.InitializeContext(ctx)
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "Granting the ISN admin role will give the user access to:<ul><li>Create an ISN</li><li>Add signal types to their own ISNs</li><li>Read/write to their own ISNs</li><li>Grant other accounts read or write access to their ISNs</li><li>Manage service accounts</li><li>Disable/Enable accounts</li><li>View all users and their email addresses</li><li>Reset user passwords</li></ul>Note that ISN admins can't change ISNs they don't own (a site admin must use the <em>transfer ownership</em> feature if this is requred)")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "Granting the ISN admin role will give the user access to:<ul><li>Create an ISN</li><li>Add signal types to their own ISNs, and enable or disable them</li><li>Read/write to their own ISNs</li><li>Grant other accounts read or write access to their ISNs</li><li>Create service accounts</li><li>View all users and their email addresses</li></ul>Note that ISN admins can't change ISNs they don't own (a site admin must use the <em>transfer ownership</em> feature if this is required).<br><br>Account management (enabling and disabling accounts, generating password reset links and reissuing service account credentials) is done by a site admin, since it affects the account on every ISN it belongs to.")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
