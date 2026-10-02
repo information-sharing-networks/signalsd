@@ -105,7 +105,7 @@ func (u *UserHandler) RegisterUser(w http.ResponseWriter, r *http.Request) error
 	defer func() {
 		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 			// Log the error but don't try to respond since the request may have already timed out
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("rollback_error", err.Error()),
 			)
 
@@ -146,7 +146,7 @@ func (u *UserHandler) RegisterUser(w http.ResponseWriter, r *http.Request) error
 	}
 
 	// log the new user id in the final request log context
-	logger.ContextWithLogAttrs(r.Context(),
+	logger.AddLogAttrs(r.Context(),
 		slog.String("new_account_id", account.ID.String()),
 	)
 
@@ -193,7 +193,7 @@ func (u *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) err
 
 	user, err := u.queries.GetUserWithPasswordByID(r.Context(), userAccountID)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("account_id", userAccountID.String()),
 		)
 
@@ -203,7 +203,7 @@ func (u *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) err
 	// Verify the current password against the stored hash
 	err = u.authService.CheckPasswordHash(user.HashedPassword, req.CurrentPassword)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("account_id", userAccountID.String()),
 		)
 		return apperrors.AuthenticationFailure("Current password is incorrect", nil)
@@ -223,7 +223,7 @@ func (u *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) err
 		HashedPassword: newPasswordHash,
 	})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("account_id", user.AccountID.String()),
 		)
 
@@ -286,7 +286,7 @@ func (u *UserHandler) GrantUserIsnAdminRole(w http.ResponseWriter, r *http.Reque
 	}
 	targetAccount, err := u.queries.GetAccountByID(r.Context(), targetAccountID)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("target_account_id", targetAccountID.String()),
 		)
 
@@ -309,13 +309,13 @@ func (u *UserHandler) GrantUserIsnAdminRole(w http.ResponseWriter, r *http.Reque
 	//update user role
 	rowsUpdated, err := u.queries.UpdateUserAccountToIsnAdmin(r.Context(), targetAccountID)
 	if err != nil || rowsUpdated == 0 {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("target_account_id", targetAccountID.String()),
 		)
 
 		return apperrors.DatabaseError("database error", err)
 	}
-	logger.ContextWithLogAttrs(r.Context(),
+	logger.AddLogAttrs(r.Context(),
 		slog.String("target_account_id", targetAccountID.String()),
 	)
 
@@ -355,7 +355,7 @@ func (u *UserHandler) RevokeUserIsnAdminRole(w http.ResponseWriter, r *http.Requ
 	}
 	targetAccount, err := u.queries.GetAccountByID(r.Context(), targetAccountID)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("target_account_id", targetAccountID.String()),
 		)
 
@@ -378,13 +378,13 @@ func (u *UserHandler) RevokeUserIsnAdminRole(w http.ResponseWriter, r *http.Requ
 	//update user role
 	rowsUpdated, err := u.queries.UpdateUserAccountToMember(r.Context(), targetAccountID)
 	if err != nil || rowsUpdated == 0 {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("target_account_id", targetAccountID.String()),
 		)
 
 		return apperrors.DatabaseError("database error", err)
 	}
-	logger.ContextWithLogAttrs(r.Context(),
+	logger.AddLogAttrs(r.Context(),
 		slog.String("target_account_id", targetAccountID.String()),
 	)
 
@@ -435,7 +435,7 @@ func (u *UserHandler) GrantUserSiteAdminRole(w http.ResponseWriter, r *http.Requ
 
 	targetAccount, err := u.queries.GetAccountByID(r.Context(), targetAccountID)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("target_account_id", targetAccountID.String()),
 		)
 
@@ -458,13 +458,13 @@ func (u *UserHandler) GrantUserSiteAdminRole(w http.ResponseWriter, r *http.Requ
 	//update user role
 	rowsUpdated, err := u.queries.UpdateUserAccountToSiteAdmin(r.Context(), targetAccountID)
 	if err != nil || rowsUpdated == 0 {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("target_account_id", targetAccountID.String()),
 		)
 
 		return apperrors.DatabaseError("database error", err)
 	}
-	logger.ContextWithLogAttrs(r.Context(),
+	logger.AddLogAttrs(r.Context(),
 		slog.String("target_account_id", targetAccountID.String()),
 	)
 
@@ -505,7 +505,7 @@ func (u *UserHandler) RevokeUserSiteAdminRole(w http.ResponseWriter, r *http.Req
 
 	targetAccount, err := u.queries.GetAccountByID(r.Context(), targetAccountID)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("target_account_id", targetAccountID.String()),
 		)
 
@@ -528,14 +528,14 @@ func (u *UserHandler) RevokeUserSiteAdminRole(w http.ResponseWriter, r *http.Req
 	//update user role to member
 	rowsUpdated, err := u.queries.UpdateUserAccountToMember(r.Context(), targetAccountID)
 	if err != nil || rowsUpdated == 0 {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("target_account_id", targetAccountID.String()),
 		)
 
 		return apperrors.DatabaseError("database error", err)
 	}
 
-	logger.ContextWithLogAttrs(r.Context(),
+	logger.AddLogAttrs(r.Context(),
 		slog.String("target_account_id", targetAccountID.String()),
 	)
 
@@ -587,14 +587,14 @@ func (u *UserHandler) PasswordResetTokenPage(w http.ResponseWriter, r *http.Requ
 	resetToken, err := u.queries.GetPasswordResetToken(r.Context(), tokenID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("reason", "password reset token has already been used or is no longer valid"),
 			)
 
 			u.renderErrorPage(w, "Reset Token Not Found", "The password reset token you provided has already been used or is no longer valid")
 			return
 		}
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
 		)
 
@@ -604,7 +604,7 @@ func (u *UserHandler) PasswordResetTokenPage(w http.ResponseWriter, r *http.Requ
 
 	// Check if token has expired
 	if time.Now().After(resetToken.ExpiresAt) {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("reason", "password reset token has expired"),
 		)
 
@@ -615,7 +615,7 @@ func (u *UserHandler) PasswordResetTokenPage(w http.ResponseWriter, r *http.Requ
 	// Get user information
 	user, err := u.queries.GetUserByID(r.Context(), resetToken.UserAccountID)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
 		)
 
@@ -630,7 +630,7 @@ func (u *UserHandler) PasswordResetTokenPage(w http.ResponseWriter, r *http.Requ
 		ExpiresIn: time.Until(resetToken.ExpiresAt),
 	}
 
-	logger.ContextWithLogAttrs(r.Context(),
+	logger.AddLogAttrs(r.Context(),
 		slog.String("user_email", user.Email),
 		slog.String("user_id", resetToken.UserAccountID.String()),
 	)
@@ -639,7 +639,7 @@ func (u *UserHandler) PasswordResetTokenPage(w http.ResponseWriter, r *http.Requ
 	// the rendered page contains a form that posts to the PasswordResetTokenHandler
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	if err := authTemplates.PasswordResetTokenPage(data).Render(r.Context(), w); err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
 		)
 
@@ -705,7 +705,7 @@ func (u *UserHandler) PasswordResetToken(w http.ResponseWriter, r *http.Request)
 
 	defer func() {
 		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("rollback_error", err.Error()),
 			)
 		}
@@ -739,7 +739,7 @@ func (u *UserHandler) PasswordResetToken(w http.ResponseWriter, r *http.Request)
 		HashedPassword: hashedPassword,
 	})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("user_id", resetToken.UserAccountID.String()),
 		)
 
@@ -761,7 +761,7 @@ func (u *UserHandler) PasswordResetToken(w http.ResponseWriter, r *http.Request)
 		return apperrors.DatabaseError("database error", err)
 	}
 
-	logger.ContextWithLogAttrs(r.Context(),
+	logger.AddLogAttrs(r.Context(),
 		slog.String("user_id", resetToken.UserAccountID.String()),
 		slog.String("admin_account_id", resetToken.CreatedByAdminID.String()),
 	)

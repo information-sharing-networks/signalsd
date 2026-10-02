@@ -164,7 +164,7 @@ func (i *IsnHandler) CreateIsn(w http.ResponseWriter, r *http.Request) error {
 
 	defer func() {
 		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("rollback_error", err.Error()),
 			)
 
@@ -195,7 +195,7 @@ func (i *IsnHandler) CreateIsn(w http.ResponseWriter, r *http.Request) error {
 		Visibility:    *req.Visibility,
 	})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("slug", slug),
 		)
 
@@ -259,7 +259,7 @@ func (i *IsnHandler) UpdateIsn(w http.ResponseWriter, r *http.Request) error {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apperrors.NotFound("ISN not found", nil)
 		}
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("isn_slug", isnSlug),
 		)
 
@@ -299,7 +299,7 @@ func (i *IsnHandler) UpdateIsn(w http.ResponseWriter, r *http.Request) error {
 		Visibility: isn.Visibility,
 	})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("isn_slug", isnSlug),
 		)
 
@@ -379,7 +379,7 @@ func (s *IsnHandler) GetIsn(w http.ResponseWriter, r *http.Request) error {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apperrors.NotFound(fmt.Sprintf("No isn found for %s", slug), nil)
 		}
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("isn_slug", slug),
 		)
 
@@ -389,7 +389,7 @@ func (s *IsnHandler) GetIsn(w http.ResponseWriter, r *http.Request) error {
 	// get the owner of the isn
 	dbUser, err := s.queries.GetUserByIsnID(r.Context(), dbIsn.ID)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("isn_id", dbIsn.ID.String()),
 		)
 
@@ -418,7 +418,7 @@ func (s *IsnHandler) GetIsn(w http.ResponseWriter, r *http.Request) error {
 	dbSignalTypes, err := s.queries.GetSignalTypesByIsnID(r.Context(), dbIsn.ID)
 	if err != nil {
 		if !errors.Is(err, pgx.ErrNoRows) {
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("isn_id", dbIsn.ID.String()),
 			)
 
@@ -498,7 +498,7 @@ func (i *IsnHandler) TransferIsnOwnership(w http.ResponseWriter, r *http.Request
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apperrors.NotFound("ISN not found", nil)
 		}
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("isn_slug", isnSlug),
 		)
 
@@ -513,7 +513,7 @@ func (i *IsnHandler) TransferIsnOwnership(w http.ResponseWriter, r *http.Request
 	// validate new account ID
 	newAdminAccountID, err := uuid.Parse(req.NewAdminAccountID)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("new_admin_account_id", req.NewAdminAccountID),
 		)
 
@@ -526,7 +526,7 @@ func (i *IsnHandler) TransferIsnOwnership(w http.ResponseWriter, r *http.Request
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apperrors.InvalidRequest("new owner account not found", nil)
 		}
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("new_admin_account_id", newAdminAccountID.String()),
 		)
 
@@ -558,7 +558,7 @@ func (i *IsnHandler) TransferIsnOwnership(w http.ResponseWriter, r *http.Request
 		UserAccountID: newAdminAccountID,
 	})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("isn_id", isn.ID.String()),
 		)
 
@@ -569,7 +569,7 @@ func (i *IsnHandler) TransferIsnOwnership(w http.ResponseWriter, r *http.Request
 		return apperrors.DatabaseError("no rows updated during ownership transfer", nil)
 	}
 
-	logger.ContextWithLogAttrs(r.Context(),
+	logger.AddLogAttrs(r.Context(),
 		slog.String("isn_slug", isn.Slug),
 		slog.String("from_user_id", isn.UserAccountID.String()),
 		slog.String("to_user_id", newAdminAccountID.String()),

@@ -92,7 +92,7 @@ func (a *AdminHandler) ResetEnv(w http.ResponseWriter, r *http.Request) error {
 
 	defer func() {
 		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("rollback_error", err.Error()),
 			)
 		}
@@ -228,7 +228,7 @@ func (a *AdminHandler) DisableAccount(w http.ResponseWriter, r *http.Request) er
 
 	defer func() {
 		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("rollback_error", err.Error()),
 			)
 
@@ -252,7 +252,7 @@ func (a *AdminHandler) DisableAccount(w http.ResponseWriter, r *http.Request) er
 	}
 
 	if rowsAffected == 0 {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("error_code", "account not found or already disabled"),
 		)
 
@@ -335,7 +335,7 @@ func (a *AdminHandler) EnableAccount(w http.ResponseWriter, r *http.Request) err
 	// Parse account ID as UUID
 	accountID, err := uuid.Parse(accountIDString)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("account_id_string", accountIDString),
 		)
 
@@ -456,7 +456,7 @@ func (a *AdminHandler) GetUsers(w http.ResponseWriter, r *http.Request) error {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apperrors.NotFound(fmt.Sprintf("No user found for email %v", emailParam), nil)
 		}
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("email", emailParam),
 		)
 
@@ -525,7 +525,7 @@ func (a *AdminHandler) GetServiceAccounts(w http.ResponseWriter, r *http.Request
 			serviceAccounts[i] = newServiceAccountDetails(dbServiceAccount)
 		}
 
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.Int("count", len(serviceAccounts)),
 		)
 
@@ -662,7 +662,7 @@ func (a *AdminHandler) GeneratePasswordResetLink(w http.ResponseWriter, r *http.
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apperrors.NotFound("user not found", nil)
 		}
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("user_id", tagetUserID.String()),
 		)
 
@@ -672,7 +672,7 @@ func (a *AdminHandler) GeneratePasswordResetLink(w http.ResponseWriter, r *http.
 	// Delete any existing password reset tokens for this user (following service account pattern)
 	_, err = a.queries.DeletePasswordResetTokensForUser(r.Context(), tagetUserID)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("user_id", tagetUserID.String()),
 		)
 
@@ -688,7 +688,7 @@ func (a *AdminHandler) GeneratePasswordResetLink(w http.ResponseWriter, r *http.
 		CreatedByAdminID: accountID,
 	})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("user_id", tagetUserID.String()),
 		)
 
@@ -702,7 +702,7 @@ func (a *AdminHandler) GeneratePasswordResetLink(w http.ResponseWriter, r *http.
 	)
 
 	// Add user and admin account IDs to final request log context (the reset URL is not logged - anyone who could read the logs could use it to reset the user's password)
-	logger.ContextWithLogAttrs(r.Context(),
+	logger.AddLogAttrs(r.Context(),
 		slog.String("user_id", tagetUserID.String()),
 		slog.String("admin_account_id", accountID.String()),
 	)

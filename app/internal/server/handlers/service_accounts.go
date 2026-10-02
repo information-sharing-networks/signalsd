@@ -133,7 +133,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccount(w http.ResponseWriter, r 
 
 	defer func() {
 		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("rollback_error", err.Error()),
 			)
 
@@ -142,7 +142,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccount(w http.ResponseWriter, r 
 
 	txQueries := s.queries.WithTx(tx)
 
-	logger.ContextWithLogAttrs(r.Context(),
+	logger.AddLogAttrs(r.Context(),
 		slog.String("client_id", clientID),
 	)
 
@@ -195,7 +195,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccount(w http.ResponseWriter, r 
 	)
 
 	// add account id to final request log context (the setup url is not logged - anyone who could read the logs could use it to get the client secret)
-	logger.ContextWithLogAttrs(r.Context(),
+	logger.AddLogAttrs(r.Context(),
 		slog.String("account_id", serviceAccountID.String()),
 	)
 
@@ -266,7 +266,7 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentials(w http.Response
 	// Revoke existing client secrets and one-time secrets
 	_, err = s.queries.RevokeAllClientSecretsForAccount(r.Context(), serviceAccount.AccountID)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("client_id", clientID),
 			slog.String("account_id", serviceAccountID.String()),
 		)
@@ -279,7 +279,7 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentials(w http.Response
 		ClientOrganization: serviceAccount.ClientOrganization,
 	})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("client_id", clientID),
 			slog.String("account_id", serviceAccountID.String()),
 		)
@@ -295,7 +295,7 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentials(w http.Response
 
 	defer func() {
 		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("rollback_error", err.Error()),
 			)
 
@@ -334,7 +334,7 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentials(w http.Response
 	)
 
 	// add client id and account id to final request log context (the setup url is not logged - anyone who could read the logs could use it to get the client secret)
-	logger.ContextWithLogAttrs(r.Context(),
+	logger.AddLogAttrs(r.Context(),
 		slog.String("client_id", clientID),
 		slog.String("account_id", serviceAccountID.String()),
 	)
@@ -384,7 +384,7 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 	// Start transaction
 	tx, err := s.pool.BeginTx(r.Context(), pgx.TxOptions{})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
 		)
 
@@ -394,7 +394,7 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 
 	defer func() {
 		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("rollback_error", err.Error()),
 			)
 
@@ -409,14 +409,14 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 	oneTimeSecret, err := txQueries.GetOneTimeClientSecret(r.Context(), oneTimeSecretID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("reason", "setup id has already been used or is no longer valid"),
 			)
 
 			s.renderErrorPage(w, "set up ID not found ", "The setup ID you provided has already been used or is no longer valid")
 			return
 		}
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
 		)
 
@@ -426,7 +426,7 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 
 	// Check if token has expired
 	if time.Now().After(oneTimeSecret.ExpiresAt) {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("reason", "setup id has expired"),
 		)
 
@@ -436,7 +436,7 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 
 	serviceAccount, err := txQueries.GetServiceAccountByAccountID(r.Context(), oneTimeSecret.ServiceAccountAccountID)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
 		)
 
@@ -447,7 +447,7 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 	// Revoke any existing client secrets for this service account
 	_, err = txQueries.RevokeAllClientSecretsForAccount(r.Context(), oneTimeSecret.ServiceAccountAccountID)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
 		)
 
@@ -465,7 +465,7 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 		ExpiresAt:               expiresAt,
 	})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
 		)
 
@@ -476,7 +476,7 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 	// Delete the one-time secret
 	_, err = txQueries.DeleteOneTimeClientSecret(r.Context(), oneTimeSecretID)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
 		)
 
@@ -485,7 +485,7 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 	}
 
 	if err := tx.Commit(r.Context()); err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
 		)
 
@@ -500,7 +500,7 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 		ExpiresAt:    expiresAt,
 	}
 
-	logger.ContextWithLogAttrs(r.Context(),
+	logger.AddLogAttrs(r.Context(),
 		slog.String("client_id", serviceAccount.ClientID),
 		slog.String("account_id", serviceAccount.AccountID.String()),
 	)
@@ -510,7 +510,7 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 	w.WriteHeader(http.StatusCreated)
 
 	if err := serviceAccountTemplates.SetupPage(data).Render(r.Context(), w); err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
 		)
 

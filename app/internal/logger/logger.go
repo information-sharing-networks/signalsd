@@ -37,19 +37,18 @@ var (
 	RequestLoggerKey = contextKey{"request_logger"}
 )
 
-// ContextWithLogAttr allows handlers to add attributes to the final request log.
+// AddLogAttrs allows handlers to add attributes to the final request log.
 //
-// The context values are added to a shared slice that is used by the RequestLogging middleware to create the final log message for the http request.
+// The attributes are appended to a shared slice in the request context that is used by the RequestLogging middleware to create the final log message for the http request.
 //
 // Use this function to add useful tracking information to the final request log, for example the account_id of the authenticated user.
-func ContextWithLogAttrs(ctx context.Context, attrs ...slog.Attr) context.Context {
+func AddLogAttrs(ctx context.Context, attrs ...slog.Attr) {
 	if attrPtr, ok := ctx.Value(logAttrsKey).(*[]slog.Attr); ok {
 		*attrPtr = append(*attrPtr, attrs...)
-		return ctx
+		return
 	}
 	// programming error - this should not happen
-	slog.Warn("ContextWithLogAttrs called on context without shared log attributes slice")
-	return ctx
+	slog.Warn("AddLogAttrs called on context without shared log attributes slice")
 }
 
 func ContextLogAttrs(ctx context.Context) []slog.Attr {
@@ -66,7 +65,7 @@ func ContextLogAttrs(ctx context.Context) []slog.Attr {
 //
 // the logger can be used to create intermediary log messages before the request finsihes.
 //
-// To add attributes to the final request log, use ContextWithLogAttrs instead.
+// To add attributes to the final request log, use AddLogAttrs instead.
 func ContextRequestLogger(ctx context.Context) *slog.Logger {
 	if logger, ok := ctx.Value(RequestLoggerKey).(*slog.Logger); ok {
 		return logger
@@ -117,7 +116,7 @@ func InitLogger(logLevel slog.Level, environment string) *slog.Logger {
 // RequestLogging is a middleware that logs HTTP request completion.
 //
 // By default the log messages include the request_id, request path, method, status, duration and bytes written.
-// Handlers can use ContextWithLogAttrs to add additional attributes to the log message.
+// Handlers can use AddLogAttrs to add additional attributes to the log message.
 //
 // To create log messages about events that occur during a request, use the ContextRequestLogger.
 func RequestLogging(logger *slog.Logger) func(http.Handler) http.Handler {

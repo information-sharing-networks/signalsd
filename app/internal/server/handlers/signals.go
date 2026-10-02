@@ -108,7 +108,7 @@ func (s *SignalsHandler) WithdrawSignal(w http.ResponseWriter, r *http.Request) 
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apperrors.NotFound("signal not found", nil)
 		}
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("local_ref", *req.LocalRef),
 		)
 
@@ -130,7 +130,7 @@ func (s *SignalsHandler) WithdrawSignal(w http.ResponseWriter, r *http.Request) 
 	})
 
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("local_ref", *req.LocalRef),
 		)
 
@@ -141,7 +141,7 @@ func (s *SignalsHandler) WithdrawSignal(w http.ResponseWriter, r *http.Request) 
 		return apperrors.NotFound("signal not found or ISN/signal type no longer active", nil)
 	}
 
-	logger.ContextWithLogAttrs(r.Context(),
+	logger.AddLogAttrs(r.Context(),
 		slog.String("signal_id", signal.ID.String()),
 		slog.String("local_ref", signal.LocalRef),
 		slog.String("withdrawn_by", accountID.String()),

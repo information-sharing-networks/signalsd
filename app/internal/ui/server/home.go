@@ -91,7 +91,7 @@ func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//  add account log attribute to context so it is included in the final request log
-	_ = logger.ContextWithLogAttrs(r.Context(),
+	logger.AddLogAttrs(r.Context(),
 		slog.String("account_id", accessTokenDetails.AccountID),
 	)
 

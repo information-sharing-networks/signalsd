@@ -113,7 +113,7 @@ func (s *SignalsBatchHandler) GetSignalBatchStatus(w http.ResponseWriter, r *htt
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apperrors.NotFound("batch not found", nil)
 		}
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("batch_ref", batchRef),
 		)
 
@@ -122,7 +122,7 @@ func (s *SignalsBatchHandler) GetSignalBatchStatus(w http.ResponseWriter, r *htt
 
 	response, err := s.getBatchStatusDetails(r.Context(), signalBatch.ID)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("batch_ref", batchRef),
 		)
 
@@ -270,7 +270,7 @@ func (s *SignalsBatchHandler) SearchBatches(w http.ResponseWriter, r *http.Reque
 	for _, batch := range batches {
 		statusResponse, err := s.getBatchStatusDetails(r.Context(), batch.BatchID)
 		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("batch_id", batch.BatchID.String()),
 			)
 			return apperrors.DatabaseError("database error", err)

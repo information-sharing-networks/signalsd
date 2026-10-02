@@ -279,7 +279,7 @@ func (h *DocumentsHandler) RouteDocument(w http.ResponseWriter, r *http.Request)
 		return h.recordFailure(ctx, upload, &isn.Slug, permissionErr)
 	}
 
-	logger.ContextWithLogAttrs(ctx,
+	logger.AddLogAttrs(ctx,
 		slog.String("isn_slug", isn.Slug),
 	)
 
@@ -428,7 +428,7 @@ func (h *DocumentsHandler) startBatch(ctx context.Context, upload *documentUploa
 	}
 	upload.batch = batch
 
-	logger.ContextWithLogAttrs(ctx,
+	logger.AddLogAttrs(ctx,
 		slog.String("batch_ref", batch.BatchRef),
 		slog.String("local_ref", upload.localRef),
 	)

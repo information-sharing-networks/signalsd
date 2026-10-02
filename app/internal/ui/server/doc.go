@@ -72,7 +72,7 @@
 // rather than generating a new ID, so both the UI and API log entries share the same
 // request_id and can be correlated in the logs.
 //
-// To add fields to the final request log from within a handler, use [logger.ContextWithLogAttrs].
+// To add fields to the final request log from within a handler, use [logger.AddLogAttrs].
 // The [auth.AddAccountIDToLogContext] middleware already does this for account_id on all
 // authenticated routes — do not add account_id manually in handlers on those routes.
 //

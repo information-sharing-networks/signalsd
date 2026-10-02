@@ -232,7 +232,7 @@ func (h *RoutingConfigHandler) UpdateSignalRoutingConfig(w http.ResponseWriter, 
 
 	defer func() {
 		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("rollback_error", err.Error()),
 			)
 
@@ -327,7 +327,7 @@ func (h *RoutingConfigHandler) DeleteSignalRoutingConfig(w http.ResponseWriter, 
 
 	// refresh the cache for this instance (polling will catch-up the other instances eventually)
 	if err := h.signalRouterCache.Load(r.Context()); err != nil {
-		logger.ContextWithLogAttrs(r.Context(), slog.String("router_cache_reload_error", err.Error()))
+		logger.AddLogAttrs(r.Context(), slog.String("router_cache_reload_error", err.Error()))
 	}
 
 	return responses.NoContent(w, http.StatusNoContent)

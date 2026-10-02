@@ -313,7 +313,7 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 
 	// Validate this is a public ISN
 	if !s.publicIsnCache.HasSignalType(searchParams.isnSlug, signalTypePath) {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("signal_type", signalTypePath),
 			slog.String("isn_slug", searchParams.isnSlug),
 		)
@@ -340,7 +340,7 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 		IncludeWithdrawn: &searchParams.includeWithdrawn,
 	})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("isn_slug", searchParams.isnSlug),
 		)
 
@@ -540,7 +540,7 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 		IncludeWithdrawn: &searchParams.includeWithdrawn,
 	})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("isn_slug", searchParams.isnSlug),
 		)
 

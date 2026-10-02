@@ -98,7 +98,7 @@ func (i *IsnAccountHandler) UpdateIsnAccountPermission(w http.ResponseWriter, r 
 			return apperrors.NotFound("ISN not found", nil)
 		}
 
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("isn_slug", isnSlug),
 		)
 
@@ -123,7 +123,7 @@ func (i *IsnAccountHandler) UpdateIsnAccountPermission(w http.ResponseWriter, r 
 
 	targetAccount, err := i.queries.GetAccountByID(r.Context(), targetAccountID)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("target_account_id", targetAccountID.String()),
 		)
 
@@ -132,7 +132,7 @@ func (i *IsnAccountHandler) UpdateIsnAccountPermission(w http.ResponseWriter, r 
 
 	// deny users making uncessary attempts to grant perms to themeselves
 	if userAccountID == targetAccountID {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("operation", "grant_isn_account"),
 		)
 		return apperrors.InvalidRequest("accounts cannot grant ISN permissions to themselves", nil)
@@ -156,14 +156,14 @@ func (i *IsnAccountHandler) UpdateIsnAccountPermission(w http.ResponseWriter, r 
 		CanWrite:  *req.CanWrite,
 	})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("target_account_id", targetAccountID.String()),
 			slog.String("isn_slug", isnSlug),
 		)
 
 		return apperrors.DatabaseError("database error", err)
 	}
-	logger.ContextWithLogAttrs(r.Context(),
+	logger.AddLogAttrs(r.Context(),
 		slog.Bool("can_read", *req.CanRead),
 		slog.Bool("can_write", *req.CanWrite),
 		slog.String("target_account_id", targetAccount.ID.String()),
@@ -207,7 +207,7 @@ func (i *IsnAccountHandler) GetIsnAccounts(w http.ResponseWriter, r *http.Reques
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apperrors.NotFound("ISN not found", nil)
 		}
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("isn_slug", isnSlug),
 		)
 
@@ -227,7 +227,7 @@ func (i *IsnAccountHandler) GetIsnAccounts(w http.ResponseWriter, r *http.Reques
 	// Get all accounts with access to this ISN
 	dbAccounts, err := i.queries.GetAccountsByIsnID(r.Context(), isn.ID)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("isn_slug", isnSlug),
 		)
 
@@ -254,7 +254,7 @@ func (i *IsnAccountHandler) GetIsnAccounts(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	logger.ContextWithLogAttrs(r.Context(),
+	logger.AddLogAttrs(r.Context(),
 		slog.Int("count", len(accounts)),
 		slog.String("isn_slug", isnSlug))
 	return responses.JSON(w, http.StatusOK, accounts)

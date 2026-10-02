@@ -50,7 +50,7 @@ func (a *AuthService) RequireValidAccessToken(next http.Handler) http.Handler {
 		}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 		if err != nil {
 			if errors.Is(err, jwt.ErrTokenExpired) {
-				logger.ContextWithLogAttrs(r.Context(),
+				logger.AddLogAttrs(r.Context(),
 					slog.String("account_id", claims.AccountID.String()),
 				)
 				responses.RenderError(w, r, &apperrors.HTTPError{
@@ -74,7 +74,7 @@ func (a *AuthService) RequireValidAccessToken(next http.Handler) http.Handler {
 
 		accountID, err := uuid.Parse(accountIDString)
 		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("account_id", claims.AccountID.String()),
 			)
 
@@ -83,7 +83,7 @@ func (a *AuthService) RequireValidAccessToken(next http.Handler) http.Handler {
 		}
 
 		// Add account_id, role and account_type to final request log context
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("account_id", accountID.String()),
 			slog.String("account_type", claims.AccountType),
 			slog.String("role", claims.Role),
@@ -164,7 +164,7 @@ func (a *AuthService) RequireValidRefreshToken(next http.Handler) http.Handler {
 		)
 
 		// Add user_account_id to final request log context
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("account_id", userAccountID.String()),
 		)
 
@@ -205,7 +205,7 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 
 		serviceAccount, err := a.queries.GetServiceAccountByClientID(r.Context(), clientID)
 		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("invalid_client_id", clientID),
 			)
 
@@ -217,14 +217,14 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 		account, err := a.queries.GetAccountByID(r.Context(), serviceAccount.AccountID)
 		if err != nil {
 			if err == sql.ErrNoRows {
-				logger.ContextWithLogAttrs(r.Context(),
+				logger.AddLogAttrs(r.Context(),
 					slog.String("client_id", clientID),
 				)
 
 				responses.RenderError(w, r, apperrors.InternalError("account not found", err))
 				return
 			}
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("client_id", clientID),
 			)
 
@@ -234,7 +234,7 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 
 		// check for disabled accounts
 		if !account.IsActive {
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("client_id", clientID),
 				slog.String("account_id", serviceAccount.AccountID.String()),
 			)
@@ -251,7 +251,7 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 			ServiceAccountAccountID: serviceAccount.AccountID,
 		})
 		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("client_id", clientID),
 			)
 
@@ -268,7 +268,7 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 			slog.String("account_id", serviceAccount.AccountID.String()),
 		)
 
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("client_id", clientID),
 			slog.String("account_id", serviceAccount.AccountID.String()),
 		)
@@ -304,7 +304,7 @@ func (a *AuthService) RequireNonRevokedClientCredentials(next http.Handler) http
 
 		serviceAccount, err := a.queries.GetServiceAccountByClientID(r.Context(), clientID)
 		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("invalid_client_id", clientID),
 			)
 
@@ -315,14 +315,14 @@ func (a *AuthService) RequireNonRevokedClientCredentials(next http.Handler) http
 		account, err := a.queries.GetAccountByID(r.Context(), serviceAccount.AccountID)
 		if err != nil {
 			if err == sql.ErrNoRows {
-				logger.ContextWithLogAttrs(r.Context(),
+				logger.AddLogAttrs(r.Context(),
 					slog.String("client_id", clientID),
 				)
 
 				responses.RenderError(w, r, apperrors.InternalError("account not found", err))
 				return
 			}
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("client_id", clientID),
 			)
 
@@ -332,7 +332,7 @@ func (a *AuthService) RequireNonRevokedClientCredentials(next http.Handler) http
 
 		// check for disabled accounts
 		if !account.IsActive {
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("client_id", clientID),
 				slog.String("account_id", serviceAccount.AccountID.String()),
 			)
@@ -349,7 +349,7 @@ func (a *AuthService) RequireNonRevokedClientCredentials(next http.Handler) http
 			ServiceAccountAccountID: serviceAccount.AccountID,
 		})
 		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("client_id", clientID),
 			)
 
@@ -365,7 +365,7 @@ func (a *AuthService) RequireNonRevokedClientCredentials(next http.Handler) http
 			slog.String("account_id", serviceAccount.AccountID.String()),
 		)
 
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("client_id", clientID),
 			slog.String("account_id", serviceAccount.AccountID.String()),
 		)
@@ -395,7 +395,7 @@ func (a *AuthService) RequireRole(allowedRoles ...string) func(http.Handler) htt
 			}
 
 			// let the logger middleware handle log message
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.Any("expected_roles", allowedRoles),
 				slog.String("got_role", claims.Role),
 			)
@@ -458,7 +458,7 @@ func (a *AuthService) RequireAccessPermission(permissions ...string) func(http.H
 				return
 			}
 
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("isn_permission", strings.Join(permissions, ",")),
 				slog.String("isn_slug", isnSlug),
 			)
@@ -522,7 +522,7 @@ func (a *AuthService) RequireIsnMembership(next http.Handler) http.Handler {
 			}
 		}
 
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("isn_slug", isnSlug),
 		)
 		next.ServeHTTP(w, r)
@@ -534,7 +534,7 @@ func (a *AuthService) RequireDevEnv(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		if a.environment != "dev" {
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("environment", a.environment),
 			)
 

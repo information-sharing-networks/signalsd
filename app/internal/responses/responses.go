@@ -146,7 +146,7 @@ func RenderError(w http.ResponseWriter, r *http.Request, err error) {
 			attrs = append(attrs, slog.String("error", oerr.Err.Error()))
 		}
 
-		logger.ContextWithLogAttrs(r.Context(), attrs...)
+		logger.AddLogAttrs(r.Context(), attrs...)
 
 		// write error json
 		if oerr.Status >= 500 {
@@ -183,7 +183,7 @@ func RenderError(w http.ResponseWriter, r *http.Request, err error) {
 		attrs = append(attrs, slog.String("error", herr.Err.Error()))
 	}
 
-	logger.ContextWithLogAttrs(r.Context(), attrs...)
+	logger.AddLogAttrs(r.Context(), attrs...)
 
 	// write error JSON
 	if herr.Status >= 500 {

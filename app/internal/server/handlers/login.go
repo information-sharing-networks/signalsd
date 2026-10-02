@@ -83,7 +83,7 @@ func (l *LoginHandler) Login(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	// add the account_id to the request log context
-	logger.ContextWithLogAttrs(r.Context(),
+	logger.AddLogAttrs(r.Context(),
 		slog.String("account_id", user.AccountID.String()),
 	)
 

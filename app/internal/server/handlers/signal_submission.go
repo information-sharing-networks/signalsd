@@ -137,7 +137,7 @@ func recordSignalProcessingFailures(ctx context.Context, queries *database.Queri
 		})
 		if err != nil {
 			// the failure detail could not be recorded - log it so the missing batch detail can be traced
-			logger.ContextWithLogAttrs(ctx,
+			logger.AddLogAttrs(ctx,
 				slog.String("local_ref", failed.LocalRef),
 				slog.String("error", err.Error()),
 			)
@@ -582,7 +582,7 @@ func (s *SignalsHandler) startBatch(ctx context.Context, submission *signalsSubm
 	}
 	submission.batch = batch
 
-	logger.ContextWithLogAttrs(ctx,
+	logger.AddLogAttrs(ctx,
 		slog.String("batch_ref", batch.BatchRef),
 		slog.String("batch_id", batch.ID.String()),
 	)

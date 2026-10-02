@@ -224,7 +224,7 @@ func (a *TokenHandler) RevokeRefreshToken(w http.ResponseWriter, r *http.Request
 	}
 
 	// add log attributes for final request log
-	logger.ContextWithLogAttrs(r.Context(),
+	logger.AddLogAttrs(r.Context(),
 		slog.String("component", "RevokeRefreshTokenHandler"),
 		slog.String("account_id", userAccountId.String()),
 	)
@@ -289,7 +289,7 @@ func (a *TokenHandler) RotateServiceAccountSecret(w http.ResponseWriter, r *http
 
 	defer func() {
 		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("rollback_error", err.Error()),
 			)
 		}
@@ -315,7 +315,7 @@ func (a *TokenHandler) RotateServiceAccountSecret(w http.ResponseWriter, r *http
 		return apperrors.DatabaseError("failed to commit transaction", err)
 	}
 
-	logger.ContextWithLogAttrs(r.Context(),
+	logger.AddLogAttrs(r.Context(),
 		slog.String("client_id", serviceAccount.ClientID),
 	)
 

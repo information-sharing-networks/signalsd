@@ -169,14 +169,14 @@ func (s *SignalTypeHandler) CreateSignalType(w http.ResponseWriter, r *http.Requ
 
 	// check for valid github url formats
 	if err := utils.ValidateGithubFileURL(req.SchemaURL, "schema"); err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("schema_url", req.SchemaURL),
 		)
 
 		return apperrors.MalformedBody("invalid schema URL", err)
 	}
 	if err := utils.ValidateGithubFileURL(req.ReadmeURL, "readme"); err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("readme_url", req.ReadmeURL),
 		)
 
@@ -186,7 +186,7 @@ func (s *SignalTypeHandler) CreateSignalType(w http.ResponseWriter, r *http.Requ
 	// Check that the readme file exists on GitHub
 	if req.ReadmeURL != signalsd.SkipReadmeURL {
 		if err := utils.CheckGithubFileExists(req.ReadmeURL); err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("readme_url", req.ReadmeURL),
 			)
 
@@ -197,7 +197,7 @@ func (s *SignalTypeHandler) CreateSignalType(w http.ResponseWriter, r *http.Requ
 	// generate slug.
 	slug, err = utils.GenerateSlug(req.Title)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("title", req.Title),
 		)
 
@@ -207,7 +207,7 @@ func (s *SignalTypeHandler) CreateSignalType(w http.ResponseWriter, r *http.Requ
 	// check if there is already a signal type with this slug (the query below returns currentSignalType.semver == "0.0.0" if there is no existing version)
 	currentSignalType, err := s.queries.GetLatestSlugVersion(r.Context(), slug)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("slug", slug),
 		)
 
@@ -222,7 +222,7 @@ func (s *SignalTypeHandler) CreateSignalType(w http.ResponseWriter, r *http.Requ
 	//  increment the semver using the supplied bump instruction supplied in the req
 	semVer, err = utils.IncrementSemVer(req.BumpType, currentSignalType.SemVer)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("current_version", currentSignalType.SemVer),
 		)
 
@@ -237,7 +237,7 @@ func (s *SignalTypeHandler) CreateSignalType(w http.ResponseWriter, r *http.Requ
 	} else {
 		schemaContent, err = utils.FetchFileContentFromGithub(req.SchemaURL)
 		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("schema_url", req.SchemaURL),
 			)
 
@@ -247,7 +247,7 @@ func (s *SignalTypeHandler) CreateSignalType(w http.ResponseWriter, r *http.Requ
 
 	_, err = schemas.ValidateAndCompileSchema(req.SchemaURL, schemaContent)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("schema_url", req.SchemaURL),
 		)
 
@@ -267,7 +267,7 @@ func (s *SignalTypeHandler) CreateSignalType(w http.ResponseWriter, r *http.Requ
 		ContentKind:   req.ContentKind,
 	})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("slug", slug),
 		)
 
@@ -335,14 +335,14 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchema(w http.ResponseWriter, r
 
 	// check for valid github url formats
 	if err := utils.ValidateGithubFileURL(req.SchemaURL, "schema"); err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("schema_url", req.SchemaURL),
 		)
 
 		return apperrors.MalformedBody("invalid schema URL", err)
 	}
 	if err := utils.ValidateGithubFileURL(req.ReadmeURL, "readme"); err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("readme_url", req.ReadmeURL),
 		)
 
@@ -352,7 +352,7 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchema(w http.ResponseWriter, r
 	// Check that the readme file exists on GitHub
 	if req.ReadmeURL != signalsd.SkipReadmeURL {
 		if err := utils.CheckGithubFileExists(req.ReadmeURL); err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("readme_url", req.ReadmeURL),
 			)
 
@@ -381,7 +381,7 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchema(w http.ResponseWriter, r
 		SchemaURL: req.SchemaURL,
 	})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("slug", slug),
 		)
 
@@ -394,7 +394,7 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchema(w http.ResponseWriter, r
 	//  increment the semver using the supplied bump instruction supplied in the req
 	semVer, err = utils.IncrementSemVer(req.BumpType, currentSignalType.SemVer)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("current_version", currentSignalType.SemVer),
 		)
 
@@ -409,7 +409,7 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchema(w http.ResponseWriter, r
 	} else {
 		schemaContent, err = utils.FetchFileContentFromGithub(req.SchemaURL)
 		if err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("schema_url", req.SchemaURL),
 			)
 
@@ -419,7 +419,7 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchema(w http.ResponseWriter, r
 
 	_, err = schemas.ValidateAndCompileSchema(req.SchemaURL, schemaContent)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("schema_url", req.SchemaURL),
 		)
 
@@ -439,7 +439,7 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchema(w http.ResponseWriter, r
 		ContentKind:   currentSignalType.ContentKind,
 	})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("slug", slug),
 		)
 
@@ -493,7 +493,7 @@ func (s *SignalTypeHandler) UpdateSignalType(w http.ResponseWriter, r *http.Requ
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apperrors.NotFound(fmt.Sprintf("No signal type found for %s/v%s", slug, semVer), nil)
 		}
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("signal_type_slug", slug),
 		)
 
@@ -513,7 +513,7 @@ func (s *SignalTypeHandler) UpdateSignalType(w http.ResponseWriter, r *http.Requ
 	// prepare struct for update
 	if req.ReadmeURL != nil {
 		if err := utils.ValidateGithubFileURL(*req.ReadmeURL, "readme"); err != nil {
-			logger.ContextWithLogAttrs(r.Context(),
+			logger.AddLogAttrs(r.Context(),
 				slog.String("readme_url", *req.ReadmeURL),
 			)
 
@@ -523,7 +523,7 @@ func (s *SignalTypeHandler) UpdateSignalType(w http.ResponseWriter, r *http.Requ
 		// Check that the readme file exists on GitHub
 		if *req.ReadmeURL != signalsd.SkipReadmeURL {
 			if err := utils.CheckGithubFileExists(*req.ReadmeURL); err != nil {
-				logger.ContextWithLogAttrs(r.Context(),
+				logger.AddLogAttrs(r.Context(),
 					slog.String("readme_url", *req.ReadmeURL),
 				)
 
@@ -545,7 +545,7 @@ func (s *SignalTypeHandler) UpdateSignalType(w http.ResponseWriter, r *http.Requ
 		Detail:    signalType.Detail,
 	})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("signal_type_id", signalType.ID.String()),
 		)
 
@@ -591,7 +591,7 @@ func (s *SignalTypeHandler) DeleteSignalType(w http.ResponseWriter, r *http.Requ
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apperrors.NotFound(fmt.Sprintf("No signal type found for %s/v%s", signalTypeSlug, semVer), nil)
 		}
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("signal_type_slug", signalTypeSlug),
 		)
 
@@ -601,7 +601,7 @@ func (s *SignalTypeHandler) DeleteSignalType(w http.ResponseWriter, r *http.Requ
 	// check if signal type is being used by any signals
 	hasSignals, err := s.queries.CheckSignalTypeHasSignals(r.Context(), signalType.ID)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("signal_type_id", signalType.ID.String()),
 		)
 
@@ -615,7 +615,7 @@ func (s *SignalTypeHandler) DeleteSignalType(w http.ResponseWriter, r *http.Requ
 	// delete the signal type
 	rowsAffected, err := s.queries.DeleteSignalType(r.Context(), signalType.ID)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("signal_type_id", signalType.ID.String()),
 		)
 
@@ -668,7 +668,7 @@ func (s *SignalTypeHandler) GetSignalType(w http.ResponseWriter, r *http.Request
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apperrors.NotFound(fmt.Sprintf("No signal type found for %s/v%s", signalTypeSlug, semVer), nil)
 		}
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("signal_type_slug", signalTypeSlug),
 		)
 
@@ -792,7 +792,7 @@ func (s *SignalTypeHandler) GetIsnSignalTypes(w http.ResponseWriter, r *http.Req
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apperrors.NotFound(fmt.Sprintf("No ISN found for %s", isnSlug), nil)
 		}
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("isn_slug", isnSlug),
 		)
 		return apperrors.DatabaseError("database error", err)
@@ -800,7 +800,7 @@ func (s *SignalTypeHandler) GetIsnSignalTypes(w http.ResponseWriter, r *http.Req
 
 	dbSignalTypes, err := s.queries.GetSignalTypesByIsnID(r.Context(), isn.ID)
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("isn_id", isn.ID.String()),
 		)
 		return apperrors.DatabaseError("database error", err)
@@ -875,7 +875,7 @@ func (s *SignalTypeHandler) GetIsnSignalType(w http.ResponseWriter, r *http.Requ
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apperrors.NotFound(fmt.Sprintf("No ISN found for %s", isnSlug), nil)
 		}
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("isn_slug", isnSlug),
 		)
 		return apperrors.DatabaseError("database error", err)
@@ -890,7 +890,7 @@ func (s *SignalTypeHandler) GetIsnSignalType(w http.ResponseWriter, r *http.Requ
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apperrors.NotFound(fmt.Sprintf("Signal type %s/v%s has not been added to ISN %s", signalTypeSlug, semVer, isnSlug), nil)
 		}
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("isn_id", isn.ID.String()),
 			slog.String("signal_type_slug", signalTypeSlug),
 		)
@@ -970,7 +970,7 @@ func (s *SignalTypeHandler) AddSignalTypeToISN(w http.ResponseWriter, r *http.Re
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apperrors.NotFound("ISN not found", nil)
 		}
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("isn_slug", isnSlug),
 		)
 		return apperrors.DatabaseError("database error", err)
@@ -999,7 +999,7 @@ func (s *SignalTypeHandler) AddSignalTypeToISN(w http.ResponseWriter, r *http.Re
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apperrors.NotFound(fmt.Sprintf("Signal type %s/v%s not found", req.SignalTypeSlug, req.SemVer), nil)
 		}
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("signal_type_slug", req.SignalTypeSlug),
 			slog.String("sem_ver", req.SemVer),
 		)
@@ -1012,7 +1012,7 @@ func (s *SignalTypeHandler) AddSignalTypeToISN(w http.ResponseWriter, r *http.Re
 		SignalTypeID: signalType.ID,
 	})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("isn_id", isn.ID.String()),
 			slog.String("signal_type_id", signalType.ID.String()),
 		)
@@ -1065,7 +1065,7 @@ func (s *SignalTypeHandler) UpdateIsnSignalTypeStatus(w http.ResponseWriter, r *
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apperrors.NotFound("ISN not found", nil)
 		}
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("isn_slug", isnSlug),
 		)
 		return apperrors.DatabaseError("database error", err)
@@ -1095,7 +1095,7 @@ func (s *SignalTypeHandler) UpdateIsnSignalTypeStatus(w http.ResponseWriter, r *
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apperrors.NotFound("Signal type not found", nil)
 		}
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("signal_type_slug", signalTypeSlug),
 			slog.String("sem_ver", semVer),
 		)
@@ -1120,7 +1120,7 @@ func (s *SignalTypeHandler) UpdateIsnSignalTypeStatus(w http.ResponseWriter, r *
 		IsInUse:      *req.IsInUse,
 	})
 	if err != nil {
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("isn_id", isn.ID.String()),
 			slog.String("signal_type_id", signalType.ID.String()),
 		)

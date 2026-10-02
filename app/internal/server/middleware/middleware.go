@@ -64,7 +64,7 @@ func RequestSizeLimit(maxBytes int64) func(http.Handler) http.Handler {
 
 			// Check Content-Length header first (if present)
 			if r.ContentLength > maxBytes {
-				logger.ContextWithLogAttrs(r.Context(),
+				logger.AddLogAttrs(r.Context(),
 					slog.String("component", "RequestSizeLimit"),
 					slog.Int64("content_length", r.ContentLength),
 					slog.Int64("max_bytes", maxBytes),
@@ -98,7 +98,7 @@ func RateLimit(requestsPerSecond int32, burst int32) func(http.Handler) http.Han
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if !limiter.Allow() {
-				logger.ContextWithLogAttrs(r.Context(),
+				logger.AddLogAttrs(r.Context(),
 					slog.String("component", "RateLimit"),
 				)
 

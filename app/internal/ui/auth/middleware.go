@@ -211,7 +211,7 @@ func (a *AuthService) AddAccountIDToLogContext(next http.Handler) http.Handler {
 			return
 		}
 
-		logger.ContextWithLogAttrs(r.Context(),
+		logger.AddLogAttrs(r.Context(),
 			slog.String("account_id", accessTokenDetails.AccountID),
 		)
 
