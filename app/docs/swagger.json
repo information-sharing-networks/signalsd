@@ -4514,7 +4514,8 @@
                     "type": "string",
                     "enum": [
                         "json",
-                        "document"
+                        "document",
+                        "event"
                     ],
                     "example": "json"
                 },

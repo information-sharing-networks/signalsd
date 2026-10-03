@@ -97,6 +97,7 @@ func (s *Server) RegisterRoutes() {
 		// checkbox toggles
 		r.Get("/ui-api/toggles/skip-validation", s.ToggleSkipValidation)
 		r.Get("/ui-api/toggles/skip-readme", s.ToggleSkipReadme)
+		r.Get("/ui-api/toggles/content-kind", s.ToggleContentKind)
 
 		// these routes are only relevant where accounts have been granted access to one or more ISNs
 		r.Group(func(r chi.Router) {

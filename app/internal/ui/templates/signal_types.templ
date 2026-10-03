@@ -1,6 +1,7 @@
 package templates
 
 import (
+	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
@@ -13,12 +14,19 @@ templ CreateSignalTypePage(environment string) {
 			<div class="card">
 				<div class="card-body">
 					@InfoAlert(){
-						Signal types specify a record that can be shared over an ISN.  The field definition is held as an external json schema file on GithHub.
+						Signal types specify a record that can be shared over an ISN.
 						Signal Types are defined at a site level and must be added to the ISNs that need to use them.
 						<br></br>
 						<br></br>
-						When creating a new Signal Type select a unqiue title to identify it.
-						A Signal Type can have multiple versions - these share the same title but have different json schemas. 
+						The content kind determines how signals of this type are sent and can't be changed later:
+						<ul>
+							<li><strong>JSON</strong> - JSON records validated against a JSON schema file on GitHub.</li>
+							<li><strong>Event</strong> - immutable JSON records of a process waypoint (e.g. a certificate was approved), validated against a JSON schema file on GitHub. Events must be correlated to the signal they are about and include an occurred_at timestamp.</li>
+							<li><strong>Document</strong> - files, such as PDFs. Document signal types don't have a schema.</li>
+						</ul>
+						<br></br>
+						When creating a new Signal Type select a unique title to identify it.
+						A JSON or Event Signal Type can have multiple versions - these share the same title but have different json schemas.
 						Use the <em>Register Schema</em> feature to add a new version.
 						<br></br>
 						<br></br>
@@ -39,13 +47,11 @@ templ CreateSignalTypePage(environment string) {
 							<div class="form-group">
 								@TitleInput()
 							</div>
+							<div class="form-group">
+								@ContentKindSelector()
+							</div>
 						</div>
-						<div class="form-group">
-							@SkipValidationCheckbox()
-						</div>
-						<div class="form-group">
-							@SchemaURLInput(false)
-						</div>
+						@SchemaFields(signalsd.ContentKindJSON)
 						<div class="form-group">
 							@SkipReadmeCheckbox()
 						</div>
@@ -183,6 +189,7 @@ templ ListSignalTypesPage(environment string, signalTypes []client.SignalTypeDet
 										<th>Title</th>
 										<th>Slug</th>
 										<th>Version</th>
+										<th>Content Kind</th>
 										<th>Description</th>
 										<th>Schema URL</th>
 										<th>README URL</th>
@@ -195,10 +202,13 @@ templ ListSignalTypesPage(environment string, signalTypes []client.SignalTypeDet
 											<td class="font-semibold">{ st.Title }</td>
 											<td><code class="bg-gray-100 px-2 py-1 rounded text-sm">{ st.Slug }</code></td>
 											<td><code class="bg-gray-100 px-2 py-1 rounded text-sm">{ st.SemVer }</code></td>
+											<td class="text-sm">{ st.ContentKind }</td>
 											<td class="text-sm text-muted">{ st.Detail }</td>
 											<td class="text-sm">
 
-												if st.SchemaURL == "" {
+												if st.ContentKind == signalsd.ContentKindDocument {
+													<p class="text-muted">Not used</p>
+												} else if st.SchemaURL == "" {
 													<p class="text-muted">Not provided</p>
 												} else {
 													<a href={ templ.SafeURL(st.SchemaURL) } target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">
@@ -215,7 +225,7 @@ templ ListSignalTypesPage(environment string, signalTypes []client.SignalTypeDet
 													</a>
 												}
 											</td>
-											<td class="text-sm text-muted">{ st.CreatedAt }</td>
+											<td class="text-sm text-muted">{ types.FormatDateTime(st.CreatedAt) }</td>
 										</tr>
 									}
 								</tbody>
@@ -263,6 +273,42 @@ templ VersionNumberSelector() {
 		<option value="minor">Minor (0.1.0)</option>
 		<option value="major">Major (1.0.0)</option>
 	</select>
+}
+
+templ ContentKindSelector() {
+	<label for="content-kind" class="form-label">Content Kind</label>
+	<select
+		id="content-kind"
+		name="content-kind"
+		required
+		class="form-select"
+		hx-get="/ui-api/toggles/content-kind"
+		hx-target="#schema-fields-container"
+		hx-swap="outerHTML"
+	>
+		<option value={ signalsd.ContentKindJSON } selected>JSON</option>
+		<option value={ signalsd.ContentKindEvent }>Event</option>
+		<option value={ signalsd.ContentKindDocument }>Document</option>
+	</select>
+}
+
+// SchemaFields renders the schema inputs for the create signal type form.
+// Document signal types don't have a schema, so the inputs are replaced by a note.
+templ SchemaFields(contentKind string) {
+	<div id="schema-fields-container">
+		if contentKind == signalsd.ContentKindDocument {
+			<div class="form-group">
+				<p class="text-muted text-sm">Document signal types don't have a schema.</p>
+			</div>
+		} else {
+			<div class="form-group">
+				@SkipValidationCheckbox()
+			</div>
+			<div class="form-group">
+				@SchemaURLInput(false)
+			</div>
+		}
+	</div>
 }
 
 templ SchemaURLInput(skipValidation bool) {

@@ -83,7 +83,7 @@ type SignalType struct {
 	Title       string    `json:"title" example:"Sample Signal Type"`
 	Detail      string    `json:"detail" example:"Sample signal type description"`
 	SemVer      string    `json:"sem_ver" example:""`
-	ContentKind string    `json:"content_kind" example:"json" enums:"json,document"`
+	ContentKind string    `json:"content_kind" example:"json" enums:"json,document,event"`
 	IsInUse     bool      `json:"is_in_use" example:"true"`
 }
 

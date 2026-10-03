@@ -12,11 +12,12 @@ import (
 
 // CreateSignalTypeRequest represents the request body for creating a signal type
 type CreateSignalTypeRequest struct {
-	SchemaURL string `json:"schema_url"`
-	Title     string `json:"title"`
-	BumpType  string `json:"bump_type"`
-	ReadmeURL string `json:"readme_url"`
-	Detail    string `json:"detail"`
+	SchemaURL   string `json:"schema_url,omitempty"` // omitted for document signal types
+	Title       string `json:"title"`
+	BumpType    string `json:"bump_type"`
+	ReadmeURL   string `json:"readme_url"`
+	Detail      string `json:"detail"`
+	ContentKind string `json:"content_kind"`
 }
 
 // NewSignalTypeResponse represents the response from creating a signal type
@@ -147,15 +148,16 @@ func (c *Client) UpdateIsnSignalTypeStatus(ctx context.Context, accessToken, isn
 }
 
 type SignalTypeDetail struct {
-	ID        string `json:"id"`
-	CreatedAt string `json:"created_at"`
-	UpdatedAt string `json:"updated_at"`
-	Slug      string `json:"slug"`
-	SchemaURL string `json:"schema_url"`
-	ReadmeURL string `json:"readme_url"`
-	Title     string `json:"title"`
-	Detail    string `json:"detail"`
-	SemVer    string `json:"sem_ver"`
+	ID          string `json:"id"`
+	CreatedAt   string `json:"created_at"`
+	UpdatedAt   string `json:"updated_at"`
+	Slug        string `json:"slug"`
+	SchemaURL   string `json:"schema_url"`
+	ReadmeURL   string `json:"readme_url"`
+	Title       string `json:"title"`
+	Detail      string `json:"detail"`
+	SemVer      string `json:"sem_ver"`
+	ContentKind string `json:"content_kind"`
 }
 
 // GetSignalTypes gets all signal types using the signalsd API

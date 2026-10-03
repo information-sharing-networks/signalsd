@@ -49,11 +49,15 @@ func (s *Server) RegisterNewSignalTypeSchemaPage(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Deduplicate by slug to show each signal type once
+	// Deduplicate by slug to show each signal type once.
+	// Document signal types are excluded because they don't have schemas
 	signalTypeSlugs := make([]types.SignalTypeSlug, 0, len(signalTypes))
 	seen := make(map[string]bool)
 
 	for _, signalType := range signalTypes {
+		if signalType.ContentKind == signalsd.ContentKindDocument {
+			continue
+		}
 		if !seen[signalType.Slug] {
 			seen[signalType.Slug] = true
 			signalTypeSlugs = append(signalTypeSlugs, types.SignalTypeSlug{
@@ -72,7 +76,8 @@ func (s *Server) RegisterNewSignalTypeSchemaPage(w http.ResponseWriter, r *http.
 //	@Tags			HTMX Actions
 //	@Param			title			formData	string	true	"Signal type title"
 //	@Param			detail			formData	string	true	"Description"
-//	@Param			schema-url		formData	string	true	"JSON Schema URL (ignored when skip-validation is true)"
+//	@Param			content-kind	formData	string	true	"'json', 'event' or 'document'"
+//	@Param			schema-url		formData	string	false	"JSON Schema URL (required for json and event signal types unless skip-validation is true, not used for document signal types)"
 //	@Param			readme-url		formData	string	true	"Readme URL (ignored when skip-readme is true)"
 //	@Param			skip-validation	formData	string	false	"'true' to skip schema validation"
 //	@Param			skip-readme		formData	string	false	"'true' to skip readme requirement"
@@ -85,13 +90,22 @@ func (s *Server) CreateSignalType(w http.ResponseWriter, r *http.Request) {
 
 	// Parse form data
 	title := r.FormValue("title")
+	contentKind := r.FormValue("content-kind")
 	schemaURL := r.FormValue("schema-url")
 	readmeURL := r.FormValue("readme-url")
 	detail := r.FormValue("detail")
 	skipValidation := r.FormValue("skip-validation") == "true"
 	skipReadme := r.FormValue("skip-readme") == "true"
 
-	if skipValidation {
+	if !signalsd.ValidContentKinds[contentKind] {
+		templ.Handler(templates.ErrorAlert("Please select a valid content kind.")).ServeHTTP(w, r)
+		return
+	}
+
+	// document signal types don't have a schema
+	if contentKind == signalsd.ContentKindDocument {
+		schemaURL = ""
+	} else if skipValidation {
 		schemaURL = signalsd.SkipValidationURL
 	}
 	if skipReadme {
@@ -99,8 +113,12 @@ func (s *Server) CreateSignalType(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate required fields
-	if title == "" || schemaURL == "" || readmeURL == "" || detail == "" {
+	if title == "" || readmeURL == "" || detail == "" {
 		templ.Handler(templates.ErrorAlert("Please fill in all required fields.")).ServeHTTP(w, r)
+		return
+	}
+	if contentKind != signalsd.ContentKindDocument && schemaURL == "" {
+		templ.Handler(templates.ErrorAlert("Please enter a schema URL or select Skip JSON Schema Validation.")).ServeHTTP(w, r)
 		return
 	}
 
@@ -113,11 +131,12 @@ func (s *Server) CreateSignalType(w http.ResponseWriter, r *http.Request) {
 
 	// Prepare request - create signal type with initial version
 	createReq := client.CreateSignalTypeRequest{
-		SchemaURL: schemaURL,
-		Title:     title,
-		ReadmeURL: readmeURL,
-		Detail:    detail,
-		BumpType:  "major", // Initial version is always
+		SchemaURL:   schemaURL,
+		Title:       title,
+		ReadmeURL:   readmeURL,
+		Detail:      detail,
+		BumpType:    "major", // Initial version is always
+		ContentKind: contentKind,
 	}
 
 	// Call the API to create the signal type
@@ -391,7 +410,7 @@ func (s *Server) ListSignalTypesPage(w http.ResponseWriter, r *http.Request) {
 //	@Tags			HTMX Actions
 //	@Param			skip-validation	query	bool	false	"'true' to render the field as disabled"
 //	@Success		200				"HTML partial"
-//	@Router			/ui-api/signal-types/toggle-skip-validation [get]
+//	@Router			/ui-api/toggles/skip-validation [get]
 func (s *Server) ToggleSkipValidation(w http.ResponseWriter, r *http.Request) {
 	skipValidation := r.FormValue("skip-validation") == "true"
 	templ.Handler(templates.SchemaURLInput(skipValidation)).ServeHTTP(w, r)
@@ -404,8 +423,21 @@ func (s *Server) ToggleSkipValidation(w http.ResponseWriter, r *http.Request) {
 //	@Tags			HTMX Actions
 //	@Param			skip-readme	query	bool	false	"'true' to render the field as disabled"
 //	@Success		200			"HTML partial"
-//	@Router			/ui-api/signal-types/toggle-skip-readme [get]
+//	@Router			/ui-api/toggles/skip-readme [get]
 func (s *Server) ToggleSkipReadme(w http.ResponseWriter, r *http.Request) {
 	skipReadme := r.FormValue("skip-readme") == "true"
 	templ.Handler(templates.ReadmeURLInput(skipReadme)).ServeHTTP(w, r)
+}
+
+// ToggleContentKind godoc
+//
+//	@Summary		Toggle schema fields for the selected content kind
+//	@Description	HTMX endpoint. Returns the schema fields for the create signal type form: the skip validation checkbox and schema URL input for json and event signal types, or a note that document signal types have no schema.
+//	@Tags			HTMX Actions
+//	@Param			content-kind	query	string	false	"'json', 'event' or 'document'"
+//	@Success		200				"HTML partial"
+//	@Router			/ui-api/toggles/content-kind [get]
+func (s *Server) ToggleContentKind(w http.ResponseWriter, r *http.Request) {
+	contentKind := r.FormValue("content-kind")
+	templ.Handler(templates.SchemaFields(contentKind)).ServeHTTP(w, r)
 }

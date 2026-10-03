@@ -882,10 +882,15 @@ paths:
         name: detail
         required: true
         type: string
-      - description: JSON Schema URL (ignored when skip-validation is true)
+      - description: '''json'', ''event'' or ''document'''
+        in: formData
+        name: content-kind
+        required: true
+        type: string
+      - description: JSON Schema URL (required for json and event signal types unless
+          skip-validation is true, not used for document signal types)
         in: formData
         name: schema-url
-        required: true
         type: string
       - description: Readme URL (ignored when skip-readme is true)
         in: formData
@@ -1090,36 +1095,6 @@ paths:
       summary: Remove routing mapping row
       tags:
       - HTMX Actions
-  /ui-api/signal-types/toggle-skip-readme:
-    get:
-      description: HTMX endpoint. Returns a readme URL input field, enabled or disabled
-        based on the skip-readme flag.
-      parameters:
-      - description: '''true'' to render the field as disabled'
-        in: query
-        name: skip-readme
-        type: boolean
-      responses:
-        "200":
-          description: HTML partial
-      summary: Toggle readme URL input
-      tags:
-      - HTMX Actions
-  /ui-api/signal-types/toggle-skip-validation:
-    get:
-      description: HTMX endpoint. Returns a schema URL input field, enabled or disabled
-        based on the skip-validation flag.
-      parameters:
-      - description: '''true'' to render the field as disabled'
-        in: query
-        name: skip-validation
-        type: boolean
-      responses:
-        "200":
-          description: HTML partial
-      summary: Toggle schema validation input
-      tags:
-      - HTMX Actions
   /ui-api/signals/{isn_slug}/{signal_type_slug}/v{sem_ver}/{signal_id}/correlated/{count}:
     get:
       description: HTMX endpoint. Returns a table of signals correlated to the specified
@@ -1216,6 +1191,52 @@ paths:
         "401":
           description: HTML error partial
       summary: Search signals
+      tags:
+      - HTMX Actions
+  /ui-api/toggles/content-kind:
+    get:
+      description: 'HTMX endpoint. Returns the schema fields for the create signal
+        type form: the skip validation checkbox and schema URL input for json and
+        event signal types, or a note that document signal types have no schema.'
+      parameters:
+      - description: '''json'', ''event'' or ''document'''
+        in: query
+        name: content-kind
+        type: string
+      responses:
+        "200":
+          description: HTML partial
+      summary: Toggle schema fields for the selected content kind
+      tags:
+      - HTMX Actions
+  /ui-api/toggles/skip-readme:
+    get:
+      description: HTMX endpoint. Returns a readme URL input field, enabled or disabled
+        based on the skip-readme flag.
+      parameters:
+      - description: '''true'' to render the field as disabled'
+        in: query
+        name: skip-readme
+        type: boolean
+      responses:
+        "200":
+          description: HTML partial
+      summary: Toggle readme URL input
+      tags:
+      - HTMX Actions
+  /ui-api/toggles/skip-validation:
+    get:
+      description: HTMX endpoint. Returns a schema URL input field, enabled or disabled
+        based on the skip-validation flag.
+      parameters:
+      - description: '''true'' to render the field as disabled'
+        in: query
+        name: skip-validation
+        type: boolean
+      responses:
+        "200":
+          description: HTML partial
+      summary: Toggle schema validation input
       tags:
       - HTMX Actions
   /ui-api/users/generate-password-reset-link:

@@ -1048,10 +1048,16 @@
                     },
                     {
                         "type": "string",
-                        "description": "JSON Schema URL (ignored when skip-validation is true)",
-                        "name": "schema-url",
+                        "description": "'json', 'event' or 'document'",
+                        "name": "content-kind",
                         "in": "formData",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "JSON Schema URL (required for json and event signal types unless skip-validation is true, not used for document signal types)",
+                        "name": "schema-url",
+                        "in": "formData"
                     },
                     {
                         "type": "string",
@@ -1335,50 +1341,6 @@
                 }
             }
         },
-        "/ui-api/signal-types/toggle-skip-readme": {
-            "get": {
-                "description": "HTMX endpoint. Returns a readme URL input field, enabled or disabled based on the skip-readme flag.",
-                "tags": [
-                    "HTMX Actions"
-                ],
-                "summary": "Toggle readme URL input",
-                "parameters": [
-                    {
-                        "type": "boolean",
-                        "description": "'true' to render the field as disabled",
-                        "name": "skip-readme",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "HTML partial"
-                    }
-                }
-            }
-        },
-        "/ui-api/signal-types/toggle-skip-validation": {
-            "get": {
-                "description": "HTMX endpoint. Returns a schema URL input field, enabled or disabled based on the skip-validation flag.",
-                "tags": [
-                    "HTMX Actions"
-                ],
-                "summary": "Toggle schema validation input",
-                "parameters": [
-                    {
-                        "type": "boolean",
-                        "description": "'true' to render the field as disabled",
-                        "name": "skip-validation",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "HTML partial"
-                    }
-                }
-            }
-        },
         "/ui-api/signals/search": {
             "get": {
                 "description": "HTMX endpoint. Returns a table of signals matching the search criteria. Requires ISN read access.",
@@ -1512,6 +1474,72 @@
                         "name": "count",
                         "in": "path",
                         "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    }
+                }
+            }
+        },
+        "/ui-api/toggles/content-kind": {
+            "get": {
+                "description": "HTMX endpoint. Returns the schema fields for the create signal type form: the skip validation checkbox and schema URL input for json and event signal types, or a note that document signal types have no schema.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Toggle schema fields for the selected content kind",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "'json', 'event' or 'document'",
+                        "name": "content-kind",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    }
+                }
+            }
+        },
+        "/ui-api/toggles/skip-readme": {
+            "get": {
+                "description": "HTMX endpoint. Returns a readme URL input field, enabled or disabled based on the skip-readme flag.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Toggle readme URL input",
+                "parameters": [
+                    {
+                        "type": "boolean",
+                        "description": "'true' to render the field as disabled",
+                        "name": "skip-readme",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial"
+                    }
+                }
+            }
+        },
+        "/ui-api/toggles/skip-validation": {
+            "get": {
+                "description": "HTMX endpoint. Returns a schema URL input field, enabled or disabled based on the skip-validation flag.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Toggle schema validation input",
+                "parameters": [
+                    {
+                        "type": "boolean",
+                        "description": "'true' to render the field as disabled",
+                        "name": "skip-validation",
+                        "in": "query"
                     }
                 ],
                 "responses": {

@@ -889,6 +889,7 @@ definitions:
         enum:
         - json
         - document
+        - event
         example: json
         type: string
       created_at:
