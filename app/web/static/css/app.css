@@ -596,6 +596,12 @@ table tbody tr:hover {
   color: #b91c1c;
 }
 
+.content-kind-label {
+  font-size: inherit;
+  font-weight: normal;
+  color: #6b7280;
+}
+
 .signal-metadata {
   display: flex;
   gap: 1rem;

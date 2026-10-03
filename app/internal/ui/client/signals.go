@@ -29,6 +29,9 @@ type SearchSignal struct {
 	Email                string          `json:"email,omitempty"`
 	SignalID             string          `json:"signal_id"`
 	LocalRef             string          `json:"local_ref"`
+	SignalTypeSlug       string          `json:"signal_type_slug"`
+	SemVer               string          `json:"sem_ver"`
+	ContentKind          string          `json:"content_kind"`
 	SignalCreatedAt      string          `json:"signal_created_at"`
 	SignalVersionID      string          `json:"signal_version_id"`
 	VersionNumber        int32           `json:"version_number"`

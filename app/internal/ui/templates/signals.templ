@@ -65,7 +65,10 @@ templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions,  p
 
 						<!-- Signal Header -->
 						<div class="signal-header">
-							<h4 class="signal-title">{ "local ref: " + signal.LocalRef }</h4>
+							<h4 class="signal-title">
+								{ "local ref: " + signal.LocalRef }
+								@ContentKindLabel(signal.ContentKind)
+							</h4>
 							if signal.IsWithdrawn {
 								<span class="signal-badge signal-badge-withdrawn">
 									Withdrawn
@@ -129,6 +132,12 @@ templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions,  p
 	
 }
 
+// ContentKindLabel renders the content kind in parentheses, at the font size of the surrounding text.
+// The leading space separates it from the preceding text (templ strips whitespace between elements)
+templ ContentKindLabel(contentKind string) {
+	<span class="content-kind-label">{ " (" + contentKind + ")" }</span>
+}
+
 templ MonitorButton() {
 	</br>
 	<button
@@ -169,6 +178,7 @@ templ CorrelatedSignalsTable(signal client.SearchSignalWithCorrelationsAndVersio
 			<thead>
 				<tr>
 					<th>local_ref</th>
+					<th>signal type</th>
 					<th>created at</th>
 					<th>email</th>
 					<th>details</th>
@@ -182,6 +192,10 @@ templ CorrelatedSignalsTable(signal client.SearchSignalWithCorrelationsAndVersio
 						}
 					>
 						<td>{ correlated.LocalRef } </td>
+						<td>
+							{ fmt.Sprintf("%s/v%s", correlated.SignalTypeSlug, correlated.SemVer) }
+							@ContentKindLabel(correlated.ContentKind)
+						</td>
 						<td>{ types.FormatDateTime(correlated.SignalCreatedAt) }</td>
 						<td>{ correlated.Email }</td>
 						<td>
