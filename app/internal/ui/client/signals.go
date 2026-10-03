@@ -41,6 +41,14 @@ type SearchSignal struct {
 	Content              json.RawMessage `json:"content"`
 }
 
+// DocumentMetadata is the content of a document signal in search results (the document itself is downloaded separately)
+type DocumentMetadata struct {
+	Name      string `json:"name"`
+	MimeType  string `json:"mime_type"`
+	SizeBytes int64  `json:"size_bytes"`
+	SHA256    string `json:"sha256"`
+}
+
 // PreviousSignalVersion represents a previous version of a signal
 type PreviousSignalVersion struct {
 	SignalVersionID string          `json:"signal_version_id"`
@@ -126,4 +134,50 @@ func (c *Client) SearchSignals(ctx context.Context, accessToken string, params S
 	}
 
 	return &searchResp, nil
+}
+
+// DownloadDocumentParams identifies the document signal version to download
+type DownloadDocumentParams struct {
+	IsnSlug          string
+	SignalTypeSlug   string
+	SemVer           string
+	SignalID         string
+	VersionNumber    string
+	IncludeWithdrawn bool
+}
+
+// DownloadDocument requests a document from the signalsd API.
+// The response is returned unread so the caller can stream the document to the browser - the caller must close the response body.
+func (c *Client) DownloadDocument(ctx context.Context, accessToken string, params DownloadDocumentParams) (*http.Response, error) {
+	url := fmt.Sprintf("%s/api/isn/%s/signal-types/%s/v%s/signals/%s/content",
+		c.baseURL, params.IsnSlug, params.SignalTypeSlug, params.SemVer, params.SignalID)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, NewClientInternalError(err, "creating download document request")
+	}
+
+	q := req.URL.Query()
+	if params.VersionNumber != "" {
+		q.Add("version", params.VersionNumber)
+	}
+	if params.IncludeWithdrawn {
+		q.Add("include_withdrawn", "true")
+	}
+	req.URL.RawQuery = q.Encode()
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+	setRequestID(req, ctx)
+
+	res, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, NewClientConnectionError(err)
+	}
+
+	if res.StatusCode != http.StatusOK {
+		defer res.Body.Close()
+		return nil, NewClientApiError(res)
+	}
+
+	return res, nil
 }

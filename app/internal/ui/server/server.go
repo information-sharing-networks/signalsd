@@ -107,6 +107,7 @@ func (s *Server) RegisterRoutes() {
 			r.Get("/search", s.SearchSignalsPage)
 			r.Get("/ui-api/signals/search", s.SearchSignals)
 			r.Get("/ui-api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}/correlated-count/{count}", s.GetLatestCorrelatedSignals)
+			r.Get("/ui-api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}/content", s.DownloadDocument)
 		})
 
 		// admin routes (isnadmin or siteadmin)

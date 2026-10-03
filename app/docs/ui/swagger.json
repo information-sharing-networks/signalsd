@@ -844,6 +844,62 @@
                 }
             }
         },
+        "/ui-api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}/content": {
+            "get": {
+                "description": "Streams the document stored with a document signal from the signalsd API to the browser as an attachment. Requires ISN read access.",
+                "tags": [
+                    "UI Pages"
+                ],
+                "summary": "Download a document",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "ISN slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Signal type slug",
+                        "name": "signal_type_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Semantic version",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Signal ID",
+                        "name": "signal_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "the version to download (default: the latest version)",
+                        "name": "version",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "'true' to download a withdrawn document",
+                        "name": "include_withdrawn",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "the document"
+                    }
+                }
+            }
+        },
         "/ui-api/options/isn/signal-type-slugs": {
             "get": {
                 "description": "HTMX endpoint. Returns a signal type slug select element scoped to the user's token permissions for the selected ISN.",

@@ -1,7 +1,9 @@
 package server
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -98,7 +100,66 @@ func (s *Server) GetLatestCorrelatedSignals(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	templ.Handler(templates.CorrelatedSignalsTable((*searchResp)[0], count)).ServeHTTP(w, r)
+	templ.Handler(templates.CorrelatedSignalsTable(isnSlug, (*searchResp)[0], count)).ServeHTTP(w, r)
+}
+
+// DownloadDocument godoc
+//
+//	@Summary		Download a document
+//	@Description	Streams the document stored with a document signal from the signalsd API to the browser as an attachment. Requires ISN read access.
+//	@Tags			UI Pages
+//	@Param			isn_slug			path	string	true	"ISN slug"
+//	@Param			signal_type_slug	path	string	true	"Signal type slug"
+//	@Param			sem_ver				path	string	true	"Semantic version"
+//	@Param			signal_id			path	string	true	"Signal ID"
+//	@Param			version				query	int		false	"the version to download (default: the latest version)"
+//	@Param			include_withdrawn	query	bool	false	"'true' to download a withdrawn document"
+//	@Success		200					"the document"
+//	@Router			/ui-api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}/content [get]
+func (s *Server) DownloadDocument(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	params := client.DownloadDocumentParams{
+		IsnSlug:          chi.URLParam(r, "isn_slug"),
+		SignalTypeSlug:   chi.URLParam(r, "signal_type_slug"),
+		SemVer:           chi.URLParam(r, "sem_ver"),
+		SignalID:         chi.URLParam(r, "signal_id"),
+		VersionNumber:    r.URL.Query().Get("version"),
+		IncludeWithdrawn: r.URL.Query().Get("include_withdrawn") == "true",
+	}
+
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
+	if !ok {
+		reqLogger.Error("Access token details not found in context")
+		http.Error(w, "Authentication required. Please log in again.", http.StatusUnauthorized)
+		return
+	}
+
+	// this endpoint is opened as a link rather than called by HTMX, so errors are returned as plain text
+	res, err := s.apiClient.DownloadDocument(r.Context(), accessTokenDetails.AccessToken, params)
+	if err != nil {
+		reqLogger.Error("Failed to download document", slog.String("error", err.Error()))
+
+		status := http.StatusInternalServerError
+		if cerr, ok := errors.AsType[*client.ClientError](err); ok && cerr.StatusCode > 0 {
+			status = cerr.StatusCode
+		}
+		http.Error(w, client.UserMessage(err), status)
+		return
+	}
+	defer res.Body.Close()
+
+	// pass on the headers that tell the browser what the document is and what to call it
+	for _, header := range []string{"Content-Type", "Content-Disposition", "Content-Length", "ETag"} {
+		if value := res.Header.Get(header); value != "" {
+			w.Header().Set(header, value)
+		}
+	}
+	w.WriteHeader(http.StatusOK)
+
+	if _, err := io.Copy(w, res.Body); err != nil {
+		reqLogger.Error("Failed to stream document to the browser", slog.String("error", err.Error()))
+	}
 }
 
 // SearchSignals godoc

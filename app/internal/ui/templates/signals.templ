@@ -1,8 +1,9 @@
 package templates
 
 import (
-	"fmt"
 	"encoding/json"
+	"fmt"
+	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
@@ -36,13 +37,12 @@ templ SearchSignalsPage(environment string, isns []types.IsnOption, perms map[st
 						</div>
 						<div class="form-group">
 							@MonitorButton()
-							<img class="monitor-spinner" src="/static/images/bars.svg" alt="Loading..." style="width: 20px; height: 20px;">
-						</div>	
-
+							<img class="monitor-spinner" src="/static/images/bars.svg" alt="Loading..." style="width: 20px; height: 20px;"/>
+						</div>
 					</form>
 					<div class="form-group">
-			            <div id="search-results"></div>
-                    </div>
+						<div id="search-results"></div>
+					</div>
 				</div>
 			</div>
 			@SearchSignalScripts()
@@ -51,7 +51,7 @@ templ SearchSignalsPage(environment string, isns []types.IsnOption, perms map[st
 }
 
 // render search results from the SearchSignals handler
-templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions,  params client.SignalSearchParams) {
+templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions, params client.SignalSearchParams) {
 	<div class="card">
 		<div class="card-header">
 			<h3 class="card-title">Search Results ({ types.FormatRecordsReturned(len(signals)) })</h3>
@@ -62,7 +62,6 @@ templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions,  p
 			<div class="card-body margin-top-6">
 				for _, signal := range signals {
 					<div class="signal-card compact" id={ signal.SignalID }>
-
 						<!-- Signal Header -->
 						<div class="signal-header">
 							<h4 class="signal-title">
@@ -79,16 +78,12 @@ templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions,  p
 									{ fmt.Sprintf("(version %d)", signal.VersionNumber) }
 								</span>
 							}
-
-					
 						</div>
-
 						<!-- Signal Metadata -->
 						<div class="signal-metadata">
 							@SignalMetadataItem("Created", types.FormatDateTime(signal.SignalCreatedAt))
 							@SignalMetadataItem("Created by", signal.Email)
 						</div>
-
 						<!-- Signal Content -->
 						<div class="json-container">
 							<pre class="json-content compact language-json">
@@ -96,7 +91,8 @@ templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions,  p
 									{ string(signal.Content) }
 								</code>
 							</pre>
-							<pre style="display: none;" class="json-content pretty-printed">@templ.Raw(PrettyPrintJSON(signal.Content))</pre>
+							<pre style="display: none;" class="json-content pretty-printed">@templ.Raw(PrettyPrintJSON(signal.Content))
+</pre>
 							<button
 								type="button"
 								data-signal-id={ signal.SignalID }
@@ -105,10 +101,12 @@ templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions,  p
 								<image src="/static/images/prettyprint.svg" alt="pretty print" style="width: 20px; height: 20px;"></image>
 							</button>
 						</div>
-						if params.IncludeCorrelated {
-							@CorrelatedSignalsTable(signal, len(signal.CorrelatedSignals))
+						if signal.ContentKind == signalsd.ContentKindDocument {
+							@DownloadDocumentButton(params.IsnSlug, signal.SearchSignal)
 						}
-
+						if params.IncludeCorrelated {
+							@CorrelatedSignalsTable(params.IsnSlug, signal, len(signal.CorrelatedSignals))
+						}
 						<!-- todo previous versions -->
 						<!-- Additional Info -->
 						<div class="additional-details">
@@ -129,7 +127,6 @@ templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions,  p
 			</div>
 		}
 	</div>
-	
 }
 
 // ContentKindLabel renders the content kind in parentheses, at the font size of the surrounding text.
@@ -139,7 +136,6 @@ templ ContentKindLabel(contentKind string) {
 }
 
 templ MonitorButton() {
-	</br>
 	<button
 		id="monitor-btn"
 		type="button"
@@ -157,7 +153,7 @@ templ MonitorButton() {
 		hx-target="#search-results"
 		hx-include="form"
 		style="display: none"
-	/>
+	></div>
 }
 
 templ NoSignalsFound() {
@@ -167,9 +163,8 @@ templ NoSignalsFound() {
 }
 
 // render the correlated signals table - where the count of correlated signals has changed, highlight the new rows
-templ CorrelatedSignalsTable(signal client.SearchSignalWithCorrelationsAndVersions, originalCount int) {
-	{{ id := fmt.Sprintf("correlated-signals-table-%s",signal.SignalID) }}
-
+templ CorrelatedSignalsTable(isnSlug string, signal client.SearchSignalWithCorrelationsAndVersions, originalCount int) {
+	{{ id := fmt.Sprintf("correlated-signals-table-%s", signal.SignalID) }}
 	if len(signal.CorrelatedSignals) == 0 {
 		<div id={ id }></div>
 	} else {
@@ -201,8 +196,13 @@ templ CorrelatedSignalsTable(signal client.SearchSignalWithCorrelationsAndVersio
 						<td>
 							<button class="open-modal-btn btn btn-primary" data-correlated-signal-id={ correlated.SignalID }>View</button>
 							<dialog class="modal" id={ fmt.Sprintf("modal-%s", correlated.SignalID) }>
-								<h3> { correlated.LocalRef }</h3>
-								<pre>{ PrettyPrintJSON(correlated.Content) }</pre>
+								<h3>{ correlated.LocalRef }</h3>
+								if correlated.ContentKind == signalsd.ContentKindDocument {
+									@DocumentMetadataDetails(correlated.Content)
+									@DownloadDocumentButton(isnSlug, correlated)
+								} else {
+									<pre class="correlated-json">{ PrettyPrintJSON(correlated.Content) }</pre>
+								}
 								<button class="close-modal-btn btn btn-primary" data-correlated-signal-id={ correlated.SignalID }>Close</button>
 							</dialog>
 						</td>
@@ -211,13 +211,11 @@ templ CorrelatedSignalsTable(signal client.SearchSignalWithCorrelationsAndVersio
 			</tbody>
 		</table>
 	}
-	
 }
 
 templ SearchSignalScripts() {
 	@SignalSearchScript()
 }
-
 
 templ StartDateField() {
 	<div class="form-group">
@@ -282,15 +280,44 @@ templ AccountIDField() {
 	</div>
 }
 
+// DocumentMetadataDetails renders the metadata of a document signal as labelled fields.
+// If the content can't be read as document metadata it is shown as json instead
+templ DocumentMetadataDetails(content []byte) {
+	{{ var metadata client.DocumentMetadata }}
+	if err := json.Unmarshal(content, &metadata); err != nil {
+		<pre class="correlated-json">{ PrettyPrintJSON(content) }</pre>
+	} else {
+		<div class="document-metadata">
+			@SignalMetadataSimple("Name", metadata.Name)
+			@SignalMetadataSimple("Type", metadata.MimeType)
+			@SignalMetadataSimple("Size", types.FormatFileSize(metadata.SizeBytes))
+			@SignalMetadataSimple("SHA-256", metadata.SHA256)
+		</div>
+	}
+}
+
+// DownloadDocumentButton links to the UI endpoint that streams the document from the API.
+// The version shown in the search results is downloaded (rather than the latest), and withdrawn documents are requested with include_withdrawn
+templ DownloadDocumentButton(isnSlug string, signal client.SearchSignal) {
+	{{
+		downloadURL := fmt.Sprintf("/ui-api/isn/%s/signal-types/%s/v%s/signals/%s/content?version=%d",
+			isnSlug, signal.SignalTypeSlug, signal.SemVer, signal.SignalID, signal.VersionNumber)
+		if signal.IsWithdrawn {
+			downloadURL += "&include_withdrawn=true"
+		}
+	}}
+	<a href={ templ.SafeURL(downloadURL) } class="btn btn-primary download-document-btn">Download</a>
+}
+
 /* pretty print json */
 func PrettyPrintJSON(jsonElement []byte) string {
 	var obj any
-	if err:= json.Unmarshal([]byte(jsonElement), &obj); err != nil {
+	if err := json.Unmarshal([]byte(jsonElement), &obj); err != nil {
 		return string(jsonElement)
 	}
-	pretty, err := json.MarshalIndent(obj, "", "  ");
+	pretty, err := json.MarshalIndent(obj, "", "  ")
 	if err != nil {
 		return string(jsonElement)
-	}	
+	}
 	return string(pretty)
 }

@@ -557,6 +557,45 @@ paths:
       summary: Clear alert messages
       tags:
       - HTMX Actions
+  /ui-api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}/content:
+    get:
+      description: Streams the document stored with a document signal from the signalsd
+        API to the browser as an attachment. Requires ISN read access.
+      parameters:
+      - description: ISN slug
+        in: path
+        name: isn_slug
+        required: true
+        type: string
+      - description: Signal type slug
+        in: path
+        name: signal_type_slug
+        required: true
+        type: string
+      - description: Semantic version
+        in: path
+        name: sem_ver
+        required: true
+        type: string
+      - description: Signal ID
+        in: path
+        name: signal_id
+        required: true
+        type: string
+      - description: 'the version to download (default: the latest version)'
+        in: query
+        name: version
+        type: integer
+      - description: '''true'' to download a withdrawn document'
+        in: query
+        name: include_withdrawn
+        type: boolean
+      responses:
+        "200":
+          description: the document
+      summary: Download a document
+      tags:
+      - UI Pages
   /ui-api/isn/accounts/manage:
     put:
       description: HTMX endpoint. Adds or removes a user/service account from an ISN.

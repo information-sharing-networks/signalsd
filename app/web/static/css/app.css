@@ -245,9 +245,12 @@ body[data-environment="dev"] .login-title::after {
 p {
   margin: 0;
 }
+.download-document-btn {
+  margin-right: 20px;
+}
 
 .btn {
-  width: 220px;
+  max-width: 220px;
 }
 
 .card-header {
@@ -594,6 +597,18 @@ table tbody tr:hover {
 .signal-badge-withdrawn {
   background: #fef2f2;
   color: #b91c1c;
+}
+
+/* json content in the correlated signal modal (the modal is inside a table cell, which centres text by default) */
+.correlated-json {
+  text-align: left;
+  margin: 20px;
+}
+
+/* lets the 64 character sha256 hash wrap inside the correlated signal modal */
+.document-metadata {
+  overflow-wrap: anywhere;
+  padding-bottom: 20px;
 }
 
 .content-kind-label {
