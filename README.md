@@ -5,7 +5,7 @@
 ![ci](https://github.com/information-sharing-networks/signalsd/actions/workflows/ci.yml/badge.svg)
 ![cd-staging](https://github.com/information-sharing-networks/signalsd/actions/workflows/cd-staging-aws.yml/badge.svg)
 ![cd-production](https://github.com/information-sharing-networks/signalsd/actions/workflows/cd-production-aws.yml/badge.svg)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/information-sharing-networks/signalsd)
+[![Ask DeepWiki](https://img.shields.io/badge/Ask-DeepWiki-blue)](https://deepwiki.com/information-sharing-networks/signalsd)
 
 # Information Sharing Networks
 Information Sharing Networks (ISNs) give organisations a way to start sharing data with each other without having to build bespoke technology from scratch every time.
@@ -230,18 +230,18 @@ By default the signalsd service starts with a basic web interface. If you want t
 # Technical overview
 The wiki provides a helpful overview of the technical aspects of the project (AI Generated):
 
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/information-sharing-networks/signalsd)
+[![Ask DeepWiki](https://img.shields.io/badge/Ask-DeepWiki-blue)](https://deepwiki.com/information-sharing-networks/signalsd)
 
 The core design concepts are described in the three diagrams below.
 
 ## Auth
-![auth-2025-10-20-1039](https://github.com/user-attachments/assets/8ae6e0f7-dd08-42e5-b1f2-72c944866e22)
+![auth-2026-10-04](https://github.com/user-attachments/assets/a42e7fe5-5707-4deb-9579-8f3170ae78fe)
 
 ## ISN config
-![isn-config-2025-10-20-1039](https://github.com/user-attachments/assets/b7ad1604-8c47-4591-9393-d4968f8c0e6d)
+![isn-config-2026-10-04](https://github.com/user-attachments/assets/d48dba0b-fc4a-4a4c-af0a-d3f5e234b9d0)
 
 ## Signal Load
-![signals-load-2025-10-20-1039](https://github.com/user-attachments/assets/3798eecc-87b9-4dce-9053-54cb6b9baebb)
+![signals-load-2026-10-04](https://github.com/user-attachments/assets/d5371ceb-9fce-4296-bf70-328e537daf23)
 
 ## Rate Limits
 The service includes a shared rate limiter for all traffic regardless of source IP or user identity and protects all endpoints including auth, API, and admin routes.
