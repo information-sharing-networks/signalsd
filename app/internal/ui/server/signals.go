@@ -149,8 +149,9 @@ func (s *Server) DownloadDocument(w http.ResponseWriter, r *http.Request) {
 	}
 	defer res.Body.Close()
 
-	// pass on the headers that tell the browser what the document is and what to call it
-	for _, header := range []string{"Content-Type", "Content-Disposition", "Content-Length", "ETag"} {
+	// pass on the headers that tell the browser what the document is and what to call it,
+	// and the API's instructions not to cache the document or guess a different content type
+	for _, header := range []string{"Content-Type", "Content-Disposition", "Content-Length", "ETag", "Cache-Control", "X-Content-Type-Options"} {
 		if value := res.Header.Get(header); value != "" {
 			w.Header().Set(header, value)
 		}
