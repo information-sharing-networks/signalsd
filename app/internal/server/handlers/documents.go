@@ -36,12 +36,12 @@ import (
 // Each field is read into memory, so this stops a malicious client using large field values to exhaust the server's memory
 const maxFormFieldSize = 1024
 
-// uploadRequestOverhead allows for the form fields and multipart headers sent with the document -
-// the request size limit for uploads is MAX_DOCUMENT_SIZE plus this
-// (the document itself is limited to MAX_DOCUMENT_SIZE by storeDocumentSignal)
+// uploadRequestOverhead allows for the form fields and multipart headers sent with the document
 const uploadRequestOverhead = 64 * 1024
 
-// MaxUploadRequestSize is the request size limit for the document upload routes
+// MaxUploadRequestSize is the request size limit for the document upload routes.
+// This is the services configured max doc size (MAX_DOCUMENT_SIZE) + space for the form fields and metadata sent with the document.
+// The document itself is limited to MAX_DOCUMENT_SIZE by storeDocumentSignal.
 func MaxUploadRequestSize(maxDocumentSize int64) int64 {
 	return maxDocumentSize + uploadRequestOverhead
 }
@@ -149,6 +149,13 @@ type DocumentUploadResponse struct {
 //	@Description	The same file uploaded with a different local_ref is a separate document.
 //	@Description
 //	@Description	Rejected uploads are recorded against the batch (see the batch status endpoint).
+//	@Description
+//	@Description	**Retries**
+//	@Description
+//	@Description	An upload either stores a new version or stores nothing, so if an upload fails or times out, send it again.
+//	@Description	If the first attempt was stored, the retry returns that version with unchanged=true, provided it uses the same file, the same filename and the same (or no) correlation_id.
+//	@Description	A retry sent while the original upload is still being processed can occasionally store an extra, identical version - this is harmless, but pollers will see one more update.
+//	@Description	Uploads can take up to 2 minutes on the server (by default), so to avoid this set your client timeout above that.
 //	@Description
 //	@Description	**Optional fields**
 //	@Description	- correlation_id: the ID of a signal of any type in the same ISN that this document relates to (e.g. the consignment a bill of lading belongs to).

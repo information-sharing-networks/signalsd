@@ -1255,6 +1255,15 @@ info:
     - **If the signal was withdrawn**, it is reactivated with a new version (json and document signals).
     - **Events are never changed**: resubmitting an event with different content or a different `correlation_id`, or after it was withdrawn, fails with `resource_already_exists`. To correct an event, withdraw it and send a new event with a new `local_ref`.
 
+    ## Recovering from failures
+    Each signal in a request is stored separately, so a request that fails part way through (e.g. a timeout) can leave some signals stored and others not. Because unchanged signals are not stored again, you can recover in either of these ways:
+    - **Resend the whole request.** Signals that were already stored are returned with `unchanged: true`, and only the missing or failed signals are stored. Note that any signal in the request that has been withdrawn since it was sent is reactivated.
+    - **Resend only the failures.** The response lists the signals that failed, and *Get Batch Status* lists the batch's unresolved failures.
+
+    When a whole request fails (400, 401, 403, 413 or 500), or you get no response (e.g. a timeout), no failures are recorded in the batch, so resend the whole request once the problem is fixed.
+
+    A retry sent while the original request is still being processed can occasionally store an extra, identical version. This is harmless - the content doesn't change - but pollers will see one more update. To avoid it, set your client timeout above the server's request timeout: 15 seconds by default, or 2 minutes for document uploads.
+
     ## Correlation
     A signal can be linked to another signal in the same ISN by setting its `correlation_id` to the other signal's `signal_id`. Search with `include_correlated=true` returns the signals linked to each result, and the `correlation_id` search filter returns the signals linked to one signal.
 
@@ -2538,6 +2547,16 @@ paths:
         The response shows stored and failed signal counts broken down by ISN and signal type.
         Where a signal is listed as 'rejected' this means the signal failed to load in this batch and has not been successfully resubmitted subsequently.
 
+        **Unresolved failures**
+
+        `unresolved_failures` lists the signals to correct and resend (see _Recovering from failures_ in the API introduction).
+        A failure is resolved when a later version of the signal is stored, in this batch or any other.
+
+        Resending a signal that is unchanged doesn't store a new version.
+        Unchanged signals are counted in the batch that first stored them, not the batch they were resent in.
+
+        Requests that fail as a whole (e.g. invalid JSON, permission errors or timeouts) are not recorded, so they don't appear here.
+
         Members can view their own batches. Site admins can supply ?account_id= to view another account's batch.
       parameters:
       - description: Batch reference
@@ -3053,6 +3072,11 @@ paths:
         return a simple error_code/error_message response rather than a detailed audit log.
         The individual signal failures are not logged in this case, and the client must resupply the data once the problem is resolved.
 
+        **Retries**
+
+        Requests can be safely resent: signals that were already stored are returned with `unchanged: true` and are not stored again
+        (see _Recovering from failures_ in the API introduction).
+
         **JSON Schema Validation**
 
         the json contained in the `content` field is validated against the JSON schema specified for the signal type unless validation is disabled on the type definition.
@@ -3063,7 +3087,7 @@ paths:
 
         **Signal versions**
 
-        New versions are created when signals are resupplied using the same local_ref, e.g. because the client wants to correct a previously publsihed signal.
+        New versions are created when signals are resupplied using the same local_ref, e.g. because the client wants to correct a previously published signal.
         If a signal has been withdrawn it will be reactivated if you resubmit it using the same local_ref.
 
         A resubmission that doesn't change the signal - the same content, and the same or no correlation_id - creates no new version: the response contains the `signal_id`, `signal_version_id` and `version_number` of the existing latest version, with `unchanged: true` (so signals can be safely resent).
@@ -3073,7 +3097,7 @@ paths:
 
         **Correlating signals**
 
-        Correlation IDs can be used to link signals together (a `correlation_id` is the `signals_id` of a previosuly submitted signal)
+        Correlation IDs can be used to link signals together (a `correlation_id` is the `signal_id` of a previously submitted signal)
         Signals can only be correlated within the same ISN.
         If the supplied correlation_id is not found in the same ISN as the signal being submitted,
         the response will contain a 422 or 207 status code and the error_code for the failed signal will be `invalid_correlation_id`.
@@ -3426,6 +3450,13 @@ paths:
         The same file uploaded with a different local_ref is a separate document.
 
         Rejected uploads are recorded against the batch (see the batch status endpoint).
+
+        **Retries**
+
+        An upload either stores a new version or stores nothing, so if an upload fails or times out, send it again.
+        If the first attempt was stored, the retry returns that version with unchanged=true, provided it uses the same file, the same filename and the same (or no) correlation_id.
+        A retry sent while the original upload is still being processed can occasionally store an extra, identical version - this is harmless, but pollers will see one more update.
+        Uploads can take up to 2 minutes on the server (by default), so to avoid this set your client timeout above that.
 
         **Optional fields**
         - correlation_id: the ID of a signal of any type in the same ISN that this document relates to (e.g. the consignment a bill of lading belongs to).

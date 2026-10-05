@@ -68,6 +68,16 @@ type BatchSearchParams struct {
 //	@Description	The response shows stored and failed signal counts broken down by ISN and signal type.
 //	@Description	Where a signal is listed as 'rejected' this means the signal failed to load in this batch and has not been successfully resubmitted subsequently.
 //	@Description
+//	@Description	**Unresolved failures**
+//	@Description
+//	@Description	`unresolved_failures` lists the signals to correct and resend (see _Recovering from failures_ in the API introduction).
+//	@Description	A failure is resolved when a later version of the signal is stored, in this batch or any other.
+//	@Description
+//	@Description	Resending a signal that is unchanged doesn't store a new version.
+//	@Description	Unchanged signals are counted in the batch that first stored them, not the batch they were resent in.
+//	@Description
+//	@Description	Requests that fail as a whole (e.g. invalid JSON, permission errors or timeouts) are not recorded, so they don't appear here.
+//	@Description
 //	@Description	Members can view their own batches. Site admins can supply ?account_id= to view another account's batch.
 //	@Description
 //

@@ -127,6 +127,15 @@ import (
 //	@description	- **If the signal was withdrawn**, it is reactivated with a new version (json and document signals).
 //	@description	- **Events are never changed**: resubmitting an event with different content or a different `correlation_id`, or after it was withdrawn, fails with `resource_already_exists`. To correct an event, withdraw it and send a new event with a new `local_ref`.
 //	@description
+//	@description	## Recovering from failures
+//	@description	Each signal in a request is stored separately, so a request that fails part way through (e.g. a timeout) can leave some signals stored and others not. Because unchanged signals are not stored again, you can recover in either of these ways:
+//	@description	- **Resend the whole request.** Signals that were already stored are returned with `unchanged: true`, and only the missing or failed signals are stored. Note that any signal in the request that has been withdrawn since it was sent is reactivated.
+//	@description	- **Resend only the failures.** The response lists the signals that failed, and *Get Batch Status* lists the batch's unresolved failures.
+//	@description
+//	@description	When a whole request fails (400, 401, 403, 413 or 500), or you get no response (e.g. a timeout), no failures are recorded in the batch, so resend the whole request once the problem is fixed.
+//	@description
+//	@description	A retry sent while the original request is still being processed can occasionally store an extra, identical version. This is harmless - the content doesn't change - but pollers will see one more update. To avoid it, set your client timeout above the server's request timeout: 15 seconds by default, or 2 minutes for document uploads.
+//	@description
 //	@description	## Correlation
 //	@description	A signal can be linked to another signal in the same ISN by setting its `correlation_id` to the other signal's `signal_id`. Search with `include_correlated=true` returns the signals linked to each result, and the `correlation_id` search filter returns the signals linked to one signal.
 //	@description

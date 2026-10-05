@@ -204,6 +204,11 @@ type CreateSignalsSummary struct {
 //	@Description	return a simple error_code/error_message response rather than a detailed audit log.
 //	@Description	The individual signal failures are not logged in this case, and the client must resupply the data once the problem is resolved.
 //	@Description
+//	@Description	**Retries**
+//	@Description
+//	@Description	Requests can be safely resent: signals that were already stored are returned with `unchanged: true` and are not stored again
+//	@Description	(see _Recovering from failures_ in the API introduction).
+//	@Description
 //	@Description	**JSON Schema Validation**
 //	@Description
 //	@Description	the json contained in the `content` field is validated against the JSON schema specified for the signal type unless validation is disabled on the type definition.
@@ -214,7 +219,7 @@ type CreateSignalsSummary struct {
 //	@Description
 //	@Description	**Signal versions**
 //	@Description
-//	@Description	New versions are created when signals are resupplied using the same local_ref, e.g. because the client wants to correct a previously publsihed signal.
+//	@Description	New versions are created when signals are resupplied using the same local_ref, e.g. because the client wants to correct a previously published signal.
 //	@Description	If a signal has been withdrawn it will be reactivated if you resubmit it using the same local_ref.
 //	@Description
 //	@Description	A resubmission that doesn't change the signal - the same content, and the same or no correlation_id - creates no new version: the response contains the `signal_id`, `signal_version_id` and `version_number` of the existing latest version, with `unchanged: true` (so signals can be safely resent).
@@ -224,7 +229,7 @@ type CreateSignalsSummary struct {
 //	@Description
 //	@Description	**Correlating signals**
 //	@Description
-//	@Description	Correlation IDs can be used to link signals together (a `correlation_id` is the `signals_id` of a previosuly submitted signal)
+//	@Description	Correlation IDs can be used to link signals together (a `correlation_id` is the `signal_id` of a previously submitted signal)
 //	@Description	Signals can only be correlated within the same ISN.
 //	@Description	If the supplied correlation_id is not found in the same ISN as the signal being submitted,
 //	@Description	the response will contain a 422 or 207 status code and the error_code for the failed signal will be `invalid_correlation_id`.
