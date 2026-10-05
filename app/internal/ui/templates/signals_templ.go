@@ -320,8 +320,8 @@ func SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions, par
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				if signal.CorrelatedToSignalID != "" && signal.CorrelatedToSignalID != signal.SignalID {
-					templ_7745c5c3_Err = SignalMetadataSimple("Correlated To", signal.CorrelatedToSignalID).Render(ctx, templ_7745c5c3_Buffer)
+				if signal.CorrelationID != "" {
+					templ_7745c5c3_Err = SignalMetadataSimple("Correlated To", signal.CorrelationID).Render(ctx, templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}

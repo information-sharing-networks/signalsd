@@ -117,8 +117,8 @@ templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions, pa
 								}
 								@SignalMetadataSimple("Account ID", signal.AccountID)
 								@SignalMetadataSimple("Signal Id", signal.SignalID)
-								if signal.CorrelatedToSignalID != "" && signal.CorrelatedToSignalID != signal.SignalID {
-									@SignalMetadataSimple("Correlated To", signal.CorrelatedToSignalID)
+								if signal.CorrelationID != "" {
+									@SignalMetadataSimple("Correlated To", signal.CorrelationID)
 								}
 							</div>
 						</div>

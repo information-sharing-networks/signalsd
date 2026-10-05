@@ -24,21 +24,21 @@ type SignalSearchParams struct {
 
 // SearchSignal represents a signal in search results
 type SearchSignal struct {
-	AccountID            string          `json:"account_id"`
-	AccountType          string          `json:"account_type"`
-	Email                string          `json:"email,omitempty"`
-	SignalID             string          `json:"signal_id"`
-	LocalRef             string          `json:"local_ref"`
-	SignalTypeSlug       string          `json:"signal_type_slug"`
-	SemVer               string          `json:"sem_ver"`
-	ContentKind          string          `json:"content_kind"`
-	SignalCreatedAt      string          `json:"signal_created_at"`
-	SignalVersionID      string          `json:"signal_version_id"`
-	VersionNumber        int32           `json:"version_number"`
-	VersionCreatedAt     string          `json:"version_created_at"`
-	CorrelatedToSignalID string          `json:"correlated_to_signal_id"`
-	IsWithdrawn          bool            `json:"is_withdrawn"`
-	Content              json.RawMessage `json:"content"`
+	AccountID        string          `json:"account_id"`
+	AccountType      string          `json:"account_type"`
+	Email            string          `json:"email,omitempty"`
+	SignalID         string          `json:"signal_id"`
+	LocalRef         string          `json:"local_ref"`
+	SignalTypeSlug   string          `json:"signal_type_slug"`
+	SemVer           string          `json:"sem_ver"`
+	ContentKind      string          `json:"content_kind"`
+	SignalCreatedAt  string          `json:"signal_created_at"`
+	SignalVersionID  string          `json:"signal_version_id"`
+	VersionNumber    int32           `json:"version_number"`
+	VersionCreatedAt string          `json:"version_created_at"`
+	CorrelationID    string          `json:"correlation_id"` // empty if the signal is not linked to another signal (null in the API response)
+	IsWithdrawn      bool            `json:"is_withdrawn"`
+	Content          json.RawMessage `json:"content"`
 }
 
 // DocumentMetadata is the content of a document signal in search results (the document itself is downloaded separately)

@@ -624,12 +624,20 @@ definitions:
   handlers.PreviousSignalVersion:
     properties:
       content:
+        description: the content of this version (the json payload, or the document
+          metadata for documents)
         type: object
       created_at:
+        description: when this version was received
+        example: "2026-09-27T14:02:00.123456Z"
         type: string
       signal_version_id:
+        description: the server generated ID of this version
+        example: 835788bd-789d-4091-96e3-db0f51ccbabc
         type: string
       version_number:
+        description: the version number of this version
+        example: 1
         type: integer
     type: object
   handlers.RegisterNewSignalTypeSchemaRequest:
@@ -686,58 +694,116 @@ definitions:
   handlers.SearchSignal:
     properties:
       account_id:
+        description: the account that sent the signal
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
         type: string
       account_type:
+        description: the type of account that sent the signal
+        enum:
+        - user
+        - service_account
+        example: service_account
         type: string
       content:
+        description: 'the signal content: the json payload for json signals and events,
+          or the document metadata (name, mime_type, size_bytes and sha256) for documents'
         type: object
       content_kind:
+        description: 'how the content is sent and stored: json (the content is the
+          signal), document (the content is the document metadata - the document is
+          downloaded from the content endpoint) or event (the content is the event,
+          including occurred_at)'
         enum:
         - json
         - document
         - event
         example: json
         type: string
-      correlated_to_signal_id:
+      correlation_id:
+        description: |-
+          the signal_id of the signal this signal is linked to (the correlation_id it was submitted with). Null if the signal is not linked to another signal.
+          To fetch the linked signal, search its signal type with signal_id=<correlation_id>
+        example: 75b45fe1-ecc2-4629-946b-fd9058c3b2ca
         type: string
+        x-nullable: true
       email:
-        description: not included in public ISN searches
+        description: the email address of the account that sent the signal (the user's
+          email, or the service account's contact email). Not included in public ISN
+          searches
+        example: sender@example.com
         type: string
       is_withdrawn:
+        description: true if the signal has been withdrawn (withdrawn signals are
+          only returned when include_withdrawn=true)
+        example: false
         type: boolean
       local_ref:
+        description: the sender's reference for the signal - unique for the sending
+          account, ISN and signal type
+        example: item_id_#1
         type: string
       sem_ver:
+        description: the version of the signal type
         example: 0.0.1
         type: string
       signal_created_at:
+        description: when the signal was first received
+        example: "2026-09-27T14:02:00.123456Z"
         type: string
       signal_id:
+        description: the server generated ID of the signal. Use it as the correlation_id
+          when submitting signals that link to this signal, and as the signal_id search
+          filter
+        example: 4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19
         type: string
       signal_type_slug:
+        description: the signal type (use signal_type_slug and sem_ver, not the search
+          URL, to build the URLs of correlated signals - they are often a different
+          type)
         example: sample-signal-type
         type: string
       signal_updated_at:
         description: when the signal was last created, given a new version, recorrelated
           or withdrawn (the cursor when polling - start the next poll 1 minute before
           the last result's value)
+        example: "2026-09-27T14:02:00.123456Z"
         type: string
       signal_version_id:
+        description: the server generated ID of this version of the signal
+        example: 835788bd-789d-4091-96e3-db0f51ccbabc
         type: string
       version_created_at:
+        description: when this version was received
+        example: "2026-09-27T14:02:00.123456Z"
         type: string
       version_number:
+        description: the version number of this version (1 for the first version,
+          incremented each time the signal is changed)
+        example: 1
         type: integer
     type: object
   handlers.SearchSignalWithCorrelationsAndVersions:
     properties:
       account_id:
+        description: the account that sent the signal
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
         type: string
       account_type:
+        description: the type of account that sent the signal
+        enum:
+        - user
+        - service_account
+        example: service_account
         type: string
       content:
+        description: 'the signal content: the json payload for json signals and events,
+          or the document metadata (name, mime_type, size_bytes and sha256) for documents'
         type: object
       content_kind:
+        description: 'how the content is sent and stored: json (the content is the
+          signal), document (the content is the document metadata - the document is
+          downloaded from the content endpoint) or event (the content is the event,
+          including occurred_at)'
         enum:
         - json
         - document
@@ -745,42 +811,78 @@ definitions:
         example: json
         type: string
       correlated_signals:
+        description: |-
+          the signals linked to this signal - those whose correlation_id is this signal's signal_id (include_correlated=true).
+          Correlation is one level deep: the signals linked to these signals are not included
         items:
           $ref: '#/definitions/handlers.SearchSignal'
         type: array
-      correlated_to_signal_id:
+      correlation_id:
+        description: |-
+          the signal_id of the signal this signal is linked to (the correlation_id it was submitted with). Null if the signal is not linked to another signal.
+          To fetch the linked signal, search its signal type with signal_id=<correlation_id>
+        example: 75b45fe1-ecc2-4629-946b-fd9058c3b2ca
         type: string
+        x-nullable: true
       email:
-        description: not included in public ISN searches
+        description: the email address of the account that sent the signal (the user's
+          email, or the service account's contact email). Not included in public ISN
+          searches
+        example: sender@example.com
         type: string
       is_withdrawn:
+        description: true if the signal has been withdrawn (withdrawn signals are
+          only returned when include_withdrawn=true)
+        example: false
         type: boolean
       local_ref:
+        description: the sender's reference for the signal - unique for the sending
+          account, ISN and signal type
+        example: item_id_#1
         type: string
       previous_signal_versions:
+        description: the earlier versions of this signal (include_previous_versions=true)
         items:
           $ref: '#/definitions/handlers.PreviousSignalVersion'
         type: array
       sem_ver:
+        description: the version of the signal type
         example: 0.0.1
         type: string
       signal_created_at:
+        description: when the signal was first received
+        example: "2026-09-27T14:02:00.123456Z"
         type: string
       signal_id:
+        description: the server generated ID of the signal. Use it as the correlation_id
+          when submitting signals that link to this signal, and as the signal_id search
+          filter
+        example: 4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19
         type: string
       signal_type_slug:
+        description: the signal type (use signal_type_slug and sem_ver, not the search
+          URL, to build the URLs of correlated signals - they are often a different
+          type)
         example: sample-signal-type
         type: string
       signal_updated_at:
         description: when the signal was last created, given a new version, recorrelated
           or withdrawn (the cursor when polling - start the next poll 1 minute before
           the last result's value)
+        example: "2026-09-27T14:02:00.123456Z"
         type: string
       signal_version_id:
+        description: the server generated ID of this version of the signal
+        example: 835788bd-789d-4091-96e3-db0f51ccbabc
         type: string
       version_created_at:
+        description: when this version was received
+        example: "2026-09-27T14:02:00.123456Z"
         type: string
       version_number:
+        description: the version number of this version (1 for the first version,
+          incremented each time the signal is changed)
+        example: 1
         type: integer
     type: object
   handlers.ServiceAccountDetails:
@@ -1266,6 +1368,8 @@ info:
 
     ## Correlation
     A signal can be linked to another signal in the same ISN by setting its `correlation_id` to the other signal's `signal_id`. Search with `include_correlated=true` returns the signals linked to each result, and the `correlation_id` search filter returns the signals linked to one signal.
+
+    Search results include each signal's `correlation_id` (null if the signal is not linked to another signal). To fetch the signal it is linked to (e.g. the consignment an event is about), search that signal's type with `signal_id=<correlation_id>`.
 
     **Correlate to the entity directly.** For example, correlate a consignment's documents and events to the consignment itself, not to each other. Correlation is one level deep: `include_correlated` only returns signals that are correlated directly to the returned signal.
 
@@ -3299,6 +3403,7 @@ paths:
         "signal_type_slug": "shipment",
         "sem_ver": "1.0.0",
         "content_kind": "json",
+        "correlation_id": null,
         "content": {...},
         "correlated_signals": [{
         "signal_id": "4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19",
@@ -3306,6 +3411,7 @@ paths:
         "signal_type_slug": "bill-of-lading",
         "sem_ver": "1.0.0",
         "content_kind": "document",
+        "correlation_id": "def87f89-dab6-4607-95f7-593d61cb5742",
         "content": {"name": "BL-2026-0042.pdf", "mime_type": "application/pdf", ...},
         ...
         }],
@@ -3340,7 +3446,8 @@ paths:
         in: query
         name: account_id
         type: string
-      - description: Signal ID
+      - description: Return the signal with this signal_id (e.g. the correlation_id
+          of a signal of another type)
         example: 4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19
         in: query
         name: signal_id
@@ -3350,7 +3457,8 @@ paths:
         in: query
         name: local_ref
         type: string
-      - description: Return signals correlated with this signal ID
+      - description: Return the signals of this type that are linked to the signal
+          with this signal_id (those whose correlation_id is this value)
         example: 4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19
         in: query
         name: correlation_id
@@ -3707,7 +3815,8 @@ paths:
         in: query
         name: account_id
         type: string
-      - description: Signal ID
+      - description: Return the signal with this signal_id (e.g. the correlation_id
+          of a signal of another type)
         example: 4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19
         in: query
         name: signal_id
@@ -3717,7 +3826,8 @@ paths:
         in: query
         name: local_ref
         type: string
-      - description: Return signals correlated with this signal ID
+      - description: Return the signals of this type that are linked to the signal
+          with this signal_id (those whose correlation_id is this value)
         example: 4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19
         in: query
         name: correlation_id

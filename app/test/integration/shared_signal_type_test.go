@@ -188,7 +188,7 @@ func TestLocalRefReuseAcrossIsns(t *testing.T) {
 		if len(signals) != 1 {
 			t.Fatalf("Expected 1 signal in alpha ISN, got %d", len(signals))
 		}
-		if signals[0]["signal_id"] != alphaSignalID || signals[0]["version_number"] != float64(1) || signals[0]["correlated_to_signal_id"] != alphaSignalID {
+		if signals[0]["signal_id"] != alphaSignalID || signals[0]["version_number"] != float64(1) || signals[0]["correlation_id"] != nil {
 			t.Errorf("Expected alpha signal %s at version 1 and uncorrelated, got %v", alphaSignalID, signals[0])
 		}
 

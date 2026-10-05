@@ -139,6 +139,8 @@ import (
 //	@description	## Correlation
 //	@description	A signal can be linked to another signal in the same ISN by setting its `correlation_id` to the other signal's `signal_id`. Search with `include_correlated=true` returns the signals linked to each result, and the `correlation_id` search filter returns the signals linked to one signal.
 //	@description
+//	@description	Search results include each signal's `correlation_id` (null if the signal is not linked to another signal). To fetch the signal it is linked to (e.g. the consignment an event is about), search that signal's type with `signal_id=<correlation_id>`.
+//	@description
 //	@description	**Correlate to the entity directly.** For example, correlate a consignment's documents and events to the consignment itself, not to each other. Correlation is one level deep: `include_correlated` only returns signals that are correlated directly to the returned signal.
 //	@description
 //	@description	**Correlating is sharing.** Correlating your signal to a signal created by another account is like emailing that account a copy: they can see it (and every account with read access to the ISN already can), with the extra controls that you can withdraw it or send new versions, and they see those changes. Unlike email:

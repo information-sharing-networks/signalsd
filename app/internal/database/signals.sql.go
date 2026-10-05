@@ -662,7 +662,7 @@ SELECT
     lsv.id AS signal_version_id,
     lsv.version_number,
     lsv.created_at version_created_at,
-    s.correlation_id as correlated_to_signal_id,
+    s.correlation_id,
     s.is_withdrawn,
     lsv.content
 FROM
@@ -706,22 +706,22 @@ type GetSignalsByCorrelationIDsParams struct {
 }
 
 type GetSignalsByCorrelationIDsRow struct {
-	AccountID            uuid.UUID       `json:"account_id"`
-	AccountType          string          `json:"account_type"`
-	Email                string          `json:"email"`
-	SignalID             uuid.UUID       `json:"signal_id"`
-	LocalRef             string          `json:"local_ref"`
-	SignalTypeSlug       string          `json:"signal_type_slug"`
-	SemVer               string          `json:"sem_ver"`
-	ContentKind          string          `json:"content_kind"`
-	SignalCreatedAt      time.Time       `json:"signal_created_at"`
-	SignalUpdatedAt      time.Time       `json:"signal_updated_at"`
-	SignalVersionID      uuid.UUID       `json:"signal_version_id"`
-	VersionNumber        int32           `json:"version_number"`
-	VersionCreatedAt     time.Time       `json:"version_created_at"`
-	CorrelatedToSignalID uuid.UUID       `json:"correlated_to_signal_id"`
-	IsWithdrawn          bool            `json:"is_withdrawn"`
-	Content              json.RawMessage `json:"content"`
+	AccountID        uuid.UUID       `json:"account_id"`
+	AccountType      string          `json:"account_type"`
+	Email            string          `json:"email"`
+	SignalID         uuid.UUID       `json:"signal_id"`
+	LocalRef         string          `json:"local_ref"`
+	SignalTypeSlug   string          `json:"signal_type_slug"`
+	SemVer           string          `json:"sem_ver"`
+	ContentKind      string          `json:"content_kind"`
+	SignalCreatedAt  time.Time       `json:"signal_created_at"`
+	SignalUpdatedAt  time.Time       `json:"signal_updated_at"`
+	SignalVersionID  uuid.UUID       `json:"signal_version_id"`
+	VersionNumber    int32           `json:"version_number"`
+	VersionCreatedAt time.Time       `json:"version_created_at"`
+	CorrelationID    uuid.UUID       `json:"correlation_id"`
+	IsWithdrawn      bool            `json:"is_withdrawn"`
+	Content          json.RawMessage `json:"content"`
 }
 
 // Get all signals that correlate to the provided signal IDs (for embedding correlated signals)
@@ -752,7 +752,7 @@ func (q *Queries) GetSignalsByCorrelationIDs(ctx context.Context, arg GetSignals
 			&i.SignalVersionID,
 			&i.VersionNumber,
 			&i.VersionCreatedAt,
-			&i.CorrelatedToSignalID,
+			&i.CorrelationID,
 			&i.IsWithdrawn,
 			&i.Content,
 		); err != nil {
@@ -781,7 +781,7 @@ SELECT
     lsv.id AS signal_version_id,
     lsv.version_number,
     lsv.created_at version_created_at,
-    s.correlation_id as correlated_to_signal_id,
+    s.correlation_id,
     s.is_withdrawn,
     lsv.content
 FROM
@@ -839,22 +839,22 @@ type GetSignalsWithOptionalFiltersParams struct {
 }
 
 type GetSignalsWithOptionalFiltersRow struct {
-	AccountID            uuid.UUID       `json:"account_id"`
-	AccountType          string          `json:"account_type"`
-	Email                string          `json:"email"`
-	SignalID             uuid.UUID       `json:"signal_id"`
-	LocalRef             string          `json:"local_ref"`
-	SignalTypeSlug       string          `json:"signal_type_slug"`
-	SemVer               string          `json:"sem_ver"`
-	ContentKind          string          `json:"content_kind"`
-	SignalCreatedAt      time.Time       `json:"signal_created_at"`
-	SignalUpdatedAt      time.Time       `json:"signal_updated_at"`
-	SignalVersionID      uuid.UUID       `json:"signal_version_id"`
-	VersionNumber        int32           `json:"version_number"`
-	VersionCreatedAt     time.Time       `json:"version_created_at"`
-	CorrelatedToSignalID uuid.UUID       `json:"correlated_to_signal_id"`
-	IsWithdrawn          bool            `json:"is_withdrawn"`
-	Content              json.RawMessage `json:"content"`
+	AccountID        uuid.UUID       `json:"account_id"`
+	AccountType      string          `json:"account_type"`
+	Email            string          `json:"email"`
+	SignalID         uuid.UUID       `json:"signal_id"`
+	LocalRef         string          `json:"local_ref"`
+	SignalTypeSlug   string          `json:"signal_type_slug"`
+	SemVer           string          `json:"sem_ver"`
+	ContentKind      string          `json:"content_kind"`
+	SignalCreatedAt  time.Time       `json:"signal_created_at"`
+	SignalUpdatedAt  time.Time       `json:"signal_updated_at"`
+	SignalVersionID  uuid.UUID       `json:"signal_version_id"`
+	VersionNumber    int32           `json:"version_number"`
+	VersionCreatedAt time.Time       `json:"version_created_at"`
+	CorrelationID    uuid.UUID       `json:"correlation_id"`
+	IsWithdrawn      bool            `json:"is_withdrawn"`
+	Content          json.RawMessage `json:"content"`
 }
 
 // you must supply the isn_slug,signal_type_slug & sem_ver params - other filters are optional
@@ -899,7 +899,7 @@ func (q *Queries) GetSignalsWithOptionalFilters(ctx context.Context, arg GetSign
 			&i.SignalVersionID,
 			&i.VersionNumber,
 			&i.VersionCreatedAt,
-			&i.CorrelatedToSignalID,
+			&i.CorrelationID,
 			&i.IsWithdrawn,
 			&i.Content,
 		); err != nil {

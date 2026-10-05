@@ -245,7 +245,7 @@ SELECT
     lsv.id AS signal_version_id,
     lsv.version_number,
     lsv.created_at version_created_at,
-    s.correlation_id as correlated_to_signal_id,
+    s.correlation_id,
     s.is_withdrawn,
     lsv.content
 FROM
@@ -349,7 +349,7 @@ SELECT
     lsv.id AS signal_version_id,
     lsv.version_number,
     lsv.created_at version_created_at,
-    s.correlation_id as correlated_to_signal_id,
+    s.correlation_id,
     s.is_withdrawn,
     lsv.content
 FROM

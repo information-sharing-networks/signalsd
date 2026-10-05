@@ -40,38 +40,84 @@ type SearchParams struct {
 
 // search signals reponse
 
-// SearchSignal represents a signal returned from the database
+// SearchSignal is a signal returned by the search endpoints (the latest version of the signal).
+//
+// The field comments are the field descriptions in the API docs, so they refer to the json field names.
 type SearchSignal struct {
-	AccountID            uuid.UUID       `json:"account_id"`
-	AccountType          string          `json:"account_type"`
-	Email                string          `json:"email,omitempty"` // not included in public ISN searches
-	SignalID             uuid.UUID       `json:"signal_id"`
-	LocalRef             string          `json:"local_ref"`
-	SignalTypeSlug       string          `json:"signal_type_slug" example:"sample-signal-type"`
-	SemVer               string          `json:"sem_ver" example:"0.0.1"`
-	ContentKind          string          `json:"content_kind" example:"json" enums:"json,document,event"`
-	SignalCreatedAt      time.Time       `json:"signal_created_at"`
-	SignalUpdatedAt      time.Time       `json:"signal_updated_at"` // when the signal was last created, given a new version, recorrelated or withdrawn (the cursor when polling - start the next poll 1 minute before the last result's value)
-	SignalVersionID      uuid.UUID       `json:"signal_version_id"`
-	VersionNumber        int32           `json:"version_number"`
-	VersionCreatedAt     time.Time       `json:"version_created_at"`
-	CorrelatedToSignalID uuid.UUID       `json:"correlated_to_signal_id"`
-	IsWithdrawn          bool            `json:"is_withdrawn"`
-	Content              json.RawMessage `json:"content" swaggertype:"object"`
+	// the account that sent the signal
+	AccountID uuid.UUID `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
+
+	// the type of account that sent the signal
+	AccountType string `json:"account_type" example:"service_account" enums:"user,service_account"`
+
+	// the email address of the account that sent the signal (the user's email, or the service account's contact email). Not included in public ISN searches
+	Email string `json:"email,omitempty" example:"sender@example.com"`
+
+	// the server generated ID of the signal. Use it as the correlation_id when submitting signals that link to this signal, and as the signal_id search filter
+	SignalID uuid.UUID `json:"signal_id" example:"4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19"`
+
+	// the sender's reference for the signal - unique for the sending account, ISN and signal type
+	LocalRef string `json:"local_ref" example:"item_id_#1"`
+
+	// the signal type (use signal_type_slug and sem_ver, not the search URL, to build the URLs of correlated signals - they are often a different type)
+	SignalTypeSlug string `json:"signal_type_slug" example:"sample-signal-type"`
+
+	// the version of the signal type
+	SemVer string `json:"sem_ver" example:"0.0.1"`
+
+	// how the content is sent and stored: json (the content is the signal), document (the content is the document metadata - the document is downloaded from the content endpoint) or event (the content is the event, including occurred_at)
+	ContentKind string `json:"content_kind" example:"json" enums:"json,document,event"`
+
+	// when the signal was first received
+	SignalCreatedAt time.Time `json:"signal_created_at" example:"2026-09-27T14:02:00.123456Z"`
+
+	// when the signal was last created, given a new version, recorrelated or withdrawn (the cursor when polling - start the next poll 1 minute before the last result's value)
+	SignalUpdatedAt time.Time `json:"signal_updated_at" example:"2026-09-27T14:02:00.123456Z"`
+
+	// the server generated ID of this version of the signal
+	SignalVersionID uuid.UUID `json:"signal_version_id" example:"835788bd-789d-4091-96e3-db0f51ccbabc"`
+
+	// the version number of this version (1 for the first version, incremented each time the signal is changed)
+	VersionNumber int32 `json:"version_number" example:"1"`
+
+	// when this version was received
+	VersionCreatedAt time.Time `json:"version_created_at" example:"2026-09-27T14:02:00.123456Z"`
+
+	// the signal_id of the signal this signal is linked to (the correlation_id it was submitted with). Null if the signal is not linked to another signal.
+	// To fetch the linked signal, search its signal type with signal_id=<correlation_id>
+	CorrelationID *uuid.UUID `json:"correlation_id" example:"75b45fe1-ecc2-4629-946b-fd9058c3b2ca" extensions:"x-nullable"`
+
+	// true if the signal has been withdrawn (withdrawn signals are only returned when include_withdrawn=true)
+	IsWithdrawn bool `json:"is_withdrawn" example:"false"`
+
+	// the signal content: the json payload for json signals and events, or the document metadata (name, mime_type, size_bytes and sha256) for documents
+	Content json.RawMessage `json:"content" swaggertype:"object"`
 }
 
-// optionally the search can return the history of a signal
+// PreviousSignalVersion is an earlier version of a returned signal (include_previous_versions=true)
 type PreviousSignalVersion struct {
-	SignalVersionID uuid.UUID       `json:"signal_version_id"`
-	CreatedAt       time.Time       `json:"created_at"`
-	VersionNumber   int32           `json:"version_number"`
-	Content         json.RawMessage `json:"content" swaggertype:"object"`
+	// the server generated ID of this version
+	SignalVersionID uuid.UUID `json:"signal_version_id" example:"835788bd-789d-4091-96e3-db0f51ccbabc"`
+
+	// when this version was received
+	CreatedAt time.Time `json:"created_at" example:"2026-09-27T14:02:00.123456Z"`
+
+	// the version number of this version
+	VersionNumber int32 `json:"version_number" example:"1"`
+
+	// the content of this version (the json payload, or the document metadata for documents)
+	Content json.RawMessage `json:"content" swaggertype:"object"`
 }
 
-// optionally the search can return the signals correlated with a returned signal
+// SearchSignalWithCorrelationsAndVersions is a search result, optionally with its correlated signals and previous versions
 type SearchSignalWithCorrelationsAndVersions struct {
 	SearchSignal
-	CorrelatedSignals      []SearchSignal          `json:"correlated_signals,omitempty"`
+
+	// the signals linked to this signal - those whose correlation_id is this signal's signal_id (include_correlated=true).
+	// Correlation is one level deep: the signals linked to these signals are not included
+	CorrelatedSignals []SearchSignal `json:"correlated_signals,omitempty"`
+
+	// the earlier versions of this signal (include_previous_versions=true)
 	PreviousSignalVersions []PreviousSignalVersion `json:"previous_signal_versions,omitempty"`
 }
 
@@ -242,24 +288,24 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 			email = signal.Email
 		}
 		correlatedSignal := SearchSignal{
-			AccountID:            signal.AccountID,
-			AccountType:          signal.AccountType,
-			Email:                email,
-			SignalID:             signal.SignalID,
-			LocalRef:             signal.LocalRef,
-			SignalTypeSlug:       signal.SignalTypeSlug,
-			SemVer:               signal.SemVer,
-			ContentKind:          signal.ContentKind,
-			SignalCreatedAt:      signal.SignalCreatedAt,
-			SignalUpdatedAt:      signal.SignalUpdatedAt,
-			SignalVersionID:      signal.SignalVersionID,
-			VersionNumber:        signal.VersionNumber,
-			VersionCreatedAt:     signal.VersionCreatedAt,
-			CorrelatedToSignalID: signal.CorrelatedToSignalID,
-			IsWithdrawn:          signal.IsWithdrawn,
-			Content:              signal.Content,
+			AccountID:        signal.AccountID,
+			AccountType:      signal.AccountType,
+			Email:            email,
+			SignalID:         signal.SignalID,
+			LocalRef:         signal.LocalRef,
+			SignalTypeSlug:   signal.SignalTypeSlug,
+			SemVer:           signal.SemVer,
+			ContentKind:      signal.ContentKind,
+			SignalCreatedAt:  signal.SignalCreatedAt,
+			SignalUpdatedAt:  signal.SignalUpdatedAt,
+			SignalVersionID:  signal.SignalVersionID,
+			VersionNumber:    signal.VersionNumber,
+			VersionCreatedAt: signal.VersionCreatedAt,
+			CorrelationID:    &signal.CorrelationID, // the query excludes uncorrelated signals
+			IsWithdrawn:      signal.IsWithdrawn,
+			Content:          signal.Content,
 		}
-		result[signal.CorrelatedToSignalID] = append(result[signal.CorrelatedToSignalID], correlatedSignal)
+		result[signal.CorrelationID] = append(result[signal.CorrelationID], correlatedSignal)
 	}
 
 	return result, nil
@@ -283,9 +329,9 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 //	@Param			end_date					query		string	false	"End date"																																																	example(2006-01-02T15:15:00Z)
 //	@Param			updated_since				query		string	false	"Signals created, given a new version, recorrelated or withdrawn since this time (to poll for changes, use with include_withdrawn=true and set it 1 minute before the last signal_updated_at you received)"	example(2006-01-02T15:05:00Z)
 //	@Param			account_id					query		string	false	"Account ID"																																																example(def87f89-dab6-4607-95f7-593d61cb5742)
-//	@Param			signal_id					query		string	false	"Signal ID"																																																	example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
+//	@Param			signal_id					query		string	false	"Return the signal with this signal_id (e.g. the correlation_id of a signal of another type)"																												example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
 //	@Param			local_ref					query		string	false	"Local reference"																																															example(item_id_#1)
-//	@Param			correlation_id				query		string	false	"Return signals correlated with this signal ID"																																								example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
+//	@Param			correlation_id				query		string	false	"Return the signals of this type that are linked to the signal with this signal_id (those whose correlation_id is this value)"																				example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
 //	@Param			include_withdrawn			query		string	false	"Include withdrawn signals (default: false)"																																								example(true)
 //	@Param			include_correlated			query		string	false	"Include signals that link to each returned signal (default: false)"																																		example(true)
 //	@Param			include_previous_versions	query		string	false	"Include previous versions of each returned signal (default: false)"																																		example(true)
@@ -383,24 +429,30 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 	}
 
 	for _, returnedSignal := range returnedSignals {
+		// uncorrelated signals are stored correlated to themselves - these are returned as null
+		var correlationID *uuid.UUID
+		if returnedSignal.CorrelationID != returnedSignal.SignalID {
+			correlationID = &returnedSignal.CorrelationID
+		}
+
 		signal := SearchSignalWithCorrelationsAndVersions{
 			SearchSignal: SearchSignal{
-				AccountID:            returnedSignal.AccountID,
-				AccountType:          returnedSignal.AccountType,
-				Email:                "", // do not show email addresses in public ISNs
-				SignalID:             returnedSignal.SignalID,
-				LocalRef:             returnedSignal.LocalRef,
-				SignalTypeSlug:       returnedSignal.SignalTypeSlug,
-				SemVer:               returnedSignal.SemVer,
-				ContentKind:          returnedSignal.ContentKind,
-				SignalCreatedAt:      returnedSignal.SignalCreatedAt,
-				SignalUpdatedAt:      returnedSignal.SignalUpdatedAt,
-				SignalVersionID:      returnedSignal.SignalVersionID,
-				VersionNumber:        returnedSignal.VersionNumber,
-				VersionCreatedAt:     returnedSignal.VersionCreatedAt,
-				CorrelatedToSignalID: returnedSignal.CorrelatedToSignalID,
-				IsWithdrawn:          returnedSignal.IsWithdrawn,
-				Content:              returnedSignal.Content,
+				AccountID:        returnedSignal.AccountID,
+				AccountType:      returnedSignal.AccountType,
+				Email:            "", // do not show email addresses in public ISNs
+				SignalID:         returnedSignal.SignalID,
+				LocalRef:         returnedSignal.LocalRef,
+				SignalTypeSlug:   returnedSignal.SignalTypeSlug,
+				SemVer:           returnedSignal.SemVer,
+				ContentKind:      returnedSignal.ContentKind,
+				SignalCreatedAt:  returnedSignal.SignalCreatedAt,
+				SignalUpdatedAt:  returnedSignal.SignalUpdatedAt,
+				SignalVersionID:  returnedSignal.SignalVersionID,
+				VersionNumber:    returnedSignal.VersionNumber,
+				VersionCreatedAt: returnedSignal.VersionCreatedAt,
+				CorrelationID:    correlationID,
+				IsWithdrawn:      returnedSignal.IsWithdrawn,
+				Content:          returnedSignal.Content,
 			},
 		}
 		// Add correlated signals if requested
@@ -443,9 +495,9 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 //	@Param			end_date					query		string	false	"End date"																																																	example(2006-01-02T15:15:00Z)
 //	@Param			updated_since				query		string	false	"Signals created, given a new version, recorrelated or withdrawn since this time (to poll for changes, use with include_withdrawn=true and set it 1 minute before the last signal_updated_at you received)"	example(2006-01-02T15:05:00Z)
 //	@Param			account_id					query		string	false	"Account ID"																																																example(def87f89-dab6-4607-95f7-593d61cb5742)
-//	@Param			signal_id					query		string	false	"Signal ID"																																																	example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
+//	@Param			signal_id					query		string	false	"Return the signal with this signal_id (e.g. the correlation_id of a signal of another type)"																												example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
 //	@Param			local_ref					query		string	false	"Local reference"																																															example(item_id_#1)
-//	@Param			correlation_id				query		string	false	"Return signals correlated with this signal ID"																																								example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
+//	@Param			correlation_id				query		string	false	"Return the signals of this type that are linked to the signal with this signal_id (those whose correlation_id is this value)"																				example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
 //	@Param			include_withdrawn			query		string	false	"Include withdrawn signals (default: false)"																																								example(true)
 //	@Param			include_correlated			query		string	false	"Include signals that link to each returned signal (default: false)"																																		example(true)
 //	@Param			include_previous_versions	query		string	false	"Include previous versions of each returned signal (default: false)"																																		example(true)
@@ -481,6 +533,7 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 //	@Description	"signal_type_slug": "shipment",
 //	@Description	"sem_ver": "1.0.0",
 //	@Description	"content_kind": "json",
+//	@Description	"correlation_id": null,
 //	@Description	"content": {...},
 //	@Description	"correlated_signals": [{
 //	@Description	"signal_id": "4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19",
@@ -488,6 +541,7 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 //	@Description	"signal_type_slug": "bill-of-lading",
 //	@Description	"sem_ver": "1.0.0",
 //	@Description	"content_kind": "document",
+//	@Description	"correlation_id": "def87f89-dab6-4607-95f7-593d61cb5742",
 //	@Description	"content": {"name": "BL-2026-0042.pdf", "mime_type": "application/pdf", ...},
 //	@Description	...
 //	@Description	}],
@@ -588,24 +642,30 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 	}
 
 	for _, returnedSignal := range returnedSignals {
+		// uncorrelated signals are stored correlated to themselves - these are returned as null
+		var correlationID *uuid.UUID
+		if returnedSignal.CorrelationID != returnedSignal.SignalID {
+			correlationID = &returnedSignal.CorrelationID
+		}
+
 		signal := SearchSignalWithCorrelationsAndVersions{
 			SearchSignal: SearchSignal{
-				AccountID:            returnedSignal.AccountID,
-				AccountType:          returnedSignal.AccountType,
-				Email:                returnedSignal.Email,
-				SignalID:             returnedSignal.SignalID,
-				LocalRef:             returnedSignal.LocalRef,
-				SignalTypeSlug:       returnedSignal.SignalTypeSlug,
-				SemVer:               returnedSignal.SemVer,
-				ContentKind:          returnedSignal.ContentKind,
-				SignalCreatedAt:      returnedSignal.SignalCreatedAt,
-				SignalUpdatedAt:      returnedSignal.SignalUpdatedAt,
-				SignalVersionID:      returnedSignal.SignalVersionID,
-				VersionNumber:        returnedSignal.VersionNumber,
-				VersionCreatedAt:     returnedSignal.VersionCreatedAt,
-				CorrelatedToSignalID: returnedSignal.CorrelatedToSignalID,
-				IsWithdrawn:          returnedSignal.IsWithdrawn,
-				Content:              returnedSignal.Content,
+				AccountID:        returnedSignal.AccountID,
+				AccountType:      returnedSignal.AccountType,
+				Email:            returnedSignal.Email,
+				SignalID:         returnedSignal.SignalID,
+				LocalRef:         returnedSignal.LocalRef,
+				SignalTypeSlug:   returnedSignal.SignalTypeSlug,
+				SemVer:           returnedSignal.SemVer,
+				ContentKind:      returnedSignal.ContentKind,
+				SignalCreatedAt:  returnedSignal.SignalCreatedAt,
+				SignalUpdatedAt:  returnedSignal.SignalUpdatedAt,
+				SignalVersionID:  returnedSignal.SignalVersionID,
+				VersionNumber:    returnedSignal.VersionNumber,
+				VersionCreatedAt: returnedSignal.VersionCreatedAt,
+				CorrelationID:    correlationID,
+				IsWithdrawn:      returnedSignal.IsWithdrawn,
+				Content:          returnedSignal.Content,
 			},
 		}
 
