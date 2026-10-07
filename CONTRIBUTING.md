@@ -17,7 +17,7 @@ Use the Docker development environment:
 ```bash
 git clone https://github.com/information-sharing-networks/signalsd.git
 cd signalsd
-docker compose up
+make docker-up
 ```
 
 The service runs on http://localhost:8080 with API docs at `/docs`.
