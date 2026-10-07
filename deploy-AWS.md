@@ -16,6 +16,34 @@ and adding the custom hostname as an additional host-header value on the relevan
 service's listener rule. The default URL is preserved as a second value on the same rule
 so both hostnames continue to resolve.
 
+### How the containers run
+
+ECS Express Mode is a layer over standard ECS: given an image and the two IAM roles described
+below, it creates and manages the task definition, service, ALB target group and listener
+rule, security groups and auto-scaling policy. These are ordinary ECS resources and can be
+inspected in the console, but should be changed through the Express service rather than edited directly.
+
+Each running copy of the app is an ECS task — a single container running
+`/app/signalsd run all`. Fargate runs each task in its own
+isolated VM.
+
+| Service            | CPU / memory   | Tasks (min–max) | Scales on        |
+|--------------------|----------------|-----------------|------------------|
+| `signalsd`         | 1 vCPU / 2 GB  | 1–4             | average CPU 60%  |
+| `signalsd-staging` | 0.5 vCPU / 1 GB | 1–2            | average CPU 60%  |
+
+Both services run in the `default` cluster. The container listens on port `8080` and TLS terminates at the ALB, which forwards plain HTTP to the task.
+
+These settings were set when the services were created.
+
+On each deploy the workflow passes a new image, env vars and secret ARNs to
+`amazon-ecs-deploy-express-service`, which registers a new task definition revision and
+starts a rolling replacement:
+
+1. Fargate starts new tasks; the task-execution role pulls the image from ECR.
+2. Once a new task passes the ALB health check it is registered in the target group.
+3. Old tasks are drained and stopped.
+
 ### Authentication
 
 The deploy pipeline authenticates via GitHub OIDC: GitHub's identity token is exchanged
@@ -97,14 +125,14 @@ To set up an equivalent environment, an admin needs:
   and the auto-scaling minimum/maximum each environment needs.
 - Two GitHub repository secrets:
   - `AWS_ACCOUNT_ID` — used to construct ECR registry URLs and role ARNs in the
-  - `AWS_ROLE_ARN` — the deploy role ARN.
     workflows.
+  - `AWS_ROLE_ARN` — the deploy role ARN.
 
-Get the values for the gihub secrets using
+Get the values for the GitHub secrets using
 ```bash
 # AWS_ACCOUNT_ID
 aws sts get-caller-identity --query Account --output text
 
-# ARW_ROLE_ARN
+# AWS_ROLE_ARN
 aws iam get-role --role-name github-actions-signalsd --query 'Role.Arn' --output text
 ```

@@ -51,5 +51,5 @@ EXPOSE 8080
 
 # GCP uses the ENTRYPOINT and supplies --args="run,all"`
 ENTRYPOINT ["/app/signalsd"]
-# AWS App Runner has no runtime arg override (unlike Cloud Run's --args), so CMD provides the default
+# AWS ECS Express services don't set a command, so CMD provides the default
 CMD ["run", "all"]
