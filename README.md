@@ -241,7 +241,7 @@ The core design concepts are described in the three diagrams below.
 ![isn-config-2026-10-04](https://github.com/user-attachments/assets/d48dba0b-fc4a-4a4c-af0a-d3f5e234b9d0)
 
 ## Signal Load
-![signals-load-2026-10-04](https://github.com/user-attachments/assets/71110c2c-c2f2-44c3-9a7b-54f12f4fee8d)
+![signals-load-2026-10-04](https://github.com/user-attachments/assets/cd0ad1a5-3dd3-4986-98c5-0a2d347bce71)
 
 ## Rate Limits
 The service includes a shared rate limiter for all traffic regardless of source IP or user identity and protects all endpoints including auth, API, and admin routes.
