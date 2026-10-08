@@ -62,7 +62,7 @@ import (
 //	@description	The signalsd backend service acts as an OAuth 2.0 Authorization Server and supports web users and service accounts.
 //	@description
 //	@description	### Authentication Flows
-//	@description	- **Web users**: (Refresh Token Grant Type) Authentication via /auth/login -> receive JWT access token + HTTP-only refresh cookie -> use bearer tokens for API calls
+//	@description	- **Web users**: (Refresh Token Grant Type) Authentication via /api/auth/login -> receive JWT access token + HTTP-only refresh cookie -> use bearer tokens for API calls
 //	@description	- **Service accounts**: Clients implement OAuth Client Credentials flow -> receive JWT access token -> use bearer tokens for API calls
 //	@description
 //	@description	### Token Usage
@@ -71,14 +71,17 @@ import (
 //	@description	Authorization: Bearer <jwt-access-token>
 //	@description	```
 //	@description
-//	@description	**Token Refresh (Web Users):**
-//	@description	- Client calls `/oauth/token?grant_type=refresh_token` with HTTP-only refresh token cookie
-//	@description	- API validates refresh token and issues new access token + rotated refresh cookie
-//	@description	- Client receives new bearer token for subsequent API calls
-//	@description
 //	@description	**Token Refresh (Service Accounts):**
 //	@description	- Client calls `/oauth/token?grant_type=client_credentials` with client ID/secret
 //	@description	- API validates credentials and issues new access token
+//	@description	- Client receives new bearer token for subsequent API calls
+//	@description
+//	@description	**Login (Web Users):**
+//	@description	- Client calls `/api/auth/login` with email and password and receives an access token in the response body. The refresh token is set as an HTTP-only cookie.
+//	@description
+//	@description	**Token Refresh (Web Users):**
+//	@description	- Client calls `/oauth/token?grant_type=refresh_token` with HTTP-only refresh token cookie
+//	@description	- API validates refresh token and issues new access token + rotated refresh cookie
 //	@description	- Client receives new bearer token for subsequent API calls
 //	@description
 //	@description	**Token Lifetimes:**
@@ -143,10 +146,9 @@ import (
 //	@description
 //	@description	**Correlate to the entity directly.** For example, correlate a consignment's documents and events to the consignment itself, not to each other. Correlation is one level deep: `include_correlated` only returns signals that are correlated directly to the returned signal.
 //	@description
-//	@description	**Correlating is sharing.** Correlating your signal to a signal created by another account is like emailing that account a copy: they can see it (and every account with read access to the ISN already can), with the extra controls that you can withdraw it or send new versions, and they see those changes. Unlike email:
-//	@description	- withdrawing a signal stops further access through the service, but the other account may already have fetched it
-//	@description	- if a new version changes the `correlation_id`, the access moves with it: the new signal's owner can see every version, including earlier ones
-//	@description	- your account and email address are shown with the signal
+//	@description	**Correlating is sharing.** Correlating your signal to a signal created by another account is like emailing that account a copy, with the extra controls that you can withdraw it or send new versions, and they see those changes. Unlike email:
+//	@description	- withdrawing a signal stops further access through the service
+//	@description	- if a new version changes the correlation_id, access moves with it: the owner of the newly correlated signal can see every version, and the previous owner can no longer access it through the service
 //	@description
 //	@description	## Who can see signals
 //	@description	- Accounts with **read** access to an ISN can see every signal in it.
@@ -158,7 +160,7 @@ import (
 //	@description	## Events
 //	@description	Event signals record that a process waypoint has been reached - e.g. `ehc-approved` (an export health certificate was approved) or `departed-origin` - for the signal they are correlated to. Each waypoint is its own event signal type, so recipients choose which events they receive by choosing which event types to search or poll.
 //	@description	- **`correlation_id` is required**: correlate the event to the signal it is about (e.g. the consignment). Requests containing events without one are rejected.
-//	@description	- **`content` must include `occurred_at`**: the time the waypoint was reached, as an RFC 3339 timestamp with a time zone offset (e.g. `2026-09-27T14:02:00Z`). It is a field of the event's `content`, not of the signal itself (alongside `local_ref`).
+//	@description	- **`content` must include `occurred_at`**: the time the waypoint was reached, as an RFC 3339 timestamp with a time zone offset (e.g. `2026-09-27T14:02:00Z`).
 //	@description	- **`subject`**: if the event is about a specific version of a signal (e.g. version 3 of a document), name it in a `subject` field in `content`: `{"signal_id": "...", "version": 3}`. Always include the version - later versions of the document may be different.
 //	@description	- **Events are immutable** (see Versions and resubmissions).
 //	@description	- The service doesn't enforce an order: events are accepted in any order and can repeat (e.g. several inspections). To build a timeline, order a signal's correlated events by `occurred_at`.
