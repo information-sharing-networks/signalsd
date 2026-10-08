@@ -56,8 +56,8 @@ func (s *Server) SearchSignalsPage(w http.ResponseWriter, r *http.Request) {
 //	@Param			signal_type_slug	path	string	true	"Signal type slug"
 //	@Param			sem_ver				path	string	true	"Semantic version"
 //	@Param			count				path	int		true	"Number of correlated signals already displayed"
-//	@Success		200					"HTML partial"
-//	@Router			/ui-api/signals/{isn_slug}/{signal_type_slug}/v{sem_ver}/{signal_id}/correlated/{count} [get]
+//	@Success		200					"HTML partial (or an error alert)"
+//	@Router			/ui-api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}/correlated-count/{count} [get]
 func (s *Server) GetLatestCorrelatedSignals(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
 
@@ -106,7 +106,7 @@ func (s *Server) GetLatestCorrelatedSignals(w http.ResponseWriter, r *http.Reque
 // DownloadDocument godoc
 //
 //	@Summary		Download a document
-//	@Description	Streams the document stored with a document signal from the signalsd API to the browser as an attachment. Requires ISN read access.
+//	@Description	Streams the document stored with a document signal from the signalsd API to the browser as an attachment. Requires access to the ISN (write-only accounts can only download their own documents and the documents correlated to their signals).
 //	@Tags			UI Pages
 //	@Param			isn_slug			path	string	true	"ISN slug"
 //	@Param			signal_type_slug	path	string	true	"Signal type slug"
@@ -166,7 +166,7 @@ func (s *Server) DownloadDocument(w http.ResponseWriter, r *http.Request) {
 // SearchSignals godoc
 //
 //	@Summary		Search signals
-//	@Description	HTMX endpoint. Returns a table of signals matching the search criteria. Requires ISN read access.
+//	@Description	HTMX endpoint. Returns a table of signals matching the search criteria. Requires access to the ISN (write-only accounts only see their own signals and the signals correlated to them).
 //	@Tags			HTMX Actions
 //	@Param			isn-slug					query	string	true	"ISN slug"
 //	@Param			signal-type-slug			query	string	true	"Signal type slug"
@@ -179,9 +179,7 @@ func (s *Server) DownloadDocument(w http.ResponseWriter, r *http.Request) {
 //	@Param			include-withdrawn			query	bool	false	"Include withdrawn signals"
 //	@Param			include-correlated			query	bool	false	"Include correlated signals"
 //	@Param			include-previous-versions	query	bool	false	"Include previous schema versions"
-//	@Success		200							"HTML partial"
-//	@Failure		400							"HTML error partial"
-//	@Failure		401							"HTML error partial"
+//	@Success		200							"HTML partial (or an error alert)"
 //	@Router			/ui-api/signals/search [get]
 func (s *Server) SearchSignals(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())

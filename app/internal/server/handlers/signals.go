@@ -40,7 +40,7 @@ func NewSignalsHandler(queries *database.Queries, pool *pgxpool.Pool, schemaCach
 	}
 }
 
-// WithdrawSignalsRequest contains the local ref for the signal being withdrawn
+// WithdrawSignalRequest contains the local ref for the signal being withdrawn
 type WithdrawSignalRequest struct {
 	LocalRef *string `json:"local_ref,omitempty" example:"item_id_#1"`
 }
@@ -54,7 +54,8 @@ type WithdrawSignalRequest struct {
 //	@Description
 //	@Description	Withdrawn signals are hidden from search results by default but remain in the database.
 //	@Description	Signals can only be withdrawn by the account that created the signal.
-//	@Description	To reactivate a signal resupply it with the same local_ref using the 'create signals' end point.
+//	@Description	To reactivate a json signal, resubmit it with the same local_ref using the *Submit Signals* endpoint. To reactivate a document, upload it again with the same local_ref using *Upload a Document*.
+//	@Description	Withdrawn events cannot be reactivated - send a new event with a new local_ref instead.
 //
 //	@Tags			Signal Exchange
 //
@@ -65,10 +66,11 @@ type WithdrawSignalRequest struct {
 //
 //	@Success		204
 //	@Failure		400	{object}	responses.ErrorResponse	"malformed_body"
-//	@Failure		401	{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		401	{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		409	{object}	responses.ErrorResponse	"resource_already_exists"
+//	@Failure		413	{object}	responses.ErrorResponse	"request_too_large"
 //	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken

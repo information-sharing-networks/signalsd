@@ -10,11 +10,11 @@ import (
 
 // SignalRoutingRule is the mapping between a pattern and a isn.
 type SignalRoutingRule struct {
-	MatchPattern     string `json:"match_pattern" example:"*felixstowe*"`
-	Operator         string `json:"operator" enums:"matches,equals,does_not_match,does_not_equal" example:"matches"`
-	IsCaseInsensitve bool   `json:"is_case_insensitive" example:"true"`
-	IsnSlug          string `json:"isn_slug" example:"felixstowe-isn"`
-	Sequence         int32  `json:"sequence" example:"1"`
+	MatchPattern      string `json:"match_pattern" example:"*felixstowe*"`
+	Operator          string `json:"operator" enums:"matches,equals,does_not_match,does_not_equal" example:"matches"`
+	IsCaseInsensitive bool   `json:"is_case_insensitive" example:"true"`
+	IsnSlug           string `json:"isn_slug" example:"felixstowe-isn"`
+	Sequence          int32  `json:"sequence" example:"1"`
 }
 
 // UpdateSignalRoutingConfigRequest is the body for setting routing rules.

@@ -58,7 +58,7 @@ type UpdatePasswordRequest struct {
 //	@Description	New members can't access any information beyond the public data on the site until an admin grants them access to an ISN.
 //	@Description
 //	@Description	Site admins can grant other users the "isnadmin" role.
-//	@Description	ISN admins can create ISNs and service accounts, and grant other accounts permission to read or write to the ISNs they created.
+//	@Description	ISN admins can create ISNs and service accounts, and grant other accounts permission to read or write to the ISNs they own.
 //
 //	@Success		201
 //	@Failure		400	{object}	responses.ErrorResponse	"malformed_body | password_too_short"
@@ -167,7 +167,7 @@ func (u *UserHandler) RegisterUser(w http.ResponseWriter, r *http.Request) error
 //	@Param		request	body	handlers.UpdatePasswordRequest	true	"user details"
 //	@Success	204
 //	@Failure	400	{object}	responses.ErrorResponse	"malformed_body | password_too_short"
-//	@Failure	401	{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure	401	{object}	responses.ErrorResponse	"authorization_error | access_token_expired | authentication_error (incorrect current password)"
 //	@Failure	500	{object}	responses.ErrorResponse	"database_error | internal_error"
 //
 //	@Security	BearerAccessToken
@@ -250,7 +250,7 @@ func (u *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) err
 //	@Description	- read/write to their own ISNs
 //	@Description	- Grant other accounts read or write access to their ISNs
 //	@Description
-//	@Description	Note that ISN admins can't change ISNs they don't own (a site admin must use the `transfer ownership` endpoint if this is requred)
+//	@Description	Note that ISN admins can't change ISNs they don't own (a site admin must use the `transfer ownership` endpoint if this is required)
 //	@Description
 //	@Description	An ISN admin also has access to the following site-level functions:
 //	@Description	- Create service accounts
@@ -258,12 +258,15 @@ func (u *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) err
 //	@Description
 //	@Description	Account management (enabling and disabling accounts, password reset links and reissuing service account credentials) is done by site admins, since it affects the account on every ISN it belongs to.
 //	@Description
+//	@Description	The change takes effect when the account next gets an access token (up to 30 minutes later).
+//	@Description
 //	@Description	**This endpoint can only be used by site admin accounts**
 //
 //	@Param			account_id	path	string	true	"account id"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
 //	@Success		204
 //	@Failure		400	{object}	responses.ErrorResponse	"invalid_request"
+//	@Failure		401	{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
@@ -327,12 +330,17 @@ func (u *UserHandler) GrantUserIsnAdminRole(w http.ResponseWriter, r *http.Reque
 //	@Summary		Revoke ISN Admin Role
 //	@Tags			Account Management
 //
+//	@Description	The account reverts to the member role.
+//	@Description
+//	@Description	The change takes effect when the account next gets an access token (up to 30 minutes later).
+//	@Description
 //	@Description	**This endpoint can only be used by site admin accounts**
 //
 //	@Param			account_id	path	string	true	"account id"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
 //	@Success		204
 //	@Failure		400	{object}	responses.ErrorResponse	"invalid_request"
+//	@Failure		401	{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
@@ -398,7 +406,7 @@ func (u *UserHandler) RevokeUserIsnAdminRole(w http.ResponseWriter, r *http.Requ
 //
 //	@Description	This endpoint grants the site admin role to a user.
 //	@Description
-//	@Description	A site admin can create and manage any ISN and adminster acounts on the site.
+//	@Description	A site admin can create and manage any ISN and administer accounts on the site.
 //	@Description
 //	@Description	The following tasks can only be performed by site admins:
 //	@Description	- Create new signal types on the site
@@ -406,12 +414,15 @@ func (u *UserHandler) RevokeUserIsnAdminRole(w http.ResponseWriter, r *http.Requ
 //	@Description	- Transfer ISN ownership between accounts
 //	@Description	- Assign the site admin role to other users
 //	@Description
+//	@Description	The change takes effect when the account next gets an access token (up to 30 minutes later).
+//	@Description
 //	@Description	**This endpoint can only be used by site admin accounts**
 //
 //	@Param			account_id	path	string	true	"account id"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
 //	@Success		204
 //	@Failure		400	{object}	responses.ErrorResponse	"invalid_request"
+//	@Failure		401	{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
@@ -476,12 +487,17 @@ func (u *UserHandler) GrantUserSiteAdminRole(w http.ResponseWriter, r *http.Requ
 //	@Summary		Revoke Site Admin Role
 //	@Tags			Account Management
 //
+//	@Description	The account reverts to the member role.
+//	@Description
+//	@Description	The change takes effect when the account next gets an access token (up to 30 minutes later).
+//	@Description
 //	@Description	**This endpoint can only be used by site admin accounts**
 //
 //	@Param			account_id	path	string	true	"account id"	example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
 //
 //	@Success		204
 //	@Failure		400	{object}	responses.ErrorResponse	"invalid_request"
+//	@Failure		401	{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
@@ -657,7 +673,7 @@ func (u *UserHandler) PasswordResetTokenPage(w http.ResponseWriter, r *http.Requ
 //	@Description
 //	@Description	On success the token is deleted so the link can't be reused, and the user can log in with the new password.
 //	@Description
-//	@Description	Note that no access token is required - possession of the reset token is what authorises the change. Reset tokens can only be issued by admins (see *Generate Password Reset Link* under Account Management).
+//	@Description	Note that no access token is required - possession of the reset token is what authorises the change. Reset tokens can only be issued by site admins (see *Generate Password Reset Link* under Account Management).
 //
 //	@Tags			One-time Links (browser pages)
 //
@@ -691,7 +707,7 @@ func (u *UserHandler) PasswordResetToken(w http.ResponseWriter, r *http.Request)
 
 	// Validate the new password
 	if req.NewPassword == "" {
-		return apperrors.MalformedBody("new-password is required", nil)
+		return apperrors.MalformedBody("new_password is required", nil)
 	}
 
 	if len(req.NewPassword) < signalsd.MinimumPasswordLength {

@@ -191,13 +191,13 @@ templ RoutingMappingRow(seq int, rule client.SignalRoutingRule, isnOptions []typ
 			</select>
 		</td>
 		<td class="contains-btn">
-			<input type="hidden" name="case-insensitive" value={ strconv.FormatBool(rule.IsCaseInsensitve) }/>
+			<input type="hidden" name="case-insensitive" value={ strconv.FormatBool(rule.IsCaseInsensitive) }/>
 			<button
 				type="button"
-				class={ "btn btn-small btn-toggle-bool", templ.KV("btn-active", rule.IsCaseInsensitve) }
-				aria-pressed={ strconv.FormatBool(rule.IsCaseInsensitve) }
+				class={ "btn btn-small btn-toggle-bool", templ.KV("btn-active", rule.IsCaseInsensitive) }
+				aria-pressed={ strconv.FormatBool(rule.IsCaseInsensitive) }
 				data-toggle-bool
-			>{ strconv.FormatBool(rule.IsCaseInsensitve) }</button>
+			>{ strconv.FormatBool(rule.IsCaseInsensitive) }</button>
 		</td>
 		<td>
 			<select name="isn-slugs" class="form-select" required arial-label="Target ISN">

@@ -38,7 +38,7 @@ type SearchParams struct {
 	includePreviousSignalVersions bool
 }
 
-// search signals reponse
+// search signals response
 
 // SearchSignal is a signal returned by the search endpoints (the latest version of the signal).
 //
@@ -208,7 +208,7 @@ func parseSearchParams(r *http.Request) (SearchParams, error) {
 	return searchParams, nil
 }
 
-// validateSearchParams conforms that the combination of search parameters is valid
+// validateSearchParams confirms that the combination of search parameters is valid
 func validateSearchParams(params SearchParams) error {
 	hasPartialDateRange := (params.startDate != nil) != (params.endDate != nil)
 	if hasPartialDateRange {
@@ -229,7 +229,7 @@ func validateSearchParams(params SearchParams) error {
 	return nil
 }
 
-// getSignals version fetches all the previous versions for a set of signals and returns them as a map of signal_id to versions
+// getPreviousSignalVersions fetches all the previous versions for a set of signals and returns them as a map of signal_id to versions
 func (s *SignalsHandler) getPreviousSignalVersions(ctx context.Context, signalIDs []uuid.UUID) (map[uuid.UUID][]PreviousSignalVersion, error) {
 	if len(signalIDs) == 0 {
 		return make(map[uuid.UUID][]PreviousSignalVersion), nil
@@ -320,13 +320,19 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 //	@Description
 //	@Description	Note the endpoint returns the latest version of each signal.
 //	@Description
+//	@Description	**Search parameters**
+//	@Description
+//	@Description	At least one of these filters is required: start_date and end_date, updated_since, account_id, signal_id, local_ref or correlation_id.
+//	@Description	start_date and end_date must be used together - they filter on when the latest version of the signal was created (both are inclusive).
+//	@Description	Results are ordered by signal_updated_at (oldest first).
+//	@Description
 //	@Description	**Polling for changes**
 //	@Description
 //	@Description	Use updated_since with include_withdrawn=true. Polling is at-least-once: start each poll 1 minute before the last signal_updated_at you received, and skip the results you have already seen (the same signal_id and signal_updated_at).
 //	@Description	See *Polling for changes* in the API overview for why the overlap is needed.
 //
-//	@Param			start_date					query		string	false	"Start date"																																																example(2006-01-02T15:05:00Z)
-//	@Param			end_date					query		string	false	"End date"																																																	example(2006-01-02T15:15:00Z)
+//	@Param			start_date					query		string	false	"Signals whose latest version was created at or after this time (use with end_date)"																														example(2006-01-02T15:05:00Z)
+//	@Param			end_date					query		string	false	"Signals whose latest version was created at or before this time (use with start_date)"																														example(2006-01-02T15:15:00Z)
 //	@Param			updated_since				query		string	false	"Signals created, given a new version, recorrelated or withdrawn since this time (to poll for changes, use with include_withdrawn=true and set it 1 minute before the last signal_updated_at you received)"	example(2006-01-02T15:05:00Z)
 //	@Param			account_id					query		string	false	"Account ID"																																																example(def87f89-dab6-4607-95f7-593d61cb5742)
 //	@Param			signal_id					query		string	false	"Return the signal with this signal_id (e.g. the correlation_id of a signal of another type)"																												example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
@@ -400,7 +406,7 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 
 	response := make([]SearchSignalWithCorrelationsAndVersions, 0, len(returnedSignals))
 
-	// the (optional) signal_versions and correlated_signals fields are populated using separte queries and then merged into the response
+	// the (optional) signal_versions and correlated_signals fields are populated using separate queries and then merged into the response
 	// ...not very efficient but assumption is that these options will most likely be used with individual signals rather than in bulk (needs monitoring to confirm)
 	signalIDs := make([]uuid.UUID, 0, len(returnedSignals))
 
@@ -479,9 +485,15 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 //	@Summary		Signal Search (private ISNs)
 //	@Tags			Signal Exchange
 //
-//	@Description	Search for signals by date or account in private ISNs (authentication required - only accounts with read or write permissions to the ISN can access signals).
+//	@Description	Search for signals in private ISNs (authentication required - any account with read or write permission on the ISN can use this endpoint).
 //	@Description
 //	@Description	Note the endpoint returns the latest version of each signal.
+//	@Description
+//	@Description	**Search parameters**
+//	@Description
+//	@Description	At least one of these filters is required: start_date and end_date, updated_since, account_id, signal_id, local_ref or correlation_id.
+//	@Description	start_date and end_date must be used together - they filter on when the latest version of the signal was created (both are inclusive).
+//	@Description	Results are ordered by signal_updated_at (oldest first).
 //	@Description
 //	@Description	Write-only accounts can only see the signals created by their own account, and the signals other accounts have correlated to them.
 //	@Description	This also applies to correlated signals returned with include_correlated=true.
@@ -491,8 +503,8 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 //	@Description	Use updated_since with include_withdrawn=true. Polling is at-least-once: start each poll 1 minute before the last signal_updated_at you received, and skip the results you have already seen (the same signal_id and signal_updated_at).
 //	@Description	See *Polling for changes* in the API overview for why the overlap is needed.
 //
-//	@Param			start_date					query		string	false	"Start date"																																																example(2006-01-02T15:05:00Z)
-//	@Param			end_date					query		string	false	"End date"																																																	example(2006-01-02T15:15:00Z)
+//	@Param			start_date					query		string	false	"Signals whose latest version was created at or after this time (use with end_date)"																														example(2006-01-02T15:05:00Z)
+//	@Param			end_date					query		string	false	"Signals whose latest version was created at or before this time (use with start_date)"																														example(2006-01-02T15:15:00Z)
 //	@Param			updated_since				query		string	false	"Signals created, given a new version, recorrelated or withdrawn since this time (to poll for changes, use with include_withdrawn=true and set it 1 minute before the last signal_updated_at you received)"	example(2006-01-02T15:05:00Z)
 //	@Param			account_id					query		string	false	"Account ID"																																																example(def87f89-dab6-4607-95f7-593d61cb5742)
 //	@Param			signal_id					query		string	false	"Return the signal with this signal_id (e.g. the correlation_id of a signal of another type)"																												example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
@@ -504,7 +516,9 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 //
 //	@Success		200							{array}		handlers.SearchSignalWithCorrelationsAndVersions
 //	@Failure		400							{object}	responses.ErrorResponse	"invalid_url_param"
-//	@Failure		401							{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		401							{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
+//	@Failure		403							{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		404							{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		500							{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
@@ -569,7 +583,7 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 		return apperrors.AuthenticationFailure("authentication required for private ISN access", nil)
 	}
 
-	// ISN and signal type in-use checks are now performed by RequireIsnPermission middleware
+	// ISN and signal type in-use checks are now performed by RequireIsnMembership middleware
 
 	// Validate search parameters
 	if err := validateSearchParams(searchParams); err != nil {
@@ -613,7 +627,7 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 
 	response := make([]SearchSignalWithCorrelationsAndVersions, 0, len(returnedSignals))
 
-	// the (optional) signal_versions and correlated_signals fields are populated using separte queries and then merged into the response
+	// the (optional) signal_versions and correlated_signals fields are populated using separate queries and then merged into the response
 	// ...not very efficient but assumption is that these options will most likely be used with individual signals rather than in bulk (needs monitoring to confirm)
 	signalIDs := make([]uuid.UUID, 0, len(returnedSignals))
 

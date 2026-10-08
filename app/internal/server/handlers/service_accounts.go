@@ -79,7 +79,7 @@ type SetupPageData struct {
 //	@Description
 //	@Description	To reissue credentials for an existing service account, use the **Reissue Service Account Credentials** endpoint.
 //	@Description
-//	@Description	You have to be an admin to use this end point
+//	@Description	Only site admins and ISN admins can use this endpoint
 //	@Description
 //	@Tags		Service Accounts
 //
@@ -87,7 +87,8 @@ type SetupPageData struct {
 //
 //	@Success	201		{object}	handlers.CreateServiceAccountResponse
 //	@Failure	400		{object}	responses.ErrorResponse	"malformed_body"
-//	@Failure	401		{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure	401		{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
+//	@Failure	403		{object}	responses.ErrorResponse	"forbidden"
 //	@Failure	409		{object}	responses.ErrorResponse	"resource_already_exists"
 //	@Failure	500		{object}	responses.ErrorResponse	"database_error | internal_error"
 //
@@ -229,7 +230,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccount(w http.ResponseWriter, r 
 //
 //	@Success	200		{object}	handlers.ReissueServiceAccountCredentialsResponse
 //	@Failure	400		{object}	responses.ErrorResponse	"malformed_body"
-//	@Failure	401		{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure	401		{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure	403		{object}	responses.ErrorResponse	"forbidden"
 //	@Failure	404		{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure	500		{object}	responses.ErrorResponse	"database_error | internal_error"

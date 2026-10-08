@@ -117,9 +117,7 @@ func (s *Server) renderRoutingForm(w http.ResponseWriter, r *http.Request, slug,
 //	@Param			operators			formData	[]string	true	"operator per row"				enums(matches,equals,does_not_match,does_not_equal)
 //	@Param			case-insensitive	formData	[]string	true	"'true' or 'false' per row"
 //	@Param			isn-slugs			formData	[]string	true	"target ISN slug per row"	example(felixstowe-isn)
-//	@Success		200					"HTML partial"
-//	@Failure		400					"HTML error partial"
-//	@Failure		401					"HTML error partial"
+//	@Success		200					"HTML partial (or an error alert)"
 //	@Router			/ui-api/signal-types/routing [put]
 func (s *Server) SaveSignalRoutingConfig(w http.ResponseWriter, r *http.Request) {
 	reqLogger := s.logger.With(slog.String("handler", "SaveIsnRouting"))
@@ -158,11 +156,11 @@ func (s *Server) SaveSignalRoutingConfig(w http.ResponseWriter, r *http.Request)
 		}
 		sequence++
 		routingRules = append(routingRules, client.SignalRoutingRule{
-			MatchPattern:     pattern,
-			Operator:         strings.TrimSpace(operators[i]),
-			IsCaseInsensitve: caseInsensitiveFlags[i] == "true",
-			IsnSlug:          isn,
-			Sequence:         sequence,
+			MatchPattern:      pattern,
+			Operator:          strings.TrimSpace(operators[i]),
+			IsCaseInsensitive: caseInsensitiveFlags[i] == "true",
+			IsnSlug:           isn,
+			Sequence:          sequence,
 		})
 	}
 
@@ -197,9 +195,7 @@ func (s *Server) SaveSignalRoutingConfig(w http.ResponseWriter, r *http.Request)
 //	@Tags			HTMX Actions
 //	@Param			signal-type-slug	formData	string	true	"signal type slug"	example(sample-signal-type)
 //	@Param			sem-ver				formData	string	true	"version"			example(1.0.0)
-//	@Success		200					"HTML partial"
-//	@Failure		400					"HTML error partial"
-//	@Failure		401					"HTML error partial"
+//	@Success		200					"HTML partial (or an error alert)"
 //	@Router			/ui-api/signal-types/routing [delete]
 func (s *Server) DeleteSignalRoutingConfig(w http.ResponseWriter, r *http.Request) {
 	reqLogger := s.logger.With(slog.String("handler", "DeleteSignalRoutingConfig"))
@@ -234,7 +230,7 @@ func (s *Server) DeleteSignalRoutingConfig(w http.ResponseWriter, r *http.Reques
 //	@Tags			HTMX Actions
 //	@Param			signal-type-slug	query	string	true	"signal type slug"	example(sample-signal-type)
 //	@Param			sem-ver				query	string	true	"version"			example(1.0.0)
-//	@Success		200					"HTML partial"
+//	@Success		200					"HTML partial (or an error alert)"
 //	@Router			/ui-api/signal-types/routing [get]
 func (s *Server) LoadSignalRoutingForm(w http.ResponseWriter, r *http.Request) {
 	slug := r.FormValue("signal-type-slug")
@@ -263,7 +259,7 @@ func (s *Server) RemoveRoutingRow(w http.ResponseWriter, r *http.Request) {
 //	@Description	HTMX endpoint. Returns a new empty mapping row to append to the form table.
 //	@Description	The optional count param is used to set the initial sequence label in the rendered row.
 //	@Tags			HTMX Actions
-//	@Success		200	"HTML partial"
+//	@Success		200	"HTML partial (or an error alert)"
 //	@Router			/ui-api/signal-types/routing/add-row [get]
 func (s *Server) AddRoutingRow(w http.ResponseWriter, r *http.Request) {
 	reqLogger := s.logger.With(slog.String("handler", "AddRoutingRow"))

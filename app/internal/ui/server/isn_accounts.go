@@ -16,7 +16,7 @@ import (
 // ManageIsnAccountsPage godoc
 //
 //	@Summary		Manage ISN accounts page
-//	@Description	Renders the ISN accounts management page. Requires isnadmin role.
+//	@Description	Renders the ISN accounts management page. Requires admin rights for at least one ISN (the ISN owner, or a site admin).
 //	@Tags			UI Pages
 //	@Success		200	"HTML page"
 //	@Router			/admin/isn/accounts/manage [get]
@@ -60,16 +60,14 @@ func (s *Server) ManageIsnAccountsPage(w http.ResponseWriter, r *http.Request) {
 // ManageIsnAccounts godoc
 //
 //	@Summary		Manage ISN accounts
-//	@Description	HTMX endpoint. Adds or removes a user/service account from an ISN. Requires isnadmin role.
+//	@Description	HTMX endpoint. Adds or removes a user/service account from an ISN. Requires admin rights for at least one ISN (the ISN owner, or a site admin).
 //	@Tags			HTMX Actions
 //	@Param			isn-slug					formData	string	true	"ISN slug"
 //	@Param			account-type				formData	string	true	"'user' or 'service-account'"
-//	@Param			permission					formData	string	true	"'read', 'write', or 'none' (removes account)"
+//	@Param			permission					formData	string	true	"'read', 'write', 'read-write', or 'none' (revokes the account's access)"
 //	@Param			user-identifier				formData	string	false	"User email (when account-type is 'user')"
 //	@Param			service-account-identifier	formData	string	false	"Client ID (when account-type is 'service-account')"
-//	@Success		200							"HTML partial"
-//	@Failure		400							"HTML error partial"
-//	@Failure		401							"HTML error partial"
+//	@Success		200							"HTML partial (or an error alert)"
 //	@Router			/ui-api/isn/accounts/manage [put]
 func (s *Server) ManageIsnAccounts(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
@@ -171,9 +169,7 @@ func (s *Server) TransferOwnershipPage(w http.ResponseWriter, r *http.Request) {
 //	@Tags			HTMX Actions
 //	@Param			isn-slug		formData	string	true	"ISN slug"
 //	@Param			new-owner-email	formData	string	true	"Email of the new owner (must be an existing user)"
-//	@Success		200				"HTML partial"
-//	@Failure		400				"HTML error partial"
-//	@Failure		401				"HTML error partial"
+//	@Success		200				"HTML partial (or an error alert)"
 //	@Router			/ui-api/isn/transfer-ownership [put]
 func (s *Server) TransferOwnership(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())

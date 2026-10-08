@@ -10,24 +10,26 @@ info:
     - `400` Malformed request (invalid json, missing required fields, etc.)
     - `401` Unauthorized (invalid credentials)
     - `403` Forbidden (insufficient permissions)
+    - `404` Resource not found (e.g. an ISN or signal type that doesn't exist or is not in use)
     - `413` Request body exceeds size limit
     - `429` Rate limit exceeded
     - `500` Internal server error
+    - `504` Request timed out (`timeout`)
 
     Individual endpoints document their specific business logic errors.
 
-    Standard error responses include a JSON response body containing `error_code` and `error_description` fields
+    Standard error responses include a JSON response body containing `error_code`, `message` and `request_id` fields.
 
-    The /oauth endpoints include an additional `error` field - this contains the RFC6749 standard error code.
+    The /oauth endpoints return `error` (the RFC6749 standard error code), `error_code` and `error_description` fields instead.
 
     ## Request Limits
-    All endpoints are protected by:
-    - **Rate limiting**: Configurable requests per second
-    - **Request size limits**: 64KB for admin/auth endpoints, 5MB for signal ingestion
+    The endpoints are protected by:
+    - **Rate limiting**: Configurable requests per second (all endpoints)
+    - **Request size limits** (configurable - these are the defaults): 64KB for admin/auth endpoints, 5MB for json and event signal submissions, 20MB for document uploads
 
-    Check the Signalsd-Max-Request-Body response header for the configured limit on signals payload.
+    Check the `Signalsd-Max-Request-Size` response header for the configured size limit of the endpoint called.
 
-    The rate limit is set globaly and prevents abuse of the service.
+    The rate limit is set globally and prevents abuse of the service.
     In production there will be additional protections in place such as per-IP rate limiting provided by the load balancer/reverse proxy.
 
     ## Authentication & Authorization
@@ -46,7 +48,7 @@ info:
     ```
 
     **Token Refresh (Service Accounts):**
-    - Client calls `/oauth/token?grant_type=client_credentials` with client ID/secret
+    - Client calls `POST /oauth/token` with `grant_type=client_credentials` in the form body, and the client ID/secret as form fields or HTTP Basic auth
     - API validates credentials and issues new access token
     - Client receives new bearer token for subsequent API calls
 
@@ -54,13 +56,17 @@ info:
     - Client calls `/api/auth/login` with email and password and receives an access token in the response body. The refresh token is set as an HTTP-only cookie.
 
     **Token Refresh (Web Users):**
-    - Client calls `/oauth/token?grant_type=refresh_token` with HTTP-only refresh token cookie
+    - Client calls `POST /oauth/token` with `grant_type=refresh_token` in the form body (the HTTP-only refresh token cookie is sent automatically)
     - API validates refresh token and issues new access token + rotated refresh cookie
     - Client receives new bearer token for subsequent API calls
 
     **Token Lifetimes:**
     - Access tokens: 30 minutes
-    - Refresh tokens: 30 days (web users only)
+    - Refresh tokens: 30 days (web users only). Each refresh issues a new refresh token valid for another 30 days, so users only need to log in again if they don't use the service for 30 days.
+
+    Each login or refresh revokes the user's other refresh tokens, so a user has one active session at a time.
+
+    The account's role and ISN permissions are included in the access token when it is issued. Changes to them (and disabling an account) take effect when the account next gets an access token - up to 30 minutes later.
 
     ### CSRF Protection
     The refresh token used by the /oauth API endpoints is stored in an HttpOnly cookie (to prevent access by JavaScript)
@@ -70,11 +76,11 @@ info:
 
     CORS is used to control which browser-based clients can make cross-origin requests to the API and read responses.
 
-    the `ALLOWED_ORIGINS` environment variable is used to configure the CORS rules.
+    The `ALLOWED_ORIGINS` environment variable is used to configure the CORS rules.
 
     In production, you should restrict ALLOWED_ORIGINS to trusted client origins (the server will not start if it is not set)
 
-    ## Date/Time Handling:
+    ## Date/Time Handling
 
     **URL Parameters**: The following ISO 8601 formats are accepted in URL query parameters:
     - 2006-01-02T15:04:05Z (UTC)
@@ -98,7 +104,7 @@ info:
     Search, withdrawal and batches work the same way for every kind, and search results include each signal's `content_kind`.
 
     ## Versions and resubmissions
-    Each signal is identified by the `local_ref` the sender supplies, which must be unique for the account, ISN and signal type (sending the same `local_ref` to two ISNs creates two independent signals). When a `local_ref` is sent to the same ISN again:
+    Each signal is identified by the `local_ref` the sender supplies, which must be unique for the account, ISN and signal type version (sending the same `local_ref` to two ISNs, or to two versions of a signal type, creates two independent signals). When a `local_ref` is sent to the same ISN again:
     - **If something changed**, a new version of the signal is stored (json and document signals).
     - **If nothing changed** (the same content, and the same or no `correlation_id`), nothing is stored. The response contains the `signal_id`, `signal_version_id` and `version_number` of the existing latest version, with `unchanged: true`, so requests can be safely retried. JSON content is compared as JSON (key order and whitespace are ignored). Documents compare the file and its filename.
     - **If the signal was withdrawn**, it is reactivated with a new version (json and document signals).
@@ -106,12 +112,14 @@ info:
 
     ## Recovering from failures
     Each signal in a request is stored separately, so a request that fails part way through (e.g. a timeout) can leave some signals stored and others not. Because unchanged signals are not stored again, you can recover in either of these ways:
-    - **Resend the whole request.** Signals that were already stored are returned with `unchanged: true`, and only the missing or failed signals are stored. Note that any signal in the request that has been withdrawn since it was sent is reactivated.
+    - **Resend the whole request.** Signals that were already stored are returned with `unchanged: true`, and only the missing or failed signals are stored. Note that any json signal in the request that has been withdrawn since it was sent is reactivated (withdrawn events are not reactivated - they fail with `resource_already_exists`).
     - **Resend only the failures.** The response lists the signals that failed, and *Get Batch Status* lists the batch's unresolved failures.
 
-    When a whole request fails (400, 401, 403, 413 or 500), or you get no response (e.g. a timeout), no failures are recorded in the batch, so resend the whole request once the problem is fixed.
+    When a whole *Submit Signals* request fails (an error response such as 400, 401, 403, 404, 413 or 500), or you get no response, no failures are recorded in the batch, so resend the whole request once the problem is fixed. Rejected document uploads are recorded in the batch (except when the request's form fields are missing or invalid).
 
-    A retry sent while the original request is still being processed can occasionally store an extra, identical version. This is harmless - the content doesn't change - but pollers will see one more update. To avoid it, set your client timeout above the server's request timeout: 15 seconds by default, or 2 minutes for document uploads.
+    If the server's request timeout is reached part way through a *Submit Signals* request, the remaining signals are returned as `database_error` failures but may not be recorded in the batch - resend the whole request.
+
+    A retry of a json signal or document sent while the original request is still being processed can occasionally store an extra, identical version. This is harmless - the content doesn't change - but pollers will see one more update. To avoid it, set your client timeout above the server's request timeout: 15 seconds by default, or 2 minutes for document uploads.
 
     ## Correlation
     A signal can be linked to another signal in the same ISN by setting its `correlation_id` to the other signal's `signal_id`. Search with `include_correlated=true` returns the signals linked to each result, and the `correlation_id` search filter returns the signals linked to one signal.
@@ -127,7 +135,7 @@ info:
     ## Who can see signals
     - Accounts with **read** access to an ISN can see every signal in it.
     - Accounts with **write-only** access can see the signals they created, and the signals other accounts have correlated to their signals (one level deep).
-    - Signals in a **public** ISN can be searched by anyone.
+    - Signals in a **public** ISN can be searched by anyone, using *Signal Search (public ISNs)* (`/api/public/isn/...`). Downloading a document still needs an access token and access to the ISN.
 
     Privacy between participants is set by the ISN's permissions. For example, in a network where all participants share their data with a government agency but not with each other, the participants are given write-only access and the agency is given read access.
 
@@ -163,7 +171,7 @@ info:
 
     ## Route types
     - **Page handlers** (`GET /admin/*`, `/search`, etc.): return a full HTML page (`200`)
-    - **HTMX action handlers** (`PUT`/`POST` to `/ui-api/*`): return an HTML partial (`200`) - either a success or error alert fragment
+    - **HTMX action handlers** (`/ui-api/*`): return an HTML partial (`200`) - either the requested content, or a success or error alert fragment
 
     - see /ui-docs for more information
 
@@ -223,7 +231,8 @@ paths:
       - UI Pages
   /admin/isn/accounts/manage:
     get:
-      description: Renders the ISN accounts management page. Requires isnadmin role.
+      description: Renders the ISN accounts management page. Requires admin rights
+        for at least one ISN (the ISN owner, or a site admin).
       responses:
         "200":
           description: HTML page
@@ -252,7 +261,7 @@ paths:
   /admin/isn/signal-types/add:
     get:
       description: Renders the form to associate a signal type version with an ISN.
-        Requires isnadmin role.
+        Requires admin rights for at least one ISN (the ISN owner, or a site admin).
       responses:
         "200":
           description: HTML page
@@ -262,7 +271,7 @@ paths:
   /admin/isn/signal-types/manage:
     get:
       description: Renders the form to enable or disable signal types within an ISN.
-        Requires isnadmin role.
+        Requires admin rights for at least one ISN (the ISN owner, or a site admin).
       responses:
         "200":
           description: HTML page
@@ -309,7 +318,7 @@ paths:
   /admin/signal-types/list:
     get:
       description: Renders a read-only report of all registered signal types. Requires
-        isnadmin role.
+        admin rights for at least one ISN (the ISN owner, or a site admin).
       responses:
         "200":
           description: HTML page
@@ -380,8 +389,6 @@ paths:
       responses:
         "200":
           description: HTML partial or HX-Redirect header
-        "400":
-          description: HTML error partial
       summary: Authenticate user
       tags:
       - HTMX Actions
@@ -423,9 +430,7 @@ paths:
         type: string
       responses:
         "200":
-          description: HTML partial
-        "400":
-          description: HTML error partial
+          description: HTML partial (or an error alert)
       summary: Register new user
       tags:
       - HTMX Actions
@@ -469,11 +474,7 @@ paths:
         type: string
       responses:
         "200":
-          description: HTML partial
-        "400":
-          description: HTML error partial
-        "401":
-          description: HTML error partial
+          description: HTML partial (or an error alert)
       summary: Update password
       tags:
       - HTMX Actions
@@ -494,11 +495,7 @@ paths:
         type: string
       responses:
         "200":
-          description: HTML partial
-        "400":
-          description: HTML error partial
-        "401":
-          description: HTML error partial
+          description: HTML partial (or an error alert)
       summary: Grant or revoke ISN admin role
       tags:
       - HTMX Actions
@@ -527,11 +524,7 @@ paths:
         type: string
       responses:
         "200":
-          description: HTML partial
-        "400":
-          description: HTML error partial
-        "401":
-          description: HTML error partial
+          description: HTML partial (or an error alert)
       summary: Enable or disable an account
       tags:
       - HTMX Actions
@@ -552,11 +545,7 @@ paths:
         type: string
       responses:
         "200":
-          description: HTML partial
-        "400":
-          description: HTML error partial
-        "401":
-          description: HTML error partial
+          description: HTML partial (or an error alert)
       summary: Grant or revoke site admin role
       tags:
       - HTMX Actions
@@ -573,7 +562,9 @@ paths:
   /ui-api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}/content:
     get:
       description: Streams the document stored with a document signal from the signalsd
-        API to the browser as an attachment. Requires ISN read access.
+        API to the browser as an attachment. Requires access to the ISN (write-only
+        accounts can only download their own documents and the documents correlated
+        to their signals).
       parameters:
       - description: ISN slug
         in: path
@@ -609,10 +600,46 @@ paths:
       summary: Download a document
       tags:
       - UI Pages
+  /ui-api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}/correlated-count/{count}:
+    get:
+      description: HTMX endpoint. Returns a table of signals correlated to the specified
+        signal.
+      parameters:
+      - description: Signal ID
+        in: path
+        name: signal_id
+        required: true
+        type: string
+      - description: ISN slug
+        in: path
+        name: isn_slug
+        required: true
+        type: string
+      - description: Signal type slug
+        in: path
+        name: signal_type_slug
+        required: true
+        type: string
+      - description: Semantic version
+        in: path
+        name: sem_ver
+        required: true
+        type: string
+      - description: Number of correlated signals already displayed
+        in: path
+        name: count
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: HTML partial (or an error alert)
+      summary: Get correlated signals
+      tags:
+      - HTMX Actions
   /ui-api/isn/accounts/manage:
     put:
       description: HTMX endpoint. Adds or removes a user/service account from an ISN.
-        Requires isnadmin role.
+        Requires admin rights for at least one ISN (the ISN owner, or a site admin).
       parameters:
       - description: ISN slug
         in: formData
@@ -624,7 +651,8 @@ paths:
         name: account-type
         required: true
         type: string
-      - description: '''read'', ''write'', or ''none'' (removes account)'
+      - description: '''read'', ''write'', ''read-write'', or ''none'' (revokes the
+          account''s access)'
         in: formData
         name: permission
         required: true
@@ -639,11 +667,7 @@ paths:
         type: string
       responses:
         "200":
-          description: HTML partial
-        "400":
-          description: HTML error partial
-        "401":
-          description: HTML error partial
+          description: HTML partial (or an error alert)
       summary: Manage ISN accounts
       tags:
       - HTMX Actions
@@ -669,11 +693,7 @@ paths:
         type: string
       responses:
         "200":
-          description: HTML partial
-        "400":
-          description: HTML error partial
-        "401":
-          description: HTML error partial
+          description: HTML partial (or an error alert)
       summary: Create ISN
       tags:
       - HTMX Actions
@@ -694,18 +714,14 @@ paths:
         type: string
       responses:
         "200":
-          description: HTML partial
-        "400":
-          description: HTML error partial
-        "401":
-          description: HTML error partial
+          description: HTML partial (or an error alert)
       summary: Enable or disable an ISN
       tags:
       - HTMX Actions
   /ui-api/isn/signal-types/add:
     post:
       description: HTMX endpoint. Associates a signal type version with an ISN. Requires
-        isnadmin role for the target ISN.
+        admin rights for at least one ISN (the ISN owner, or a site admin).
       parameters:
       - description: ISN slug
         in: formData
@@ -724,18 +740,15 @@ paths:
         type: string
       responses:
         "200":
-          description: HTML partial
-        "400":
-          description: HTML error partial
-        "401":
-          description: HTML error partial
+          description: HTML partial (or an error alert)
       summary: Add signal type to ISN
       tags:
       - HTMX Actions
   /ui-api/isn/signal-types/manage:
     put:
       description: HTMX endpoint. Enables or disables a specific signal type version
-        within an ISN. Requires isnadmin role.
+        within an ISN. Requires admin rights for at least one ISN (the ISN owner,
+        or a site admin).
       parameters:
       - description: ISN slug
         in: formData
@@ -759,11 +772,7 @@ paths:
         type: string
       responses:
         "200":
-          description: HTML partial
-        "400":
-          description: HTML error partial
-        "401":
-          description: HTML error partial
+          description: HTML partial (or an error alert)
       summary: Enable or disable a signal type for an ISN
       tags:
       - HTMX Actions
@@ -784,11 +793,7 @@ paths:
         type: string
       responses:
         "200":
-          description: HTML partial
-        "400":
-          description: HTML error partial
-        "401":
-          description: HTML error partial
+          description: HTML partial (or an error alert)
       summary: Transfer ISN ownership
       tags:
       - HTMX Actions
@@ -891,11 +896,7 @@ paths:
         type: string
       responses:
         "200":
-          description: HTML partial
-        "400":
-          description: HTML error partial
-        "401":
-          description: HTML error partial
+          description: HTML partial (or an error alert)
       summary: Create service account
       tags:
       - HTMX Actions
@@ -911,17 +912,13 @@ paths:
         type: string
       responses:
         "200":
-          description: HTML partial
-        "400":
-          description: HTML error partial
-        "401":
-          description: HTML error partial
+          description: HTML partial (or an error alert)
       summary: Reissue service account credentials
       tags:
       - HTMX Actions
   /ui-api/signal-types/create:
     post:
-      description: HTMX endpoint. Creates a new signal type at version . Requires
+      description: HTMX endpoint. Creates a new signal type at version 1.0.0. Requires
         siteadmin role.
       parameters:
       - description: Signal type title
@@ -959,11 +956,7 @@ paths:
         type: string
       responses:
         "200":
-          description: HTML partial
-        "400":
-          description: HTML error partial
-        "401":
-          description: HTML error partial
+          description: HTML partial (or an error alert)
       summary: Create signal type
       tags:
       - HTMX Actions
@@ -999,11 +992,7 @@ paths:
         type: string
       responses:
         "200":
-          description: HTML partial
-        "400":
-          description: HTML error partial
-        "401":
-          description: HTML error partial
+          description: HTML partial (or an error alert)
       summary: Register new signal type schema version
       tags:
       - HTMX Actions
@@ -1025,11 +1014,7 @@ paths:
         type: string
       responses:
         "200":
-          description: HTML partial
-        "400":
-          description: HTML error partial
-        "401":
-          description: HTML error partial
+          description: HTML partial (or an error alert)
       summary: Delete Signals Routing Rules
       tags:
       - HTMX Actions
@@ -1052,7 +1037,7 @@ paths:
         type: string
       responses:
         "200":
-          description: HTML partial
+          description: HTML partial (or an error alert)
       summary: Load signals routing form
       tags:
       - HTMX Actions
@@ -1118,11 +1103,7 @@ paths:
         type: array
       responses:
         "200":
-          description: HTML partial
-        "400":
-          description: HTML error partial
-        "401":
-          description: HTML error partial
+          description: HTML partial (or an error alert)
       summary: Save Signals Routing Rules
       tags:
       - HTMX Actions
@@ -1133,7 +1114,7 @@ paths:
         The optional count param is used to set the initial sequence label in the rendered row.
       responses:
         "200":
-          description: HTML partial
+          description: HTML partial (or an error alert)
       summary: Add routing mapping row
       tags:
       - HTMX Actions
@@ -1147,46 +1128,11 @@ paths:
       summary: Remove routing mapping row
       tags:
       - HTMX Actions
-  /ui-api/signals/{isn_slug}/{signal_type_slug}/v{sem_ver}/{signal_id}/correlated/{count}:
-    get:
-      description: HTMX endpoint. Returns a table of signals correlated to the specified
-        signal.
-      parameters:
-      - description: Signal ID
-        in: path
-        name: signal_id
-        required: true
-        type: string
-      - description: ISN slug
-        in: path
-        name: isn_slug
-        required: true
-        type: string
-      - description: Signal type slug
-        in: path
-        name: signal_type_slug
-        required: true
-        type: string
-      - description: Semantic version
-        in: path
-        name: sem_ver
-        required: true
-        type: string
-      - description: Number of correlated signals already displayed
-        in: path
-        name: count
-        required: true
-        type: integer
-      responses:
-        "200":
-          description: HTML partial
-      summary: Get correlated signals
-      tags:
-      - HTMX Actions
   /ui-api/signals/search:
     get:
       description: HTMX endpoint. Returns a table of signals matching the search criteria.
-        Requires ISN read access.
+        Requires access to the ISN (write-only accounts only see their own signals
+        and the signals correlated to them).
       parameters:
       - description: ISN slug
         in: query
@@ -1237,11 +1183,7 @@ paths:
         type: boolean
       responses:
         "200":
-          description: HTML partial
-        "400":
-          description: HTML error partial
-        "401":
-          description: HTML error partial
+          description: HTML partial (or an error alert)
       summary: Search signals
       tags:
       - HTMX Actions
@@ -1257,7 +1199,7 @@ paths:
         type: string
       responses:
         "200":
-          description: HTML partial
+          description: HTML partial (or an error alert)
       summary: Toggle schema fields for the selected content kind
       tags:
       - HTMX Actions
@@ -1272,7 +1214,7 @@ paths:
         type: boolean
       responses:
         "200":
-          description: HTML partial
+          description: HTML partial (or an error alert)
       summary: Toggle readme URL input
       tags:
       - HTMX Actions
@@ -1287,7 +1229,7 @@ paths:
         type: boolean
       responses:
         "200":
-          description: HTML partial
+          description: HTML partial (or an error alert)
       summary: Toggle schema validation input
       tags:
       - HTMX Actions
@@ -1303,11 +1245,7 @@ paths:
         type: string
       responses:
         "200":
-          description: HTML partial
-        "400":
-          description: HTML error partial
-        "401":
-          description: HTML error partial
+          description: HTML partial (or an error alert)
       summary: Generate password reset link
       tags:
       - HTMX Actions

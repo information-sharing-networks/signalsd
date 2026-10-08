@@ -178,17 +178,28 @@ definitions:
   handlers.BatchStatus:
     properties:
       isn_slug:
-        description: empty for signals the signal router could not route to an ISN
+        description: IsnSlug is empty for signals the signal router could not route
+          to an ISN
+        example: sample-isn
         type: string
       rejected_count:
+        description: RejectedCount is the number of unresolved failures
+        example: 1
         type: integer
       signal_type_slug:
+        example: sample-signal-type
         type: string
       signal_type_version:
+        description: SignalTypeVersion is the signal type's sem_ver with a "v" prefix
+        example: v1.0.0
         type: string
       stored_count:
+        description: StoredCount is the number of signal versions stored in this batch
+        example: 10
         type: integer
       unresolved_failures:
+        description: UnresolvedFailures lists the signals that failed in this batch
+          and have not been stored since
         items:
           $ref: '#/definitions/handlers.FailureRow'
         type: array
@@ -302,14 +313,15 @@ definitions:
         example: https://github.com/user/project/blob/2025.01.01/schema.json
         type: string
       title:
-        description: unique title
+        description: the slug generated from the title must be unique
         example: Sample Signal @example.org
         type: string
     type: object
   handlers.CreateSignalsRequest:
     properties:
       batch_ref:
-        description: BatchRef groups signals under a sender-chosen label
+        description: 'BatchRef groups signals under a sender-chosen label (1-128 characters:
+          letters, numbers, hyphens and underscores only)'
         example: daily-sync-2026-04-02
         type: string
       signals:
@@ -321,12 +333,12 @@ definitions:
   handlers.CreateSignalsSummary:
     properties:
       rejected_count:
-        description: Rejected Count is the list of records rejected due to issues
+        description: RejectedCount is the count of records rejected due to issues
           with the contents of the record
         example: 1
         type: integer
       stored_count:
-        description: StoredCount is the count of records sucessfully loaded
+        description: StoredCount is the count of records successfully loaded
         example: 1
         type: integer
       total_submitted:
@@ -340,7 +352,7 @@ definitions:
           UnroutableCount is the count of signals sent to the Signal Router that could not be routed.
           (e.g because no routing rule matched the data, or the account lacks write permission to the resolved ISN)
 
-          This field is only supplied in responses to the Signals Router handler.
+          This field is only supplied in responses to the Signals Router handler, and is omitted when it is zero.
         example: 1
         type: integer
     type: object
@@ -404,7 +416,7 @@ definitions:
   handlers.FailedSignal:
     properties:
       error_code:
-        example: validation_error
+        example: malformed_body
         type: string
       error_message:
         example: field 'name' is required
@@ -550,7 +562,7 @@ definitions:
         example: signal-type-1/v0.0.1
         type: string
       stored_signals:
-        description: StoredSignals is the list of signals sucessfully processed
+        description: StoredSignals is the list of signals successfully processed
         items:
           $ref: '#/definitions/handlers.StoredSignal'
         type: array
@@ -925,7 +937,7 @@ definitions:
   handlers.SignalRoutingConfigResponse:
     properties:
       routing_field:
-        example: payload.PorfOfEntry
+        example: payload.portOfEntry
         type: string
       routing_rules:
         items:
@@ -970,7 +982,7 @@ definitions:
         type: string
       results:
         description: Results contains per-ISN outcomes.  It will only contain one
-          entry for standard signal submisions (the ISN from the URL)
+          entry for standard signal submissions (the ISN from the URL)
         items:
           $ref: '#/definitions/handlers.IsnResult'
         type: array
@@ -979,8 +991,8 @@ definitions:
         - $ref: '#/definitions/handlers.CreateSignalsSummary'
         description: Summary contains the summary of counts
       unroutable_signals:
-        description: UnroutableSignals is only included when using the Signal Router
-          (N/A for standard signal submission)
+        description: UnroutableSignals is only included in Signal Router responses,
+          and is omitted when there are no unroutable signals
         items:
           $ref: '#/definitions/handlers.FailedSignal'
         type: array
@@ -1138,6 +1150,13 @@ definitions:
         example: private
         type: string
     type: object
+  handlers.UpdateIsnSignalTypeStatusRequest:
+    properties:
+      is_in_use:
+        description: whether this signal type version is enabled on the ISN
+        example: false
+        type: boolean
+    type: object
   handlers.UpdatePasswordRequest:
     properties:
       current_password:
@@ -1163,10 +1182,6 @@ definitions:
         description: updated description
         example: description
         type: string
-      is_in_use:
-        description: whether this signal type version is actively used
-        example: false
-        type: boolean
       readme_url:
         description: 'README file URL: must be a GitHub URL ending in .md'
         example: https://github.com/user/project/blob/2025.01.01/readme.md
@@ -1266,24 +1281,26 @@ info:
     - `400` Malformed request (invalid json, missing required fields, etc.)
     - `401` Unauthorized (invalid credentials)
     - `403` Forbidden (insufficient permissions)
+    - `404` Resource not found (e.g. an ISN or signal type that doesn't exist or is not in use)
     - `413` Request body exceeds size limit
     - `429` Rate limit exceeded
     - `500` Internal server error
+    - `504` Request timed out (`timeout`)
 
     Individual endpoints document their specific business logic errors.
 
-    Standard error responses include a JSON response body containing `error_code` and `error_description` fields
+    Standard error responses include a JSON response body containing `error_code`, `message` and `request_id` fields.
 
-    The /oauth endpoints include an additional `error` field - this contains the RFC6749 standard error code.
+    The /oauth endpoints return `error` (the RFC6749 standard error code), `error_code` and `error_description` fields instead.
 
     ## Request Limits
-    All endpoints are protected by:
-    - **Rate limiting**: Configurable requests per second
-    - **Request size limits**: 64KB for admin/auth endpoints, 5MB for signal ingestion
+    The endpoints are protected by:
+    - **Rate limiting**: Configurable requests per second (all endpoints)
+    - **Request size limits** (configurable - these are the defaults): 64KB for admin/auth endpoints, 5MB for json and event signal submissions, 20MB for document uploads
 
-    Check the Signalsd-Max-Request-Body response header for the configured limit on signals payload.
+    Check the `Signalsd-Max-Request-Size` response header for the configured size limit of the endpoint called.
 
-    The rate limit is set globaly and prevents abuse of the service.
+    The rate limit is set globally and prevents abuse of the service.
     In production there will be additional protections in place such as per-IP rate limiting provided by the load balancer/reverse proxy.
 
     ## Authentication & Authorization
@@ -1302,7 +1319,7 @@ info:
     ```
 
     **Token Refresh (Service Accounts):**
-    - Client calls `/oauth/token?grant_type=client_credentials` with client ID/secret
+    - Client calls `POST /oauth/token` with `grant_type=client_credentials` in the form body, and the client ID/secret as form fields or HTTP Basic auth
     - API validates credentials and issues new access token
     - Client receives new bearer token for subsequent API calls
 
@@ -1310,13 +1327,17 @@ info:
     - Client calls `/api/auth/login` with email and password and receives an access token in the response body. The refresh token is set as an HTTP-only cookie.
 
     **Token Refresh (Web Users):**
-    - Client calls `/oauth/token?grant_type=refresh_token` with HTTP-only refresh token cookie
+    - Client calls `POST /oauth/token` with `grant_type=refresh_token` in the form body (the HTTP-only refresh token cookie is sent automatically)
     - API validates refresh token and issues new access token + rotated refresh cookie
     - Client receives new bearer token for subsequent API calls
 
     **Token Lifetimes:**
     - Access tokens: 30 minutes
-    - Refresh tokens: 30 days (web users only)
+    - Refresh tokens: 30 days (web users only). Each refresh issues a new refresh token valid for another 30 days, so users only need to log in again if they don't use the service for 30 days.
+
+    Each login or refresh revokes the user's other refresh tokens, so a user has one active session at a time.
+
+    The account's role and ISN permissions are included in the access token when it is issued. Changes to them (and disabling an account) take effect when the account next gets an access token - up to 30 minutes later.
 
     ### CSRF Protection
     The refresh token used by the /oauth API endpoints is stored in an HttpOnly cookie (to prevent access by JavaScript)
@@ -1326,11 +1347,11 @@ info:
 
     CORS is used to control which browser-based clients can make cross-origin requests to the API and read responses.
 
-    the `ALLOWED_ORIGINS` environment variable is used to configure the CORS rules.
+    The `ALLOWED_ORIGINS` environment variable is used to configure the CORS rules.
 
     In production, you should restrict ALLOWED_ORIGINS to trusted client origins (the server will not start if it is not set)
 
-    ## Date/Time Handling:
+    ## Date/Time Handling
 
     **URL Parameters**: The following ISO 8601 formats are accepted in URL query parameters:
     - 2006-01-02T15:04:05Z (UTC)
@@ -1354,7 +1375,7 @@ info:
     Search, withdrawal and batches work the same way for every kind, and search results include each signal's `content_kind`.
 
     ## Versions and resubmissions
-    Each signal is identified by the `local_ref` the sender supplies, which must be unique for the account, ISN and signal type (sending the same `local_ref` to two ISNs creates two independent signals). When a `local_ref` is sent to the same ISN again:
+    Each signal is identified by the `local_ref` the sender supplies, which must be unique for the account, ISN and signal type version (sending the same `local_ref` to two ISNs, or to two versions of a signal type, creates two independent signals). When a `local_ref` is sent to the same ISN again:
     - **If something changed**, a new version of the signal is stored (json and document signals).
     - **If nothing changed** (the same content, and the same or no `correlation_id`), nothing is stored. The response contains the `signal_id`, `signal_version_id` and `version_number` of the existing latest version, with `unchanged: true`, so requests can be safely retried. JSON content is compared as JSON (key order and whitespace are ignored). Documents compare the file and its filename.
     - **If the signal was withdrawn**, it is reactivated with a new version (json and document signals).
@@ -1362,12 +1383,14 @@ info:
 
     ## Recovering from failures
     Each signal in a request is stored separately, so a request that fails part way through (e.g. a timeout) can leave some signals stored and others not. Because unchanged signals are not stored again, you can recover in either of these ways:
-    - **Resend the whole request.** Signals that were already stored are returned with `unchanged: true`, and only the missing or failed signals are stored. Note that any signal in the request that has been withdrawn since it was sent is reactivated.
+    - **Resend the whole request.** Signals that were already stored are returned with `unchanged: true`, and only the missing or failed signals are stored. Note that any json signal in the request that has been withdrawn since it was sent is reactivated (withdrawn events are not reactivated - they fail with `resource_already_exists`).
     - **Resend only the failures.** The response lists the signals that failed, and *Get Batch Status* lists the batch's unresolved failures.
 
-    When a whole request fails (400, 401, 403, 413 or 500), or you get no response (e.g. a timeout), no failures are recorded in the batch, so resend the whole request once the problem is fixed.
+    When a whole *Submit Signals* request fails (an error response such as 400, 401, 403, 404, 413 or 500), or you get no response, no failures are recorded in the batch, so resend the whole request once the problem is fixed. Rejected document uploads are recorded in the batch (except when the request's form fields are missing or invalid).
 
-    A retry sent while the original request is still being processed can occasionally store an extra, identical version. This is harmless - the content doesn't change - but pollers will see one more update. To avoid it, set your client timeout above the server's request timeout: 15 seconds by default, or 2 minutes for document uploads.
+    If the server's request timeout is reached part way through a *Submit Signals* request, the remaining signals are returned as `database_error` failures but may not be recorded in the batch - resend the whole request.
+
+    A retry of a json signal or document sent while the original request is still being processed can occasionally store an extra, identical version. This is harmless - the content doesn't change - but pollers will see one more update. To avoid it, set your client timeout above the server's request timeout: 15 seconds by default, or 2 minutes for document uploads.
 
     ## Correlation
     A signal can be linked to another signal in the same ISN by setting its `correlation_id` to the other signal's `signal_id`. Search with `include_correlated=true` returns the signals linked to each result, and the `correlation_id` search filter returns the signals linked to one signal.
@@ -1383,7 +1406,7 @@ info:
     ## Who can see signals
     - Accounts with **read** access to an ISN can see every signal in it.
     - Accounts with **write-only** access can see the signals they created, and the signals other accounts have correlated to their signals (one level deep).
-    - Signals in a **public** ISN can be searched by anyone.
+    - Signals in a **public** ISN can be searched by anyone, using *Signal Search (public ISNs)* (`/api/public/isn/...`). Downloading a document still needs an access token and access to the ISN.
 
     Privacy between participants is set by the ISN's permissions. For example, in a network where all participants share their data with a government agency but not with each other, the participants are given write-only access and the agency is given read access.
 
@@ -1419,7 +1442,7 @@ info:
 
     ## Route types
     - **Page handlers** (`GET /admin/*`, `/search`, etc.): return a full HTML page (`200`)
-    - **HTMX action handlers** (`PUT`/`POST` to `/ui-api/*`): return an HTML partial (`200`) - either a success or error alert fragment
+    - **HTMX action handlers** (`/ui-api/*`): return an HTML partial (`200`) - either the requested content, or a success or error alert fragment
 
     - see /ui-docs for more information
 
@@ -1449,7 +1472,9 @@ paths:
         - Revokes all client secrets/one-time secrets (service accounts)
         - Revokes all refresh tokens (web users)
 
-        **Recovery:** Account must be re-enabled by admin via `/admin/accounts/{id}/enable`
+        Access tokens that were already issued remain valid until they expire (up to 30 minutes).
+
+        **Recovery:** Account must be re-enabled by admin via `POST /api/admin/accounts/{account_id}/enable`
         Service accounts will also need a new client secret via `/api/auth/service-accounts/reissue-credentials`
 
         Only site admins can disable accounts (disabling an account removes its access to every ISN it belongs to).
@@ -1470,7 +1495,7 @@ paths:
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: authentication_error
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
@@ -1497,7 +1522,7 @@ paths:
         Sets account status to `is_active = true` (does not create new tokens).
 
         **Post-Enable Steps Required:**
-        - **Service Accounts**: will need a new client secret via `/api/auth/service-accounts/reissue_credentials`
+        - **Service Accounts**: will need a new client secret via `/api/auth/service-accounts/reissue-credentials`
         - **Web Users**: Can immediately log in again via `/api/auth/login`
 
         Only site admins can enable accounts.
@@ -1516,7 +1541,7 @@ paths:
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: authentication_error
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
@@ -1538,7 +1563,12 @@ paths:
       - Account Management
   /api/admin/accounts/{account_id}/isn-admin-role:
     delete:
-      description: '**This endpoint can only be used by site admin accounts**'
+      description: |-
+        The account reverts to the member role.
+
+        The change takes effect when the account next gets an access token (up to 30 minutes later).
+
+        **This endpoint can only be used by site admin accounts**
       parameters:
       - description: account id
         example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
@@ -1551,6 +1581,10 @@ paths:
           description: No Content
         "400":
           description: invalid_request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
@@ -1576,13 +1610,15 @@ paths:
         - read/write to their own ISNs
         - Grant other accounts read or write access to their ISNs
 
-        Note that ISN admins can't change ISNs they don't own (a site admin must use the `transfer ownership` endpoint if this is requred)
+        Note that ISN admins can't change ISNs they don't own (a site admin must use the `transfer ownership` endpoint if this is required)
 
         An ISN admin also has access to the following site-level functions:
         - Create service accounts
         - View all users and their email addresses
 
         Account management (enabling and disabling accounts, password reset links and reissuing service account credentials) is done by site admins, since it affects the account on every ISN it belongs to.
+
+        The change takes effect when the account next gets an access token (up to 30 minutes later).
 
         **This endpoint can only be used by site admin accounts**
       parameters:
@@ -1597,6 +1633,10 @@ paths:
           description: No Content
         "400":
           description: invalid_request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
@@ -1614,7 +1654,12 @@ paths:
       - Account Management
   /api/admin/accounts/{account_id}/site-admin-role:
     delete:
-      description: '**This endpoint can only be used by site admin accounts**'
+      description: |-
+        The account reverts to the member role.
+
+        The change takes effect when the account next gets an access token (up to 30 minutes later).
+
+        **This endpoint can only be used by site admin accounts**
       parameters:
       - description: account id
         example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
@@ -1627,6 +1672,10 @@ paths:
           description: No Content
         "400":
           description: invalid_request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
@@ -1646,13 +1695,15 @@ paths:
       description: |-
         This endpoint grants the site admin role to a user.
 
-        A site admin can create and manage any ISN and adminster acounts on the site.
+        A site admin can create and manage any ISN and administer accounts on the site.
 
         The following tasks can only be performed by site admins:
         - Create new signal types on the site
         - Register new signal type schemas
         - Transfer ISN ownership between accounts
         - Assign the site admin role to other users
+
+        The change takes effect when the account next gets an access token (up to 30 minutes later).
 
         **This endpoint can only be used by site admin accounts**
       parameters:
@@ -1667,6 +1718,10 @@ paths:
           description: No Content
         "400":
           description: invalid_request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
@@ -1708,6 +1763,10 @@ paths:
           description: malformed_body | invalid_request
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: authorization_error | access_token_expired
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
         "403":
           description: forbidden
           schema:
@@ -1722,7 +1781,6 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      - RefreshTokenCookieAuth: []
       summary: Transfer ISN Ownership
       tags:
       - ISN Configuration
@@ -1747,10 +1805,10 @@ paths:
       - Site Admin
   /api/admin/service-accounts:
     get:
-      description: "Only owners and admins can view service account lists.\n\nTo return
-        a specific service account supply one of the following query parameter combinations:\n-\tid
-        (account ID)\n-\tclient_id\n-\tclient_email & client_organization\nNo query
-        parameters = return all service accounts\n"
+      description: "Only site admins and ISN admins can view service account lists.\n\nTo
+        return a specific service account supply one of the following query parameter
+        combinations:\n-\tid (account ID)\n-\tclient_id\n-\tclient_email & client_organization\n\nNo
+        query parameters = return all service accounts\n"
       parameters:
       - description: Service Account ID
         example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
@@ -1774,17 +1832,15 @@ paths:
         type: string
       responses:
         "200":
-          description: OK
+          description: Specific service account (when query params provided)
           schema:
-            items:
-              $ref: '#/definitions/handlers.ServiceAccountDetails'
-            type: array
+            $ref: '#/definitions/handlers.ServiceAccountDetails'
         "400":
           description: invalid_request
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: authentication_error
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
@@ -1820,7 +1876,7 @@ paths:
               $ref: '#/definitions/handlers.SignalTypeDetail'
             type: array
         "401":
-          description: authentication_error
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
@@ -1839,8 +1895,8 @@ paths:
     post:
       description: |-
         Signal types specify a record that can be shared on the site
-        - Each type has a unique title and this is used to create a URL-friendly slug
-        - The title and slug fields can't be changed and must be unique for the site
+        - The title is used to create a URL-friendly slug, which must be unique for the site (two titles that produce the same slug conflict - 409)
+        - The title and slug fields can't be changed
         - The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading
 
         Content kinds
@@ -1859,11 +1915,11 @@ paths:
 
         Versions
         - A signal type can have multiple versions - these share the same title/slug but have different JSON schemas
-        - Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (, 0.1.0 or 0.0.1)
+        - Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)
 
         After creating a signal type, use the AddSignalTypeToIsn endpoint to link it to one or more ISNs.
 
-        Signal type definitions are referred to like this: /api/signal-types/{signal_type_slug}/v{sem_ver}
+        Signal type definitions are referred to in paths like this: {signal_type_slug}/v{sem_ver} (e.g. /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver})
 
         Note: this endpoint can only be used by site admins
       parameters:
@@ -1880,6 +1936,10 @@ paths:
             $ref: '#/definitions/handlers.NewSignalTypeResponse'
         "400":
           description: malformed_body
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
@@ -1908,6 +1968,9 @@ paths:
 
         Use the bump_type (major/minor/patch) parameter to determine how the version number should be incremented.
 
+        The new version keeps the title and content_kind of the existing signal type.
+        Schemas can only be registered for json and event signal types.
+
         Note: this endpoint can only be used by site admins
       parameters:
       - description: signal type slug
@@ -1929,6 +1992,10 @@ paths:
             $ref: '#/definitions/handlers.NewSignalTypeResponse'
         "400":
           description: malformed_body
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
@@ -1954,8 +2021,12 @@ paths:
       - Signal Types
   /api/admin/signal-types/{signal_type_slug}/v{sem_ver}:
     delete:
-      description: Only signal types that have never been referenced by signals can
-        be deleted
+      description: |-
+        Only signal types that have never been referenced by signals can be deleted.
+
+        Deleting a signal type also removes it from every ISN it was added to, and deletes its routing config.
+
+        Note: this endpoint can only be used by site admins
       parameters:
       - description: signal type slug
         example: sample-signal-type
@@ -1972,6 +2043,14 @@ paths:
       responses:
         "204":
           description: No Content
+        "401":
+          description: authorization_error | access_token_expired
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
         "404":
           description: resource_not_found
           schema:
@@ -2015,7 +2094,7 @@ paths:
           schema:
             $ref: '#/definitions/handlers.SignalTypeDetail'
         "401":
-          description: authentication_error
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
@@ -2067,7 +2146,7 @@ paths:
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: authentication_error
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
@@ -2106,6 +2185,14 @@ paths:
       responses:
         "204":
           description: No Content
+        "401":
+          description: authorization_error | access_token_expired
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
         "404":
           description: resource_not_found
           schema:
@@ -2139,6 +2226,14 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/handlers.SignalRoutingConfigResponse'
+        "401":
+          description: authorization_error | access_token_expired
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
         "404":
           description: resource_not_found
           schema:
@@ -2156,15 +2251,18 @@ paths:
       description: |-
         Replaces the route config for the specified signal type path
 
-        the routing_field must be a plain Dot Notation path -
-        under the covers the service uses gjson paths, however the special patern matching symbols (*?#@|!()[]%<>=) are not currently allowed.
+        the routing_field must be a plain Dot Notation path that is defined in the signal type's schema -
+        under the covers the service uses gjson paths, however the special pattern matching symbols (*?#@|!()[]%<>=) and numeric (array index) path segments are not currently allowed.
 
-        When using the 'matches' and 'not matches' operator, any occurance of '*' and '?' in the matching pattern will be treated as a wildcard.
+        When using the 'matches' and 'does_not_match' operators, any occurrence of '*' and '?' in the matching pattern will be treated as a wildcard ('equals' and 'does_not_equal' compare the pattern literally).
         The pattern is always compared to the full contents of the specified routing field.
 
         Patterns are matched in order according to the supplied sequence number (smallest sequence first)
-        and the first match is accepted. Where the routing field is an array, as long as one or more elements match
-        the match is accepted.
+        and the first match is accepted. Each rule must have a different sequence number.
+        Where the routing field is an array, the rule matches if one or more elements match
+        (for 'does_not_match' and 'does_not_equal', if one or more elements do not match the pattern).
+
+        The new config is used by the router within 30 seconds.
       parameters:
       - description: signal type slug
         example: sample-signal-type
@@ -2189,6 +2287,14 @@ paths:
           description: No Content
         "400":
           description: malformed_body
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: authorization_error | access_token_expired
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: forbidden
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
@@ -2232,7 +2338,7 @@ paths:
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: authentication_error
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
@@ -2280,7 +2386,7 @@ paths:
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: authentication_error
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
@@ -2303,12 +2409,14 @@ paths:
   /api/auth/login:
     post:
       description: |-
-        The response body includes an access token which can be used to access the protected enpoints, assuming the account has the appropriate permissions.
+        The response body includes an access token which can be used to access the protected endpoints, assuming the account has the appropriate permissions.
         The access_token is valid for 30 minutes.
 
-        As part of the login response, the server sets a http-only cookie on the client that will allow it to refresh the token (use the /oauth/token endpoint with a grant_type=refresh_token param)
+        As part of the login response, the server sets a http-only cookie on the client that will allow it to refresh the token (POST to the /oauth/token endpoint with grant_type=refresh_token in the form body).
+        The cookie's path is `/oauth`, so browsers only send it to the /oauth endpoints.
         The refresh_token lasts 30 days unless it is revoked earlier.
-        - To renew the refresh_token, log in again.
+        - Each refresh issues a new refresh_token valid for another 30 days, so the user only has to log in again if they don't refresh for 30 days.
+        - Logging in revokes the user's other refresh tokens, so a user has one active session at a time.
         - To revoke the refresh_token, call the /oauth/revoke endpoint.
 
         The account's role and permissions are encoded as part of the jwt access token and this information is also provided in the response body.
@@ -2373,7 +2481,7 @@ paths:
 
         On success the token is deleted so the link can't be reused, and the user can log in with the new password.
 
-        Note that no access token is required - possession of the reset token is what authorises the change. Reset tokens can only be issued by admins (see *Generate Password Reset Link* under Account Management).
+        Note that no access token is required - possession of the reset token is what authorises the change. Reset tokens can only be issued by site admins (see *Generate Password Reset Link* under Account Management).
       parameters:
       - description: Password reset token ID, taken from the reset link
         example: 550e8400-e29b-41d4-a716-446655440000
@@ -2432,7 +2540,8 @@ paths:
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: authentication_error
+          description: authorization_error | access_token_expired | authentication_error
+            (incorrect current password)
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "500":
@@ -2453,7 +2562,7 @@ paths:
         New members can't access any information beyond the public data on the site until an admin grants them access to an ISN.
 
         Site admins can grant other users the "isnadmin" role.
-        ISN admins can create ISNs and service accounts, and grant other accounts permission to read or write to the ISNs they created.
+        ISN admins can create ISNs and service accounts, and grant other accounts permission to read or write to the ISNs they own.
       parameters:
       - description: user details
         in: body
@@ -2488,7 +2597,7 @@ paths:
 
         To reissue credentials for an existing service account, use the **Reissue Service Account Credentials** endpoint.
 
-        You have to be an admin to use this end point
+        Only site admins and ISN admins can use this endpoint
       parameters:
       - description: service account details
         in: body
@@ -2506,7 +2615,11 @@ paths:
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: authentication_error
+          description: authorization_error | access_token_expired
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: forbidden
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "409":
@@ -2550,7 +2663,7 @@ paths:
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: authentication_error
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
@@ -2586,7 +2699,9 @@ paths:
         - Recovery from a missed rotation deadline (expired secret)
         - Suspected credential compromise requiring immediate rotation
 
-        Client secrets expire after 1 year by default.
+        Client secrets expire after 1 year.
+
+        Credentials can be supplied as form fields or via HTTP Basic Auth (`Authorization: Basic base64(client_id:client_secret)`).
       parameters:
       - description: Client ID
         in: formData
@@ -2657,13 +2772,15 @@ paths:
 
         `unresolved_failures` lists the signals to correct and resend (see _Recovering from failures_ in the API introduction).
         A failure is resolved when a later version of the signal is stored, in this batch or any other.
+        Signals the Signals Router could not route to an ISN (empty isn_slug) stay listed, even if the signal is stored later.
 
         Resending a signal that is unchanged doesn't store a new version.
         Unchanged signals are counted in the batch that first stored them, not the batch they were resent in.
 
-        Requests that fail as a whole (e.g. invalid JSON, permission errors or timeouts) are not recorded, so they don't appear here.
+        Requests that are rejected as a whole (e.g. invalid JSON, authentication or permission errors) are not recorded, so they don't appear here.
+        If a request times out part way through, the signals stored before the timeout are reported.
 
-        Members can view their own batches. Site admins can supply ?account_id= to view another account's batch.
+        Accounts can view their own batches. Site admins can supply ?account_id= to view another account's batch.
       parameters:
       - description: Batch reference
         example: daily-sync-2026-04-02
@@ -2682,6 +2799,10 @@ paths:
             $ref: '#/definitions/handlers.BatchStatusResponse'
         "400":
           description: invalid_request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
@@ -2704,18 +2825,20 @@ paths:
   /api/batches/search:
     get:
       description: |-
-        Returns the full status for all matching batches. Members see their own batches; site admins see all.
-        At least one date filter must be provided.
+        Returns the full status for all matching batches. Accounts see their own batches; site admins see all.
+        Both created_after and created_before must be provided.
       parameters:
       - description: Earliest batch creation time
         example: "2006-01-02T15:04:05Z"
         in: query
         name: created_after
+        required: true
         type: string
       - description: Latest batch creation time
         example: "2006-01-02T16:00:00Z"
         in: query
         name: created_before
+        required: true
         type: string
       responses:
         "200":
@@ -2728,8 +2851,12 @@ paths:
           description: invalid_url_param
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: authorization_error | access_token_expired
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
         "500":
-          description: database_error
+          description: database_error | internal_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -2739,7 +2866,8 @@ paths:
       - Signal Exchange
   /api/isn:
     get:
-      description: get a list of the configured ISNs
+      description: get a list of the configured ISNs (any authenticated account can
+        use this endpoint - private ISNs are included)
       parameters:
       - default: false
         description: Include inactive ISNs
@@ -2753,10 +2881,16 @@ paths:
             items:
               $ref: '#/definitions/handlers.Isn'
             type: array
+        "401":
+          description: authorization_error | access_token_expired
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
         "500":
           description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
       summary: Get ISN configurations
       tags:
       - ISN Configuration
@@ -2778,6 +2912,8 @@ paths:
         different membership and be configured for different Signal Types.
 
         This endpoint can only be used by ISN admins and site admins
+
+        All fields (title, detail, is_in_use and visibility) are required.
       parameters:
       - description: ISN configuration
         in: body
@@ -2794,6 +2930,14 @@ paths:
           description: malformed_body
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: authorization_error | access_token_expired
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
         "409":
           description: resource_already_exists
           schema:
@@ -2804,13 +2948,13 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
-      - RefreshTokenCookieAuth: []
       summary: Create an ISN
       tags:
       - ISN Configuration
   /api/isn/{isn_slug}:
     get:
-      description: Returns details about the ISN
+      description: Returns details about the ISN (any authenticated account can use
+        this endpoint)
       parameters:
       - description: ISN slug
         example: sample-isn
@@ -2823,8 +2967,8 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/handlers.IsnAndLinkedInfo'
-        "400":
-          description: invalid_url_param
+        "401":
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
@@ -2835,6 +2979,8 @@ paths:
           description: database_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
       summary: Get an ISN configuration
       tags:
       - ISN Configuration
@@ -2842,7 +2988,7 @@ paths:
       description: |-
         Update the ISN configuration
         This endpoint can only be used by admin accounts
-        ISN admins can only update ISNs they created
+        ISN admins can only update ISNs they own
         Site admins can update any ISN
       parameters:
       - description: ISN slug
@@ -2865,7 +3011,7 @@ paths:
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: authentication_error
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
@@ -2888,8 +3034,9 @@ paths:
   /api/isn/{isn_slug}/accounts:
     get:
       description: |-
-        Get a list of all accounts (users and service accounts) that have permissions on the specified ISN.
-        Only ISN admins (for the ISNs they created) and site admins can view this information
+        Get a list of all accounts (users and service accounts) that have had permissions on the specified ISN.
+        Accounts whose access has been revoked are included (with can_read and can_write both false).
+        Only ISN admins (for the ISNs they own) and site admins can view this information
       parameters:
       - description: ISN slug
         example: sample-isn
@@ -2904,8 +3051,8 @@ paths:
             items:
               $ref: '#/definitions/handlers.IsnAccount'
             type: array
-        "400":
-          description: invalid_url_param
+        "401":
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
@@ -2931,7 +3078,7 @@ paths:
         Update an account's access permission for an ISN. Set both can_read and can_write to false to revoke all access.
 
         This endpoint can only be used by admin accounts:
-        - ISN admins can only update membership for ISNs they created).
+        - ISN admins can only update membership for ISNs they own.
         - Site admins can update membership for any ISN
 
         Permissions:
@@ -2939,8 +3086,9 @@ paths:
         - Accounts with 'write' permission can create signals on the ISN.
         - For accounts that need read/write access to an ISN, you must grant both 'read' and 'write' permissions.
 
-        Note that accounts with 'write' permission to an ISN are also automatically granted 'read'
-        permission for signals they created, but can't view other signals on the ISN.
+        Note that accounts with only 'write' permission to an ISN can view the signals they created, and the signals other accounts have correlated to their signals, but no others.
+
+        The change takes effect when the account next gets an access token (up to 30 minutes later).
 
         You must supply values for both can_read and can_write.
       parameters:
@@ -2967,6 +3115,10 @@ paths:
           description: OK
         "400":
           description: invalid_request | malformed_body
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
@@ -3015,7 +3167,7 @@ paths:
               $ref: '#/definitions/handlers.IsnSignalTypeDetail'
             type: array
         "401":
-          description: authentication_error
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
@@ -3064,7 +3216,7 @@ paths:
           schema:
             $ref: '#/definitions/handlers.IsnSignalTypeDetail'
         "401":
-          description: authentication_error
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "404":
@@ -3085,6 +3237,7 @@ paths:
         Enable or disable a signal type for a specific ISN
 
         When a signal type is disabled for an ISN, signals of this type can no longer be read or written to the ISN.
+        The change takes effect when each account next gets an access token (up to 30 minutes later).
 
         Note: this endpoint can only be used by site admins and ISN admins.
         ISN admins can only update signal types for ISNs they own.
@@ -3112,7 +3265,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/handlers.UpdateSignalTypeRequest'
+          $ref: '#/definitions/handlers.UpdateIsnSignalTypeStatusRequest'
       responses:
         "204":
           description: No Content
@@ -3121,7 +3274,7 @@ paths:
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: authentication_error
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
@@ -3144,10 +3297,10 @@ paths:
   /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals:
     post:
       description: |
-        Submit JSON or event signals to an ISN (documents are sent to document signal types with Upload a Document)
+        Submit JSON or event signals to an ISN (documents are sent to document signal types with Upload a Document - using this endpoint for a document signal type returns 400 `invalid_url_param`)
         - payloads must not mix signals of different types and are subject to the size limits defined on the site.
         - The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account to the ISN (the same local_ref sent to two ISNs identifies two independent signals).
-        - If a local reference is received more than once from an account for the specified ISN and signal_type a new version of the signal will be stored with a incremented version number (unless the signal is unchanged - see Signal versions).
+        - If a local reference is received more than once from an account for the specified ISN and signal_type a new version of the signal will be stored with an incremented version number (unless the signal is unchanged - see Signal versions).
         - Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.
 
         **Batches**
@@ -3166,7 +3319,7 @@ paths:
         **Error handling**
 
         Partial loads of the data are possible where the request is a valid format but individual signals fail to load
-        (e.g schema validation errors, incorrect correlations ids).
+        (e.g schema validation errors, incorrect correlation ids).
         Failures are logged and trackable via the Batch Status endpoint.
         The response provides an audit trail detailing the submission outcome.
 
@@ -3174,7 +3327,7 @@ paths:
         consequently the `Results` field is an array (one element for each ISN in the results).
         There will only ever be a single entry when using this handler.
 
-        Errors that relate to the entire request  - e.g invalid json, authentication, permission and server errors (400, 401, 403, 500) -
+        Errors that relate to the entire request  - e.g invalid json, authentication, permission and server errors (400, 401, 403, 404, 413, 500) -
         return a simple error_code/error_message response rather than a detailed audit log.
         The individual signal failures are not logged in this case, and the client must resupply the data once the problem is resolved.
 
@@ -3187,9 +3340,11 @@ paths:
 
         the json contained in the `content` field is validated against the JSON schema specified for the signal type unless validation is disabled on the type definition.
 
-        When schema validation is disabled, basic checks are still done on the incoming data and the following issues create a 400 error and cause the entire payload to be rejected:
+        Whether or not schema validation is enabled, the following issues create a 400 error and cause the entire payload to be rejected:
         - invalid json format
         - missing fields (batch_ref must be present; the array of signals must be in a json object called signals; and the content and local_ref must be present for each element of the signals array).
+        - a batch_ref that is longer than 128 characters or contains characters other than letters, numbers, hyphens and underscores
+        - an event without a correlation_id
 
         **Signal versions**
 
@@ -3254,11 +3409,11 @@ paths:
           schema:
             $ref: '#/definitions/handlers.SignalSubmissionResponse'
         "400":
-          description: malformed_body
+          description: malformed_body | invalid_url_param
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: authentication_error
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
@@ -3349,7 +3504,7 @@ paths:
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: authentication_error
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
@@ -3364,6 +3519,10 @@ paths:
           description: database_error | internal_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
+        "504":
+          description: timeout
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
       summary: Download a Document
@@ -3372,9 +3531,15 @@ paths:
   /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search:
     get:
       description: |-
-        Search for signals by date or account in private ISNs (authentication required - only accounts with read or write permissions to the ISN can access signals).
+        Search for signals in private ISNs (authentication required - any account with read or write permission on the ISN can use this endpoint).
 
         Note the endpoint returns the latest version of each signal.
+
+        **Search parameters**
+
+        At least one of these filters is required: start_date and end_date, updated_since, account_id, signal_id, local_ref or correlation_id.
+        start_date and end_date must be used together - they filter on when the latest version of the signal was created (both are inclusive).
+        Results are ordered by signal_updated_at (oldest first).
 
         Write-only accounts can only see the signals created by their own account, and the signals other accounts have correlated to them.
         This also applies to correlated signals returned with include_correlated=true.
@@ -3426,12 +3591,14 @@ paths:
         ```
         Omit version to download the latest version, and add include_withdrawn=true if the signal is withdrawn.
       parameters:
-      - description: Start date
+      - description: Signals whose latest version was created at or after this time
+          (use with end_date)
         example: "2006-01-02T15:05:00Z"
         in: query
         name: start_date
         type: string
-      - description: End date
+      - description: Signals whose latest version was created at or before this time
+          (use with start_date)
         example: "2006-01-02T15:15:00Z"
         in: query
         name: end_date
@@ -3494,7 +3661,15 @@ paths:
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: authentication_error
+          description: authorization_error | access_token_expired
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: resource_not_found
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "500":
@@ -3520,7 +3695,9 @@ paths:
 
         The request is multipart/form-data with one document per request:
         - send the form fields first (batch_ref, local_ref and any optional fields) - **the file must be the last part**
-        - the file part must be named `file` and must include a filename - the filename is stored as the document's name
+        - the file part must be named `file` and must include a filename - the filename (without any directory path) is stored as the document's name
+        - only the batch_ref, local_ref, correlation_id, sha256 and file fields are accepted (other fields are rejected with 400 malformed_body), and each form field value can be up to 1024 bytes
+        - documents can be up to 20MB by default (the `Signalsd-Max-Request-Size` response header gives the request limit, which allows an extra 64KB for the form fields). Larger uploads are rejected with 413 request_too_large
 
         The request body looks like this:
         ```
@@ -3550,7 +3727,7 @@ paths:
 
         **Versions**
 
-        Uploads for a local_ref you have already used on the ISN are compared with its latest version (the same local_ref uploaded to another ISN is a separate document):
+        Uploads for a local_ref you have already used for this signal type version on the ISN are compared with its latest version (the same local_ref uploaded to another ISN is a separate document):
         - the same file with the same filename creates no new version: the response contains the signal_id, signal_version_id and version_number of the existing latest version, with unchanged=true - so uploads can be safely retried
         - a different file, or the same file with a different filename, creates a new version (including a file that matches an older version)
         - re-uploading a withdrawn document creates a new version and reactivates it
@@ -3559,7 +3736,8 @@ paths:
         Unchanged uploads are not counted in the batch they were sent in - the existing version belongs to the batch that stored it.
         The same file uploaded with a different local_ref is a separate document.
 
-        Rejected uploads are recorded against the batch (see the batch status endpoint).
+        Uploads rejected after the form fields have been read (e.g. unsupported format, a filename extension or sha256 mismatch, an invalid correlation_id, too large, no permission) are recorded against the batch (see the batch status endpoint).
+        Requests with missing or invalid form fields are not recorded.
 
         **Retries**
 
@@ -3629,7 +3807,7 @@ paths:
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: authentication_error
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
@@ -3656,6 +3834,10 @@ paths:
           description: database_error | internal_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
+        "504":
+          description: timeout
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
       security:
       - BearerAccessToken: []
       summary: Upload a Document
@@ -3670,7 +3852,8 @@ paths:
 
         Withdrawn signals are hidden from search results by default but remain in the database.
         Signals can only be withdrawn by the account that created the signal.
-        To reactivate a signal resupply it with the same local_ref using the 'create signals' end point.
+        To reactivate a json signal, resubmit it with the same local_ref using the *Submit Signals* endpoint. To reactivate a document, upload it again with the same local_ref using *Upload a Document*.
+        Withdrawn events cannot be reactivated - send a new event with a new local_ref instead.
       parameters:
       - description: ISN slug
         example: sample-isn
@@ -3704,7 +3887,7 @@ paths:
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: authentication_error
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
@@ -3717,6 +3900,10 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
         "409":
           description: resource_already_exists
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "413":
+          description: request_too_large
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "500":
@@ -3735,6 +3922,8 @@ paths:
 
         Note: this endpoint can only be used by site admins and ISN admins.
         ISN admins can only add signal types to ISNs they own.
+
+        Adding a signal type that is already on the ISN does nothing.
       parameters:
       - description: ISN slug
         example: sample-isn
@@ -3756,7 +3945,7 @@ paths:
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: authentication_error
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
@@ -3783,6 +3972,12 @@ paths:
 
         Note the endpoint returns the latest version of each signal.
 
+        **Search parameters**
+
+        At least one of these filters is required: start_date and end_date, updated_since, account_id, signal_id, local_ref or correlation_id.
+        start_date and end_date must be used together - they filter on when the latest version of the signal was created (both are inclusive).
+        Results are ordered by signal_updated_at (oldest first).
+
         **Polling for changes**
 
         Use updated_since with include_withdrawn=true. Polling is at-least-once: start each poll 1 minute before the last signal_updated_at you received, and skip the results you have already seen (the same signal_id and signal_updated_at).
@@ -3795,12 +3990,14 @@ paths:
         For document signals (content_kind=document) the content field holds the document metadata (name, mime_type, size_bytes and sha256).
         Downloading the document requires an account on the ISN and an access token - see the private signal search endpoint for how to download a document from the search results.
       parameters:
-      - description: Start date
+      - description: Signals whose latest version was created at or after this time
+          (use with end_date)
         example: "2006-01-02T15:05:00Z"
         in: query
         name: start_date
         type: string
-      - description: End date
+      - description: Signals whose latest version was created at or before this time
+          (use with start_date)
         example: "2006-01-02T15:15:00Z"
         in: query
         name: end_date
@@ -3901,7 +4098,7 @@ paths:
         - signals that do not contain the routing field defined in the _Routing Rules Config_, or do not satisfy any of the routing rules
         - signals whose correlation_id is not found (or whose ISN is not in use)
 
-        Signals that resolve to an ISN where the account lacks write permission, or where the signal type is not in use,
+        Signals that resolve to an ISN where the account lacks access or write permission (`forbidden`), or where the ISN or signal type is not in use (`resource_not_found`),
         are rejected and listed in the `failed_signals` of that ISN's result.
 
         **Usage**
@@ -3938,15 +4135,11 @@ paths:
           schema:
             $ref: '#/definitions/handlers.SignalSubmissionResponse'
         "400":
-          description: malformed_body
+          description: malformed_body | invalid_url_param
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: authentication_error
-          schema:
-            $ref: '#/definitions/responses.ErrorResponse'
-        "404":
-          description: resource_not_found
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "413":
@@ -3959,7 +4152,7 @@ paths:
           schema:
             $ref: '#/definitions/handlers.SignalSubmissionResponse'
         "500":
-          description: database_error
+          description: database_error | internal_error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -3976,7 +4169,7 @@ paths:
         (e.g. a bill of lading is sent to the ISN that received its consignment).
 
         correlation_id is required - routing rules are not used for documents (they match on fields in JSON signals).
-        The upload is rejected with 422 invalid_correlation_id if the correlated signal is not found,
+        The upload is rejected with 422 invalid_correlation_id if the correlated signal is not found or its ISN is not in use,
         and with 403 forbidden if the account does not have write permission on the correlated signal's ISN.
 
         Other than the ISN resolution, this endpoint behaves the same way as the standard _Upload a Document_ endpoint
@@ -4033,7 +4226,7 @@ paths:
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "401":
-          description: authentication_error
+          description: authorization_error | access_token_expired
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
@@ -4058,6 +4251,10 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
         "500":
           description: database_error | internal_error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "504":
+          description: timeout
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
       security:
@@ -4116,8 +4313,8 @@ paths:
         Alternatively, credentials may be supplied via HTTP Basic Auth (`Authorization: Basic base64(client_id:client_secret)`).
 
         Revokes **all** client secrets for the service account, which prevents any further token requests
-        until an admin reissues credentials via `POST /api/auth/service-accounts/reissue_credentials`.
-        This does not permanently disable the account — use `POST /admin/accounts/{account_id}/disable` for that.
+        until an admin reissues credentials via `POST /api/auth/service-accounts/reissue-credentials`.
+        This does not permanently disable the account — use `POST /api/admin/accounts/{account_id}/disable` for that.
 
         ---
 
@@ -4151,15 +4348,12 @@ paths:
         "200":
           description: OK
         "400":
-          description: unsupported_grant_type · invalid_request · invalid_grant
+          description: unsupported_grant_type · invalid_request · invalid_grant (refresh
+            token missing, expired or revoked - error_code refresh_token_invalid)
           schema:
             $ref: '#/definitions/responses.OAuthErrorResponse'
         "401":
           description: invalid_client
-          schema:
-            $ref: '#/definitions/responses.OAuthErrorResponse'
-        "404":
-          description: invalid_grant (token not found)
           schema:
             $ref: '#/definitions/responses.OAuthErrorResponse'
         "500":
@@ -4201,9 +4395,10 @@ paths:
         The refresh token is read automatically from the `refresh_token` HTTP-only cookie set during login.
         No additional form fields are required.
 
-        Returns a new access token in the response body. The rotated refresh token is set as a new HTTP-only cookie.
-        Access tokens expire after 30 minutes. Refresh tokens expire after 30 days — if the refresh token
-        has expired the user must log in again.
+        Returns a new access token in the response body. The rotated refresh token is set as a new HTTP-only cookie
+        (the cookie's path is `/oauth`, so browsers only send it to the /oauth endpoints).
+        Access tokens expire after 30 minutes. Each refresh issues a new refresh token that expires 30 days later,
+        so the user only has to log in again if they don't refresh for 30 days. Refreshing revokes the user's other refresh tokens (one session per user).
       parameters:
       - description: Grant type
         enum:
@@ -4233,7 +4428,7 @@ paths:
         "401":
           description: invalid_client — wrong, expired, or revoked client secret.
             If your secret has expired, use POST /api/auth/service-accounts/rotate-secret
-            to self-serve a new.
+            to self-serve a new secret.
           schema:
             $ref: '#/definitions/responses.OAuthErrorResponse'
         "500":
@@ -4272,7 +4467,7 @@ tags:
 - description: Registration, login and password management for web users. A signed-in
     user can change their own password here; users who have forgotten their password
     are sent a one-time link by an admin instead (see *Generate Password Reset Link*
-    under Account Management. Use the OAuth 2.0 endpoints to obtain access tokens.
+    under Account Management). Use the OAuth 2.0 endpoints to obtain access tokens.
   name: User Authentication
 - description: Register service accounts and manage their credentials (used for system-to-system
     access). Use the OAuth 2.0 endpoints to exchange service account credentials for
@@ -4286,9 +4481,10 @@ tags:
   name: Signals Routing
 - description: Define the format of the data being shared in an ISN
   name: Signal Types
-- description: Create and manage Information Sharing Networks (ISNs) - these endpoints
-    can only be used by the accounts that have a siteadmin or isnadmin role Note that
-    ISN admins can only view or update details for ISNs they created.
+- description: Create and manage Information Sharing Networks (ISNs). Creating and
+    updating ISNs can only be done by accounts that have a siteadmin or isnadmin role,
+    and ISN admins can only update the ISNs they own. Any authenticated account can
+    view ISN details.
   name: ISN Configuration
 - description: Grant accounts read or write access to an ISN
   name: ISN Permissions
@@ -4298,10 +4494,10 @@ tags:
     endpoints are public. The site reset endpoint only works in environments configured
     as 'dev'.
   name: Site Admin
-- description: These endpoints should not be called directly. Some admin endpoints,  for
-    insance *Register Service Account* and *Generate Password Reset Link*, return
+- description: These endpoints should not be called directly. Some admin endpoints,
+    for instance *Register Service Account* and *Generate Password Reset Link*, return
     a one time link URL that the user then opens in their browser to interact with
-    the auth system. These endpoints return the HTML used to in the one-time links.
-    The URLs do not need an access token - the link is itself the credential - and
-    should be treated as secrets.
+    the auth system. These endpoints return the HTML used in the one-time links. The
+    URLs do not need an access token - the link is itself the credential - and should
+    be treated as secrets.
   name: One-time Links (browser pages)

@@ -111,6 +111,8 @@ type IsnAndLinkedInfo struct {
 //	@Description	different membership and be configured for different Signal Types.
 //	@Description
 //	@Description	This endpoint can only be used by ISN admins and site admins
+//	@Description
+//	@Description	All fields (title, detail, is_in_use and visibility) are required.
 //
 //	@Tags			ISN Configuration
 //
@@ -118,11 +120,12 @@ type IsnAndLinkedInfo struct {
 //
 //	@Success		201		{object}	handlers.CreateIsnResponse
 //	@Failure		400		{object}	responses.ErrorResponse	"malformed_body"
+//	@Failure		401		{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
+//	@Failure		403		{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		409		{object}	responses.ErrorResponse	"resource_already_exists"
 //	@Failure		500		{object}	responses.ErrorResponse	"database_error | internal_error"
 //
 //	@Security		BearerAccessToken
-//	@Security		RefreshTokenCookieAuth
 //
 //	@Router			/api/isn/ [post]
 //
@@ -223,7 +226,7 @@ func (i *IsnHandler) CreateIsn(w http.ResponseWriter, r *http.Request) error {
 //	@Summary		Update an ISN
 //	@Description	Update the ISN configuration
 //	@Description	This endpoint can only be used by admin accounts
-//	@Description	ISN admins can only update ISNs they created
+//	@Description	ISN admins can only update ISNs they own
 //	@Description	Site admins can update any ISN
 //
 //	@Tags			ISN Configuration
@@ -233,7 +236,7 @@ func (i *IsnHandler) CreateIsn(w http.ResponseWriter, r *http.Request) error {
 //
 //	@Success		204
 //	@Failure		400	{object}	responses.ErrorResponse	"malformed_body"
-//	@Failure		401	{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		401	{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		500	{object}	responses.ErrorResponse	"database_error"
@@ -312,12 +315,15 @@ func (i *IsnHandler) UpdateIsn(w http.ResponseWriter, r *http.Request) error {
 // GetIsns godoc
 //
 //	@Summary		Get ISN configurations
-//	@Description	get a list of the configured ISNs
+//	@Description	get a list of the configured ISNs (any authenticated account can use this endpoint - private ISNs are included)
 //	@Param			include_inactive	query	bool	false	"Include inactive ISNs"	default(false)
 //	@Tags			ISN Configuration
 //
 //	@Success		200	{array}		handlers.Isn
+//	@Failure		401	{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		500	{object}	responses.ErrorResponse	"database_error"
+//
+//	@Security		BearerAccessToken
 //
 //	@Router			/api/isn [get]
 func (s *IsnHandler) GetIsns(w http.ResponseWriter, r *http.Request) error {
@@ -358,15 +364,17 @@ func (s *IsnHandler) GetIsns(w http.ResponseWriter, r *http.Request) error {
 // GetIsn godoc
 //
 //	@Summary		Get an ISN configuration
-//	@Description	Returns details about the ISN
+//	@Description	Returns details about the ISN (any authenticated account can use this endpoint)
 //	@Param			isn_slug	path	string	true	"ISN slug"	example(sample-isn)
 //
 //	@Tags			ISN Configuration
 //
 //	@Success		200	{object}	handlers.IsnAndLinkedInfo
-//	@Failure		400	{object}	responses.ErrorResponse	"invalid_url_param"
+//	@Failure		401	{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		500	{object}	responses.ErrorResponse	"database_error"
+//
+//	@Security		BearerAccessToken
 //
 //	@Router			/api/isn/{isn_slug} [get]
 func (s *IsnHandler) GetIsn(w http.ResponseWriter, r *http.Request) error {
@@ -477,12 +485,12 @@ func (s *IsnHandler) GetIsn(w http.ResponseWriter, r *http.Request) error {
 //
 //	@Success		200
 //	@Failure		400	{object}	responses.ErrorResponse	"malformed_body | invalid_request"
+//	@Failure		401	{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
-//	@Security		RefreshTokenCookieAuth
 //
 //	@Router			/api/admin/isn/{isn_slug}/transfer-ownership [put]
 //

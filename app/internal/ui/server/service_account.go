@@ -53,9 +53,7 @@ func (s *Server) ReissueServiceAccountCredentialsPage(w http.ResponseWriter, r *
 //	@Tags			HTMX Actions
 //	@Param			email			formData	string	true	"Contact email"
 //	@Param			organization	formData	string	true	"Organization name"
-//	@Success		200				"HTML partial"
-//	@Failure		400				"HTML error partial"
-//	@Failure		401				"HTML error partial"
+//	@Success		200				"HTML partial (or an error alert)"
 //	@Router			/ui-api/service-accounts/create [post]
 func (s *Server) CreateServiceAccount(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
@@ -96,9 +94,7 @@ func (s *Server) CreateServiceAccount(w http.ResponseWriter, r *http.Request) {
 //	@Description	HTMX endpoint. Issues a new client secret for the selected service account. Requires siteadmin role.
 //	@Tags			HTMX Actions
 //	@Param			service-account-dropdown	formData	string	true	"Client ID of the service account"
-//	@Success		200							"HTML partial"
-//	@Failure		400							"HTML error partial"
-//	@Failure		401							"HTML error partial"
+//	@Success		200							"HTML partial (or an error alert)"
 //	@Router			/ui-api/service-accounts/reissue-credentials [put]
 func (s *Server) ReissueServiceAccountCredentials(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())

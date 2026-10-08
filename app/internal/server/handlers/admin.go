@@ -68,7 +68,7 @@ func newServiceAccountDetails(serviceAccount database.ServiceAccount) ServiceAcc
 
 type AccountStatusResponse struct {
 	AccountID   uuid.UUID `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
-	AccountType string    `json:"account_type" example:"user" enums:"user,service-account"`
+	AccountType string    `json:"account_type" example:"user" enums:"user,service_account"`
 	Status      string    `json:"status" example:"disabled" enums:"enabled,disabled"`
 }
 
@@ -192,7 +192,9 @@ func (a *AdminHandler) Version(w http.ResponseWriter, r *http.Request) error {
 //	@Description	- Revokes all client secrets/one-time secrets (service accounts)
 //	@Description	- Revokes all refresh tokens (web users)
 //	@Description
-//	@Description	**Recovery:** Account must be re-enabled by admin via `/admin/accounts/{id}/enable`
+//	@Description	Access tokens that were already issued remain valid until they expire (up to 30 minutes).
+//	@Description
+//	@Description	**Recovery:** Account must be re-enabled by admin via `POST /api/admin/accounts/{account_id}/enable`
 //	@Description	Service accounts will also need a new client secret via `/api/auth/service-accounts/reissue-credentials`
 //	@Description
 //	@Description	Only site admins can disable accounts (disabling an account removes its access to every ISN it belongs to).
@@ -204,7 +206,7 @@ func (a *AdminHandler) Version(w http.ResponseWriter, r *http.Request) error {
 //
 //	@Success		200
 //	@Failure		400	{object}	responses.ErrorResponse	"invalid_url_param"
-//	@Failure		401	{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		401	{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		500	{object}	responses.ErrorResponse	"database_error"
@@ -311,7 +313,7 @@ func (a *AdminHandler) DisableAccount(w http.ResponseWriter, r *http.Request) er
 //	@Description	Sets account status to `is_active = true` (does not create new tokens).
 //	@Description
 //	@Description	**Post-Enable Steps Required:**
-//	@Description	- **Service Accounts**: will need a new client secret via `/api/auth/service-accounts/reissue_credentials`
+//	@Description	- **Service Accounts**: will need a new client secret via `/api/auth/service-accounts/reissue-credentials`
 //	@Description	- **Web Users**: Can immediately log in again via `/api/auth/login`
 //	@Description
 //	@Description	Only site admins can enable accounts.
@@ -321,7 +323,7 @@ func (a *AdminHandler) DisableAccount(w http.ResponseWriter, r *http.Request) er
 //
 //	@Success		200
 //	@Failure		400	{object}	responses.ErrorResponse	"invalid_url_param"
-//	@Failure		401	{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		401	{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		500	{object}	responses.ErrorResponse	"database_error"
@@ -382,7 +384,7 @@ func (a *AdminHandler) EnableAccount(w http.ResponseWriter, r *http.Request) err
 //	@Success		200		{array}		handlers.UserDetails	"All users (when no query params)"
 //	@Success		200		{object}	handlers.UserDetails	"Specific user (when query params provided)"
 //	@Failure		400		{object}	responses.ErrorResponse	"invalid_request"
-//	@Failure		401		{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		401		{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		403		{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		404		{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		500		{object}	responses.ErrorResponse	"database_error"
@@ -478,28 +480,29 @@ func (a *AdminHandler) GetUsers(w http.ResponseWriter, r *http.Request) error {
 // GetServiceAccounts godoc
 //
 //	@Summary		Get Service Accounts
-//	@Description	Only owners and admins can view service account lists.
+//	@Description	Only site admins and ISN admins can view service account lists.
 //	@Description
 //	@Description	To return a specific service account supply one of the following query parameter combinations:
 //	@Description	-	id (account ID)
 //	@Description	-	client_id
 //	@Description	-	client_email & client_organization
-//	@Descriotion
+//	@Description
 //	@Description	No query parameters = return all service accounts
 //	@Description
 //	@Tags		Account Management
 //
-//	@Param		id					query		string	false	"Service Account ID"													example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
-//	@Param		client_id			query		string	false	"Service Account Client ID"												example(sa_exampleorg_k7j2m9x1)
-//	@Param		client_email		query		string	false	"Service Account Contact Email (must be used with client_organization)"	example(contact@example.com)
-//	@Param		client_organization	query		string	false	"Service Account Organization (must be used with client_email)"			example(Example Org)
+//	@Param		id					query		string							false	"Service Account ID"													example(a38c99ed-c75c-4a4a-a901-c9485cf93cf3)
+//	@Param		client_id			query		string							false	"Service Account Client ID"												example(sa_exampleorg_k7j2m9x1)
+//	@Param		client_email		query		string							false	"Service Account Contact Email (must be used with client_organization)"	example(contact@example.com)
+//	@Param		client_organization	query		string							false	"Service Account Organization (must be used with client_email)"			example(Example Org)
 //
-//	@Success	200					{array}		handlers.ServiceAccountDetails
-//	@Failure	400					{object}	responses.ErrorResponse	"invalid_request"
-//	@Failure	401					{object}	responses.ErrorResponse	"authentication_error"
-//	@Failure	403					{object}	responses.ErrorResponse	"forbidden"
-//	@Failure	404					{object}	responses.ErrorResponse	"resource_not_found"
-//	@Failure	500					{object}	responses.ErrorResponse	"database_error"
+//	@Success	200					{array}		handlers.ServiceAccountDetails	"All service accounts (when no query params)"
+//	@Success	200					{object}	handlers.ServiceAccountDetails	"Specific service account (when query params provided)"
+//	@Failure	400					{object}	responses.ErrorResponse			"invalid_request"
+//	@Failure	401					{object}	responses.ErrorResponse			"authorization_error | access_token_expired"
+//	@Failure	403					{object}	responses.ErrorResponse			"forbidden"
+//	@Failure	404					{object}	responses.ErrorResponse			"resource_not_found"
+//	@Failure	500					{object}	responses.ErrorResponse			"database_error"
 //
 //	@Security	BearerAccessToken
 //
@@ -629,7 +632,7 @@ type GeneratePasswordResetLinkResponse struct {
 //
 //	@Success		200		{object}	handlers.GeneratePasswordResetLinkResponse
 //	@Failure		400		{object}	responses.ErrorResponse	"invalid_url_param"
-//	@Failure		401		{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		401		{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		403		{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		404		{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		500		{object}	responses.ErrorResponse	"database_error | internal_error"

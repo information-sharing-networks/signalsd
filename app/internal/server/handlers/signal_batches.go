@@ -35,11 +35,21 @@ type FailureRow struct {
 
 // BatchStatus summarises stored and failed signals for one ISN + signal type combination within a batch
 type BatchStatus struct {
-	IsnSlug            string       `json:"isn_slug"` // empty for signals the signal router could not route to an ISN
-	SignalTypeSlug     string       `json:"signal_type_slug"`
-	SignalTypeVersion  string       `json:"signal_type_version"`
-	StoredCount        int64        `json:"stored_count"`
-	RejectedCount      int64        `json:"rejected_count"`
+	// IsnSlug is empty for signals the signal router could not route to an ISN
+	IsnSlug string `json:"isn_slug" example:"sample-isn"`
+
+	SignalTypeSlug string `json:"signal_type_slug" example:"sample-signal-type"`
+
+	// SignalTypeVersion is the signal type's sem_ver with a "v" prefix
+	SignalTypeVersion string `json:"signal_type_version" example:"v1.0.0"`
+
+	// StoredCount is the number of signal versions stored in this batch
+	StoredCount int64 `json:"stored_count" example:"10"`
+
+	// RejectedCount is the number of unresolved failures
+	RejectedCount int64 `json:"rejected_count" example:"1"`
+
+	// UnresolvedFailures lists the signals that failed in this batch and have not been stored since
 	UnresolvedFailures []FailureRow `json:"unresolved_failures,omitempty"`
 }
 
@@ -72,13 +82,15 @@ type BatchSearchParams struct {
 //	@Description
 //	@Description	`unresolved_failures` lists the signals to correct and resend (see _Recovering from failures_ in the API introduction).
 //	@Description	A failure is resolved when a later version of the signal is stored, in this batch or any other.
+//	@Description	Signals the Signals Router could not route to an ISN (empty isn_slug) stay listed, even if the signal is stored later.
 //	@Description
 //	@Description	Resending a signal that is unchanged doesn't store a new version.
 //	@Description	Unchanged signals are counted in the batch that first stored them, not the batch they were resent in.
 //	@Description
-//	@Description	Requests that fail as a whole (e.g. invalid JSON, permission errors or timeouts) are not recorded, so they don't appear here.
+//	@Description	Requests that are rejected as a whole (e.g. invalid JSON, authentication or permission errors) are not recorded, so they don't appear here.
+//	@Description	If a request times out part way through, the signals stored before the timeout are reported.
 //	@Description
-//	@Description	Members can view their own batches. Site admins can supply ?account_id= to view another account's batch.
+//	@Description	Accounts can view their own batches. Site admins can supply ?account_id= to view another account's batch.
 //	@Description
 //
 //	@Tags		Signal Exchange
@@ -87,6 +99,7 @@ type BatchSearchParams struct {
 //
 //	@Success	200			{object}	BatchStatusResponse
 //	@Failure	400			{object}	responses.ErrorResponse	"invalid_request"
+//	@Failure	401			{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure	403			{object}	responses.ErrorResponse	"forbidden"
 //	@Failure	404			{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure	500			{object}	responses.ErrorResponse	"database_error"
@@ -216,15 +229,16 @@ func (s *SignalsBatchHandler) getBatchStatusDetails(ctx context.Context, batchID
 //	@Summary		Search For Batches
 //	@Tags			Signal Exchange
 //
-//	@Description	Returns the full status for all matching batches. Members see their own batches; site admins see all.
-//	@Description	At least one date filter must be provided.
+//	@Description	Returns the full status for all matching batches. Accounts see their own batches; site admins see all.
+//	@Description	Both created_after and created_before must be provided.
 //
-//	@Param			created_after	query		string	false	"Earliest batch creation time"	example(2006-01-02T15:04:05Z)
-//	@Param			created_before	query		string	false	"Latest batch creation time"	example(2006-01-02T16:00:00Z)
+//	@Param			created_after	query		string	true	"Earliest batch creation time"	example(2006-01-02T15:04:05Z)
+//	@Param			created_before	query		string	true	"Latest batch creation time"	example(2006-01-02T16:00:00Z)
 //
 //	@Success		200				{array}		BatchStatusResponse
 //	@Failure		400				{object}	responses.ErrorResponse	"invalid_url_param"
-//	@Failure		500				{object}	responses.ErrorResponse	"database_error"
+//	@Failure		401				{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
+//	@Failure		500				{object}	responses.ErrorResponse	"database_error | internal_error"
 //	@Security		BearerAccessToken
 //	@Router			/api/batches/search [get]
 func (s *SignalsBatchHandler) SearchBatches(w http.ResponseWriter, r *http.Request) error {

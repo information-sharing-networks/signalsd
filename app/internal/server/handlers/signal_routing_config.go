@@ -35,11 +35,11 @@ func NewRoutingConfigHandler(queries *database.Queries, pool *pgxpool.Pool, sign
 // SignalRoutingRule is the mapping between a pattern and a isn.
 // When linked to a signal type/Routing field this forms part of the Isn route config
 type SignalRoutingRule struct {
-	MatchPattern     string `json:"match_pattern" example:"*felixstowe*"`
-	Operator         string `json:"operator" enums:"matches,equals,does_not_match,does_not_equal" example:"matches"`
-	IsCaseInsensitve bool   `json:"is_case_insensitive" example:"true"`
-	IsnSlug          string `json:"isn_slug" example:"felixstowe-isn"`
-	Sequence         int32  `json:"sequence" example:"1"`
+	MatchPattern      string `json:"match_pattern" example:"*felixstowe*"`
+	Operator          string `json:"operator" enums:"matches,equals,does_not_match,does_not_equal" example:"matches"`
+	IsCaseInsensitive bool   `json:"is_case_insensitive" example:"true"`
+	IsnSlug           string `json:"isn_slug" example:"felixstowe-isn"`
+	Sequence          int32  `json:"sequence" example:"1"`
 }
 
 // UpdateSignalRoutingConfigRequest replaces the full rule + mapping set for a signal type path
@@ -51,7 +51,7 @@ type UpdateSignalRoutingConfigRequest struct {
 // SignalRoutingConfigResponse contains the full set of isn routes for a signal type path
 type SignalRoutingConfigResponse struct {
 	SignalTypePath string              `json:"signal_type_path" example:"sample-signal-type/v1.0.0"`
-	RoutingField   string              `json:"routing_field" example:"payload.PorfOfEntry"`
+	RoutingField   string              `json:"routing_field" example:"payload.portOfEntry"`
 	RoutingRules   []SignalRoutingRule `json:"routing_rules"`
 }
 
@@ -67,6 +67,8 @@ type SignalRoutingConfigResponse struct {
 //	@Param			sem_ver				path		string	true	"version"			example(1.0.0)
 //
 //	@Success		200					{object}	handlers.SignalRoutingConfigResponse
+//	@Failure		401					{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
+//	@Failure		403					{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		404					{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		500					{object}	responses.ErrorResponse	"database_error"
 //	@Security		BearerAccessToken
@@ -103,11 +105,11 @@ func (h *RoutingConfigHandler) GetSignalRoutingConfig(w http.ResponseWriter, r *
 	rules := make([]SignalRoutingRule, len(dbRules))
 	for i, rule := range dbRules {
 		rules[i] = SignalRoutingRule{
-			MatchPattern:     rule.MatchPattern,
-			IsnSlug:          rule.IsnSlug,
-			Operator:         rule.Operator,
-			IsCaseInsensitve: rule.IsCaseInsensitive,
-			Sequence:         rule.RuleSequence,
+			MatchPattern:      rule.MatchPattern,
+			IsnSlug:           rule.IsnSlug,
+			Operator:          rule.Operator,
+			IsCaseInsensitive: rule.IsCaseInsensitive,
+			Sequence:          rule.RuleSequence,
 		}
 	}
 	res.RoutingRules = rules
@@ -121,15 +123,18 @@ func (h *RoutingConfigHandler) GetSignalRoutingConfig(w http.ResponseWriter, r *
 //
 //	@Description	Replaces the route config for the specified signal type path
 //	@Description
-//	@Description	the routing_field must be a plain Dot Notation path -
-//	@Description	under the covers the service uses gjson paths, however the special patern matching symbols (*?#@|!()[]%<>=) are not currently allowed.
+//	@Description	the routing_field must be a plain Dot Notation path that is defined in the signal type's schema -
+//	@Description	under the covers the service uses gjson paths, however the special pattern matching symbols (*?#@|!()[]%<>=) and numeric (array index) path segments are not currently allowed.
 //	@Description
-//	@Description	When using the 'matches' and 'not matches' operator, any occurance of '*' and '?' in the matching pattern will be treated as a wildcard.
+//	@Description	When using the 'matches' and 'does_not_match' operators, any occurrence of '*' and '?' in the matching pattern will be treated as a wildcard ('equals' and 'does_not_equal' compare the pattern literally).
 //	@Description	The pattern is always compared to the full contents of the specified routing field.
 //	@Description
 //	@Description	Patterns are matched in order according to the supplied sequence number (smallest sequence first)
-//	@Description	and the first match is accepted. Where the routing field is an array, as long as one or more elements match
-//	@Description	the match is accepted.
+//	@Description	and the first match is accepted. Each rule must have a different sequence number.
+//	@Description	Where the routing field is an array, the rule matches if one or more elements match
+//	@Description	(for 'does_not_match' and 'does_not_equal', if one or more elements do not match the pattern).
+//	@Description
+//	@Description	The new config is used by the router within 30 seconds.
 //
 //	@Param			signal_type_slug	path	string										true	"signal type slug"	example(sample-signal-type)
 //	@Param			sem_ver				path	string										true	"version"			example(1.0.0)
@@ -137,6 +142,8 @@ func (h *RoutingConfigHandler) GetSignalRoutingConfig(w http.ResponseWriter, r *
 //
 //	@Success		204
 //	@Failure		400	{object}	responses.ErrorResponse	"malformed_body"
+//	@Failure		401	{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
+//	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		500	{object}	responses.ErrorResponse	"database_error | internal_error"
 //
@@ -260,7 +267,7 @@ func (h *RoutingConfigHandler) UpdateSignalRoutingConfig(w http.ResponseWriter, 
 			SignalRoutingConfigID: signalRoutingConfig.ID,
 			MatchPattern:          rule.MatchPattern,
 			Operator:              rule.Operator,
-			IsCaseInsensitive:     rule.IsCaseInsensitve,
+			IsCaseInsensitive:     rule.IsCaseInsensitive,
 			IsnID:                 isnIDs[i].ID,
 			RuleSequence:          rule.Sequence,
 		}); err != nil {
@@ -287,6 +294,8 @@ func (h *RoutingConfigHandler) UpdateSignalRoutingConfig(w http.ResponseWriter, 
 //	@Param			sem_ver				path	string	true	"version"			example(1.0.0)
 //
 //	@Success		204
+//	@Failure		401	{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
+//	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //	@Security		BearerAccessToken

@@ -30,7 +30,7 @@ func NewSignalTypeHandler(queries *database.Queries) *SignalTypeHandler {
 
 type CreateSignalTypeRequest struct {
 	SchemaURL   string `json:"schema_url" example:"https://github.com/user/project/blob/2025.01.01/schema.json"` // JSON schema URL: must be a GitHub URL ending in .json, OR use https://github.com/skip/validation/main/schema.json to disable validation. Not used for document signal types
-	Title       string `json:"title" example:"Sample Signal @example.org"`                                       // unique title
+	Title       string `json:"title" example:"Sample Signal @example.org"`                                       // the slug generated from the title must be unique
 	BumpType    string `json:"bump_type" example:"patch" enums:"major,minor,patch"`                              // this is used to increment semver for the signal type
 	ReadmeURL   string `json:"readme_url" example:"https://github.com/user/project/blob/2025.01.01/readme.md"`   // README file URL: must be a GitHub URL ending in .md
 	Detail      string `json:"detail" example:"description"`                                                     // description
@@ -57,7 +57,10 @@ type AddSignalTypeToIsnRequest struct {
 type UpdateSignalTypeRequest struct {
 	ReadmeURL *string `json:"readme_url" example:"https://github.com/user/project/blob/2025.01.01/readme.md"` // README file URL: must be a GitHub URL ending in .md
 	Detail    *string `json:"detail" example:"description"`                                                   // updated description
-	IsInUse   *bool   `json:"is_in_use" example:"false"`                                                      // whether this signal type version is actively used
+}
+
+type UpdateIsnSignalTypeStatusRequest struct {
+	IsInUse *bool `json:"is_in_use" example:"false"` // whether this signal type version is enabled on the ISN
 }
 
 // Response struct for GET handlers
@@ -85,8 +88,8 @@ type IsnSignalTypeDetail struct {
 //	@Summary		Create Signal Type
 //
 //	@Description	Signal types specify a record that can be shared on the site
-//	@Description	- Each type has a unique title and this is used to create a URL-friendly slug
-//	@Description	- The title and slug fields can't be changed and must be unique for the site
+//	@Description	- The title is used to create a URL-friendly slug, which must be unique for the site (two titles that produce the same slug conflict - 409)
+//	@Description	- The title and slug fields can't be changed
 //	@Description	- The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading
 //	@Description
 //	@Description	Content kinds
@@ -105,11 +108,11 @@ type IsnSignalTypeDetail struct {
 //	@Description
 //	@Description	Versions
 //	@Description	- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas
-//	@Description	- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (, 0.1.0 or 0.0.1)
+//	@Description	- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)
 //	@Description
 //	@Description	After creating a signal type, use the AddSignalTypeToIsn endpoint to link it to one or more ISNs.
 //	@Description
-//	@Description	Signal type definitions are referred to like this: /api/signal-types/{signal_type_slug}/v{sem_ver}
+//	@Description	Signal type definitions are referred to in paths like this: {signal_type_slug}/v{sem_ver} (e.g. /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver})
 //	@Description
 //	@Description	Note: this endpoint can only be used by site admins
 //
@@ -119,6 +122,7 @@ type IsnSignalTypeDetail struct {
 //
 //	@Success		201		{object}	handlers.NewSignalTypeResponse
 //	@Failure		400		{object}	responses.ErrorResponse	"malformed_body"
+//	@Failure		401		{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		403		{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		409		{object}	responses.ErrorResponse	"resource_already_exists"
 //	@Failure		500		{object}	responses.ErrorResponse	"database_error | internal_error"
@@ -289,6 +293,9 @@ func (s *SignalTypeHandler) CreateSignalType(w http.ResponseWriter, r *http.Requ
 //	@Description
 //	@Description	Use the bump_type (major/minor/patch) parameter to determine how the version number should be incremented.
 //	@Description
+//	@Description	The new version keeps the title and content_kind of the existing signal type.
+//	@Description	Schemas can only be registered for json and event signal types.
+//	@Description
 //	@Description	Note: this endpoint can only be used by site admins
 //
 //	@Tags			Signal Types
@@ -298,6 +305,7 @@ func (s *SignalTypeHandler) CreateSignalType(w http.ResponseWriter, r *http.Requ
 //
 //	@Success		201					{object}	handlers.NewSignalTypeResponse
 //	@Failure		400					{object}	responses.ErrorResponse	"malformed_body"
+//	@Failure		401					{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		403					{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		404					{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		409					{object}	responses.ErrorResponse	"resource_already_exists"
@@ -467,7 +475,7 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchema(w http.ResponseWriter, r
 //
 //	@Success		204
 //	@Failure		400	{object}	responses.ErrorResponse	"malformed_body"
-//	@Failure		401	{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		401	{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		500	{object}	responses.ErrorResponse	"database_error"
@@ -560,7 +568,11 @@ func (s *SignalTypeHandler) UpdateSignalType(w http.ResponseWriter, r *http.Requ
 // DeleteSignalType godoc
 //
 //	@Summary		Delete a Signal Type
-//	@Description	Only signal types that have never been referenced by signals can be deleted
+//	@Description	Only signal types that have never been referenced by signals can be deleted.
+//	@Description
+//	@Description	Deleting a signal type also removes it from every ISN it was added to, and deletes its routing config.
+//	@Description
+//	@Description	Note: this endpoint can only be used by site admins
 //
 //	@Param			signal_type_slug	path	string	true	"signal type slug"	example(sample-signal-type)
 //	@Param			sem_ver				path	string	true	"version"			example(1.0.0)
@@ -568,6 +580,8 @@ func (s *SignalTypeHandler) UpdateSignalType(w http.ResponseWriter, r *http.Requ
 //	@Tags			Signal Types
 //
 //	@Success		204
+//	@Failure		401	{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
+//	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		409	{object}	responses.ErrorResponse	"resource_in_use"
 //	@Failure		500	{object}	responses.ErrorResponse	"database_error"
@@ -644,7 +658,7 @@ func (s *SignalTypeHandler) DeleteSignalType(w http.ResponseWriter, r *http.Requ
 //	@Param			sem_ver				path		string	true	"version"			example(1.0.0)
 //
 //	@Success		200					{object}	handlers.SignalTypeDetail
-//	@Failure		401					{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		401					{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		403					{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		404					{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		500					{object}	responses.ErrorResponse	"database_error"
@@ -712,7 +726,7 @@ func (s *SignalTypeHandler) GetSignalType(w http.ResponseWriter, r *http.Request
 //	@Tags			Signal Types
 //
 //	@Success		200	{array}		handlers.SignalTypeDetail
-//	@Failure		401	{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		401	{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
@@ -775,7 +789,7 @@ func (s *SignalTypeHandler) GetSignalTypes(w http.ResponseWriter, r *http.Reques
 //	@Param			include_inactive	query		bool	false	"Include signal types that are disabled on the ISN"	default(false)
 //
 //	@Success		200					{array}		handlers.IsnSignalTypeDetail
-//	@Failure		401					{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		401					{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		404					{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		500					{object}	responses.ErrorResponse	"database_error"
 //
@@ -857,7 +871,7 @@ func (s *SignalTypeHandler) GetIsnSignalTypes(w http.ResponseWriter, r *http.Req
 //	@Param			sem_ver				path		string	true	"version"			example(1.0.0)
 //
 //	@Success		200					{object}	handlers.IsnSignalTypeDetail
-//	@Failure		401					{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		401					{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		404					{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		500					{object}	responses.ErrorResponse	"database_error"
 //
@@ -930,6 +944,8 @@ func (s *SignalTypeHandler) GetIsnSignalType(w http.ResponseWriter, r *http.Requ
 //	@Description
 //	@Description	Note: this endpoint can only be used by site admins and ISN admins.
 //	@Description	ISN admins can only add signal types to ISNs they own.
+//	@Description
+//	@Description	Adding a signal type that is already on the ISN does nothing.
 //
 //	@Tags			ISN Configuration
 //
@@ -938,7 +954,7 @@ func (s *SignalTypeHandler) GetIsnSignalType(w http.ResponseWriter, r *http.Requ
 //
 //	@Success		204
 //	@Failure		400	{object}	responses.ErrorResponse	"malformed_body"
-//	@Failure		401	{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		401	{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		500	{object}	responses.ErrorResponse	"database_error"
@@ -1029,20 +1045,21 @@ func (s *SignalTypeHandler) AddSignalTypeToISN(w http.ResponseWriter, r *http.Re
 //	@Description	Enable or disable a signal type for a specific ISN
 //	@Description
 //	@Description	When a signal type is disabled for an ISN, signals of this type can no longer be read or written to the ISN.
+//	@Description	The change takes effect when each account next gets an access token (up to 30 minutes later).
 //	@Description
 //	@Description	Note: this endpoint can only be used by site admins and ISN admins.
 //	@Description	ISN admins can only update signal types for ISNs they own.
 //
-//	@Param			isn_slug			path	string								true	"ISN slug"			example(sample-isn)
-//	@Param			signal_type_slug	path	string								true	"signal type slug"	example(sample-signal-type)
-//	@Param			sem_ver				path	string								true	"version"			example(1.0.0)
-//	@Param			request				body	handlers.UpdateSignalTypeRequest	true	"status update request"
+//	@Param			isn_slug			path	string										true	"ISN slug"			example(sample-isn)
+//	@Param			signal_type_slug	path	string										true	"signal type slug"	example(sample-signal-type)
+//	@Param			sem_ver				path	string										true	"version"			example(1.0.0)
+//	@Param			request				body	handlers.UpdateIsnSignalTypeStatusRequest	true	"status update request"
 //
 //	@Tags			ISN Configuration
 //
 //	@Success		204
 //	@Failure		400	{object}	responses.ErrorResponse	"malformed_body"
-//	@Failure		401	{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		401	{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		500	{object}	responses.ErrorResponse	"database_error"
@@ -1053,7 +1070,7 @@ func (s *SignalTypeHandler) AddSignalTypeToISN(w http.ResponseWriter, r *http.Re
 //
 // Should only be used with RequireRole (isnadmin,siteadmin) middleware
 func (s *SignalTypeHandler) UpdateIsnSignalTypeStatus(w http.ResponseWriter, r *http.Request) error {
-	var req = UpdateSignalTypeRequest{}
+	var req = UpdateIsnSignalTypeStatusRequest{}
 
 	isnSlug := r.PathValue("isn_slug")
 	signalTypeSlug := r.PathValue("signal_type_slug")

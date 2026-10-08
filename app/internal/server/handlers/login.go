@@ -34,12 +34,14 @@ type LoginRequest struct {
 // Login godoc
 //
 //	@Summary		Login
-//	@Description	The response body includes an access token which can be used to access the protected enpoints, assuming the account has the appropriate permissions.
+//	@Description	The response body includes an access token which can be used to access the protected endpoints, assuming the account has the appropriate permissions.
 //	@Description	The access_token is valid for 30 minutes.
 //	@Description
-//	@Description	As part of the login response, the server sets a http-only cookie on the client that will allow it to refresh the token (use the /oauth/token endpoint with a grant_type=refresh_token param)
+//	@Description	As part of the login response, the server sets a http-only cookie on the client that will allow it to refresh the token (POST to the /oauth/token endpoint with grant_type=refresh_token in the form body).
+//	@Description	The cookie's path is `/oauth`, so browsers only send it to the /oauth endpoints.
 //	@Description	The refresh_token lasts 30 days unless it is revoked earlier.
-//	@Description	- To renew the refresh_token, log in again.
+//	@Description	- Each refresh issues a new refresh_token valid for another 30 days, so the user only has to log in again if they don't refresh for 30 days.
+//	@Description	- Logging in revokes the user's other refresh tokens, so a user has one active session at a time.
 //	@Description	- To revoke the refresh_token, call the /oauth/revoke endpoint.
 //	@Description
 //	@Description	The account's role and permissions are encoded as part of the jwt access token and this information is also provided in the response body.

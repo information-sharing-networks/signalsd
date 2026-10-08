@@ -7,7 +7,7 @@
     ],
     "swagger": "2.0",
     "info": {
-        "description": "Signals ISN service API for managing Information Sharing Networks\n\n## Common Error Responses\nAll endpoints may return:\n- `400` Malformed request (invalid json, missing required fields, etc.)\n- `401` Unauthorized (invalid credentials)\n- `403` Forbidden (insufficient permissions)\n- `413` Request body exceeds size limit\n- `429` Rate limit exceeded\n- `500` Internal server error\n\nIndividual endpoints document their specific business logic errors.\n\nStandard error responses include a JSON response body containing `error_code` and `error_description` fields\n\nThe /oauth endpoints include an additional `error` field - this contains the RFC6749 standard error code.\n\n## Request Limits\nAll endpoints are protected by:\n- **Rate limiting**: Configurable requests per second\n- **Request size limits**: 64KB for admin/auth endpoints, 5MB for signal ingestion\n\nCheck the Signalsd-Max-Request-Body response header for the configured limit on signals payload.\n\nThe rate limit is set globaly and prevents abuse of the service.\nIn production there will be additional protections in place such as per-IP rate limiting provided by the load balancer/reverse proxy.\n\n## Authentication \u0026 Authorization\n\n### OAuth\nThe signalsd backend service acts as an OAuth 2.0 Authorization Server and supports web users and service accounts.\n\n### Authentication Flows\n- **Web users**: (Refresh Token Grant Type) Authentication via /api/auth/login -\u003e receive JWT access token + HTTP-only refresh cookie -\u003e use bearer tokens for API calls\n- **Service accounts**: Clients implement OAuth Client Credentials flow -\u003e receive JWT access token -\u003e use bearer tokens for API calls\n\n### Token Usage\nAll protected API endpoints require a valid JWT access token in the Authorization header:\n```\nAuthorization: Bearer \u003cjwt-access-token\u003e\n```\n\n**Token Refresh (Service Accounts):**\n- Client calls `/oauth/token?grant_type=client_credentials` with client ID/secret\n- API validates credentials and issues new access token\n- Client receives new bearer token for subsequent API calls\n\n**Login (Web Users):**\n- Client calls `/api/auth/login` with email and password and receives an access token in the response body. The refresh token is set as an HTTP-only cookie.\n\n**Token Refresh (Web Users):**\n- Client calls `/oauth/token?grant_type=refresh_token` with HTTP-only refresh token cookie\n- API validates refresh token and issues new access token + rotated refresh cookie\n- Client receives new bearer token for subsequent API calls\n\n**Token Lifetimes:**\n- Access tokens: 30 minutes\n- Refresh tokens: 30 days (web users only)\n\n### CSRF Protection\nThe refresh token used by the /oauth API endpoints is stored in an HttpOnly cookie (to prevent access by JavaScript)\nand marked with SameSite=Strict (to prevent it from being sent in cross-site requests, mitigating CSRF).\n\n### CORS Protection\n\nCORS is used to control which browser-based clients can make cross-origin requests to the API and read responses.\n\nthe `ALLOWED_ORIGINS` environment variable is used to configure the CORS rules.\n\nIn production, you should restrict ALLOWED_ORIGINS to trusted client origins (the server will not start if it is not set)\n\n## Date/Time Handling:\n\n**URL Parameters**: The following ISO 8601 formats are accepted in URL query parameters:\n- 2006-01-02T15:04:05Z (UTC)\n- 2006-01-02T15:04:05+07:00 (with offset)\n- 2006-01-02T15:04:05.999999999Z (nano precision)\n- 2006-01-02 (date only, treated as start of day UTC: 2006-01-02T00:00:00Z)\n\nNote: When including a timestamp with a timezone offset in a query parameter, encode the + sign as %2B (e.g. 2025-08-31T12:00:00%2B07:00). Otherwise, + may be interpreted as a space.\n\n**Response Bodies**: All date/time fields in JSON responses use RFC3339 format (ISO 8601):\n- Example: \"2025-06-03T13:47:47.331787+01:00\"\n\n# Signals\n\n## Content kinds\nEach signal type has a `content_kind`, which determines how its signals are sent:\n- **json**: JSON content, validated against the signal type's schema. Sent with *Submit Signals* (or *Submit Signals via Router*).\n- **document**: a file (PDF, JPEG, PNG or XML). Sent with *Upload a Document* and retrieved with *Download a Document*. Search results contain the document's metadata, not the file.\n- **event**: an immutable JSON record that a process waypoint has been reached for another signal (e.g. an export health certificate was approved for a consignment). Sent with *Submit Signals* (see Events below).\n\nSearch, withdrawal and batches work the same way for every kind, and search results include each signal's `content_kind`.\n\n## Versions and resubmissions\nEach signal is identified by the `local_ref` the sender supplies, which must be unique for the account, ISN and signal type (sending the same `local_ref` to two ISNs creates two independent signals). When a `local_ref` is sent to the same ISN again:\n- **If something changed**, a new version of the signal is stored (json and document signals).\n- **If nothing changed** (the same content, and the same or no `correlation_id`), nothing is stored. The response contains the `signal_id`, `signal_version_id` and `version_number` of the existing latest version, with `unchanged: true`, so requests can be safely retried. JSON content is compared as JSON (key order and whitespace are ignored). Documents compare the file and its filename.\n- **If the signal was withdrawn**, it is reactivated with a new version (json and document signals).\n- **Events are never changed**: resubmitting an event with different content or a different `correlation_id`, or after it was withdrawn, fails with `resource_already_exists`. To correct an event, withdraw it and send a new event with a new `local_ref`.\n\n## Recovering from failures\nEach signal in a request is stored separately, so a request that fails part way through (e.g. a timeout) can leave some signals stored and others not. Because unchanged signals are not stored again, you can recover in either of these ways:\n- **Resend the whole request.** Signals that were already stored are returned with `unchanged: true`, and only the missing or failed signals are stored. Note that any signal in the request that has been withdrawn since it was sent is reactivated.\n- **Resend only the failures.** The response lists the signals that failed, and *Get Batch Status* lists the batch's unresolved failures.\n\nWhen a whole request fails (400, 401, 403, 413 or 500), or you get no response (e.g. a timeout), no failures are recorded in the batch, so resend the whole request once the problem is fixed.\n\nA retry sent while the original request is still being processed can occasionally store an extra, identical version. This is harmless - the content doesn't change - but pollers will see one more update. To avoid it, set your client timeout above the server's request timeout: 15 seconds by default, or 2 minutes for document uploads.\n\n## Correlation\nA signal can be linked to another signal in the same ISN by setting its `correlation_id` to the other signal's `signal_id`. Search with `include_correlated=true` returns the signals linked to each result, and the `correlation_id` search filter returns the signals linked to one signal.\n\nSearch results include each signal's `correlation_id` (null if the signal is not linked to another signal). To fetch the signal it is linked to (e.g. the consignment an event is about), search that signal's type with `signal_id=\u003ccorrelation_id\u003e`.\n\n**Correlate to the entity directly.** For example, correlate a consignment's documents and events to the consignment itself, not to each other. Correlation is one level deep: `include_correlated` only returns signals that are correlated directly to the returned signal.\n\n**Correlating is sharing.** Correlating your signal to a signal created by another account is like emailing that account a copy, with the extra controls that you can withdraw it or send new versions, and they see those changes. Unlike email:\n- withdrawing a signal stops further access through the service\n- if a new version changes the correlation_id, access moves with it: the owner of the newly correlated signal can see every version, and the previous owner can no longer access it through the service\n\n## Who can see signals\n- Accounts with **read** access to an ISN can see every signal in it.\n- Accounts with **write-only** access can see the signals they created, and the signals other accounts have correlated to their signals (one level deep).\n- Signals in a **public** ISN can be searched by anyone.\n\nPrivacy between participants is set by the ISN's permissions. For example, in a network where all participants share their data with a government agency but not with each other, the participants are given write-only access and the agency is given read access.\n\n## Events\nEvent signals record that a process waypoint has been reached - e.g. `ehc-approved` (an export health certificate was approved) or `departed-origin` - for the signal they are correlated to. Each waypoint is its own event signal type, so recipients choose which events they receive by choosing which event types to search or poll.\n- **`correlation_id` is required**: correlate the event to the signal it is about (e.g. the consignment). Requests containing events without one are rejected.\n- **`content` must include `occurred_at`**: the time the waypoint was reached, as an RFC 3339 timestamp with a time zone offset (e.g. `2026-09-27T14:02:00Z`).\n- **`subject`**: if the event is about a specific version of a signal (e.g. version 3 of a document), name it in a `subject` field in `content`: `{\"signal_id\": \"...\", \"version\": 3}`. Always include the version - later versions of the document may be different.\n- **Events are immutable** (see Versions and resubmissions).\n- The service doesn't enforce an order: events are accepted in any order and can repeat (e.g. several inspections). To build a timeline, order a signal's correlated events by `occurred_at`.\n\nExample: `{\"local_ref\": \"ehc-approved-001\", \"correlation_id\": \"\u003cconsignment signal_id\u003e\", \"content\": {\"occurred_at\": \"2026-09-27T14:02:00Z\", \"subject\": {\"signal_id\": \"\u003cdocument signal_id\u003e\", \"version\": 3}, \"certificate_no\": \"EHC-001\"}}`\n\n**Schemas for event types.** An event type's schema validates the event's `content`, as for json signal types, but:\n- the service checks `occurred_at` whatever the schema says. The schema must still allow it: declare `occurred_at` (and `subject`, if the type has one) and list it as required, especially if the schema uses `\"additionalProperties\": false`\n- `occurred_at` and `subject` are reserved - don't use them for anything else\n- the service doesn't check `subject` yet, so a type whose events have a subject should require it in its schema, as `{\"signal_id\": \u003cuuid\u003e, \"version\": \u003cinteger\u003e}`\n\n## Polling for changes\nTo find out about new and changed signals, poll *Signal Search* for each signal type you are interested in:\n```\nGET /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search?updated_since={cursor}\u0026include_withdrawn=true\n```\n- `updated_since` returns the signals that were created, given a new version, recorrelated or withdrawn since that time. Results are ordered by `signal_updated_at`, so the last result's `signal_updated_at` is your cursor.\n- Use `include_withdrawn=true`, so withdrawn signals are returned with `is_withdrawn: true` (otherwise they silently drop out of the results).\n- **Polling is at-least-once, so overlap your polls**: set `updated_since` to 1 minute before your cursor, and skip the results you have already seen (the same `signal_id` and `signal_updated_at`).\n- Why the overlap is needed: `signal_updated_at` is set when the service starts storing a signal, not when it finishes. A signal that was still being stored when you last polled can therefore appear with a `signal_updated_at` a little before your cursor. The 1 minute overlap makes sure your next poll picks it up.\n- Search results are not paginated, so poll often enough to keep each result set small.\n\n# UI Endpoints\n\nUI endpoints serve the browser-based management interface.\n\n## Route types\n- **Page handlers** (`GET /admin/*`, `/search`, etc.): return a full HTML page (`200`)\n- **HTMX action handlers** (`PUT`/`POST` to `/ui-api/*`): return an HTML partial (`200`) - either a success or error alert fragment\n\n- see /ui-docs for more information\n\n## Auth\nAll protected routes require a valid session (cookie-based). Unauthenticated requests redirect to `/login`.\nRequests with insufficient role are redirected to `/access-denied`.\n\n## Role requirements\n- **Public** (`/login`, `/register`): no authentication required\n- **Authenticated**: any logged-in user (`/dashboard`, `/settings`, and `/search` for accounts with access to an ISN)\n- **`isnadmin` or `siteadmin`**: the admin dashboard, ISN creation, enabling and disabling ISNs, service account creation\n- **Admins of at least one ISN**: ISN access, the ISN's signal types, viewing signal type configuration\n- **`siteadmin` only**: account management (enabling and disabling accounts, password reset links, reissuing service account credentials), ISN ownership transfer, role management, signal type creation and schemas, signal routing rules",
+        "description": "Signals ISN service API for managing Information Sharing Networks\n\n## Common Error Responses\nAll endpoints may return:\n- `400` Malformed request (invalid json, missing required fields, etc.)\n- `401` Unauthorized (invalid credentials)\n- `403` Forbidden (insufficient permissions)\n- `404` Resource not found (e.g. an ISN or signal type that doesn't exist or is not in use)\n- `413` Request body exceeds size limit\n- `429` Rate limit exceeded\n- `500` Internal server error\n- `504` Request timed out (`timeout`)\n\nIndividual endpoints document their specific business logic errors.\n\nStandard error responses include a JSON response body containing `error_code`, `message` and `request_id` fields.\n\nThe /oauth endpoints return `error` (the RFC6749 standard error code), `error_code` and `error_description` fields instead.\n\n## Request Limits\nThe endpoints are protected by:\n- **Rate limiting**: Configurable requests per second (all endpoints)\n- **Request size limits** (configurable - these are the defaults): 64KB for admin/auth endpoints, 5MB for json and event signal submissions, 20MB for document uploads\n\nCheck the `Signalsd-Max-Request-Size` response header for the configured size limit of the endpoint called.\n\nThe rate limit is set globally and prevents abuse of the service.\nIn production there will be additional protections in place such as per-IP rate limiting provided by the load balancer/reverse proxy.\n\n## Authentication \u0026 Authorization\n\n### OAuth\nThe signalsd backend service acts as an OAuth 2.0 Authorization Server and supports web users and service accounts.\n\n### Authentication Flows\n- **Web users**: (Refresh Token Grant Type) Authentication via /api/auth/login -\u003e receive JWT access token + HTTP-only refresh cookie -\u003e use bearer tokens for API calls\n- **Service accounts**: Clients implement OAuth Client Credentials flow -\u003e receive JWT access token -\u003e use bearer tokens for API calls\n\n### Token Usage\nAll protected API endpoints require a valid JWT access token in the Authorization header:\n```\nAuthorization: Bearer \u003cjwt-access-token\u003e\n```\n\n**Token Refresh (Service Accounts):**\n- Client calls `POST /oauth/token` with `grant_type=client_credentials` in the form body, and the client ID/secret as form fields or HTTP Basic auth\n- API validates credentials and issues new access token\n- Client receives new bearer token for subsequent API calls\n\n**Login (Web Users):**\n- Client calls `/api/auth/login` with email and password and receives an access token in the response body. The refresh token is set as an HTTP-only cookie.\n\n**Token Refresh (Web Users):**\n- Client calls `POST /oauth/token` with `grant_type=refresh_token` in the form body (the HTTP-only refresh token cookie is sent automatically)\n- API validates refresh token and issues new access token + rotated refresh cookie\n- Client receives new bearer token for subsequent API calls\n\n**Token Lifetimes:**\n- Access tokens: 30 minutes\n- Refresh tokens: 30 days (web users only). Each refresh issues a new refresh token valid for another 30 days, so users only need to log in again if they don't use the service for 30 days.\n\nEach login or refresh revokes the user's other refresh tokens, so a user has one active session at a time.\n\nThe account's role and ISN permissions are included in the access token when it is issued. Changes to them (and disabling an account) take effect when the account next gets an access token - up to 30 minutes later.\n\n### CSRF Protection\nThe refresh token used by the /oauth API endpoints is stored in an HttpOnly cookie (to prevent access by JavaScript)\nand marked with SameSite=Strict (to prevent it from being sent in cross-site requests, mitigating CSRF).\n\n### CORS Protection\n\nCORS is used to control which browser-based clients can make cross-origin requests to the API and read responses.\n\nThe `ALLOWED_ORIGINS` environment variable is used to configure the CORS rules.\n\nIn production, you should restrict ALLOWED_ORIGINS to trusted client origins (the server will not start if it is not set)\n\n## Date/Time Handling\n\n**URL Parameters**: The following ISO 8601 formats are accepted in URL query parameters:\n- 2006-01-02T15:04:05Z (UTC)\n- 2006-01-02T15:04:05+07:00 (with offset)\n- 2006-01-02T15:04:05.999999999Z (nano precision)\n- 2006-01-02 (date only, treated as start of day UTC: 2006-01-02T00:00:00Z)\n\nNote: When including a timestamp with a timezone offset in a query parameter, encode the + sign as %2B (e.g. 2025-08-31T12:00:00%2B07:00). Otherwise, + may be interpreted as a space.\n\n**Response Bodies**: All date/time fields in JSON responses use RFC3339 format (ISO 8601):\n- Example: \"2025-06-03T13:47:47.331787+01:00\"\n\n# Signals\n\n## Content kinds\nEach signal type has a `content_kind`, which determines how its signals are sent:\n- **json**: JSON content, validated against the signal type's schema. Sent with *Submit Signals* (or *Submit Signals via Router*).\n- **document**: a file (PDF, JPEG, PNG or XML). Sent with *Upload a Document* and retrieved with *Download a Document*. Search results contain the document's metadata, not the file.\n- **event**: an immutable JSON record that a process waypoint has been reached for another signal (e.g. an export health certificate was approved for a consignment). Sent with *Submit Signals* (see Events below).\n\nSearch, withdrawal and batches work the same way for every kind, and search results include each signal's `content_kind`.\n\n## Versions and resubmissions\nEach signal is identified by the `local_ref` the sender supplies, which must be unique for the account, ISN and signal type version (sending the same `local_ref` to two ISNs, or to two versions of a signal type, creates two independent signals). When a `local_ref` is sent to the same ISN again:\n- **If something changed**, a new version of the signal is stored (json and document signals).\n- **If nothing changed** (the same content, and the same or no `correlation_id`), nothing is stored. The response contains the `signal_id`, `signal_version_id` and `version_number` of the existing latest version, with `unchanged: true`, so requests can be safely retried. JSON content is compared as JSON (key order and whitespace are ignored). Documents compare the file and its filename.\n- **If the signal was withdrawn**, it is reactivated with a new version (json and document signals).\n- **Events are never changed**: resubmitting an event with different content or a different `correlation_id`, or after it was withdrawn, fails with `resource_already_exists`. To correct an event, withdraw it and send a new event with a new `local_ref`.\n\n## Recovering from failures\nEach signal in a request is stored separately, so a request that fails part way through (e.g. a timeout) can leave some signals stored and others not. Because unchanged signals are not stored again, you can recover in either of these ways:\n- **Resend the whole request.** Signals that were already stored are returned with `unchanged: true`, and only the missing or failed signals are stored. Note that any json signal in the request that has been withdrawn since it was sent is reactivated (withdrawn events are not reactivated - they fail with `resource_already_exists`).\n- **Resend only the failures.** The response lists the signals that failed, and *Get Batch Status* lists the batch's unresolved failures.\n\nWhen a whole *Submit Signals* request fails (an error response such as 400, 401, 403, 404, 413 or 500), or you get no response, no failures are recorded in the batch, so resend the whole request once the problem is fixed. Rejected document uploads are recorded in the batch (except when the request's form fields are missing or invalid).\n\nIf the server's request timeout is reached part way through a *Submit Signals* request, the remaining signals are returned as `database_error` failures but may not be recorded in the batch - resend the whole request.\n\nA retry of a json signal or document sent while the original request is still being processed can occasionally store an extra, identical version. This is harmless - the content doesn't change - but pollers will see one more update. To avoid it, set your client timeout above the server's request timeout: 15 seconds by default, or 2 minutes for document uploads.\n\n## Correlation\nA signal can be linked to another signal in the same ISN by setting its `correlation_id` to the other signal's `signal_id`. Search with `include_correlated=true` returns the signals linked to each result, and the `correlation_id` search filter returns the signals linked to one signal.\n\nSearch results include each signal's `correlation_id` (null if the signal is not linked to another signal). To fetch the signal it is linked to (e.g. the consignment an event is about), search that signal's type with `signal_id=\u003ccorrelation_id\u003e`.\n\n**Correlate to the entity directly.** For example, correlate a consignment's documents and events to the consignment itself, not to each other. Correlation is one level deep: `include_correlated` only returns signals that are correlated directly to the returned signal.\n\n**Correlating is sharing.** Correlating your signal to a signal created by another account is like emailing that account a copy, with the extra controls that you can withdraw it or send new versions, and they see those changes. Unlike email:\n- withdrawing a signal stops further access through the service\n- if a new version changes the correlation_id, access moves with it: the owner of the newly correlated signal can see every version, and the previous owner can no longer access it through the service\n\n## Who can see signals\n- Accounts with **read** access to an ISN can see every signal in it.\n- Accounts with **write-only** access can see the signals they created, and the signals other accounts have correlated to their signals (one level deep).\n- Signals in a **public** ISN can be searched by anyone, using *Signal Search (public ISNs)* (`/api/public/isn/...`). Downloading a document still needs an access token and access to the ISN.\n\nPrivacy between participants is set by the ISN's permissions. For example, in a network where all participants share their data with a government agency but not with each other, the participants are given write-only access and the agency is given read access.\n\n## Events\nEvent signals record that a process waypoint has been reached - e.g. `ehc-approved` (an export health certificate was approved) or `departed-origin` - for the signal they are correlated to. Each waypoint is its own event signal type, so recipients choose which events they receive by choosing which event types to search or poll.\n- **`correlation_id` is required**: correlate the event to the signal it is about (e.g. the consignment). Requests containing events without one are rejected.\n- **`content` must include `occurred_at`**: the time the waypoint was reached, as an RFC 3339 timestamp with a time zone offset (e.g. `2026-09-27T14:02:00Z`).\n- **`subject`**: if the event is about a specific version of a signal (e.g. version 3 of a document), name it in a `subject` field in `content`: `{\"signal_id\": \"...\", \"version\": 3}`. Always include the version - later versions of the document may be different.\n- **Events are immutable** (see Versions and resubmissions).\n- The service doesn't enforce an order: events are accepted in any order and can repeat (e.g. several inspections). To build a timeline, order a signal's correlated events by `occurred_at`.\n\nExample: `{\"local_ref\": \"ehc-approved-001\", \"correlation_id\": \"\u003cconsignment signal_id\u003e\", \"content\": {\"occurred_at\": \"2026-09-27T14:02:00Z\", \"subject\": {\"signal_id\": \"\u003cdocument signal_id\u003e\", \"version\": 3}, \"certificate_no\": \"EHC-001\"}}`\n\n**Schemas for event types.** An event type's schema validates the event's `content`, as for json signal types, but:\n- the service checks `occurred_at` whatever the schema says. The schema must still allow it: declare `occurred_at` (and `subject`, if the type has one) and list it as required, especially if the schema uses `\"additionalProperties\": false`\n- `occurred_at` and `subject` are reserved - don't use them for anything else\n- the service doesn't check `subject` yet, so a type whose events have a subject should require it in its schema, as `{\"signal_id\": \u003cuuid\u003e, \"version\": \u003cinteger\u003e}`\n\n## Polling for changes\nTo find out about new and changed signals, poll *Signal Search* for each signal type you are interested in:\n```\nGET /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search?updated_since={cursor}\u0026include_withdrawn=true\n```\n- `updated_since` returns the signals that were created, given a new version, recorrelated or withdrawn since that time. Results are ordered by `signal_updated_at`, so the last result's `signal_updated_at` is your cursor.\n- Use `include_withdrawn=true`, so withdrawn signals are returned with `is_withdrawn: true` (otherwise they silently drop out of the results).\n- **Polling is at-least-once, so overlap your polls**: set `updated_since` to 1 minute before your cursor, and skip the results you have already seen (the same `signal_id` and `signal_updated_at`).\n- Why the overlap is needed: `signal_updated_at` is set when the service starts storing a signal, not when it finishes. A signal that was still being stored when you last polled can therefore appear with a `signal_updated_at` a little before your cursor. The 1 minute overlap makes sure your next poll picks it up.\n- Search results are not paginated, so poll often enough to keep each result set small.\n\n# UI Endpoints\n\nUI endpoints serve the browser-based management interface.\n\n## Route types\n- **Page handlers** (`GET /admin/*`, `/search`, etc.): return a full HTML page (`200`)\n- **HTMX action handlers** (`/ui-api/*`): return an HTML partial (`200`) - either the requested content, or a success or error alert fragment\n\n- see /ui-docs for more information\n\n## Auth\nAll protected routes require a valid session (cookie-based). Unauthenticated requests redirect to `/login`.\nRequests with insufficient role are redirected to `/access-denied`.\n\n## Role requirements\n- **Public** (`/login`, `/register`): no authentication required\n- **Authenticated**: any logged-in user (`/dashboard`, `/settings`, and `/search` for accounts with access to an ISN)\n- **`isnadmin` or `siteadmin`**: the admin dashboard, ISN creation, enabling and disabling ISNs, service account creation\n- **Admins of at least one ISN**: ISN access, the ISN's signal types, viewing signal type configuration\n- **`siteadmin` only**: account management (enabling and disabling accounts, password reset links, reissuing service account credentials), ISN ownership transfer, role management, signal type creation and schemas, signal routing rules",
         "title": "Signals ISN API",
         "contact": {},
         "license": {
@@ -73,7 +73,7 @@
         },
         "/admin/isn/accounts/manage": {
             "get": {
-                "description": "Renders the ISN accounts management page. Requires isnadmin role.",
+                "description": "Renders the ISN accounts management page. Requires admin rights for at least one ISN (the ISN owner, or a site admin).",
                 "tags": [
                     "UI Pages"
                 ],
@@ -115,7 +115,7 @@
         },
         "/admin/isn/signal-types/add": {
             "get": {
-                "description": "Renders the form to associate a signal type version with an ISN. Requires isnadmin role.",
+                "description": "Renders the form to associate a signal type version with an ISN. Requires admin rights for at least one ISN (the ISN owner, or a site admin).",
                 "tags": [
                     "UI Pages"
                 ],
@@ -129,7 +129,7 @@
         },
         "/admin/isn/signal-types/manage": {
             "get": {
-                "description": "Renders the form to enable or disable signal types within an ISN. Requires isnadmin role.",
+                "description": "Renders the form to enable or disable signal types within an ISN. Requires admin rights for at least one ISN (the ISN owner, or a site admin).",
                 "tags": [
                     "UI Pages"
                 ],
@@ -199,7 +199,7 @@
         },
         "/admin/signal-types/list": {
             "get": {
-                "description": "Renders a read-only report of all registered signal types. Requires isnadmin role.",
+                "description": "Renders a read-only report of all registered signal types. Requires admin rights for at least one ISN (the ISN owner, or a site admin).",
                 "tags": [
                     "UI Pages"
                 ],
@@ -304,9 +304,6 @@
                 "responses": {
                     "200": {
                         "description": "HTML partial or HX-Redirect header"
-                    },
-                    "400": {
-                        "description": "HTML error partial"
                     }
                 }
             }
@@ -368,10 +365,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "HTML partial"
-                    },
-                    "400": {
-                        "description": "HTML error partial"
+                        "description": "HTML partial (or an error alert)"
                     }
                 }
             }
@@ -436,13 +430,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "HTML partial"
-                    },
-                    "400": {
-                        "description": "HTML error partial"
-                    },
-                    "401": {
-                        "description": "HTML error partial"
+                        "description": "HTML partial (or an error alert)"
                     }
                 }
             }
@@ -472,13 +460,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "HTML partial"
-                    },
-                    "400": {
-                        "description": "HTML error partial"
-                    },
-                    "401": {
-                        "description": "HTML error partial"
+                        "description": "HTML partial (or an error alert)"
                     }
                 }
             }
@@ -520,13 +502,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "HTML partial"
-                    },
-                    "400": {
-                        "description": "HTML error partial"
-                    },
-                    "401": {
-                        "description": "HTML error partial"
+                        "description": "HTML partial (or an error alert)"
                     }
                 }
             }
@@ -556,13 +532,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "HTML partial"
-                    },
-                    "400": {
-                        "description": "HTML error partial"
-                    },
-                    "401": {
-                        "description": "HTML error partial"
+                        "description": "HTML partial (or an error alert)"
                     }
                 }
             }
@@ -583,7 +553,7 @@
         },
         "/ui-api/isn/accounts/manage": {
             "put": {
-                "description": "HTMX endpoint. Adds or removes a user/service account from an ISN. Requires isnadmin role.",
+                "description": "HTMX endpoint. Adds or removes a user/service account from an ISN. Requires admin rights for at least one ISN (the ISN owner, or a site admin).",
                 "tags": [
                     "HTMX Actions"
                 ],
@@ -605,7 +575,7 @@
                     },
                     {
                         "type": "string",
-                        "description": "'read', 'write', or 'none' (removes account)",
+                        "description": "'read', 'write', 'read-write', or 'none' (revokes the account's access)",
                         "name": "permission",
                         "in": "formData",
                         "required": true
@@ -625,13 +595,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "HTML partial"
-                    },
-                    "400": {
-                        "description": "HTML error partial"
-                    },
-                    "401": {
-                        "description": "HTML error partial"
+                        "description": "HTML partial (or an error alert)"
                     }
                 }
             }
@@ -668,13 +632,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "HTML partial"
-                    },
-                    "400": {
-                        "description": "HTML error partial"
-                    },
-                    "401": {
-                        "description": "HTML error partial"
+                        "description": "HTML partial (or an error alert)"
                     }
                 }
             }
@@ -704,20 +662,14 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "HTML partial"
-                    },
-                    "400": {
-                        "description": "HTML error partial"
-                    },
-                    "401": {
-                        "description": "HTML error partial"
+                        "description": "HTML partial (or an error alert)"
                     }
                 }
             }
         },
         "/ui-api/isn/signal-types/add": {
             "post": {
-                "description": "HTMX endpoint. Associates a signal type version with an ISN. Requires isnadmin role for the target ISN.",
+                "description": "HTMX endpoint. Associates a signal type version with an ISN. Requires admin rights for at least one ISN (the ISN owner, or a site admin).",
                 "tags": [
                     "HTMX Actions"
                 ],
@@ -747,20 +699,14 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "HTML partial"
-                    },
-                    "400": {
-                        "description": "HTML error partial"
-                    },
-                    "401": {
-                        "description": "HTML error partial"
+                        "description": "HTML partial (or an error alert)"
                     }
                 }
             }
         },
         "/ui-api/isn/signal-types/manage": {
             "put": {
-                "description": "HTMX endpoint. Enables or disables a specific signal type version within an ISN. Requires isnadmin role.",
+                "description": "HTMX endpoint. Enables or disables a specific signal type version within an ISN. Requires admin rights for at least one ISN (the ISN owner, or a site admin).",
                 "tags": [
                     "HTMX Actions"
                 ],
@@ -797,13 +743,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "HTML partial"
-                    },
-                    "400": {
-                        "description": "HTML error partial"
-                    },
-                    "401": {
-                        "description": "HTML error partial"
+                        "description": "HTML partial (or an error alert)"
                     }
                 }
             }
@@ -833,20 +773,14 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "HTML partial"
-                    },
-                    "400": {
-                        "description": "HTML error partial"
-                    },
-                    "401": {
-                        "description": "HTML error partial"
+                        "description": "HTML partial (or an error alert)"
                     }
                 }
             }
         },
         "/ui-api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}/content": {
             "get": {
-                "description": "Streams the document stored with a document signal from the signalsd API to the browser as an attachment. Requires ISN read access.",
+                "description": "Streams the document stored with a document signal from the signalsd API to the browser as an attachment. Requires access to the ISN (write-only accounts can only download their own documents and the documents correlated to their signals).",
                 "tags": [
                     "UI Pages"
                 ],
@@ -896,6 +830,57 @@
                 "responses": {
                     "200": {
                         "description": "the document"
+                    }
+                }
+            }
+        },
+        "/ui-api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}/correlated-count/{count}": {
+            "get": {
+                "description": "HTMX endpoint. Returns a table of signals correlated to the specified signal.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Get correlated signals",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Signal ID",
+                        "name": "signal_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "ISN slug",
+                        "name": "isn_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Signal type slug",
+                        "name": "signal_type_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Semantic version",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Number of correlated signals already displayed",
+                        "name": "count",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial (or an error alert)"
                     }
                 }
             }
@@ -1040,13 +1025,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "HTML partial"
-                    },
-                    "400": {
-                        "description": "HTML error partial"
-                    },
-                    "401": {
-                        "description": "HTML error partial"
+                        "description": "HTML partial (or an error alert)"
                     }
                 }
             }
@@ -1069,20 +1048,14 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "HTML partial"
-                    },
-                    "400": {
-                        "description": "HTML error partial"
-                    },
-                    "401": {
-                        "description": "HTML error partial"
+                        "description": "HTML partial (or an error alert)"
                     }
                 }
             }
         },
         "/ui-api/signal-types/create": {
             "post": {
-                "description": "HTMX endpoint. Creates a new signal type at version . Requires siteadmin role.",
+                "description": "HTMX endpoint. Creates a new signal type at version 1.0.0. Requires siteadmin role.",
                 "tags": [
                     "HTMX Actions"
                 ],
@@ -1137,13 +1110,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "HTML partial"
-                    },
-                    "400": {
-                        "description": "HTML error partial"
-                    },
-                    "401": {
-                        "description": "HTML error partial"
+                        "description": "HTML partial (or an error alert)"
                     }
                 }
             }
@@ -1194,13 +1161,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "HTML partial"
-                    },
-                    "400": {
-                        "description": "HTML error partial"
-                    },
-                    "401": {
-                        "description": "HTML error partial"
+                        "description": "HTML partial (or an error alert)"
                     }
                 }
             }
@@ -1232,7 +1193,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "HTML partial"
+                        "description": "HTML partial (or an error alert)"
                     }
                 }
             },
@@ -1322,13 +1283,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "HTML partial"
-                    },
-                    "400": {
-                        "description": "HTML error partial"
-                    },
-                    "401": {
-                        "description": "HTML error partial"
+                        "description": "HTML partial (or an error alert)"
                     }
                 }
             },
@@ -1358,13 +1313,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "HTML partial"
-                    },
-                    "400": {
-                        "description": "HTML error partial"
-                    },
-                    "401": {
-                        "description": "HTML error partial"
+                        "description": "HTML partial (or an error alert)"
                     }
                 }
             }
@@ -1378,7 +1327,7 @@
                 "summary": "Add routing mapping row",
                 "responses": {
                     "200": {
-                        "description": "HTML partial"
+                        "description": "HTML partial (or an error alert)"
                     }
                 }
             }
@@ -1399,7 +1348,7 @@
         },
         "/ui-api/signals/search": {
             "get": {
-                "description": "HTMX endpoint. Returns a table of signals matching the search criteria. Requires ISN read access.",
+                "description": "HTMX endpoint. Returns a table of signals matching the search criteria. Requires access to the ISN (write-only accounts only see their own signals and the signals correlated to them).",
                 "tags": [
                     "HTMX Actions"
                 ],
@@ -1477,64 +1426,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "HTML partial"
-                    },
-                    "400": {
-                        "description": "HTML error partial"
-                    },
-                    "401": {
-                        "description": "HTML error partial"
-                    }
-                }
-            }
-        },
-        "/ui-api/signals/{isn_slug}/{signal_type_slug}/v{sem_ver}/{signal_id}/correlated/{count}": {
-            "get": {
-                "description": "HTMX endpoint. Returns a table of signals correlated to the specified signal.",
-                "tags": [
-                    "HTMX Actions"
-                ],
-                "summary": "Get correlated signals",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Signal ID",
-                        "name": "signal_id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "ISN slug",
-                        "name": "isn_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Signal type slug",
-                        "name": "signal_type_slug",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "string",
-                        "description": "Semantic version",
-                        "name": "sem_ver",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Number of correlated signals already displayed",
-                        "name": "count",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "HTML partial"
+                        "description": "HTML partial (or an error alert)"
                     }
                 }
             }
@@ -1556,7 +1448,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "HTML partial"
+                        "description": "HTML partial (or an error alert)"
                     }
                 }
             }
@@ -1578,7 +1470,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "HTML partial"
+                        "description": "HTML partial (or an error alert)"
                     }
                 }
             }
@@ -1600,7 +1492,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "HTML partial"
+                        "description": "HTML partial (or an error alert)"
                     }
                 }
             }
@@ -1623,13 +1515,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "HTML partial"
-                    },
-                    "400": {
-                        "description": "HTML error partial"
-                    },
-                    "401": {
-                        "description": "HTML error partial"
+                        "description": "HTML partial (or an error alert)"
                     }
                 }
             }

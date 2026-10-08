@@ -36,9 +36,7 @@ func (s *Server) SettingsPage(w http.ResponseWriter, r *http.Request) {
 //	@Param			current-password	formData	string	true	"Current password"
 //	@Param			new-password		formData	string	true	"New password"
 //	@Param			confirm-password	formData	string	true	"Confirm new password"
-//	@Success		200					"HTML partial"
-//	@Failure		400					"HTML error partial"
-//	@Failure		401					"HTML error partial"
+//	@Success		200					"HTML partial (or an error alert)"
 //	@Router			/ui-api/account/password [put]
 func (s *Server) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
@@ -108,9 +106,7 @@ func (s *Server) GeneratePasswordResetLinkPage(w http.ResponseWriter, r *http.Re
 //	@Description	HTMX endpoint. Generates a one-time password reset URL for a user. Requires siteadmin role.
 //	@Tags			HTMX Actions
 //	@Param			user-dropdown	formData	string	true	"Selected user in 'email|role' format"
-//	@Success		200				"HTML partial"
-//	@Failure		400				"HTML error partial"
-//	@Failure		401				"HTML error partial"
+//	@Success		200				"HTML partial (or an error alert)"
 //	@Router			/ui-api/users/generate-password-reset-link [put]
 func (s *Server) GeneratePasswordResetLink(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
@@ -226,9 +222,7 @@ func (s *Server) ManageAccountStatusPage(w http.ResponseWriter, r *http.Request)
 //	@Param			action						formData	string	true	"'enable' or 'disable'"
 //	@Param			user-identifier				formData	string	false	"User email (when account-type is 'user')"
 //	@Param			service-account-identifier	formData	string	false	"Client ID (when account-type is 'service-account')"
-//	@Success		200							"HTML partial"
-//	@Failure		400							"HTML error partial"
-//	@Failure		401							"HTML error partial"
+//	@Success		200							"HTML partial (or an error alert)"
 //	@Router			/ui-api/accounts/manage [put]
 func (s *Server) ManageAccountStatus(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
@@ -341,9 +335,7 @@ func (s *Server) MangeSiteAdminRolesPage(w http.ResponseWriter, r *http.Request)
 //	@Tags			HTMX Actions
 //	@Param			user-email	formData	string	true	"User email"
 //	@Param			action		formData	string	true	"'grant' or 'revoke'"
-//	@Success		200			"HTML partial"
-//	@Failure		400			"HTML error partial"
-//	@Failure		401			"HTML error partial"
+//	@Success		200			"HTML partial (or an error alert)"
 //	@Router			/ui-api/accounts/isn-admins/manage [put]
 func (s *Server) ManageAdminRoles(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
@@ -399,9 +391,7 @@ func (s *Server) ManageAdminRoles(w http.ResponseWriter, r *http.Request) {
 //	@Tags			HTMX Actions
 //	@Param			user-email	formData	string	true	"User email"
 //	@Param			action		formData	string	true	"'grant' or 'revoke'"
-//	@Success		200			"HTML partial"
-//	@Failure		400			"HTML error partial"
-//	@Failure		401			"HTML error partial"
+//	@Success		200			"HTML partial (or an error alert)"
 //	@Router			/ui-api/accounts/site-admins/manage [put]
 func (s *Server) ManageSiteAdminRoles(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())

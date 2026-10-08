@@ -72,7 +72,7 @@ func (s *Server) RegisterNewSignalTypeSchemaPage(w http.ResponseWriter, r *http.
 // CreateSignalType godoc
 //
 //	@Summary		Create signal type
-//	@Description	HTMX endpoint. Creates a new signal type at version . Requires siteadmin role.
+//	@Description	HTMX endpoint. Creates a new signal type at version 1.0.0. Requires siteadmin role.
 //	@Tags			HTMX Actions
 //	@Param			title			formData	string	true	"Signal type title"
 //	@Param			detail			formData	string	true	"Description"
@@ -81,9 +81,7 @@ func (s *Server) RegisterNewSignalTypeSchemaPage(w http.ResponseWriter, r *http.
 //	@Param			readme-url		formData	string	true	"Readme URL (ignored when skip-readme is true)"
 //	@Param			skip-validation	formData	string	false	"'true' to skip schema validation"
 //	@Param			skip-readme		formData	string	false	"'true' to skip readme requirement"
-//	@Success		200				"HTML partial"
-//	@Failure		400				"HTML error partial"
-//	@Failure		401				"HTML error partial"
+//	@Success		200				"HTML partial (or an error alert)"
 //	@Router			/ui-api/signal-types/create [post]
 func (s *Server) CreateSignalType(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
@@ -135,7 +133,7 @@ func (s *Server) CreateSignalType(w http.ResponseWriter, r *http.Request) {
 		Title:       title,
 		ReadmeURL:   readmeURL,
 		Detail:      detail,
-		BumpType:    "major", // Initial version is always
+		BumpType:    "major", // Initial version is always 1.0.0
 		ContentKind: contentKind,
 	}
 
@@ -160,9 +158,7 @@ func (s *Server) CreateSignalType(w http.ResponseWriter, r *http.Request) {
 //	@Param			readme-url			formData	string	true	"Readme URL"
 //	@Param			detail				formData	string	true	"Description of changes"
 //	@Param			bump-type			formData	string	true	"'major', 'minor', or 'patch'"
-//	@Success		200					"HTML partial"
-//	@Failure		400					"HTML error partial"
-//	@Failure		401					"HTML error partial"
+//	@Success		200					"HTML partial (or an error alert)"
 //	@Router			/ui-api/signal-types/register-new-schema [put]
 func (s *Server) RegisterNewSignalTypeSchema(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
@@ -209,14 +205,12 @@ func (s *Server) RegisterNewSignalTypeSchema(w http.ResponseWriter, r *http.Requ
 // AddSignalTypeToIsn godoc
 //
 //	@Summary		Add signal type to ISN
-//	@Description	HTMX endpoint. Associates a signal type version with an ISN. Requires isnadmin role for the target ISN.
+//	@Description	HTMX endpoint. Associates a signal type version with an ISN. Requires admin rights for at least one ISN (the ISN owner, or a site admin).
 //	@Tags			HTMX Actions
 //	@Param			isn-slug			formData	string	true	"ISN slug"
 //	@Param			signal-type-slug	formData	string	true	"Signal type slug"
 //	@Param			sem-ver				formData	string	true	"Semantic version"
-//	@Success		200					"HTML partial"
-//	@Failure		400					"HTML error partial"
-//	@Failure		401					"HTML error partial"
+//	@Success		200					"HTML partial (or an error alert)"
 //	@Router			/ui-api/isn/signal-types/add [post]
 func (s *Server) AddSignalTypeToIsn(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
@@ -259,7 +253,7 @@ func (s *Server) AddSignalTypeToIsn(w http.ResponseWriter, r *http.Request) {
 // AddSignalTypeToIsnPage godoc
 //
 //	@Summary		Add signal type to ISN page
-//	@Description	Renders the form to associate a signal type version with an ISN. Requires isnadmin role.
+//	@Description	Renders the form to associate a signal type version with an ISN. Requires admin rights for at least one ISN (the ISN owner, or a site admin).
 //	@Tags			UI Pages
 //	@Success		200	"HTML page"
 //	@Router			/admin/isn/signal-types/add [get]
@@ -287,7 +281,7 @@ func (s *Server) AddSignalTypeToIsnPage(w http.ResponseWriter, r *http.Request) 
 // ManageIsnSignalTypesStatusPage godoc
 //
 //	@Summary		Manage ISN signal type status page
-//	@Description	Renders the form to enable or disable signal types within an ISN. Requires isnadmin role.
+//	@Description	Renders the form to enable or disable signal types within an ISN. Requires admin rights for at least one ISN (the ISN owner, or a site admin).
 //	@Tags			UI Pages
 //	@Success		200	"HTML page"
 //	@Router			/admin/isn/signal-types/manage [get]
@@ -316,15 +310,13 @@ func (s *Server) ManageIsnSignalTypesStatusPage(w http.ResponseWriter, r *http.R
 // ManageIsnSignalTypesStatus godoc
 //
 //	@Summary		Enable or disable a signal type for an ISN
-//	@Description	HTMX endpoint. Enables or disables a specific signal type version within an ISN. Requires isnadmin role.
+//	@Description	HTMX endpoint. Enables or disables a specific signal type version within an ISN. Requires admin rights for at least one ISN (the ISN owner, or a site admin).
 //	@Tags			HTMX Actions
 //	@Param			isn-slug			formData	string	true	"ISN slug"
 //	@Param			signal-type-slug	formData	string	true	"Signal type slug"
 //	@Param			sem-ver				formData	string	true	"Semantic version"
 //	@Param			action				formData	string	true	"'enable' or 'disable'"
-//	@Success		200					"HTML partial"
-//	@Failure		400					"HTML error partial"
-//	@Failure		401					"HTML error partial"
+//	@Success		200					"HTML partial (or an error alert)"
 //	@Router			/ui-api/isn/signal-types/manage [put]
 func (s *Server) ManageIsnSignalTypesStatus(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
@@ -379,7 +371,7 @@ func (s *Server) ManageIsnSignalTypesStatus(w http.ResponseWriter, r *http.Reque
 // ListSignalTypesPage godoc
 //
 //	@Summary		List signal types page
-//	@Description	Renders a read-only report of all registered signal types. Requires isnadmin role.
+//	@Description	Renders a read-only report of all registered signal types. Requires admin rights for at least one ISN (the ISN owner, or a site admin).
 //	@Tags			UI Pages
 //	@Success		200	"HTML page"
 //	@Router			/admin/signal-types/list [get]
@@ -409,7 +401,7 @@ func (s *Server) ListSignalTypesPage(w http.ResponseWriter, r *http.Request) {
 //	@Description	HTMX endpoint. Returns a schema URL input field, enabled or disabled based on the skip-validation flag.
 //	@Tags			HTMX Actions
 //	@Param			skip-validation	query	bool	false	"'true' to render the field as disabled"
-//	@Success		200				"HTML partial"
+//	@Success		200				"HTML partial (or an error alert)"
 //	@Router			/ui-api/toggles/skip-validation [get]
 func (s *Server) ToggleSkipValidation(w http.ResponseWriter, r *http.Request) {
 	skipValidation := r.FormValue("skip-validation") == "true"
@@ -422,7 +414,7 @@ func (s *Server) ToggleSkipValidation(w http.ResponseWriter, r *http.Request) {
 //	@Description	HTMX endpoint. Returns a readme URL input field, enabled or disabled based on the skip-readme flag.
 //	@Tags			HTMX Actions
 //	@Param			skip-readme	query	bool	false	"'true' to render the field as disabled"
-//	@Success		200			"HTML partial"
+//	@Success		200			"HTML partial (or an error alert)"
 //	@Router			/ui-api/toggles/skip-readme [get]
 func (s *Server) ToggleSkipReadme(w http.ResponseWriter, r *http.Request) {
 	skipReadme := r.FormValue("skip-readme") == "true"
@@ -435,7 +427,7 @@ func (s *Server) ToggleSkipReadme(w http.ResponseWriter, r *http.Request) {
 //	@Description	HTMX endpoint. Returns the schema fields for the create signal type form: the skip validation checkbox and schema URL input for json and event signal types, or a note that document signal types have no schema.
 //	@Tags			HTMX Actions
 //	@Param			content-kind	query	string	false	"'json', 'event' or 'document'"
-//	@Success		200				"HTML partial"
+//	@Success		200				"HTML partial (or an error alert)"
 //	@Router			/ui-api/toggles/content-kind [get]
 func (s *Server) ToggleContentKind(w http.ResponseWriter, r *http.Request) {
 	contentKind := r.FormValue("content-kind")

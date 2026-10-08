@@ -59,7 +59,6 @@ func (s *Server) RedirectToLogin(w http.ResponseWriter, r *http.Request) {
 //	@Param			email		formData	string	true	"User email"
 //	@Param			password	formData	string	true	"User password"
 //	@Success		200			"HTML partial or HX-Redirect header"
-//	@Failure		400			"HTML error partial"
 //	@Router			/login [post]
 func (s *Server) Login(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
@@ -118,8 +117,7 @@ func (s *Server) RegisterPage(w http.ResponseWriter, r *http.Request) {
 //	@Param			email				formData	string	true	"User email"
 //	@Param			password			formData	string	true	"Password"
 //	@Param			confirm-password	formData	string	true	"Confirm password"
-//	@Success		200					"HTML partial"
-//	@Failure		400					"HTML error partial"
+//	@Success		200					"HTML partial (or an error alert)"
 //	@Router			/register [post]
 func (s *Server) Register(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")

@@ -41,17 +41,17 @@ type SubmittedSignal struct {
 	Content json.RawMessage `json:"content" swaggertype:"object"`
 }
 
-// CreateSignalRequest contains the http request body used when submitting signals
+// CreateSignalsRequest contains the http request body used when submitting signals
 type CreateSignalsRequest struct {
 
-	// BatchRef groups signals under a sender-chosen label
+	// BatchRef groups signals under a sender-chosen label (1-128 characters: letters, numbers, hyphens and underscores only)
 	BatchRef string `json:"batch_ref" example:"daily-sync-2026-04-02"`
 
 	// Signals - the list of signals to be loaded
 	Signals []SubmittedSignal `json:"signals"`
 }
 
-// batcRefRegexp - batch refs must be alphanumeric, hyphens, and underscores only, length 1–128.
+// batchRefRegexp - batch refs must be alphanumeric, hyphens, and underscores only, length 1–128.
 var batchRefRegexp = regexp.MustCompile(`^[a-zA-Z0-9_-]{1,128}$`)
 
 // IsnResult holds stored and failed signals
@@ -64,7 +64,7 @@ type IsnResult struct {
 	// SignalTypePath is the target Signal Type
 	SignalTypePath string `json:"signal_type_path" example:"signal-type-1/v0.0.1"`
 
-	// StoredSignals is the list of signals sucessfully processed
+	// StoredSignals is the list of signals successfully processed
 	StoredSignals []StoredSignal `json:"stored_signals"`
 
 	// Failed Signals is the list of signals that could not be loaded to the target ISN
@@ -72,7 +72,7 @@ type IsnResult struct {
 }
 
 // SignalSubmissionResponse is the response body for signal submission endpoints.
-// Results is a slice of per-ISN outcomes. For the standard endpoint it always contains
+// Results is a slice of per-ISN outcomes. For the standard endpoint it always contains one entry (the ISN in the URL).
 type SignalSubmissionResponse struct {
 
 	// BatchRef is the client supplied batch identifier
@@ -81,10 +81,10 @@ type SignalSubmissionResponse struct {
 	// AccountID is the account that sent the data
 	AccountID uuid.UUID `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
 
-	// Results contains per-ISN outcomes.  It will only contain one entry for standard signal submisions (the ISN from the URL)
+	// Results contains per-ISN outcomes.  It will only contain one entry for standard signal submissions (the ISN from the URL)
 	Results []IsnResult `json:"results"`
 
-	// UnroutableSignals is only included when using the Signal Router (N/A for standard signal submission)
+	// UnroutableSignals is only included in Signal Router responses, and is omitted when there are no unroutable signals
 	UnroutableSignals []FailedSignal `json:"unroutable_signals,omitempty"`
 
 	// Summary contains the summary of counts
@@ -110,9 +110,12 @@ type StoredSignal struct {
 	Unchanged bool `json:"unchanged,omitempty" example:"false"`
 }
 
+// FailedSignal describes a signal that could not be stored.
+// ErrorCode is one of: malformed_body (e.g. schema validation errors), invalid_correlation_id, resource_not_found,
+// resource_already_exists (events), database_error, and for the Signals Router: forbidden and invalid_request (no routing rule matched)
 type FailedSignal struct {
 	LocalRef     string `json:"local_ref" example:"item_id_#2"`
-	ErrorCode    string `json:"error_code" example:"validation_error"`
+	ErrorCode    string `json:"error_code" example:"malformed_body"`
 	ErrorMessage string `json:"error_message" example:"field 'name' is required"`
 }
 
@@ -152,16 +155,16 @@ type CreateSignalsSummary struct {
 	// StoredCount+RejectedCount+UnroutableCount = TotalSubmitted
 	TotalSubmitted int `json:"total_submitted" example:"3"`
 
-	// StoredCount is the count of records sucessfully loaded
+	// StoredCount is the count of records successfully loaded
 	StoredCount int `json:"stored_count" example:"1"`
 
-	// Rejected Count is the list of records rejected due to issues with the contents of the record
+	// RejectedCount is the count of records rejected due to issues with the contents of the record
 	RejectedCount int `json:"rejected_count" example:"1"`
 
 	// UnroutableCount is the count of signals sent to the Signal Router that could not be routed.
 	// (e.g because no routing rule matched the data, or the account lacks write permission to the resolved ISN)
 	//
-	// This field is only supplied in responses to the Signals Router handler.
+	// This field is only supplied in responses to the Signals Router handler, and is omitted when it is zero.
 	UnroutableCount int `json:"unroutable_count,omitempty" example:"1"`
 }
 
@@ -170,10 +173,10 @@ type CreateSignalsSummary struct {
 //	@Summary		Submit Signals
 //	@Tags			Signal Exchange
 //
-//	@Description	Submit JSON or event signals to an ISN (documents are sent to document signal types with Upload a Document)
+//	@Description	Submit JSON or event signals to an ISN (documents are sent to document signal types with Upload a Document - using this endpoint for a document signal type returns 400 `invalid_url_param`)
 //	@Description	- payloads must not mix signals of different types and are subject to the size limits defined on the site.
 //	@Description	- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account to the ISN (the same local_ref sent to two ISNs identifies two independent signals).
-//	@Description	- If a local reference is received more than once from an account for the specified ISN and signal_type a new version of the signal will be stored with a incremented version number (unless the signal is unchanged - see Signal versions).
+//	@Description	- If a local reference is received more than once from an account for the specified ISN and signal_type a new version of the signal will be stored with an incremented version number (unless the signal is unchanged - see Signal versions).
 //	@Description	- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.
 //	@Description
 //	@Description	**Batches**
@@ -192,7 +195,7 @@ type CreateSignalsSummary struct {
 //	@Description	**Error handling**
 //	@Description
 //	@Description	Partial loads of the data are possible where the request is a valid format but individual signals fail to load
-//	@Description	(e.g schema validation errors, incorrect correlations ids).
+//	@Description	(e.g schema validation errors, incorrect correlation ids).
 //	@Description	Failures are logged and trackable via the Batch Status endpoint.
 //	@Description	The response provides an audit trail detailing the submission outcome.
 //	@Description
@@ -200,7 +203,7 @@ type CreateSignalsSummary struct {
 //	@Description	consequently the `Results` field is an array (one element for each ISN in the results).
 //	@Description	There will only ever be a single entry when using this handler.
 //	@Description
-//	@Description	Errors that relate to the entire request  - e.g invalid json, authentication, permission and server errors (400, 401, 403, 500) -
+//	@Description	Errors that relate to the entire request  - e.g invalid json, authentication, permission and server errors (400, 401, 403, 404, 413, 500) -
 //	@Description	return a simple error_code/error_message response rather than a detailed audit log.
 //	@Description	The individual signal failures are not logged in this case, and the client must resupply the data once the problem is resolved.
 //	@Description
@@ -213,9 +216,11 @@ type CreateSignalsSummary struct {
 //	@Description
 //	@Description	the json contained in the `content` field is validated against the JSON schema specified for the signal type unless validation is disabled on the type definition.
 //	@Description
-//	@Description	When schema validation is disabled, basic checks are still done on the incoming data and the following issues create a 400 error and cause the entire payload to be rejected:
+//	@Description	Whether or not schema validation is enabled, the following issues create a 400 error and cause the entire payload to be rejected:
 //	@Description	- invalid json format
 //	@Description	- missing fields (batch_ref must be present; the array of signals must be in a json object called signals; and the content and local_ref must be present for each element of the signals array).
+//	@Description	- a batch_ref that is longer than 128 characters or contains characters other than letters, numbers, hyphens and underscores
+//	@Description	- an event without a correlation_id
 //	@Description
 //	@Description	**Signal versions**
 //	@Description
@@ -255,8 +260,8 @@ type CreateSignalsSummary struct {
 //	@Success	200					{object}	handlers.SignalSubmissionResponse	"All signals processed successfully"
 //	@Success	207					{object}	handlers.SignalSubmissionResponse	"Partial success - some signals succeeded, some failed"
 //	@Success	422					{object}	handlers.SignalSubmissionResponse	"Valid request format but all signals failed processing - returns detailed error information"
-//	@Failure	400					{object}	responses.ErrorResponse				"malformed_body"
-//	@Failure	401					{object}	responses.ErrorResponse				"authentication_error"
+//	@Failure	400					{object}	responses.ErrorResponse				"malformed_body | invalid_url_param"
+//	@Failure	401					{object}	responses.ErrorResponse				"authorization_error | access_token_expired"
 //	@Failure	403					{object}	responses.ErrorResponse				"forbidden"
 //	@Failure	404					{object}	responses.ErrorResponse				"resource_not_found"
 //	@Failure	413					{object}	responses.ErrorResponse				"request_too_large"
@@ -357,7 +362,7 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) e
 //	@Description	- signals that do not contain the routing field defined in the _Routing Rules Config_, or do not satisfy any of the routing rules
 //	@Description	- signals whose correlation_id is not found (or whose ISN is not in use)
 //	@Description
-//	@Description	Signals that resolve to an ISN where the account lacks write permission, or where the signal type is not in use,
+//	@Description	Signals that resolve to an ISN where the account lacks access or write permission (`forbidden`), or where the ISN or signal type is not in use (`resource_not_found`),
 //	@Description	are rejected and listed in the `failed_signals` of that ISN's result.
 //	@Description
 //	@Description	**Usage**
@@ -373,11 +378,10 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) e
 //	@Success		200					{object}	handlers.SignalSubmissionResponse	"All signals processed successfully"
 //	@Success		207					{object}	handlers.SignalSubmissionResponse	"Partial success - some signals succeeded, some failed"
 //	@Success		422					{object}	handlers.SignalSubmissionResponse	"Valid request format but all signals failed processing - returns detailed error information"
-//	@Failure		400					{object}	responses.ErrorResponse				"malformed_body"
-//	@Failure		401					{object}	responses.ErrorResponse				"authentication_error"
-//	@Failure		404					{object}	responses.ErrorResponse				"resource_not_found"
+//	@Failure		400					{object}	responses.ErrorResponse				"malformed_body | invalid_url_param"
+//	@Failure		401					{object}	responses.ErrorResponse				"authorization_error | access_token_expired"
 //	@Failure		413					{object}	responses.ErrorResponse				"request_too_large"
-//	@Failure		500					{object}	responses.ErrorResponse				"database_error"
+//	@Failure		500					{object}	responses.ErrorResponse				"database_error | internal_error"
 //
 //	@Security		BearerAccessToken
 //
@@ -547,14 +551,14 @@ func (s *SignalsHandler) readSignalsRequest(r *http.Request) (*signalsSubmission
 		return nil, apperrors.MalformedBody("batch_ref is required", nil)
 	}
 	if !batchRefRegexp.MatchString(req.BatchRef) {
-		return nil, apperrors.MalformedBody("batch_ref must be less than 128 characters and can only contain alphanumeric characters, hyphens, and underscores", nil)
+		return nil, apperrors.MalformedBody("batch_ref must be at most 128 characters and can only contain alphanumeric characters, hyphens, and underscores", nil)
 	}
 
 	if req.Signals == nil {
 		return nil, apperrors.MalformedBody("request must contain a 'signals' array", nil)
 	}
 	if len(req.Signals) == 0 {
-		return nil, apperrors.MalformedBody("request must contain must contain at least one signal in the 'signals' array", nil)
+		return nil, apperrors.MalformedBody("request must contain at least one signal in the 'signals' array", nil)
 	}
 
 	for i, signal := range req.Signals {

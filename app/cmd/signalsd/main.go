@@ -36,24 +36,26 @@ import (
 //	@description	- `400` Malformed request (invalid json, missing required fields, etc.)
 //	@description	- `401` Unauthorized (invalid credentials)
 //	@description	- `403` Forbidden (insufficient permissions)
+//	@description	- `404` Resource not found (e.g. an ISN or signal type that doesn't exist or is not in use)
 //	@description	- `413` Request body exceeds size limit
 //	@description	- `429` Rate limit exceeded
 //	@description	- `500` Internal server error
+//	@description	- `504` Request timed out (`timeout`)
 //	@description
 //	@description	Individual endpoints document their specific business logic errors.
 //	@description
-//	@description	Standard error responses include a JSON response body containing `error_code` and `error_description` fields
+//	@description	Standard error responses include a JSON response body containing `error_code`, `message` and `request_id` fields.
 //	@description
-//	@description	The /oauth endpoints include an additional `error` field - this contains the RFC6749 standard error code.
+//	@description	The /oauth endpoints return `error` (the RFC6749 standard error code), `error_code` and `error_description` fields instead.
 //	@description
 //	@description	## Request Limits
-//	@description	All endpoints are protected by:
-//	@description	- **Rate limiting**: Configurable requests per second
-//	@description	- **Request size limits**: 64KB for admin/auth endpoints, 5MB for signal ingestion
+//	@description	The endpoints are protected by:
+//	@description	- **Rate limiting**: Configurable requests per second (all endpoints)
+//	@description	- **Request size limits** (configurable - these are the defaults): 64KB for admin/auth endpoints, 5MB for json and event signal submissions, 20MB for document uploads
 //	@description
-//	@description	Check the Signalsd-Max-Request-Body response header for the configured limit on signals payload.
+//	@description	Check the `Signalsd-Max-Request-Size` response header for the configured size limit of the endpoint called.
 //	@description
-//	@description	The rate limit is set globaly and prevents abuse of the service.
+//	@description	The rate limit is set globally and prevents abuse of the service.
 //	@description	In production there will be additional protections in place such as per-IP rate limiting provided by the load balancer/reverse proxy.
 //	@description
 //	@description	## Authentication & Authorization
@@ -72,7 +74,7 @@ import (
 //	@description	```
 //	@description
 //	@description	**Token Refresh (Service Accounts):**
-//	@description	- Client calls `/oauth/token?grant_type=client_credentials` with client ID/secret
+//	@description	- Client calls `POST /oauth/token` with `grant_type=client_credentials` in the form body, and the client ID/secret as form fields or HTTP Basic auth
 //	@description	- API validates credentials and issues new access token
 //	@description	- Client receives new bearer token for subsequent API calls
 //	@description
@@ -80,13 +82,17 @@ import (
 //	@description	- Client calls `/api/auth/login` with email and password and receives an access token in the response body. The refresh token is set as an HTTP-only cookie.
 //	@description
 //	@description	**Token Refresh (Web Users):**
-//	@description	- Client calls `/oauth/token?grant_type=refresh_token` with HTTP-only refresh token cookie
+//	@description	- Client calls `POST /oauth/token` with `grant_type=refresh_token` in the form body (the HTTP-only refresh token cookie is sent automatically)
 //	@description	- API validates refresh token and issues new access token + rotated refresh cookie
 //	@description	- Client receives new bearer token for subsequent API calls
 //	@description
 //	@description	**Token Lifetimes:**
 //	@description	- Access tokens: 30 minutes
-//	@description	- Refresh tokens: 30 days (web users only)
+//	@description	- Refresh tokens: 30 days (web users only). Each refresh issues a new refresh token valid for another 30 days, so users only need to log in again if they don't use the service for 30 days.
+//	@description
+//	@description	Each login or refresh revokes the user's other refresh tokens, so a user has one active session at a time.
+//	@description
+//	@description	The account's role and ISN permissions are included in the access token when it is issued. Changes to them (and disabling an account) take effect when the account next gets an access token - up to 30 minutes later.
 //	@description
 //	@description	### CSRF Protection
 //	@description	The refresh token used by the /oauth API endpoints is stored in an HttpOnly cookie (to prevent access by JavaScript)
@@ -96,11 +102,11 @@ import (
 //	@description
 //	@description	CORS is used to control which browser-based clients can make cross-origin requests to the API and read responses.
 //	@description
-//	@description	the `ALLOWED_ORIGINS` environment variable is used to configure the CORS rules.
+//	@description	The `ALLOWED_ORIGINS` environment variable is used to configure the CORS rules.
 //	@description
 //	@description	In production, you should restrict ALLOWED_ORIGINS to trusted client origins (the server will not start if it is not set)
 //	@description
-//	@description	## Date/Time Handling:
+//	@description	## Date/Time Handling
 //	@description
 //	@description	**URL Parameters**: The following ISO 8601 formats are accepted in URL query parameters:
 //	@description	- 2006-01-02T15:04:05Z (UTC)
@@ -124,7 +130,7 @@ import (
 //	@description	Search, withdrawal and batches work the same way for every kind, and search results include each signal's `content_kind`.
 //	@description
 //	@description	## Versions and resubmissions
-//	@description	Each signal is identified by the `local_ref` the sender supplies, which must be unique for the account, ISN and signal type (sending the same `local_ref` to two ISNs creates two independent signals). When a `local_ref` is sent to the same ISN again:
+//	@description	Each signal is identified by the `local_ref` the sender supplies, which must be unique for the account, ISN and signal type version (sending the same `local_ref` to two ISNs, or to two versions of a signal type, creates two independent signals). When a `local_ref` is sent to the same ISN again:
 //	@description	- **If something changed**, a new version of the signal is stored (json and document signals).
 //	@description	- **If nothing changed** (the same content, and the same or no `correlation_id`), nothing is stored. The response contains the `signal_id`, `signal_version_id` and `version_number` of the existing latest version, with `unchanged: true`, so requests can be safely retried. JSON content is compared as JSON (key order and whitespace are ignored). Documents compare the file and its filename.
 //	@description	- **If the signal was withdrawn**, it is reactivated with a new version (json and document signals).
@@ -132,12 +138,14 @@ import (
 //	@description
 //	@description	## Recovering from failures
 //	@description	Each signal in a request is stored separately, so a request that fails part way through (e.g. a timeout) can leave some signals stored and others not. Because unchanged signals are not stored again, you can recover in either of these ways:
-//	@description	- **Resend the whole request.** Signals that were already stored are returned with `unchanged: true`, and only the missing or failed signals are stored. Note that any signal in the request that has been withdrawn since it was sent is reactivated.
+//	@description	- **Resend the whole request.** Signals that were already stored are returned with `unchanged: true`, and only the missing or failed signals are stored. Note that any json signal in the request that has been withdrawn since it was sent is reactivated (withdrawn events are not reactivated - they fail with `resource_already_exists`).
 //	@description	- **Resend only the failures.** The response lists the signals that failed, and *Get Batch Status* lists the batch's unresolved failures.
 //	@description
-//	@description	When a whole request fails (400, 401, 403, 413 or 500), or you get no response (e.g. a timeout), no failures are recorded in the batch, so resend the whole request once the problem is fixed.
+//	@description	When a whole *Submit Signals* request fails (an error response such as 400, 401, 403, 404, 413 or 500), or you get no response, no failures are recorded in the batch, so resend the whole request once the problem is fixed. Rejected document uploads are recorded in the batch (except when the request's form fields are missing or invalid).
 //	@description
-//	@description	A retry sent while the original request is still being processed can occasionally store an extra, identical version. This is harmless - the content doesn't change - but pollers will see one more update. To avoid it, set your client timeout above the server's request timeout: 15 seconds by default, or 2 minutes for document uploads.
+//	@description	If the server's request timeout is reached part way through a *Submit Signals* request, the remaining signals are returned as `database_error` failures but may not be recorded in the batch - resend the whole request.
+//	@description
+//	@description	A retry of a json signal or document sent while the original request is still being processed can occasionally store an extra, identical version. This is harmless - the content doesn't change - but pollers will see one more update. To avoid it, set your client timeout above the server's request timeout: 15 seconds by default, or 2 minutes for document uploads.
 //	@description
 //	@description	## Correlation
 //	@description	A signal can be linked to another signal in the same ISN by setting its `correlation_id` to the other signal's `signal_id`. Search with `include_correlated=true` returns the signals linked to each result, and the `correlation_id` search filter returns the signals linked to one signal.
@@ -153,7 +161,7 @@ import (
 //	@description	## Who can see signals
 //	@description	- Accounts with **read** access to an ISN can see every signal in it.
 //	@description	- Accounts with **write-only** access can see the signals they created, and the signals other accounts have correlated to their signals (one level deep).
-//	@description	- Signals in a **public** ISN can be searched by anyone.
+//	@description	- Signals in a **public** ISN can be searched by anyone, using *Signal Search (public ISNs)* (`/api/public/isn/...`). Downloading a document still needs an access token and access to the ISN.
 //	@description
 //	@description	Privacy between participants is set by the ISN's permissions. For example, in a network where all participants share their data with a government agency but not with each other, the participants are given write-only access and the agency is given read access.
 //	@description
@@ -189,7 +197,7 @@ import (
 //	@description
 //	@description	## Route types
 //	@description	- **Page handlers** (`GET /admin/*`, `/search`, etc.): return a full HTML page (`200`)
-//	@description	- **HTMX action handlers** (`PUT`/`POST` to `/ui-api/*`): return an HTML partial (`200`) - either a success or error alert fragment
+//	@description	- **HTMX action handlers** (`/ui-api/*`): return an HTML partial (`200`) - either the requested content, or a success or error alert fragment
 //	@description
 //	@description	- see /ui-docs for more information
 //	@description
@@ -222,7 +230,7 @@ import (
 //	@tag.description	Access token issuance and revocation. The signalsd backend acts as an OAuth 2.0 Authorization Server: service accounts use the client_credentials grant, web users use the refresh_token grant. Start here if you are connecting a system to the API.
 
 //	@tag.name			User Authentication
-//	@tag.description	Registration, login and password management for web users. A signed-in user can change their own password here; users who have forgotten their password are sent a one-time link by an admin instead (see *Generate Password Reset Link* under Account Management. Use the OAuth 2.0 endpoints to obtain access tokens.
+//	@tag.description	Registration, login and password management for web users. A signed-in user can change their own password here; users who have forgotten their password are sent a one-time link by an admin instead (see *Generate Password Reset Link* under Account Management). Use the OAuth 2.0 endpoints to obtain access tokens.
 
 //	@tag.name			Service Accounts
 //	@tag.description	Register service accounts and manage their credentials (used for system-to-system access). Use the OAuth 2.0 endpoints to exchange service account credentials for an access token.
@@ -237,7 +245,7 @@ import (
 //	@tag.description	Define the format of the data being shared in an ISN
 
 //	@tag.name			ISN Configuration
-//	@tag.description	Create and manage Information Sharing Networks (ISNs) - these endpoints can only be used by the accounts that have a siteadmin or isnadmin role Note that ISN admins can only view or update details for ISNs they created.
+//	@tag.description	Create and manage Information Sharing Networks (ISNs). Creating and updating ISNs can only be done by accounts that have a siteadmin or isnadmin role, and ISN admins can only update the ISNs they own. Any authenticated account can view ISN details.
 
 //	@tag.name			ISN Permissions
 //	@tag.description	Grant accounts read or write access to an ISN
@@ -249,7 +257,7 @@ import (
 //	@tag.description	Service health, version and site tools. The health checks and version endpoints are public. The site reset endpoint only works in environments configured as 'dev'.
 
 //	@tag.name			One-time Links (browser pages)
-//	@tag.description	These endpoints should not be called directly. Some admin endpoints,  for insance *Register Service Account* and *Generate Password Reset Link*, return a one time link URL that the user then opens in their browser to interact with the auth system. These endpoints return the HTML used to in the one-time links. The URLs do not need an access token - the link is itself the credential - and should be treated as secrets.
+//	@tag.description	These endpoints should not be called directly. Some admin endpoints, for instance *Register Service Account* and *Generate Password Reset Link*, return a one time link URL that the user then opens in their browser to interact with the auth system. These endpoints return the HTML used in the one-time links. The URLs do not need an access token - the link is itself the credential - and should be treated as secrets.
 
 //	@tag.name			UI Pages
 //	@tag.description	Browser-based management interface. Page handlers return full HTML

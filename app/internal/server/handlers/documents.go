@@ -109,7 +109,9 @@ type DocumentUploadResponse struct {
 //	@Description
 //	@Description	The request is multipart/form-data with one document per request:
 //	@Description	- send the form fields first (batch_ref, local_ref and any optional fields) - **the file must be the last part**
-//	@Description	- the file part must be named `file` and must include a filename - the filename is stored as the document's name
+//	@Description	- the file part must be named `file` and must include a filename - the filename (without any directory path) is stored as the document's name
+//	@Description	- only the batch_ref, local_ref, correlation_id, sha256 and file fields are accepted (other fields are rejected with 400 malformed_body), and each form field value can be up to 1024 bytes
+//	@Description	- documents can be up to 20MB by default (the `Signalsd-Max-Request-Size` response header gives the request limit, which allows an extra 64KB for the form fields). Larger uploads are rejected with 413 request_too_large
 //	@Description
 //	@Description	The request body looks like this:
 //	@Description	```
@@ -139,7 +141,7 @@ type DocumentUploadResponse struct {
 //	@Description
 //	@Description	**Versions**
 //	@Description
-//	@Description	Uploads for a local_ref you have already used on the ISN are compared with its latest version (the same local_ref uploaded to another ISN is a separate document):
+//	@Description	Uploads for a local_ref you have already used for this signal type version on the ISN are compared with its latest version (the same local_ref uploaded to another ISN is a separate document):
 //	@Description	- the same file with the same filename creates no new version: the response contains the signal_id, signal_version_id and version_number of the existing latest version, with unchanged=true - so uploads can be safely retried
 //	@Description	- a different file, or the same file with a different filename, creates a new version (including a file that matches an older version)
 //	@Description	- re-uploading a withdrawn document creates a new version and reactivates it
@@ -148,7 +150,8 @@ type DocumentUploadResponse struct {
 //	@Description	Unchanged uploads are not counted in the batch they were sent in - the existing version belongs to the batch that stored it.
 //	@Description	The same file uploaded with a different local_ref is a separate document.
 //	@Description
-//	@Description	Rejected uploads are recorded against the batch (see the batch status endpoint).
+//	@Description	Uploads rejected after the form fields have been read (e.g. unsupported format, a filename extension or sha256 mismatch, an invalid correlation_id, too large, no permission) are recorded against the batch (see the batch status endpoint).
+//	@Description	Requests with missing or invalid form fields are not recorded.
 //	@Description
 //	@Description	**Retries**
 //	@Description
@@ -176,13 +179,14 @@ type DocumentUploadResponse struct {
 //
 //	@Success		200					{object}	handlers.DocumentUploadResponse
 //	@Failure		400					{object}	responses.ErrorResponse	"malformed_body | invalid_url_param"
-//	@Failure		401					{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		401					{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		403					{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		404					{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		413					{object}	responses.ErrorResponse	"request_too_large"
 //	@Failure		415					{object}	responses.ErrorResponse	"unsupported_media_type"
 //	@Failure		422					{object}	responses.ErrorResponse	"invalid_correlation_id"
 //	@Failure		500					{object}	responses.ErrorResponse	"database_error | internal_error"
+//	@Failure		504					{object}	responses.ErrorResponse	"timeout"
 //
 //	@Security		BearerAccessToken
 //
@@ -213,7 +217,7 @@ func (h *DocumentsHandler) UploadDocument(w http.ResponseWriter, r *http.Request
 //	@Description	(e.g. a bill of lading is sent to the ISN that received its consignment).
 //	@Description
 //	@Description	correlation_id is required - routing rules are not used for documents (they match on fields in JSON signals).
-//	@Description	The upload is rejected with 422 invalid_correlation_id if the correlated signal is not found,
+//	@Description	The upload is rejected with 422 invalid_correlation_id if the correlated signal is not found or its ISN is not in use,
 //	@Description	and with 403 forbidden if the account does not have write permission on the correlated signal's ISN.
 //	@Description
 //	@Description	Other than the ISN resolution, this endpoint behaves the same way as the standard _Upload a Document_ endpoint
@@ -232,13 +236,14 @@ func (h *DocumentsHandler) UploadDocument(w http.ResponseWriter, r *http.Request
 //
 //	@Success		200					{object}	handlers.DocumentUploadResponse
 //	@Failure		400					{object}	responses.ErrorResponse	"malformed_body | invalid_url_param"
-//	@Failure		401					{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		401					{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		403					{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		404					{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		413					{object}	responses.ErrorResponse	"request_too_large"
 //	@Failure		415					{object}	responses.ErrorResponse	"unsupported_media_type"
 //	@Failure		422					{object}	responses.ErrorResponse	"invalid_correlation_id"
 //	@Failure		500					{object}	responses.ErrorResponse	"database_error | internal_error"
+//	@Failure		504					{object}	responses.ErrorResponse	"timeout"
 //
 //	@Security		BearerAccessToken
 //
@@ -393,7 +398,7 @@ func (h *DocumentsHandler) readUploadFields(r *http.Request) (*documentUpload, e
 	}
 
 	if !batchRefRegexp.MatchString(upload.batchRef) {
-		return nil, apperrors.MalformedBody("batch_ref must be less than 128 characters and can only contain alphanumeric characters, hyphens, and underscores", nil)
+		return nil, apperrors.MalformedBody("batch_ref must be at most 128 characters and can only contain alphanumeric characters, hyphens, and underscores", nil)
 	}
 
 	if upload.localRef == "" {
@@ -664,10 +669,11 @@ func (h *DocumentsHandler) storeDocumentSignal(w http.ResponseWriter, r *http.Re
 //	@Produce		application/pdf,image/jpeg,image/png,text/xml
 //	@Success		200	{file}		file					"the document"
 //	@Failure		400	{object}	responses.ErrorResponse	"invalid_url_param"
-//	@Failure		401	{object}	responses.ErrorResponse	"authentication_error"
+//	@Failure		401	{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		500	{object}	responses.ErrorResponse	"database_error | internal_error"
+//	@Failure		504	{object}	responses.ErrorResponse	"timeout"
 //
 //	@Security		BearerAccessToken
 //

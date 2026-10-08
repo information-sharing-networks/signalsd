@@ -30,9 +30,7 @@ func (s *Server) CreateIsnPage(w http.ResponseWriter, r *http.Request) {
 //	@Param			title		formData	string	true	"ISN title"
 //	@Param			detail		formData	string	true	"ISN description"
 //	@Param			visibility	formData	string	true	"'public' or 'private'"
-//	@Success		200			"HTML partial"
-//	@Failure		400			"HTML error partial"
-//	@Failure		401			"HTML error partial"
+//	@Success		200			"HTML partial (or an error alert)"
 //	@Router			/ui-api/isn/create [post]
 func (s *Server) CreateIsn(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())
@@ -104,9 +102,7 @@ func (s *Server) ManageIsnStatusPage(w http.ResponseWriter, r *http.Request) {
 //	@Tags			HTMX Actions
 //	@Param			isn-slug	formData	string	true	"ISN slug"
 //	@Param			action		formData	string	true	"'enable' or 'disable'"
-//	@Success		200			"HTML partial"
-//	@Failure		400			"HTML error partial"
-//	@Failure		401			"HTML error partial"
+//	@Success		200			"HTML partial (or an error alert)"
 //	@Router			/ui-api/isn/manage [put]
 func (s *Server) ManageIsnStatus(w http.ResponseWriter, r *http.Request) {
 	reqLogger := logger.ContextRequestLogger(r.Context())

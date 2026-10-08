@@ -53,7 +53,7 @@ type IsnAccount struct {
 //	@Description	Update an account's access permission for an ISN. Set both can_read and can_write to false to revoke all access.
 //	@Description
 //	@Description	This endpoint can only be used by admin accounts:
-//	@Description	- ISN admins can only update membership for ISNs they created).
+//	@Description	- ISN admins can only update membership for ISNs they own.
 //	@Description	- Site admins can update membership for any ISN
 //	@Description
 //	@Description	Permissions:
@@ -61,8 +61,9 @@ type IsnAccount struct {
 //	@Description	- Accounts with 'write' permission can create signals on the ISN.
 //	@Description	- For accounts that need read/write access to an ISN, you must grant both 'read' and 'write' permissions.
 //	@Description
-//	@Description	Note that accounts with 'write' permission to an ISN are also automatically granted 'read'
-//	@Description	permission for signals they created, but can't view other signals on the ISN.
+//	@Description	Note that accounts with only 'write' permission to an ISN can view the signals they created, and the signals other accounts have correlated to their signals, but no others.
+//	@Description
+//	@Description	The change takes effect when the account next gets an access token (up to 30 minutes later).
 //	@Description
 //	@Description	You must supply values for both can_read and can_write.
 //
@@ -72,6 +73,7 @@ type IsnAccount struct {
 //
 //	@Success		200
 //	@Failure		400	{object}	responses.ErrorResponse	"invalid_request | malformed_body"
+//	@Failure		401	{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		500	{object}	responses.ErrorResponse	"database_error"
@@ -177,13 +179,14 @@ func (i *IsnAccountHandler) UpdateIsnAccountPermission(w http.ResponseWriter, r 
 //
 //	@Summary		Get ISN Account Membership
 //	@Tags			ISN Configuration
-//	@Description	Get a list of all accounts (users and service accounts) that have permissions on the specified ISN.
-//	@Description	Only ISN admins (for the ISNs they created) and site admins can view this information
+//	@Description	Get a list of all accounts (users and service accounts) that have had permissions on the specified ISN.
+//	@Description	Accounts whose access has been revoked are included (with can_read and can_write both false).
+//	@Description	Only ISN admins (for the ISNs they own) and site admins can view this information
 //
 //	@Param			isn_slug	path		string	true	"ISN slug"	example(sample-isn)
 //
 //	@Success		200			{array}		handlers.IsnAccount
-//	@Failure		400			{object}	responses.ErrorResponse	"invalid_url_param"
+//	@Failure		401			{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		403			{object}	responses.ErrorResponse	"forbidden"
 //	@Failure		404			{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		500			{object}	responses.ErrorResponse	"database_error"

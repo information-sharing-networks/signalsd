@@ -71,9 +71,10 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, p
 //	@Description	The refresh token is read automatically from the `refresh_token` HTTP-only cookie set during login.
 //	@Description	No additional form fields are required.
 //	@Description
-//	@Description	Returns a new access token in the response body. The rotated refresh token is set as a new HTTP-only cookie.
-//	@Description	Access tokens expire after 30 minutes. Refresh tokens expire after 30 days — if the refresh token
-//	@Description	has expired the user must log in again.
+//	@Description	Returns a new access token in the response body. The rotated refresh token is set as a new HTTP-only cookie
+//	@Description	(the cookie's path is `/oauth`, so browsers only send it to the /oauth endpoints).
+//	@Description	Access tokens expire after 30 minutes. Each refresh issues a new refresh token that expires 30 days later,
+//	@Description	so the user only has to log in again if they don't refresh for 30 days. Refreshing revokes the user's other refresh tokens (one session per user).
 //	@Description
 //	@Tags		OAuth 2.0
 //	@Accept		x-www-form-urlencoded
@@ -84,7 +85,7 @@ func NewTokenHandler(queries *database.Queries, authService *auth.AuthService, p
 //
 //	@Success	200				{object}	auth.AccessTokenResponse
 //	@Failure	400				{object}	responses.OAuthErrorResponse	"unsupported_grant_type · invalid_request · invalid_grant"
-//	@Failure	401				{object}	responses.OAuthErrorResponse	"invalid_client — wrong, expired, or revoked client secret. If your secret has expired, use POST /api/auth/service-accounts/rotate-secret to self-serve a new."
+//	@Failure	401				{object}	responses.OAuthErrorResponse	"invalid_client — wrong, expired, or revoked client secret. If your secret has expired, use POST /api/auth/service-accounts/rotate-secret to self-serve a new secret."
 //	@Failure	500				{object}	responses.OAuthErrorResponse	"server_error"
 //
 //	@Router		/oauth/token [post]
@@ -148,8 +149,8 @@ func (a *TokenHandler) RefreshAccessToken(w http.ResponseWriter, r *http.Request
 //	@Description	Alternatively, credentials may be supplied via HTTP Basic Auth (`Authorization: Basic base64(client_id:client_secret)`).
 //	@Description
 //	@Description	Revokes **all** client secrets for the service account, which prevents any further token requests
-//	@Description	until an admin reissues credentials via `POST /api/auth/service-accounts/reissue_credentials`.
-//	@Description	This does not permanently disable the account — use `POST /admin/accounts/{account_id}/disable` for that.
+//	@Description	until an admin reissues credentials via `POST /api/auth/service-accounts/reissue-credentials`.
+//	@Description	This does not permanently disable the account — use `POST /api/admin/accounts/{account_id}/disable` for that.
 //	@Description
 //	@Description	---
 //	@Description
@@ -171,9 +172,8 @@ func (a *TokenHandler) RefreshAccessToken(w http.ResponseWriter, r *http.Request
 //	@Param		client_secret	formData	string	false	"Client secret (client_credentials grant only)"
 //
 //	@Success	200
-//	@Failure	400	{object}	responses.OAuthErrorResponse	"unsupported_grant_type · invalid_request · invalid_grant"
+//	@Failure	400	{object}	responses.OAuthErrorResponse	"unsupported_grant_type · invalid_request · invalid_grant (refresh token missing, expired or revoked - error_code refresh_token_invalid)"
 //	@Failure	401	{object}	responses.OAuthErrorResponse	"invalid_client"
-//	@Failure	404	{object}	responses.OAuthErrorResponse	"invalid_grant (token not found)"
 //	@Failure	500	{object}	responses.OAuthErrorResponse	"server_error"
 //
 //	@Router		/oauth/revoke [post]
@@ -246,7 +246,9 @@ func (a *TokenHandler) RevokeRefreshToken(w http.ResponseWriter, r *http.Request
 //	@Description	- Recovery from a missed rotation deadline (expired secret)
 //	@Description	- Suspected credential compromise requiring immediate rotation
 //	@Description
-//	@Description	Client secrets expire after 1 year by default.
+//	@Description	Client secrets expire after 1 year.
+//	@Description
+//	@Description	Credentials can be supplied as form fields or via HTTP Basic Auth (`Authorization: Basic base64(client_id:client_secret)`).
 //
 //	@Tags			Service Accounts
 //

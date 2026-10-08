@@ -7,7 +7,7 @@
     ],
     "swagger": "2.0",
     "info": {
-        "description": "Signals ISN service API for managing Information Sharing Networks\n\n## Common Error Responses\nAll endpoints may return:\n- `400` Malformed request (invalid json, missing required fields, etc.)\n- `401` Unauthorized (invalid credentials)\n- `403` Forbidden (insufficient permissions)\n- `413` Request body exceeds size limit\n- `429` Rate limit exceeded\n- `500` Internal server error\n\nIndividual endpoints document their specific business logic errors.\n\nStandard error responses include a JSON response body containing `error_code` and `error_description` fields\n\nThe /oauth endpoints include an additional `error` field - this contains the RFC6749 standard error code.\n\n## Request Limits\nAll endpoints are protected by:\n- **Rate limiting**: Configurable requests per second\n- **Request size limits**: 64KB for admin/auth endpoints, 5MB for signal ingestion\n\nCheck the Signalsd-Max-Request-Body response header for the configured limit on signals payload.\n\nThe rate limit is set globaly and prevents abuse of the service.\nIn production there will be additional protections in place such as per-IP rate limiting provided by the load balancer/reverse proxy.\n\n## Authentication \u0026 Authorization\n\n### OAuth\nThe signalsd backend service acts as an OAuth 2.0 Authorization Server and supports web users and service accounts.\n\n### Authentication Flows\n- **Web users**: (Refresh Token Grant Type) Authentication via /api/auth/login -\u003e receive JWT access token + HTTP-only refresh cookie -\u003e use bearer tokens for API calls\n- **Service accounts**: Clients implement OAuth Client Credentials flow -\u003e receive JWT access token -\u003e use bearer tokens for API calls\n\n### Token Usage\nAll protected API endpoints require a valid JWT access token in the Authorization header:\n```\nAuthorization: Bearer \u003cjwt-access-token\u003e\n```\n\n**Token Refresh (Service Accounts):**\n- Client calls `/oauth/token?grant_type=client_credentials` with client ID/secret\n- API validates credentials and issues new access token\n- Client receives new bearer token for subsequent API calls\n\n**Login (Web Users):**\n- Client calls `/api/auth/login` with email and password and receives an access token in the response body. The refresh token is set as an HTTP-only cookie.\n\n**Token Refresh (Web Users):**\n- Client calls `/oauth/token?grant_type=refresh_token` with HTTP-only refresh token cookie\n- API validates refresh token and issues new access token + rotated refresh cookie\n- Client receives new bearer token for subsequent API calls\n\n**Token Lifetimes:**\n- Access tokens: 30 minutes\n- Refresh tokens: 30 days (web users only)\n\n### CSRF Protection\nThe refresh token used by the /oauth API endpoints is stored in an HttpOnly cookie (to prevent access by JavaScript)\nand marked with SameSite=Strict (to prevent it from being sent in cross-site requests, mitigating CSRF).\n\n### CORS Protection\n\nCORS is used to control which browser-based clients can make cross-origin requests to the API and read responses.\n\nthe `ALLOWED_ORIGINS` environment variable is used to configure the CORS rules.\n\nIn production, you should restrict ALLOWED_ORIGINS to trusted client origins (the server will not start if it is not set)\n\n## Date/Time Handling:\n\n**URL Parameters**: The following ISO 8601 formats are accepted in URL query parameters:\n- 2006-01-02T15:04:05Z (UTC)\n- 2006-01-02T15:04:05+07:00 (with offset)\n- 2006-01-02T15:04:05.999999999Z (nano precision)\n- 2006-01-02 (date only, treated as start of day UTC: 2006-01-02T00:00:00Z)\n\nNote: When including a timestamp with a timezone offset in a query parameter, encode the + sign as %2B (e.g. 2025-08-31T12:00:00%2B07:00). Otherwise, + may be interpreted as a space.\n\n**Response Bodies**: All date/time fields in JSON responses use RFC3339 format (ISO 8601):\n- Example: \"2025-06-03T13:47:47.331787+01:00\"\n\n# Signals\n\n## Content kinds\nEach signal type has a `content_kind`, which determines how its signals are sent:\n- **json**: JSON content, validated against the signal type's schema. Sent with *Submit Signals* (or *Submit Signals via Router*).\n- **document**: a file (PDF, JPEG, PNG or XML). Sent with *Upload a Document* and retrieved with *Download a Document*. Search results contain the document's metadata, not the file.\n- **event**: an immutable JSON record that a process waypoint has been reached for another signal (e.g. an export health certificate was approved for a consignment). Sent with *Submit Signals* (see Events below).\n\nSearch, withdrawal and batches work the same way for every kind, and search results include each signal's `content_kind`.\n\n## Versions and resubmissions\nEach signal is identified by the `local_ref` the sender supplies, which must be unique for the account, ISN and signal type (sending the same `local_ref` to two ISNs creates two independent signals). When a `local_ref` is sent to the same ISN again:\n- **If something changed**, a new version of the signal is stored (json and document signals).\n- **If nothing changed** (the same content, and the same or no `correlation_id`), nothing is stored. The response contains the `signal_id`, `signal_version_id` and `version_number` of the existing latest version, with `unchanged: true`, so requests can be safely retried. JSON content is compared as JSON (key order and whitespace are ignored). Documents compare the file and its filename.\n- **If the signal was withdrawn**, it is reactivated with a new version (json and document signals).\n- **Events are never changed**: resubmitting an event with different content or a different `correlation_id`, or after it was withdrawn, fails with `resource_already_exists`. To correct an event, withdraw it and send a new event with a new `local_ref`.\n\n## Recovering from failures\nEach signal in a request is stored separately, so a request that fails part way through (e.g. a timeout) can leave some signals stored and others not. Because unchanged signals are not stored again, you can recover in either of these ways:\n- **Resend the whole request.** Signals that were already stored are returned with `unchanged: true`, and only the missing or failed signals are stored. Note that any signal in the request that has been withdrawn since it was sent is reactivated.\n- **Resend only the failures.** The response lists the signals that failed, and *Get Batch Status* lists the batch's unresolved failures.\n\nWhen a whole request fails (400, 401, 403, 413 or 500), or you get no response (e.g. a timeout), no failures are recorded in the batch, so resend the whole request once the problem is fixed.\n\nA retry sent while the original request is still being processed can occasionally store an extra, identical version. This is harmless - the content doesn't change - but pollers will see one more update. To avoid it, set your client timeout above the server's request timeout: 15 seconds by default, or 2 minutes for document uploads.\n\n## Correlation\nA signal can be linked to another signal in the same ISN by setting its `correlation_id` to the other signal's `signal_id`. Search with `include_correlated=true` returns the signals linked to each result, and the `correlation_id` search filter returns the signals linked to one signal.\n\nSearch results include each signal's `correlation_id` (null if the signal is not linked to another signal). To fetch the signal it is linked to (e.g. the consignment an event is about), search that signal's type with `signal_id=\u003ccorrelation_id\u003e`.\n\n**Correlate to the entity directly.** For example, correlate a consignment's documents and events to the consignment itself, not to each other. Correlation is one level deep: `include_correlated` only returns signals that are correlated directly to the returned signal.\n\n**Correlating is sharing.** Correlating your signal to a signal created by another account is like emailing that account a copy, with the extra controls that you can withdraw it or send new versions, and they see those changes. Unlike email:\n- withdrawing a signal stops further access through the service\n- if a new version changes the correlation_id, access moves with it: the owner of the newly correlated signal can see every version, and the previous owner can no longer access it through the service\n\n## Who can see signals\n- Accounts with **read** access to an ISN can see every signal in it.\n- Accounts with **write-only** access can see the signals they created, and the signals other accounts have correlated to their signals (one level deep).\n- Signals in a **public** ISN can be searched by anyone.\n\nPrivacy between participants is set by the ISN's permissions. For example, in a network where all participants share their data with a government agency but not with each other, the participants are given write-only access and the agency is given read access.\n\n## Events\nEvent signals record that a process waypoint has been reached - e.g. `ehc-approved` (an export health certificate was approved) or `departed-origin` - for the signal they are correlated to. Each waypoint is its own event signal type, so recipients choose which events they receive by choosing which event types to search or poll.\n- **`correlation_id` is required**: correlate the event to the signal it is about (e.g. the consignment). Requests containing events without one are rejected.\n- **`content` must include `occurred_at`**: the time the waypoint was reached, as an RFC 3339 timestamp with a time zone offset (e.g. `2026-09-27T14:02:00Z`).\n- **`subject`**: if the event is about a specific version of a signal (e.g. version 3 of a document), name it in a `subject` field in `content`: `{\"signal_id\": \"...\", \"version\": 3}`. Always include the version - later versions of the document may be different.\n- **Events are immutable** (see Versions and resubmissions).\n- The service doesn't enforce an order: events are accepted in any order and can repeat (e.g. several inspections). To build a timeline, order a signal's correlated events by `occurred_at`.\n\nExample: `{\"local_ref\": \"ehc-approved-001\", \"correlation_id\": \"\u003cconsignment signal_id\u003e\", \"content\": {\"occurred_at\": \"2026-09-27T14:02:00Z\", \"subject\": {\"signal_id\": \"\u003cdocument signal_id\u003e\", \"version\": 3}, \"certificate_no\": \"EHC-001\"}}`\n\n**Schemas for event types.** An event type's schema validates the event's `content`, as for json signal types, but:\n- the service checks `occurred_at` whatever the schema says. The schema must still allow it: declare `occurred_at` (and `subject`, if the type has one) and list it as required, especially if the schema uses `\"additionalProperties\": false`\n- `occurred_at` and `subject` are reserved - don't use them for anything else\n- the service doesn't check `subject` yet, so a type whose events have a subject should require it in its schema, as `{\"signal_id\": \u003cuuid\u003e, \"version\": \u003cinteger\u003e}`\n\n## Polling for changes\nTo find out about new and changed signals, poll *Signal Search* for each signal type you are interested in:\n```\nGET /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search?updated_since={cursor}\u0026include_withdrawn=true\n```\n- `updated_since` returns the signals that were created, given a new version, recorrelated or withdrawn since that time. Results are ordered by `signal_updated_at`, so the last result's `signal_updated_at` is your cursor.\n- Use `include_withdrawn=true`, so withdrawn signals are returned with `is_withdrawn: true` (otherwise they silently drop out of the results).\n- **Polling is at-least-once, so overlap your polls**: set `updated_since` to 1 minute before your cursor, and skip the results you have already seen (the same `signal_id` and `signal_updated_at`).\n- Why the overlap is needed: `signal_updated_at` is set when the service starts storing a signal, not when it finishes. A signal that was still being stored when you last polled can therefore appear with a `signal_updated_at` a little before your cursor. The 1 minute overlap makes sure your next poll picks it up.\n- Search results are not paginated, so poll often enough to keep each result set small.\n\n# UI Endpoints\n\nUI endpoints serve the browser-based management interface.\n\n## Route types\n- **Page handlers** (`GET /admin/*`, `/search`, etc.): return a full HTML page (`200`)\n- **HTMX action handlers** (`PUT`/`POST` to `/ui-api/*`): return an HTML partial (`200`) - either a success or error alert fragment\n\n- see /ui-docs for more information\n\n## Auth\nAll protected routes require a valid session (cookie-based). Unauthenticated requests redirect to `/login`.\nRequests with insufficient role are redirected to `/access-denied`.\n\n## Role requirements\n- **Public** (`/login`, `/register`): no authentication required\n- **Authenticated**: any logged-in user (`/dashboard`, `/settings`, and `/search` for accounts with access to an ISN)\n- **`isnadmin` or `siteadmin`**: the admin dashboard, ISN creation, enabling and disabling ISNs, service account creation\n- **Admins of at least one ISN**: ISN access, the ISN's signal types, viewing signal type configuration\n- **`siteadmin` only**: account management (enabling and disabling accounts, password reset links, reissuing service account credentials), ISN ownership transfer, role management, signal type creation and schemas, signal routing rules",
+        "description": "Signals ISN service API for managing Information Sharing Networks\n\n## Common Error Responses\nAll endpoints may return:\n- `400` Malformed request (invalid json, missing required fields, etc.)\n- `401` Unauthorized (invalid credentials)\n- `403` Forbidden (insufficient permissions)\n- `404` Resource not found (e.g. an ISN or signal type that doesn't exist or is not in use)\n- `413` Request body exceeds size limit\n- `429` Rate limit exceeded\n- `500` Internal server error\n- `504` Request timed out (`timeout`)\n\nIndividual endpoints document their specific business logic errors.\n\nStandard error responses include a JSON response body containing `error_code`, `message` and `request_id` fields.\n\nThe /oauth endpoints return `error` (the RFC6749 standard error code), `error_code` and `error_description` fields instead.\n\n## Request Limits\nThe endpoints are protected by:\n- **Rate limiting**: Configurable requests per second (all endpoints)\n- **Request size limits** (configurable - these are the defaults): 64KB for admin/auth endpoints, 5MB for json and event signal submissions, 20MB for document uploads\n\nCheck the `Signalsd-Max-Request-Size` response header for the configured size limit of the endpoint called.\n\nThe rate limit is set globally and prevents abuse of the service.\nIn production there will be additional protections in place such as per-IP rate limiting provided by the load balancer/reverse proxy.\n\n## Authentication \u0026 Authorization\n\n### OAuth\nThe signalsd backend service acts as an OAuth 2.0 Authorization Server and supports web users and service accounts.\n\n### Authentication Flows\n- **Web users**: (Refresh Token Grant Type) Authentication via /api/auth/login -\u003e receive JWT access token + HTTP-only refresh cookie -\u003e use bearer tokens for API calls\n- **Service accounts**: Clients implement OAuth Client Credentials flow -\u003e receive JWT access token -\u003e use bearer tokens for API calls\n\n### Token Usage\nAll protected API endpoints require a valid JWT access token in the Authorization header:\n```\nAuthorization: Bearer \u003cjwt-access-token\u003e\n```\n\n**Token Refresh (Service Accounts):**\n- Client calls `POST /oauth/token` with `grant_type=client_credentials` in the form body, and the client ID/secret as form fields or HTTP Basic auth\n- API validates credentials and issues new access token\n- Client receives new bearer token for subsequent API calls\n\n**Login (Web Users):**\n- Client calls `/api/auth/login` with email and password and receives an access token in the response body. The refresh token is set as an HTTP-only cookie.\n\n**Token Refresh (Web Users):**\n- Client calls `POST /oauth/token` with `grant_type=refresh_token` in the form body (the HTTP-only refresh token cookie is sent automatically)\n- API validates refresh token and issues new access token + rotated refresh cookie\n- Client receives new bearer token for subsequent API calls\n\n**Token Lifetimes:**\n- Access tokens: 30 minutes\n- Refresh tokens: 30 days (web users only). Each refresh issues a new refresh token valid for another 30 days, so users only need to log in again if they don't use the service for 30 days.\n\nEach login or refresh revokes the user's other refresh tokens, so a user has one active session at a time.\n\nThe account's role and ISN permissions are included in the access token when it is issued. Changes to them (and disabling an account) take effect when the account next gets an access token - up to 30 minutes later.\n\n### CSRF Protection\nThe refresh token used by the /oauth API endpoints is stored in an HttpOnly cookie (to prevent access by JavaScript)\nand marked with SameSite=Strict (to prevent it from being sent in cross-site requests, mitigating CSRF).\n\n### CORS Protection\n\nCORS is used to control which browser-based clients can make cross-origin requests to the API and read responses.\n\nThe `ALLOWED_ORIGINS` environment variable is used to configure the CORS rules.\n\nIn production, you should restrict ALLOWED_ORIGINS to trusted client origins (the server will not start if it is not set)\n\n## Date/Time Handling\n\n**URL Parameters**: The following ISO 8601 formats are accepted in URL query parameters:\n- 2006-01-02T15:04:05Z (UTC)\n- 2006-01-02T15:04:05+07:00 (with offset)\n- 2006-01-02T15:04:05.999999999Z (nano precision)\n- 2006-01-02 (date only, treated as start of day UTC: 2006-01-02T00:00:00Z)\n\nNote: When including a timestamp with a timezone offset in a query parameter, encode the + sign as %2B (e.g. 2025-08-31T12:00:00%2B07:00). Otherwise, + may be interpreted as a space.\n\n**Response Bodies**: All date/time fields in JSON responses use RFC3339 format (ISO 8601):\n- Example: \"2025-06-03T13:47:47.331787+01:00\"\n\n# Signals\n\n## Content kinds\nEach signal type has a `content_kind`, which determines how its signals are sent:\n- **json**: JSON content, validated against the signal type's schema. Sent with *Submit Signals* (or *Submit Signals via Router*).\n- **document**: a file (PDF, JPEG, PNG or XML). Sent with *Upload a Document* and retrieved with *Download a Document*. Search results contain the document's metadata, not the file.\n- **event**: an immutable JSON record that a process waypoint has been reached for another signal (e.g. an export health certificate was approved for a consignment). Sent with *Submit Signals* (see Events below).\n\nSearch, withdrawal and batches work the same way for every kind, and search results include each signal's `content_kind`.\n\n## Versions and resubmissions\nEach signal is identified by the `local_ref` the sender supplies, which must be unique for the account, ISN and signal type version (sending the same `local_ref` to two ISNs, or to two versions of a signal type, creates two independent signals). When a `local_ref` is sent to the same ISN again:\n- **If something changed**, a new version of the signal is stored (json and document signals).\n- **If nothing changed** (the same content, and the same or no `correlation_id`), nothing is stored. The response contains the `signal_id`, `signal_version_id` and `version_number` of the existing latest version, with `unchanged: true`, so requests can be safely retried. JSON content is compared as JSON (key order and whitespace are ignored). Documents compare the file and its filename.\n- **If the signal was withdrawn**, it is reactivated with a new version (json and document signals).\n- **Events are never changed**: resubmitting an event with different content or a different `correlation_id`, or after it was withdrawn, fails with `resource_already_exists`. To correct an event, withdraw it and send a new event with a new `local_ref`.\n\n## Recovering from failures\nEach signal in a request is stored separately, so a request that fails part way through (e.g. a timeout) can leave some signals stored and others not. Because unchanged signals are not stored again, you can recover in either of these ways:\n- **Resend the whole request.** Signals that were already stored are returned with `unchanged: true`, and only the missing or failed signals are stored. Note that any json signal in the request that has been withdrawn since it was sent is reactivated (withdrawn events are not reactivated - they fail with `resource_already_exists`).\n- **Resend only the failures.** The response lists the signals that failed, and *Get Batch Status* lists the batch's unresolved failures.\n\nWhen a whole *Submit Signals* request fails (an error response such as 400, 401, 403, 404, 413 or 500), or you get no response, no failures are recorded in the batch, so resend the whole request once the problem is fixed. Rejected document uploads are recorded in the batch (except when the request's form fields are missing or invalid).\n\nIf the server's request timeout is reached part way through a *Submit Signals* request, the remaining signals are returned as `database_error` failures but may not be recorded in the batch - resend the whole request.\n\nA retry of a json signal or document sent while the original request is still being processed can occasionally store an extra, identical version. This is harmless - the content doesn't change - but pollers will see one more update. To avoid it, set your client timeout above the server's request timeout: 15 seconds by default, or 2 minutes for document uploads.\n\n## Correlation\nA signal can be linked to another signal in the same ISN by setting its `correlation_id` to the other signal's `signal_id`. Search with `include_correlated=true` returns the signals linked to each result, and the `correlation_id` search filter returns the signals linked to one signal.\n\nSearch results include each signal's `correlation_id` (null if the signal is not linked to another signal). To fetch the signal it is linked to (e.g. the consignment an event is about), search that signal's type with `signal_id=\u003ccorrelation_id\u003e`.\n\n**Correlate to the entity directly.** For example, correlate a consignment's documents and events to the consignment itself, not to each other. Correlation is one level deep: `include_correlated` only returns signals that are correlated directly to the returned signal.\n\n**Correlating is sharing.** Correlating your signal to a signal created by another account is like emailing that account a copy, with the extra controls that you can withdraw it or send new versions, and they see those changes. Unlike email:\n- withdrawing a signal stops further access through the service\n- if a new version changes the correlation_id, access moves with it: the owner of the newly correlated signal can see every version, and the previous owner can no longer access it through the service\n\n## Who can see signals\n- Accounts with **read** access to an ISN can see every signal in it.\n- Accounts with **write-only** access can see the signals they created, and the signals other accounts have correlated to their signals (one level deep).\n- Signals in a **public** ISN can be searched by anyone, using *Signal Search (public ISNs)* (`/api/public/isn/...`). Downloading a document still needs an access token and access to the ISN.\n\nPrivacy between participants is set by the ISN's permissions. For example, in a network where all participants share their data with a government agency but not with each other, the participants are given write-only access and the agency is given read access.\n\n## Events\nEvent signals record that a process waypoint has been reached - e.g. `ehc-approved` (an export health certificate was approved) or `departed-origin` - for the signal they are correlated to. Each waypoint is its own event signal type, so recipients choose which events they receive by choosing which event types to search or poll.\n- **`correlation_id` is required**: correlate the event to the signal it is about (e.g. the consignment). Requests containing events without one are rejected.\n- **`content` must include `occurred_at`**: the time the waypoint was reached, as an RFC 3339 timestamp with a time zone offset (e.g. `2026-09-27T14:02:00Z`).\n- **`subject`**: if the event is about a specific version of a signal (e.g. version 3 of a document), name it in a `subject` field in `content`: `{\"signal_id\": \"...\", \"version\": 3}`. Always include the version - later versions of the document may be different.\n- **Events are immutable** (see Versions and resubmissions).\n- The service doesn't enforce an order: events are accepted in any order and can repeat (e.g. several inspections). To build a timeline, order a signal's correlated events by `occurred_at`.\n\nExample: `{\"local_ref\": \"ehc-approved-001\", \"correlation_id\": \"\u003cconsignment signal_id\u003e\", \"content\": {\"occurred_at\": \"2026-09-27T14:02:00Z\", \"subject\": {\"signal_id\": \"\u003cdocument signal_id\u003e\", \"version\": 3}, \"certificate_no\": \"EHC-001\"}}`\n\n**Schemas for event types.** An event type's schema validates the event's `content`, as for json signal types, but:\n- the service checks `occurred_at` whatever the schema says. The schema must still allow it: declare `occurred_at` (and `subject`, if the type has one) and list it as required, especially if the schema uses `\"additionalProperties\": false`\n- `occurred_at` and `subject` are reserved - don't use them for anything else\n- the service doesn't check `subject` yet, so a type whose events have a subject should require it in its schema, as `{\"signal_id\": \u003cuuid\u003e, \"version\": \u003cinteger\u003e}`\n\n## Polling for changes\nTo find out about new and changed signals, poll *Signal Search* for each signal type you are interested in:\n```\nGET /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search?updated_since={cursor}\u0026include_withdrawn=true\n```\n- `updated_since` returns the signals that were created, given a new version, recorrelated or withdrawn since that time. Results are ordered by `signal_updated_at`, so the last result's `signal_updated_at` is your cursor.\n- Use `include_withdrawn=true`, so withdrawn signals are returned with `is_withdrawn: true` (otherwise they silently drop out of the results).\n- **Polling is at-least-once, so overlap your polls**: set `updated_since` to 1 minute before your cursor, and skip the results you have already seen (the same `signal_id` and `signal_updated_at`).\n- Why the overlap is needed: `signal_updated_at` is set when the service starts storing a signal, not when it finishes. A signal that was still being stored when you last polled can therefore appear with a `signal_updated_at` a little before your cursor. The 1 minute overlap makes sure your next poll picks it up.\n- Search results are not paginated, so poll often enough to keep each result set small.\n\n# UI Endpoints\n\nUI endpoints serve the browser-based management interface.\n\n## Route types\n- **Page handlers** (`GET /admin/*`, `/search`, etc.): return a full HTML page (`200`)\n- **HTMX action handlers** (`/ui-api/*`): return an HTML partial (`200`) - either the requested content, or a success or error alert fragment\n\n- see /ui-docs for more information\n\n## Auth\nAll protected routes require a valid session (cookie-based). Unauthenticated requests redirect to `/login`.\nRequests with insufficient role are redirected to `/access-denied`.\n\n## Role requirements\n- **Public** (`/login`, `/register`): no authentication required\n- **Authenticated**: any logged-in user (`/dashboard`, `/settings`, and `/search` for accounts with access to an ISN)\n- **`isnadmin` or `siteadmin`**: the admin dashboard, ISN creation, enabling and disabling ISNs, service account creation\n- **Admins of at least one ISN**: ISN access, the ISN's signal types, viewing signal type configuration\n- **`siteadmin` only**: account management (enabling and disabling accounts, password reset links, reissuing service account credentials), ISN ownership transfer, role management, signal type creation and schemas, signal routing rules",
         "title": "Signals ISN API",
         "contact": {},
         "license": {
@@ -22,7 +22,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "**Use Cases:**\n- **Security Incident**: Compromised account needs immediate lockout\n- **Employee Departure**: Remove access for departed staff\n\n**Actions Performed:**\n- Sets `is_active = false` (account becomes unusable)\n- Revokes all client secrets/one-time secrets (service accounts)\n- Revokes all refresh tokens (web users)\n\n**Recovery:** Account must be re-enabled by admin via `/admin/accounts/{id}/enable`\nService accounts will also need a new client secret via `/api/auth/service-accounts/reissue-credentials`\n\nOnly site admins can disable accounts (disabling an account removes its access to every ISN it belongs to).\n\nISN admins remove an account from their own ISN by revoking its ISN access.",
+                "description": "**Use Cases:**\n- **Security Incident**: Compromised account needs immediate lockout\n- **Employee Departure**: Remove access for departed staff\n\n**Actions Performed:**\n- Sets `is_active = false` (account becomes unusable)\n- Revokes all client secrets/one-time secrets (service accounts)\n- Revokes all refresh tokens (web users)\n\nAccess tokens that were already issued remain valid until they expire (up to 30 minutes).\n\n**Recovery:** Account must be re-enabled by admin via `POST /api/admin/accounts/{account_id}/enable`\nService accounts will also need a new client secret via `/api/auth/service-accounts/reissue-credentials`\n\nOnly site admins can disable accounts (disabling an account removes its access to every ISN it belongs to).\n\nISN admins remove an account from their own ISN by revoking its ISN access.",
                 "tags": [
                     "Account Management"
                 ],
@@ -48,7 +48,7 @@
                         }
                     },
                     "401": {
-                        "description": "authentication_error",
+                        "description": "authorization_error | access_token_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -81,7 +81,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "**Administrative endpoint to re-enable previously disabled accounts.**\nSets account status to `is_active = true` (does not create new tokens).\n\n**Post-Enable Steps Required:**\n- **Service Accounts**: will need a new client secret via `/api/auth/service-accounts/reissue_credentials`\n- **Web Users**: Can immediately log in again via `/api/auth/login`\n\nOnly site admins can enable accounts.",
+                "description": "**Administrative endpoint to re-enable previously disabled accounts.**\nSets account status to `is_active = true` (does not create new tokens).\n\n**Post-Enable Steps Required:**\n- **Service Accounts**: will need a new client secret via `/api/auth/service-accounts/reissue-credentials`\n- **Web Users**: Can immediately log in again via `/api/auth/login`\n\nOnly site admins can enable accounts.",
                 "tags": [
                     "Account Management"
                 ],
@@ -107,7 +107,7 @@
                         }
                     },
                     "401": {
-                        "description": "authentication_error",
+                        "description": "authorization_error | access_token_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -140,7 +140,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "This endpoint grants the ISN admin role to a site member\n\nAn ISN admin can:\n- Create an ISN\n- Add signal_types to their own ISNs\n- read/write to their own ISNs\n- Grant other accounts read or write access to their ISNs\n\nNote that ISN admins can't change ISNs they don't own (a site admin must use the `transfer ownership` endpoint if this is requred)\n\nAn ISN admin also has access to the following site-level functions:\n- Create service accounts\n- View all users and their email addresses\n\nAccount management (enabling and disabling accounts, password reset links and reissuing service account credentials) is done by site admins, since it affects the account on every ISN it belongs to.\n\n**This endpoint can only be used by site admin accounts**",
+                "description": "This endpoint grants the ISN admin role to a site member\n\nAn ISN admin can:\n- Create an ISN\n- Add signal_types to their own ISNs\n- read/write to their own ISNs\n- Grant other accounts read or write access to their ISNs\n\nNote that ISN admins can't change ISNs they don't own (a site admin must use the `transfer ownership` endpoint if this is required)\n\nAn ISN admin also has access to the following site-level functions:\n- Create service accounts\n- View all users and their email addresses\n\nAccount management (enabling and disabling accounts, password reset links and reissuing service account credentials) is done by site admins, since it affects the account on every ISN it belongs to.\n\nThe change takes effect when the account next gets an access token (up to 30 minutes later).\n\n**This endpoint can only be used by site admin accounts**",
                 "tags": [
                     "Account Management"
                 ],
@@ -165,6 +165,12 @@
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "authorization_error | access_token_expired",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
                     "403": {
                         "description": "forbidden",
                         "schema": {
@@ -185,7 +191,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "**This endpoint can only be used by site admin accounts**",
+                "description": "The account reverts to the member role.\n\nThe change takes effect when the account next gets an access token (up to 30 minutes later).\n\n**This endpoint can only be used by site admin accounts**",
                 "tags": [
                     "Account Management"
                 ],
@@ -206,6 +212,12 @@
                     },
                     "400": {
                         "description": "invalid_request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "authorization_error | access_token_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -232,7 +244,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "This endpoint grants the site admin role to a user.\n\nA site admin can create and manage any ISN and adminster acounts on the site.\n\nThe following tasks can only be performed by site admins:\n- Create new signal types on the site\n- Register new signal type schemas\n- Transfer ISN ownership between accounts\n- Assign the site admin role to other users\n\n**This endpoint can only be used by site admin accounts**",
+                "description": "This endpoint grants the site admin role to a user.\n\nA site admin can create and manage any ISN and administer accounts on the site.\n\nThe following tasks can only be performed by site admins:\n- Create new signal types on the site\n- Register new signal type schemas\n- Transfer ISN ownership between accounts\n- Assign the site admin role to other users\n\nThe change takes effect when the account next gets an access token (up to 30 minutes later).\n\n**This endpoint can only be used by site admin accounts**",
                 "tags": [
                     "Account Management"
                 ],
@@ -257,6 +269,12 @@
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "authorization_error | access_token_expired",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
                     "403": {
                         "description": "forbidden",
                         "schema": {
@@ -277,7 +295,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "**This endpoint can only be used by site admin accounts**",
+                "description": "The account reverts to the member role.\n\nThe change takes effect when the account next gets an access token (up to 30 minutes later).\n\n**This endpoint can only be used by site admin accounts**",
                 "tags": [
                     "Account Management"
                 ],
@@ -302,6 +320,12 @@
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "authorization_error | access_token_expired",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
                     "403": {
                         "description": "forbidden",
                         "schema": {
@@ -322,9 +346,6 @@
                 "security": [
                     {
                         "BearerAccessToken": []
-                    },
-                    {
-                        "RefreshTokenCookieAuth": []
                     }
                 ],
                 "description": "Transfer ownership of an ISN to another admin account.\nThis can be used when an admin leaves or when reorganizing responsibilities.\nOnly site admins can transfer ISN ownership.",
@@ -357,6 +378,12 @@
                     },
                     "400": {
                         "description": "malformed_body | invalid_request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "authorization_error | access_token_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -415,7 +442,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Only owners and admins can view service account lists.\n\nTo return a specific service account supply one of the following query parameter combinations:\n-\tid (account ID)\n-\tclient_id\n-\tclient_email \u0026 client_organization\nNo query parameters = return all service accounts\n",
+                "description": "Only site admins and ISN admins can view service account lists.\n\nTo return a specific service account supply one of the following query parameter combinations:\n-\tid (account ID)\n-\tclient_id\n-\tclient_email \u0026 client_organization\n\nNo query parameters = return all service accounts\n",
                 "tags": [
                     "Account Management"
                 ],
@@ -452,12 +479,9 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "OK",
+                        "description": "Specific service account (when query params provided)",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/handlers.ServiceAccountDetails"
-                            }
+                            "$ref": "#/definitions/handlers.ServiceAccountDetails"
                         }
                     },
                     "400": {
@@ -467,7 +491,7 @@
                         }
                     },
                     "401": {
-                        "description": "authentication_error",
+                        "description": "authorization_error | access_token_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -516,7 +540,7 @@
                         }
                     },
                     "401": {
-                        "description": "authentication_error",
+                        "description": "authorization_error | access_token_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -541,7 +565,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Signal types specify a record that can be shared on the site\n- Each type has a unique title and this is used to create a URL-friendly slug\n- The title and slug fields can't be changed and must be unique for the site\n- The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading\n\nContent kinds\n- json (default): signals are JSON validated against the signal type's schema\n- document: signals are files (e.g. a PDF bill of lading) Document signal types do not have a schema - omit schema_url\n- event: signals are immutable JSON records of a process waypoint (e.g. export health certificate approved), validated against the signal type's schema.\nEvents must be correlated to the signal they are about and have an occurred_at timestamp in their content (see Submit Signals)\n\nJSON Schema URL Requirements\n- Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)\n- To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json\n\nReadme URL requirements\n- Must be a link to a file ending .md on a public github repo.\n- Use the special URL: https://github.com/skip/readme/main/readme.md to indicate there is no readme\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas\n- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (, 0.1.0 or 0.0.1)\n\nAfter creating a signal type, use the AddSignalTypeToIsn endpoint to link it to one or more ISNs.\n\nSignal type definitions are referred to like this: /api/signal-types/{signal_type_slug}/v{sem_ver}\n\nNote: this endpoint can only be used by site admins",
+                "description": "Signal types specify a record that can be shared on the site\n- The title is used to create a URL-friendly slug, which must be unique for the site (two titles that produce the same slug conflict - 409)\n- The title and slug fields can't be changed\n- The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading\n\nContent kinds\n- json (default): signals are JSON validated against the signal type's schema\n- document: signals are files (e.g. a PDF bill of lading) Document signal types do not have a schema - omit schema_url\n- event: signals are immutable JSON records of a process waypoint (e.g. export health certificate approved), validated against the signal type's schema.\nEvents must be correlated to the signal they are about and have an occurred_at timestamp in their content (see Submit Signals)\n\nJSON Schema URL Requirements\n- Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)\n- To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json\n\nReadme URL requirements\n- Must be a link to a file ending .md on a public github repo.\n- Use the special URL: https://github.com/skip/readme/main/readme.md to indicate there is no readme\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas\n- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)\n\nAfter creating a signal type, use the AddSignalTypeToIsn endpoint to link it to one or more ISNs.\n\nSignal type definitions are referred to in paths like this: {signal_type_slug}/v{sem_ver} (e.g. /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver})\n\nNote: this endpoint can only be used by site admins",
                 "tags": [
                     "Signal Types"
                 ],
@@ -566,6 +590,12 @@
                     },
                     "400": {
                         "description": "malformed_body",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "authorization_error | access_token_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -598,7 +628,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Registers a new schema for an existing signal type\n\nYou must specify a schema_url that has not been previously registered for this signal type.\n\nUse the bump_type (major/minor/patch) parameter to determine how the version number should be incremented.\n\nNote: this endpoint can only be used by site admins",
+                "description": "Registers a new schema for an existing signal type\n\nYou must specify a schema_url that has not been previously registered for this signal type.\n\nUse the bump_type (major/minor/patch) parameter to determine how the version number should be incremented.\n\nThe new version keeps the title and content_kind of the existing signal type.\nSchemas can only be registered for json and event signal types.\n\nNote: this endpoint can only be used by site admins",
                 "tags": [
                     "Signal Types"
                 ],
@@ -631,6 +661,12 @@
                     },
                     "400": {
                         "description": "malformed_body",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "authorization_error | access_token_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -700,7 +736,7 @@
                         }
                     },
                     "401": {
-                        "description": "authentication_error",
+                        "description": "authorization_error | access_token_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -774,7 +810,7 @@
                         }
                     },
                     "401": {
-                        "description": "authentication_error",
+                        "description": "authorization_error | access_token_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -805,7 +841,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Only signal types that have never been referenced by signals can be deleted",
+                "description": "Only signal types that have never been referenced by signals can be deleted.\n\nDeleting a signal type also removes it from every ISN it was added to, and deletes its routing config.\n\nNote: this endpoint can only be used by site admins",
                 "tags": [
                     "Signal Types"
                 ],
@@ -831,6 +867,18 @@
                 "responses": {
                     "204": {
                         "description": "No Content"
+                    },
+                    "401": {
+                        "description": "authorization_error | access_token_expired",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
                     },
                     "404": {
                         "description": "resource_not_found",
@@ -890,6 +938,18 @@
                             "$ref": "#/definitions/handlers.SignalRoutingConfigResponse"
                         }
                     },
+                    "401": {
+                        "description": "authorization_error | access_token_expired",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
                     "404": {
                         "description": "resource_not_found",
                         "schema": {
@@ -910,7 +970,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Replaces the route config for the specified signal type path\n\nthe routing_field must be a plain Dot Notation path -\nunder the covers the service uses gjson paths, however the special patern matching symbols (*?#@|!()[]%\u003c\u003e=) are not currently allowed.\n\nWhen using the 'matches' and 'not matches' operator, any occurance of '*' and '?' in the matching pattern will be treated as a wildcard.\nThe pattern is always compared to the full contents of the specified routing field.\n\nPatterns are matched in order according to the supplied sequence number (smallest sequence first)\nand the first match is accepted. Where the routing field is an array, as long as one or more elements match\nthe match is accepted.",
+                "description": "Replaces the route config for the specified signal type path\n\nthe routing_field must be a plain Dot Notation path that is defined in the signal type's schema -\nunder the covers the service uses gjson paths, however the special pattern matching symbols (*?#@|!()[]%\u003c\u003e=) and numeric (array index) path segments are not currently allowed.\n\nWhen using the 'matches' and 'does_not_match' operators, any occurrence of '*' and '?' in the matching pattern will be treated as a wildcard ('equals' and 'does_not_equal' compare the pattern literally).\nThe pattern is always compared to the full contents of the specified routing field.\n\nPatterns are matched in order according to the supplied sequence number (smallest sequence first)\nand the first match is accepted. Each rule must have a different sequence number.\nWhere the routing field is an array, the rule matches if one or more elements match\n(for 'does_not_match' and 'does_not_equal', if one or more elements do not match the pattern).\n\nThe new config is used by the router within 30 seconds.",
                 "tags": [
                     "Signals Routing"
                 ],
@@ -948,6 +1008,18 @@
                     },
                     "400": {
                         "description": "malformed_body",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "authorization_error | access_token_expired",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "forbidden",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -998,6 +1070,18 @@
                 "responses": {
                     "204": {
                         "description": "No Content"
+                    },
+                    "401": {
+                        "description": "authorization_error | access_token_expired",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
                     },
                     "404": {
                         "description": "resource_not_found",
@@ -1056,7 +1140,7 @@
                         }
                     },
                     "401": {
-                        "description": "authentication_error",
+                        "description": "authorization_error | access_token_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1118,7 +1202,7 @@
                         }
                     },
                     "401": {
-                        "description": "authentication_error",
+                        "description": "authorization_error | access_token_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1146,7 +1230,7 @@
         },
         "/api/auth/login": {
             "post": {
-                "description": "The response body includes an access token which can be used to access the protected enpoints, assuming the account has the appropriate permissions.\nThe access_token is valid for 30 minutes.\n\nAs part of the login response, the server sets a http-only cookie on the client that will allow it to refresh the token (use the /oauth/token endpoint with a grant_type=refresh_token param)\nThe refresh_token lasts 30 days unless it is revoked earlier.\n- To renew the refresh_token, log in again.\n- To revoke the refresh_token, call the /oauth/revoke endpoint.\n\nThe account's role and permissions are encoded as part of the jwt access token and this information is also provided in the response body.",
+                "description": "The response body includes an access token which can be used to access the protected endpoints, assuming the account has the appropriate permissions.\nThe access_token is valid for 30 minutes.\n\nAs part of the login response, the server sets a http-only cookie on the client that will allow it to refresh the token (POST to the /oauth/token endpoint with grant_type=refresh_token in the form body).\nThe cookie's path is `/oauth`, so browsers only send it to the /oauth endpoints.\nThe refresh_token lasts 30 days unless it is revoked earlier.\n- Each refresh issues a new refresh_token valid for another 30 days, so the user only has to log in again if they don't refresh for 30 days.\n- Logging in revokes the user's other refresh tokens, so a user has one active session at a time.\n- To revoke the refresh_token, call the /oauth/revoke endpoint.\n\nThe account's role and permissions are encoded as part of the jwt access token and this information is also provided in the response body.",
                 "tags": [
                     "User Authentication"
                 ],
@@ -1217,7 +1301,7 @@
                 }
             },
             "post": {
-                "description": "Sets a new password using a one-time reset token, then consumes the token.\n\nThis is the submission target of the form served by *Password Reset Form* at the same URL, posted by the form's own JavaScript.\n\nOn success the token is deleted so the link can't be reused, and the user can log in with the new password.\n\nNote that no access token is required - possession of the reset token is what authorises the change. Reset tokens can only be issued by admins (see *Generate Password Reset Link* under Account Management).",
+                "description": "Sets a new password using a one-time reset token, then consumes the token.\n\nThis is the submission target of the form served by *Password Reset Form* at the same URL, posted by the form's own JavaScript.\n\nOn success the token is deleted so the link can't be reused, and the user can log in with the new password.\n\nNote that no access token is required - possession of the reset token is what authorises the change. Reset tokens can only be issued by site admins (see *Generate Password Reset Link* under Account Management).",
                 "tags": [
                     "One-time Links (browser pages)"
                 ],
@@ -1306,7 +1390,7 @@
                         }
                     },
                     "401": {
-                        "description": "authentication_error",
+                        "description": "authorization_error | access_token_expired | authentication_error (incorrect current password)",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1322,7 +1406,7 @@
         },
         "/api/auth/register": {
             "post": {
-                "description": "Registers a web user with an email address and a password.\n\nThe first user created is granted the \"siteadmin\" role and has super-user access to the site. Everyone who registers after that gets the \"member\" role.\nNew members can't access any information beyond the public data on the site until an admin grants them access to an ISN.\n\nSite admins can grant other users the \"isnadmin\" role.\nISN admins can create ISNs and service accounts, and grant other accounts permission to read or write to the ISNs they created.",
+                "description": "Registers a web user with an email address and a password.\n\nThe first user created is granted the \"siteadmin\" role and has super-user access to the site. Everyone who registers after that gets the \"member\" role.\nNew members can't access any information beyond the public data on the site until an admin grants them access to an ISN.\n\nSite admins can grant other users the \"isnadmin\" role.\nISN admins can create ISNs and service accounts, and grant other accounts permission to read or write to the ISNs they own.",
                 "tags": [
                     "User Authentication"
                 ],
@@ -1370,7 +1454,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Registering a new service account creates a one-time setup link. Send it to whoever is operating the service account - opening it in a browser shows them their client credentials. The link expires after 48 hours and can only be used once.\n\nNote that where an organization needs more than one service account they must supply unique contact emails for each account.\n\nTo reissue credentials for an existing service account, use the **Reissue Service Account Credentials** endpoint.\n\nYou have to be an admin to use this end point\n",
+                "description": "Registering a new service account creates a one-time setup link. Send it to whoever is operating the service account - opening it in a browser shows them their client credentials. The link expires after 48 hours and can only be used once.\n\nNote that where an organization needs more than one service account they must supply unique contact emails for each account.\n\nTo reissue credentials for an existing service account, use the **Reissue Service Account Credentials** endpoint.\n\nOnly site admins and ISN admins can use this endpoint\n",
                 "tags": [
                     "Service Accounts"
                 ],
@@ -1400,7 +1484,13 @@
                         }
                     },
                     "401": {
-                        "description": "authentication_error",
+                        "description": "authorization_error | access_token_expired",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "forbidden",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1457,7 +1547,7 @@
                         }
                     },
                     "401": {
-                        "description": "authentication_error",
+                        "description": "authorization_error | access_token_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1485,7 +1575,7 @@
         },
         "/api/auth/service-accounts/rotate-secret": {
             "post": {
-                "description": "Self-service endpoint for service accounts to rotate their client secret.\nThis endpoint accepts expired (but not revoked) credentials, so a service account that\nmissed a rotation deadline can still self-serve recovery without admin intervention.\nThe old secret remains valid for 5 minutes after rotation to prevent race conditions\nin distributed deployments or when network issues prevent clients receiving the new secret immediately.\n\n**Use Cases:**\n- Regular credential rotation for security compliance\n- Recovery from a missed rotation deadline (expired secret)\n- Suspected credential compromise requiring immediate rotation\n\nClient secrets expire after 1 year by default.",
+                "description": "Self-service endpoint for service accounts to rotate their client secret.\nThis endpoint accepts expired (but not revoked) credentials, so a service account that\nmissed a rotation deadline can still self-serve recovery without admin intervention.\nThe old secret remains valid for 5 minutes after rotation to prevent race conditions\nin distributed deployments or when network issues prevent clients receiving the new secret immediately.\n\n**Use Cases:**\n- Regular credential rotation for security compliance\n- Recovery from a missed rotation deadline (expired secret)\n- Suspected credential compromise requiring immediate rotation\n\nClient secrets expire after 1 year.\n\nCredentials can be supplied as form fields or via HTTP Basic Auth (`Authorization: Basic base64(client_id:client_secret)`).",
                 "consumes": [
                     "application/x-www-form-urlencoded"
                 ],
@@ -1571,7 +1661,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Returns the full status for all matching batches. Members see their own batches; site admins see all.\nAt least one date filter must be provided.",
+                "description": "Returns the full status for all matching batches. Accounts see their own batches; site admins see all.\nBoth created_after and created_before must be provided.",
                 "tags": [
                     "Signal Exchange"
                 ],
@@ -1582,14 +1672,16 @@
                         "example": "2006-01-02T15:04:05Z",
                         "description": "Earliest batch creation time",
                         "name": "created_after",
-                        "in": "query"
+                        "in": "query",
+                        "required": true
                     },
                     {
                         "type": "string",
                         "example": "2006-01-02T16:00:00Z",
                         "description": "Latest batch creation time",
                         "name": "created_before",
-                        "in": "query"
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1608,8 +1700,14 @@
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "authorization_error | access_token_expired",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
                     "500": {
-                        "description": "database_error",
+                        "description": "database_error | internal_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1624,7 +1722,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Returns the status of a batch identified by batch_ref, scoped to the authenticated account.\n\nThe response shows stored and failed signal counts broken down by ISN and signal type.\nWhere a signal is listed as 'rejected' this means the signal failed to load in this batch and has not been successfully resubmitted subsequently.\n\n**Unresolved failures**\n\n`unresolved_failures` lists the signals to correct and resend (see _Recovering from failures_ in the API introduction).\nA failure is resolved when a later version of the signal is stored, in this batch or any other.\n\nResending a signal that is unchanged doesn't store a new version.\nUnchanged signals are counted in the batch that first stored them, not the batch they were resent in.\n\nRequests that fail as a whole (e.g. invalid JSON, permission errors or timeouts) are not recorded, so they don't appear here.\n\nMembers can view their own batches. Site admins can supply ?account_id= to view another account's batch.\n",
+                "description": "Returns the status of a batch identified by batch_ref, scoped to the authenticated account.\n\nThe response shows stored and failed signal counts broken down by ISN and signal type.\nWhere a signal is listed as 'rejected' this means the signal failed to load in this batch and has not been successfully resubmitted subsequently.\n\n**Unresolved failures**\n\n`unresolved_failures` lists the signals to correct and resend (see _Recovering from failures_ in the API introduction).\nA failure is resolved when a later version of the signal is stored, in this batch or any other.\nSignals the Signals Router could not route to an ISN (empty isn_slug) stay listed, even if the signal is stored later.\n\nResending a signal that is unchanged doesn't store a new version.\nUnchanged signals are counted in the batch that first stored them, not the batch they were resent in.\n\nRequests that are rejected as a whole (e.g. invalid JSON, authentication or permission errors) are not recorded, so they don't appear here.\nIf a request times out part way through, the signals stored before the timeout are reported.\n\nAccounts can view their own batches. Site admins can supply ?account_id= to view another account's batch.\n",
                 "tags": [
                     "Signal Exchange"
                 ],
@@ -1658,6 +1756,12 @@
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "authorization_error | access_token_expired",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
                     "403": {
                         "description": "forbidden",
                         "schema": {
@@ -1681,7 +1785,12 @@
         },
         "/api/isn": {
             "get": {
-                "description": "get a list of the configured ISNs",
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "get a list of the configured ISNs (any authenticated account can use this endpoint - private ISNs are included)",
                 "tags": [
                     "ISN Configuration"
                 ],
@@ -1705,6 +1814,12 @@
                             }
                         }
                     },
+                    "401": {
+                        "description": "authorization_error | access_token_expired",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "database_error",
                         "schema": {
@@ -1719,12 +1834,9 @@
                 "security": [
                     {
                         "BearerAccessToken": []
-                    },
-                    {
-                        "RefreshTokenCookieAuth": []
                     }
                 ],
-                "description": "Create an Information Sharing Network (ISN)\n\n*Visibility*\nSignals in a private ISN can only be seen by members of the ISN.\nSignals in a public ISN can be viewed by anyone (no authentication required).\nAccounts need write permission for the ISN before they can submit signals\n\nOnce the ISN is created you can:\n- Grant accounts permission to use it\n- Add the Signal Types that can be shared over the network\n\nThere can be multiple ISNs on the site and each ISN can have a\ndifferent membership and be configured for different Signal Types.\n\nThis endpoint can only be used by ISN admins and site admins",
+                "description": "Create an Information Sharing Network (ISN)\n\n*Visibility*\nSignals in a private ISN can only be seen by members of the ISN.\nSignals in a public ISN can be viewed by anyone (no authentication required).\nAccounts need write permission for the ISN before they can submit signals\n\nOnce the ISN is created you can:\n- Grant accounts permission to use it\n- Add the Signal Types that can be shared over the network\n\nThere can be multiple ISNs on the site and each ISN can have a\ndifferent membership and be configured for different Signal Types.\n\nThis endpoint can only be used by ISN admins and site admins\n\nAll fields (title, detail, is_in_use and visibility) are required.",
                 "tags": [
                     "ISN Configuration"
                 ],
@@ -1753,6 +1865,18 @@
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
+                    "401": {
+                        "description": "authorization_error | access_token_expired",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
                     "409": {
                         "description": "resource_already_exists",
                         "schema": {
@@ -1770,7 +1894,12 @@
         },
         "/api/isn/{isn_slug}": {
             "get": {
-                "description": "Returns details about the ISN",
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Returns details about the ISN (any authenticated account can use this endpoint)",
                 "tags": [
                     "ISN Configuration"
                 ],
@@ -1792,8 +1921,8 @@
                             "$ref": "#/definitions/handlers.IsnAndLinkedInfo"
                         }
                     },
-                    "400": {
-                        "description": "invalid_url_param",
+                    "401": {
+                        "description": "authorization_error | access_token_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1818,7 +1947,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Update the ISN configuration\nThis endpoint can only be used by admin accounts\nISN admins can only update ISNs they created\nSite admins can update any ISN",
+                "description": "Update the ISN configuration\nThis endpoint can only be used by admin accounts\nISN admins can only update ISNs they own\nSite admins can update any ISN",
                 "tags": [
                     "ISN Configuration"
                 ],
@@ -1853,7 +1982,7 @@
                         }
                     },
                     "401": {
-                        "description": "authentication_error",
+                        "description": "authorization_error | access_token_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1886,7 +2015,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Get a list of all accounts (users and service accounts) that have permissions on the specified ISN.\nOnly ISN admins (for the ISNs they created) and site admins can view this information",
+                "description": "Get a list of all accounts (users and service accounts) that have had permissions on the specified ISN.\nAccounts whose access has been revoked are included (with can_read and can_write both false).\nOnly ISN admins (for the ISNs they own) and site admins can view this information",
                 "tags": [
                     "ISN Configuration"
                 ],
@@ -1911,8 +2040,8 @@
                             }
                         }
                     },
-                    "400": {
-                        "description": "invalid_url_param",
+                    "401": {
+                        "description": "authorization_error | access_token_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -1945,7 +2074,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Update an account's access permission for an ISN. Set both can_read and can_write to false to revoke all access.\n\nThis endpoint can only be used by admin accounts:\n- ISN admins can only update membership for ISNs they created).\n- Site admins can update membership for any ISN\n\nPermissions:\n- Accounts with 'read' permission can view all signals on the ISN.\n- Accounts with 'write' permission can create signals on the ISN.\n- For accounts that need read/write access to an ISN, you must grant both 'read' and 'write' permissions.\n\nNote that accounts with 'write' permission to an ISN are also automatically granted 'read'\npermission for signals they created, but can't view other signals on the ISN.\n\nYou must supply values for both can_read and can_write.",
+                "description": "Update an account's access permission for an ISN. Set both can_read and can_write to false to revoke all access.\n\nThis endpoint can only be used by admin accounts:\n- ISN admins can only update membership for ISNs they own.\n- Site admins can update membership for any ISN\n\nPermissions:\n- Accounts with 'read' permission can view all signals on the ISN.\n- Accounts with 'write' permission can create signals on the ISN.\n- For accounts that need read/write access to an ISN, you must grant both 'read' and 'write' permissions.\n\nNote that accounts with only 'write' permission to an ISN can view the signals they created, and the signals other accounts have correlated to their signals, but no others.\n\nThe change takes effect when the account next gets an access token (up to 30 minutes later).\n\nYou must supply values for both can_read and can_write.",
                 "tags": [
                     "Account Management"
                 ],
@@ -1983,6 +2112,12 @@
                     },
                     "400": {
                         "description": "invalid_request | malformed_body",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "authorization_error | access_token_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -2048,7 +2183,7 @@
                         }
                     },
                     "401": {
-                        "description": "authentication_error",
+                        "description": "authorization_error | access_token_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -2075,7 +2210,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Link an existing signal type to an ISN\n\nNote: this endpoint can only be used by site admins and ISN admins.\nISN admins can only add signal types to ISNs they own.",
+                "description": "Link an existing signal type to an ISN\n\nNote: this endpoint can only be used by site admins and ISN admins.\nISN admins can only add signal types to ISNs they own.\n\nAdding a signal type that is already on the ISN does nothing.",
                 "tags": [
                     "ISN Configuration"
                 ],
@@ -2110,7 +2245,7 @@
                         }
                     },
                     "401": {
-                        "description": "authentication_error",
+                        "description": "authorization_error | access_token_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -2182,7 +2317,7 @@
                         }
                     },
                     "401": {
-                        "description": "authentication_error",
+                        "description": "authorization_error | access_token_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -2207,7 +2342,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Enable or disable a signal type for a specific ISN\n\nWhen a signal type is disabled for an ISN, signals of this type can no longer be read or written to the ISN.\n\nNote: this endpoint can only be used by site admins and ISN admins.\nISN admins can only update signal types for ISNs they own.",
+                "description": "Enable or disable a signal type for a specific ISN\n\nWhen a signal type is disabled for an ISN, signals of this type can no longer be read or written to the ISN.\nThe change takes effect when each account next gets an access token (up to 30 minutes later).\n\nNote: this endpoint can only be used by site admins and ISN admins.\nISN admins can only update signal types for ISNs they own.",
                 "tags": [
                     "ISN Configuration"
                 ],
@@ -2243,7 +2378,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/handlers.UpdateSignalTypeRequest"
+                            "$ref": "#/definitions/handlers.UpdateIsnSignalTypeStatusRequest"
                         }
                     }
                 ],
@@ -2258,7 +2393,7 @@
                         }
                     },
                     "401": {
-                        "description": "authentication_error",
+                        "description": "authorization_error | access_token_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -2291,7 +2426,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Submit JSON or event signals to an ISN (documents are sent to document signal types with Upload a Document)\n- payloads must not mix signals of different types and are subject to the size limits defined on the site.\n- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account to the ISN (the same local_ref sent to two ISNs identifies two independent signals).\n- If a local reference is received more than once from an account for the specified ISN and signal_type a new version of the signal will be stored with a incremented version number (unless the signal is unchanged - see Signal versions).\n- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.\n\n**Batches**\n\nBatches group separate loads for reporting and tracking purposes.\n- Signal loads are tracked under the batch_ref supplied as part of the request. To start a new batch\njust supply a different batch_ref.\n- Batches are stored at the account level and therefore can include signals from different ISNs and Signal Types\n- Use the *Get Batch Status* endpoint to get a report on the status of signals loaded in a batch.\n\n**Authentication**\n\nRequires a valid access token.\nThe claims in the access token list the ISNs and signal_types that the account is permitted to use.\n\n**Error handling**\n\nPartial loads of the data are possible where the request is a valid format but individual signals fail to load\n(e.g schema validation errors, incorrect correlations ids).\nFailures are logged and trackable via the Batch Status endpoint.\nThe response provides an audit trail detailing the submission outcome.\n\nNote the response structure is also used by the Signals Router endpoint, which can return results for multiple ISNs -\nconsequently the `Results` field is an array (one element for each ISN in the results).\nThere will only ever be a single entry when using this handler.\n\nErrors that relate to the entire request  - e.g invalid json, authentication, permission and server errors (400, 401, 403, 500) -\nreturn a simple error_code/error_message response rather than a detailed audit log.\nThe individual signal failures are not logged in this case, and the client must resupply the data once the problem is resolved.\n\n**Retries**\n\nRequests can be safely resent: signals that were already stored are returned with `unchanged: true` and are not stored again\n(see _Recovering from failures_ in the API introduction).\n\n**JSON Schema Validation**\n\nthe json contained in the `content` field is validated against the JSON schema specified for the signal type unless validation is disabled on the type definition.\n\nWhen schema validation is disabled, basic checks are still done on the incoming data and the following issues create a 400 error and cause the entire payload to be rejected:\n- invalid json format\n- missing fields (batch_ref must be present; the array of signals must be in a json object called signals; and the content and local_ref must be present for each element of the signals array).\n\n**Signal versions**\n\nNew versions are created when signals are resupplied using the same local_ref, e.g. because the client wants to correct a previously published signal.\nIf a signal has been withdrawn it will be reactivated if you resubmit it using the same local_ref.\n\nA resubmission that doesn't change the signal - the same content, and the same or no correlation_id - creates no new version: the response contains the `signal_id`, `signal_version_id` and `version_number` of the existing latest version, with `unchanged: true` (so signals can be safely resent).\nThe content is compared as JSON, so differences in key order and whitespace are ignored.\nUnchanged signals are not counted in the batch they were resent in - the existing version belongs to the batch that stored it.\nResubmitting a withdrawn signal always creates a new version (and reactivates it).\n\n**Correlating signals**\n\nCorrelation IDs can be used to link signals together (a `correlation_id` is the `signal_id` of a previously submitted signal)\nSignals can only be correlated within the same ISN.\nIf the supplied correlation_id is not found in the same ISN as the signal being submitted,\nthe response will contain a 422 or 207 status code and the error_code for the failed signal will be `invalid_correlation_id`.\n\n**Events**\n\nSignals sent to event signal types record that a process waypoint has been reached for another signal (e.g. an approved export health certificate is available for a consignment).\n- events must have a `correlation_id` - correlate the event to the signal it is about (e.g. the consignment). Requests with events that don't have one are rejected (400)\n- the `content` object must include an `occurred_at` field (directly in `content`, not nested in another object) containing an RFC 3339 timestamp with a time zone offset (e.g. 2026-09-27T14:02:00Z) - the time the waypoint was reached\n- events are immutable: resubmitting an event with the same local_ref, content and correlation_id creates no new version and returns the existing version's `signal_id`, `signal_version_id` and `version_number` with `unchanged: true` (so events can be safely resent),\nand resubmitting it with anything different, or after it was withdrawn, fails with `resource_already_exists`.\nTo correct an event, withdraw it and send a new event with a new local_ref.\n- where an event is about a specific version of a signal (e.g. version 3 of a document), name it in a `subject` field in `content`: `{\"signal_id\": \"...\", \"version\": 3}`\n\nExample event: `{\"local_ref\": \"ehc-approved-001\", \"correlation_id\": \"\u003cconsignment signal_id\u003e\", \"content\": {\"occurred_at\": \"2026-09-27T14:02:00Z\", \"subject\": {\"signal_id\": \"\u003cdocument signal_id\u003e\", \"version\": 3}, \"certificate_no\": \"EHC-001\"}}`\n",
+                "description": "Submit JSON or event signals to an ISN (documents are sent to document signal types with Upload a Document - using this endpoint for a document signal type returns 400 `invalid_url_param`)\n- payloads must not mix signals of different types and are subject to the size limits defined on the site.\n- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account to the ISN (the same local_ref sent to two ISNs identifies two independent signals).\n- If a local reference is received more than once from an account for the specified ISN and signal_type a new version of the signal will be stored with an incremented version number (unless the signal is unchanged - see Signal versions).\n- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.\n\n**Batches**\n\nBatches group separate loads for reporting and tracking purposes.\n- Signal loads are tracked under the batch_ref supplied as part of the request. To start a new batch\njust supply a different batch_ref.\n- Batches are stored at the account level and therefore can include signals from different ISNs and Signal Types\n- Use the *Get Batch Status* endpoint to get a report on the status of signals loaded in a batch.\n\n**Authentication**\n\nRequires a valid access token.\nThe claims in the access token list the ISNs and signal_types that the account is permitted to use.\n\n**Error handling**\n\nPartial loads of the data are possible where the request is a valid format but individual signals fail to load\n(e.g schema validation errors, incorrect correlation ids).\nFailures are logged and trackable via the Batch Status endpoint.\nThe response provides an audit trail detailing the submission outcome.\n\nNote the response structure is also used by the Signals Router endpoint, which can return results for multiple ISNs -\nconsequently the `Results` field is an array (one element for each ISN in the results).\nThere will only ever be a single entry when using this handler.\n\nErrors that relate to the entire request  - e.g invalid json, authentication, permission and server errors (400, 401, 403, 404, 413, 500) -\nreturn a simple error_code/error_message response rather than a detailed audit log.\nThe individual signal failures are not logged in this case, and the client must resupply the data once the problem is resolved.\n\n**Retries**\n\nRequests can be safely resent: signals that were already stored are returned with `unchanged: true` and are not stored again\n(see _Recovering from failures_ in the API introduction).\n\n**JSON Schema Validation**\n\nthe json contained in the `content` field is validated against the JSON schema specified for the signal type unless validation is disabled on the type definition.\n\nWhether or not schema validation is enabled, the following issues create a 400 error and cause the entire payload to be rejected:\n- invalid json format\n- missing fields (batch_ref must be present; the array of signals must be in a json object called signals; and the content and local_ref must be present for each element of the signals array).\n- a batch_ref that is longer than 128 characters or contains characters other than letters, numbers, hyphens and underscores\n- an event without a correlation_id\n\n**Signal versions**\n\nNew versions are created when signals are resupplied using the same local_ref, e.g. because the client wants to correct a previously published signal.\nIf a signal has been withdrawn it will be reactivated if you resubmit it using the same local_ref.\n\nA resubmission that doesn't change the signal - the same content, and the same or no correlation_id - creates no new version: the response contains the `signal_id`, `signal_version_id` and `version_number` of the existing latest version, with `unchanged: true` (so signals can be safely resent).\nThe content is compared as JSON, so differences in key order and whitespace are ignored.\nUnchanged signals are not counted in the batch they were resent in - the existing version belongs to the batch that stored it.\nResubmitting a withdrawn signal always creates a new version (and reactivates it).\n\n**Correlating signals**\n\nCorrelation IDs can be used to link signals together (a `correlation_id` is the `signal_id` of a previously submitted signal)\nSignals can only be correlated within the same ISN.\nIf the supplied correlation_id is not found in the same ISN as the signal being submitted,\nthe response will contain a 422 or 207 status code and the error_code for the failed signal will be `invalid_correlation_id`.\n\n**Events**\n\nSignals sent to event signal types record that a process waypoint has been reached for another signal (e.g. an approved export health certificate is available for a consignment).\n- events must have a `correlation_id` - correlate the event to the signal it is about (e.g. the consignment). Requests with events that don't have one are rejected (400)\n- the `content` object must include an `occurred_at` field (directly in `content`, not nested in another object) containing an RFC 3339 timestamp with a time zone offset (e.g. 2026-09-27T14:02:00Z) - the time the waypoint was reached\n- events are immutable: resubmitting an event with the same local_ref, content and correlation_id creates no new version and returns the existing version's `signal_id`, `signal_version_id` and `version_number` with `unchanged: true` (so events can be safely resent),\nand resubmitting it with anything different, or after it was withdrawn, fails with `resource_already_exists`.\nTo correct an event, withdraw it and send a new event with a new local_ref.\n- where an event is about a specific version of a signal (e.g. version 3 of a document), name it in a `subject` field in `content`: `{\"signal_id\": \"...\", \"version\": 3}`\n\nExample event: `{\"local_ref\": \"ehc-approved-001\", \"correlation_id\": \"\u003cconsignment signal_id\u003e\", \"content\": {\"occurred_at\": \"2026-09-27T14:02:00Z\", \"subject\": {\"signal_id\": \"\u003cdocument signal_id\u003e\", \"version\": 3}, \"certificate_no\": \"EHC-001\"}}`\n",
                 "tags": [
                     "Signal Exchange"
                 ],
@@ -2345,13 +2480,13 @@
                         }
                     },
                     "400": {
-                        "description": "malformed_body",
+                        "description": "malformed_body | invalid_url_param",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "authentication_error",
+                        "description": "authorization_error | access_token_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -2396,7 +2531,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Search for signals by date or account in private ISNs (authentication required - only accounts with read or write permissions to the ISN can access signals).\n\nNote the endpoint returns the latest version of each signal.\n\nWrite-only accounts can only see the signals created by their own account, and the signals other accounts have correlated to them.\nThis also applies to correlated signals returned with include_correlated=true.\n\n**Polling for changes**\n\nUse updated_since with include_withdrawn=true. Polling is at-least-once: start each poll 1 minute before the last signal_updated_at you received, and skip the results you have already seen (the same signal_id and signal_updated_at).\nSee *Polling for changes* in the API overview for why the overlap is needed.\n\n**Retrieving a signal from the search results**\n\nFor json signals (content_kind=json) and events (content_kind=event) the signal is returned in the content field.\n\nFor document signals (content_kind=document) the content field holds the document metadata (name, mime_type, size_bytes and sha256) and the document is downloaded from the signal's content endpoint:\n```\nGET /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}/content?version={version_number}\n```\nBuild the URL from the signal_type_slug, sem_ver, signal_id and version_number in the search result, not from the search URL:\ncorrelated signals (include_correlated=true) are often a different signal type from the one searched.\nThe isn_slug is the ISN that was searched (correlated signals are in the same ISN).\n\nFor example, searching for a shipment with its correlated signals:\n```\nGET /api/isn/sample-isn/signal-types/shipment/v1.0.0/signals/search?local_ref=SHIP-0042\u0026include_correlated=true\n\n[{\n\"signal_id\": \"def87f89-dab6-4607-95f7-593d61cb5742\",\n\"signal_type_slug\": \"shipment\",\n\"sem_ver\": \"1.0.0\",\n\"content_kind\": \"json\",\n\"correlation_id\": null,\n\"content\": {...},\n\"correlated_signals\": [{\n\"signal_id\": \"4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19\",\n\"version_number\": 2,\n\"signal_type_slug\": \"bill-of-lading\",\n\"sem_ver\": \"1.0.0\",\n\"content_kind\": \"document\",\n\"correlation_id\": \"def87f89-dab6-4607-95f7-593d61cb5742\",\n\"content\": {\"name\": \"BL-2026-0042.pdf\", \"mime_type\": \"application/pdf\", ...},\n...\n}],\n...\n}]\n```\nthe correlated bill of lading is downloaded with:\n```\nGET /api/isn/sample-isn/signal-types/bill-of-lading/v1.0.0/signals/4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19/content?version=2\n```\nOmit version to download the latest version, and add include_withdrawn=true if the signal is withdrawn.",
+                "description": "Search for signals in private ISNs (authentication required - any account with read or write permission on the ISN can use this endpoint).\n\nNote the endpoint returns the latest version of each signal.\n\n**Search parameters**\n\nAt least one of these filters is required: start_date and end_date, updated_since, account_id, signal_id, local_ref or correlation_id.\nstart_date and end_date must be used together - they filter on when the latest version of the signal was created (both are inclusive).\nResults are ordered by signal_updated_at (oldest first).\n\nWrite-only accounts can only see the signals created by their own account, and the signals other accounts have correlated to them.\nThis also applies to correlated signals returned with include_correlated=true.\n\n**Polling for changes**\n\nUse updated_since with include_withdrawn=true. Polling is at-least-once: start each poll 1 minute before the last signal_updated_at you received, and skip the results you have already seen (the same signal_id and signal_updated_at).\nSee *Polling for changes* in the API overview for why the overlap is needed.\n\n**Retrieving a signal from the search results**\n\nFor json signals (content_kind=json) and events (content_kind=event) the signal is returned in the content field.\n\nFor document signals (content_kind=document) the content field holds the document metadata (name, mime_type, size_bytes and sha256) and the document is downloaded from the signal's content endpoint:\n```\nGET /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}/content?version={version_number}\n```\nBuild the URL from the signal_type_slug, sem_ver, signal_id and version_number in the search result, not from the search URL:\ncorrelated signals (include_correlated=true) are often a different signal type from the one searched.\nThe isn_slug is the ISN that was searched (correlated signals are in the same ISN).\n\nFor example, searching for a shipment with its correlated signals:\n```\nGET /api/isn/sample-isn/signal-types/shipment/v1.0.0/signals/search?local_ref=SHIP-0042\u0026include_correlated=true\n\n[{\n\"signal_id\": \"def87f89-dab6-4607-95f7-593d61cb5742\",\n\"signal_type_slug\": \"shipment\",\n\"sem_ver\": \"1.0.0\",\n\"content_kind\": \"json\",\n\"correlation_id\": null,\n\"content\": {...},\n\"correlated_signals\": [{\n\"signal_id\": \"4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19\",\n\"version_number\": 2,\n\"signal_type_slug\": \"bill-of-lading\",\n\"sem_ver\": \"1.0.0\",\n\"content_kind\": \"document\",\n\"correlation_id\": \"def87f89-dab6-4607-95f7-593d61cb5742\",\n\"content\": {\"name\": \"BL-2026-0042.pdf\", \"mime_type\": \"application/pdf\", ...},\n...\n}],\n...\n}]\n```\nthe correlated bill of lading is downloaded with:\n```\nGET /api/isn/sample-isn/signal-types/bill-of-lading/v1.0.0/signals/4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19/content?version=2\n```\nOmit version to download the latest version, and add include_withdrawn=true if the signal is withdrawn.",
                 "tags": [
                     "Signal Exchange"
                 ],
@@ -2405,14 +2540,14 @@
                     {
                         "type": "string",
                         "example": "2006-01-02T15:05:00Z",
-                        "description": "Start date",
+                        "description": "Signals whose latest version was created at or after this time (use with end_date)",
                         "name": "start_date",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "example": "2006-01-02T15:15:00Z",
-                        "description": "End date",
+                        "description": "Signals whose latest version was created at or before this time (use with start_date)",
                         "name": "end_date",
                         "in": "query"
                     },
@@ -2490,7 +2625,19 @@
                         }
                     },
                     "401": {
-                        "description": "authentication_error",
+                        "description": "authorization_error | access_token_expired",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "resource_not_found",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -2511,7 +2658,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Upload a document (e.g. a PDF bill of lading) to a document signal type (JSON signals are sent with Submit Signals).\n\nDocuments are signals: they have a local_ref, versions, can be correlated with other signals and withdrawn.\nThe document details (name, mime_type, size_bytes and sha256) are returned as the signal content by the signal search endpoints.\n\n**Request format**\n\nThe request is multipart/form-data with one document per request:\n- send the form fields first (batch_ref, local_ref and any optional fields) - **the file must be the last part**\n- the file part must be named `file` and must include a filename - the filename is stored as the document's name\n\nThe request body looks like this:\n```\n--boundary\nContent-Disposition: form-data; name=\"batch_ref\"\n\ndaily-2026-09-26\n--boundary\nContent-Disposition: form-data; name=\"local_ref\"\n\nbol-0042\n--boundary\nContent-Disposition: form-data; name=\"file\"; filename=\"BL-0042.pdf\"\nContent-Type: application/pdf\n\n(the document bytes)\n--boundary--\n```\n\n**Supported formats**\n\nOnly common business document formats can be uploaded: PDF, JPEG, PNG and XML. Other files are rejected with 415 unsupported_media_type.\nThe format is detected from the content of the file - the Content-Type of the file part is ignored.\nXML documents must start with an XML declaration (\u003c?xml ...?\u003e).\n\nThe filename extension must match the format (.pdf, .jpg or .jpeg, .png, .xml - in any case), otherwise the upload is rejected with 400 malformed_body.\n\n**Versions**\n\nUploads for a local_ref you have already used on the ISN are compared with its latest version (the same local_ref uploaded to another ISN is a separate document):\n- the same file with the same filename creates no new version: the response contains the signal_id, signal_version_id and version_number of the existing latest version, with unchanged=true - so uploads can be safely retried\n- a different file, or the same file with a different filename, creates a new version (including a file that matches an older version)\n- re-uploading a withdrawn document creates a new version and reactivates it\n- supplying a different correlation_id creates a new version with the new link (omitting correlation_id keeps the existing link)\n\nUnchanged uploads are not counted in the batch they were sent in - the existing version belongs to the batch that stored it.\nThe same file uploaded with a different local_ref is a separate document.\n\nRejected uploads are recorded against the batch (see the batch status endpoint).\n\n**Retries**\n\nAn upload either stores a new version or stores nothing, so if an upload fails or times out, send it again.\nIf the first attempt was stored, the retry returns that version with unchanged=true, provided it uses the same file, the same filename and the same (or no) correlation_id.\nA retry sent while the original upload is still being processed can occasionally store an extra, identical version - this is harmless, but pollers will see one more update.\nUploads can take up to 2 minutes on the server (by default), so to avoid this set your client timeout above that.\n\n**Optional fields**\n- correlation_id: the ID of a signal of any type in the same ISN that this document relates to (e.g. the consignment a bill of lading belongs to).\nThe upload is rejected with 422 invalid_correlation_id if the signal does not exist in the ISN.\n(To send a document to the ISN of the signal it relates to without specifying the ISN, use _Upload a Document via Router_.)\n- sha256: the sha256 of the document as lowercase hex, computed by the sender before uploading. If it does not match the uploaded file the upload is rejected with 400 malformed_body and no version is created.\nUse it to confirm the document stored is exactly the one you sent. If it is omitted, the sha256 computed by the server is returned in the response and can be used to check the upload afterwards.",
+                "description": "Upload a document (e.g. a PDF bill of lading) to a document signal type (JSON signals are sent with Submit Signals).\n\nDocuments are signals: they have a local_ref, versions, can be correlated with other signals and withdrawn.\nThe document details (name, mime_type, size_bytes and sha256) are returned as the signal content by the signal search endpoints.\n\n**Request format**\n\nThe request is multipart/form-data with one document per request:\n- send the form fields first (batch_ref, local_ref and any optional fields) - **the file must be the last part**\n- the file part must be named `file` and must include a filename - the filename (without any directory path) is stored as the document's name\n- only the batch_ref, local_ref, correlation_id, sha256 and file fields are accepted (other fields are rejected with 400 malformed_body), and each form field value can be up to 1024 bytes\n- documents can be up to 20MB by default (the `Signalsd-Max-Request-Size` response header gives the request limit, which allows an extra 64KB for the form fields). Larger uploads are rejected with 413 request_too_large\n\nThe request body looks like this:\n```\n--boundary\nContent-Disposition: form-data; name=\"batch_ref\"\n\ndaily-2026-09-26\n--boundary\nContent-Disposition: form-data; name=\"local_ref\"\n\nbol-0042\n--boundary\nContent-Disposition: form-data; name=\"file\"; filename=\"BL-0042.pdf\"\nContent-Type: application/pdf\n\n(the document bytes)\n--boundary--\n```\n\n**Supported formats**\n\nOnly common business document formats can be uploaded: PDF, JPEG, PNG and XML. Other files are rejected with 415 unsupported_media_type.\nThe format is detected from the content of the file - the Content-Type of the file part is ignored.\nXML documents must start with an XML declaration (\u003c?xml ...?\u003e).\n\nThe filename extension must match the format (.pdf, .jpg or .jpeg, .png, .xml - in any case), otherwise the upload is rejected with 400 malformed_body.\n\n**Versions**\n\nUploads for a local_ref you have already used for this signal type version on the ISN are compared with its latest version (the same local_ref uploaded to another ISN is a separate document):\n- the same file with the same filename creates no new version: the response contains the signal_id, signal_version_id and version_number of the existing latest version, with unchanged=true - so uploads can be safely retried\n- a different file, or the same file with a different filename, creates a new version (including a file that matches an older version)\n- re-uploading a withdrawn document creates a new version and reactivates it\n- supplying a different correlation_id creates a new version with the new link (omitting correlation_id keeps the existing link)\n\nUnchanged uploads are not counted in the batch they were sent in - the existing version belongs to the batch that stored it.\nThe same file uploaded with a different local_ref is a separate document.\n\nUploads rejected after the form fields have been read (e.g. unsupported format, a filename extension or sha256 mismatch, an invalid correlation_id, too large, no permission) are recorded against the batch (see the batch status endpoint).\nRequests with missing or invalid form fields are not recorded.\n\n**Retries**\n\nAn upload either stores a new version or stores nothing, so if an upload fails or times out, send it again.\nIf the first attempt was stored, the retry returns that version with unchanged=true, provided it uses the same file, the same filename and the same (or no) correlation_id.\nA retry sent while the original upload is still being processed can occasionally store an extra, identical version - this is harmless, but pollers will see one more update.\nUploads can take up to 2 minutes on the server (by default), so to avoid this set your client timeout above that.\n\n**Optional fields**\n- correlation_id: the ID of a signal of any type in the same ISN that this document relates to (e.g. the consignment a bill of lading belongs to).\nThe upload is rejected with 422 invalid_correlation_id if the signal does not exist in the ISN.\n(To send a document to the ISN of the signal it relates to without specifying the ISN, use _Upload a Document via Router_.)\n- sha256: the sha256 of the document as lowercase hex, computed by the sender before uploading. If it does not match the uploaded file the upload is rejected with 400 malformed_body and no version is created.\nUse it to confirm the document stored is exactly the one you sent. If it is omitted, the sha256 computed by the server is returned in the response and can be used to check the upload afterwards.",
                 "consumes": [
                     "multipart/form-data"
                 ],
@@ -2592,7 +2739,7 @@
                         }
                     },
                     "401": {
-                        "description": "authentication_error",
+                        "description": "authorization_error | access_token_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -2632,6 +2779,12 @@
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
+                    },
+                    "504": {
+                        "description": "timeout",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
                     }
                 }
             }
@@ -2643,7 +2796,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Withdraw a signal by local reference\n\nOnly the account's signal with this local reference on this ISN is withdrawn (a signal with the same local reference on another ISN is not affected).\n\nWithdrawn signals are hidden from search results by default but remain in the database.\nSignals can only be withdrawn by the account that created the signal.\nTo reactivate a signal resupply it with the same local_ref using the 'create signals' end point.",
+                "description": "Withdraw a signal by local reference\n\nOnly the account's signal with this local reference on this ISN is withdrawn (a signal with the same local reference on another ISN is not affected).\n\nWithdrawn signals are hidden from search results by default but remain in the database.\nSignals can only be withdrawn by the account that created the signal.\nTo reactivate a json signal, resubmit it with the same local_ref using the *Submit Signals* endpoint. To reactivate a document, upload it again with the same local_ref using *Upload a Document*.\nWithdrawn events cannot be reactivated - send a new event with a new local_ref instead.",
                 "tags": [
                     "Signal Exchange"
                 ],
@@ -2694,7 +2847,7 @@
                         }
                     },
                     "401": {
-                        "description": "authentication_error",
+                        "description": "authorization_error | access_token_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -2713,6 +2866,12 @@
                     },
                     "409": {
                         "description": "resource_already_exists",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "413": {
+                        "description": "request_too_large",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -2805,7 +2964,7 @@
                         }
                     },
                     "401": {
-                        "description": "authentication_error",
+                        "description": "authorization_error | access_token_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -2827,13 +2986,19 @@
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
+                    },
+                    "504": {
+                        "description": "timeout",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
                     }
                 }
             }
         },
         "/api/public/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search": {
             "get": {
-                "description": "Search for signals in public ISNs (no authentication required).\n\nNote the endpoint returns the latest version of each signal.\n\n**Polling for changes**\n\nUse updated_since with include_withdrawn=true. Polling is at-least-once: start each poll 1 minute before the last signal_updated_at you received, and skip the results you have already seen (the same signal_id and signal_updated_at).\nSee *Polling for changes* in the API overview for why the overlap is needed.\n\n**Retrieving a signal from the search results**\n\nFor json signals (content_kind=json) and events (content_kind=event) the signal is returned in the content field.\n\nFor document signals (content_kind=document) the content field holds the document metadata (name, mime_type, size_bytes and sha256).\nDownloading the document requires an account on the ISN and an access token - see the private signal search endpoint for how to download a document from the search results.",
+                "description": "Search for signals in public ISNs (no authentication required).\n\nNote the endpoint returns the latest version of each signal.\n\n**Search parameters**\n\nAt least one of these filters is required: start_date and end_date, updated_since, account_id, signal_id, local_ref or correlation_id.\nstart_date and end_date must be used together - they filter on when the latest version of the signal was created (both are inclusive).\nResults are ordered by signal_updated_at (oldest first).\n\n**Polling for changes**\n\nUse updated_since with include_withdrawn=true. Polling is at-least-once: start each poll 1 minute before the last signal_updated_at you received, and skip the results you have already seen (the same signal_id and signal_updated_at).\nSee *Polling for changes* in the API overview for why the overlap is needed.\n\n**Retrieving a signal from the search results**\n\nFor json signals (content_kind=json) and events (content_kind=event) the signal is returned in the content field.\n\nFor document signals (content_kind=document) the content field holds the document metadata (name, mime_type, size_bytes and sha256).\nDownloading the document requires an account on the ISN and an access token - see the private signal search endpoint for how to download a document from the search results.",
                 "tags": [
                     "Signal Exchange"
                 ],
@@ -2842,14 +3007,14 @@
                     {
                         "type": "string",
                         "example": "2006-01-02T15:05:00Z",
-                        "description": "Start date",
+                        "description": "Signals whose latest version was created at or after this time (use with end_date)",
                         "name": "start_date",
                         "in": "query"
                     },
                     {
                         "type": "string",
                         "example": "2006-01-02T15:15:00Z",
-                        "description": "End date",
+                        "description": "Signals whose latest version was created at or before this time (use with start_date)",
                         "name": "end_date",
                         "in": "query"
                     },
@@ -2948,7 +3113,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Submit JSON or event signals without specifying a target ISN - the router resolves the ISN for each signal\n(documents are sent to document signal types with _Upload a Document via Router_).\nEvents always have a correlation ID, so they are always routed to the ISN of the correlated signal.\n\n**ISN resolution by correlation ID**\n\nWhere a _correlation ID_ is supplied, the routing rules do not apply and the signal\nis routed to the ISN that received the correlated signal.\n\n**ISN resolution by pattern match**\n\nIf no correlation ID is supplied, the ISN is resolved using the routing rules defined for the _Signal Type_.\nThe rules are applied in the order defined in the _Routing Rules Config_ (first match is accepted).\n\n**Resubmissions**\n\nlocal_ref is unique per ISN, so a resubmitted signal only updates the original if it resolves to the same ISN.\nIf it resolves to a different ISN (e.g. because the routing field changed) it is stored as a new signal on that ISN, and the original signal is not changed - withdraw it if it is no longer needed.\n\n**Resolution failures**\n\nSignals that can't be routed are listed in `unroutable_signals` (and counted in `unroutable_count`):\n- signals that do not contain the routing field defined in the _Routing Rules Config_, or do not satisfy any of the routing rules\n- signals whose correlation_id is not found (or whose ISN is not in use)\n\nSignals that resolve to an ISN where the account lacks write permission, or where the signal type is not in use,\nare rejected and listed in the `failed_signals` of that ISN's result.\n\n**Usage**\n\nOther than the ISN resolution, this endpoint behaves the same way as the standard _Submit Signals_ endpoint\n(request format, batches, error handling, schema validation, versions and correlation).\nThe response contains a result for each ISN the signals were routed to.",
+                "description": "Submit JSON or event signals without specifying a target ISN - the router resolves the ISN for each signal\n(documents are sent to document signal types with _Upload a Document via Router_).\nEvents always have a correlation ID, so they are always routed to the ISN of the correlated signal.\n\n**ISN resolution by correlation ID**\n\nWhere a _correlation ID_ is supplied, the routing rules do not apply and the signal\nis routed to the ISN that received the correlated signal.\n\n**ISN resolution by pattern match**\n\nIf no correlation ID is supplied, the ISN is resolved using the routing rules defined for the _Signal Type_.\nThe rules are applied in the order defined in the _Routing Rules Config_ (first match is accepted).\n\n**Resubmissions**\n\nlocal_ref is unique per ISN, so a resubmitted signal only updates the original if it resolves to the same ISN.\nIf it resolves to a different ISN (e.g. because the routing field changed) it is stored as a new signal on that ISN, and the original signal is not changed - withdraw it if it is no longer needed.\n\n**Resolution failures**\n\nSignals that can't be routed are listed in `unroutable_signals` (and counted in `unroutable_count`):\n- signals that do not contain the routing field defined in the _Routing Rules Config_, or do not satisfy any of the routing rules\n- signals whose correlation_id is not found (or whose ISN is not in use)\n\nSignals that resolve to an ISN where the account lacks access or write permission (`forbidden`), or where the ISN or signal type is not in use (`resource_not_found`),\nare rejected and listed in the `failed_signals` of that ISN's result.\n\n**Usage**\n\nOther than the ISN resolution, this endpoint behaves the same way as the standard _Submit Signals_ endpoint\n(request format, batches, error handling, schema validation, versions and correlation).\nThe response contains a result for each ISN the signals were routed to.",
                 "tags": [
                     "Signal Exchange"
                 ],
@@ -2994,19 +3159,13 @@
                         }
                     },
                     "400": {
-                        "description": "malformed_body",
+                        "description": "malformed_body | invalid_url_param",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "401": {
-                        "description": "authentication_error",
-                        "schema": {
-                            "$ref": "#/definitions/responses.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "resource_not_found",
+                        "description": "authorization_error | access_token_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -3024,7 +3183,7 @@
                         }
                     },
                     "500": {
-                        "description": "database_error",
+                        "description": "database_error | internal_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -3039,7 +3198,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Upload a document without specifying the target ISN: the document is sent to the ISN of the signal it is correlated with\n(e.g. a bill of lading is sent to the ISN that received its consignment).\n\ncorrelation_id is required - routing rules are not used for documents (they match on fields in JSON signals).\nThe upload is rejected with 422 invalid_correlation_id if the correlated signal is not found,\nand with 403 forbidden if the account does not have write permission on the correlated signal's ISN.\n\nOther than the ISN resolution, this endpoint behaves the same way as the standard _Upload a Document_ endpoint\n(request format, supported formats, versions and the optional sha256 field).\n\nThe response includes the isn_slug of the ISN the document was sent to.",
+                "description": "Upload a document without specifying the target ISN: the document is sent to the ISN of the signal it is correlated with\n(e.g. a bill of lading is sent to the ISN that received its consignment).\n\ncorrelation_id is required - routing rules are not used for documents (they match on fields in JSON signals).\nThe upload is rejected with 422 invalid_correlation_id if the correlated signal is not found or its ISN is not in use,\nand with 403 forbidden if the account does not have write permission on the correlated signal's ISN.\n\nOther than the ISN resolution, this endpoint behaves the same way as the standard _Upload a Document_ endpoint\n(request format, supported formats, versions and the optional sha256 field).\n\nThe response includes the isn_slug of the ISN the document was sent to.",
                 "consumes": [
                     "multipart/form-data"
                 ],
@@ -3113,7 +3272,7 @@
                         }
                     },
                     "401": {
-                        "description": "authentication_error",
+                        "description": "authorization_error | access_token_expired",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -3150,6 +3309,12 @@
                     },
                     "500": {
                         "description": "database_error | internal_error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "504": {
+                        "description": "timeout",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -3205,7 +3370,7 @@
         },
         "/oauth/revoke": {
             "post": {
-                "description": "Revokes credentials to prevent them being used to obtain new access tokens.\nThe request body must be `application/x-www-form-urlencoded` (RFC 6749).\nAny access tokens already issued remain valid until they expire (30 minutes).\n\n---\n\n**Service Accounts — `client_credentials` grant (logout / credential rotation)**\n\nInclude in the request body:\n- `grant_type=client_credentials`\n- `client_id=\u003cyour_client_id\u003e`\n- `client_secret=\u003cyour_client_secret\u003e`\n\nAlternatively, credentials may be supplied via HTTP Basic Auth (`Authorization: Basic base64(client_id:client_secret)`).\n\nRevokes **all** client secrets for the service account, which prevents any further token requests\nuntil an admin reissues credentials via `POST /api/auth/service-accounts/reissue_credentials`.\nThis does not permanently disable the account — use `POST /admin/accounts/{account_id}/disable` for that.\n\n---\n\n**Web Users — `refresh_token` grant (logout)**\n\nInclude in the request body:\n- `grant_type=refresh_token`\n\nThe refresh token is read automatically from the `refresh_token` HTTP-only cookie.\nNo additional form fields are required.\n\nRevokes the current refresh token. The user must log in again to obtain a new one.\n",
+                "description": "Revokes credentials to prevent them being used to obtain new access tokens.\nThe request body must be `application/x-www-form-urlencoded` (RFC 6749).\nAny access tokens already issued remain valid until they expire (30 minutes).\n\n---\n\n**Service Accounts — `client_credentials` grant (logout / credential rotation)**\n\nInclude in the request body:\n- `grant_type=client_credentials`\n- `client_id=\u003cyour_client_id\u003e`\n- `client_secret=\u003cyour_client_secret\u003e`\n\nAlternatively, credentials may be supplied via HTTP Basic Auth (`Authorization: Basic base64(client_id:client_secret)`).\n\nRevokes **all** client secrets for the service account, which prevents any further token requests\nuntil an admin reissues credentials via `POST /api/auth/service-accounts/reissue-credentials`.\nThis does not permanently disable the account — use `POST /api/admin/accounts/{account_id}/disable` for that.\n\n---\n\n**Web Users — `refresh_token` grant (logout)**\n\nInclude in the request body:\n- `grant_type=refresh_token`\n\nThe refresh token is read automatically from the `refresh_token` HTTP-only cookie.\nNo additional form fields are required.\n\nRevokes the current refresh token. The user must log in again to obtain a new one.\n",
                 "consumes": [
                     "application/x-www-form-urlencoded"
                 ],
@@ -3243,19 +3408,13 @@
                         "description": "OK"
                     },
                     "400": {
-                        "description": "unsupported_grant_type · invalid_request · invalid_grant",
+                        "description": "unsupported_grant_type · invalid_request · invalid_grant (refresh token missing, expired or revoked - error_code refresh_token_invalid)",
                         "schema": {
                             "$ref": "#/definitions/responses.OAuthErrorResponse"
                         }
                     },
                     "401": {
                         "description": "invalid_client",
-                        "schema": {
-                            "$ref": "#/definitions/responses.OAuthErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "invalid_grant (token not found)",
                         "schema": {
                             "$ref": "#/definitions/responses.OAuthErrorResponse"
                         }
@@ -3271,7 +3430,7 @@
         },
         "/oauth/token": {
             "post": {
-                "description": "Issues a new access token. The request body must be `application/x-www-form-urlencoded` (RFC 6749).\n\nService accounts use the `client_credentials` grant, web users use the `refresh_token` grant - see below.\n\n---\n\n**Service Accounts — `client_credentials` grant**\n\nInclude in the request body:\n- `grant_type=client_credentials`\n- `client_id=\u003cyour_client_id\u003e`\n- `client_secret=\u003cyour_client_secret\u003e`\n\nAlternatively, credentials may be supplied via HTTP Basic Auth (`Authorization: Basic base64(client_id:client_secret)`).\n\nReturns a new access token in the response body. Access tokens expire after 30 minutes.\n\n---\n\n**Web Users — `refresh_token` grant**\n\nInclude in the request body:\n- `grant_type=refresh_token`\n\nThe refresh token is read automatically from the `refresh_token` HTTP-only cookie set during login.\nNo additional form fields are required.\n\nReturns a new access token in the response body. The rotated refresh token is set as a new HTTP-only cookie.\nAccess tokens expire after 30 minutes. Refresh tokens expire after 30 days — if the refresh token\nhas expired the user must log in again.\n",
+                "description": "Issues a new access token. The request body must be `application/x-www-form-urlencoded` (RFC 6749).\n\nService accounts use the `client_credentials` grant, web users use the `refresh_token` grant - see below.\n\n---\n\n**Service Accounts — `client_credentials` grant**\n\nInclude in the request body:\n- `grant_type=client_credentials`\n- `client_id=\u003cyour_client_id\u003e`\n- `client_secret=\u003cyour_client_secret\u003e`\n\nAlternatively, credentials may be supplied via HTTP Basic Auth (`Authorization: Basic base64(client_id:client_secret)`).\n\nReturns a new access token in the response body. Access tokens expire after 30 minutes.\n\n---\n\n**Web Users — `refresh_token` grant**\n\nInclude in the request body:\n- `grant_type=refresh_token`\n\nThe refresh token is read automatically from the `refresh_token` HTTP-only cookie set during login.\nNo additional form fields are required.\n\nReturns a new access token in the response body. The rotated refresh token is set as a new HTTP-only cookie\n(the cookie's path is `/oauth`, so browsers only send it to the /oauth endpoints).\nAccess tokens expire after 30 minutes. Each refresh issues a new refresh token that expires 30 days later,\nso the user only has to log in again if they don't refresh for 30 days. Refreshing revokes the user's other refresh tokens (one session per user).\n",
                 "consumes": [
                     "application/x-www-form-urlencoded"
                 ],
@@ -3318,7 +3477,7 @@
                         }
                     },
                     "401": {
-                        "description": "invalid_client — wrong, expired, or revoked client secret. If your secret has expired, use POST /api/auth/service-accounts/rotate-secret to self-serve a new.",
+                        "description": "invalid_client — wrong, expired, or revoked client secret. If your secret has expired, use POST /api/auth/service-accounts/rotate-secret to self-serve a new secret.",
                         "schema": {
                             "$ref": "#/definitions/responses.OAuthErrorResponse"
                         }
@@ -3557,22 +3716,31 @@
             "type": "object",
             "properties": {
                 "isn_slug": {
-                    "description": "empty for signals the signal router could not route to an ISN",
-                    "type": "string"
+                    "description": "IsnSlug is empty for signals the signal router could not route to an ISN",
+                    "type": "string",
+                    "example": "sample-isn"
                 },
                 "rejected_count": {
-                    "type": "integer"
+                    "description": "RejectedCount is the number of unresolved failures",
+                    "type": "integer",
+                    "example": 1
                 },
                 "signal_type_slug": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "sample-signal-type"
                 },
                 "signal_type_version": {
-                    "type": "string"
+                    "description": "SignalTypeVersion is the signal type's sem_ver with a \"v\" prefix",
+                    "type": "string",
+                    "example": "v1.0.0"
                 },
                 "stored_count": {
-                    "type": "integer"
+                    "description": "StoredCount is the number of signal versions stored in this batch",
+                    "type": "integer",
+                    "example": 10
                 },
                 "unresolved_failures": {
+                    "description": "UnresolvedFailures lists the signals that failed in this batch and have not been stored since",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/handlers.FailureRow"
@@ -3725,7 +3893,7 @@
                     "example": "https://github.com/user/project/blob/2025.01.01/schema.json"
                 },
                 "title": {
-                    "description": "unique title",
+                    "description": "the slug generated from the title must be unique",
                     "type": "string",
                     "example": "Sample Signal @example.org"
                 }
@@ -3735,7 +3903,7 @@
             "type": "object",
             "properties": {
                 "batch_ref": {
-                    "description": "BatchRef groups signals under a sender-chosen label",
+                    "description": "BatchRef groups signals under a sender-chosen label (1-128 characters: letters, numbers, hyphens and underscores only)",
                     "type": "string",
                     "example": "daily-sync-2026-04-02"
                 },
@@ -3752,12 +3920,12 @@
             "type": "object",
             "properties": {
                 "rejected_count": {
-                    "description": "Rejected Count is the list of records rejected due to issues with the contents of the record",
+                    "description": "RejectedCount is the count of records rejected due to issues with the contents of the record",
                     "type": "integer",
                     "example": 1
                 },
                 "stored_count": {
-                    "description": "StoredCount is the count of records sucessfully loaded",
+                    "description": "StoredCount is the count of records successfully loaded",
                     "type": "integer",
                     "example": 1
                 },
@@ -3767,7 +3935,7 @@
                     "example": 3
                 },
                 "unroutable_count": {
-                    "description": "UnroutableCount is the count of signals sent to the Signal Router that could not be routed.\n(e.g because no routing rule matched the data, or the account lacks write permission to the resolved ISN)\n\nThis field is only supplied in responses to the Signals Router handler.",
+                    "description": "UnroutableCount is the count of signals sent to the Signal Router that could not be routed.\n(e.g because no routing rule matched the data, or the account lacks write permission to the resolved ISN)\n\nThis field is only supplied in responses to the Signals Router handler, and is omitted when it is zero.",
                     "type": "integer",
                     "example": 1
                 }
@@ -3847,7 +4015,7 @@
             "properties": {
                 "error_code": {
                     "type": "string",
-                    "example": "validation_error"
+                    "example": "malformed_body"
                 },
                 "error_message": {
                     "type": "string",
@@ -4047,7 +4215,7 @@
                     "example": "signal-type-1/v0.0.1"
                 },
                 "stored_signals": {
-                    "description": "StoredSignals is the list of signals sucessfully processed",
+                    "description": "StoredSignals is the list of signals successfully processed",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/handlers.StoredSignal"
@@ -4496,7 +4664,7 @@
             "properties": {
                 "routing_field": {
                     "type": "string",
-                    "example": "payload.PorfOfEntry"
+                    "example": "payload.portOfEntry"
                 },
                 "routing_rules": {
                     "type": "array",
@@ -4555,7 +4723,7 @@
                     "example": "daily-sync-2026-04-02"
                 },
                 "results": {
-                    "description": "Results contains per-ISN outcomes.  It will only contain one entry for standard signal submisions (the ISN from the URL)",
+                    "description": "Results contains per-ISN outcomes.  It will only contain one entry for standard signal submissions (the ISN from the URL)",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/handlers.IsnResult"
@@ -4570,7 +4738,7 @@
                     ]
                 },
                 "unroutable_signals": {
-                    "description": "UnroutableSignals is only included when using the Signal Router (N/A for standard signal submission)",
+                    "description": "UnroutableSignals is only included in Signal Router responses, and is omitted when there are no unroutable signals",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/handlers.FailedSignal"
@@ -4774,6 +4942,16 @@
                 }
             }
         },
+        "handlers.UpdateIsnSignalTypeStatusRequest": {
+            "type": "object",
+            "properties": {
+                "is_in_use": {
+                    "description": "whether this signal type version is enabled on the ISN",
+                    "type": "boolean",
+                    "example": false
+                }
+            }
+        },
         "handlers.UpdatePasswordRequest": {
             "type": "object",
             "properties": {
@@ -4809,11 +4987,6 @@
                     "description": "updated description",
                     "type": "string",
                     "example": "description"
-                },
-                "is_in_use": {
-                    "description": "whether this signal type version is actively used",
-                    "type": "boolean",
-                    "example": false
                 },
                 "readme_url": {
                     "description": "README file URL: must be a GitHub URL ending in .md",
@@ -4958,7 +5131,7 @@
             "name": "OAuth 2.0"
         },
         {
-            "description": "Registration, login and password management for web users. A signed-in user can change their own password here; users who have forgotten their password are sent a one-time link by an admin instead (see *Generate Password Reset Link* under Account Management. Use the OAuth 2.0 endpoints to obtain access tokens.",
+            "description": "Registration, login and password management for web users. A signed-in user can change their own password here; users who have forgotten their password are sent a one-time link by an admin instead (see *Generate Password Reset Link* under Account Management). Use the OAuth 2.0 endpoints to obtain access tokens.",
             "name": "User Authentication"
         },
         {
@@ -4978,7 +5151,7 @@
             "name": "Signal Types"
         },
         {
-            "description": "Create and manage Information Sharing Networks (ISNs) - these endpoints can only be used by the accounts that have a siteadmin or isnadmin role Note that ISN admins can only view or update details for ISNs they created.",
+            "description": "Create and manage Information Sharing Networks (ISNs). Creating and updating ISNs can only be done by accounts that have a siteadmin or isnadmin role, and ISN admins can only update the ISNs they own. Any authenticated account can view ISN details.",
             "name": "ISN Configuration"
         },
         {
@@ -4994,7 +5167,7 @@
             "name": "Site Admin"
         },
         {
-            "description": "These endpoints should not be called directly. Some admin endpoints,  for insance *Register Service Account* and *Generate Password Reset Link*, return a one time link URL that the user then opens in their browser to interact with the auth system. These endpoints return the HTML used to in the one-time links. The URLs do not need an access token - the link is itself the credential - and should be treated as secrets.",
+            "description": "These endpoints should not be called directly. Some admin endpoints, for instance *Register Service Account* and *Generate Password Reset Link*, return a one time link URL that the user then opens in their browser to interact with the auth system. These endpoints return the HTML used in the one-time links. The URLs do not need an access token - the link is itself the credential - and should be treated as secrets.",
             "name": "One-time Links (browser pages)"
         }
     ]
