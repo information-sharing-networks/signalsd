@@ -171,6 +171,10 @@ func (s *SignalTypeHandler) CreateSignalType(w http.ResponseWriter, r *http.Requ
 		return apperrors.MalformedBody("you must supply all the fields: schema URL (json and event signal types only), title, bump type, readme URL and detail", nil)
 	}
 
+	if !signalsd.ValidBumpTypes[req.BumpType] {
+		return apperrors.MalformedBody(fmt.Sprintf("invalid bump_type %q - use major, minor or patch", req.BumpType), nil)
+	}
+
 	// check for valid github url formats
 	if err := utils.ValidateGithubFileURL(req.SchemaURL, "schema"); err != nil {
 		logger.AddLogAttrs(r.Context(),
@@ -336,6 +340,10 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchema(w http.ResponseWriter, r
 		req.ReadmeURL == "" ||
 		req.Detail == "" {
 		return apperrors.MalformedBody("you must supply all the fields: schema URL, slug, version, readme URL and detail", nil)
+	}
+
+	if !signalsd.ValidBumpTypes[req.BumpType] {
+		return apperrors.MalformedBody(fmt.Sprintf("invalid bump_type %q - use major, minor or patch", req.BumpType), nil)
 	}
 
 	req.SchemaURL = strings.TrimSpace(req.SchemaURL)

@@ -31,10 +31,11 @@ WHERE user_account_id = $1
 AND revoked_at IS NULL;
 
 -- name: CountActiveRefreshTokens :one
--- used as part of integration tests
+-- used as part of integration tests: counts the refresh tokens that are not revoked or expired
 SELECT COUNT(*) AS unrevoked_count 
 FROM refresh_tokens
 WHERE user_account_id = $1
-AND revoked_at IS NOT NULL;
+AND revoked_at IS NULL
+AND expires_at > NOW();
 
 

@@ -198,13 +198,6 @@ func grantPermission(t *testing.T, ctx context.Context, queries *database.Querie
 	}
 }
 
-func disableAccount(t *testing.T, ctx context.Context, queries *database.Queries, accountID uuid.UUID) {
-	_, err := queries.DisableAccount(ctx, accountID)
-	if err != nil {
-		t.Fatalf("failed to disable account %s: %v", accountID, err)
-	}
-}
-
 func enableAccount(t *testing.T, ctx context.Context, queries *database.Queries, accountID uuid.UUID) {
 	_, err := queries.EnableAccount(ctx, accountID)
 	if err != nil {

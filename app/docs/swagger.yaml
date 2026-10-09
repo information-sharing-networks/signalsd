@@ -1591,6 +1591,10 @@ paths:
           description: forbidden
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
         "500":
           description: database_error
           schema:
@@ -1643,6 +1647,10 @@ paths:
           description: forbidden
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
         "500":
           description: database_error
           schema:
@@ -1680,6 +1688,10 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
           description: forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: resource_not_found
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "500":
@@ -1726,6 +1738,10 @@ paths:
             $ref: '#/definitions/responses.ErrorResponse'
         "403":
           description: forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: resource_not_found
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
         "500":
@@ -2252,7 +2268,7 @@ paths:
         Replaces the route config for the specified signal type path
 
         the routing_field must be a plain Dot Notation path that is defined in the signal type's schema -
-        under the covers the service uses gjson paths, however the special pattern matching symbols (*?#@|!()[]%<>=) and numeric (array index) path segments are not currently allowed.
+        under the covers the service uses gjson paths, however the special pattern matching symbols (*?#@|!()[]%<>=), empty path segments and numeric (array index) path segments are not currently allowed.
 
         When using the 'matches' and 'does_not_match' operators, any occurrence of '*' and '?' in the matching pattern will be treated as a wildcard ('equals' and 'does_not_equal' compare the pattern literally).
         The pattern is always compared to the full contents of the specified routing field.
@@ -2262,7 +2278,7 @@ paths:
         Where the routing field is an array, the rule matches if one or more elements match
         (for 'does_not_match' and 'does_not_equal', if one or more elements do not match the pattern).
 
-        The new config is used by the router within 30 seconds.
+        The new config is used immediately by the instance that handled the request, and by the other instances of the service within 30 seconds.
       parameters:
       - description: signal type slug
         example: sample-signal-type
@@ -2692,7 +2708,8 @@ paths:
         This endpoint accepts expired (but not revoked) credentials, so a service account that
         missed a rotation deadline can still self-serve recovery without admin intervention.
         The old secret remains valid for 5 minutes after rotation to prevent race conditions
-        in distributed deployments or when network issues prevent clients receiving the new secret immediately.
+        in distributed deployments or when network issues prevent clients receiving the new secret immediately
+        (if the response is lost, the old secret can be used to rotate again during those 5 minutes).
 
         **Use Cases:**
         - Regular credential rotation for security compliance

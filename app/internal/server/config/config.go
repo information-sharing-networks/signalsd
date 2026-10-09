@@ -160,6 +160,13 @@ var SupportedDocumentFormats = map[string][]string{
 	"text/xml":        {".xml"},
 }
 
+// ValidBumpTypes are the ways a signal type's sem_ver can be incremented when a new version is created
+var ValidBumpTypes = map[string]bool{
+	"major": true,
+	"minor": true,
+	"patch": true,
+}
+
 // ValidRouteMatchingOperators list the limited set of operations supported for isn routes
 var ValidRouteMatchingOperators = map[string]bool{
 	"matches":        true,

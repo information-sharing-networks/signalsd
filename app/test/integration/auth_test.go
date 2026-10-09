@@ -17,6 +17,7 @@ package integration
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -570,10 +571,22 @@ func TestDisabledAccountAuth(t *testing.T) {
 	grantPermission(t, ctx, testEnv.queries, siteAdminISN.ID, memberAccount.ID, "write")
 	grantPermission(t, ctx, testEnv.queries, siteAdminISN.ID, serviceAccount.ID, "write")
 
+	// accounts are disabled using the admin endpoint, since the handler is responsible for revoking the account's credentials
+	siteAdminToken := testEnv.getAccessToken(t, siteAdminAccount.ID)
+	disableAccountURL := func(accountID fmt.Stringer) string {
+		return fmt.Sprintf("%s/api/admin/accounts/%s/disable", testEnv.baseURL, accountID)
+	}
+
 	// note the authservice uses the accountID in the context to determine the account being accessed
 	ctx = auth.ContextWithAccountID(context.Background(), memberAccount.ID)
+
+	// give the web user a refresh token (as if they had logged in), so the test can check it is revoked
+	if _, err := authService.RotateRefreshToken(ctx); err != nil {
+		t.Fatalf("Failed to create refresh token: %v", err)
+	}
+
 	t.Run("disabled web user account access denied", func(t *testing.T) {
-		disableAccount(t, ctx, testEnv.queries, memberAccount.ID)
+		expectStatus(t, sendAdminRequest(t, http.MethodPost, disableAccountURL(memberAccount.ID), siteAdminToken, nil), http.StatusOK)
 		_, err := authService.CreateAccessToken(ctx)
 		if err == nil {
 			t.Errorf("disabled web user account %v was allowed to create an access token ", memberAccount.ID)
@@ -603,7 +616,7 @@ func TestDisabledAccountAuth(t *testing.T) {
 	ctx = auth.ContextWithAccountID(context.Background(), serviceAccount.ID)
 
 	t.Run("disabled service account access denied", func(t *testing.T) {
-		disableAccount(t, ctx, testEnv.queries, serviceAccount.ID)
+		expectStatus(t, sendAdminRequest(t, http.MethodPost, disableAccountURL(serviceAccount.ID), siteAdminToken, nil), http.StatusOK)
 		_, err := authService.CreateAccessToken(ctx)
 		if err == nil {
 			t.Errorf("disabled service account %v was allowed to create an access token ", serviceAccount.ID)
@@ -616,7 +629,7 @@ func TestDisabledAccountAuth(t *testing.T) {
 		}
 
 		if count != 0 {
-			t.Errorf("found %v active client secrets for disabled service account %v", count, memberAccount.ID)
+			t.Errorf("found %v active client secrets for disabled service account %v", count, serviceAccount.ID)
 		}
 
 	})

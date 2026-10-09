@@ -549,16 +549,6 @@ paths:
       summary: Grant or revoke site admin role
       tags:
       - HTMX Actions
-  /ui-api/alerts/clear:
-    get:
-      description: HTMX endpoint. Returns empty content to clear any displayed alert
-        partial.
-      responses:
-        "200":
-          description: empty
-      summary: Clear alert messages
-      tags:
-      - HTMX Actions
   /ui-api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}/content:
     get:
       description: Streams the document stored with a document signal from the signalsd

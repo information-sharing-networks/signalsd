@@ -241,9 +241,12 @@ SELECT st2.sem_ver,
 FROM signal_types st2
 WHERE st2.slug = $1
   AND st2.sem_ver =
-    (SELECT max(st3.sem_ver)
+    -- compare the versions numerically (as text, 0.0.9 sorts after 0.0.10)
+    (SELECT st3.sem_ver
      FROM signal_types st3
-     WHERE st3.slug = $1)
+     WHERE st3.slug = $1
+     ORDER BY string_to_array(st3.sem_ver, '.')::int[] DESC
+     LIMIT 1)
 `
 
 type GetLatestSlugVersionRow struct {

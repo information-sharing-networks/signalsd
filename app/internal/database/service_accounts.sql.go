@@ -16,10 +16,10 @@ const CountActiveClientSecrets = `-- name: CountActiveClientSecrets :one
 SELECT COUNT(*) as active_client_secrets 
 FROM client_secrets
 WHERE service_account_account_id = $1
-AND revoked_at IS NOT NULL
+AND (revoked_at IS NULL OR revoked_at > NOW())
 `
 
-// used in integration tests
+// used in integration tests: counts the secrets that are not revoked (including secrets scheduled for revocation)
 func (q *Queries) CountActiveClientSecrets(ctx context.Context, serviceAccountAccountID uuid.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, CountActiveClientSecrets, serviceAccountAccountID)
 	var active_client_secrets int64
@@ -172,7 +172,7 @@ const GetNonRevokedClientSecretByHashedSecret = `-- name: GetNonRevokedClientSec
 SELECT hashed_secret, created_at, updated_at, service_account_account_id, expires_at, revoked_at FROM client_secrets
 WHERE hashed_secret = $1
 AND service_account_account_id = $2
-AND revoked_at IS NULL
+AND (revoked_at IS NULL OR revoked_at > NOW())
 `
 
 type GetNonRevokedClientSecretByHashedSecretParams struct {
@@ -181,6 +181,7 @@ type GetNonRevokedClientSecretByHashedSecretParams struct {
 }
 
 // used for rotation: allows expired but not revoked credentials
+// (a secret scheduled for revocation can still be used to rotate until revoked_at, e.g. if the client did not receive the response to an earlier rotation)
 func (q *Queries) GetNonRevokedClientSecretByHashedSecret(ctx context.Context, arg GetNonRevokedClientSecretByHashedSecretParams) (ClientSecret, error) {
 	row := q.db.QueryRow(ctx, GetNonRevokedClientSecretByHashedSecret, arg.HashedSecret, arg.ServiceAccountAccountID)
 	var i ClientSecret
@@ -319,7 +320,7 @@ const GetValidClientSecretByHashedSecret = `-- name: GetValidClientSecretByHashe
 SELECT hashed_secret, created_at, updated_at, service_account_account_id, expires_at, revoked_at FROM client_secrets
 WHERE hashed_secret = $1
 AND service_account_account_id = $2
-AND revoked_at IS NULL
+AND (revoked_at IS NULL OR revoked_at > NOW())
 AND expires_at > NOW()
 `
 
@@ -329,6 +330,7 @@ type GetValidClientSecretByHashedSecretParams struct {
 }
 
 // used for authentication: does not return expired or revoked credentials
+// (a secret scheduled for revocation remains valid until revoked_at)
 //
 // the secret must belong to the service account being authenticated.
 func (q *Queries) GetValidClientSecretByHashedSecret(ctx context.Context, arg GetValidClientSecretByHashedSecretParams) (ClientSecret, error) {
@@ -349,7 +351,7 @@ const GetValidClientSecretByServiceAccountAccountId = `-- name: GetValidClientSe
 SELECT hashed_secret, expires_at
 FROM client_secrets
 WHERE service_account_account_id = $1
-  AND revoked_at IS NULL
+  AND (revoked_at IS NULL OR revoked_at > NOW())
   AND expires_at > NOW()
 `
 
@@ -358,7 +360,7 @@ type GetValidClientSecretByServiceAccountAccountIdRow struct {
 	ExpiresAt    time.Time `json:"expires_at"`
 }
 
-// only returns unrevoked/unexpired secrets
+// only returns unrevoked/unexpired secrets (a secret scheduled for revocation remains valid until revoked_at)
 func (q *Queries) GetValidClientSecretByServiceAccountAccountId(ctx context.Context, serviceAccountAccountID uuid.UUID) (GetValidClientSecretByServiceAccountAccountIdRow, error) {
 	row := q.db.QueryRow(ctx, GetValidClientSecretByServiceAccountAccountId, serviceAccountAccountID)
 	var i GetValidClientSecretByServiceAccountAccountIdRow
@@ -369,9 +371,10 @@ func (q *Queries) GetValidClientSecretByServiceAccountAccountId(ctx context.Cont
 const RevokeAllClientSecretsForAccount = `-- name: RevokeAllClientSecretsForAccount :execrows
 UPDATE client_secrets SET (updated_at, revoked_at) = (NOW(), NOW())
 WHERE service_account_account_id = $1
-AND revoked_at IS NULL
+AND (revoked_at IS NULL OR revoked_at > NOW())
 `
 
+// revokes immediately, including secrets that are scheduled for revocation (see ScheduleRevokeAllClientSecretsForAccount)
 func (q *Queries) RevokeAllClientSecretsForAccount(ctx context.Context, serviceAccountAccountID uuid.UUID) (int64, error) {
 	result, err := q.db.Exec(ctx, RevokeAllClientSecretsForAccount, serviceAccountAccountID)
 	if err != nil {
@@ -394,11 +397,13 @@ func (q *Queries) RevokeClientSecret(ctx context.Context, hashedSecret string) (
 }
 
 const ScheduleRevokeAllClientSecretsForAccount = `-- name: ScheduleRevokeAllClientSecretsForAccount :execrows
-UPDATE client_secrets SET (updated_at, revoked_at) = (NOW() + INTERVAL '5 minutes', NOW())
+UPDATE client_secrets SET (updated_at, revoked_at) = (NOW(), NOW() + INTERVAL '5 minutes')
 WHERE service_account_account_id = $1
 AND revoked_at IS NULL
 `
 
+// used when a secret is rotated: the existing secrets remain valid for 5 minutes, so clients that have not yet received the new secret keep working.
+// (secrets that are already scheduled for revocation keep their existing revocation time)
 func (q *Queries) ScheduleRevokeAllClientSecretsForAccount(ctx context.Context, serviceAccountAccountID uuid.UUID) (int64, error) {
 	result, err := q.db.Exec(ctx, ScheduleRevokeAllClientSecretsForAccount, serviceAccountAccountID)
 	if err != nil {

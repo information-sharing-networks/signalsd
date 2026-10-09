@@ -177,6 +177,12 @@
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
+                    "404": {
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "database_error",
                         "schema": {
@@ -224,6 +230,12 @@
                     },
                     "403": {
                         "description": "forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "resource_not_found",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -281,6 +293,12 @@
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
+                    "404": {
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "database_error",
                         "schema": {
@@ -328,6 +346,12 @@
                     },
                     "403": {
                         "description": "forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "resource_not_found",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -970,7 +994,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Replaces the route config for the specified signal type path\n\nthe routing_field must be a plain Dot Notation path that is defined in the signal type's schema -\nunder the covers the service uses gjson paths, however the special pattern matching symbols (*?#@|!()[]%\u003c\u003e=) and numeric (array index) path segments are not currently allowed.\n\nWhen using the 'matches' and 'does_not_match' operators, any occurrence of '*' and '?' in the matching pattern will be treated as a wildcard ('equals' and 'does_not_equal' compare the pattern literally).\nThe pattern is always compared to the full contents of the specified routing field.\n\nPatterns are matched in order according to the supplied sequence number (smallest sequence first)\nand the first match is accepted. Each rule must have a different sequence number.\nWhere the routing field is an array, the rule matches if one or more elements match\n(for 'does_not_match' and 'does_not_equal', if one or more elements do not match the pattern).\n\nThe new config is used by the router within 30 seconds.",
+                "description": "Replaces the route config for the specified signal type path\n\nthe routing_field must be a plain Dot Notation path that is defined in the signal type's schema -\nunder the covers the service uses gjson paths, however the special pattern matching symbols (*?#@|!()[]%\u003c\u003e=), empty path segments and numeric (array index) path segments are not currently allowed.\n\nWhen using the 'matches' and 'does_not_match' operators, any occurrence of '*' and '?' in the matching pattern will be treated as a wildcard ('equals' and 'does_not_equal' compare the pattern literally).\nThe pattern is always compared to the full contents of the specified routing field.\n\nPatterns are matched in order according to the supplied sequence number (smallest sequence first)\nand the first match is accepted. Each rule must have a different sequence number.\nWhere the routing field is an array, the rule matches if one or more elements match\n(for 'does_not_match' and 'does_not_equal', if one or more elements do not match the pattern).\n\nThe new config is used immediately by the instance that handled the request, and by the other instances of the service within 30 seconds.",
                 "tags": [
                     "Signals Routing"
                 ],
@@ -1575,7 +1599,7 @@
         },
         "/api/auth/service-accounts/rotate-secret": {
             "post": {
-                "description": "Self-service endpoint for service accounts to rotate their client secret.\nThis endpoint accepts expired (but not revoked) credentials, so a service account that\nmissed a rotation deadline can still self-serve recovery without admin intervention.\nThe old secret remains valid for 5 minutes after rotation to prevent race conditions\nin distributed deployments or when network issues prevent clients receiving the new secret immediately.\n\n**Use Cases:**\n- Regular credential rotation for security compliance\n- Recovery from a missed rotation deadline (expired secret)\n- Suspected credential compromise requiring immediate rotation\n\nClient secrets expire after 1 year.\n\nCredentials can be supplied as form fields or via HTTP Basic Auth (`Authorization: Basic base64(client_id:client_secret)`).",
+                "description": "Self-service endpoint for service accounts to rotate their client secret.\nThis endpoint accepts expired (but not revoked) credentials, so a service account that\nmissed a rotation deadline can still self-serve recovery without admin intervention.\nThe old secret remains valid for 5 minutes after rotation to prevent race conditions\nin distributed deployments or when network issues prevent clients receiving the new secret immediately\n(if the response is lost, the old secret can be used to rotate again during those 5 minutes).\n\n**Use Cases:**\n- Regular credential rotation for security compliance\n- Recovery from a missed rotation deadline (expired secret)\n- Suspected credential compromise requiring immediate rotation\n\nClient secrets expire after 1 year.\n\nCredentials can be supplied as form fields or via HTTP Basic Auth (`Authorization: Basic base64(client_id:client_secret)`).",
                 "consumes": [
                     "application/x-www-form-urlencoded"
                 ],

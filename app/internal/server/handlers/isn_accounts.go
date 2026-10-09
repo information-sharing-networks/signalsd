@@ -125,6 +125,9 @@ func (i *IsnAccountHandler) UpdateIsnAccountPermission(w http.ResponseWriter, r 
 
 	targetAccount, err := i.queries.GetAccountByID(r.Context(), targetAccountID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperrors.NotFound("account not found", nil)
+		}
 		logger.AddLogAttrs(r.Context(),
 			slog.String("target_account_id", targetAccountID.String()),
 		)

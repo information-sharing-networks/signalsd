@@ -185,7 +185,7 @@ func (i *IsnHandler) CreateIsn(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	if !signalsd.ValidVisibilities[*req.Visibility] {
-		return apperrors.MalformedBody(fmt.Sprintf("invalid visiblity value: %s", *req.Visibility), nil)
+		return apperrors.MalformedBody(fmt.Sprintf("invalid visibility value: %s", *req.Visibility), nil)
 	}
 
 	// create isn
@@ -292,6 +292,9 @@ func (i *IsnHandler) UpdateIsn(w http.ResponseWriter, r *http.Request) error {
 		isn.IsInUse = *req.IsInUse
 	}
 	if req.Visibility != nil {
+		if !signalsd.ValidVisibilities[*req.Visibility] {
+			return apperrors.MalformedBody(fmt.Sprintf("invalid visibility value: %s", *req.Visibility), nil)
+		}
 		isn.Visibility = *req.Visibility
 	}
 
@@ -406,14 +409,15 @@ func (s *IsnHandler) GetIsn(w http.ResponseWriter, r *http.Request) error {
 
 	// Convert database structs to our response structs
 	isn := Isn{
-		ID:         dbIsn.ID,
-		CreatedAt:  dbIsn.CreatedAt,
-		UpdatedAt:  dbIsn.UpdatedAt,
-		Title:      dbIsn.Title,
-		Slug:       dbIsn.Slug,
-		Detail:     dbIsn.Detail,
-		IsInUse:    dbIsn.IsInUse,
-		Visibility: dbIsn.Visibility,
+		ID:            dbIsn.ID,
+		CreatedAt:     dbIsn.CreatedAt,
+		UpdatedAt:     dbIsn.UpdatedAt,
+		UserAccountID: dbIsn.UserAccountID,
+		Title:         dbIsn.Title,
+		Slug:          dbIsn.Slug,
+		Detail:        dbIsn.Detail,
+		IsInUse:       dbIsn.IsInUse,
+		Visibility:    dbIsn.Visibility,
 	}
 
 	user := User{

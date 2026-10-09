@@ -268,6 +268,7 @@ func (u *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) err
 //	@Failure		400	{object}	responses.ErrorResponse	"invalid_request"
 //	@Failure		401	{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
@@ -289,6 +290,9 @@ func (u *UserHandler) GrantUserIsnAdminRole(w http.ResponseWriter, r *http.Reque
 	}
 	targetAccount, err := u.queries.GetAccountByID(r.Context(), targetAccountID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperrors.NotFound("account not found", nil)
+		}
 		logger.AddLogAttrs(r.Context(),
 			slog.String("target_account_id", targetAccountID.String()),
 		)
@@ -307,6 +311,11 @@ func (u *UserHandler) GrantUserIsnAdminRole(w http.ResponseWriter, r *http.Reque
 
 	if targetAccount.AccountRole == "isnadmin" {
 		return apperrors.InvalidRequest("this account is already an admin", nil)
+	}
+
+	// site admins already have every ISN admin permission - granting the ISN admin role would demote them
+	if targetAccount.AccountRole == "siteadmin" {
+		return apperrors.InvalidRequest("this account is a site admin - revoke the site admin role first", nil)
 	}
 
 	//update user role
@@ -342,6 +351,7 @@ func (u *UserHandler) GrantUserIsnAdminRole(w http.ResponseWriter, r *http.Reque
 //	@Failure		400	{object}	responses.ErrorResponse	"invalid_request"
 //	@Failure		401	{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
@@ -363,6 +373,9 @@ func (u *UserHandler) RevokeUserIsnAdminRole(w http.ResponseWriter, r *http.Requ
 	}
 	targetAccount, err := u.queries.GetAccountByID(r.Context(), targetAccountID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperrors.NotFound("account not found", nil)
+		}
 		logger.AddLogAttrs(r.Context(),
 			slog.String("target_account_id", targetAccountID.String()),
 		)
@@ -424,6 +437,7 @@ func (u *UserHandler) RevokeUserIsnAdminRole(w http.ResponseWriter, r *http.Requ
 //	@Failure		400	{object}	responses.ErrorResponse	"invalid_request"
 //	@Failure		401	{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
@@ -446,6 +460,9 @@ func (u *UserHandler) GrantUserSiteAdminRole(w http.ResponseWriter, r *http.Requ
 
 	targetAccount, err := u.queries.GetAccountByID(r.Context(), targetAccountID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperrors.NotFound("account not found", nil)
+		}
 		logger.AddLogAttrs(r.Context(),
 			slog.String("target_account_id", targetAccountID.String()),
 		)
@@ -499,6 +516,7 @@ func (u *UserHandler) GrantUserSiteAdminRole(w http.ResponseWriter, r *http.Requ
 //	@Failure		400	{object}	responses.ErrorResponse	"invalid_request"
 //	@Failure		401	{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
 //	@Failure		403	{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		404	{object}	responses.ErrorResponse	"resource_not_found"
 //	@Failure		500	{object}	responses.ErrorResponse	"database_error"
 //
 //	@Security		BearerAccessToken
@@ -521,6 +539,9 @@ func (u *UserHandler) RevokeUserSiteAdminRole(w http.ResponseWriter, r *http.Req
 
 	targetAccount, err := u.queries.GetAccountByID(r.Context(), targetAccountID)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperrors.NotFound("account not found", nil)
+		}
 		logger.AddLogAttrs(r.Context(),
 			slog.String("target_account_id", targetAccountID.String()),
 		)

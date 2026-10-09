@@ -16,10 +16,11 @@ const CountActiveRefreshTokens = `-- name: CountActiveRefreshTokens :one
 SELECT COUNT(*) AS unrevoked_count 
 FROM refresh_tokens
 WHERE user_account_id = $1
-AND revoked_at IS NOT NULL
+AND revoked_at IS NULL
+AND expires_at > NOW()
 `
 
-// used as part of integration tests
+// used as part of integration tests: counts the refresh tokens that are not revoked or expired
 func (q *Queries) CountActiveRefreshTokens(ctx context.Context, userAccountID uuid.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, CountActiveRefreshTokens, userAccountID)
 	var unrevoked_count int64

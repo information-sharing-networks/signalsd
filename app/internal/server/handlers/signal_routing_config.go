@@ -124,7 +124,7 @@ func (h *RoutingConfigHandler) GetSignalRoutingConfig(w http.ResponseWriter, r *
 //	@Description	Replaces the route config for the specified signal type path
 //	@Description
 //	@Description	the routing_field must be a plain Dot Notation path that is defined in the signal type's schema -
-//	@Description	under the covers the service uses gjson paths, however the special pattern matching symbols (*?#@|!()[]%<>=) and numeric (array index) path segments are not currently allowed.
+//	@Description	under the covers the service uses gjson paths, however the special pattern matching symbols (*?#@|!()[]%<>=), empty path segments and numeric (array index) path segments are not currently allowed.
 //	@Description
 //	@Description	When using the 'matches' and 'does_not_match' operators, any occurrence of '*' and '?' in the matching pattern will be treated as a wildcard ('equals' and 'does_not_equal' compare the pattern literally).
 //	@Description	The pattern is always compared to the full contents of the specified routing field.
@@ -134,7 +134,7 @@ func (h *RoutingConfigHandler) GetSignalRoutingConfig(w http.ResponseWriter, r *
 //	@Description	Where the routing field is an array, the rule matches if one or more elements match
 //	@Description	(for 'does_not_match' and 'does_not_equal', if one or more elements do not match the pattern).
 //	@Description
-//	@Description	The new config is used by the router within 30 seconds.
+//	@Description	The new config is used immediately by the instance that handled the request, and by the other instances of the service within 30 seconds.
 //
 //	@Param			signal_type_slug	path	string										true	"signal type slug"	example(sample-signal-type)
 //	@Param			sem_ver				path	string										true	"version"			example(1.0.0)
@@ -171,8 +171,11 @@ func (h *RoutingConfigHandler) UpdateSignalRoutingConfig(w http.ResponseWriter, 
 		return apperrors.MalformedBody("routing_field must be a plain JSON path (e.g. payload.portOfEntry) - wildcards and gjson operators are not supported", nil)
 	}
 
-	// prevent numeric path segments (gjson array index access e.g. payload.0.item)
+	// prevent empty and numeric path segments (gjson array index access e.g. payload.0.item)
 	for seg := range strings.SplitSeq(req.RoutingField, ".") {
+		if seg == "" {
+			return apperrors.MalformedBody("routing_field must not contain empty segments (e.g. payload..item)", nil)
+		}
 		if _, err := strconv.Atoi(seg); err == nil {
 			return apperrors.MalformedBody("routing_field must not contain numeric segments - routing by array index is not supported", nil)
 		}
@@ -183,7 +186,13 @@ func (h *RoutingConfigHandler) UpdateSignalRoutingConfig(w http.ResponseWriter, 
 	}
 
 	// Validate routes
+	sequences := make(map[int32]bool, len(req.RoutingRules))
 	for i, rule := range req.RoutingRules {
+
+		if sequences[rule.Sequence] {
+			return apperrors.MalformedBody(fmt.Sprintf("mapping[%d]: sequence %d is used by more than one rule - each rule must have a different sequence", i, rule.Sequence), nil)
+		}
+		sequences[rule.Sequence] = true
 
 		if rule.MatchPattern == "" || rule.IsnSlug == "" {
 			return apperrors.MalformedBody(fmt.Sprintf("mapping[%d]: match_pattern and isn_slug are required", i), nil)
@@ -277,6 +286,11 @@ func (h *RoutingConfigHandler) UpdateSignalRoutingConfig(w http.ResponseWriter, 
 
 	if err := tx.Commit(r.Context()); err != nil {
 		return apperrors.DatabaseError("database error", err)
+	}
+
+	// refresh the cache for this instance (polling will catch-up the other instances eventually)
+	if err := h.signalRouterCache.Load(r.Context()); err != nil {
+		logger.AddLogAttrs(r.Context(), slog.String("router_cache_reload_error", err.Error()))
 	}
 
 	return responses.NoContent(w, http.StatusNoContent)

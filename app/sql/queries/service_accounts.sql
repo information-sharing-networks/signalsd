@@ -33,11 +33,11 @@ WHERE service_account_account_id = (SELECT account_id
 AND expires_at > NOW();
 
 -- name: GetValidClientSecretByServiceAccountAccountId :one
--- only returns unrevoked/unexpired secrets
+-- only returns unrevoked/unexpired secrets (a secret scheduled for revocation remains valid until revoked_at)
 SELECT hashed_secret, expires_at
 FROM client_secrets
 WHERE service_account_account_id = $1
-  AND revoked_at IS NULL
+  AND (revoked_at IS NULL OR revoked_at > NOW())
   AND expires_at > NOW();
 
 -- name: RevokeClientSecret :execrows
@@ -45,19 +45,22 @@ UPDATE client_secrets SET (updated_at, revoked_at) = (NOW(), NOW())
 WHERE hashed_secret = $1;
 
 -- name: RevokeAllClientSecretsForAccount :execrows
+-- revokes immediately, including secrets that are scheduled for revocation (see ScheduleRevokeAllClientSecretsForAccount)
 UPDATE client_secrets SET (updated_at, revoked_at) = (NOW(), NOW())
 WHERE service_account_account_id = $1
-AND revoked_at IS NULL;
+AND (revoked_at IS NULL OR revoked_at > NOW());
 
 -- name: CountActiveClientSecrets :one
--- used in integration tests
+-- used in integration tests: counts the secrets that are not revoked (including secrets scheduled for revocation)
 SELECT COUNT(*) as active_client_secrets 
 FROM client_secrets
 WHERE service_account_account_id = $1
-AND revoked_at IS NOT NULL;
+AND (revoked_at IS NULL OR revoked_at > NOW());
 
 -- name: ScheduleRevokeAllClientSecretsForAccount :execrows
-UPDATE client_secrets SET (updated_at, revoked_at) = (NOW() + INTERVAL '5 minutes', NOW())
+-- used when a secret is rotated: the existing secrets remain valid for 5 minutes, so clients that have not yet received the new secret keep working.
+-- (secrets that are already scheduled for revocation keep their existing revocation time)
+UPDATE client_secrets SET (updated_at, revoked_at) = (NOW(), NOW() + INTERVAL '5 minutes')
 WHERE service_account_account_id = $1
 AND revoked_at IS NULL;
 
@@ -81,20 +84,22 @@ WHERE id = $1;
 
 -- name: GetValidClientSecretByHashedSecret :one
 -- used for authentication: does not return expired or revoked credentials
+-- (a secret scheduled for revocation remains valid until revoked_at)
 --
 -- the secret must belong to the service account being authenticated.
 SELECT * FROM client_secrets
 WHERE hashed_secret = $1
 AND service_account_account_id = $2
-AND revoked_at IS NULL
+AND (revoked_at IS NULL OR revoked_at > NOW())
 AND expires_at > NOW();
 
 -- name: GetNonRevokedClientSecretByHashedSecret :one
 -- used for rotation: allows expired but not revoked credentials
+-- (a secret scheduled for revocation can still be used to rotate until revoked_at, e.g. if the client did not receive the response to an earlier rotation)
 SELECT * FROM client_secrets
 WHERE hashed_secret = $1
 AND service_account_account_id = $2
-AND revoked_at IS NULL;
+AND (revoked_at IS NULL OR revoked_at > NOW());
 
 -- name: GetServiceAccountByClientID :one
 SELECT sa.* FROM service_accounts sa

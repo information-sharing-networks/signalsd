@@ -537,20 +537,6 @@
                 }
             }
         },
-        "/ui-api/alerts/clear": {
-            "get": {
-                "description": "HTMX endpoint. Returns empty content to clear any displayed alert partial.",
-                "tags": [
-                    "HTMX Actions"
-                ],
-                "summary": "Clear alert messages",
-                "responses": {
-                    "200": {
-                        "description": "empty"
-                    }
-                }
-            }
-        },
         "/ui-api/isn/accounts/manage": {
             "put": {
                 "description": "HTMX endpoint. Adds or removes a user/service account from an ISN. Requires admin rights for at least one ISN (the ISN owner, or a site admin).",

@@ -263,3 +263,77 @@ func TestClientSecretIsBoundToServiceAccount(t *testing.T) {
 		})
 	})
 }
+
+// TestClientSecretRotationGracePeriod checks that a rotated secret keeps working for a short time
+// (so clients that have not yet received the new secret are not locked out), and that revoking the
+// account's secrets ends the grace period immediately.
+func TestClientSecretRotationGracePeriod(t *testing.T) {
+	ctx := context.Background()
+
+	testEnv := startInProcessServer(t, "")
+
+	siteAdminAccount := createTestAccount(t, ctx, testEnv.queries, "siteadmin", "user", "siteadmin@grace.test")
+	siteAdminToken := testEnv.getAccessToken(t, siteAdminAccount.ID)
+
+	// rotateSecret rotates the account's secret and returns the new secret
+	rotateSecret := func(t *testing.T, account testServiceAccount) string {
+		t.Helper()
+		response := makeRotateSecretRequest(t, testEnv.baseURL, account.clientID, account.secret)
+		responseBody := expectJSONResponse(t, response, http.StatusOK)
+		newSecret, ok := responseBody["client_secret"].(string)
+		if !ok || newSecret == "" {
+			t.Fatal("Expected a new client_secret in the rotation response")
+		}
+		return newSecret
+	}
+
+	// expectTokenStatus requests an access token with the supplied credentials and checks the response status
+	expectTokenStatus := func(t *testing.T, clientID, clientSecret string, expectedStatus int) {
+		t.Helper()
+		response := makeOAuthTokenRequest(t, testEnv.baseURL, "client_credentials", map[string]string{
+			"client_id":     clientID,
+			"client_secret": clientSecret,
+		}, "")
+		defer response.Body.Close()
+		if response.StatusCode != expectedStatus {
+			t.Errorf("Expected status %d, got %d", expectedStatus, response.StatusCode)
+		}
+	}
+
+	t.Run("old secret works until the grace period ends", func(t *testing.T) {
+		account := createServiceAccountWithSecret(t, ctx, testEnv, "rotated@grace.test", time.Hour)
+		newSecret := rotateSecret(t, account)
+
+		expectTokenStatus(t, account.clientID, account.secret, http.StatusOK)
+		expectTokenStatus(t, account.clientID, newSecret, http.StatusOK)
+
+		// end the grace period
+		_, err := testEnv.pool.Exec(ctx, `UPDATE client_secrets SET revoked_at = NOW() - INTERVAL '1 second'
+			WHERE service_account_account_id = $1 AND revoked_at IS NOT NULL`, account.accountID)
+		if err != nil {
+			t.Fatalf("Failed to end the grace period: %v", err)
+		}
+
+		expectTokenStatus(t, account.clientID, account.secret, http.StatusUnauthorized)
+		expectTokenStatus(t, account.clientID, newSecret, http.StatusOK)
+	})
+
+	t.Run("disabling the account revokes secrets in their grace period", func(t *testing.T) {
+		account := createServiceAccountWithSecret(t, ctx, testEnv, "disabled@grace.test", time.Hour)
+		newSecret := rotateSecret(t, account)
+
+		url := fmt.Sprintf("%s/api/admin/accounts/%s/disable", testEnv.baseURL, account.accountID)
+		expectStatus(t, sendAdminRequest(t, http.MethodPost, url, siteAdminToken, nil), http.StatusOK)
+
+		count, err := testEnv.queries.CountActiveClientSecrets(ctx, account.accountID)
+		if err != nil {
+			t.Fatalf("Failed to count active client secrets: %v", err)
+		}
+		if count != 0 {
+			t.Errorf("found %d active client secrets for the disabled service account", count)
+		}
+
+		expectTokenStatus(t, account.clientID, account.secret, http.StatusUnauthorized)
+		expectTokenStatus(t, account.clientID, newSecret, http.StatusUnauthorized)
+	})
+}

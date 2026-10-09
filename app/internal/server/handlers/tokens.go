@@ -239,7 +239,8 @@ func (a *TokenHandler) RevokeRefreshToken(w http.ResponseWriter, r *http.Request
 //	@Description	This endpoint accepts expired (but not revoked) credentials, so a service account that
 //	@Description	missed a rotation deadline can still self-serve recovery without admin intervention.
 //	@Description	The old secret remains valid for 5 minutes after rotation to prevent race conditions
-//	@Description	in distributed deployments or when network issues prevent clients receiving the new secret immediately.
+//	@Description	in distributed deployments or when network issues prevent clients receiving the new secret immediately
+//	@Description	(if the response is lost, the old secret can be used to rotate again during those 5 minutes).
 //	@Description
 //	@Description	**Use Cases:**
 //	@Description	- Regular credential rotation for security compliance
