@@ -1,3 +1,6 @@
+# check=skip=InvalidDefaultArgInFrom
+# (GO_VERSION has no default by design - see below)
+#
 # build the signalsd service image for prod using scratch base.
 #
 # Note that the historical need to copy ca-certificates and tzdata from builder images do not apply in Go 1.25+
@@ -6,10 +9,12 @@
 # - Static compilation (CGO_ENABLED=0) ensures all dependencies are embedded in the binary 
 
 
-# GO version is replaced by the github workflow with the version in app/go.mod
-# if running the dockerfile locally set GO_VERSION in your env to overwrite the default below
+# GO_VERSION must be supplied as a build arg - the github workflows pass the version in app/go.mod.
+# There is deliberately no default (a default would go out of date when go.mod is updated) - if it is not set
+# the build fails with an "invalid reference format" error. To build locally:
+#   docker build --build-arg GO_VERSION=$(grep '^go ' app/go.mod | awk '{print $2}') -f app/Dockerfile .
 
-ARG GO_VERSION=1.26.2 
+ARG GO_VERSION
 FROM golang:${GO_VERSION}-alpine AS builder
 
 WORKDIR /app
