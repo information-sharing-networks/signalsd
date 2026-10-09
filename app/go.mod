@@ -1,6 +1,6 @@
 module github.com/information-sharing-networks/signalsd/app
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/a-h/templ v0.3.1020
