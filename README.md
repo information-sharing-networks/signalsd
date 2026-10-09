@@ -171,7 +171,18 @@ The app uses the following go tools:
 - govulncheck - vulnerability scanner
 - Air - live reload
 
-These tools are defined in the tools section of `mod.go` and installed as part of the docker image.
+These tools are defined in the tool section of `app/go.mod` and installed as part of the docker image.
+
+#### Upgrading Go
+The Go version is set by the `go` line in `app/go.mod` (the docker image and the CI builds use the same version). To upgrade:
+
+1. Update the `go` line in `app/go.mod`
+2. `make docker-build` - rebuild the image with the new toolchain
+3. `make update-tools` - upgrade the go tools (older versions may not support the new Go release)
+4. `make check` - confirm everything passes
+5. Commit `app/go.mod` and `app/go.sum`
+
+Other developers will need to rebuild their image (`make docker-build`) and upgrade their local Go installation.
 
 The Docker app is started with Air which will restart the service whenever you save changes to the code. 
 Air is configured to automatically run code generation (templ, sqlc and swag) and applies any pending database migrations before restarting the signalsd server.

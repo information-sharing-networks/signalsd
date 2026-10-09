@@ -1,7 +1,7 @@
 # Docker-based Makefile for signalsd
 # Uses tools installed in Docker containers instead of local installations
 
-.PHONY: help psql check generate docs swag-fmt sqlc fmt vet lint security vuln test clean docker-up docker-down docker-reset templ go-api go-ui db-migrate-up db-migrate-down check-containers go-all
+.PHONY: help psql check generate docs swag-fmt sqlc fmt vet lint security vuln update-tools test clean docker-up docker-down docker-reset templ go-api go-ui db-migrate-up db-migrate-down check-containers go-all
 
 export GO_VERSION := $(shell grep '^go ' app/go.mod | awk '{print $$2}')
 
@@ -42,6 +42,7 @@ help:
 	@echo "  make lint            - Run staticcheck"
 	@echo "  make security        - Run gosec security analysis"
 	@echo "  make vuln            - Run govulncheck vulnerability scan"
+	@echo "  make update-tools    - Upgrade the go tools in app/go.mod (run after bumping the Go version)"
 	@echo "  make restart         - restart the docker app"
 	@echo "  make logs            - follow docker logs"
 	@echo "  make psql            - run psql agaist the dev database"
@@ -145,6 +146,13 @@ vuln:
 	@echo "🔍 Running vulnerability scan..."
 	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && go tool govulncheck ./..."
 
+
+# Upgrade the go tools listed in app/go.mod (staticcheck, govulncheck, sqlc etc).
+# Run after bumping the go version in app/go.mod and rebuilding the image (make docker-build) -
+# the tools must support the new Go version. Then run make check and commit app/go.mod and app/go.sum.
+update-tools:
+	@echo "🔧 Updating go tools..."
+	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && go get tool && go mod tidy"
 
 # Clean build artifacts
 clean:
