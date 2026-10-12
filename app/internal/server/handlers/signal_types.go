@@ -29,19 +29,26 @@ func NewSignalTypeHandler(queries *database.Queries) *SignalTypeHandler {
 }
 
 type CreateSignalTypeRequest struct {
-	SchemaURL   string `json:"schema_url" example:"https://github.com/user/project/blob/2025.01.01/schema.json"` // JSON schema URL: must be a GitHub URL ending in .json, OR use https://github.com/skip/validation/main/schema.json to disable validation. Not used for document signal types
-	Title       string `json:"title" example:"Sample Signal @example.org"`                                       // the slug generated from the title must be unique
-	BumpType    string `json:"bump_type" example:"patch" enums:"major,minor,patch"`                              // this is used to increment semver for the signal type
-	ReadmeURL   string `json:"readme_url" example:"https://github.com/user/project/blob/2025.01.01/readme.md"`   // README file URL: must be a GitHub URL ending in .md
-	Detail      string `json:"detail" example:"description"`                                                     // description
-	ContentKind string `json:"content_kind" example:"json" enums:"json,document,event"`                          // optional (default json): json signals are validated against the schema, document signals are files (e.g. PDFs), event signals are immutable json signals that record a process waypoint
+	SchemaURL   string `json:"schema_url" example:"https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/schema.json"` // JSON schema URL: must be a GitHub URL ending in .json, OR use https://github.com/skip/validation/main/schema.json to disable validation. Not used for document signal types
+	Title       string `json:"title" example:"Sample Signal @example.org"`                                                               // the slug generated from the title must be unique
+	BumpType    string `json:"bump_type" example:"patch" enums:"major,minor,patch"`                                                      // this is used to increment semver for the signal type
+	ReadmeURL   string `json:"readme_url" example:"https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/readme.md"`   // README file URL: must be a GitHub URL ending in .md
+	Detail      string `json:"detail" example:"description"`                                                                             // description
+	ContentKind string `json:"content_kind" example:"json" enums:"json,document,event"`                                                  // optional (default json): json signals are validated against the schema, document signals are files (e.g. PDFs), event signals are immutable json signals that record a process waypoint
 }
 
 type RegisterNewSignalTypeSchemaRequest struct {
-	SchemaURL string `json:"schema_url" example:"https://github.com/user/project/blob/2025.01.01/schema.json"` // JSON schema URL: must be a GitHub URL ending in .json, OR use https://github.com/skip/validation/main/schema.json to disable validation
-	BumpType  string `json:"bump_type" example:"patch" enums:"major,minor,patch"`                              // this is used to increment semver for the signal type
-	ReadmeURL string `json:"readme_url" example:"https://github.com/user/project/blob/2025.01.01/readme.md"`   // README file URL: must be a GitHub URL ending in .md
-	Detail    string `json:"detail" example:"description"`                                                     // description
+	SchemaURL string `json:"schema_url" example:"https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/schema.json"` // JSON schema URL: must be a GitHub URL ending in .json, OR use https://github.com/skip/validation/main/schema.json to disable validation
+	BumpType  string `json:"bump_type" example:"patch" enums:"major,minor,patch"`                                                      // this is used to increment semver for the signal type
+	ReadmeURL string `json:"readme_url" example:"https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/readme.md"`   // README file URL: must be a GitHub URL ending in .md
+	Detail    string `json:"detail" example:"description"`                                                                             // description
+}
+
+type RefreshSignalTypeSchemaResponse struct {
+	Slug                  string `json:"slug" example:"sample-signal"`
+	SemVer                string `json:"sem_ver" example:"1.0.0"`
+	SchemaURL             string `json:"schema_url" example:"https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/schema.json"` // the schema file the updated schema was fetched from
+	SignalVersionsChecked int    `json:"signal_versions_checked" example:"1000"`                                                                   // the number of recent signal versions that were checked against the updated schema (at most 1000)
 }
 
 type NewSignalTypeResponse struct {
@@ -55,8 +62,8 @@ type AddSignalTypeToIsnRequest struct {
 }
 
 type UpdateSignalTypeRequest struct {
-	ReadmeURL *string `json:"readme_url" example:"https://github.com/user/project/blob/2025.01.01/readme.md"` // README file URL: must be a GitHub URL ending in .md
-	Detail    *string `json:"detail" example:"description"`                                                   // updated description
+	ReadmeURL *string `json:"readme_url" example:"https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/readme.md"` // README file URL: must be a GitHub URL ending in .md
+	Detail    *string `json:"detail" example:"description"`                                                                           // updated description
 }
 
 type UpdateIsnSignalTypeStatusRequest struct {
@@ -69,8 +76,8 @@ type SignalTypeDetail struct {
 	CreatedAt   time.Time `json:"created_at" example:"2025-06-03T13:47:47.331787+01:00"`
 	UpdatedAt   time.Time `json:"updated_at" example:"2025-06-03T13:47:47.331787+01:00"`
 	Slug        string    `json:"slug" example:"sample-signal-type"`
-	SchemaURL   string    `json:"schema_url" example:"https://github.com/user/project/blob/2025.01.01/schema.json"`
-	ReadmeURL   string    `json:"readme_url" example:"https://github.com/user/project/blob/2025.01.01/readme.md"`
+	SchemaURL   string    `json:"schema_url" example:"https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/schema.json"`
+	ReadmeURL   string    `json:"readme_url" example:"https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/readme.md"`
 	Title       string    `json:"title" example:"Sample Signal Type"`
 	Detail      string    `json:"detail" example:"Sample signal type description"`
 	SemVer      string    `json:"sem_ver" example:""`
@@ -99,7 +106,7 @@ type IsnSignalTypeDetail struct {
 //	@Description	Events must be correlated to the signal they are about and have an occurred_at timestamp in their content (see Submit Signals)
 //	@Description
 //	@Description	JSON Schema URL Requirements
-//	@Description	- Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)
+//	@Description	- Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/main/sample-signal-type/2025-01-01/schema.json)
 //	@Description	- To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json
 //	@Description
 //	@Description	Readme URL requirements
@@ -465,6 +472,157 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchema(w http.ResponseWriter, r
 	return responses.JSON(w, http.StatusCreated, NewSignalTypeResponse{
 		Slug:   returnedSignalType.Slug,
 		SemVer: returnedSignalType.SemVer,
+	})
+}
+
+// RefreshSignalTypeSchema godoc
+//
+//	@Summary		Refresh a Schema
+//	@Description	Updates the schema of an existing signal type version in place, without creating a new version: the schema file is fetched again from the signal type's schema_url.
+//	@Description
+//	@Description	The schema is stored when the signal type version is registered, so changes to the schema file on GitHub are not used until the schema is refreshed.
+//	@Description	To change the schema, update the file on GitHub (GitHub keeps the history of the file) and then call this endpoint.
+//	@Description
+//	@Description	Use with caution - replacing a schema with an incompatible version will break existing integrations - if in doubt, register a new schema instead and ask clients to migrate.
+//	@Description
+//	@Description	As a safety check, the most recent 1000 signal versions are validated against the new schema.
+//	@Description
+//	@Description	If the signal type has a routing config, the routing field must be defined in the new schema.
+//	@Description
+//	@Description	Schemas can only be replaced for json and event signal types.
+//	@Description
+//	@Description	Note: this endpoint can only be used by site admins
+//
+//	@Tags			Signal Types
+//
+//	@Param			signal_type_slug	path		string	true	"signal type slug"	example(sample-signal-type)
+//	@Param			sem_ver				path		string	true	"version"			example(1.0.0)
+//
+//	@Success		200					{object}	handlers.RefreshSignalTypeSchemaResponse
+//	@Failure		400					{object}	responses.ErrorResponse	"malformed_body | invalid_request"
+//	@Failure		401					{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
+//	@Failure		403					{object}	responses.ErrorResponse	"forbidden"
+//	@Failure		404					{object}	responses.ErrorResponse	"resource_not_found"
+//	@Failure		500					{object}	responses.ErrorResponse	"database_error | internal_error"
+//
+//	@Security		BearerAccessToken
+//
+//	@Router			/api/admin/signal-types/{signal_type_slug}/v{sem_ver}/schema/refresh [post]
+//
+// Should only be used with RequireRole (siteadmin) middleware
+func (s *SignalTypeHandler) RefreshSignalTypeSchema(w http.ResponseWriter, r *http.Request) error {
+
+	slug := r.PathValue("signal_type_slug")
+	semVer := r.PathValue("sem_ver")
+
+	signalType, err := s.queries.GetSignalTypeBySlugAndVersion(r.Context(), database.GetSignalTypeBySlugAndVersionParams{
+		Slug:   slug,
+		SemVer: semVer,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperrors.NotFound(fmt.Sprintf("No signal type found for %s/v%s", slug, semVer), nil)
+		}
+		logger.AddLogAttrs(r.Context(),
+			slog.String("signal_type_slug", slug),
+		)
+
+		return apperrors.DatabaseError("database error", err)
+	}
+
+	// only json and event signal types have schemas
+	if signalType.ContentKind != signalsd.ContentKindJSON && signalType.ContentKind != signalsd.ContentKindEvent {
+		return apperrors.MalformedBody(fmt.Sprintf("schemas can't be refreshed for %s signal types", signalType.ContentKind), nil)
+	}
+
+	// signal types registered without a schema have no schema file to fetch
+	if schemas.SkipValidation(signalType.SchemaURL) {
+		return apperrors.InvalidRequest(fmt.Sprintf("%s/v%s was registered without a schema - register a new version to add one", slug, semVer), nil)
+	}
+
+	schemaContent, err := utils.FetchFileContentFromGithub(signalType.SchemaURL)
+	if err != nil {
+		logger.AddLogAttrs(r.Context(),
+			slog.String("schema_url", signalType.SchemaURL),
+		)
+
+		return apperrors.MalformedBody("could not fetch schema from GitHub", err)
+	}
+
+	if schemaContent == signalType.SchemaContent {
+		return apperrors.InvalidRequest("the schema file on GitHub is the same as the stored schema (if you have just updated the file, GitHub can take a few minutes to serve the new version)", nil)
+	}
+
+	schema, err := schemas.ValidateAndCompileSchema(signalType.SchemaURL, schemaContent)
+	if err != nil {
+		logger.AddLogAttrs(r.Context(),
+			slog.String("schema_url", signalType.SchemaURL),
+		)
+
+		return apperrors.MalformedBody("invalid JSON schema", err)
+	}
+
+	// the routing field (if the signal type has a routing config) must still be defined in the updated schema
+	routingConfig, err := s.queries.GetSignalRoutingConfigBySignalType(r.Context(), database.GetSignalRoutingConfigBySignalTypeParams{
+		SignalTypeSlug: slug,
+		SemVer:         semVer,
+	})
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return apperrors.DatabaseError("database error", err)
+	}
+	if err == nil { // routing exists
+		fieldExists, err := schemas.FieldPathExists(schema, routingConfig.RoutingField)
+		if err != nil {
+			return apperrors.InternalError("could not check the routing field against the updated schema", err)
+		}
+		if !fieldExists {
+			return apperrors.InvalidRequest(fmt.Sprintf("the routing field %q used by the routing config for %s/v%s is not defined in the updated schema", routingConfig.RoutingField, slug, semVer), nil)
+		}
+	}
+
+	// safety check: the most recent signals must be valid against the updated schema
+	recentSignals, err := schemas.CheckRecentSignals(r.Context(), s.queries, signalType.ID, schema)
+	if err != nil {
+		return apperrors.DatabaseError("database error", err)
+	}
+	if recentSignals.FailureCount > 0 {
+		failures := make([]string, 0, len(recentSignals.Failures))
+		for _, failure := range recentSignals.Failures {
+			failures = append(failures, fmt.Sprintf("signal_id %s (local_ref %q) version %d: %s", failure.SignalID, failure.LocalRef, failure.VersionNumber, failure.Error))
+		}
+		return apperrors.InvalidRequest(fmt.Sprintf("the updated schema rejects %d of the %d most recent signal versions - first failures: %s",
+			recentSignals.FailureCount, recentSignals.SignalsChecked, strings.Join(failures, "; ")), nil)
+	}
+
+	rowsAffected, err := s.queries.UpdateSignalTypeSchemaContent(r.Context(), database.UpdateSignalTypeSchemaContentParams{
+		ID:            signalType.ID,
+		SchemaContent: schemaContent,
+	})
+	if err != nil {
+		logger.AddLogAttrs(r.Context(),
+			slog.String("signal_type_id", signalType.ID.String()),
+		)
+
+		return apperrors.DatabaseError("database error", err)
+	}
+	if rowsAffected != 1 {
+		return apperrors.DatabaseError(fmt.Sprintf("database error - expected to update 1 signal type, updated %d", rowsAffected), nil)
+	}
+
+	// the history of the schema content is kept by GitHub - this log entry records who refreshed the schema and when
+	accountID, _ := auth.ContextAccountID(r.Context())
+	logger.ContextRequestLogger(r.Context()).Info("signal type schema refreshed",
+		slog.String("signal_type", fmt.Sprintf("%s/v%s", slug, semVer)),
+		slog.String("schema_url", signalType.SchemaURL),
+		slog.Int("signal_versions_checked", recentSignals.SignalsChecked),
+		slog.String("account_id", accountID.String()),
+	)
+
+	return responses.JSON(w, http.StatusOK, RefreshSignalTypeSchemaResponse{
+		Slug:                  slug,
+		SemVer:                semVer,
+		SchemaURL:             signalType.SchemaURL,
+		SignalVersionsChecked: recentSignals.SignalsChecked,
 	})
 }
 

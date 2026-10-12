@@ -149,7 +149,11 @@ func (c *Cache) ValidateJSONSignal(signalTypePath string, rawJSON json.RawMessag
 		return fmt.Errorf("internal error: schema missing in cache for signalTypePath %s", signalTypePath)
 	}
 
-	// Validate with cached schema
+	return ValidateContent(schema, rawJSON)
+}
+
+// ValidateContent validates the JSON content of a signal against a compiled schema.
+func ValidateContent(schema *jsonschema.Schema, rawJSON json.RawMessage) error {
 	var data any
 	if err := json.Unmarshal(rawJSON, &data); err != nil {
 		return fmt.Errorf("invalid JSON format: %v", err)
@@ -159,7 +163,6 @@ func (c *Cache) ValidateJSONSignal(signalTypePath string, rawJSON json.RawMessag
 		return fmt.Errorf("schema validation failed: %v", err)
 	}
 
-	// json successfully validates against schema
 	return nil
 }
 
@@ -193,6 +196,13 @@ func (c *Cache) FieldPathExistsInSchema(signalTypePath, fieldPath string) (bool,
 		return false, fmt.Errorf("schema missing from cache for signal type %q", signalTypePath)
 	}
 
+	return FieldPathExists(schema, fieldPath)
+}
+
+// FieldPathExists reports whether fieldPath is a valid dot-notation path in the compiled schema
+// (see FieldPathExistsInSchema for the limitations).
+// Returns an error if the field path contains an empty segment.
+func FieldPathExists(schema *jsonschema.Schema, fieldPath string) (bool, error) {
 	current := schema
 
 	for seg := range strings.SplitSeq(fieldPath, ".") {

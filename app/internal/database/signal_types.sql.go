@@ -474,3 +474,23 @@ func (q *Queries) UpdateSignalTypeDetails(ctx context.Context, arg UpdateSignalT
 	}
 	return result.RowsAffected(), nil
 }
+
+const UpdateSignalTypeSchemaContent = `-- name: UpdateSignalTypeSchemaContent :execrows
+UPDATE signal_types SET (updated_at, schema_content) = (NOW(), $2)
+WHERE id = $1
+`
+
+type UpdateSignalTypeSchemaContentParams struct {
+	ID            uuid.UUID `json:"id"`
+	SchemaContent string    `json:"schema_content"`
+}
+
+// updates the stored schema of an existing signal type version after the schema file has been fetched again from its schema_url
+// (the handler checks a sample of the recent signals are valid against the updated schema first)
+func (q *Queries) UpdateSignalTypeSchemaContent(ctx context.Context, arg UpdateSignalTypeSchemaContentParams) (int64, error) {
+	result, err := q.db.Exec(ctx, UpdateSignalTypeSchemaContent, arg.ID, arg.SchemaContent)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}

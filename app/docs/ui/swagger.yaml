@@ -325,6 +325,16 @@ paths:
       summary: List signal types page
       tags:
       - UI Pages
+  /admin/signal-types/refresh-schema:
+    get:
+      description: Renders the form to fetch the schema of a signal type version again
+        from GitHub, updating it in place. Requires siteadmin role.
+      responses:
+        "200":
+          description: HTML page
+      summary: Refresh signal type schema page
+      tags:
+      - UI Pages
   /admin/signal-types/register-new-schema:
     get:
       description: Renders the form to register a new schema version for an existing
@@ -948,6 +958,27 @@ paths:
         "200":
           description: HTML partial (or an error alert)
       summary: Create signal type
+      tags:
+      - HTMX Actions
+  /ui-api/signal-types/refresh-schema:
+    post:
+      description: HTMX endpoint. Fetches the schema of a signal type version again
+        from its schema URL, updating it in place. Requires siteadmin role.
+      parameters:
+      - description: Signal type slug
+        in: formData
+        name: signal-type-slug
+        required: true
+        type: string
+      - description: Semantic version
+        in: formData
+        name: sem-ver
+        required: true
+        type: string
+      responses:
+        "200":
+          description: HTML partial (or an error alert)
+      summary: Refresh signal type schema
       tags:
       - HTMX Actions
   /ui-api/signal-types/register-new-schema:

@@ -357,6 +357,7 @@ func (s *Server) registerAdminRoutes() {
 				r.Post("/signal-types", responses.Wrap(signalTypes.CreateSignalType))
 				r.Post("/signal-types/{signal_type_slug}/schemas", responses.Wrap(signalTypes.RegisterNewSignalTypeSchema))
 				r.Put("/signal-types/{signal_type_slug}/v{sem_ver}", responses.Wrap(signalTypes.UpdateSignalType))
+				r.Post("/signal-types/{signal_type_slug}/v{sem_ver}/schema/refresh", responses.Wrap(signalTypes.RefreshSignalTypeSchema))
 				r.Delete("/signal-types/{signal_type_slug}/v{sem_ver}", responses.Wrap(signalTypes.DeleteSignalType))
 
 				// Signals Routing Rules management

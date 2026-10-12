@@ -182,6 +182,9 @@ func (s *Server) RegisterRoutes() {
 			r.Get("/admin/signal-types/register-new-schema", s.RegisterNewSignalTypeSchemaPage)
 			r.Put("/ui-api/signal-types/register-new-schema", s.RegisterNewSignalTypeSchema)
 
+			r.Get("/admin/signal-types/refresh-schema", s.RefreshSignalTypeSchemaPage)
+			r.Post("/ui-api/signal-types/refresh-schema", s.RefreshSignalTypeSchema)
+
 			// Signals Routing Rules
 			r.Get("/admin/signal-types/routing", s.ManageSignalRoutingPage)
 			r.Get("/ui-api/signal-types/routing", s.LoadSignalRoutingForm)

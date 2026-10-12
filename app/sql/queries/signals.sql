@@ -404,6 +404,23 @@ WHERE
     AND sv.id != (SELECT id from latest_signal_versions lsv WHERE lsv.signal_id = sv.signal_id)
     ORDER BY sv.created_at;
 
+-- name: GetRecentSignalVersionsBySignalTypeID :many
+-- returns the most recent versions of the signal type's signals (any version of any signal, including withdrawn signals),
+-- newest first (signal version ids are uuidv7, so they are ordered by creation time).
+-- Used to check a sample of the stored signals against an updated schema.
+SELECT
+    sv.id AS signal_version_id,
+    sv.signal_id,
+    s.local_ref,
+    sv.version_number,
+    sv.content
+FROM signal_versions sv
+JOIN signals s ON s.id = sv.signal_id
+    AND s.account_id = sv.account_id
+WHERE s.signal_type_id = sqlc.arg(signal_type_id)
+ORDER BY sv.id DESC
+LIMIT sqlc.arg(sample_size);
+
 -- name: GetLatestSignalVersionByLocalRef :one
 -- returns the latest version of the account's signal with the supplied local_ref on the ISN (used to detect unchanged document uploads)
 SELECT

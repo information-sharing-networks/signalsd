@@ -202,6 +202,85 @@ func (s *Server) RegisterNewSignalTypeSchema(w http.ResponseWriter, r *http.Requ
 	templ.Handler(templates.SignalTypeCreationSuccess(*response)).ServeHTTP(w, r)
 }
 
+// RefreshSignalTypeSchemaPage godoc
+//
+//	@Summary		Refresh signal type schema page
+//	@Description	Renders the form to fetch the schema of a signal type version again from GitHub, updating it in place. Requires siteadmin role.
+//	@Tags			UI Pages
+//	@Success		200	"HTML page"
+//	@Router			/admin/signal-types/refresh-schema [get]
+func (s *Server) RefreshSignalTypeSchemaPage(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
+	if !ok {
+		reqLogger.Error("failed to read accessTokenDetails from context")
+		return
+	}
+
+	signalTypes, err := s.apiClient.GetSignalTypes(r.Context(), accessTokenDetails.AccessToken)
+	if err != nil {
+		reqLogger.Error("Failed to get signal types", slog.String("error", err.Error()))
+		templ.Handler(templates.ErrorAlert("Failed to load signal types. Please try again.")).ServeHTTP(w, r)
+		return
+	}
+
+	// Deduplicate by slug to show each signal type once.
+	// Document signal types are excluded because they don't have schemas
+	signalTypeSlugs := make([]types.SignalTypeSlug, 0, len(signalTypes))
+	seen := make(map[string]bool)
+
+	for _, signalType := range signalTypes {
+		if signalType.ContentKind == signalsd.ContentKindDocument {
+			continue
+		}
+		if !seen[signalType.Slug] {
+			seen[signalType.Slug] = true
+			signalTypeSlugs = append(signalTypeSlugs, types.SignalTypeSlug{
+				Slug: signalType.Slug,
+			})
+		}
+	}
+
+	templ.Handler(templates.RefreshSignalTypeSchemaPage(s.config.Environment, signalTypeSlugs)).ServeHTTP(w, r)
+}
+
+// RefreshSignalTypeSchema godoc
+//
+//	@Summary		Refresh signal type schema
+//	@Description	HTMX endpoint. Fetches the schema of a signal type version again from its schema URL, updating it in place. Requires siteadmin role.
+//	@Tags			HTMX Actions
+//	@Param			signal-type-slug	formData	string	true	"Signal type slug"
+//	@Param			sem-ver				formData	string	true	"Semantic version"
+//	@Success		200					"HTML partial (or an error alert)"
+//	@Router			/ui-api/signal-types/refresh-schema [post]
+func (s *Server) RefreshSignalTypeSchema(w http.ResponseWriter, r *http.Request) {
+	reqLogger := logger.ContextRequestLogger(r.Context())
+
+	slug := r.FormValue("signal-type-slug")
+	semVer := r.FormValue("sem-ver")
+
+	if slug == "" || semVer == "" {
+		templ.Handler(templates.ErrorAlert("Please select a signal type and version.")).ServeHTTP(w, r)
+		return
+	}
+
+	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
+	if !ok {
+		templ.Handler(templates.ErrorAlert("Authentication required. Please log in again.")).ServeHTTP(w, r)
+		return
+	}
+
+	response, err := s.apiClient.RefreshSignalTypeSchema(r.Context(), accessTokenDetails.AccessToken, slug, semVer)
+	if err != nil {
+		reqLogger.Error("Failed to refresh signal type schema", slog.String("error", err.Error()))
+		templ.Handler(templates.ErrorAlert(client.UserMessage(err))).ServeHTTP(w, r)
+		return
+	}
+
+	templ.Handler(templates.SignalTypeSchemaRefreshSuccess(*response)).ServeHTTP(w, r)
+}
+
 // AddSignalTypeToIsn godoc
 //
 //	@Summary		Add signal type to ISN

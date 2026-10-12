@@ -1,6 +1,8 @@
 package templates
 
 import (
+	"fmt"
+
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
@@ -135,6 +137,87 @@ templ RegisterNewSignalTypeSchemaPage(environment string, signalTypes []types.Si
 			</div>
 		</div>
 	}
+}
+
+// RefreshSignalTypeSchemaPage renders the page to fetch the schema of a signal type version again from GitHub.
+// Uses cascading dropdowns: Signal Type -> Version.
+templ RefreshSignalTypeSchemaPage(environment string, signalTypes []types.SignalTypeSlug) {
+	@BaseLayout("Refresh a Signal Type Schema") {
+		@Navigation(environment)
+		<div class="page-container">
+			<h1 class="page-title">Refresh a Schema</h1>
+			<div class="card">
+				<div class="card-body">
+					@InfoAlert() {
+						To update the schema of an existing version, update the schema file on GitHub and then refresh it here.
+						Readers and writers keep using the same version, so they don't need to change their integrations.
+						<br></br>
+						<br></br>
+						This is intended for tightening a schema that was looser than the data actually being exchanged.
+						As a safety check, the most recent 1000 signals are validated against the updated schema and the refresh is rejected if any of them are not valid.
+						This is only a sample - it is your responsibility to make sure the updated schema is compatible with the existing signals.
+						<br></br>
+						<br></br>
+						Use <em>Register a New Schema</em> instead if the change might break existing writers or readers,
+						or if anyone might later need to know exactly which schema a signal was validated against.
+					}
+					@NoticeAlert() {
+						Tell the writers before tightening a schema - signals that are not valid against the updated schema will be rejected.
+						GitHub can take a few minutes to serve a file you have just updated - if the refresh reports that the schema has not changed, wait and try again.
+					}
+					<form hx-post="/ui-api/signal-types/refresh-schema" hx-target="#refresh-schema-result" hx-swap="innerHTML" class="margin-top-4">
+						<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+							<div class="form-group">
+								<label for="signal-type-slug" class="form-label">Signal Type</label>
+								<select
+									id="signal-type-slug"
+									name="signal-type-slug"
+									required
+									class="form-select"
+									hx-get="/ui-api/options/signal-type-versions"
+									hx-target="#sem-ver"
+									hx-swap="outerHTML"
+									hx-trigger="change"
+									hx-indicator="#signal-type-loading"
+								>
+									<option value="">Select Signal Type...</option>
+									for _, signalType := range signalTypes {
+										<option value={ signalType.Slug }>{ signalType.Slug }</option>
+									}
+								</select>
+								<div id="signal-type-loading" class="htmx-indicator loading-spinner">Loading...</div>
+							</div>
+							<div class="form-group">
+								<label for="sem-ver" class="form-label">Version</label>
+								<select id="sem-ver" name="sem-ver" required disabled class="form-select">
+									<option value="">Select Version...</option>
+								</select>
+							</div>
+						</div>
+						<div class="form-group" id="refresh-schema-result"></div>
+						<div class="form-group">
+							<button
+								type="submit"
+								class="btn btn-primary"
+								hx-confirm="Refresh the schema of this signal type version from GitHub? Signals that are not valid against the updated schema will be rejected."
+							>
+								Refresh Schema
+							</button>
+						</div>
+					</form>
+				</div>
+			</div>
+		</div>
+	}
+}
+
+// SignalTypeSchemaRefreshSuccess renders a success message after a schema refresh
+templ SignalTypeSchemaRefreshSuccess(response client.RefreshSignalTypeSchemaResponse) {
+	@SuccessAlert(fmt.Sprintf("The schema for %s/v%s has been updated.", response.Slug, response.SemVer))
+	<div class="margin-top-4">
+		<p><strong>Schema URL:</strong> <a href={ templ.SafeURL(response.SchemaURL) } target="_blank" rel="noopener noreferrer" class="text-blue-600 hover:underline">{ response.SchemaURL }</a></p>
+		<p><strong>Recent signals checked:</strong> { fmt.Sprint(response.SignalVersionsChecked) }</p>
+	</div>
 }
 
 // AddSignalTypeToIsnPage renders the page to associate a signal type with an ISN.

@@ -106,10 +106,10 @@ type SignalType struct {
 	SemVer string `json:"sem_ver,omitempty" example:"0.0.1"`
 
 	// SchemaURL is the URL of the signal type schema
-	SchemaURL string `json:"schema_url,omitempty" example:"https://github.com/user/project/blob/2025.01.01/schema.json"`
+	SchemaURL string `json:"schema_url,omitempty" example:"https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/schema.json"`
 
 	// ReadmeURL is the URL of the signal type readme
-	ReadmeURL string `json:"readme_url,omitempty" example:"https://github.com/user/project/blob/2025.01.01/readme.md"`
+	ReadmeURL string `json:"readme_url,omitempty" example:"https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/readme.md"`
 
 	// InUse is true if the signal type is active. Note this will always be false if the parent ISN has been marked as 'not in use'
 	InUse bool `json:"in_use" example:"true"`

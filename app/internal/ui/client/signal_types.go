@@ -1,6 +1,6 @@
 package client
 
-// these functions call the signalsd API to manage signal types (create, register new schema, add to ISN, update Signal Type status)
+// these functions call the signalsd API to manage signal types (create, register new schema, refresh schema, add to ISN, update Signal Type status)
 
 import (
 	"bytes"
@@ -105,6 +105,44 @@ func (c *Client) RegisterNewSignalTypeSchema(ctx context.Context, accessToken st
 	}
 
 	return &createResp, nil
+}
+
+// RefreshSignalTypeSchemaResponse represents the response from refreshing the schema of a signal type version
+type RefreshSignalTypeSchemaResponse struct {
+	Slug                  string `json:"slug"`
+	SemVer                string `json:"sem_ver"`
+	SchemaURL             string `json:"schema_url"`
+	SignalVersionsChecked int    `json:"signal_versions_checked"`
+}
+
+// RefreshSignalTypeSchema fetches the schema of a signal type version again from its schema URL, updating the schema in place
+func (c *Client) RefreshSignalTypeSchema(ctx context.Context, accessToken, signalTypeSlug, semVer string) (*RefreshSignalTypeSchemaResponse, error) {
+	url := fmt.Sprintf("%s/api/admin/signal-types/%s/v%s/schema/refresh", c.baseURL, signalTypeSlug, semVer)
+
+	httpReq, err := http.NewRequestWithContext(ctx, "POST", url, nil)
+	if err != nil {
+		return nil, NewClientInternalError(err, "creating refresh schema request")
+	}
+
+	httpReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
+	setRequestID(httpReq, ctx)
+
+	res, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return nil, NewClientConnectionError(err)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return nil, NewClientApiError(res)
+	}
+
+	var refreshResp RefreshSignalTypeSchemaResponse
+	if err := json.NewDecoder(res.Body).Decode(&refreshResp); err != nil {
+		return nil, NewClientInternalError(err, "decoding refresh schema response")
+	}
+
+	return &refreshResp, nil
 }
 
 // UpdateSignalTypeStatusRequest represents the request body for updating signal type status

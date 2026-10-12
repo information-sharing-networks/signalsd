@@ -18,6 +18,12 @@ RETURNING *;
 UPDATE signal_types SET (updated_at, readme_url, detail) = (NOW(), $2, $3)
 WHERE id = $1;
 
+-- name: UpdateSignalTypeSchemaContent :execrows
+-- updates the stored schema of an existing signal type version after the schema file has been fetched again from its schema_url
+-- (the handler checks a sample of the recent signals are valid against the updated schema first)
+UPDATE signal_types SET (updated_at, schema_content) = (NOW(), $2)
+WHERE id = $1;
+
 
 -- name: GetSignalTypes :many
 SELECT st.*

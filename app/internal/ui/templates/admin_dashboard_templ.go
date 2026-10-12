@@ -62,7 +62,7 @@ func AdminDashboardPage(environment string, isSiteAdmin bool) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			if isSiteAdmin {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<a href=\"/admin/signal-types/create\" class=\"btn btn-primary\">Create Signal Types</a> <a href=\"/admin/signal-types/register-new-schema\" class=\"btn btn-primary\">Register a New Schema</a> <a href=\"/admin/signal-types/routing\" class=\"btn btn-primary\">Manage Routing Rules</a>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<a href=\"/admin/signal-types/create\" class=\"btn btn-primary\">Create Signal Types</a> <a href=\"/admin/signal-types/register-new-schema\" class=\"btn btn-primary\">Register a New Schema</a> <a href=\"/admin/signal-types/refresh-schema\" class=\"btn btn-primary\">Refresh a Schema</a> <a href=\"/admin/signal-types/routing\" class=\"btn btn-primary\">Manage Routing Rules</a>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

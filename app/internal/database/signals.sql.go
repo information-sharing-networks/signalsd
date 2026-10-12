@@ -465,6 +465,63 @@ func (q *Queries) GetPreviousSignalVersions(ctx context.Context, signalIds []uui
 	return items, nil
 }
 
+const GetRecentSignalVersionsBySignalTypeID = `-- name: GetRecentSignalVersionsBySignalTypeID :many
+SELECT
+    sv.id AS signal_version_id,
+    sv.signal_id,
+    s.local_ref,
+    sv.version_number,
+    sv.content
+FROM signal_versions sv
+JOIN signals s ON s.id = sv.signal_id
+    AND s.account_id = sv.account_id
+WHERE s.signal_type_id = $1
+ORDER BY sv.id DESC
+LIMIT $2
+`
+
+type GetRecentSignalVersionsBySignalTypeIDParams struct {
+	SignalTypeID uuid.UUID `json:"signal_type_id"`
+	SampleSize   int32     `json:"sample_size"`
+}
+
+type GetRecentSignalVersionsBySignalTypeIDRow struct {
+	SignalVersionID uuid.UUID       `json:"signal_version_id"`
+	SignalID        uuid.UUID       `json:"signal_id"`
+	LocalRef        string          `json:"local_ref"`
+	VersionNumber   int32           `json:"version_number"`
+	Content         json.RawMessage `json:"content"`
+}
+
+// returns the most recent versions of the signal type's signals (any version of any signal, including withdrawn signals),
+// newest first (signal version ids are uuidv7, so they are ordered by creation time).
+// Used to check a sample of the stored signals against an updated schema.
+func (q *Queries) GetRecentSignalVersionsBySignalTypeID(ctx context.Context, arg GetRecentSignalVersionsBySignalTypeIDParams) ([]GetRecentSignalVersionsBySignalTypeIDRow, error) {
+	rows, err := q.db.Query(ctx, GetRecentSignalVersionsBySignalTypeID, arg.SignalTypeID, arg.SampleSize)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetRecentSignalVersionsBySignalTypeIDRow
+	for rows.Next() {
+		var i GetRecentSignalVersionsBySignalTypeIDRow
+		if err := rows.Scan(
+			&i.SignalVersionID,
+			&i.SignalID,
+			&i.LocalRef,
+			&i.VersionNumber,
+			&i.Content,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const GetSignalByAccountAndLocalRef = `-- name: GetSignalByAccountAndLocalRef :one
 SELECT s.id, s.created_at, s.updated_at, s.account_id, s.isn_id, s.signal_type_id, s.local_ref, s.correlation_id, s.is_withdrawn, s.is_archived, i.slug as isn_slug, st.slug as signal_type_slug, st.sem_ver
 FROM signals s

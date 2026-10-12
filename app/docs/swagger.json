@@ -589,7 +589,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Signal types specify a record that can be shared on the site\n- The title is used to create a URL-friendly slug, which must be unique for the site (two titles that produce the same slug conflict - 409)\n- The title and slug fields can't be changed\n- The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading\n\nContent kinds\n- json (default): signals are JSON validated against the signal type's schema\n- document: signals are files (e.g. a PDF bill of lading) Document signal types do not have a schema - omit schema_url\n- event: signals are immutable JSON records of a process waypoint (e.g. export health certificate approved), validated against the signal type's schema.\nEvents must be correlated to the signal they are about and have an occurred_at timestamp in their content (see Submit Signals)\n\nJSON Schema URL Requirements\n- Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)\n- To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json\n\nReadme URL requirements\n- Must be a link to a file ending .md on a public github repo.\n- Use the special URL: https://github.com/skip/readme/main/readme.md to indicate there is no readme\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas\n- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)\n\nAfter creating a signal type, use the AddSignalTypeToIsn endpoint to link it to one or more ISNs.\n\nSignal type definitions are referred to in paths like this: {signal_type_slug}/v{sem_ver} (e.g. /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver})\n\nNote: this endpoint can only be used by site admins",
+                "description": "Signal types specify a record that can be shared on the site\n- The title is used to create a URL-friendly slug, which must be unique for the site (two titles that produce the same slug conflict - 409)\n- The title and slug fields can't be changed\n- The signal type fields are defined in an external JSON schema file and this schema file is used to validate signals before loading\n\nContent kinds\n- json (default): signals are JSON validated against the signal type's schema\n- document: signals are files (e.g. a PDF bill of lading) Document signal types do not have a schema - omit schema_url\n- event: signals are immutable JSON records of a process waypoint (e.g. export health certificate approved), validated against the signal type's schema.\nEvents must be correlated to the signal they are about and have an occurred_at timestamp in their content (see Submit Signals)\n\nJSON Schema URL Requirements\n- Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/main/sample-signal-type/2025-01-01/schema.json)\n- To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json\n\nReadme URL requirements\n- Must be a link to a file ending .md on a public github repo.\n- Use the special URL: https://github.com/skip/readme/main/readme.md to indicate there is no readme\n\nVersions\n- A signal type can have multiple versions - these share the same title/slug but have different JSON schemas\n- Use this endpoint to create the first version - the bump_type (major/minor/patch) determines the initial semver (1.0.0, 0.1.0 or 0.0.1)\n\nAfter creating a signal type, use the AddSignalTypeToIsn endpoint to link it to one or more ISNs.\n\nSignal type definitions are referred to in paths like this: {signal_type_slug}/v{sem_ver} (e.g. /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver})\n\nNote: this endpoint can only be used by site admins",
                 "tags": [
                     "Signal Types"
                 ],
@@ -1115,6 +1115,76 @@
                     },
                     "500": {
                         "description": "database_error",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/admin/signal-types/{signal_type_slug}/v{sem_ver}/schema/refresh": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAccessToken": []
+                    }
+                ],
+                "description": "Updates the schema of an existing signal type version in place, without creating a new version: the schema file is fetched again from the signal type's schema_url.\n\nThe schema is stored when the signal type version is registered, so changes to the schema file on GitHub are not used until the schema is refreshed.\nTo change the schema, update the file on GitHub (GitHub keeps the history of the file) and then call this endpoint.\n\nUse with caution - replacing a schema with an incompatible version will break existing integrations - if in doubt, register a new schema instead and ask clients to migrate.\n\nAs a safety check, the most recent 1000 signal versions are validated against the new schema.\n\nIf the signal type has a routing config, the routing field must be defined in the new schema.\n\nSchemas can only be replaced for json and event signal types.\n\nNote: this endpoint can only be used by site admins",
+                "tags": [
+                    "Signal Types"
+                ],
+                "summary": "Refresh a Schema",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "sample-signal-type",
+                        "description": "signal type slug",
+                        "name": "signal_type_slug",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "example": "1.0.0",
+                        "description": "version",
+                        "name": "sem_ver",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/handlers.RefreshSignalTypeSchemaResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "malformed_body | invalid_request",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "authorization_error | access_token_expired",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "resource_not_found",
+                        "schema": {
+                            "$ref": "#/definitions/responses.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "database_error | internal_error",
                         "schema": {
                             "$ref": "#/definitions/responses.ErrorResponse"
                         }
@@ -3702,12 +3772,12 @@
                 "readme_url": {
                     "description": "ReadmeURL is the URL of the signal type readme",
                     "type": "string",
-                    "example": "https://github.com/user/project/blob/2025.01.01/readme.md"
+                    "example": "https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/readme.md"
                 },
                 "schema_url": {
                     "description": "SchemaURL is the URL of the signal type schema",
                     "type": "string",
-                    "example": "https://github.com/user/project/blob/2025.01.01/schema.json"
+                    "example": "https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/schema.json"
                 },
                 "sem_ver": {
                     "description": "SemVer is the signal type version (e.g. 0.0.1)",
@@ -3909,12 +3979,12 @@
                 "readme_url": {
                     "description": "README file URL: must be a GitHub URL ending in .md",
                     "type": "string",
-                    "example": "https://github.com/user/project/blob/2025.01.01/readme.md"
+                    "example": "https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/readme.md"
                 },
                 "schema_url": {
                     "description": "JSON schema URL: must be a GitHub URL ending in .json, OR use https://github.com/skip/validation/main/schema.json to disable validation. Not used for document signal types",
                     "type": "string",
-                    "example": "https://github.com/user/project/blob/2025.01.01/schema.json"
+                    "example": "https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/schema.json"
                 },
                 "title": {
                     "description": "the slug generated from the title must be unique",
@@ -4278,11 +4348,11 @@
                 },
                 "readme_url": {
                     "type": "string",
-                    "example": "https://github.com/user/project/blob/2025.01.01/readme.md"
+                    "example": "https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/readme.md"
                 },
                 "schema_url": {
                     "type": "string",
-                    "example": "https://github.com/user/project/blob/2025.01.01/schema.json"
+                    "example": "https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/schema.json"
                 },
                 "sem_ver": {
                     "type": "string",
@@ -4362,6 +4432,29 @@
                 }
             }
         },
+        "handlers.RefreshSignalTypeSchemaResponse": {
+            "type": "object",
+            "properties": {
+                "schema_url": {
+                    "description": "the schema file the updated schema was fetched from",
+                    "type": "string",
+                    "example": "https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/schema.json"
+                },
+                "sem_ver": {
+                    "type": "string",
+                    "example": "1.0.0"
+                },
+                "signal_versions_checked": {
+                    "description": "the number of recent signal versions that were checked against the updated schema (at most 1000)",
+                    "type": "integer",
+                    "example": 1000
+                },
+                "slug": {
+                    "type": "string",
+                    "example": "sample-signal"
+                }
+            }
+        },
         "handlers.RegisterNewSignalTypeSchemaRequest": {
             "type": "object",
             "properties": {
@@ -4383,12 +4476,12 @@
                 "readme_url": {
                     "description": "README file URL: must be a GitHub URL ending in .md",
                     "type": "string",
-                    "example": "https://github.com/user/project/blob/2025.01.01/readme.md"
+                    "example": "https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/readme.md"
                 },
                 "schema_url": {
                     "description": "JSON schema URL: must be a GitHub URL ending in .json, OR use https://github.com/skip/validation/main/schema.json to disable validation",
                     "type": "string",
-                    "example": "https://github.com/user/project/blob/2025.01.01/schema.json"
+                    "example": "https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/schema.json"
                 }
             }
         },
@@ -4850,11 +4943,11 @@
                 },
                 "readme_url": {
                     "type": "string",
-                    "example": "https://github.com/user/project/blob/2025.01.01/readme.md"
+                    "example": "https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/readme.md"
                 },
                 "schema_url": {
                     "type": "string",
-                    "example": "https://github.com/user/project/blob/2025.01.01/schema.json"
+                    "example": "https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/schema.json"
                 },
                 "sem_ver": {
                     "type": "string",
@@ -5015,7 +5108,7 @@
                 "readme_url": {
                     "description": "README file URL: must be a GitHub URL ending in .md",
                     "type": "string",
-                    "example": "https://github.com/user/project/blob/2025.01.01/readme.md"
+                    "example": "https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/readme.md"
                 }
             }
         },

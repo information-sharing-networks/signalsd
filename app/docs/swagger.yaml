@@ -149,11 +149,11 @@ definitions:
         type: string
       readme_url:
         description: ReadmeURL is the URL of the signal type readme
-        example: https://github.com/user/project/blob/2025.01.01/readme.md
+        example: https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/readme.md
         type: string
       schema_url:
         description: SchemaURL is the URL of the signal type schema
-        example: https://github.com/user/project/blob/2025.01.01/schema.json
+        example: https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/schema.json
         type: string
       sem_ver:
         description: SemVer is the signal type version (e.g. 0.0.1)
@@ -304,13 +304,13 @@ definitions:
         type: string
       readme_url:
         description: 'README file URL: must be a GitHub URL ending in .md'
-        example: https://github.com/user/project/blob/2025.01.01/readme.md
+        example: https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/readme.md
         type: string
       schema_url:
         description: 'JSON schema URL: must be a GitHub URL ending in .json, OR use
           https://github.com/skip/validation/main/schema.json to disable validation.
           Not used for document signal types'
-        example: https://github.com/user/project/blob/2025.01.01/schema.json
+        example: https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/schema.json
         type: string
       title:
         description: the slug generated from the title must be unique
@@ -590,10 +590,10 @@ definitions:
         example: true
         type: boolean
       readme_url:
-        example: https://github.com/user/project/blob/2025.01.01/readme.md
+        example: https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/readme.md
         type: string
       schema_url:
-        example: https://github.com/user/project/blob/2025.01.01/schema.json
+        example: https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/schema.json
         type: string
       sem_ver:
         example: ""
@@ -652,6 +652,24 @@ definitions:
         example: 1
         type: integer
     type: object
+  handlers.RefreshSignalTypeSchemaResponse:
+    properties:
+      schema_url:
+        description: the schema file the updated schema was fetched from
+        example: https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/schema.json
+        type: string
+      sem_ver:
+        example: 1.0.0
+        type: string
+      signal_versions_checked:
+        description: the number of recent signal versions that were checked against
+          the updated schema (at most 1000)
+        example: 1000
+        type: integer
+      slug:
+        example: sample-signal
+        type: string
+    type: object
   handlers.RegisterNewSignalTypeSchemaRequest:
     properties:
       bump_type:
@@ -668,12 +686,12 @@ definitions:
         type: string
       readme_url:
         description: 'README file URL: must be a GitHub URL ending in .md'
-        example: https://github.com/user/project/blob/2025.01.01/readme.md
+        example: https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/readme.md
         type: string
       schema_url:
         description: 'JSON schema URL: must be a GitHub URL ending in .json, OR use
           https://github.com/skip/validation/main/schema.json to disable validation'
-        example: https://github.com/user/project/blob/2025.01.01/schema.json
+        example: https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/schema.json
         type: string
     type: object
   handlers.ReissueServiceAccountCredentialsRequest:
@@ -1056,10 +1074,10 @@ definitions:
         example: 67890684-3b14-42cf-b785-df28ce570400
         type: string
       readme_url:
-        example: https://github.com/user/project/blob/2025.01.01/readme.md
+        example: https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/readme.md
         type: string
       schema_url:
-        example: https://github.com/user/project/blob/2025.01.01/schema.json
+        example: https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/schema.json
         type: string
       sem_ver:
         example: ""
@@ -1184,7 +1202,7 @@ definitions:
         type: string
       readme_url:
         description: 'README file URL: must be a GitHub URL ending in .md'
-        example: https://github.com/user/project/blob/2025.01.01/readme.md
+        example: https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/readme.md
         type: string
     type: object
   handlers.User:
@@ -1922,7 +1940,7 @@ paths:
         Events must be correlated to the signal they are about and have an occurred_at timestamp in their content (see Submit Signals)
 
         JSON Schema URL Requirements
-        - Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/2025.01.01/schema.json)
+        - Must be a link to a schema file on a public github repo (e.g., https://github.com/org/repo/blob/main/sample-signal-type/2025-01-01/schema.json)
         - To disable schema validation, use the special URL: https://github.com/skip/validation/main/schema.json
 
         Readme URL requirements
@@ -2326,6 +2344,66 @@ paths:
       summary: Update Signals Routing Config
       tags:
       - Signals Routing
+  /api/admin/signal-types/{signal_type_slug}/v{sem_ver}/schema/refresh:
+    post:
+      description: |-
+        Updates the schema of an existing signal type version in place, without creating a new version: the schema file is fetched again from the signal type's schema_url.
+
+        The schema is stored when the signal type version is registered, so changes to the schema file on GitHub are not used until the schema is refreshed.
+        To change the schema, update the file on GitHub (GitHub keeps the history of the file) and then call this endpoint.
+
+        Use with caution - replacing a schema with an incompatible version will break existing integrations - if in doubt, register a new schema instead and ask clients to migrate.
+
+        As a safety check, the most recent 1000 signal versions are validated against the new schema.
+
+        If the signal type has a routing config, the routing field must be defined in the new schema.
+
+        Schemas can only be replaced for json and event signal types.
+
+        Note: this endpoint can only be used by site admins
+      parameters:
+      - description: signal type slug
+        example: sample-signal-type
+        in: path
+        name: signal_type_slug
+        required: true
+        type: string
+      - description: version
+        example: 1.0.0
+        in: path
+        name: sem_ver
+        required: true
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.RefreshSignalTypeSchemaResponse'
+        "400":
+          description: malformed_body | invalid_request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: authorization_error | access_token_expired
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "403":
+          description: forbidden
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: resource_not_found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error | internal_error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Refresh a Schema
+      tags:
+      - Signal Types
   /api/admin/users:
     get:
       description: |-

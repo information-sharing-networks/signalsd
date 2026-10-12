@@ -211,6 +211,20 @@
                 }
             }
         },
+        "/admin/signal-types/refresh-schema": {
+            "get": {
+                "description": "Renders the form to fetch the schema of a signal type version again from GitHub, updating it in place. Requires siteadmin role.",
+                "tags": [
+                    "UI Pages"
+                ],
+                "summary": "Refresh signal type schema page",
+                "responses": {
+                    "200": {
+                        "description": "HTML page"
+                    }
+                }
+            }
+        },
         "/admin/signal-types/register-new-schema": {
             "get": {
                 "description": "Renders the form to register a new schema version for an existing signal type. Requires siteadmin role.",
@@ -1092,6 +1106,36 @@
                         "description": "'true' to skip readme requirement",
                         "name": "skip-readme",
                         "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML partial (or an error alert)"
+                    }
+                }
+            }
+        },
+        "/ui-api/signal-types/refresh-schema": {
+            "post": {
+                "description": "HTMX endpoint. Fetches the schema of a signal type version again from its schema URL, updating it in place. Requires siteadmin role.",
+                "tags": [
+                    "HTMX Actions"
+                ],
+                "summary": "Refresh signal type schema",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Signal type slug",
+                        "name": "signal-type-slug",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Semantic version",
+                        "name": "sem-ver",
+                        "in": "formData",
+                        "required": true
                     }
                 ],
                 "responses": {
