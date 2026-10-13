@@ -103,3 +103,44 @@ func TestMatchesResult(t *testing.T) {
 		})
 	}
 }
+
+// TestResolveAtSignKeys checks that a routing field entered by the user cannot invoke a gjson modifier:
+// segments starting with '@' (e.g. JSON-LD "@value") must always be matched as literal keys.
+// Without escaping, "@values", "@this" and "@reverse" would be applied as gjson modifiers.
+//
+// Each case has a decoy rule, checked first, that matches the value of a sibling key.
+// A modifier that returns more than the target key (e.g. "@values" returns all the sibling values)
+// would hit the decoy and route to the wrong ISN.
+func TestResolveAtSignKeys(t *testing.T) {
+	content := []byte(`{"location": {"identifier": {"@value": "GBDVR", "@values": "GBFXT", "@this": "GBSOU", "@reverse": "GBLIV"}}}`)
+
+	tests := []struct {
+		field        string
+		pattern      string
+		decoyPattern string
+	}{
+		{field: "location.identifier.@value", pattern: "GBDVR", decoyPattern: "GBFXT"},
+		{field: "location.identifier.@values", pattern: "GBFXT", decoyPattern: "GBDVR"},
+		{field: "location.identifier.@this", pattern: "GBSOU", decoyPattern: "GBDVR"},
+		{field: "location.identifier.@reverse", pattern: "GBLIV", decoyPattern: "GBDVR"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.field, func(t *testing.T) {
+			c := &Cache{SignalRoutingConfigs: map[string]signalRoutingConfig{
+				"test/v1.0.0": {
+					routingField: tt.field, // as entered by the user
+					routingRules: []routingRule{
+						{matchPattern: tt.decoyPattern, operator: "equals", isnSlug: "wrong-isn"},
+						{matchPattern: tt.pattern, operator: "equals", isnSlug: "isn-a"},
+					},
+				},
+			}}
+
+			_, isnSlug, ok := c.Resolve("test/v1.0.0", content)
+			if !ok || isnSlug != "isn-a" {
+				t.Errorf("want route to isn-a, got ok=%v isnSlug=%q", ok, isnSlug)
+			}
+		})
+	}
+}

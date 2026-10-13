@@ -9,6 +9,7 @@ package integration
 // - Successful routing to multiple ISNs in a single batch
 // - Correlation ID routing
 // - Response structure correctness
+// - Routing on a JSON-LD "@value" field
 
 import (
 	"context"
@@ -479,6 +480,65 @@ func TestRouteSignals(t *testing.T) {
 }
 
 // routerPayload builds a minimal valid request body for the router endpoint.
+// TestRouteSignalsJSONLDRoutingField checks that a routing field containing a JSON-LD "@value" key
+// is accepted by the admin API and used to route signals, e.g
+// { "location": { "@value": "GBDVR" } }
+func TestRouteSignalsJSONLDRoutingField(t *testing.T) {
+	ctx := context.Background()
+	testEnv := startInProcessServer(t, "")
+
+	siteAdminAccount := createTestAccount(t, ctx, testEnv.queries, "siteadmin", "user", "siteadmin@jsonld-router-test.com")
+	isn := createTestISN(t, ctx, testEnv.queries, "isn-dover", "ISN Dover", siteAdminAccount.ID, "private")
+
+	schema := `{"type": "object", "properties": {"location": {"type": "object", "properties": {"@value": {"type": "string"}}}}}`
+	signalType, err := testEnv.queries.CreateSignalType(ctx, database.CreateSignalTypeParams{
+		Slug:          "jsonld-router-test",
+		SchemaURL:     testSchemaURL,
+		ReadmeURL:     testReadmeURL,
+		Title:         "jsonld router test",
+		Detail:        testSignalTypeDetail,
+		SemVer:        "1.0.0",
+		SchemaContent: schema,
+		ContentKind:   signalsd.ContentKindJSON,
+	})
+	if err != nil {
+		t.Fatalf("Failed to create signal type: %v", err)
+	}
+	addSignalTypeToIsn(t, ctx, testEnv.queries, isn.ID, signalType.ID)
+
+	if err := testEnv.schemaCache.Load(ctx); err != nil {
+		t.Fatalf("schemaCache.Load: %v", err)
+	}
+
+	// get the token after the setup above so it includes the ISN and signal type
+	token := testEnv.getAccessToken(t, siteAdminAccount.ID)
+
+	// setRoutingConfig fails the test if the routing field is rejected
+	setRoutingConfig(t, testEnv, token, signalType,
+		handlers.UpdateSignalRoutingConfigRequest{
+			RoutingField: "location.@value",
+			RoutingRules: []handlers.SignalRoutingRule{
+				{MatchPattern: "GBDVR", Operator: "equals", IsnSlug: isn.Slug, Sequence: 1},
+			},
+		})
+
+	if err := testEnv.routerCache.Load(ctx); err != nil {
+		t.Fatalf("routerCache.Load: %v", err)
+	}
+
+	signal := map[string]any{
+		"local_ref": "s-1",
+		"content":   map[string]any{"location": map[string]any{"@value": "GBDVR"}},
+	}
+	resp := submitRouteSignalsRequest(t, testEnv.baseURL, routerPayload("batch-1", []map[string]any{signal}), token, signalType.Slug, signalType.SemVer)
+
+	// a 200 response means the signal was routed (unroutable signals are rejected)
+	result := expectSubmissionResponse(t, resp, http.StatusOK)
+	if findIsnResult(result.Results, isn.Slug) == nil {
+		t.Errorf("no result entry for %s", isn.Slug)
+	}
+}
+
 func routerPayload(batchRef string, signals []map[string]any) map[string]any {
 	return map[string]any{
 		"batch_ref": batchRef,
