@@ -129,7 +129,8 @@ func (h *RoutingConfigHandler) GetSignalRoutingConfig(w http.ResponseWriter, r *
 //	@Description	Replaces the route config for the specified signal type path
 //	@Description
 //	@Description	the routing_field must be a plain Dot Notation path that is defined in the signal type's schema -
-//	@Description	under the covers the service uses gjson paths, however the special pattern matching symbols (*?#@|!()[]%<>=), empty path segments and numeric (array index) path segments are not currently allowed.
+//	@Description	field names can only contain letters, digits, '_', '-', ':' and '@' (e.g. JSON-LD keys such as location.@value) and are always matched literally.
+//	@Description	Empty path segments and numeric (array index) path segments are not allowed.
 //	@Description
 //	@Description	When using the 'matches' and 'does_not_match' operators, any occurrence of '*' and '?' in the matching pattern will be treated as a wildcard ('equals' and 'does_not_equal' compare the pattern literally).
 //	@Description	The pattern is always compared to the full contents of the specified routing field.

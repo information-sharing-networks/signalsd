@@ -479,7 +479,6 @@ func TestRouteSignals(t *testing.T) {
 	})
 }
 
-// routerPayload builds a minimal valid request body for the router endpoint.
 // TestRouteSignalsJSONLDRoutingField checks that a routing field containing a JSON-LD "@value" key
 // is accepted by the admin API and used to route signals, e.g
 // { "location": { "@value": "GBDVR" } }
@@ -539,6 +538,7 @@ func TestRouteSignalsJSONLDRoutingField(t *testing.T) {
 	}
 }
 
+// routerPayload builds a minimal valid request body for the router endpoint.
 func routerPayload(batchRef string, signals []map[string]any) map[string]any {
 	return map[string]any{
 		"batch_ref": batchRef,
