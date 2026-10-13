@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -27,6 +28,10 @@ type RoutingConfigHandler struct {
 	signalRouterCache *router.Cache
 	schemaCache       *schemas.Cache
 }
+
+// routingFieldSegmentRegexp lists the chars allowed in each segment of a routing field.
+// '@' is allowed so JSON-LD keys such as "@value" can be used - the router escapes it so it is never treated as a gjson modifier.
+var routingFieldSegmentRegexp = regexp.MustCompile(`^[a-zA-Z0-9_:@-]+$`)
 
 func NewRoutingConfigHandler(queries *database.Queries, pool *pgxpool.Pool, signalRouterCache *router.Cache, schemaCache *schemas.Cache) *RoutingConfigHandler {
 	return &RoutingConfigHandler{queries: queries, pool: pool, signalRouterCache: signalRouterCache, schemaCache: schemaCache}
@@ -124,7 +129,8 @@ func (h *RoutingConfigHandler) GetSignalRoutingConfig(w http.ResponseWriter, r *
 //	@Description	Replaces the route config for the specified signal type path
 //	@Description
 //	@Description	the routing_field must be a plain Dot Notation path that is defined in the signal type's schema -
-//	@Description	under the covers the service uses gjson paths, however the special pattern matching symbols (*?#@|!()[]%<>=), empty path segments and numeric (array index) path segments are not currently allowed.
+//	@Description	field names can only contain letters, digits, '_', '-', ':' and '@' (e.g. JSON-LD keys such as location.@value) and are always matched literally.
+//	@Description	Empty path segments and numeric (array index) path segments are not allowed.
 //	@Description
 //	@Description	When using the 'matches' and 'does_not_match' operators, any occurrence of '*' and '?' in the matching pattern will be treated as a wildcard ('equals' and 'does_not_equal' compare the pattern literally).
 //	@Description	The pattern is always compared to the full contents of the specified routing field.
@@ -166,15 +172,14 @@ func (h *RoutingConfigHandler) UpdateSignalRoutingConfig(w http.ResponseWriter, 
 		return apperrors.MalformedBody("routing_field is required", nil)
 	}
 
-	// prevent the use of chars with special meaning in gjson
-	if strings.ContainsAny(req.RoutingField, `*?#@|!()[]%<>=`) {
-		return apperrors.MalformedBody("routing_field must be a plain JSON path (e.g. payload.portOfEntry) - wildcards and gjson operators are not supported", nil)
-	}
-
-	// prevent empty and numeric path segments (gjson array index access e.g. payload.0.item)
+	// prevent empty segments, chars with special meaning in gjson (wildcards, modifiers etc)
+	// and numeric path segments (gjson array index access e.g. payload.0.item)
 	for seg := range strings.SplitSeq(req.RoutingField, ".") {
 		if seg == "" {
 			return apperrors.MalformedBody("routing_field must not contain empty segments (e.g. payload..item)", nil)
+		}
+		if !routingFieldSegmentRegexp.MatchString(seg) {
+			return apperrors.MalformedBody("routing_field must be a plain JSON path (e.g. payload.portOfEntry) - field names can only contain letters, digits, '_', '-', ':' and '@'", nil)
 		}
 		if _, err := strconv.Atoi(seg); err == nil {
 			return apperrors.MalformedBody("routing_field must not contain numeric segments - routing by array index is not supported", nil)

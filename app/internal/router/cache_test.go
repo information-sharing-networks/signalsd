@@ -103,3 +103,34 @@ func TestMatchesResult(t *testing.T) {
 		})
 	}
 }
+
+// TestResolveAtSignKeys checks that '@' in a routing field is always matched as a literal key
+// (e.g. JSON-LD "@value") and is never applied as a gjson modifier.
+func TestResolveAtSignKeys(t *testing.T) {
+	content := []byte(`{"location": {"@value": "GBDVR"}}`)
+
+	tests := []struct {
+		name   string
+		field  string
+		wantOK bool
+	}{
+		{name: "JSON-LD key is matched", field: "location.@value", wantOK: true},
+		// there is no "@this" key - as a gjson modifier, @this would return the location object and match "*"
+		{name: "gjson modifier is not applied", field: "location.@this", wantOK: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Cache{SignalRoutingConfigs: map[string]signalRoutingConfig{
+				"test/v1.0.0": {
+					routingField: tt.field,
+					routingRules: []routingRule{{matchPattern: "*", operator: "matches"}},
+				},
+			}}
+
+			if _, _, ok := c.Resolve("test/v1.0.0", content); ok != tt.wantOK {
+				t.Errorf("Resolve(%q): got ok=%v, want %v", tt.field, ok, tt.wantOK)
+			}
+		})
+	}
+}

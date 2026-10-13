@@ -40,6 +40,7 @@ type routingRule struct {
 // For instance:  payload.PortOfEntry + [ "*Felistowe*",... ]
 // Ordering of the routes determined by the SQL query and preserved in the slice.
 type signalRoutingConfig struct {
+	// routingField is the plain dot-separated path entered by the user (escaped at lookup - see Resolve)
 	routingField string
 	routingRules []routingRule
 }
@@ -150,7 +151,18 @@ func (c *Cache) Resolve(signalTypePath string, content json.RawMessage) (isnID u
 		return uuid.Nil(), "", false
 	}
 
-	result := gjson.GetBytes(content, SignalRoutingConfig.routingField)
+	// escape each segment of the routing field so it is matched literally.
+	// This is needed for JSON-LD keys such as "@value": without escaping, gjson treats a
+	// segment starting with '@' as a modifier (e.g. "@values" or "@this") rather than a key.
+	// Segments are escaped individually because gjson.Escape also escapes the '.' separators.
+	// The admin API only accepts letters, digits, '_', '-', ':' and '@' in a routing field, but escaping
+	// every char means routing configs saved before that check was added are also matched literally.
+	segs := strings.Split(SignalRoutingConfig.routingField, ".")
+	for i, seg := range segs {
+		segs[i] = gjson.Escape(seg)
+	}
+
+	result := gjson.GetBytes(content, strings.Join(segs, "."))
 	if !result.Exists() {
 		return uuid.Nil(), "", false
 	}
