@@ -819,7 +819,7 @@ paths:
         type: string
       - description: Include inactive signal types
         in: query
-        name: include_inactive
+        name: include-inactive
         type: boolean
       responses:
         "200":
@@ -848,7 +848,7 @@ paths:
         type: string
       - description: Include inactive versions
         in: query
-        name: include_inactive
+        name: include-inactive
         type: boolean
       responses:
         "200":

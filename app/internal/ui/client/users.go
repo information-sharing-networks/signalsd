@@ -349,7 +349,7 @@ func (c *Client) EnableAccount(ctx context.Context, accessToken, accountID strin
 func (c *Client) UpdatePassword(ctx context.Context, accessToken, currentPassword, newPassword string) error {
 	updatePasswordReq := struct {
 		CurrentPassword string `json:"current_password"`
-		NewPassword     string `json:"new-password"`
+		NewPassword     string `json:"new_password"`
 	}{
 		CurrentPassword: currentPassword,
 		NewPassword:     newPassword,

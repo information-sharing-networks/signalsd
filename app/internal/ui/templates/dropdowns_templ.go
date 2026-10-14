@@ -480,7 +480,7 @@ func IsnSignalTypeCascade(isns []types.IsnOption, slugsEndpoint string, includeI
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var24 string
-		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("%s?include_inactive=%v", slugsEndpoint, includeInactive))
+		templ_7745c5c3_Var24, templ_7745c5c3_Err = templ.ResolveAttributeValue(fmt.Sprintf("%s?include-inactive=%v", slugsEndpoint, includeInactive))
 		if templ_7745c5c3_Err != nil {
 			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/dropdowns.templ`, Line: 143, Col: 82}
 		}

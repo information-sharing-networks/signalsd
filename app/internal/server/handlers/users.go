@@ -43,7 +43,7 @@ type CreateUserRequest struct {
 
 type UpdatePasswordRequest struct {
 	CurrentPassword string `json:"current_password" example:"lkIB53@6O^Y"`
-	NewPassword     string `json:"new-password" example:"ue6U>&X3j570"`
+	NewPassword     string `json:"new_password" example:"ue6U>&X3j570"`
 }
 
 // RegisterUser godoc

@@ -140,7 +140,7 @@ templ IsnSignalTypeCascade(isns []types.IsnOption, slugsEndpoint string, include
 				id="isn-slug"
 				name="isn-slug"
 				required
-				hx-get={ fmt.Sprintf("%s?include_inactive=%v", slugsEndpoint, includeInactive) }
+				hx-get={ fmt.Sprintf("%s?include-inactive=%v", slugsEndpoint, includeInactive) }
 				hx-target="#signal-type-slug"
 				hx-swap="outerHTML"
 				hx-trigger="change"

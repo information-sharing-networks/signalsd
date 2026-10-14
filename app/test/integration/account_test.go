@@ -1235,7 +1235,7 @@ func TestSelfServePasswordChange(t *testing.T) {
 		newPassword := "new-secure-password-456"
 		changeRequest := map[string]string{
 			"current_password": userPassword,
-			"new-password":     newPassword,
+			"new_password":     newPassword,
 		}
 
 		requestBody, err := json.Marshal(changeRequest)
@@ -1333,7 +1333,7 @@ func TestSelfServePasswordChange(t *testing.T) {
 		newPassword := "another-new-password-789"
 		changeRequest := map[string]string{
 			"current_password": wrongPassword,
-			"new-password":     newPassword,
+			"new_password":     newPassword,
 		}
 
 		requestBody, err := json.Marshal(changeRequest)
@@ -1393,7 +1393,7 @@ func TestSelfServePasswordChange(t *testing.T) {
 	t.Run("password change requires authentication", func(t *testing.T) {
 		changeRequest := map[string]string{
 			"current_password": "some-password",
-			"new-password":     "new-password-123",
+			"new_password":     "new-password-123",
 		}
 
 		requestBody, err := json.Marshal(changeRequest)
@@ -1457,7 +1457,7 @@ func TestSelfServePasswordChange(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				changeRequest := map[string]string{
 					"current_password": tt.currentPass,
-					"new-password":     tt.newPass,
+					"new_password":     tt.newPass,
 				}
 
 				requestBody, err := json.Marshal(changeRequest)
@@ -1496,7 +1496,7 @@ func TestSelfServePasswordChange(t *testing.T) {
 		tooShortPassword := "short"
 		changeRequest := map[string]string{
 			"current_password": userPassword,
-			"new-password":     tooShortPassword,
+			"new_password":     tooShortPassword,
 		}
 
 		requestBody, err := json.Marshal(changeRequest)

@@ -5076,7 +5076,7 @@
                     "type": "string",
                     "example": "lkIB53@6O^Y"
                 },
-                "new-password": {
+                "new_password": {
                     "type": "string",
                     "example": "ue6U\u003e\u0026X3j570"
                 }

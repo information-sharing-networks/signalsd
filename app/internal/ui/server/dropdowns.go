@@ -103,7 +103,7 @@ func (s *Server) APISignalTypeVersions(w http.ResponseWriter, r *http.Request) {
 //	@Description	HTMX endpoint. Returns a signal type slug select element scoped to the user's token permissions for the selected ISN.
 //	@Tags			HTMX Actions
 //	@Param			isn-slug			query	string	true	"ISN slug"	example(felixstowe-isn)
-//	@Param			include_inactive	query	bool	false	"Include inactive signal types"
+//	@Param			include-inactive	query	bool	false	"Include inactive signal types"
 //	@Success		200					"HTML partial"
 //	@Failure		400					"empty response"
 //	@Router			/ui-api/options/isn/signal-type-slugs [get]
@@ -116,7 +116,7 @@ func (s *Server) TokenSignalTypeSlugs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	includeInactive := r.FormValue("include_inactive") == "true"
+	includeInactive := r.FormValue("include-inactive") == "true"
 
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {
@@ -145,7 +145,7 @@ func (s *Server) TokenSignalTypeSlugs(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	versionsEndpoint := fmt.Sprintf("/ui-api/options/isn/signal-type-versions?include_inactive=%v", includeInactive)
+	versionsEndpoint := fmt.Sprintf("/ui-api/options/isn/signal-type-versions?include-inactive=%v", includeInactive)
 	templ.Handler(templates.SignalTypeSlugsSelect(signalTypeSlugs, versionsEndpoint, "#isn-slug")).ServeHTTP(w, r)
 }
 
@@ -156,7 +156,7 @@ func (s *Server) TokenSignalTypeSlugs(w http.ResponseWriter, r *http.Request) {
 //	@Tags			HTMX Actions
 //	@Param			signal-type-slug	query	string	true	"Signal type slug"	example(sample-signal-type)
 //	@Param			isn-slug			query	string	true	"ISN slug"			example(felixstowe-isn)
-//	@Param			include_inactive	query	bool	false	"Include inactive versions"
+//	@Param			include-inactive	query	bool	false	"Include inactive versions"
 //	@Success		200					"HTML partial"
 //	@Failure		400					"empty response"
 //	@Router			/ui-api/options/isn/signal-type-versions [get]
@@ -170,7 +170,7 @@ func (s *Server) TokenSignalTypeVersions(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	includeInactive := r.FormValue("include_inactive") == "true"
+	includeInactive := r.FormValue("include-inactive") == "true"
 
 	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
 	if !ok {

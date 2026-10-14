@@ -904,7 +904,7 @@
                     {
                         "type": "boolean",
                         "description": "Include inactive signal types",
-                        "name": "include_inactive",
+                        "name": "include-inactive",
                         "in": "query"
                     }
                 ],
@@ -945,7 +945,7 @@
                     {
                         "type": "boolean",
                         "description": "Include inactive versions",
-                        "name": "include_inactive",
+                        "name": "include-inactive",
                         "in": "query"
                     }
                 ],
