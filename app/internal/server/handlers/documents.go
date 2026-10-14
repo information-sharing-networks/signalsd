@@ -171,8 +171,8 @@ type DocumentUploadResponse struct {
 //	@Param			isn_slug			path		string	true	"ISN slug"			example(sample-isn)
 //	@Param			signal_type_slug	path		string	true	"signal type slug"	example(bill-of-lading)
 //	@Param			sem_ver				path		string	true	"version"			example(1.0.0)
-//	@Param			batch_ref			formData	string	true	"batch reference (up to 128 alphanumeric characters, hyphens and underscores)"
-//	@Param			local_ref			formData	string	true	"your reference for the document"
+//	@Param			batch_ref			formData	string	true	"label used to track uploads with Get Batch Status (up to 128 alphanumeric characters, hyphens and underscores)"
+//	@Param			local_ref			formData	string	true	"your ID for the document - upload with the same local_ref to store a new version"
 //	@Param			correlation_id		formData	string	false	"the ID of a signal in the same ISN that this document relates to"
 //	@Param			sha256				formData	string	false	"the sha256 of the document (lowercase hex) - the upload is rejected if it does not match"
 //	@Param			file				formData	file	true	"the document (must be the last part of the request)"
@@ -228,8 +228,8 @@ func (h *DocumentsHandler) UploadDocument(w http.ResponseWriter, r *http.Request
 //	@Accept			multipart/form-data
 //	@Param			signal_type_slug	path		string	true	"signal type slug"	example(bill-of-lading)
 //	@Param			sem_ver				path		string	true	"version"			example(1.0.0)
-//	@Param			batch_ref			formData	string	true	"batch reference (up to 128 alphanumeric characters, hyphens and underscores)"
-//	@Param			local_ref			formData	string	true	"your reference for the document"
+//	@Param			batch_ref			formData	string	true	"label used to track uploads with Get Batch Status (up to 128 alphanumeric characters, hyphens and underscores)"
+//	@Param			local_ref			formData	string	true	"your ID for the document - upload with the same local_ref to store a new version"
 //	@Param			correlation_id		formData	string	true	"the ID of the signal this document relates to - the document is sent to the same ISN"
 //	@Param			sha256				formData	string	false	"the sha256 of the document (lowercase hex) - the upload is rejected if it does not match"
 //	@Param			file				formData	file	true	"the document (must be the last part of the request)"

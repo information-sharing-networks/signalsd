@@ -104,11 +104,31 @@ info:
     Search, withdrawal and batches work the same way for every kind, and search results include each signal's `content_kind`.
 
     ## Versions and resubmissions
-    Each signal is identified by the `local_ref` the sender supplies, which must be unique for the account, ISN and signal type version (sending the same `local_ref` to two ISNs, or to two versions of a signal type, creates two independent signals). When a `local_ref` is sent to the same ISN again:
+    A signal describes one thing, such as a consignment or a certificate. As more data emerges or corrections are made, you send the signal again and the service stores it as a new version of the same signal, so recipients see the latest version and can see its history.
+
+    You give each signal a `local_ref`, usually its ID in your own system, and send the same `local_ref` every time you send that signal. A `local_ref` is unique for your account, the ISN and the signal type version (sending the same `local_ref` to two ISNs or to two different signal types, creates two independent signals).
+
+    The service gives each signal a `signal_id` when it is first stored. Other participants use it to refer to your signal (e.g. when they want to link to it - see Correlation below).
+
+    When a `local_ref` is sent to the same ISN again:
     - **If something changed**, a new version of the signal is stored (json and document signals).
     - **If nothing changed** (the same content, and the same or no `correlation_id`), nothing is stored. The response contains the `signal_id`, `signal_version_id` and `version_number` of the existing latest version, with `unchanged: true`, so requests can be safely retried. JSON content is compared as JSON (key order and whitespace are ignored). Documents compare the file and its filename.
     - **If the signal was withdrawn**, it is reactivated with a new version (json and document signals).
     - **Events are never changed**: resubmitting an event with different content or a different `correlation_id`, or after it was withdrawn, fails with `resource_already_exists`. To correct an event, withdraw it and send a new event with a new `local_ref`.
+
+    ## Batches
+    Each request also has a `batch_ref`: a label you choose to track your requests, e.g. one per scheduled run. Requests sent with the same `batch_ref` are added to the same batch, and *Get Batch Status* reports what was stored and what failed in it. The `batch_ref` doesn't affect how signals are stored.
+
+    ## Correlation
+    A signal can be linked to another signal in the same ISN by setting its `correlation_id` to the other signal's `signal_id`.
+
+    Search results include each signal's `correlation_id` (null if the signal is not linked to another signal).  Search with `include_correlated=true` returns the signals linked to each result, and the `correlation_id` search filter returns the signals linked to one signal.
+
+    **Correlate to the entity directly.** For example, correlate a consignment's documents and events to the consignment itself, not to each other. Correlation is one level deep: `include_correlated` only returns signals that are correlated directly to the returned signal.
+
+    **Correlating is sharing.** Correlating your signal to a signal created by another account is like emailing that account a copy, but with the extra controls that you can withdraw it or send new versions, and they see those changes. Unlike email:
+    - withdrawing a signal stops further access through the service
+    - if a new version changes the correlation_id, access moves with it: the owner of the newly correlated signal can see every version, and the previous owner can no longer access it through the service
 
     ## Recovering from failures
     Each signal in a request is stored separately, so a request that fails part way through (e.g. a timeout) can leave some signals stored and others not. Because unchanged signals are not stored again, you can recover in either of these ways:
@@ -120,17 +140,6 @@ info:
     If the server's request timeout is reached part way through a *Submit Signals* request, the remaining signals are returned as `database_error` failures but may not be recorded in the batch - resend the whole request.
 
     A retry of a json signal or document sent while the original request is still being processed can occasionally store an extra, identical version. This is harmless - the content doesn't change - but pollers will see one more update. To avoid it, set your client timeout above the server's request timeout: 15 seconds by default, or 2 minutes for document uploads.
-
-    ## Correlation
-    A signal can be linked to another signal in the same ISN by setting its `correlation_id` to the other signal's `signal_id`. Search with `include_correlated=true` returns the signals linked to each result, and the `correlation_id` search filter returns the signals linked to one signal.
-
-    Search results include each signal's `correlation_id` (null if the signal is not linked to another signal). To fetch the signal it is linked to (e.g. the consignment an event is about), search that signal's type with `signal_id=<correlation_id>`.
-
-    **Correlate to the entity directly.** For example, correlate a consignment's documents and events to the consignment itself, not to each other. Correlation is one level deep: `include_correlated` only returns signals that are correlated directly to the returned signal.
-
-    **Correlating is sharing.** Correlating your signal to a signal created by another account is like emailing that account a copy, with the extra controls that you can withdraw it or send new versions, and they see those changes. Unlike email:
-    - withdrawing a signal stops further access through the service
-    - if a new version changes the correlation_id, access moves with it: the owner of the newly correlated signal can see every version, and the previous owner can no longer access it through the service
 
     ## Who can see signals
     - Accounts with **read** access to an ISN can see every signal in it.

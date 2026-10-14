@@ -30,8 +30,8 @@ import (
 // SubmittedSignal is a json or event signal sent to the Submit Signals endpoints
 type SubmittedSignal struct {
 
-	// LocalRef is supplied by the sender and uniquely identifies each of the account's signals of this type on the ISN
-	// Repeat deliveries of the same LocalRef to the same ISN are treated as updates to the original signal (the same LocalRef sent to another ISN is a separate signal)
+	// LocalRef is the sender's ID for the signal (usually its ID in the sender's own system).
+	// Sending the same LocalRef to the same ISN again stores a new version of the signal (the same LocalRef sent to another ISN is a separate signal)
 	LocalRef string `json:"local_ref" example:"item_id_#1"`
 
 	// CorrelationID is an optional ID for another signal in the same ISN - the submitted signal is linked to the correlated signal
@@ -44,7 +44,7 @@ type SubmittedSignal struct {
 // CreateSignalsRequest contains the http request body used when submitting signals
 type CreateSignalsRequest struct {
 
-	// BatchRef groups signals under a sender-chosen label (1-128 characters: letters, numbers, hyphens and underscores only)
+	// BatchRef is a sender-chosen label used to track requests with Get Batch Status (1-128 characters: letters, numbers, hyphens and underscores only)
 	BatchRef string `json:"batch_ref" example:"daily-sync-2026-04-02"`
 
 	// Signals - the list of signals to be loaded
@@ -173,19 +173,17 @@ type CreateSignalsSummary struct {
 //	@Summary		Submit Signals
 //	@Tags			Signal Exchange
 //
-//	@Description	Submit JSON or event signals to an ISN (documents are sent to document signal types with Upload a Document - using this endpoint for a document signal type returns 400 `invalid_url_param`)
+//	@Description	Submit JSON or event signals to an ISN (documents are sent to document signal types with Upload a Document)
 //	@Description	- payloads must not mix signals of different types and are subject to the size limits defined on the site.
-//	@Description	- The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account to the ISN (the same local_ref sent to two ISNs identifies two independent signals).
-//	@Description	- If a local reference is received more than once from an account for the specified ISN and signal_type a new version of the signal will be stored with an incremented version number (unless the signal is unchanged - see Signal versions).
-//	@Description	- Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.
 //	@Description
-//	@Description	**Batches**
+//	@Description	**Request structure**
 //	@Description
-//	@Description	Batches group separate loads for reporting and tracking purposes.
-//	@Description	- Signal loads are tracked under the batch_ref supplied as part of the request. To start a new batch
-//	@Description	just supply a different batch_ref.
-//	@Description	- Batches are stored at the account level and therefore can include signals from different ISNs and Signal Types
-//	@Description	- Use the *Get Batch Status* endpoint to get a report on the status of signals loaded in a batch.
+//	@Description	The request body has two levels of wrapper around your data:
+//	@Description	- **the request wrapper** applies to the whole request: the `batch_ref`, a label for tracking requests with *Get Batch Status*, and the `signals` array.
+//	@Description	- **a signal wrapper** for each element of `signals` holds that signal's metadata: the `local_ref` that identifies the signal (send the same local_ref each time you send the signal, and corrections or new data are stored as new versions of it) and an optional `correlation_id` (the `signal_id` of a signal in the same ISN that this signal relates to - it can be another account's signal).
+//	@Description	Your data goes in the signal's `content` field, and only `content` is validated against the signal type's schema.
+//	@Description
+//	@Description	See _Versions and resubmissions_ and _Batches_ in the API introduction for more information.
 //	@Description
 //	@Description	**Authentication**
 //	@Description

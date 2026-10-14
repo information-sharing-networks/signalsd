@@ -320,8 +320,9 @@ definitions:
   handlers.CreateSignalsRequest:
     properties:
       batch_ref:
-        description: 'BatchRef groups signals under a sender-chosen label (1-128 characters:
-          letters, numbers, hyphens and underscores only)'
+        description: 'BatchRef is a sender-chosen label used to track requests with
+          Get Batch Status (1-128 characters: letters, numbers, hyphens and underscores
+          only)'
         example: daily-sync-2026-04-02
         type: string
       signals:
@@ -1133,8 +1134,8 @@ definitions:
         type: string
       local_ref:
         description: |-
-          LocalRef is supplied by the sender and uniquely identifies each of the account's signals of this type on the ISN
-          Repeat deliveries of the same LocalRef to the same ISN are treated as updates to the original signal (the same LocalRef sent to another ISN is a separate signal)
+          LocalRef is the sender's ID for the signal (usually its ID in the sender's own system).
+          Sending the same LocalRef to the same ISN again stores a new version of the signal (the same LocalRef sent to another ISN is a separate signal)
         example: item_id_#1
         type: string
     type: object
@@ -1393,11 +1394,31 @@ info:
     Search, withdrawal and batches work the same way for every kind, and search results include each signal's `content_kind`.
 
     ## Versions and resubmissions
-    Each signal is identified by the `local_ref` the sender supplies, which must be unique for the account, ISN and signal type version (sending the same `local_ref` to two ISNs, or to two versions of a signal type, creates two independent signals). When a `local_ref` is sent to the same ISN again:
+    A signal describes one thing, such as a consignment or a certificate. As more data emerges or corrections are made, you send the signal again and the service stores it as a new version of the same signal, so recipients see the latest version and can see its history.
+
+    You give each signal a `local_ref`, usually its ID in your own system, and send the same `local_ref` every time you send that signal. A `local_ref` is unique for your account, the ISN and the signal type version (sending the same `local_ref` to two ISNs or to two different signal types, creates two independent signals).
+
+    The service gives each signal a `signal_id` when it is first stored. Other participants use it to refer to your signal (e.g. when they want to link to it - see Correlation below).
+
+    When a `local_ref` is sent to the same ISN again:
     - **If something changed**, a new version of the signal is stored (json and document signals).
     - **If nothing changed** (the same content, and the same or no `correlation_id`), nothing is stored. The response contains the `signal_id`, `signal_version_id` and `version_number` of the existing latest version, with `unchanged: true`, so requests can be safely retried. JSON content is compared as JSON (key order and whitespace are ignored). Documents compare the file and its filename.
     - **If the signal was withdrawn**, it is reactivated with a new version (json and document signals).
     - **Events are never changed**: resubmitting an event with different content or a different `correlation_id`, or after it was withdrawn, fails with `resource_already_exists`. To correct an event, withdraw it and send a new event with a new `local_ref`.
+
+    ## Batches
+    Each request also has a `batch_ref`: a label you choose to track your requests, e.g. one per scheduled run. Requests sent with the same `batch_ref` are added to the same batch, and *Get Batch Status* reports what was stored and what failed in it. The `batch_ref` doesn't affect how signals are stored.
+
+    ## Correlation
+    A signal can be linked to another signal in the same ISN by setting its `correlation_id` to the other signal's `signal_id`.
+
+    Search results include each signal's `correlation_id` (null if the signal is not linked to another signal).  Search with `include_correlated=true` returns the signals linked to each result, and the `correlation_id` search filter returns the signals linked to one signal.
+
+    **Correlate to the entity directly.** For example, correlate a consignment's documents and events to the consignment itself, not to each other. Correlation is one level deep: `include_correlated` only returns signals that are correlated directly to the returned signal.
+
+    **Correlating is sharing.** Correlating your signal to a signal created by another account is like emailing that account a copy, but with the extra controls that you can withdraw it or send new versions, and they see those changes. Unlike email:
+    - withdrawing a signal stops further access through the service
+    - if a new version changes the correlation_id, access moves with it: the owner of the newly correlated signal can see every version, and the previous owner can no longer access it through the service
 
     ## Recovering from failures
     Each signal in a request is stored separately, so a request that fails part way through (e.g. a timeout) can leave some signals stored and others not. Because unchanged signals are not stored again, you can recover in either of these ways:
@@ -1409,17 +1430,6 @@ info:
     If the server's request timeout is reached part way through a *Submit Signals* request, the remaining signals are returned as `database_error` failures but may not be recorded in the batch - resend the whole request.
 
     A retry of a json signal or document sent while the original request is still being processed can occasionally store an extra, identical version. This is harmless - the content doesn't change - but pollers will see one more update. To avoid it, set your client timeout above the server's request timeout: 15 seconds by default, or 2 minutes for document uploads.
-
-    ## Correlation
-    A signal can be linked to another signal in the same ISN by setting its `correlation_id` to the other signal's `signal_id`. Search with `include_correlated=true` returns the signals linked to each result, and the `correlation_id` search filter returns the signals linked to one signal.
-
-    Search results include each signal's `correlation_id` (null if the signal is not linked to another signal). To fetch the signal it is linked to (e.g. the consignment an event is about), search that signal's type with `signal_id=<correlation_id>`.
-
-    **Correlate to the entity directly.** For example, correlate a consignment's documents and events to the consignment itself, not to each other. Correlation is one level deep: `include_correlated` only returns signals that are correlated directly to the returned signal.
-
-    **Correlating is sharing.** Correlating your signal to a signal created by another account is like emailing that account a copy, with the extra controls that you can withdraw it or send new versions, and they see those changes. Unlike email:
-    - withdrawing a signal stops further access through the service
-    - if a new version changes the correlation_id, access moves with it: the owner of the newly correlated signal can see every version, and the previous owner can no longer access it through the service
 
     ## Who can see signals
     - Accounts with **read** access to an ISN can see every signal in it.
@@ -2860,6 +2870,7 @@ paths:
     get:
       description: |
         Returns the status of a batch identified by batch_ref, scoped to the authenticated account.
+        The batch contains every request the account has sent with this batch_ref.
 
         The response shows stored and failed signal counts broken down by ISN and signal type.
         Where a signal is listed as 'rejected' this means the signal failed to load in this batch and has not been successfully resubmitted subsequently.
@@ -3393,19 +3404,17 @@ paths:
   /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals:
     post:
       description: |
-        Submit JSON or event signals to an ISN (documents are sent to document signal types with Upload a Document - using this endpoint for a document signal type returns 400 `invalid_url_param`)
+        Submit JSON or event signals to an ISN (documents are sent to document signal types with Upload a Document)
         - payloads must not mix signals of different types and are subject to the size limits defined on the site.
-        - The client-supplied local_ref must uniquely identify each signal of the specified signal type that will be supplied by the account to the ISN (the same local_ref sent to two ISNs identifies two independent signals).
-        - If a local reference is received more than once from an account for the specified ISN and signal_type a new version of the signal will be stored with an incremented version number (unless the signal is unchanged - see Signal versions).
-        - Optionally a correlation_id can be supplied - this will link the signal to a previously received signal. The correlated signal does not need to be owned by the same account but must be in the same ISN.
 
-        **Batches**
+        **Request structure**
 
-        Batches group separate loads for reporting and tracking purposes.
-        - Signal loads are tracked under the batch_ref supplied as part of the request. To start a new batch
-        just supply a different batch_ref.
-        - Batches are stored at the account level and therefore can include signals from different ISNs and Signal Types
-        - Use the *Get Batch Status* endpoint to get a report on the status of signals loaded in a batch.
+        The request body has two levels of wrapper around your data:
+        - **the request wrapper** applies to the whole request: the `batch_ref`, a label for tracking requests with *Get Batch Status*, and the `signals` array.
+        - **a signal wrapper** for each element of `signals` holds that signal's metadata: the `local_ref` that identifies the signal (send the same local_ref each time you send the signal, and corrections or new data are stored as new versions of it) and an optional `correlation_id` (the `signal_id` of a signal in the same ISN that this signal relates to - it can be another account's signal).
+        Your data goes in the signal's `content` field, and only `content` is validated against the signal type's schema.
+
+        See _Versions and resubmissions_ and _Batches_ in the API introduction for more information.
 
         **Authentication**
 
@@ -3867,13 +3876,14 @@ paths:
         name: sem_ver
         required: true
         type: string
-      - description: batch reference (up to 128 alphanumeric characters, hyphens and
-          underscores)
+      - description: label used to track uploads with Get Batch Status (up to 128
+          alphanumeric characters, hyphens and underscores)
         in: formData
         name: batch_ref
         required: true
         type: string
-      - description: your reference for the document
+      - description: your ID for the document - upload with the same local_ref to
+          store a new version
         in: formData
         name: local_ref
         required: true
@@ -4285,13 +4295,14 @@ paths:
         name: sem_ver
         required: true
         type: string
-      - description: batch reference (up to 128 alphanumeric characters, hyphens and
-          underscores)
+      - description: label used to track uploads with Get Batch Status (up to 128
+          alphanumeric characters, hyphens and underscores)
         in: formData
         name: batch_ref
         required: true
         type: string
-      - description: your reference for the document
+      - description: your ID for the document - upload with the same local_ref to
+          store a new version
         in: formData
         name: local_ref
         required: true

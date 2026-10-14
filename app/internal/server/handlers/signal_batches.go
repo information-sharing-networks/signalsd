@@ -74,6 +74,7 @@ type BatchSearchParams struct {
 //	@Summary		Get Batch Status
 //
 //	@Description	Returns the status of a batch identified by batch_ref, scoped to the authenticated account.
+//	@Description	The batch contains every request the account has sent with this batch_ref.
 //	@Description
 //	@Description	The response shows stored and failed signal counts broken down by ISN and signal type.
 //	@Description	Where a signal is listed as 'rejected' this means the signal failed to load in this batch and has not been successfully resubmitted subsequently.
