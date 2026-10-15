@@ -4176,10 +4176,17 @@
                     "example": "67890684-3b14-42cf-b785-df28ce570400"
                 },
                 "is_in_use": {
+                    "description": "IsInUse is false if the ISN has been disabled",
                     "type": "boolean",
                     "example": true
                 },
+                "owner_account_id": {
+                    "description": "OwnerAccountID is the account ID of the admin that owns the ISN",
+                    "type": "string",
+                    "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3"
+                },
                 "slug": {
+                    "description": "Slug is the URL-friendly identifier generated from the title",
                     "type": "string",
                     "example": "sample-isn"
                 },
@@ -4191,11 +4198,8 @@
                     "type": "string",
                     "example": "2025-06-03T13:47:47.331787+01:00"
                 },
-                "user_account_id": {
-                    "type": "string",
-                    "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3"
-                },
                 "visibility": {
+                    "description": "Visibility is private (signals visible to ISN members only) or public (signals visible to anyone)",
                     "type": "string",
                     "enum": [
                         "public",
@@ -4278,13 +4282,11 @@
                     "$ref": "#/definitions/handlers.Isn"
                 },
                 "signal_types": {
+                    "description": "SignalTypes lists the signal types registered on the ISN (omitted if there are none)",
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/handlers.SignalType"
                     }
-                },
-                "user": {
-                    "$ref": "#/definitions/handlers.User"
                 }
             }
         },
@@ -4888,20 +4890,23 @@
                     "example": "67890684-3b14-42cf-b785-df28ce570400"
                 },
                 "is_in_use": {
+                    "description": "IsInUse shows whether the signal type is enabled on this ISN",
                     "type": "boolean",
                     "example": true
                 },
                 "readme_url": {
+                    "description": "ReadmeURL is empty if no readme was supplied",
                     "type": "string",
                     "example": "https://example.com/readme.md"
                 },
                 "schema_url": {
+                    "description": "SchemaURL is empty if signals are not validated against a schema",
                     "type": "string",
                     "example": "https://example.com/schema.json"
                 },
                 "sem_ver": {
                     "type": "string",
-                    "example": ""
+                    "example": "1.0.0"
                 },
                 "slug": {
                     "type": "string",
@@ -5109,23 +5114,6 @@
                     "description": "README file URL: must be a GitHub URL ending in .md",
                     "type": "string",
                     "example": "https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/readme.md"
-                }
-            }
-        },
-        "handlers.User": {
-            "type": "object",
-            "properties": {
-                "account_id": {
-                    "type": "string",
-                    "example": "a38c99ed-c75c-4a4a-a901-c9485cf93cf3"
-                },
-                "created_at": {
-                    "type": "string",
-                    "example": "2025-06-03T13:47:47.331787+01:00"
-                },
-                "updated_at": {
-                    "type": "string",
-                    "example": "2025-06-03T13:47:47.331787+01:00"
                 }
             }
         },

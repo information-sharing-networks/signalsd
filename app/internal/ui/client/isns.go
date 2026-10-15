@@ -26,10 +26,10 @@ type CreateIsnResponse struct {
 // IsnDetails holds the full ISN data returned by the GET /api/isn endpoint.
 // Used in admin pages that need to filter or display metadata beyond the slug (e.g. owner, status).
 type IsnDetails struct {
-	Slug          string `json:"slug"`
-	IsInUse       bool   `json:"is_in_use"`
-	Visibility    string `json:"visibility"`
-	UserAccountID string `json:"user_account_id"`
+	Slug           string `json:"slug"`
+	IsInUse        bool   `json:"is_in_use"`
+	Visibility     string `json:"visibility"`
+	OwnerAccountID string `json:"owner_account_id"`
 }
 
 // UpdateIsnStatusRequest represents the request body for updating ISN status

@@ -45,7 +45,7 @@ type UpdateIsnRequest struct {
 }
 
 type TransferIsnOwnershipRequest struct {
-	NewAdminAccountID string `json:"new_owner_account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
+	NewOwnerAccountID string `json:"new_owner_account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
 }
 
 type CreateIsnResponse struct {
@@ -54,42 +54,56 @@ type CreateIsnResponse struct {
 	ResourceURL string    `json:"resource_url" example:"http://localhost:8080/api/isn/sample-isn"`
 }
 
-// Response structs for GET handlers
+// Isn is the ISN detail returned by the GET ISN endpoints
 type Isn struct {
-	ID            uuid.UUID `json:"id" example:"67890684-3b14-42cf-b785-df28ce570400"`
-	CreatedAt     time.Time `json:"created_at" example:"2025-06-03T13:47:47.331787+01:00"`
-	UpdatedAt     time.Time `json:"updated_at" example:"2025-06-03T13:47:47.331787+01:00"`
-	UserAccountID uuid.UUID `json:"user_account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
-	Title         string    `json:"title" example:"Sample ISN @example.org"`
-	Slug          string    `json:"slug" example:"sample-isn"`
-	Detail        string    `json:"detail" example:"Sample ISN description"`
-	IsInUse       bool      `json:"is_in_use" example:"true"`
-	Visibility    string    `json:"visibility" example:"private" enums:"public,private"`
-}
-
-type User struct {
-	AccountID uuid.UUID `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
+	ID        uuid.UUID `json:"id" example:"67890684-3b14-42cf-b785-df28ce570400"`
 	CreatedAt time.Time `json:"created_at" example:"2025-06-03T13:47:47.331787+01:00"`
 	UpdatedAt time.Time `json:"updated_at" example:"2025-06-03T13:47:47.331787+01:00"`
+
+	// OwnerAccountID is the account ID of the admin that owns the ISN
+	OwnerAccountID uuid.UUID `json:"owner_account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
+
+	Title string `json:"title" example:"Sample ISN @example.org"`
+
+	// Slug is the URL-friendly identifier generated from the title
+	Slug string `json:"slug" example:"sample-isn"`
+
+	Detail string `json:"detail" example:"Sample ISN description"`
+
+	// IsInUse is false if the ISN has been disabled
+	IsInUse bool `json:"is_in_use" example:"true"`
+
+	// Visibility is private (signals visible to ISN members only) or public (signals visible to anyone)
+	Visibility string `json:"visibility" example:"private" enums:"public,private"`
 }
 
+// SignalType is the detail of a signal type registered on the ISN
 type SignalType struct {
-	ID          uuid.UUID `json:"id" example:"67890684-3b14-42cf-b785-df28ce570400"`
-	CreatedAt   time.Time `json:"created_at" example:"2025-06-03T13:47:47.331787+01:00"`
-	UpdatedAt   time.Time `json:"updated_at" example:"2025-06-03T13:47:47.331787+01:00"`
-	Slug        string    `json:"slug" example:"sample-signal-type"`
-	SchemaURL   string    `json:"schema_url" example:"https://example.com/schema.json"`
-	ReadmeURL   string    `json:"readme_url" example:"https://example.com/readme.md"`
-	Title       string    `json:"title" example:"Sample Signal Type"`
-	Detail      string    `json:"detail" example:"Sample signal type description"`
-	SemVer      string    `json:"sem_ver" example:""`
-	ContentKind string    `json:"content_kind" example:"json" enums:"json,document,event"`
-	IsInUse     bool      `json:"is_in_use" example:"true"`
+	ID        uuid.UUID `json:"id" example:"67890684-3b14-42cf-b785-df28ce570400"`
+	CreatedAt time.Time `json:"created_at" example:"2025-06-03T13:47:47.331787+01:00"`
+	UpdatedAt time.Time `json:"updated_at" example:"2025-06-03T13:47:47.331787+01:00"`
+	Slug      string    `json:"slug" example:"sample-signal-type"`
+
+	// SchemaURL is empty if signals are not validated against a schema
+	SchemaURL string `json:"schema_url" example:"https://example.com/schema.json"`
+
+	// ReadmeURL is empty if no readme was supplied
+	ReadmeURL string `json:"readme_url" example:"https://example.com/readme.md"`
+
+	Title       string `json:"title" example:"Sample Signal Type"`
+	Detail      string `json:"detail" example:"Sample signal type description"`
+	SemVer      string `json:"sem_ver" example:"1.0.0"`
+	ContentKind string `json:"content_kind" example:"json" enums:"json,document,event"`
+
+	// IsInUse shows whether the signal type is enabled on this ISN
+	IsInUse bool `json:"is_in_use" example:"true"`
 }
 
+// IsnAndLinkedInfo is the response for the GET ISN endpoint
 type IsnAndLinkedInfo struct {
-	Isn         Isn           `json:"isn"`
-	User        User          `json:"user"`
+	Isn Isn `json:"isn"`
+
+	// SignalTypes lists the signal types registered on the ISN (omitted if there are none)
 	SignalTypes *[]SignalType `json:"signal_types,omitempty"`
 }
 
@@ -349,15 +363,15 @@ func (s *IsnHandler) GetIsns(w http.ResponseWriter, r *http.Request) error {
 	isns := make([]Isn, len(dbIsns))
 	for i, dbIsn := range dbIsns {
 		isns[i] = Isn{
-			ID:            dbIsn.ID,
-			CreatedAt:     dbIsn.CreatedAt,
-			UpdatedAt:     dbIsn.UpdatedAt,
-			UserAccountID: dbIsn.UserAccountID,
-			Title:         dbIsn.Title,
-			Slug:          dbIsn.Slug,
-			Detail:        dbIsn.Detail,
-			IsInUse:       dbIsn.IsInUse,
-			Visibility:    dbIsn.Visibility,
+			ID:             dbIsn.ID,
+			CreatedAt:      dbIsn.CreatedAt,
+			UpdatedAt:      dbIsn.UpdatedAt,
+			OwnerAccountID: dbIsn.UserAccountID,
+			Title:          dbIsn.Title,
+			Slug:           dbIsn.Slug,
+			Detail:         dbIsn.Detail,
+			IsInUse:        dbIsn.IsInUse,
+			Visibility:     dbIsn.Visibility,
 		}
 	}
 
@@ -397,33 +411,17 @@ func (s *IsnHandler) GetIsn(w http.ResponseWriter, r *http.Request) error {
 		return apperrors.DatabaseError("database error", err)
 	}
 
-	// get the owner of the isn
-	dbUser, err := s.queries.GetUserByIsnID(r.Context(), dbIsn.ID)
-	if err != nil {
-		logger.AddLogAttrs(r.Context(),
-			slog.String("isn_id", dbIsn.ID.String()),
-		)
-
-		return apperrors.DatabaseError("database error", err)
-	}
-
 	// Convert database structs to our response structs
 	isn := Isn{
-		ID:            dbIsn.ID,
-		CreatedAt:     dbIsn.CreatedAt,
-		UpdatedAt:     dbIsn.UpdatedAt,
-		UserAccountID: dbIsn.UserAccountID,
-		Title:         dbIsn.Title,
-		Slug:          dbIsn.Slug,
-		Detail:        dbIsn.Detail,
-		IsInUse:       dbIsn.IsInUse,
-		Visibility:    dbIsn.Visibility,
-	}
-
-	user := User{
-		AccountID: dbUser.AccountID,
-		CreatedAt: dbUser.CreatedAt,
-		UpdatedAt: dbUser.UpdatedAt,
+		ID:             dbIsn.ID,
+		CreatedAt:      dbIsn.CreatedAt,
+		UpdatedAt:      dbIsn.UpdatedAt,
+		OwnerAccountID: dbIsn.UserAccountID,
+		Title:          dbIsn.Title,
+		Slug:           dbIsn.Slug,
+		Detail:         dbIsn.Detail,
+		IsInUse:        dbIsn.IsInUse,
+		Visibility:     dbIsn.Visibility,
 	}
 
 	var signalTypes *[]SignalType
@@ -470,7 +468,6 @@ func (s *IsnHandler) GetIsn(w http.ResponseWriter, r *http.Request) error {
 	// Send response
 	res := IsnAndLinkedInfo{
 		Isn:         isn,
-		User:        user,
 		SignalTypes: signalTypes,
 	}
 	return responses.JSON(w, http.StatusOK, res)
@@ -523,51 +520,51 @@ func (i *IsnHandler) TransferIsnOwnership(w http.ResponseWriter, r *http.Request
 	}
 
 	// validate new account ID
-	newAdminAccountID, err := uuid.Parse(req.NewAdminAccountID)
+	newOwnerAccountID, err := uuid.Parse(req.NewOwnerAccountID)
 	if err != nil {
 		logger.AddLogAttrs(r.Context(),
-			slog.String("new_admin_account_id", req.NewAdminAccountID),
+			slog.String("new_owner_account_id", req.NewOwnerAccountID),
 		)
 
-		return apperrors.MalformedBody("invalid new admin account ID", err)
+		return apperrors.MalformedBody("invalid new owner account ID", err)
 	}
 
 	// check if new owner account exists and is an admin
-	newAdminAccount, err := i.queries.GetAccountByID(r.Context(), newAdminAccountID)
+	newOwnerAccount, err := i.queries.GetAccountByID(r.Context(), newOwnerAccountID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apperrors.InvalidRequest("new owner account not found", nil)
 		}
 		logger.AddLogAttrs(r.Context(),
-			slog.String("new_admin_account_id", newAdminAccountID.String()),
+			slog.String("new_owner_account_id", newOwnerAccountID.String()),
 		)
 
 		return apperrors.DatabaseError("database error", err)
 	}
 
 	// verify new owner is an isn admin or owner
-	if newAdminAccount.AccountType != "user" {
+	if newOwnerAccount.AccountType != "user" {
 		return apperrors.InvalidRequest("new owner must be a user account", nil)
 	}
 
-	if newAdminAccount.AccountRole != "isnadmin" && newAdminAccount.AccountRole != "siteadmin" {
+	if newOwnerAccount.AccountRole != "isnadmin" && newOwnerAccount.AccountRole != "siteadmin" {
 		return apperrors.InvalidRequest("new owner must be an admin", nil)
 	}
 
 	// check if account is active
-	if !newAdminAccount.IsActive {
+	if !newOwnerAccount.IsActive {
 		return apperrors.InvalidRequest("new owner account is not active", nil)
 	}
 
 	// prevent transferring to the same account
-	if isn.UserAccountID == newAdminAccountID {
+	if isn.UserAccountID == newOwnerAccountID {
 		return apperrors.InvalidRequest("ISN is already owned by this account", nil)
 	}
 
 	// update ISN ownership
 	rowsAffected, err := i.queries.UpdateIsnOwner(r.Context(), database.UpdateIsnOwnerParams{
 		ID:            isn.ID,
-		UserAccountID: newAdminAccountID,
+		UserAccountID: newOwnerAccountID,
 	})
 	if err != nil {
 		logger.AddLogAttrs(r.Context(),
@@ -584,7 +581,7 @@ func (i *IsnHandler) TransferIsnOwnership(w http.ResponseWriter, r *http.Request
 	logger.AddLogAttrs(r.Context(),
 		slog.String("isn_slug", isn.Slug),
 		slog.String("from_user_id", isn.UserAccountID.String()),
-		slog.String("to_user_id", newAdminAccountID.String()),
+		slog.String("to_user_id", newOwnerAccountID.String()),
 	)
 
 	return responses.NoContent(w, http.StatusOK)

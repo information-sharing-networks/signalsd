@@ -465,9 +465,15 @@ definitions:
         example: 67890684-3b14-42cf-b785-df28ce570400
         type: string
       is_in_use:
+        description: IsInUse is false if the ISN has been disabled
         example: true
         type: boolean
+      owner_account_id:
+        description: OwnerAccountID is the account ID of the admin that owns the ISN
+        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
+        type: string
       slug:
+        description: Slug is the URL-friendly identifier generated from the title
         example: sample-isn
         type: string
       title:
@@ -476,10 +482,9 @@ definitions:
       updated_at:
         example: "2025-06-03T13:47:47.331787+01:00"
         type: string
-      user_account_id:
-        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
-        type: string
       visibility:
+        description: Visibility is private (signals visible to ISN members only) or
+          public (signals visible to anyone)
         enum:
         - public
         - private
@@ -540,11 +545,11 @@ definitions:
       isn:
         $ref: '#/definitions/handlers.Isn'
       signal_types:
+        description: SignalTypes lists the signal types registered on the ISN (omitted
+          if there are none)
         items:
           $ref: '#/definitions/handlers.SignalType'
         type: array
-      user:
-        $ref: '#/definitions/handlers.User'
     type: object
   handlers.IsnResult:
     properties:
@@ -1035,16 +1040,19 @@ definitions:
         example: 67890684-3b14-42cf-b785-df28ce570400
         type: string
       is_in_use:
+        description: IsInUse shows whether the signal type is enabled on this ISN
         example: true
         type: boolean
       readme_url:
+        description: ReadmeURL is empty if no readme was supplied
         example: https://example.com/readme.md
         type: string
       schema_url:
+        description: SchemaURL is empty if signals are not validated against a schema
         example: https://example.com/schema.json
         type: string
       sem_ver:
-        example: ""
+        example: 1.0.0
         type: string
       slug:
         example: sample-signal-type
@@ -1204,18 +1212,6 @@ definitions:
       readme_url:
         description: 'README file URL: must be a GitHub URL ending in .md'
         example: https://github.com/user/project/blob/main/sample-signal-type/2025-01-01/readme.md
-        type: string
-    type: object
-  handlers.User:
-    properties:
-      account_id:
-        example: a38c99ed-c75c-4a4a-a901-c9485cf93cf3
-        type: string
-      created_at:
-        example: "2025-06-03T13:47:47.331787+01:00"
-        type: string
-      updated_at:
-        example: "2025-06-03T13:47:47.331787+01:00"
         type: string
     type: object
   handlers.UserDetails:

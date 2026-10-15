@@ -138,27 +138,6 @@ func (q *Queries) GetUserByID(ctx context.Context, accountID uuid.UUID) (GetUser
 	return i, err
 }
 
-const GetUserByIsnID = `-- name: GetUserByIsnID :one
-SELECT u.account_id, u.created_at, u.updated_at, u.email, u.hashed_password, u.user_role
-FROM users u 
-JOIN isn i ON u.account_id = i.user_account_id 
-WHERE i.id = $1
-`
-
-func (q *Queries) GetUserByIsnID(ctx context.Context, id uuid.UUID) (User, error) {
-	row := q.db.QueryRow(ctx, GetUserByIsnID, id)
-	var i User
-	err := row.Scan(
-		&i.AccountID,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.Email,
-		&i.HashedPassword,
-		&i.UserRole,
-	)
-	return i, err
-}
-
 const GetUserWithPasswordByID = `-- name: GetUserWithPasswordByID :one
 SELECT u.account_id, u.email, u.hashed_password FROM users u WHERE u.account_id = $1
 `
