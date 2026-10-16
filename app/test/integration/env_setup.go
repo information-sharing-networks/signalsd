@@ -18,7 +18,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -99,7 +98,6 @@ func startInProcessServerWithConfig(t *testing.T, publicBaseURL string, updateCo
 		WriteTimeout:            15 * time.Second,
 		IdleTimeout:             60 * time.Second,
 		DocumentTransferTimeout: 2 * time.Minute,
-		AllowedOrigins:          []string{"*"},
 		MaxSignalPayloadSize:    5242880,
 		MaxAPIRequestSize:       65536,
 		MaxDocumentSize:         testMaxDocumentSize,
@@ -122,16 +120,6 @@ func startInProcessServerWithConfig(t *testing.T, publicBaseURL string, updateCo
 
 	if updateConfig != nil {
 		updateConfig(cfg)
-	}
-
-	// Allow tests to override allowed origins (e.g. CORS tests)
-	if origins := os.Getenv("ALLOWED_ORIGINS"); origins != "" {
-		cfg.AllowedOrigins = strings.Split(origins, "|")
-	}
-
-	corsConfigs, err := signalsd.CreateCORSConfigs(cfg)
-	if err != nil {
-		t.Fatalf("Failed to create CORS configs: %v", err)
 	}
 
 	testEnv.queries = database.New(testEnv.pool)
@@ -166,7 +154,6 @@ func startInProcessServerWithConfig(t *testing.T, publicBaseURL string, updateCo
 		testEnv.queries,
 		testEnv.authService,
 		cfg,
-		corsConfigs,
 		appLogger,
 		testEnv.schemaCache,
 		testEnv.publicIsnCache,

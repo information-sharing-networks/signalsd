@@ -134,7 +134,7 @@ jobs:
                 {name: "LOG_LEVEL",   value: $log}
               ]')
 
-          for required in PUBLIC_BASE_URL ALLOWED_ORIGINS; do
+          for required in PUBLIC_BASE_URL; do
             echo "$JSON" | jq -e --arg n "$required" 'any(.name == $n)' >/dev/null \
               || { echo "Missing required SSM param: $required"; exit 1; }
           done

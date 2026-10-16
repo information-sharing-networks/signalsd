@@ -2,7 +2,8 @@
 //
 // Available middleware:
 //
-//   - CORS: wraps a pre-built (jub0bs) middleware [cors.Middleware] to handle cross-origin requests.
+//   - PublicCORS: allows browser-based clients on any origin to read the public endpoints (no credentials).
+//     The other API endpoints have no CORS policy, so browsers block cross-origin requests to them.
 //
 //   - SecurityHeaders: sets defensive HTTP response headers (CSP, X-Frame-Options,
 //     X-Content-Type-Options, Referrer-Policy). Adds HSTS in prod/staging environments.

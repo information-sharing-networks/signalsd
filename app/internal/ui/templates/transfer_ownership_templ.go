@@ -5,11 +5,10 @@ package templates
 
 //lint:file-ignore SA4006 This context is only used if a nested component is present.
 
-import (
-	"github.com/a-h/templ"
-	templruntime "github.com/a-h/templ/runtime"
-	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
-)
+import "github.com/a-h/templ"
+import templruntime "github.com/a-h/templ/runtime"
+
+import "github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 
 // TransferOwnershipPage renders the transfer ISN ownership page
 func TransferOwnershipPage(environment string, isns []types.IsnOption, users []types.UserOption) templ.Component {

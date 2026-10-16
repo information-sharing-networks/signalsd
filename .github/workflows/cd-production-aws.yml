@@ -130,7 +130,7 @@ jobs:
                 {name: "VERSION",     value: $ver}
               ]')
 
-          for required in PUBLIC_BASE_URL ALLOWED_ORIGINS; do
+          for required in PUBLIC_BASE_URL; do
             echo "$JSON" | jq -e --arg n "$required" 'any(.name == $n)' >/dev/null \
               || { echo "Missing required SSM param: $required"; exit 1; }
           done

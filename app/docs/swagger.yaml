@@ -1357,14 +1357,18 @@ info:
     ### CSRF Protection
     The refresh token used by the /oauth API endpoints is stored in an HttpOnly cookie (to prevent access by JavaScript)
     and marked with SameSite=Strict (to prevent it from being sent in cross-site requests, mitigating CSRF).
+    The server also rejects POST, PUT and DELETE requests that the browser reports as coming from another origin, since SameSite treats sibling subdomains as the same site.
 
-    ### CORS Protection
+    The other API endpoints are authenticated with bearer tokens, which browsers do not send automatically, so they are not open to CSRF.
 
-    CORS is used to control which browser-based clients can make cross-origin requests to the API and read responses.
+    ## Browser Integrations
+    Browser-based apps on other sites can only call the public endpoints directly:
+    - **Public ISNs**: *Signal Search (public ISNs)* (`/api/public/isn/...`) can be called from any website without an access token.
 
-    The `ALLOWED_ORIGINS` environment variable is used to configure the CORS rules.
+    The other endpoints have no CORS policy, so web pages on other origins can't use them: the browser won't send an access token to them or let the page read the response.
+    Call the API from your app's backend (or a small proxy) and pass the results to the browser. This is the "backend for frontend" pattern used by the signalsd UI.
 
-    In production, you should restrict ALLOWED_ORIGINS to trusted client origins (the server will not start if it is not set)
+    Server-side clients (scripts, services etc) are not affected by CORS and can call any endpoint they have access to.
 
     ## Date/Time Handling
 

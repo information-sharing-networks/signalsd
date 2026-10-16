@@ -44,13 +44,11 @@ if you are deploying to a staging environment you need to create a separate data
 - `STAGING_DATABASE_URL`
 - `STAGING_SECRET_KEY`
 
-You need to create two github environment variables: 
+You need to create a github environment variable: 
 - `PUBLIC_BASE_URL` (e.g. https://yourdomain.com) to hold the public base url for your app
-- `ALLOWED_ORIGINS` (e.g. https://yourdomain.com) to hold a pipe-separated list of allowed CORS origins
 
-If you are deploying to a staging environment you need to create separate variable to hold these values:
+If you are deploying to a staging environment you need to create a separate variable to hold this value:
 - `STAGING_PUBLIC_BASE_URL` (e.g. https://staging.yourdomain.com)
-- `STAGING_ALLOWED_ORIGINS` (e.g. https://staging.yourdomain.com)
 
 The public base URL is used by the back-end server when generating password reset and service account setup links.
 

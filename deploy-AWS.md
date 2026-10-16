@@ -68,7 +68,7 @@ paths:
 - **Secrets Manager** (`signalsd/<env>/database-url`, `signalsd/<env>/secret-key`):
   fetched at task start by the task-execution role and injected as `DATABASE_URL` and `SECRET_KEY`.
 - **SSM Parameter Store** (`signalsd/<env>/<param>`): non-sensitive runtime config —
-  `public-base-url`, `allowed-origins`, plus any of the optional tuning variables listed in [Environment Variables](#environment-variables). The SSM parameter name maps to an env var (e.g. `db-max-connections` -> `DB_MAX_CONNECTIONS`). 
+  `public-base-url`, plus any of the optional tuning variables listed in [Environment Variables](#environment-variables). The SSM parameter name maps to an env var (e.g. `db-max-connections` -> `DB_MAX_CONNECTIONS`). 
   The app uses its internal defaults where optional params are not set.
 
 A separate `signalsd/admin/master-password` secret holds the RDS master password, (used only during initial database setup)
@@ -119,8 +119,8 @@ To set up an equivalent environment, an admin needs:
   group for RDS that allows the ECS task SG on port 5432.
 - An RDS PostgreSQL instance with the two databases and per-env application users.
 - Secrets Manager entries for `signalsd/<env>/database-url` and
-  `signalsd/<env>/secret-key`, and SSM parameters under `signalsd/<env>/` for at least
-  `public-base-url` and `allowed-origins`.
+  `signalsd/<env>/secret-key`, and an SSM parameter for
+  `signalsd/<env>/public-base-url`.
 - Two ECS Express services (`signalsd`, `signalsd-staging`) with appropriate CPU/memory
   and the auto-scaling minimum/maximum each environment needs.
 - Two GitHub repository secrets:

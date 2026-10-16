@@ -39,7 +39,7 @@ func NewStandaloneServer(cfg *config.Config, logger *slog.Logger) *Server {
 	}
 
 	s.setupMiddleware()
-	s.RegisterRoutes()
+	s.registerRoutes()
 	return s
 }
 
@@ -55,13 +55,13 @@ func NewIntegratedServer(router *chi.Mux, cfg *config.Config, logger *slog.Logge
 		apiClient:   client.NewClient(cfg.APIBaseURL),
 	}
 
-	s.RegisterRoutes()
+	s.registerRoutes()
 	return s
 }
 
-// RegisterRoutes registers UI routes on the server's router.
+// registerRoutes registers UI routes on the server's router.
 // note: dynamic HMTX handlers are registered with routes starting /ui-api
-func (s *Server) RegisterRoutes() {
+func (s *Server) registerRoutes() {
 	// Public routes (no auth required)
 	s.router.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("./web/static/"))))
 	s.router.Get("/login", s.LoginPage)
@@ -204,6 +204,8 @@ func (s *Server) setupMiddleware() {
 	s.router.Use(chimiddleware.ClientIPFromXFFTrustedProxies(s.config.TrustedProxies))
 	s.router.Use(logger.RequestLogging(s.logger))
 	s.router.Use(chimiddleware.Recoverer)
+	// CSRF protection: reject cross-origin POST/PUT/DELETE requests (see doc.go)
+	s.router.Use(http.NewCrossOriginProtection().Handler)
 	// Cancel r.Context() just before WriteTimeout drops the TCP connection,
 	// so in-flight work is abandoned cleanly.
 	s.router.Use(chimiddleware.Timeout(s.config.WriteTimeout - time.Second))

@@ -5,11 +5,10 @@ package templates
 
 //lint:file-ignore SA4006 This context is only used if a nested component is present.
 
-import (
-	"github.com/a-h/templ"
-	templruntime "github.com/a-h/templ/runtime"
-	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
-)
+import "github.com/a-h/templ"
+import templruntime "github.com/a-h/templ/runtime"
+
+import "github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 
 // MangeSiteAdminRolesPage renders the site admin role management page
 func MangeSiteAdminRolesPage(environment string, users []types.UserOption) templ.Component {

@@ -37,9 +37,6 @@ type Server struct {
 	// config is the server environment configuration
 	config *signalsd.ServerEnvironment
 
-	// corsConfigs is the CORS configuration for the server - configured via the ALLOWED_ORIGINS environment variable
-	corsConfigs *signalsd.CORSConfigs
-
 	// logger is the server logger - used for application level logging - http request logging is handled by the RequestLogging middleware
 	logger *slog.Logger
 
@@ -67,7 +64,6 @@ func NewServer(
 	queries *database.Queries,
 	authService *auth.AuthService,
 	config *signalsd.ServerEnvironment,
-	corsConfigs *signalsd.CORSConfigs,
 	logger *slog.Logger,
 	schemaCache *schemas.Cache,
 	publicIsnCache *publicisns.Cache,
@@ -79,7 +75,6 @@ func NewServer(
 		queries:           queries,
 		authService:       authService,
 		config:            config,
-		corsConfigs:       corsConfigs,
 		logger:            logger,
 		router:            chi.NewRouter(),
 		schemaCache:       schemaCache,
@@ -193,6 +188,11 @@ func (s *Server) setupMiddleware() {
 	s.router.Use(logger.RequestLogging(s.logger))
 	s.router.Use(chimiddleware.StripSlashes)
 	s.router.Use(middleware.SecurityHeaders(s.config.Environment))
+	// CSRF protection for the cookie-authenticated routes (the UI and /oauth): reject POST/PUT/DELETE requests
+	// that the browser reports as coming from another origin. This is needed as well as SameSite=Strict cookies because
+	// SameSite treats every subdomain of the registrable domain as the same site (e.g. all services on *.ecs.<region>.on.aws).
+	// It does not affect the other routes: API clients using bearer tokens are not browsers.
+	s.router.Use(http.NewCrossOriginProtection().Handler)
 	s.router.Use(middleware.RateLimit(s.config.RateLimitRPS, s.config.RateLimitBurst))
 	// Cancel r.Context() just before WriteTimeout drops the TCP connection, so in-flight DB queries and goroutines
 	// are abandoned cleanly (route groups that need longer use ExtendRequestTimeout)
@@ -219,7 +219,6 @@ func (s *Server) registerAdminRoutes() {
 
 	// protected routes
 	s.router.Group(func(r chi.Router) {
-		r.Use(middleware.CORS(s.corsConfigs.Protected))
 		r.Use(middleware.RequestSizeLimit(s.config.MaxAPIRequestSize))
 
 		//oauth2.0 token handling
@@ -387,7 +386,6 @@ func (s *Server) registerSignalWriteRoutes() {
 	documents := handlers.NewDocumentsHandler(s.queries, s.pool, s.schemaCache, s.documentStore, s.config.MaxDocumentSize)
 
 	s.router.Group(func(r chi.Router) {
-		r.Use(middleware.CORS(s.corsConfigs.Protected))
 		r.Use(middleware.RequestSizeLimit(s.config.MaxSignalPayloadSize))
 		r.Use(s.authService.RequireValidAccessToken)
 		r.Use(s.authService.RequireAccessPermission("write"))
@@ -400,7 +398,6 @@ func (s *Server) registerSignalWriteRoutes() {
 	// batch status endpoints - batches belong to an account rather than an ISN, so RequireAccessPermission is not used.
 	// The handlers only return the account's own batches (site admins can view any account's batches).
 	s.router.Group(func(r chi.Router) {
-		r.Use(middleware.CORS(s.corsConfigs.Protected))
 		r.Use(s.authService.RequireValidAccessToken)
 
 		r.Get("/api/batches/search", responses.Wrap(signalBatches.SearchBatches))
@@ -411,7 +408,6 @@ func (s *Server) registerSignalWriteRoutes() {
 	// Uploads are given DOCUMENT_TRANSFER_TIMEOUT.
 	s.router.Group(func(r chi.Router) {
 		r.Use(middleware.ExtendRequestTimeout(s.config.DocumentTransferTimeout))
-		r.Use(middleware.CORS(s.corsConfigs.Protected))
 		r.Use(middleware.RequestSizeLimit(handlers.MaxUploadRequestSize(s.config.MaxDocumentSize)))
 		r.Use(s.authService.RequireValidAccessToken)
 		r.Use(s.authService.RequireAccessPermission("write"))
@@ -424,7 +420,6 @@ func (s *Server) registerSignalWriteRoutes() {
 	// after ISN resolution, via auth.CheckIsnWritePermission.
 	s.router.Group(func(r chi.Router) {
 		r.Use(middleware.ExtendRequestTimeout(s.config.DocumentTransferTimeout))
-		r.Use(middleware.CORS(s.corsConfigs.Protected))
 		r.Use(middleware.RequestSizeLimit(handlers.MaxUploadRequestSize(s.config.MaxDocumentSize)))
 		r.Use(s.authService.RequireValidAccessToken)
 
@@ -435,7 +430,6 @@ func (s *Server) registerSignalWriteRoutes() {
 	// RequireAccessPermission("write") is NOT used here - permission is checked in-handler
 	// after ISN resolution, via auth.CheckIsnWritePermission.
 	s.router.Group(func(r chi.Router) {
-		r.Use(middleware.CORS(s.corsConfigs.Protected))
 		r.Use(middleware.RequestSizeLimit(s.config.MaxSignalPayloadSize))
 		r.Use(s.authService.RequireValidAccessToken)
 		r.Post("/api/router/signal-types/{signal_type_slug}/v{sem_ver}/signals", responses.Wrap(signals.RouteSignals))
@@ -447,16 +441,17 @@ func (s *Server) registerSignalReadRoutes() {
 	signals := handlers.NewSignalsHandler(s.queries, s.pool, s.schemaCache, s.publicIsnCache, s.signalRouterCache)
 	documents := handlers.NewDocumentsHandler(s.queries, s.pool, s.schemaCache, s.documentStore, s.config.MaxDocumentSize)
 
-	// Public ISN signal search - no authentication required
-	s.router.Group(func(r chi.Router) {
-		r.Use(middleware.CORS(s.corsConfigs.Public))
-		r.Get("/api/public/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search", responses.Wrap(signals.SearchPublicSignals))
+	// Public ISN signal search - no authentication required.
+	// Route (rather than Group) is used so the CORS middleware runs before routing: this allows it to answer
+	// CORS preflight (OPTIONS) requests, which would otherwise be rejected because the route only accepts GET.
+	s.router.Route("/api/public", func(r chi.Router) {
+		r.Use(middleware.PublicCORS)
+		r.Get("/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search", responses.Wrap(signals.SearchPublicSignals))
 	})
 
 	// Private ISN signal search - any ISN member (read or write) may call this endpoint.
 	// Write-only accounts receive only the signals they created and the signals correlated to them; visibility filtering is applied in the handler.
 	s.router.Group(func(r chi.Router) {
-		r.Use(middleware.CORS(s.corsConfigs.Protected))
 		r.Use(s.authService.RequireValidAccessToken)
 		r.Use(s.authService.RequireIsnMembership)
 		r.Get("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search", responses.Wrap(signals.SearchPrivateSignals))
@@ -467,7 +462,6 @@ func (s *Server) registerSignalReadRoutes() {
 	// Downloads are given DOCUMENT_TRANSFER_TIMEOUT.
 	s.router.Group(func(r chi.Router) {
 		r.Use(middleware.ExtendRequestTimeout(s.config.DocumentTransferTimeout))
-		r.Use(middleware.CORS(s.corsConfigs.Protected))
 		r.Use(s.authService.RequireValidAccessToken)
 		r.Use(s.authService.RequireIsnMembership)
 		r.Get("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}/content", responses.Wrap(documents.DownloadDocument))
@@ -482,7 +476,7 @@ func (s *Server) registerCommonRoutes() {
 
 	// Health check endpoints
 	s.router.Route("/health", func(r chi.Router) {
-		r.Use(middleware.CORS(s.corsConfigs.Public))
+		r.Use(middleware.PublicCORS)
 
 		// Readiness - checks if the service is ready to accept traffic (includes database connectivity)
 		r.Get("/ready", responses.Wrap(admin.Readiness))
@@ -493,7 +487,7 @@ func (s *Server) registerCommonRoutes() {
 
 	// Version information
 	s.router.Route("/version", func(r chi.Router) {
-		r.Use(middleware.CORS(s.corsConfigs.Public))
+		r.Use(middleware.PublicCORS)
 		r.Get("/", responses.Wrap(admin.Version))
 	})
 }
@@ -502,7 +496,7 @@ func (s *Server) registerCommonRoutes() {
 func (s *Server) registerApiDocoRoutes() {
 	// Static file server for assets (CSS, JS, images, etc.)
 	s.router.Route("/assets", func(r chi.Router) {
-		r.Use(middleware.CORS(s.corsConfigs.Public))
+		r.Use(middleware.PublicCORS)
 
 		fs := http.FileServer(http.Dir("assets"))
 		r.Get("/*", http.StripPrefix("/assets/", fs).ServeHTTP)
@@ -510,7 +504,7 @@ func (s *Server) registerApiDocoRoutes() {
 
 	// API documentation routes
 	s.router.Route("/", func(r chi.Router) {
-		r.Use(middleware.CORS(s.corsConfigs.Public))
+		r.Use(middleware.PublicCORS)
 
 		// the docs and specs are replaced on every deployment
 		r.Use(middleware.NoCache)
@@ -564,8 +558,7 @@ func (s *Server) setupUIServer() {
 	}
 
 	// Create UI server and register its routes on the signalsd router
-	uiServer := uiserver.NewIntegratedServer(s.router, uiConfig, s.logger)
-	uiServer.RegisterRoutes()
+	uiserver.NewIntegratedServer(s.router, uiConfig, s.logger)
 
 	s.logger.Info("UI routes registered")
 }

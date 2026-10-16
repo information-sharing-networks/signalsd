@@ -133,7 +133,6 @@ func registeredRoutes(t *testing.T, mode string) map[string]bool {
 			TrustedProxies: 1,
 			WriteTimeout:   30 * time.Second,
 		},
-		&signalsd.CORSConfigs{},
 		slog.New(slog.NewTextHandler(io.Discard, nil)),
 		schemas.NewCache(nil),
 		publicisns.NewCache(nil),

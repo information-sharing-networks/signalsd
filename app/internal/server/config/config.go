@@ -2,13 +2,11 @@ package config
 
 import (
 	"fmt"
-	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
 	env "github.com/caarlos0/env/v11"
-	"github.com/jub0bs/cors"
 )
 
 // Environment variables with defaults
@@ -22,9 +20,8 @@ type ServerEnvironment struct {
 	DatabaseURL             string        `env:"DATABASE_URL,required"`
 	ReadTimeout             time.Duration `env:"READ_TIMEOUT"         envDefault:"15s"`
 	WriteTimeout            time.Duration `env:"WRITE_TIMEOUT"        envDefault:"15s"`
-	IdleTimeout             time.Duration `env:"IDLE_TIMEOUT"         envDefault:"65s"`     // must exceed ALB idle timeout (default 60s) so ALB closes first
-	DocumentTransferTimeout time.Duration `env:"DOCUMENT_TRANSFER_TIMEOUT" envDefault:"2m"` // replaces READ_TIMEOUT and WRITE_TIMEOUT for document uploads and downloads
-	AllowedOrigins          []string      `env:"ALLOWED_ORIGINS"      envSeparator:"|"`
+	IdleTimeout             time.Duration `env:"IDLE_TIMEOUT"         envDefault:"65s"`         // must exceed ALB idle timeout (default 60s) so ALB closes first
+	DocumentTransferTimeout time.Duration `env:"DOCUMENT_TRANSFER_TIMEOUT" envDefault:"2m"`     // replaces READ_TIMEOUT and WRITE_TIMEOUT for document uploads and downloads
 	MaxSignalPayloadSize    int64         `env:"MAX_SIGNAL_PAYLOAD_SIZE" envDefault:"5242880"`  // 5MB
 	MaxAPIRequestSize       int64         `env:"MAX_API_REQUEST_SIZE"    envDefault:"65536"`    // 64KB
 	MaxDocumentSize         int64         `env:"MAX_DOCUMENT_SIZE"       envDefault:"20971520"` // 20MB
@@ -38,12 +35,6 @@ type ServerEnvironment struct {
 	DBMaxConnIdleTime       time.Duration `env:"DB_MAX_CONN_IDLE_TIME" envDefault:"30m"`
 	DBConnectTimeout        time.Duration `env:"DB_CONNECT_TIMEOUT"   envDefault:"5s"`
 	TrustedProxies          int           `env:"TRUSTED_PROXIES"      envDefault:"1"` // number of reverse proxies in front of the service (e.g. 1 for a single ALB)
-}
-
-// CORSConfigs holds the CORS middleware instances for different endpoint types
-type CORSConfigs struct {
-	Public    *cors.Middleware
-	Protected *cors.Middleware
 }
 
 // fixed configs for the server (use ServerEnvironment where values need to be configurable)
@@ -67,9 +58,6 @@ const (
 
 	// CachePollInterval is how often each instance checks the DB for cache changes
 	CachePollInterval = 30 * time.Second
-
-	// CORS settings
-	CORSMaxAgeInSeconds = 86400 // 24 hours
 
 	// SkipValidationURL is used to indicate schema validation should be skipped
 	SkipValidationURL = "https://github.com/skip/validation/main/schema.json"
@@ -175,12 +163,12 @@ var ValidRouteMatchingOperators = map[string]bool{
 	"does_not_equal": true,
 }
 
-// NewServerConfig loads environment variables and returns a ServerEnvironment struct and CORSConfigs
-func NewServerConfig() (*ServerEnvironment, *CORSConfigs, error) {
+// NewServerConfig loads environment variables and returns a ServerEnvironment struct
+func NewServerConfig() (*ServerEnvironment, error) {
 	var cfg ServerEnvironment
 
 	if err := env.Parse(&cfg); err != nil {
-		return nil, nil, fmt.Errorf("failed to parse environment variables: %v", err)
+		return nil, fmt.Errorf("failed to parse environment variables: %v", err)
 	}
 
 	// default to host/port if not set (the env must be set for production - checked in the validateConfig function)
@@ -197,16 +185,10 @@ func NewServerConfig() (*ServerEnvironment, *CORSConfigs, error) {
 	cfg.PublicBaseURL = strings.TrimSuffix(cfg.PublicBaseURL, "/")
 
 	if err := validateConfig(&cfg); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	// Initialize CORS configurations
-	corsConfigs, err := CreateCORSConfigs(&cfg)
-	if err != nil {
-		return nil, nil, fmt.Errorf("CORS configuration failed: %v", err)
-	}
-
-	return &cfg, corsConfigs, nil
+	return &cfg, nil
 }
 
 // validateConfig checks for required env variables
@@ -288,74 +270,5 @@ func validateConfig(cfg *ServerEnvironment) error {
 		return fmt.Errorf("PUBLIC_BASE_URL should not include a path: %s", cfg.PublicBaseURL)
 	}
 
-	if cfg.Environment == "prod" || cfg.Environment == "staging" {
-		if len(cfg.AllowedOrigins) == 0 {
-			return fmt.Errorf("ALLOWED_ORIGINS must be set in %v", cfg.Environment)
-		}
-		if cfg.AllowedOrigins[0] == "*" {
-			return fmt.Errorf("ALLOWED_ORIGINS must not be set to '*' in %v", cfg.Environment)
-		}
-	}
-
-	// default to all origins when not in prod/staging
-	if len(cfg.AllowedOrigins) == 0 {
-		cfg.AllowedOrigins = []string{"*"}
-	}
 	return nil
-}
-
-// CreateCORSConfigs creates the CORS configurations based on the server config
-func CreateCORSConfigs(cfg *ServerEnvironment) (*CORSConfigs, error) {
-	// Trim whitespace from all origins
-	origins := make([]string, len(cfg.AllowedOrigins))
-	for i, origin := range cfg.AllowedOrigins {
-		origins[i] = strings.TrimSpace(origin)
-	}
-
-	publicConfig := cors.Config{
-		Origins: []string{"*"},
-		Methods: []string{
-			http.MethodGet,
-			http.MethodHead,
-			http.MethodOptions,
-		},
-		RequestHeaders: []string{
-			"Accept",
-			"Content-Type",
-		},
-		MaxAgeInSeconds: CORSMaxAgeInSeconds,
-	}
-
-	publicMiddleware, err := cors.NewMiddleware(publicConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create public CORS middleware: %v", err)
-	}
-
-	protectedConfig := cors.Config{
-		Origins: origins,
-		Methods: []string{
-			http.MethodGet,
-			http.MethodPost,
-			http.MethodPut,
-			http.MethodDelete,
-			http.MethodOptions,
-		},
-		RequestHeaders: []string{
-			"Content-Type",
-			"Authorization",
-		},
-		MaxAgeInSeconds: CORSMaxAgeInSeconds,
-	}
-
-	protectedMiddleware, err := cors.NewMiddleware(protectedConfig)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create protected CORS middleware: %v", err)
-	}
-
-	corsConfigs := &CORSConfigs{
-		Public:    publicMiddleware,
-		Protected: protectedMiddleware,
-	}
-
-	return corsConfigs, nil
 }

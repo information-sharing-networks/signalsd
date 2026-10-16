@@ -118,8 +118,6 @@ DATABASE_URL=postgres://user:password@host:port/database?sslmode=require
 SECRET_KEY=your-random-secret-key
 # Base URL for user facing links, e.g one-time password links (default: http://localhost:8080)
 PUBLIC_BASE_URL=https://your-server-domain.com 
-# CORS origins - list sites that are allowed to use the API
-ALLOWED_ORIGINS=https://your-ui-domain.com  #  use a pipe seperated list for multiple sites
 
 # **Optional configuration - defaults shown**
 #

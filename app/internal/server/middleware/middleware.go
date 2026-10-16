@@ -13,11 +13,32 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/responses"
 )
 
-// CORS returns a CORS middleware using the provided pre-built middleware instance.
-func CORS(middleware *cors.Middleware) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return middleware.Wrap(next)
+// corsMaxAgeInSeconds is how long browsers may cache the result of a CORS preflight request
+const corsMaxAgeInSeconds = 86400 // 24 hours
+
+// PublicCORS allows browser-based clients on any origin to read the public endpoints (no credentials).
+//
+// The other API endpoints have no CORS policy, so browsers block cross-origin requests to them:
+// browser-based clients that need them must call the API from their own backend (see the API docs).
+func PublicCORS(next http.Handler) http.Handler {
+	middleware, err := cors.NewMiddleware(cors.Config{
+		Origins: []string{"*"},
+		Methods: []string{
+			http.MethodGet,
+			http.MethodHead,
+			http.MethodOptions,
+		},
+		RequestHeaders: []string{
+			"Accept",
+			"Content-Type",
+		},
+		MaxAgeInSeconds: corsMaxAgeInSeconds,
+	})
+	if err != nil {
+		// the config is fixed, so this can only happen if the config above is edited incorrectly
+		panic("invalid public CORS config: " + err.Error())
 	}
+	return middleware.Wrap(next)
 }
 
 // NoCache requires browsers to revalidate before reusing a cached response.

@@ -4,7 +4,7 @@ package integration
 
 // CORS tests
 // Origin validation and enforcement
-// Public vs protected endpoint policies
+// Public endpoints allow all origins, the other endpoints do not allow cross-origin requests
 import (
 	"net/http"
 	"testing"
@@ -14,7 +14,7 @@ import (
 func checkOriginIsAllowed(t *testing.T, endpoint, origin string) (bool, string) {
 	t.Helper()
 
-	// make a preflight request with an Origin header and check he Access-Control-Allow-Origin response header
+	// make a preflight request with an Origin header and check the Access-Control-Allow-Origin response header
 	req, err := http.NewRequest("OPTIONS", endpoint, nil)
 	if err != nil {
 		t.Fatalf("Failed to create request: %v", err)
@@ -39,46 +39,61 @@ func checkOriginIsAllowed(t *testing.T, endpoint, origin string) (bool, string) 
 	return corsOrigin == origin, corsOrigin
 }
 
-// TestCORS tests that protected endpoints respect ALLOWED_ORIGINS configuration and that untrusted origins are blocked
+// TestCORS tests that the public endpoints allow cross-origin requests from any origin and that
+// the other endpoints do not allow cross-origin requests (browser-based clients must call them from their own backend)
 func TestCORS(t *testing.T) {
-	// Configure specific allowed origin
-	allowedOrigins := "https://trusted-app.example.com|https://trusted-app2.example.com"
-	allowedOrigin1 := "https://trusted-app.example.com"
-	allowedOrigin2 := "https://trusted-app2.example.com"
-	disallowedOrigin := "https://malicious-site.com"
+	origin := "https://any-site.example.com"
 
-	t.Setenv("ALLOWED_ORIGINS", allowedOrigins)
-
-	// Start server
 	testEnv := startInProcessServer(t, "")
 
-	privateEndpoint := testEnv.baseURL + "/api/accounts"
-	publicEndpoint := testEnv.baseURL + "/health/live"
+	privateEndpoints := []string{
+		testEnv.baseURL + "/api/accounts",
+		testEnv.baseURL + "/api/isn/sample-isn/signal-types/sample-signal-type/v1.0.0/signals/search",
+		testEnv.baseURL + "/oauth/token",
+	}
+	publicEndpoints := []string{
+		testEnv.baseURL + "/health/live",
+		testEnv.baseURL + "/api/public/isn/sample-isn/signal-types/sample-signal-type/v1.0.0/signals/search",
+	}
 
-	t.Run("trusted origin allowed", func(t *testing.T) {
-		allowed, returnedOrigin := checkOriginIsAllowed(t, privateEndpoint, allowedOrigin1)
-		if !allowed {
-			t.Errorf("Expected origin %s to be allowed, but got Access-Control-Allow-Origin: %s", allowedOrigin1, returnedOrigin)
-		}
-		allowed, returnedOrigin = checkOriginIsAllowed(t, privateEndpoint, allowedOrigin2)
-		if !allowed {
-			t.Errorf("Expected origin %s to be allowed, but got Access-Control-Allow-Origin: %s", allowedOrigin2, returnedOrigin)
-		}
-	})
+	for _, endpoint := range privateEndpoints {
+		t.Run("cross-origin blocked "+endpoint, func(t *testing.T) {
+			allowed, returnedOrigin := checkOriginIsAllowed(t, endpoint, origin)
+			if allowed {
+				t.Errorf("Expected origin %s to be blocked, but got Access-Control-Allow-Origin: %s", origin, returnedOrigin)
+			}
+		})
+	}
 
-	t.Run("untrusted origin blocked", func(t *testing.T) {
-		// Test untrusted origin is blocked
-		allowed, returnedOrigin := checkOriginIsAllowed(t, privateEndpoint, disallowedOrigin)
-		if allowed {
-			t.Errorf("Expected origin %s to be blocked, but got Access-Control-Allow-Origin: %s", disallowedOrigin, returnedOrigin)
-		}
-	})
+	for _, endpoint := range publicEndpoints {
+		t.Run("cross-origin allowed "+endpoint, func(t *testing.T) {
+			allowed, returnedOrigin := checkOriginIsAllowed(t, endpoint, origin)
+			if !allowed {
+				t.Errorf("Expected origin %s to be allowed, but got Access-Control-Allow-Origin: %s", origin, returnedOrigin)
+			}
+		})
+	}
+}
 
-	// publics endpoints can be used by everyone, even badies
-	t.Run("public endpoint allows all origins", func(t *testing.T) {
-		allowed, returnedOrigin := checkOriginIsAllowed(t, publicEndpoint, disallowedOrigin)
-		if !allowed {
-			t.Errorf("Expected origin %s to be allowed to use publc endpoint, but got Access-Control-Allow-Origin: %s", disallowedOrigin, returnedOrigin)
-		}
-	})
+// TestCrossOriginProtection tests that the server rejects POST requests that the browser reports as coming from another origin
+// (CSRF protection for the cookie-authenticated routes - the protection is a global middleware, so a single endpoint is tested)
+func TestCrossOriginProtection(t *testing.T) {
+	testEnv := startInProcessServer(t, "")
+
+	req, err := http.NewRequest(http.MethodPost, testEnv.baseURL+"/oauth/token?grant_type=refresh_token", nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+	req.Header.Set("Sec-Fetch-Site", "same-site") // e.g. a sibling subdomain, which SameSite=Strict does not block
+	req.Header.Set("Origin", "https://other.example.com")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Failed to make request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusForbidden {
+		t.Errorf("Expected status %d, got %d", http.StatusForbidden, resp.StatusCode)
+	}
 }

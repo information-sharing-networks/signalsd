@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
@@ -97,14 +96,18 @@ import (
 //	@description	### CSRF Protection
 //	@description	The refresh token used by the /oauth API endpoints is stored in an HttpOnly cookie (to prevent access by JavaScript)
 //	@description	and marked with SameSite=Strict (to prevent it from being sent in cross-site requests, mitigating CSRF).
+//	@description	The server also rejects POST, PUT and DELETE requests that the browser reports as coming from another origin, since SameSite treats sibling subdomains as the same site.
 //	@description
-//	@description	### CORS Protection
+//	@description	The other API endpoints are authenticated with bearer tokens, which browsers do not send automatically, so they are not open to CSRF.
 //	@description
-//	@description	CORS is used to control which browser-based clients can make cross-origin requests to the API and read responses.
+//	@description	## Browser Integrations
+//	@description	Browser-based apps on other sites can only call the public endpoints directly:
+//	@description	- **Public ISNs**: *Signal Search (public ISNs)* (`/api/public/isn/...`) can be called from any website without an access token.
 //	@description
-//	@description	The `ALLOWED_ORIGINS` environment variable is used to configure the CORS rules.
+//	@description	The other endpoints have no CORS policy, so web pages on other origins can't use them: the browser won't send an access token to them or let the page read the response.
+//	@description	Call the API from your app's backend (or a small proxy) and pass the results to the browser. This is the "backend for frontend" pattern used by the signalsd UI.
 //	@description
-//	@description	In production, you should restrict ALLOWED_ORIGINS to trusted client origins (the server will not start if it is not set)
+//	@description	Server-side clients (scripts, services etc) are not affected by CORS and can call any endpoint they have access to.
 //	@description
 //	@description	## Date/Time Handling
 //	@description
@@ -347,7 +350,7 @@ func runSubcmd(args []string) {
 func run(mode string) error {
 
 	// get site config
-	cfg, corsConfigs, err := signalsd.NewServerConfig()
+	cfg, err := signalsd.NewServerConfig()
 	if err != nil {
 		// exit with error
 		log.Printf("failed to load configuration: %v", err.Error())
@@ -377,13 +380,6 @@ func run(mode string) error {
 		slog.Duration("DB_MAX_CONN_IDLE_TIME", cfg.DBMaxConnIdleTime),
 		slog.Duration("DB_CONNECT_TIMEOUT", cfg.DBConnectTimeout),
 	)
-
-	// cross-origin resource sharing rules for browser based access to the API (based on the ALLOWED_ORIGINS env config) - the cors middleware will ensure that only the listed partner sites can access the protected endpoints.
-	appLogger.Info("CORS allowed origins", slog.Any("origins", cfg.AllowedOrigins))
-
-	if len(cfg.AllowedOrigins) == 0 || (len(cfg.AllowedOrigins) == 1 && strings.TrimSpace(cfg.AllowedOrigins[0]) == "*") {
-		appLogger.Warn("env is configured to allow all origins for CORS. Use the ALLOWED_ORIGINS env variable to restrict access to specific origins")
-	}
 
 	// the mode command line param determines which endpoints should be served: all, admin, signals, signals-read, signals-write, or ui
 	cfg.ServiceMode = mode
@@ -476,7 +472,6 @@ func run(mode string) error {
 		queries,
 		authService,
 		cfg,
-		corsConfigs,
 		appLogger,
 		schemaCache,
 		publicIsnCache,

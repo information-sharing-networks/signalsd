@@ -41,6 +41,21 @@
 //
 // See [auth.RequireAuth] for the middleware and [auth.SetAuthCookies] for cookie settings.
 //
+// # CSRF Protection
+//
+// Because the browser sends the auth cookies automatically, the UI routes need protection
+// against cross-site request forgery. There are two layers:
+//
+//  1. The auth cookies are SameSite=Strict, so the browser does not send them with requests
+//     initiated by other sites.
+//  2. The router uses [http.CrossOriginProtection] as a global middleware, which rejects POST/PUT/DELETE
+//     requests that the browser reports as coming from another origin (in integrated mode this
+//     is set up by the signalsd server, which also uses it to protect the /oauth refresh token cookie)
+//
+// The second layer is needed because SameSite treats every subdomain of the registrable domain
+// as the same site - for example, all services on the AWS default *.ecs.<region>.on.aws domain.
+// It also protects the /login and /logout routes, which do not rely on an existing session.
+//
 // # Handlers
 //
 // 1. UI Pages
