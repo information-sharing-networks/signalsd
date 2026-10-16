@@ -9,9 +9,14 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 )
 
+// Common context keys - use a struct to prevent conflicts
+type contextKey struct {
+	name string
+}
+
 // originalRequestContextKey stores the original request context (before RequestTimeout added its deadline).
 // ExtendRequestTimeout uses it to find out when the client disconnects (the request context is cancelled either way).
-type originalRequestContextKey struct{}
+var originalRequestContextKey = contextKey{"original-request-context"}
 
 // RequestTimeout cancels the request context 1s before the server's write timeout drops the connection,
 // so in-flight database queries and goroutines are abandoned cleanly.
@@ -19,10 +24,12 @@ type originalRequestContextKey struct{}
 func RequestTimeout(writeTimeout time.Duration) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx, cancel := context.WithTimeout(r.Context(), writeTimeout-time.Second)
+			originalCtx := r.Context()
+			ctx, cancel := context.WithTimeout(originalCtx, writeTimeout-time.Second)
 			defer cancel()
 
-			ctx = context.WithValue(ctx, originalRequestContextKey{}, r.Context())
+			// keep the original context so ExtendRequestTimeout can tell when the client disconnects
+			ctx = context.WithValue(ctx, originalRequestContextKey, originalCtx)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -52,8 +59,8 @@ func ExtendRequestTimeout(timeout time.Duration) func(http.Handler) http.Handler
 			defer cancel()
 
 			// cancel the new context if the client disconnects - the context before RequestTimeout added its deadline
-			// is only cancelled when the client disconnects (or the server shuts down)
-			requestContext, ok := r.Context().Value(originalRequestContextKey{}).(context.Context)
+			// is only cancelled when the client disconnects
+			requestContext, ok := r.Context().Value(originalRequestContextKey).(context.Context)
 			if !ok {
 				requestContext = r.Context() // RequestTimeout is not in use
 			}
