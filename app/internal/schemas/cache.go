@@ -160,7 +160,9 @@ func ValidateContent(schema *jsonschema.Schema, rawJSON json.RawMessage) error {
 	}
 
 	if err := schema.Validate(data); err != nil {
-		return fmt.Errorf("schema validation failed: %v", err)
+		// the error locations are JSON pointers relative to the content (the content root is '') -
+		// prefix them with "content" so it is clear that only the signal's content was validated
+		return fmt.Errorf("schema validation failed: %s", strings.ReplaceAll(err.Error(), "- at '", "- at 'content"))
 	}
 
 	return nil
