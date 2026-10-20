@@ -1,12 +1,19 @@
 package handlers
 
 // signal submission: the endpoints that store JSON and event signals.
-// - CreateSignals stores signals on the ISN in the URL
-// - RouteSignals resolves the ISN for each signal (by correlation_id or the signal type's routing rules)
+// - CreateSignals stores the signals on the ISN named in the URL
+// - RouteSignals finds the ISN for each signal, from its correlation_id or the signal type's routing rules
 //
-// Both endpoints share the same steps (readSignalsRequest, startBatch, then storeJSONSignal or storeEventSignal for each signal)
-// and differ only in how the ISN is found - the same structure as the document upload endpoints in documents.go.
-// Event signals are stored by storeEventSignal (see events.go), which adds the checks that make events immutable.
+// Both endpoints follow the same steps (the same structure as the document upload endpoints in documents.go):
+//  1. readSignalsRequest reads and checks the request
+//  2. startBatch records the batch
+//  3. each signal is validated against the signal type's schema
+//  4. RouteSignals only: the signal's ISN is resolved and the account's write permission on it is checked
+//     (CreateSignals relies on the RequireAccessPermission middleware for this)
+//  5. the signal is stored by storeJSONSignal, or by storeEventSignal for events (see events.go, which adds the checks that make events immutable)
+//
+// Signals are validated before they are routed so that a signal in the wrong shape is reported with its schema errors,
+// rather than as not matching a routing rule.
 
 import (
 	"context"
@@ -112,7 +119,7 @@ type StoredSignal struct {
 
 // FailedSignal describes a signal that could not be stored.
 // ErrorCode is one of: malformed_body (e.g. schema validation errors), invalid_correlation_id, resource_not_found,
-// resource_already_exists (events), database_error, and for the Signals Router: forbidden and invalid_request (no routing rule matched)
+// resource_already_exists (events), database_error, and for the Signals Router: forbidden and invalid_request (the signal could not be routed)
 type FailedSignal struct {
 	LocalRef     string `json:"local_ref" example:"item_id_#2"`
 	ErrorCode    string `json:"error_code" example:"malformed_body"`
@@ -162,7 +169,7 @@ type CreateSignalsSummary struct {
 	RejectedCount int `json:"rejected_count" example:"1"`
 
 	// UnroutableCount is the count of signals sent to the Signal Router that could not be routed.
-	// (e.g because no routing rule matched the data, or the account lacks write permission to the resolved ISN)
+	// (because the signal failed schema validation, its correlation_id was not found, or no routing rule matched the data)
 	//
 	// This field is only supplied in responses to the Signals Router handler, and is omitted when it is zero.
 	UnroutableCount int `json:"unroutable_count,omitempty" example:"1"`
@@ -297,6 +304,15 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) e
 	}
 
 	for _, signal := range submission.signals {
+		if err := s.schemaCache.ValidateJSONSignal(submission.signalTypePath(), signal.Content); err != nil {
+			result.FailedSignals = append(result.FailedSignals, FailedSignal{
+				LocalRef:     signal.LocalRef,
+				ErrorCode:    apperrors.ErrCodeMalformedBody.String(),
+				ErrorMessage: fmt.Sprintf("validation failed: %v", err),
+			})
+			continue
+		}
+
 		var stored StoredSignal
 		var failure *FailedSignal
 		switch submission.contentKind {
@@ -356,9 +372,12 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) e
 //	@Description
 //	@Description	**Resolution failures**
 //	@Description
+//	@Description	Each signal is validated against the signal type's schema before it is routed.
+//	@Description
 //	@Description	Signals that can't be routed are listed in `unroutable_signals` (and counted in `unroutable_count`):
-//	@Description	- signals that do not contain the routing field defined in the _Routing Rules Config_, or do not satisfy any of the routing rules
-//	@Description	- signals whose correlation_id is not found (or whose ISN is not in use)
+//	@Description	- signals that fail schema validation (`malformed_body`, with the validation errors)
+//	@Description	- signals that do not contain the routing field defined in the _Routing Rules Config_, or do not satisfy any of the routing rules (`invalid_request`)
+//	@Description	- signals whose correlation_id is not found, or whose ISN is not in use (`invalid_correlation_id`)
 //	@Description
 //	@Description	Signals that resolve to an ISN where the account lacks access or write permission (`forbidden`), or where the ISN or signal type is not in use (`resource_not_found`),
 //	@Description	are rejected and listed in the `failed_signals` of that ISN's result.
@@ -414,13 +433,44 @@ func (s *SignalsHandler) RouteSignals(w http.ResponseWriter, r *http.Request) er
 	totalStored, totalRejected := 0, 0
 
 	for _, signal := range submission.signals {
-		isnSlug, failure, err := s.resolveIsn(ctx, signalTypePath, signal)
-		if err != nil {
-			return err
-		}
-		if failure != nil {
-			unroutable = append(unroutable, *failure)
+		// validate before routing
+		if err := s.schemaCache.ValidateJSONSignal(signalTypePath, signal.Content); err != nil {
+			unroutable = append(unroutable, FailedSignal{
+				LocalRef:     signal.LocalRef,
+				ErrorCode:    apperrors.ErrCodeMalformedBody.String(),
+				ErrorMessage: fmt.Sprintf("validation failed: %v", err),
+			})
 			continue
+		}
+
+		// resolve the ISN: the ISN of the correlated signal if a correlation_id is supplied,
+		// otherwise the ISN of the first routing rule that matches the signal content
+		var isnSlug string
+		if signal.CorrelationID != nil {
+			isn, err := s.queries.GetIsnBySignalID(ctx, *signal.CorrelationID)
+			if errors.Is(err, pgx.ErrNoRows) {
+				unroutable = append(unroutable, FailedSignal{
+					LocalRef:     signal.LocalRef,
+					ErrorCode:    apperrors.ErrCodeInvalidCorrelationID.String(),
+					ErrorMessage: fmt.Sprintf("correlation_id %s not found or its ISN is not in use", signal.CorrelationID),
+				})
+				continue
+			}
+			if err != nil {
+				return apperrors.DatabaseError("database error", err)
+			}
+			isnSlug = isn.Slug
+		} else {
+			_, routedIsnSlug, err := s.signalRouterCache.Resolve(signalTypePath, signal.Content)
+			if err != nil {
+				unroutable = append(unroutable, FailedSignal{
+					LocalRef:     signal.LocalRef,
+					ErrorCode:    apperrors.ErrCodeInvalidRequest.String(),
+					ErrorMessage: err.Error(),
+				})
+				continue
+			}
+			isnSlug = routedIsnSlug
 		}
 
 		result, exists := isnResults[isnSlug]
@@ -452,6 +502,7 @@ func (s *SignalsHandler) RouteSignals(w http.ResponseWriter, r *http.Request) er
 		}
 
 		var stored StoredSignal
+		var failure *FailedSignal
 		switch submission.contentKind {
 		case signalsd.ContentKindJSON:
 			stored, failure = s.storeJSONSignal(ctx, submission, signal, isnSlug)
@@ -596,50 +647,16 @@ func (s *SignalsHandler) startBatch(ctx context.Context, submission *signalsSubm
 	return nil
 }
 
-// resolveIsn returns the ISN a routed signal is sent to: the ISN of the correlated signal if a correlation_id is supplied,
-// otherwise the ISN of the first routing rule that matches the signal content.
-// A signal that can't be routed is returned as a failure.
-func (s *SignalsHandler) resolveIsn(ctx context.Context, signalTypePath string, signal SubmittedSignal) (string, *FailedSignal, error) {
-	if signal.CorrelationID != nil {
-		isn, err := s.queries.GetIsnBySignalID(ctx, *signal.CorrelationID)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return "", &FailedSignal{
-					LocalRef:     signal.LocalRef,
-					ErrorCode:    apperrors.ErrCodeInvalidCorrelationID.String(),
-					ErrorMessage: fmt.Sprintf("correlation_id %s not found or its ISN is not in use", signal.CorrelationID),
-				}, nil
-			}
-			return "", nil, apperrors.DatabaseError("database error", err)
-		}
-		return isn.Slug, nil, nil
-	}
-
-	_, isnSlug, ok := s.signalRouterCache.Resolve(signalTypePath, signal.Content)
-	if !ok {
-		return "", &FailedSignal{
-			LocalRef:     signal.LocalRef,
-			ErrorCode:    apperrors.ErrCodeInvalidRequest.String(),
-			ErrorMessage: fmt.Sprintf("no routing rule matched for signal type %s", signalTypePath),
-		}, nil
-	}
-	return isnSlug, nil, nil
-}
-
-// storeJSONSignal validates a json signal against the signal type's schema and stores it on the ISN
+// storeJSONSignal stores a json signal on the ISN
 // (as a new signal, or a new version of the account's existing signal with the same local_ref on the ISN).
 // A resubmission that doesn't change the signal returns the existing version with Unchanged=true, and no new version is created.
 // It returns the stored signal, or the reason the signal could not be stored.
 //
 // Each signal is stored in its own transaction, so one failure doesn't affect the other signals in the request.
-// The account's write permission on the ISN must have been checked.
+// before using this function, the signal must have been validated against the signal type's schema, and the account's write permission on the ISN must have been checked.
 func (s *SignalsHandler) storeJSONSignal(ctx context.Context, submission *signalsSubmission, signal SubmittedSignal, isnSlug string) (StoredSignal, *FailedSignal) {
 	failed := func(code apperrors.ErrorCode, message string) (StoredSignal, *FailedSignal) {
 		return StoredSignal{}, &FailedSignal{LocalRef: signal.LocalRef, ErrorCode: code.String(), ErrorMessage: message}
-	}
-
-	if err := s.schemaCache.ValidateJSONSignal(submission.signalTypePath(), signal.Content); err != nil {
-		return failed(apperrors.ErrCodeMalformedBody, fmt.Sprintf("validation failed: %v", err))
 	}
 
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})

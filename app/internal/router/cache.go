@@ -3,6 +3,7 @@ package router
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -133,6 +134,13 @@ func (c *Cache) Len() int {
 	return len(c.SignalRoutingConfigs)
 }
 
+// the reasons a signal can't be routed (returned by Resolve)
+var (
+	ErrNoRoutingConfig      = errors.New("no routing rules are configured for the signal type")
+	ErrRoutingFieldNotFound = errors.New("routing field not found in the signal content")
+	ErrNoRuleMatched        = errors.New("routing field value did not match any routing rule")
+)
+
 // Resolve extracts the Routing Field from the json content and returns the target ISN
 // for the first matching pattern.
 //
@@ -140,21 +148,23 @@ func (c *Cache) Len() int {
 //
 // If the field resolves to a JSON array, the rule applies if any element matches.
 //
-// Returns ok=false if no rule exists for the signal type or no pattern matches field content.
+// Returns an error wrapping ErrNoRoutingConfig, ErrRoutingFieldNotFound or ErrNoRuleMatched if the signal can't be routed
+// (the error message is suitable for returning to the client).
 // Both isnID and isnSlug are returned from the cache to avoid DB lookups during signal processing.
-func (c *Cache) Resolve(signalTypePath string, content json.RawMessage) (isnID uuid.UUID, isnSlug string, ok bool) {
+func (c *Cache) Resolve(signalTypePath string, content json.RawMessage) (isnID uuid.UUID, isnSlug string, err error) {
 	c.mu.RLock()
 	SignalRoutingConfig, exists := c.SignalRoutingConfigs[signalTypePath]
 	c.mu.RUnlock()
 
 	if !exists {
-		return uuid.Nil(), "", false
+		return uuid.Nil(), "", fmt.Errorf("%w: %s", ErrNoRoutingConfig, signalTypePath)
 	}
 
 	// escape each segment of the routing field so it is matched literally.
 	// This is needed for JSON-LD keys such as "@value": without escaping, gjson treats a
 	// segment starting with '@' as a modifier (e.g. "@values" or "@this") rather than a key.
-	// Segments are escaped individually because gjson.Escape also escapes the '.' separators.
+	// gjson.Escape takes a single path component (a key name), so split the routing field
+	// on '.' and escape each key before rejoining them with '.' separators.
 	// The admin API only accepts letters, digits, '_', '-', ':' and '@' in a routing field, but escaping
 	// every char means routing configs saved before that check was added are also matched literally.
 	segs := strings.Split(SignalRoutingConfig.routingField, ".")
@@ -164,16 +174,16 @@ func (c *Cache) Resolve(signalTypePath string, content json.RawMessage) (isnID u
 
 	result := gjson.GetBytes(content, strings.Join(segs, "."))
 	if !result.Exists() {
-		return uuid.Nil(), "", false
+		return uuid.Nil(), "", fmt.Errorf("%w: %s", ErrRoutingFieldNotFound, SignalRoutingConfig.routingField)
 	}
 
 	for _, rule := range SignalRoutingConfig.routingRules {
 		if matchesResult(rule, result) {
-			return rule.isnID, rule.isnSlug, true
+			return rule.isnID, rule.isnSlug, nil
 		}
 	}
 
-	return uuid.Nil(), "", false
+	return uuid.Nil(), "", fmt.Errorf("%w: %s", ErrNoRuleMatched, SignalRoutingConfig.routingField)
 }
 
 // matchesResult returns true if the route's criteria match the gjson result.

@@ -311,8 +311,8 @@ func TestRouteSignals(t *testing.T) {
 		})
 
 		t.Run("schema_validation_failure", func(t *testing.T) {
-			// Content must match a routing rule but violate the schema.
-			// The test schema requires exactly one "test" field (additionalProperties: false).
+			// Content matches a routing rule but violates the schema (the test schema allows only the "test" field).
+			// Signals are validated before they are routed, so the signal is unroutable rather than failed on isn-a.
 			token := testEnv.getAccessToken(t, siteAdminAccount.ID)
 			resp := submitRouteSignalsRequest(t, testEnv.baseURL,
 				routerPayload("batch-badschema", []map[string]any{
@@ -320,15 +320,14 @@ func TestRouteSignals(t *testing.T) {
 				}),
 				token, slug, semVer)
 			result := expectSubmissionResponse(t, resp, http.StatusUnprocessableEntity)
-			isnResult := findIsnResult(result.Results, isnA.Slug)
-			if isnResult == nil {
-				t.Fatalf("no result entry for isn-a")
+			if len(result.Results) != 0 {
+				t.Errorf("results: want none (the signal should not be routed), got %+v", result.Results)
 			}
-			if len(isnResult.FailedSignals) != 1 {
-				t.Fatalf("failed_signals: want 1, got %d", len(isnResult.FailedSignals))
+			if len(result.UnroutableSignals) != 1 {
+				t.Fatalf("unroutable_signals: want 1, got %d", len(result.UnroutableSignals))
 			}
-			if isnResult.FailedSignals[0].ErrorCode != apperrors.ErrCodeMalformedBody.String() {
-				t.Errorf("error_code: want %q, got %q", apperrors.ErrCodeMalformedBody.String(), isnResult.FailedSignals[0].ErrorCode)
+			if result.UnroutableSignals[0].ErrorCode != apperrors.ErrCodeMalformedBody.String() {
+				t.Errorf("error_code: want %q, got %q", apperrors.ErrCodeMalformedBody.String(), result.UnroutableSignals[0].ErrorCode)
 			}
 		})
 	})

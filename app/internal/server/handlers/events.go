@@ -21,10 +21,11 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// storeEventSignal validates an event and stores it on the ISN as a new signal.
+// storeEventSignal checks an event's correlation_id and occurred_at and stores it on the ISN as a new signal.
 // An event that has already been stored with the same content and correlation_id is returned as unchanged.
 //
-// As with storeJSONSignal, each event is stored in its own transaction and the account's write permission on the ISN must have been checked.
+// As with storeJSONSignal, each event is stored in its own transaction, and the event must have been validated against
+// the signal type's schema and the account's write permission on the ISN checked.
 func (s *SignalsHandler) storeEventSignal(ctx context.Context, submission *signalsSubmission, signal SubmittedSignal, isnSlug string) (StoredSignal, *FailedSignal) {
 	failed := func(code apperrors.ErrorCode, message string) (StoredSignal, *FailedSignal) {
 		return StoredSignal{}, &FailedSignal{LocalRef: signal.LocalRef, ErrorCode: code.String(), ErrorMessage: message}
@@ -38,10 +39,6 @@ func (s *SignalsHandler) storeEventSignal(ctx context.Context, submission *signa
 
 	if err := checkOccurredAt(signal.Content); err != nil {
 		return failed(apperrors.ErrCodeMalformedBody, err.Error())
-	}
-
-	if err := s.schemaCache.ValidateJSONSignal(submission.signalTypePath(), signal.Content); err != nil {
-		return failed(apperrors.ErrCodeMalformedBody, fmt.Sprintf("validation failed: %v", err))
 	}
 
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})

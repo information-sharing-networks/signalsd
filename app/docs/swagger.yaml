@@ -351,7 +351,7 @@ definitions:
       unroutable_count:
         description: |-
           UnroutableCount is the count of signals sent to the Signal Router that could not be routed.
-          (e.g because no routing rule matched the data, or the account lacks write permission to the resolved ISN)
+          (because the signal failed schema validation, its correlation_id was not found, or no routing rule matched the data)
 
           This field is only supplied in responses to the Signals Router handler, and is omitted when it is zero.
         example: 1
@@ -4200,9 +4200,12 @@ paths:
 
         **Resolution failures**
 
+        Each signal is validated against the signal type's schema before it is routed.
+
         Signals that can't be routed are listed in `unroutable_signals` (and counted in `unroutable_count`):
-        - signals that do not contain the routing field defined in the _Routing Rules Config_, or do not satisfy any of the routing rules
-        - signals whose correlation_id is not found (or whose ISN is not in use)
+        - signals that fail schema validation (`malformed_body`, with the validation errors)
+        - signals that do not contain the routing field defined in the _Routing Rules Config_, or do not satisfy any of the routing rules (`invalid_request`)
+        - signals whose correlation_id is not found, or whose ISN is not in use (`invalid_correlation_id`)
 
         Signals that resolve to an ISN where the account lacks access or write permission (`forbidden`), or where the ISN or signal type is not in use (`resource_not_found`),
         are rejected and listed in the `failed_signals` of that ISN's result.

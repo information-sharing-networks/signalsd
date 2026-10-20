@@ -1,6 +1,7 @@
 package router
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/tidwall/gjson"
@@ -110,13 +111,13 @@ func TestResolveAtSignKeys(t *testing.T) {
 	content := []byte(`{"location": {"@value": "GBDVR"}}`)
 
 	tests := []struct {
-		name   string
-		field  string
-		wantOK bool
+		name    string
+		field   string
+		wantErr error
 	}{
-		{name: "JSON-LD key is matched", field: "location.@value", wantOK: true},
+		{name: "JSON-LD key is matched", field: "location.@value", wantErr: nil},
 		// there is no "@this" key - as a gjson modifier, @this would return the location object and match "*"
-		{name: "gjson modifier is not applied", field: "location.@this", wantOK: false},
+		{name: "gjson modifier is not applied", field: "location.@this", wantErr: ErrRoutingFieldNotFound},
 	}
 
 	for _, tt := range tests {
@@ -128,8 +129,37 @@ func TestResolveAtSignKeys(t *testing.T) {
 				},
 			}}
 
-			if _, _, ok := c.Resolve("test/v1.0.0", content); ok != tt.wantOK {
-				t.Errorf("Resolve(%q): got ok=%v, want %v", tt.field, ok, tt.wantOK)
+			if _, _, err := c.Resolve("test/v1.0.0", content); !errors.Is(err, tt.wantErr) {
+				t.Errorf("Resolve(%q): got err=%v, want %v", tt.field, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// TestResolveErrors checks that Resolve reports why a signal can't be routed
+func TestResolveErrors(t *testing.T) {
+	c := &Cache{SignalRoutingConfigs: map[string]signalRoutingConfig{
+		"test/v1.0.0": {
+			routingField: "port",
+			routingRules: []routingRule{{matchPattern: "Felixstowe", operator: "equals"}},
+		},
+	}}
+
+	tests := []struct {
+		name           string
+		signalTypePath string
+		content        string
+		wantErr        error
+	}{
+		{name: "no routing config for the signal type", signalTypePath: "other/v1.0.0", content: `{"port": "Felixstowe"}`, wantErr: ErrNoRoutingConfig},
+		{name: "routing field not in content", signalTypePath: "test/v1.0.0", content: `{"harbour": "Felixstowe"}`, wantErr: ErrRoutingFieldNotFound},
+		{name: "no rule matched", signalTypePath: "test/v1.0.0", content: `{"port": "Rotterdam"}`, wantErr: ErrNoRuleMatched},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, _, err := c.Resolve(tt.signalTypePath, []byte(tt.content)); !errors.Is(err, tt.wantErr) {
+				t.Errorf("got err=%v, want %v", err, tt.wantErr)
 			}
 		})
 	}
