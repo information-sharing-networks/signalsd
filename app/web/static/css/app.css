@@ -504,6 +504,8 @@ table caption {
 td {
   text-align: center;    /* Horizontal centering */
   vertical-align: middle;  /* Vertical centering */
+  overflow-wrap: anywhere;   /* break long unbroken strings if needed */
+  white-space: normal;  
 }
 
 table th,
