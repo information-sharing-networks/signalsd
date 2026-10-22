@@ -143,7 +143,7 @@ type IsnAndLinkedInfo struct {
 //
 //	@Router			/api/isn/ [post]
 //
-// Use with RequireRole (isnadmin,siteadmin)
+// Use with RequireAdminRole (isnadmin,siteadmin)
 func (i *IsnHandler) CreateIsn(w http.ResponseWriter, r *http.Request) error {
 	var req CreateIsnRequest
 
@@ -259,7 +259,7 @@ func (i *IsnHandler) CreateIsn(w http.ResponseWriter, r *http.Request) error {
 //
 //	@Router			/api/isn/{isn_slug} [put]
 //
-// Use with RequireRole (isnadmin,siteadmin) middleware
+// Use with RequireAdminRole (isnadmin,siteadmin) middleware
 func (i *IsnHandler) UpdateIsn(w http.ResponseWriter, r *http.Request) error {
 	var req UpdateIsnRequest
 
@@ -495,7 +495,7 @@ func (s *IsnHandler) GetIsn(w http.ResponseWriter, r *http.Request) error {
 //
 //	@Router			/api/admin/isn/{isn_slug}/transfer-ownership [put]
 //
-// Use with RequireRole (siteadmin)
+// Use with RequireAdminRole (siteadmin)
 func (i *IsnHandler) TransferIsnOwnership(w http.ResponseWriter, r *http.Request) error {
 	var req TransferIsnOwnershipRequest
 

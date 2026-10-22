@@ -192,7 +192,7 @@ func (a *AdminHandler) Version(w http.ResponseWriter, r *http.Request) error {
 //	@Description	- Revokes all client secrets/one-time secrets (service accounts)
 //	@Description	- Revokes all refresh tokens (web users)
 //	@Description
-//	@Description	Access tokens that were already issued remain valid until they expire (up to 30 minutes).
+//	@Description	If an admin account is disables, it loses access to the admin endpoints straight away. Access tokens that were already issued remain valid on the other endpoints until they expire (up to 30 minutes).
 //	@Description
 //	@Description	**Recovery:** Account must be re-enabled by admin via `POST /api/admin/accounts/{account_id}/enable`
 //	@Description	Service accounts will also need a new client secret via `/api/auth/service-accounts/reissue-credentials`

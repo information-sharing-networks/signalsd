@@ -91,7 +91,10 @@ import (
 //	@description
 //	@description	Each login or refresh revokes the user's other refresh tokens, so a user has one active session at a time.
 //	@description
-//	@description	The account's role and ISN permissions are included in the access token when it is issued. Changes to them (and disabling an account) take effect when the account next gets an access token - up to 30 minutes later.
+//	@description	The account's role and ISN permissions are included in the access token when it is issued. Changes to ISN permissions (and disabling an account) take effect when the account next gets an access token - up to 30 minutes later.
+//	@description	The exception is the admin endpoints, which check the account's current role and status on every request, so role changes and disabled accounts take effect on them straight away.
+//	@description
+//	@description	Changing or resetting a password ends all the user's sessions (their refresh tokens are revoked), so they will need to log in again.
 //	@description
 //	@description	### CSRF Protection
 //	@description	The refresh token used by the /oauth API endpoints is stored in an HttpOnly cookie (to prevent access by JavaScript)

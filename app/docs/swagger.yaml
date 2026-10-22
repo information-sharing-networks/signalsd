@@ -1352,7 +1352,10 @@ info:
 
     Each login or refresh revokes the user's other refresh tokens, so a user has one active session at a time.
 
-    The account's role and ISN permissions are included in the access token when it is issued. Changes to them (and disabling an account) take effect when the account next gets an access token - up to 30 minutes later.
+    The account's role and ISN permissions are included in the access token when it is issued. Changes to ISN permissions (and disabling an account) take effect when the account next gets an access token - up to 30 minutes later.
+    The exception is the admin endpoints, which check the account's current role and status on every request, so role changes and disabled accounts take effect on them straight away.
+
+    Changing or resetting a password ends all the user's sessions (their refresh tokens are revoked), so they will need to log in again.
 
     ### CSRF Protection
     The refresh token used by the /oauth API endpoints is stored in an HttpOnly cookie (to prevent access by JavaScript)
@@ -1500,7 +1503,7 @@ paths:
         - Revokes all client secrets/one-time secrets (service accounts)
         - Revokes all refresh tokens (web users)
 
-        Access tokens that were already issued remain valid until they expire (up to 30 minutes).
+        If an admin account is disables, it loses access to the admin endpoints straight away. Access tokens that were already issued remain valid on the other endpoints until they expire (up to 30 minutes).
 
         **Recovery:** Account must be re-enabled by admin via `POST /api/admin/accounts/{account_id}/enable`
         Service accounts will also need a new client secret via `/api/auth/service-accounts/reissue-credentials`
@@ -1594,7 +1597,7 @@ paths:
       description: |-
         The account reverts to the member role.
 
-        The change takes effect when the account next gets an access token (up to 30 minutes later).
+        The admin endpoints use the new role straight away. The UI shows or hides the admin pages when the account next gets an access token (up to 30 minutes later).
 
         **This endpoint can only be used by site admin accounts**
       parameters:
@@ -1650,7 +1653,7 @@ paths:
 
         Account management (enabling and disabling accounts, password reset links and reissuing service account credentials) is done by site admins, since it affects the account on every ISN it belongs to.
 
-        The change takes effect when the account next gets an access token (up to 30 minutes later).
+        The admin endpoints use the new role straight away. The UI shows or hides the admin pages when the account next gets an access token (up to 30 minutes later).
 
         **This endpoint can only be used by site admin accounts**
       parameters:
@@ -1693,7 +1696,7 @@ paths:
       description: |-
         The account reverts to the member role.
 
-        The change takes effect when the account next gets an access token (up to 30 minutes later).
+        The admin endpoints use the new role straight away. The UI shows or hides the admin pages when the account next gets an access token (up to 30 minutes later).
 
         **This endpoint can only be used by site admin accounts**
       parameters:
@@ -1743,7 +1746,7 @@ paths:
         - Transfer ISN ownership between accounts
         - Assign the site admin role to other users
 
-        The change takes effect when the account next gets an access token (up to 30 minutes later).
+        The admin endpoints use the new role straight away. The UI shows or hides the admin pages when the account next gets an access token (up to 30 minutes later).
 
         **This endpoint can only be used by site admin accounts**
       parameters:
@@ -2584,7 +2587,7 @@ paths:
 
         This is the submission target of the form served by *Password Reset Form* at the same URL, posted by the form's own JavaScript.
 
-        On success the token is deleted so the link can't be reused, and the user can log in with the new password.
+        On success the token is deleted so the link can't be reused, the user's existing sessions are ended (their refresh tokens are revoked), and the user can log in with the new password.
 
         Note that no access token is required - possession of the reset token is what authorises the change. Reset tokens can only be issued by site admins (see *Generate Password Reset Link* under Account Management).
       parameters:
@@ -2628,6 +2631,8 @@ paths:
         Changes the password of the signed-in user.
 
         The caller must supply a valid access token and their current password. The new password must be at least 11 characters.
+
+        On success all the user's sessions are ended (their refresh tokens are revoked), including the current one, so they will need to log in again when their access token expires.
 
         Users who have forgotten their password can't use this endpoint, since they have no current password to supply - an admin has to issue them a one-time reset link instead (see *Generate Password Reset Link* under Account Management).
       parameters:

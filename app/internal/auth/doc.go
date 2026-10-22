@@ -24,6 +24,23 @@
 // These time limits are set in config.go
 //
 // Permissions are revalidated on the database when access tokens are refreshed, the rest of the time auth checks are done using the token claims.
+// The exception is the admin routes (see below).
+//
+// # When the claims can be trusted
+//
+// The claims can be up to 30 minutes out of date, so the rule is:
+//
+//   - The admin routes (every route that requires a siteadmin or isnadmin role) check the account's current status and role
+//     on the database, via [AuthService.RequireAdminRole]. This is to avoid situation where where a stale token could be used
+//     by a disabled or demoted account to do things they are no longer entitled to do
+//     (for example, a disabled admin could re-enable their own account, or grant admin roles to another account
+//     they control)
+//   - All other routes (reading and writing signals etc) use the claims. A stale token here gives access for at most
+//     30 minutes, which is accepted to avoid a database lookup on every request.
+//
+// RequireAdminRole also replaces the role in the claims with the current role, so handlers behind it can rely on claims.Role
+// Handlers that are not behind RequireAdminRole get the role from the token, so should only use it for decisions
+// that are acceptable to be up to 30 minutes stale.
 //
 // # isActive status
 //
@@ -59,7 +76,8 @@
 //
 //   - [AuthService.RequireValidClientCredentials]: validates client_id/client_secret from the JSON body; adds accountID to context.
 //
-//   - [AuthService.RequireRole]: checks the role claim matches one of the supplied roles. Must follow RequireValidAccessToken.
+//   - [AuthService.RequireAdminRole]: checks on the database that the account is active and has one of the supplied roles,
+//     and updates the role in the claims to the current role (see "When the claims can be trusted"). Must follow RequireValidAccessToken.
 //
 //   - [AuthService.RequireAccessPermission]: checks the account has read and/or write permission on the ISN and the ISN is in use
 //     (if signal type is present in URL, it also checks the signal type is active on the ISN).

@@ -80,7 +80,7 @@ type SignalRoutingConfigResponse struct {
 //
 //	@Router			/api/admin/signal-types/{signal_type_slug}/v{sem_ver}/routes [get]
 //
-// Should only be used with RequireRole (siteadmin) middleware.
+// Should only be used with RequireAdminRole (siteadmin) middleware.
 func (h *RoutingConfigHandler) GetSignalRoutingConfig(w http.ResponseWriter, r *http.Request) error {
 	slug := r.PathValue("signal_type_slug")
 	semVer := r.PathValue("sem_ver")
@@ -157,7 +157,7 @@ func (h *RoutingConfigHandler) GetSignalRoutingConfig(w http.ResponseWriter, r *
 //
 //	@Router			/api/admin/signal-types/{signal_type_slug}/v{sem_ver}/routes [put]
 //
-// Should only be used with RequireRole (siteadmin) middleware.
+// Should only be used with RequireAdminRole (siteadmin) middleware.
 func (h *RoutingConfigHandler) UpdateSignalRoutingConfig(w http.ResponseWriter, r *http.Request) error {
 	slug := r.PathValue("signal_type_slug")
 	semVer := r.PathValue("sem_ver")
@@ -320,7 +320,7 @@ func (h *RoutingConfigHandler) UpdateSignalRoutingConfig(w http.ResponseWriter, 
 //	@Security		BearerAccessToken
 //	@Router			/api/admin/signal-types/{signal_type_slug}/v{sem_ver}/routes [delete]
 //
-// Should only be used with RequireRole (siteadmin) middleware.
+// Should only be used with RequireAdminRole (siteadmin) middleware.
 func (h *RoutingConfigHandler) DeleteSignalRoutingConfig(w http.ResponseWriter, r *http.Request) error {
 	slug := r.PathValue("signal_type_slug")
 	semVer := r.PathValue("sem_ver")

@@ -117,6 +117,7 @@ func (s *SignalsBatchHandler) GetSignalBatchStatus(w http.ResponseWriter, r *htt
 	}
 
 	// Site admins may supply ?account_id= to view another account's batch; everyone else sees their own.
+	// The role comes from the token rather than the database - acceptable here since this is read-only (see "When the claims can be trusted" in the auth package doc).
 	resolvedAccountID := claims.AccountID
 	if accountIDString := r.URL.Query().Get("account_id"); accountIDString != "" {
 		if claims.Role != "siteadmin" {

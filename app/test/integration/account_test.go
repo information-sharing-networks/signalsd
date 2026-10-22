@@ -1118,6 +1118,11 @@ func TestPasswordResetFlow(t *testing.T) {
 
 		// 3: User submits new password
 		t.Run("User submits new password", func(t *testing.T) {
+			// give the user a session (as if they had logged in), so the test can check the reset ends it
+			if _, err := testEnv.authService.RotateRefreshToken(auth.ContextWithAccountID(ctx, userAccount.ID)); err != nil {
+				t.Fatalf("Failed to create refresh token: %v", err)
+			}
+
 			newPassword := "new-secure-password-123"
 			resetRequest := handlers.PasswordResetRequest{
 				NewPassword: newPassword,
@@ -1143,6 +1148,15 @@ func TestPasswordResetFlow(t *testing.T) {
 
 			if resp.StatusCode != http.StatusOK {
 				t.Fatalf("Expected status 200, got %d", resp.StatusCode)
+			}
+
+			// check the user's existing session was ended
+			count, err := testEnv.queries.CountActiveRefreshTokens(ctx, userAccount.ID)
+			if err != nil {
+				t.Fatalf("failed to count refresh tokens: %v", err)
+			}
+			if count != 0 {
+				t.Errorf("expected the reset to revoke the user's refresh tokens, found %d active", count)
 			}
 
 			// 4: Verify user can login with new password
@@ -1232,6 +1246,12 @@ func TestSelfServePasswordChange(t *testing.T) {
 		userEmail := "user1@password.test"
 		userAccount := createTestUserWithPassword(t, ctx, testEnv.queries, testEnv.authService, "member", userEmail, userPassword)
 		userToken := testEnv.getAccessToken(t, userAccount.ID)
+
+		// give the user a session (as if they had logged in), so the test can check the password change ends it
+		if _, err := testEnv.authService.RotateRefreshToken(auth.ContextWithAccountID(ctx, userAccount.ID)); err != nil {
+			t.Fatalf("Failed to create refresh token: %v", err)
+		}
+
 		newPassword := "new-secure-password-456"
 		changeRequest := map[string]string{
 			"current_password": userPassword,
@@ -1259,6 +1279,15 @@ func TestSelfServePasswordChange(t *testing.T) {
 
 		if resp.StatusCode != http.StatusNoContent {
 			t.Fatalf("Expected %d, got %d", http.StatusNoContent, resp.StatusCode)
+		}
+
+		// check the user's existing session was ended
+		count, err := testEnv.queries.CountActiveRefreshTokens(ctx, userAccount.ID)
+		if err != nil {
+			t.Fatalf("failed to count refresh tokens: %v", err)
+		}
+		if count != 0 {
+			t.Errorf("expected the password change to revoke the user's refresh tokens, found %d active", count)
 		}
 
 		// Verify user can login with new password

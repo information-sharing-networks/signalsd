@@ -138,7 +138,7 @@ type IsnSignalTypeDetail struct {
 //
 //	@Router			/api/admin/signal-types [post]
 //
-// Should only be used with RequireRole (siteadmin) middleware
+// Should only be used with RequireAdminRole (siteadmin) middleware
 func (s *SignalTypeHandler) CreateSignalType(w http.ResponseWriter, r *http.Request) error {
 	var req CreateSignalTypeRequest
 	var slug string
@@ -509,7 +509,7 @@ func (s *SignalTypeHandler) RegisterNewSignalTypeSchema(w http.ResponseWriter, r
 //
 //	@Router			/api/admin/signal-types/{signal_type_slug}/v{sem_ver}/schema/refresh [post]
 //
-// Should only be used with RequireRole (siteadmin) middleware
+// Should only be used with RequireAdminRole (siteadmin) middleware
 func (s *SignalTypeHandler) RefreshSignalTypeSchema(w http.ResponseWriter, r *http.Request) error {
 
 	slug := r.PathValue("signal_type_slug")
@@ -756,7 +756,7 @@ func (s *SignalTypeHandler) UpdateSignalType(w http.ResponseWriter, r *http.Requ
 //
 //	@Router			/api/admin/signal-types/{signal_type_slug}/v{sem_ver} [delete]
 //
-// Should only be used with RequireRole (siteadmin) middleware
+// Should only be used with RequireAdminRole (siteadmin) middleware
 func (s *SignalTypeHandler) DeleteSignalType(w http.ResponseWriter, r *http.Request) error {
 
 	signalTypeSlug := r.PathValue("signal_type_slug")
@@ -833,7 +833,7 @@ func (s *SignalTypeHandler) DeleteSignalType(w http.ResponseWriter, r *http.Requ
 //
 //	@Router			/api/admin/signal-types/{signal_type_slug}/v{sem_ver} [get]
 //
-// Should only be used with RequireRole (siteadmin) middleware
+// Should only be used with RequireAdminRole (siteadmin) middleware
 func (s *SignalTypeHandler) GetSignalType(w http.ResponseWriter, r *http.Request) error {
 
 	signalTypeSlug := r.PathValue("signal_type_slug")
@@ -900,7 +900,7 @@ func (s *SignalTypeHandler) GetSignalType(w http.ResponseWriter, r *http.Request
 //
 //	@Router			/api/admin/signal-types [get]
 //
-// Should only be used with RequireRole (siteadmin) middleware
+// Should only be used with RequireAdminRole (siteadmin) middleware
 func (s *SignalTypeHandler) GetSignalTypes(w http.ResponseWriter, r *http.Request) error {
 
 	var dbSignalTypes []database.SignalType
@@ -1129,7 +1129,7 @@ func (s *SignalTypeHandler) GetIsnSignalType(w http.ResponseWriter, r *http.Requ
 //
 //	@Router			/api/isn/{isn_slug}/signal-types/add [post]
 //
-// Should only be used with RequireRole (siteadmin, isnadmin) middleware
+// Should only be used with RequireAdminRole (siteadmin, isnadmin) middleware
 func (s *SignalTypeHandler) AddSignalTypeToISN(w http.ResponseWriter, r *http.Request) error {
 	var req AddSignalTypeToIsnRequest
 
@@ -1234,7 +1234,7 @@ func (s *SignalTypeHandler) AddSignalTypeToISN(w http.ResponseWriter, r *http.Re
 //
 //	@Router			/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver} [put]
 //
-// Should only be used with RequireRole (isnadmin,siteadmin) middleware
+// Should only be used with RequireAdminRole (isnadmin,siteadmin) middleware
 func (s *SignalTypeHandler) UpdateIsnSignalTypeStatus(w http.ResponseWriter, r *http.Request) error {
 	var req = UpdateIsnSignalTypeStatusRequest{}
 

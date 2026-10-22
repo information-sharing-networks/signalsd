@@ -160,6 +160,8 @@ func (u *UserHandler) RegisterUser(w http.ResponseWriter, r *http.Request) error
 //	@Description
 //	@Description	The caller must supply a valid access token and their current password. The new password must be at least 11 characters.
 //	@Description
+//	@Description	On success all the user's sessions are ended (their refresh tokens are revoked), including the current one, so they will need to log in again when their access token expires.
+//	@Description
 //	@Description	Users who have forgotten their password can't use this endpoint, since they have no current password to supply - an admin has to issue them a one-time reset link instead (see *Generate Password Reset Link* under Account Management).
 //	@Description
 //	@Tags		User Authentication
@@ -218,7 +220,22 @@ func (u *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) err
 		return apperrors.InternalError("internal server error", err)
 	}
 
-	rowsAffected, err := u.queries.UpdatePassword(r.Context(), database.UpdatePasswordParams{
+	tx, err := u.pool.BeginTx(r.Context(), pgx.TxOptions{})
+	if err != nil {
+		return apperrors.DatabaseError("database error", err)
+	}
+
+	defer func() {
+		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
+			logger.AddLogAttrs(r.Context(),
+				slog.String("rollback_error", err.Error()),
+			)
+		}
+	}()
+
+	txQueries := u.queries.WithTx(tx)
+
+	rowsAffected, err := txQueries.UpdatePassword(r.Context(), database.UpdatePasswordParams{
 		AccountID:      user.AccountID,
 		HashedPassword: newPasswordHash,
 	})
@@ -231,6 +248,16 @@ func (u *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) err
 	}
 	if rowsAffected != 1 {
 		return apperrors.DatabaseError("error updating user", nil)
+	}
+
+	// end the user's sessions, so that anyone holding a stolen refresh token loses access
+	_, err = txQueries.RevokeAllRefreshTokensForUser(r.Context(), user.AccountID)
+	if err != nil {
+		return apperrors.DatabaseError("database error", err)
+	}
+
+	if err := tx.Commit(r.Context()); err != nil {
+		return apperrors.DatabaseError("database error", err)
 	}
 
 	return responses.NoContent(w, http.StatusNoContent)
@@ -258,7 +285,7 @@ func (u *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) err
 //	@Description
 //	@Description	Account management (enabling and disabling accounts, password reset links and reissuing service account credentials) is done by site admins, since it affects the account on every ISN it belongs to.
 //	@Description
-//	@Description	The change takes effect when the account next gets an access token (up to 30 minutes later).
+//	@Description	The admin endpoints use the new role straight away. The UI shows or hides the admin pages when the account next gets an access token (up to 30 minutes later).
 //	@Description
 //	@Description	**This endpoint can only be used by site admin accounts**
 //
@@ -341,7 +368,7 @@ func (u *UserHandler) GrantUserIsnAdminRole(w http.ResponseWriter, r *http.Reque
 //
 //	@Description	The account reverts to the member role.
 //	@Description
-//	@Description	The change takes effect when the account next gets an access token (up to 30 minutes later).
+//	@Description	The admin endpoints use the new role straight away. The UI shows or hides the admin pages when the account next gets an access token (up to 30 minutes later).
 //	@Description
 //	@Description	**This endpoint can only be used by site admin accounts**
 //
@@ -427,7 +454,7 @@ func (u *UserHandler) RevokeUserIsnAdminRole(w http.ResponseWriter, r *http.Requ
 //	@Description	- Transfer ISN ownership between accounts
 //	@Description	- Assign the site admin role to other users
 //	@Description
-//	@Description	The change takes effect when the account next gets an access token (up to 30 minutes later).
+//	@Description	The admin endpoints use the new role straight away. The UI shows or hides the admin pages when the account next gets an access token (up to 30 minutes later).
 //	@Description
 //	@Description	**This endpoint can only be used by site admin accounts**
 //
@@ -506,7 +533,7 @@ func (u *UserHandler) GrantUserSiteAdminRole(w http.ResponseWriter, r *http.Requ
 //
 //	@Description	The account reverts to the member role.
 //	@Description
-//	@Description	The change takes effect when the account next gets an access token (up to 30 minutes later).
+//	@Description	The admin endpoints use the new role straight away. The UI shows or hides the admin pages when the account next gets an access token (up to 30 minutes later).
 //	@Description
 //	@Description	**This endpoint can only be used by site admin accounts**
 //
@@ -692,7 +719,7 @@ func (u *UserHandler) PasswordResetTokenPage(w http.ResponseWriter, r *http.Requ
 //	@Description
 //	@Description	This is the submission target of the form served by *Password Reset Form* at the same URL, posted by the form's own JavaScript.
 //	@Description
-//	@Description	On success the token is deleted so the link can't be reused, and the user can log in with the new password.
+//	@Description	On success the token is deleted so the link can't be reused, the user's existing sessions are ended (their refresh tokens are revoked), and the user can log in with the new password.
 //	@Description
 //	@Description	Note that no access token is required - possession of the reset token is what authorises the change. Reset tokens can only be issued by site admins (see *Generate Password Reset Link* under Account Management).
 //
@@ -789,6 +816,12 @@ func (u *UserHandler) PasswordResetToken(w http.ResponseWriter, r *http.Request)
 
 	// Delete the password reset token
 	_, err = txQueries.DeletePasswordResetToken(r.Context(), tokenID)
+	if err != nil {
+		return apperrors.DatabaseError("database error", err)
+	}
+
+	// end the user's sessions, so that anyone holding a stolen refresh token loses access
+	_, err = txQueries.RevokeAllRefreshTokensForUser(r.Context(), resetToken.UserAccountID)
 	if err != nil {
 		return apperrors.DatabaseError("database error", err)
 	}

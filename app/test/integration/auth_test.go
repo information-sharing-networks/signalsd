@@ -634,3 +634,36 @@ func TestDisabledAccountAuth(t *testing.T) {
 
 	})
 }
+
+// TestAdminRoutesUseCurrentAccountState tests that the admin routes check the account's current status and role in the database,
+// rather than relying on the access token (which stays valid for up to 30 minutes after the account is changed)
+func TestAdminRoutesUseCurrentAccountState(t *testing.T) {
+	ctx := context.Background()
+
+	testEnv := startInProcessServer(t, "")
+
+	ownerAccount := createTestAccount(t, ctx, testEnv.queries, "siteadmin", "user", "owner@stale.test")
+	ownerToken := testEnv.getAccessToken(t, ownerAccount.ID)
+	ownerISN := createTestISN(t, ctx, testEnv.queries, "stale-owner-isn", "Stale owner ISN", ownerAccount.ID, "private")
+
+	t.Run("disabled site admin cannot re-enable their account", func(t *testing.T) {
+		disabledAdmin := createTestAccount(t, ctx, testEnv.queries, "siteadmin", "user", "disabled@stale.test")
+		staleToken := testEnv.getAccessToken(t, disabledAdmin.ID)
+
+		expectStatus(t, sendAdminRequest(t, http.MethodPost, fmt.Sprintf("%s/api/admin/accounts/%s/disable", testEnv.baseURL, disabledAdmin.ID), ownerToken, nil), http.StatusOK)
+
+		expectStatus(t, sendAdminRequest(t, http.MethodPost, fmt.Sprintf("%s/api/admin/accounts/%s/enable", testEnv.baseURL, disabledAdmin.ID), staleToken, nil), http.StatusForbidden)
+	})
+
+	t.Run("site admin demoted to isn admin cannot manage ISNs they do not own", func(t *testing.T) {
+		demotedAdmin := createTestAccount(t, ctx, testEnv.queries, "siteadmin", "user", "demoted@stale.test")
+		staleToken := testEnv.getAccessToken(t, demotedAdmin.ID)
+
+		if _, err := testEnv.queries.UpdateUserAccountToIsnAdmin(ctx, demotedAdmin.ID); err != nil {
+			t.Fatalf("Failed to demote account: %v", err)
+		}
+
+		updateRequest := map[string]string{"detail": "updated by a demoted admin"}
+		expectStatus(t, sendAdminRequest(t, http.MethodPut, fmt.Sprintf("%s/api/isn/%s", testEnv.baseURL, ownerISN.Slug), staleToken, updateRequest), http.StatusForbidden)
+	})
+}

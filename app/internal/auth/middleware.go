@@ -376,11 +376,18 @@ func (a *AuthService) RequireNonRevokedClientCredentials(next http.Handler) http
 	})
 }
 
-// RequireRole checks the account role in the jwt claims matches one of the supplied roles.
+// RequireAdminRole protects the admin routes: it checks the account is active and has one of the supplied admin roles (siteadmin, isnadmin).
 //
-// RequireRole should only be used after RequireValidAccessToken middlware,
+// The account status and role are read from the database rather than the jwt claims, so that disabling an account
+// or changing its role takes effect immediately on the admin routes, rather than when the access token expires.
+// Without this, a disabled admin could use their remaining access token to re-enable their account.
+// The role in the claims passed to the next handler is updated to the current role.
+//
+// Use RequireAdminRole on every admin route - see "When the claims can be trusted" in doc.go.
+//
+// RequireAdminRole should only be used after RequireValidAccessToken middlware,
 // which adds the claims to the context.
-func (a *AuthService) RequireRole(allowedRoles ...string) func(http.Handler) http.Handler {
+func (a *AuthService) RequireAdminRole(allowedRoles ...string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -389,15 +396,34 @@ func (a *AuthService) RequireRole(allowedRoles ...string) func(http.Handler) htt
 				responses.RenderError(w, r, apperrors.InternalError("could not get claims from context", nil))
 				return
 			}
-			if slices.Contains(allowedRoles, claims.Role) {
-				next.ServeHTTP(w, r)
+
+			// check account status
+			account, err := a.queries.GetAccountByID(r.Context(), claims.AccountID)
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					responses.RenderError(w, r, apperrors.Forbidden("account not found", nil))
+					return
+				}
+				responses.RenderError(w, r, apperrors.DatabaseError("database error", err))
 				return
 			}
 
-			// let the logger middleware handle log message
+			if !account.IsActive {
+				responses.RenderError(w, r, apperrors.Forbidden("account is disabled", nil))
+				return
+			}
+
+			if slices.Contains(allowedRoles, account.AccountRole) {
+				// replace the role in the claims with the current role
+				currentClaims := *claims
+				currentClaims.Role = account.AccountRole
+				next.ServeHTTP(w, r.WithContext(ContextWithClaims(r.Context(), &currentClaims)))
+				return
+			}
+
 			logger.AddLogAttrs(r.Context(),
 				slog.Any("expected_roles", allowedRoles),
-				slog.String("got_role", claims.Role),
+				slog.String("got_role", account.AccountRole),
 			)
 			responses.RenderError(w, r, apperrors.Forbidden(fmt.Sprintf("account does not have required role - must be one of %v", strings.Join(allowedRoles, ", ")), nil))
 		})

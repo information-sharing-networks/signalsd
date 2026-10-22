@@ -72,7 +72,10 @@ func (s *Server) UpdatePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	templ.Handler(templates.SuccessAlert("Password updated successfully. Your new password is now active.")).ServeHTTP(w, r)
+	// the API ends all the user's sessions when the password changes, so clear the (now revoked) auth cookies
+	s.authService.ClearAuthCookies(w)
+
+	templ.Handler(templates.SuccessAlert("Password updated successfully. You have been signed out - please log in again with your new password.")).ServeHTTP(w, r)
 }
 
 // GeneratePasswordResetLinkPage godoc

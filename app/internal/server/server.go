@@ -250,7 +250,7 @@ func (s *Server) registerAdminRoutes() {
 
 				r.Group(func(r chi.Router) {
 					r.Use(s.authService.RequireValidAccessToken)
-					r.Use(s.authService.RequireRole("siteadmin", "isnadmin"))
+					r.Use(s.authService.RequireAdminRole("siteadmin", "isnadmin"))
 
 					r.Post("/service-accounts/register", responses.Wrap(serviceAccounts.RegisterServiceAccount))
 				})
@@ -258,7 +258,7 @@ func (s *Server) registerAdminRoutes() {
 				// reissuing credentials takes over an existing service account - site admi only
 				r.Group(func(r chi.Router) {
 					r.Use(s.authService.RequireValidAccessToken)
-					r.Use(s.authService.RequireRole("siteadmin"))
+					r.Use(s.authService.RequireAdminRole("siteadmin"))
 
 					r.Post("/service-accounts/reissue-credentials", responses.Wrap(serviceAccounts.ReissueServiceAccountCredentials))
 				})
@@ -289,7 +289,7 @@ func (s *Server) registerAdminRoutes() {
 					r.Group(func(r chi.Router) {
 
 						// Accounts must be either site admin or isn admin to use these endponts
-						r.Use(s.authService.RequireRole("siteadmin", "isnadmin"))
+						r.Use(s.authService.RequireAdminRole("siteadmin", "isnadmin"))
 
 						// ISN management
 						r.Post("/", responses.Wrap(isn.CreateIsn))
@@ -332,7 +332,7 @@ func (s *Server) registerAdminRoutes() {
 			r.Group(func(r chi.Router) {
 
 				r.Use(s.authService.RequireValidAccessToken)
-				r.Use(s.authService.RequireRole("siteadmin"))
+				r.Use(s.authService.RequireAdminRole("siteadmin"))
 
 				// Account management - siteadmin only (these act on the account on every ISN it belongs to)
 				r.Post("/accounts/{account_id}/disable", responses.Wrap(admin.DisableAccount))
@@ -369,7 +369,7 @@ func (s *Server) registerAdminRoutes() {
 			r.Group(func(r chi.Router) {
 
 				r.Use(s.authService.RequireValidAccessToken)
-				r.Use(s.authService.RequireRole("siteadmin", "isnadmin"))
+				r.Use(s.authService.RequireAdminRole("siteadmin", "isnadmin"))
 
 				// account lists (used by ISN admins to find the accounts to grant ISN access to)
 				r.Get("/users", responses.Wrap(admin.GetUsers))
