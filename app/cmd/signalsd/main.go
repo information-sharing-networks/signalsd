@@ -104,11 +104,10 @@ import (
 //	@description	The other API endpoints are authenticated with bearer tokens, which browsers do not send automatically, so they are not open to CSRF.
 //	@description
 //	@description	## Browser Integrations
-//	@description	Browser-based apps on other sites can only call the public endpoints directly:
-//	@description	- **Public ISNs**: *Signal Search (public ISNs)* (`/api/public/isn/...`) can be called from any website without an access token.
+//	@description	Browser-based apps on other sites can only call the public endpoints directly.
 //	@description
 //	@description	The other endpoints have no CORS policy, so web pages on other origins can't use them: the browser won't send an access token to them or let the page read the response.
-//	@description	Call the API from your app's backend (or a small proxy) and pass the results to the browser. This is the "backend for frontend" pattern used by the signalsd UI.
+//	@description	Instead, call the API from your app's backend (or a small proxy) and pass the results to the browser. This is the "backend for frontend" pattern used by the signalsd UI.
 //	@description
 //	@description	Server-side clients (scripts, services etc) are not affected by CORS and can call any endpoint they have access to.
 //	@description
@@ -154,7 +153,9 @@ import (
 //	@description	## Correlation
 //	@description	A signal can be linked to another signal in the same ISN by setting its `correlation_id` to the other signal's `signal_id`.
 //	@description
-//	@description	Search results include each signal's `correlation_id` (null if the signal is not linked to another signal).  Search with `include_correlated=true` returns the signals linked to each result, and the `correlation_id` search filter returns the signals linked to one signal.
+//	@description	Search results include each signal's `correlation_id` (null if the signal is not linked to another signal).
+//	@description
+//	@description	Search with `include_correlated=true` returns the signals linked to each result, whatever their type, and the `correlation_id` search filter returns the signals linked to one signal. To fetch the signal a result is linked to, search with `signal_id={correlation_id}` (see *Following signals* below).
 //	@description
 //	@description	**Correlate to the entity directly.** For example, correlate a consignment's documents and events to the consignment itself, not to each other. Correlation is one level deep: `include_correlated` only returns signals that are correlated directly to the returned signal.
 //	@description
@@ -162,21 +163,23 @@ import (
 //	@description	- withdrawing a signal stops further access through the service
 //	@description	- if a new version changes the correlation_id, access moves with it: the owner of the newly correlated signal can see every version, and the previous owner can no longer access it through the service
 //	@description
-//	@description	## Recovering from failures
-//	@description	Each signal in a request is stored separately, so a request that fails part way through (e.g. a timeout) can leave some signals stored and others not. Because unchanged signals are not stored again, you can recover in either of these ways:
-//	@description	- **Resend the whole request.** Signals that were already stored are returned with `unchanged: true`, and only the missing or failed signals are stored. Note that any json signal in the request that has been withdrawn since it was sent is reactivated (withdrawn events are not reactivated - they fail with `resource_already_exists`).
-//	@description	- **Resend only the failures.** The response lists the signals that failed, and *Get Batch Status* lists the batch's unresolved failures.
+//	@description	## Partial success and resending
+//	@description	Signals in a request are validated and stored one at a time: the valid signals are stored and the ones that fail (e.g. content that doesn't match the schema, or an unknown `correlation_id`) are listed in the response with an error code. The response status tells you whether all, some or none of the signals were stored (see each endpoint for the details).
 //	@description
-//	@description	When a whole *Submit Signals* request fails (an error response such as 400, 401, 403, 404, 413 or 500), or you get no response, no failures are recorded in the batch, so resend the whole request once the problem is fixed. Rejected document uploads are recorded in the batch (except when the request's form fields are missing or invalid).
+//	@description	This is common when testing a new signal type, where some records in a large payload match the schema and others don't. Fix the failed signals and resend them. Signals that are resent unchanged are not stored again, so you can do this in either of these ways:
+//	@description	- **Resend the whole request.** Signals that were already stored are returned with `unchanged: true`, and only the fixed signals are stored. Note that any json signal in the request that has been withdrawn since it was sent is reactivated (withdrawn events are not reactivated - they fail with `resource_already_exists`).
+//	@description	- **Resend only the failures.** *Get Batch Status* lists the batch's unresolved failures.
 //	@description
-//	@description	If the server's request timeout is reached part way through a *Submit Signals* request, the remaining signals are returned as `database_error` failures but may not be recorded in the batch - resend the whole request.
+//	@description	When a whole *Submit Signals* request fails (an error response such as 400, 401, 403, 404, 413 or 500), or you get no response, nothing is recorded in the batch, so resend the whole request once the problem is fixed.
 //	@description
-//	@description	A retry of a json signal or document sent while the original request is still being processed can occasionally store an extra, identical version. This is harmless - the content doesn't change - but pollers will see one more update. To avoid it, set your client timeout above the server's request timeout: 15 seconds by default, or 2 minutes for document uploads.
+//	@description	**Timeouts.** If the server's request timeout is reached partway through a request, the signals already processed stay stored and the rest are returned as `database_error` failures (which may not be recorded in the batch), so resend the whole request.
 //	@description
 //	@description	## Who can see signals
 //	@description	- Accounts with **read** access to an ISN can see every signal in it.
 //	@description	- Accounts with **write-only** access can see the signals they created, and the signals other accounts have correlated to their signals (one level deep).
 //	@description	- Signals in a **public** ISN can be searched by anyone, using *Signal Search (public ISNs)* (`/api/public/isn/...`). Downloading a document still needs an access token and access to the ISN.
+//	@description
+//	@description	An account can have different access in each ISN. Searches across several ISNs apply each ISN's rule to the signals in it.
 //	@description
 //	@description	Privacy between participants is set by the ISN's permissions. For example, in a network where all participants share their data with a government agency but not with each other, the participants are given write-only access and the agency is given read access.
 //	@description
@@ -195,16 +198,60 @@ import (
 //	@description	- `occurred_at` and `subject` are reserved - don't use them for anything else
 //	@description	- the service doesn't check `subject` yet, so a type whose events have a subject should require it in its schema, as `{"signal_id": <uuid>, "version": <integer>}`
 //	@description
+//	@description	## Searching without naming the ISN
+//	@description	When receiving a signal_id without details of the ISN it is in you can use the following endpoints:
+//	@description	```
+//	@description	GET /api/signal-types/{signal_type_slug}/v{sem_ver}/signals/search
+//	@description	GET /api/signals/search
+//	@description	```
+//	@description	These searches cover every ISN your account is a member of. Each result includes its `isn_slug`, `signal_type_slug` and `sem_ver`, so you can build further URLs (e.g. *Download a Document*) from it.
+//	@description
 //	@description	## Polling for changes
-//	@description	To find out about new and changed signals, poll *Signal Search* for each signal type you are interested in:
+//	@description	To find out about new and changed signals, poll the signal types you are interested in, or every signal type:
+//	@description	```
+//	@description	GET /api/signal-types/{signal_type_slug}/v{sem_ver}/signals/search?updated_since={cursor}&include_withdrawn=true
+//	@description	GET /api/signals/search?updated_since={cursor}&include_withdrawn=true
+//	@description	```
+//	@description	- `updated_since` returns the signals that changed (a new version was received, or the signal was withdrawn) since that time. Results are ordered by `signal_updated_at` across all your ISNs, so the last result's `signal_updated_at` is your cursor.
+//	@description	- Use `include_withdrawn=true`, so withdrawn signals are returned with `is_withdrawn: true` (otherwise they silently drop out of the results).
+//	@description	- **Polling is at-least-once, so overlap your polls**: set `updated_since` to 1 minute before your cursor, and skip the results you have already seen (the same `signal_id` and `signal_updated_at`). This is necessary because `signal_updated_at` is set when the service starts storing a signal, not when it finishes, so a signal that was still being stored when you last polled can appear with a `signal_updated_at` a little before your cursor. The 1 minute overlap makes sure your next poll picks it up.
+//	@description	- Search results are not paginated, so poll often enough to keep each result set small.
+//	@description
+//	@description	To poll a single ISN, use *Signal Search (private ISNs)* in the same way. The same rules apply, with results ordered by `signal_updated_at` within that ISN:
 //	@description	```
 //	@description	GET /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search?updated_since={cursor}&include_withdrawn=true
 //	@description	```
-//	@description	- `updated_since` returns the signals that were created, given a new version, recorrelated or withdrawn since that time. Results are ordered by `signal_updated_at`, so the last result's `signal_updated_at` is your cursor.
-//	@description	- Use `include_withdrawn=true`, so withdrawn signals are returned with `is_withdrawn: true` (otherwise they silently drop out of the results).
-//	@description	- **Polling is at-least-once, so overlap your polls**: set `updated_since` to 1 minute before your cursor, and skip the results you have already seen (the same `signal_id` and `signal_updated_at`).
-//	@description	- Why the overlap is needed: `signal_updated_at` is set when the service starts storing a signal, not when it finishes. A signal that was still being stored when you last polled can therefore appear with a `signal_updated_at` a little before your cursor. The 1 minute overlap makes sure your next poll picks it up.
-//	@description	- Search results are not paginated, so poll often enough to keep each result set small.
+//	@description
+//	@description	## Following signals
+//	@description	**You received an event and need the signal it is about.** For example, an `ehc-approved` event is about a consignment, and you want the consignment with its documents and other events. The event's `correlation_id` is the consignment's `signal_id`:
+//	@description	```
+//	@description	GET /api/signals/search?signal_id={correlation_id}&include_correlated=true&include_withdrawn=true
+//	@description	```
+//	@description	The result is the consignment, with everything linked to it in. If the consignment was withdrawn, it is returned with `is_withdrawn: true`. Write-only accounts get an empty result if the consignment belongs to another account (see Who can see signals). The same search tells you what any `signal_id` is.
+//	@description
+//	@description	**You sent signals through the router and want the responses.** For example, you send consignments through the router, and the ports send back advice events linked to them. Poll the advice event type: the events from every port are returned, and each event's `correlation_id` is the `signal_id` the router returned for your consignment.
+//	@description	```
+//	@description	GET /api/signal-types/{advice_type}/v{sem_ver}/signals/search?updated_since={cursor}&include_withdrawn=true
+//	@description	```
+//	@description
+//	@description	**You keep a copy of the data.** For example, you store every consignment, and the documents and events linked to them. Poll every signal type, so you need one cursor rather than one for each signal type:
+//	@description	```
+//	@description	GET /api/signals/search?updated_since={cursor}&include_withdrawn=true
+//	@description	```
+//	@description	- store each result by `signal_id`, and use its `correlation_id` to attach it to the signal it is linked to
+//	@description	- if a new version links a signal to a different signal, it is returned with the new `correlation_id`
+//	@description	- a linked signal can arrive before the signal it is linked to, so keep it until that signal arrives
+//	@description	- signals of new signal types are returned too: skip the types you don't need
+//	@description
+//	@description	**You want to know when anything about one signal changes.** For example, you want an alert when a consignment gets a new version, or when a document or event is linked to it. Linking a signal to a consignment changes the linked signal, not the consignment, so polling the consignment type with `updated_since` doesn't show new documents or events. Instead, poll the consignment with everything linked to it, and compare the result with the previous poll:
+//	@description	```
+//	@description	GET /api/signals/search?signal_id={signal_id}&include_correlated=true&include_withdrawn=true
+//	@description	```
+//	@description	- a `signal_id` that wasn't there before: a signal was linked to the consignment
+//	@description	- a different `signal_updated_at`: a new version, or a withdrawal (`is_withdrawn: true`)
+//	@description	- a `signal_id` that is no longer there: the signal was linked to a different signal (or can no longer be seen)
+//	@description
+//	@description	Each poll returns the whole set, so there is no cursor to keep.
 //	@description
 //	@description	# UI Endpoints
 //	@description

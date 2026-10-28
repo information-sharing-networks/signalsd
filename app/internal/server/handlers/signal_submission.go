@@ -227,6 +227,11 @@ type CreateSignalsSummary struct {
 //	@Description	- a batch_ref that is longer than 128 characters or contains characters other than letters, numbers, hyphens and underscores
 //	@Description	- an event without a correlation_id
 //	@Description
+//	@Description	**Partial success**
+//	@Description
+//	@Description	Each signal is validated and stored separately: valid signals are stored even if others in the request fail, and the failures are listed in `failed_signals`.
+//	@Description	The response is 200 if every signal was stored, 207 if some were, and 422 if none were. See "Partial success and resending" in the introduction for how to resend the failures.
+//	@Description
 //	@Description	**Signal versions**
 //	@Description
 //	@Description	New versions are created when signals are resupplied using the same local_ref, e.g. because the client wants to correct a previously published signal.
@@ -352,13 +357,14 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) e
 //	@Tags			Signal Exchange
 //
 //	@Description	Submit JSON or event signals without specifying a target ISN - the router resolves the ISN for each signal
-//	@Description	(documents are sent to document signal types with _Upload a Document via Router_).
-//	@Description	Events always have a correlation ID, so they are always routed to the ISN of the correlated signal.
+//	@Description	(use _Upload a Document via Router_ to route documents).
 //	@Description
 //	@Description	**ISN resolution by correlation ID**
 //	@Description
 //	@Description	Where a _correlation ID_ is supplied, the routing rules do not apply and the signal
 //	@Description	is routed to the ISN that received the correlated signal.
+//	@Description
+//	@Description	Events always have a correlation ID, so they are always routed to the ISN of the correlated signal.
 //	@Description
 //	@Description	**ISN resolution by pattern match**
 //	@Description
@@ -367,7 +373,7 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) e
 //	@Description
 //	@Description	**Resubmissions**
 //	@Description
-//	@Description	local_ref is unique per ISN, so a resubmitted signal only updates the original if it resolves to the same ISN.
+//	@Description	local_ref is unique per account/ISN, so a resubmitted signal only updates the original if it resolves to the same ISN.
 //	@Description	If it resolves to a different ISN (e.g. because the routing field changed) it is stored as a new signal on that ISN, and the original signal is not changed - withdraw it if it is no longer needed.
 //	@Description
 //	@Description	**Resolution failures**
@@ -381,6 +387,9 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) e
 //	@Description
 //	@Description	Signals that resolve to an ISN where the account lacks access or write permission (`forbidden`), or where the ISN or signal type is not in use (`resource_not_found`),
 //	@Description	are rejected and listed in the `failed_signals` of that ISN's result.
+//	@Description
+//	@Description	Unroutable and rejected signals don't stop the other signals in the request from being stored.
+//	@Description	The response is 200 if every signal was stored, 207 if some were, and 422 if none were. See "Partial success and resending" in the introduction for how to resend the failures.
 //	@Description
 //	@Description	**Usage**
 //	@Description

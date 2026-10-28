@@ -457,6 +457,15 @@ func (s *Server) registerSignalReadRoutes() {
 		r.Get("/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search", responses.Wrap(signals.SearchPrivateSignals))
 	})
 
+	// Signal search across every ISN the caller is a member of
+	// There is no ISN in the path, so RequireIsnMembership isn't used: the ISNs come from the access token,
+	// and the handler applies each ISN's visibility rule.
+	s.router.Group(func(r chi.Router) {
+		r.Use(s.authService.RequireValidAccessToken)
+		r.Get("/api/signal-types/{signal_type_slug}/v{sem_ver}/signals/search", responses.Wrap(signals.SearchSignalsAcrossIsns))
+		r.Get("/api/signals/search", responses.Wrap(signals.SearchSignalsAcrossIsns))
+	})
+
 	// document download - any ISN member may call this endpoint (write-only accounts can only download the documents they
 	// uploaded and the documents correlated to their signals - checked in the handler).
 	// Downloads are given DOCUMENT_TRANSFER_TIMEOUT.

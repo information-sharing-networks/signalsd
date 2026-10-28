@@ -73,7 +73,8 @@ Tests signal creation, search, and security controls via HTTP requests.
 - ✅ Public vs private ISN access
 - ✅ Withdrawn signal handling
 - ✅ Write-only account visibility
-- ✅ Previous versions and correlated signals (`include_correlated`, `correlation_id`)
+- ✅ Previous versions and correlated signals (`include_correlated`)
+- ✅ Search across every ISN the caller is a member of, with each ISN's visibility rule (`TestCrossIsnSearch`)
 - ✅ Token validation (expired, malformed, missing)
 - ✅ Cross-ISN data leakage prevention (`shared_signal_type_test.go`)
 - ✅ Signal router and routing config (`signal_router_test.go`, `signal_routing_config_test.go`)

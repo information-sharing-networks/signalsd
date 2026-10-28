@@ -1,6 +1,6 @@
 package handlers
 
-// signal search: the public and private ISN signal search endpoints
+// signal search: the public ISN signal search, and the private signal search (in one ISN, or across every ISN the caller can access)
 
 import (
 	"context"
@@ -8,7 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net/http"
+	"slices"
 	"time"
 	"uuid"
 
@@ -23,9 +25,9 @@ import (
 
 // structs used by the search endpoint
 type SearchParams struct {
-	isnSlug                       string
-	signalTypeSlug                string
-	semVer                        string
+	isnSlug                       string // from the per-ISN path - empty to search every ISN the caller can access
+	signalTypeSlug                string // empty to search every signal type
+	semVer                        string // empty to search every signal type
 	accountID                     *uuid.UUID
 	startDate                     *time.Time
 	endDate                       *time.Time
@@ -44,6 +46,9 @@ type SearchParams struct {
 //
 // The field comments are the field descriptions in the API docs, so they refer to the json field names.
 type SearchSignal struct {
+	// the ISN the signal is in
+	IsnSlug string `json:"isn_slug" example:"sample-isn"`
+
 	// the account that sent the signal
 	AccountID uuid.UUID `json:"account_id" example:"a38c99ed-c75c-4a4a-a901-c9485cf93cf3"`
 
@@ -71,7 +76,7 @@ type SearchSignal struct {
 	// when the signal was first received
 	SignalCreatedAt time.Time `json:"signal_created_at" example:"2026-09-27T14:02:00.123456Z"`
 
-	// when the signal was last created, given a new version, recorrelated or withdrawn (the cursor when polling - start the next poll 1 minute before the last result's value)
+	// when the signal last changed: a new version was received, or the signal was withdrawn (this is the cursor used when polling)
 	SignalUpdatedAt time.Time `json:"signal_updated_at" example:"2026-09-27T14:02:00.123456Z"`
 
 	// the server generated ID of this version of the signal
@@ -84,7 +89,7 @@ type SearchSignal struct {
 	VersionCreatedAt time.Time `json:"version_created_at" example:"2026-09-27T14:02:00.123456Z"`
 
 	// the signal_id of the signal this signal is linked to (the correlation_id it was submitted with). Null if the signal is not linked to another signal.
-	// To fetch the linked signal, search its signal type with signal_id=<correlation_id>
+	// To fetch the linked signal, use GET /api/signals/search?signal_id=<correlation_id> (the linked signal is often a different type)
 	CorrelationID *uuid.UUID `json:"correlation_id" example:"75b45fe1-ecc2-4629-946b-fd9058c3b2ca" extensions:"x-nullable"`
 
 	// true if the signal has been withdrawn (withdrawn signals are only returned when include_withdrawn=true)
@@ -288,6 +293,7 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 			email = signal.Email
 		}
 		correlatedSignal := SearchSignal{
+			IsnSlug:          signal.IsnSlug,
 			AccountID:        signal.AccountID,
 			AccountType:      signal.AccountType,
 			Email:            email,
@@ -318,29 +324,32 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 //
 //	@Description	Search for signals in public ISNs (no authentication required).
 //	@Description
-//	@Description	Note the endpoint returns the latest version of each signal.
+//	@Description	The endpoint returns the latest version of each signal (use `include_previous_versions=true` to see earlier versions).
+//	@Description	Results are ordered by `signal_updated_at` (oldest first).
 //	@Description
 //	@Description	**Search parameters**
 //	@Description
-//	@Description	At least one of these filters is required: start_date and end_date, updated_since, account_id, signal_id, local_ref or correlation_id.
-//	@Description	start_date and end_date must be used together - they filter on when the latest version of the signal was created (both are inclusive).
-//	@Description	Results are ordered by signal_updated_at (oldest first).
+//	@Description	At least one of these is required: `start_date` and `end_date`, `updated_since`, `account_id`, `signal_id`, `local_ref` or `correlation_id`.
+//	@Description	`start_date` and `end_date` must be used together. They filter on when the signal's latest version was received (`version_created_at`).
+//	@Description
+//	@Description	`updated_since` filters on when the signal last changed (`signal_updated_at`): a new version was received, or the signal was withdrawn.
 //	@Description
 //	@Description	**Polling for changes**
 //	@Description
-//	@Description	Use updated_since with include_withdrawn=true. Polling is at-least-once: start each poll 1 minute before the last signal_updated_at you received, and skip the results you have already seen (the same signal_id and signal_updated_at).
-//	@Description	See *Polling for changes* in the API overview for why the overlap is needed.
+//	@Description	Polling is at-least-once: use `updated_since` as a cursor, start each poll 1 minute before the last `signal_updated_at` you received, and skip the results you have already seen (the same `signal_id` and `signal_updated_at`).
+//	@Description	Use `include_withdrawn=true`, so signals withdrawn since your last poll are returned with `is_withdrawn: true` rather than left out of the results.
+//	@Description	See *Polling for changes* in the API overview for more details.
 //
-//	@Param			start_date					query		string	false	"Signals whose latest version was created at or after this time (use with end_date)"																														example(2006-01-02T15:05:00Z)
-//	@Param			end_date					query		string	false	"Signals whose latest version was created at or before this time (use with start_date)"																														example(2006-01-02T15:15:00Z)
-//	@Param			updated_since				query		string	false	"Signals created, given a new version, recorrelated or withdrawn since this time (to poll for changes, use with include_withdrawn=true and set it 1 minute before the last signal_updated_at you received)"	example(2006-01-02T15:05:00Z)
-//	@Param			account_id					query		string	false	"Account ID"																																																example(def87f89-dab6-4607-95f7-593d61cb5742)
-//	@Param			signal_id					query		string	false	"Return the signal with this signal_id (e.g. the correlation_id of a signal of another type)"																												example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
-//	@Param			local_ref					query		string	false	"Local reference"																																															example(item_id_#1)
-//	@Param			correlation_id				query		string	false	"Return the signals of this type that are linked to the signal with this signal_id (those whose correlation_id is this value)"																				example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
-//	@Param			include_withdrawn			query		string	false	"Include withdrawn signals (default: false)"																																								example(true)
-//	@Param			include_correlated			query		string	false	"Include signals that link to each returned signal (default: false)"																																		example(true)
-//	@Param			include_previous_versions	query		string	false	"Include previous versions of each returned signal (default: false)"																																		example(true)
+//	@Param			start_date					query		string	false	"Signals whose latest version was created at or after this time (use with end_date)"																																		example(2006-01-02T15:05:00Z)
+//	@Param			end_date					query		string	false	"Signals whose latest version was created at or before this time (use with start_date)"																																		example(2006-01-02T15:15:00Z)
+//	@Param			updated_since				query		string	false	"Signals that changed (a new version was received, or the signal was withdrawn) since this time (to poll for changes, use with include_withdrawn=true and set it 1 minute before the last signal_updated_at you received)"	example(2006-01-02T15:05:00Z)
+//	@Param			account_id					query		string	false	"Account ID"																																																				example(def87f89-dab6-4607-95f7-593d61cb5742)
+//	@Param			signal_id					query		string	false	"Return the signal with this signal_id (e.g. the correlation_id of a signal of another type)"																																example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
+//	@Param			local_ref					query		string	false	"Local reference"																																																			example(item_id_#1)
+//	@Param			correlation_id				query		string	false	"Return the signals of this type that are linked to the signal with this signal_id (those whose correlation_id is this value)"																								example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
+//	@Param			include_withdrawn			query		string	false	"Include withdrawn signals (default: false)"																																												example(true)
+//	@Param			include_correlated			query		string	false	"Include signals that link to each returned signal (default: false)"																																						example(true)
+//	@Param			include_previous_versions	query		string	false	"Include previous versions of each returned signal (default: false)"																																						example(true)
 //
 //	@Success		200							{array}		handlers.SearchSignalWithCorrelationsAndVersions
 //	@Failure		400							{object}	responses.ErrorResponse	"invalid_url_param"
@@ -350,12 +359,11 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 //	@Router			/api/public/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search [get]
 //
 //	@Description
-//	@Description	**Retrieving a signal from the search results**
+//	@Description	**Documents**
 //	@Description
-//	@Description	For json signals (content_kind=json) and events (content_kind=event) the signal is returned in the content field.
-//	@Description
-//	@Description	For document signals (content_kind=document) the content field holds the document metadata (name, mime_type, size_bytes and sha256).
-//	@Description	Downloading the document requires an account on the ISN and an access token - see the private signal search endpoint for how to download a document from the search results.
+//	@Description	For json signals and events, the signal is returned in the `content` field.
+//	@Description	Documents are files, so they are not included in the search results: the `content` field holds the document's metadata (`name`, `mime_type`, `size_bytes` and `sha256`).
+//	@Description	Downloading the file requires an account on the ISN and an access token (see *Download a Document*).
 //
 // This function can be called without authentication. It will only return signals from public ISNs.
 func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Request) error {
@@ -384,9 +392,9 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 	}
 
 	returnedSignals, err := s.queries.GetSignalsWithOptionalFilters(r.Context(), database.GetSignalsWithOptionalFiltersParams{
-		IsnSlug:          searchParams.isnSlug,
-		SignalTypeSlug:   searchParams.signalTypeSlug,
-		SemVer:           searchParams.semVer,
+		IsnSlugs:         []string{searchParams.isnSlug},
+		SignalTypeSlug:   &searchParams.signalTypeSlug,
+		SemVer:           &searchParams.semVer,
 		StartDate:        searchParams.startDate,
 		EndDate:          searchParams.endDate,
 		UpdatedSince:     searchParams.updatedSince,
@@ -443,6 +451,7 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 
 		signal := SearchSignalWithCorrelationsAndVersions{
 			SearchSignal: SearchSignal{
+				IsnSlug:          returnedSignal.IsnSlug,
 				AccountID:        returnedSignal.AccountID,
 				AccountType:      returnedSignal.AccountType,
 				Email:            "", // do not show email addresses in public ISNs
@@ -485,34 +494,47 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 //	@Summary		Signal Search (private ISNs)
 //	@Tags			Signal Exchange
 //
-//	@Description	Search for signals in private ISNs (authentication required - any account with read or write permission on the ISN can use this endpoint).
+//	@Description	Search for signals in one private ISN (authentication required).
+//	@Description	To search without naming the ISN, use *Signal Search (across your ISNs)*.
 //	@Description
-//	@Description	Note the endpoint returns the latest version of each signal.
+//	@Description	The endpoint returns the latest version of each signal (use `include_previous_versions=true` to see earlier versions).
+//	@Description	Results are ordered by `signal_updated_at` (oldest first).
+//	@Description
+//	@Description	Accounts with read access can see all signals on the ISN.
+//	@Description	Write-only accounts can only see the signals created by their own account, and the signals other accounts have correlated to them (including those returned with `include_correlated=true`).
 //	@Description
 //	@Description	**Search parameters**
 //	@Description
-//	@Description	At least one of these filters is required: start_date and end_date, updated_since, account_id, signal_id, local_ref or correlation_id.
-//	@Description	start_date and end_date must be used together - they filter on when the latest version of the signal was created (both are inclusive).
-//	@Description	Results are ordered by signal_updated_at (oldest first).
+//	@Description	At least one of these is required: `start_date` and `end_date`, `updated_since`, `account_id`, `signal_id`, `local_ref` or `correlation_id`.
+//	@Description	`start_date` and `end_date` must be used together. They filter on when the signal's latest version was received (`version_created_at`).
 //	@Description
-//	@Description	Write-only accounts can only see the signals created by their own account, and the signals other accounts have correlated to them.
-//	@Description	This also applies to correlated signals returned with include_correlated=true.
+//	@Description	`updated_since` filters on when the signal last changed (`signal_updated_at`): a new version was received, or the signal was withdrawn.
 //	@Description
 //	@Description	**Polling for changes**
 //	@Description
-//	@Description	Use updated_since with include_withdrawn=true. Polling is at-least-once: start each poll 1 minute before the last signal_updated_at you received, and skip the results you have already seen (the same signal_id and signal_updated_at).
-//	@Description	See *Polling for changes* in the API overview for why the overlap is needed.
+//	@Description	Polling is at-least-once: use `updated_since` as a cursor, start each poll 1 minute before the last `signal_updated_at` you received, and skip the results you have already seen (the same `signal_id` and `signal_updated_at`).
+//	@Description	Use `include_withdrawn=true`, so signals withdrawn since your last poll are returned with `is_withdrawn: true` rather than left out of the results.
+//	@Description	See *Polling for changes* in the API overview for more details.
+//	@Description
+//	@Description	**Documents**
+//	@Description
+//	@Description	For json signals and events, the signal data is returned in the `content` field.
+//	@Description	Documents are files, so they are not included directly in the search results, instead the `content` field holds the document's metadata (`name`, `mime_type`, `size_bytes` and `sha256`), and the file is downloaded separately with *Download a Document*:
+//	@Description	```
+//	@Description	GET /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}/content?version={version_number}
+//	@Description	```
+//	@Description	The URL is built from the search result's `signal_type_slug`, `sem_ver`, `signal_id` and `version_number` (correlated documents are generally a different signal type from the one you searched).
 //
-//	@Param			start_date					query		string	false	"Signals whose latest version was created at or after this time (use with end_date)"																														example(2006-01-02T15:05:00Z)
-//	@Param			end_date					query		string	false	"Signals whose latest version was created at or before this time (use with start_date)"																														example(2006-01-02T15:15:00Z)
-//	@Param			updated_since				query		string	false	"Signals created, given a new version, recorrelated or withdrawn since this time (to poll for changes, use with include_withdrawn=true and set it 1 minute before the last signal_updated_at you received)"	example(2006-01-02T15:05:00Z)
-//	@Param			account_id					query		string	false	"Account ID"																																																example(def87f89-dab6-4607-95f7-593d61cb5742)
-//	@Param			signal_id					query		string	false	"Return the signal with this signal_id (e.g. the correlation_id of a signal of another type)"																												example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
-//	@Param			local_ref					query		string	false	"Local reference"																																															example(item_id_#1)
-//	@Param			correlation_id				query		string	false	"Return the signals of this type that are linked to the signal with this signal_id (those whose correlation_id is this value)"																				example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
-//	@Param			include_withdrawn			query		string	false	"Include withdrawn signals (default: false)"																																								example(true)
-//	@Param			include_correlated			query		string	false	"Include signals that link to each returned signal (default: false)"																																		example(true)
-//	@Param			include_previous_versions	query		string	false	"Include previous versions of each returned signal (default: false)"																																		example(true)
+//	@Param			start_date					query		string	false	"Signals whose latest version was created at or after this time (use with end_date)"																																		example(2006-01-02T15:05:00Z)
+//	@Param			end_date					query		string	false	"Signals whose latest version was created at or before this time (use with start_date)"																																		example(2006-01-02T15:15:00Z)
+//	@Param			updated_since				query		string	false	"Signals that changed (a new version was received, or the signal was withdrawn) since this time (to poll for changes, use with include_withdrawn=true and set it 1 minute before the last signal_updated_at you received)"	example(2006-01-02T15:05:00Z)
+//	@Param			account_id					query		string	false	"Account ID"																																																				example(def87f89-dab6-4607-95f7-593d61cb5742)
+//	@Param			signal_id					query		string	false	"Return the signal with this signal_id (e.g. the correlation_id of a signal of another type)"																																example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
+//	@Param			local_ref					query		string	false	"Local reference"																																																			example(item_id_#1)
+//	@Param			correlation_id				query		string	false	"Return the signals of this type that are linked to the signal with this signal_id (those whose correlation_id is this value)"																								example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
+//	@Param			include_withdrawn			query		string	false	"Include withdrawn signals (default: false)"																																												example(true)
+//	@Param			include_correlated			query		string	false	"Include signals that link to each returned signal (default: false)"																																						example(true)
+//	@Param			include_previous_versions	query		string	false	"Include previous versions of each returned signal (default: false)"																																						example(true)
 //
 //	@Success		200							{array}		handlers.SearchSignalWithCorrelationsAndVersions
 //	@Failure		400							{object}	responses.ErrorResponse	"invalid_url_param"
@@ -525,51 +547,7 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 //
 //	@Router			/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search [get]
 //
-//	@Description
-//	@Description	**Retrieving a signal from the search results**
-//	@Description
-//	@Description	For json signals (content_kind=json) and events (content_kind=event) the signal is returned in the content field.
-//	@Description
-//	@Description	For document signals (content_kind=document) the content field holds the document metadata (name, mime_type, size_bytes and sha256) and the document is downloaded from the signal's content endpoint:
-//	@Description	```
-//	@Description	GET /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}/content?version={version_number}
-//	@Description	```
-//	@Description	Build the URL from the signal_type_slug, sem_ver, signal_id and version_number in the search result, not from the search URL:
-//	@Description	correlated signals (include_correlated=true) are often a different signal type from the one searched.
-//	@Description	The isn_slug is the ISN that was searched (correlated signals are in the same ISN).
-//	@Description
-//	@Description	For example, searching for a shipment with its correlated signals:
-//	@Description	```
-//	@Description	GET /api/isn/sample-isn/signal-types/shipment/v1.0.0/signals/search?local_ref=SHIP-0042&include_correlated=true
-//	@Description
-//	@Description	[{
-//	@Description	"signal_id": "def87f89-dab6-4607-95f7-593d61cb5742",
-//	@Description	"signal_type_slug": "shipment",
-//	@Description	"sem_ver": "1.0.0",
-//	@Description	"content_kind": "json",
-//	@Description	"correlation_id": null,
-//	@Description	"content": {...},
-//	@Description	"correlated_signals": [{
-//	@Description	"signal_id": "4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19",
-//	@Description	"version_number": 2,
-//	@Description	"signal_type_slug": "bill-of-lading",
-//	@Description	"sem_ver": "1.0.0",
-//	@Description	"content_kind": "document",
-//	@Description	"correlation_id": "def87f89-dab6-4607-95f7-593d61cb5742",
-//	@Description	"content": {"name": "BL-2026-0042.pdf", "mime_type": "application/pdf", ...},
-//	@Description	...
-//	@Description	}],
-//	@Description	...
-//	@Description	}]
-//	@Description	```
-//	@Description	the correlated bill of lading is downloaded with:
-//	@Description	```
-//	@Description	GET /api/isn/sample-isn/signal-types/bill-of-lading/v1.0.0/signals/4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19/content?version=2
-//	@Description	```
-//	@Description	Omit version to download the latest version, and add include_withdrawn=true if the signal is withdrawn.
-//
-// This function should be called after the RequireAccessPermission middleware has checked the account has read permission for the ISN
-// (the middleware also checks the isn and signal type are in use)
+// This function serves both the per-ISN route and the routes that search across the caller's ISNs (SearchSignalsAcrossIsns).
 func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Request) error {
 
 	// Parse all search parameters
@@ -583,78 +561,115 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 		return apperrors.AuthenticationFailure("authentication required for private ISN access", nil)
 	}
 
-	// ISN and signal type in-use checks are now performed by RequireIsnMembership middleware
+	accountID, ok := auth.ContextAccountID(r.Context())
+	if !ok {
+		return apperrors.AuthenticationFailure("could not determine account from access token", nil)
+	}
 
 	// Validate search parameters
 	if err := validateSearchParams(searchParams); err != nil {
 		return apperrors.InvalidURLParam("invalid search parameters", err)
 	}
 
-	// Write-only accounts can only see the signals they created and the signals correlated to them
-	// (the account_id filter still means "created by": filtering on another account returns that account's signals correlated to the viewer's signals).
-	// The same restriction applies to correlated signals
-	var writeOnlyAccountID *uuid.UUID
-	isnPerms := claims.IsnPerms[searchParams.isnSlug]
-	if !isnPerms.CanRead && isnPerms.CanWrite {
-		accountID, ok := auth.ContextAccountID(r.Context())
-		if !ok {
-			return apperrors.AuthenticationFailure("could not determine account from access token", nil)
+	// Split the ISNs to search by what the caller can see in them
+	// (on the per-ISN route, only the ISN in the path - the middleware has checked the caller is a member of it):
+	// - read access: every signal in the ISN
+	// - write-only: the signals it created, and the signals correlated to them
+	// ISNs that aren't in use are not removed here - the queries leave them out.
+	var readableIsnSlugs, writeOnlyIsnSlugs []string
+	for isnSlug, isnPerms := range claims.IsnPerms {
+		if searchParams.isnSlug != "" && isnSlug != searchParams.isnSlug {
+			continue
 		}
-		writeOnlyAccountID = &accountID
-	}
-
-	returnedSignals, err := s.queries.GetSignalsWithOptionalFilters(r.Context(), database.GetSignalsWithOptionalFiltersParams{
-		IsnSlug:          searchParams.isnSlug,
-		SignalTypeSlug:   searchParams.signalTypeSlug,
-		SemVer:           searchParams.semVer,
-		StartDate:        searchParams.startDate,
-		EndDate:          searchParams.endDate,
-		UpdatedSince:     searchParams.updatedSince,
-		ViewerAccountID:  writeOnlyAccountID,
-		AccountID:        searchParams.accountID,
-		SignalID:         searchParams.signalID,
-		CorrelationID:    searchParams.correlationID,
-		LocalRef:         searchParams.localRef,
-		IncludeWithdrawn: &searchParams.includeWithdrawn,
-	})
-	if err != nil {
-		logger.AddLogAttrs(r.Context(),
-			slog.String("isn_slug", searchParams.isnSlug),
-		)
-
-		return apperrors.DatabaseError("database error", err)
-	}
-
-	response := make([]SearchSignalWithCorrelationsAndVersions, 0, len(returnedSignals))
-
-	// the (optional) signal_versions and correlated_signals fields are populated using separate queries and then merged into the response
-	// ...not very efficient but assumption is that these options will most likely be used with individual signals rather than in bulk (needs monitoring to confirm)
-	signalIDs := make([]uuid.UUID, 0, len(returnedSignals))
-
-	if searchParams.includeCorrelated || searchParams.includePreviousSignalVersions {
-		for _, row := range returnedSignals {
-			signalIDs = append(signalIDs, row.SignalID)
+		if isnPerms.CanRead {
+			readableIsnSlugs = append(readableIsnSlugs, isnSlug)
+		} else if isnPerms.CanWrite {
+			writeOnlyIsnSlugs = append(writeOnlyIsnSlugs, isnSlug)
 		}
 	}
 
-	// Get correlated signals if requested
-	var correlatedSignalBySignalID map[uuid.UUID][]SearchSignal
-	if searchParams.includeCorrelated {
+	// Each group of ISNs is searched with its own viewer setting, so every row gets the visibility rule of the ISN it is in:
+	// no viewer for the readable ISNs, and the caller's account for the write-only ISNs.
+	// (the account_id filter still means "created by": filtering on another account returns that account's signals correlated to the viewer's signals)
+	searches := []struct {
+		isnSlugs        []string
+		viewerAccountID *uuid.UUID
+	}{
+		{isnSlugs: readableIsnSlugs, viewerAccountID: nil},
+		{isnSlugs: writeOnlyIsnSlugs, viewerAccountID: &accountID},
+	}
 
-		// create a map of signal_id to their correlated signals
-		correlatedSignalBySignalID, err = s.getCorrelatedSignals(r.Context(), signalIDs, searchParams, writeOnlyAccountID, true)
+	// the routes without a signal type in the path search every signal type
+	var signalTypeSlug, semVer *string
+	if searchParams.signalTypeSlug != "" {
+		signalTypeSlug = &searchParams.signalTypeSlug
+		semVer = &searchParams.semVer
+	}
+
+	returnedSignals := []database.GetSignalsWithOptionalFiltersRow{}
+	correlatedSignalBySignalID := make(map[uuid.UUID][]SearchSignal)
+	for _, search := range searches {
+		if len(search.isnSlugs) == 0 {
+			continue
+		}
+
+		signals, err := s.queries.GetSignalsWithOptionalFilters(r.Context(), database.GetSignalsWithOptionalFiltersParams{
+			IsnSlugs:         search.isnSlugs,
+			SignalTypeSlug:   signalTypeSlug,
+			SemVer:           semVer,
+			StartDate:        searchParams.startDate,
+			EndDate:          searchParams.endDate,
+			UpdatedSince:     searchParams.updatedSince,
+			ViewerAccountID:  search.viewerAccountID,
+			AccountID:        searchParams.accountID,
+			SignalID:         searchParams.signalID,
+			CorrelationID:    searchParams.correlationID,
+			LocalRef:         searchParams.localRef,
+			IncludeWithdrawn: &searchParams.includeWithdrawn,
+		})
 		if err != nil {
 			return apperrors.DatabaseError("database error", err)
 		}
+		returnedSignals = append(returnedSignals, signals...)
+
+		// Get correlated signals if requested.
+		// They are fetched with the same viewer as the signals they are linked to (correlation is within one ISN, so they get that ISN's rule).
+		// Fetching them for both groups at once would show write-only accounts correlated signals they can't see.
+		if searchParams.includeCorrelated {
+			signalIDs := make([]uuid.UUID, 0, len(signals))
+			for _, signal := range signals {
+				signalIDs = append(signalIDs, signal.SignalID)
+			}
+
+			correlatedSignals, err := s.getCorrelatedSignals(r.Context(), signalIDs, searchParams, search.viewerAccountID, true)
+			if err != nil {
+				return apperrors.DatabaseError("database error", err)
+			}
+			// each signal is returned by only one of the two searches, so the keys never clash
+			maps.Copy(correlatedSignalBySignalID, correlatedSignals)
+		}
 	}
+
+	// combine the results of the two searches, ordered by signal_updated_at
+	slices.SortStableFunc(returnedSignals, func(a, b database.GetSignalsWithOptionalFiltersRow) int {
+		return a.SignalUpdatedAt.Compare(b.SignalUpdatedAt)
+	})
+
+	// Get previous versions if requested (these don't depend on the viewer: they are only fetched for signals the caller can see)
 	var previousVersionsBySignalID map[uuid.UUID][]PreviousSignalVersion
 	if searchParams.includePreviousSignalVersions {
+		signalIDs := make([]uuid.UUID, 0, len(returnedSignals))
+		for _, signal := range returnedSignals {
+			signalIDs = append(signalIDs, signal.SignalID)
+		}
+
 		previousVersionsBySignalID, err = s.getPreviousSignalVersions(r.Context(), signalIDs)
 		if err != nil {
 			return apperrors.DatabaseError("database error", err)
 		}
 	}
 
+	response := make([]SearchSignalWithCorrelationsAndVersions, 0, len(returnedSignals))
 	for _, returnedSignal := range returnedSignals {
 		// uncorrelated signals are stored correlated to themselves - these are returned as null
 		var correlationID *uuid.UUID
@@ -664,6 +679,7 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 
 		signal := SearchSignalWithCorrelationsAndVersions{
 			SearchSignal: SearchSignal{
+				IsnSlug:          returnedSignal.IsnSlug,
 				AccountID:        returnedSignal.AccountID,
 				AccountType:      returnedSignal.AccountType,
 				Email:            returnedSignal.Email,
@@ -699,4 +715,55 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 		response = append(response, signal)
 	}
 	return responses.JSON(w, http.StatusOK, response)
+}
+
+// SearchSignalsAcrossIsns godocs
+//
+//	@Summary		Signal Search (across your ISNs)
+//	@Tags			Signal Exchange
+//
+//	@Description	Search for signals in every ISN your account is a member of, without naming the ISN (authentication required).
+//	@Description	This is the preferred way to search: you don't need to know which ISN a signal is in (for example, when signals are sent through the router).
+//	@Description
+//	@Description	There are two routes:
+//	@Description	- `/api/signal-types/{signal_type_slug}/v{sem_ver}/signals/search` searches one signal type
+//	@Description	- `/api/signals/search` searches every signal type (e.g. to look up a `signal_id` whose type you don't know)
+//	@Description
+//	@Description	They take the same search parameters as *Signal Search (private ISNs)*.
+//	@Description	Each result includes its `isn_slug`, `signal_type_slug` and `sem_ver`. Results are ordered by `signal_updated_at` (oldest first) across all the ISNs, so polling works as for a single ISN.
+//	@Description
+//	@Description	The visibility rules are the same as for a single ISN, and are applied separately in each ISN: if you have read access to one ISN and write-only access to another, you see every signal in the first, and only your own signals and the signals correlated to them in the second.
+//	@Description
+//	@Description	A `signal_id` in an ISN you are not a member of returns no results, the same as a `signal_id` that doesn't exist.
+//	@Description	A signal type that isn't used in any of your ISNs also returns no results.
+//	@Description
+//	@Description	The ISNs searched are the ones in your access token, so an ISN you have just been added to is searched once you next get an access token.
+//	@Description
+//	@Description	At least one of these is required: `start_date` and `end_date`, `updated_since`, `account_id`, `signal_id`, `local_ref` or `correlation_id`.
+//	@Description	See *Following signals* and *Polling for changes* in the API overview for more details.
+//
+//	@Param			start_date					query		string	false	"Signals whose latest version was created at or after this time (use with end_date)"																																		example(2006-01-02T15:05:00Z)
+//	@Param			end_date					query		string	false	"Signals whose latest version was created at or before this time (use with start_date)"																																		example(2006-01-02T15:15:00Z)
+//	@Param			updated_since				query		string	false	"Signals that changed (a new version was received, or the signal was withdrawn) since this time (to poll for changes, use with include_withdrawn=true and set it 1 minute before the last signal_updated_at you received)"	example(2006-01-02T15:05:00Z)
+//	@Param			account_id					query		string	false	"Account ID"																																																				example(def87f89-dab6-4607-95f7-593d61cb5742)
+//	@Param			signal_id					query		string	false	"Return the signal with this signal_id (e.g. the correlation_id of another signal)"																																			example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
+//	@Param			local_ref					query		string	false	"Local reference"																																																			example(item_id_#1)
+//	@Param			correlation_id				query		string	false	"Return the signals that are linked to the signal with this signal_id (those whose correlation_id is this value)"																											example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
+//	@Param			include_withdrawn			query		string	false	"Include withdrawn signals (default: false)"																																												example(true)
+//	@Param			include_correlated			query		string	false	"Include signals that link to each returned signal (default: false)"																																						example(true)
+//	@Param			include_previous_versions	query		string	false	"Include previous versions of each returned signal (default: false)"																																						example(true)
+//
+//	@Success		200							{array}		handlers.SearchSignalWithCorrelationsAndVersions
+//	@Failure		400							{object}	responses.ErrorResponse	"invalid_url_param"
+//	@Failure		401							{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
+//	@Failure		500							{object}	responses.ErrorResponse	"database_error"
+//
+//	@Security		BearerAccessToken
+//
+//	@Router			/api/signal-types/{signal_type_slug}/v{sem_ver}/signals/search [get]
+//	@Router			/api/signals/search [get]
+//
+// The search is done by SearchPrivateSignals: these routes have no ISN in the path, so every ISN in the caller's access token is searched.
+func (s *SignalsHandler) SearchSignalsAcrossIsns(w http.ResponseWriter, r *http.Request) error {
+	return s.SearchPrivateSignals(w, r)
 }

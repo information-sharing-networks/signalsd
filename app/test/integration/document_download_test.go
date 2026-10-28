@@ -108,14 +108,25 @@ func TestDocumentDownload(t *testing.T) {
 	})
 
 	t.Run("documents found by searching for the signals linked to a consignment can be downloaded", func(t *testing.T) {
-		signals := expectSearchResults(t, searchPrivateSignals(t, testEnv.baseURL, billOfLadingEndpoint, readerToken, map[string]string{
-			"correlation_id": consignmentID,
+		signals := expectSearchResults(t, searchAcrossIsns(t, testEnv.baseURL, readerToken, map[string]string{
+			"signal_id":          consignmentID,
+			"include_correlated": "true",
 		}))
 		if len(signals) != 1 {
-			t.Fatalf("Expected 1 linked document, got %d", len(signals))
+			t.Fatalf("Expected 1 consignment, got %d", len(signals))
+		}
+		linked := correlatedSignalsOf(signals[0])
+		if len(linked) != 1 {
+			t.Fatalf("Expected 1 linked document, got %d", len(linked))
 		}
 
-		content := expectDownload(t, downloadDocumentRequest(t, testEnv.baseURL, readerToken, billOfLadingEndpoint, signals[0]["signal_id"].(string), ""))
+		// the download URL is built from the linked signal's own ISN and signal type
+		linkedEndpoint := testSignalEndpoint{
+			isnSlug:          linked[0]["isn_slug"].(string),
+			signalTypeSlug:   linked[0]["signal_type_slug"].(string),
+			signalTypeSemVer: linked[0]["sem_ver"].(string),
+		}
+		content := expectDownload(t, downloadDocumentRequest(t, testEnv.baseURL, readerToken, linkedEndpoint, linked[0]["signal_id"].(string), ""))
 		if !bytes.Equal(content, version2Content) {
 			t.Errorf("Expected the linked document %q, got %q", version2Content, content)
 		}

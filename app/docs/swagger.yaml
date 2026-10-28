@@ -758,7 +758,7 @@ definitions:
       correlation_id:
         description: |-
           the signal_id of the signal this signal is linked to (the correlation_id it was submitted with). Null if the signal is not linked to another signal.
-          To fetch the linked signal, search its signal type with signal_id=<correlation_id>
+          To fetch the linked signal, use GET /api/signals/search?signal_id=<correlation_id> (the linked signal is often a different type)
         example: 75b45fe1-ecc2-4629-946b-fd9058c3b2ca
         type: string
         x-nullable: true
@@ -773,6 +773,10 @@ definitions:
           only returned when include_withdrawn=true)
         example: false
         type: boolean
+      isn_slug:
+        description: the ISN the signal is in
+        example: sample-isn
+        type: string
       local_ref:
         description: the sender's reference for the signal - unique for the sending
           account, ISN and signal type
@@ -799,9 +803,8 @@ definitions:
         example: sample-signal-type
         type: string
       signal_updated_at:
-        description: when the signal was last created, given a new version, recorrelated
-          or withdrawn (the cursor when polling - start the next poll 1 minute before
-          the last result's value)
+        description: 'when the signal last changed: a new version was received, or
+          the signal was withdrawn (this is the cursor used when polling)'
         example: "2026-09-27T14:02:00.123456Z"
         type: string
       signal_version_id:
@@ -856,7 +859,7 @@ definitions:
       correlation_id:
         description: |-
           the signal_id of the signal this signal is linked to (the correlation_id it was submitted with). Null if the signal is not linked to another signal.
-          To fetch the linked signal, search its signal type with signal_id=<correlation_id>
+          To fetch the linked signal, use GET /api/signals/search?signal_id=<correlation_id> (the linked signal is often a different type)
         example: 75b45fe1-ecc2-4629-946b-fd9058c3b2ca
         type: string
         x-nullable: true
@@ -871,6 +874,10 @@ definitions:
           only returned when include_withdrawn=true)
         example: false
         type: boolean
+      isn_slug:
+        description: the ISN the signal is in
+        example: sample-isn
+        type: string
       local_ref:
         description: the sender's reference for the signal - unique for the sending
           account, ISN and signal type
@@ -902,9 +909,8 @@ definitions:
         example: sample-signal-type
         type: string
       signal_updated_at:
-        description: when the signal was last created, given a new version, recorrelated
-          or withdrawn (the cursor when polling - start the next poll 1 minute before
-          the last result's value)
+        description: 'when the signal last changed: a new version was received, or
+          the signal was withdrawn (this is the cursor used when polling)'
         example: "2026-09-27T14:02:00.123456Z"
         type: string
       signal_version_id:
@@ -1365,11 +1371,10 @@ info:
     The other API endpoints are authenticated with bearer tokens, which browsers do not send automatically, so they are not open to CSRF.
 
     ## Browser Integrations
-    Browser-based apps on other sites can only call the public endpoints directly:
-    - **Public ISNs**: *Signal Search (public ISNs)* (`/api/public/isn/...`) can be called from any website without an access token.
+    Browser-based apps on other sites can only call the public endpoints directly.
 
     The other endpoints have no CORS policy, so web pages on other origins can't use them: the browser won't send an access token to them or let the page read the response.
-    Call the API from your app's backend (or a small proxy) and pass the results to the browser. This is the "backend for frontend" pattern used by the signalsd UI.
+    Instead, call the API from your app's backend (or a small proxy) and pass the results to the browser. This is the "backend for frontend" pattern used by the signalsd UI.
 
     Server-side clients (scripts, services etc) are not affected by CORS and can call any endpoint they have access to.
 
@@ -1415,7 +1420,9 @@ info:
     ## Correlation
     A signal can be linked to another signal in the same ISN by setting its `correlation_id` to the other signal's `signal_id`.
 
-    Search results include each signal's `correlation_id` (null if the signal is not linked to another signal).  Search with `include_correlated=true` returns the signals linked to each result, and the `correlation_id` search filter returns the signals linked to one signal.
+    Search results include each signal's `correlation_id` (null if the signal is not linked to another signal).
+
+    Search with `include_correlated=true` returns the signals linked to each result, whatever their type, and the `correlation_id` search filter returns the signals linked to one signal. To fetch the signal a result is linked to, search with `signal_id={correlation_id}` (see *Following signals* below).
 
     **Correlate to the entity directly.** For example, correlate a consignment's documents and events to the consignment itself, not to each other. Correlation is one level deep: `include_correlated` only returns signals that are correlated directly to the returned signal.
 
@@ -1423,21 +1430,23 @@ info:
     - withdrawing a signal stops further access through the service
     - if a new version changes the correlation_id, access moves with it: the owner of the newly correlated signal can see every version, and the previous owner can no longer access it through the service
 
-    ## Recovering from failures
-    Each signal in a request is stored separately, so a request that fails part way through (e.g. a timeout) can leave some signals stored and others not. Because unchanged signals are not stored again, you can recover in either of these ways:
-    - **Resend the whole request.** Signals that were already stored are returned with `unchanged: true`, and only the missing or failed signals are stored. Note that any json signal in the request that has been withdrawn since it was sent is reactivated (withdrawn events are not reactivated - they fail with `resource_already_exists`).
-    - **Resend only the failures.** The response lists the signals that failed, and *Get Batch Status* lists the batch's unresolved failures.
+    ## Partial success and resending
+    Signals in a request are validated and stored one at a time: the valid signals are stored and the ones that fail (e.g. content that doesn't match the schema, or an unknown `correlation_id`) are listed in the response with an error code. The response status tells you whether all, some or none of the signals were stored (see each endpoint for the details).
 
-    When a whole *Submit Signals* request fails (an error response such as 400, 401, 403, 404, 413 or 500), or you get no response, no failures are recorded in the batch, so resend the whole request once the problem is fixed. Rejected document uploads are recorded in the batch (except when the request's form fields are missing or invalid).
+    This is common when testing a new signal type, where some records in a large payload match the schema and others don't. Fix the failed signals and resend them. Signals that are resent unchanged are not stored again, so you can do this in either of these ways:
+    - **Resend the whole request.** Signals that were already stored are returned with `unchanged: true`, and only the fixed signals are stored. Note that any json signal in the request that has been withdrawn since it was sent is reactivated (withdrawn events are not reactivated - they fail with `resource_already_exists`).
+    - **Resend only the failures.** *Get Batch Status* lists the batch's unresolved failures.
 
-    If the server's request timeout is reached part way through a *Submit Signals* request, the remaining signals are returned as `database_error` failures but may not be recorded in the batch - resend the whole request.
+    When a whole *Submit Signals* request fails (an error response such as 400, 401, 403, 404, 413 or 500), or you get no response, nothing is recorded in the batch, so resend the whole request once the problem is fixed.
 
-    A retry of a json signal or document sent while the original request is still being processed can occasionally store an extra, identical version. This is harmless - the content doesn't change - but pollers will see one more update. To avoid it, set your client timeout above the server's request timeout: 15 seconds by default, or 2 minutes for document uploads.
+    **Timeouts.** If the server's request timeout is reached partway through a request, the signals already processed stay stored and the rest are returned as `database_error` failures (which may not be recorded in the batch), so resend the whole request.
 
     ## Who can see signals
     - Accounts with **read** access to an ISN can see every signal in it.
     - Accounts with **write-only** access can see the signals they created, and the signals other accounts have correlated to their signals (one level deep).
     - Signals in a **public** ISN can be searched by anyone, using *Signal Search (public ISNs)* (`/api/public/isn/...`). Downloading a document still needs an access token and access to the ISN.
+
+    An account can have different access in each ISN. Searches across several ISNs apply each ISN's rule to the signals in it.
 
     Privacy between participants is set by the ISN's permissions. For example, in a network where all participants share their data with a government agency but not with each other, the participants are given write-only access and the agency is given read access.
 
@@ -1456,16 +1465,60 @@ info:
     - `occurred_at` and `subject` are reserved - don't use them for anything else
     - the service doesn't check `subject` yet, so a type whose events have a subject should require it in its schema, as `{"signal_id": <uuid>, "version": <integer>}`
 
+    ## Searching without naming the ISN
+    When receiving a signal_id without details of the ISN it is in you can use the following endpoints:
+    ```
+    GET /api/signal-types/{signal_type_slug}/v{sem_ver}/signals/search
+    GET /api/signals/search
+    ```
+    These searches cover every ISN your account is a member of. Each result includes its `isn_slug`, `signal_type_slug` and `sem_ver`, so you can build further URLs (e.g. *Download a Document*) from it.
+
     ## Polling for changes
-    To find out about new and changed signals, poll *Signal Search* for each signal type you are interested in:
+    To find out about new and changed signals, poll the signal types you are interested in, or every signal type:
+    ```
+    GET /api/signal-types/{signal_type_slug}/v{sem_ver}/signals/search?updated_since={cursor}&include_withdrawn=true
+    GET /api/signals/search?updated_since={cursor}&include_withdrawn=true
+    ```
+    - `updated_since` returns the signals that changed (a new version was received, or the signal was withdrawn) since that time. Results are ordered by `signal_updated_at` across all your ISNs, so the last result's `signal_updated_at` is your cursor.
+    - Use `include_withdrawn=true`, so withdrawn signals are returned with `is_withdrawn: true` (otherwise they silently drop out of the results).
+    - **Polling is at-least-once, so overlap your polls**: set `updated_since` to 1 minute before your cursor, and skip the results you have already seen (the same `signal_id` and `signal_updated_at`). This is necessary because `signal_updated_at` is set when the service starts storing a signal, not when it finishes, so a signal that was still being stored when you last polled can appear with a `signal_updated_at` a little before your cursor. The 1 minute overlap makes sure your next poll picks it up.
+    - Search results are not paginated, so poll often enough to keep each result set small.
+
+    To poll a single ISN, use *Signal Search (private ISNs)* in the same way. The same rules apply, with results ordered by `signal_updated_at` within that ISN:
     ```
     GET /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search?updated_since={cursor}&include_withdrawn=true
     ```
-    - `updated_since` returns the signals that were created, given a new version, recorrelated or withdrawn since that time. Results are ordered by `signal_updated_at`, so the last result's `signal_updated_at` is your cursor.
-    - Use `include_withdrawn=true`, so withdrawn signals are returned with `is_withdrawn: true` (otherwise they silently drop out of the results).
-    - **Polling is at-least-once, so overlap your polls**: set `updated_since` to 1 minute before your cursor, and skip the results you have already seen (the same `signal_id` and `signal_updated_at`).
-    - Why the overlap is needed: `signal_updated_at` is set when the service starts storing a signal, not when it finishes. A signal that was still being stored when you last polled can therefore appear with a `signal_updated_at` a little before your cursor. The 1 minute overlap makes sure your next poll picks it up.
-    - Search results are not paginated, so poll often enough to keep each result set small.
+
+    ## Following signals
+    **You received an event and need the signal it is about.** For example, an `ehc-approved` event is about a consignment, and you want the consignment with its documents and other events. The event's `correlation_id` is the consignment's `signal_id`:
+    ```
+    GET /api/signals/search?signal_id={correlation_id}&include_correlated=true&include_withdrawn=true
+    ```
+    The result is the consignment, with everything linked to it in. If the consignment was withdrawn, it is returned with `is_withdrawn: true`. Write-only accounts get an empty result if the consignment belongs to another account (see Who can see signals). The same search tells you what any `signal_id` is.
+
+    **You sent signals through the router and want the responses.** For example, you send consignments through the router, and the ports send back advice events linked to them. Poll the advice event type: the events from every port are returned, and each event's `correlation_id` is the `signal_id` the router returned for your consignment.
+    ```
+    GET /api/signal-types/{advice_type}/v{sem_ver}/signals/search?updated_since={cursor}&include_withdrawn=true
+    ```
+
+    **You keep a copy of the data.** For example, you store every consignment, and the documents and events linked to them. Poll every signal type, so you need one cursor rather than one for each signal type:
+    ```
+    GET /api/signals/search?updated_since={cursor}&include_withdrawn=true
+    ```
+    - store each result by `signal_id`, and use its `correlation_id` to attach it to the signal it is linked to
+    - if a new version links a signal to a different signal, it is returned with the new `correlation_id`
+    - a linked signal can arrive before the signal it is linked to, so keep it until that signal arrives
+    - signals of new signal types are returned too: skip the types you don't need
+
+    **You want to know when anything about one signal changes.** For example, you want an alert when a consignment gets a new version, or when a document or event is linked to it. Linking a signal to a consignment changes the linked signal, not the consignment, so polling the consignment type with `updated_since` doesn't show new documents or events. Instead, poll the consignment with everything linked to it, and compare the result with the previous poll:
+    ```
+    GET /api/signals/search?signal_id={signal_id}&include_correlated=true&include_withdrawn=true
+    ```
+    - a `signal_id` that wasn't there before: a signal was linked to the consignment
+    - a different `signal_updated_at`: a new version, or a withdrawal (`is_withdrawn: true`)
+    - a `signal_id` that is no longer there: the signal was linked to a different signal (or can no longer be seen)
+
+    Each poll returns the whole set, so there is no cursor to keep.
 
     # UI Endpoints
 
@@ -3456,6 +3509,11 @@ paths:
         - a batch_ref that is longer than 128 characters or contains characters other than letters, numbers, hyphens and underscores
         - an event without a correlation_id
 
+        **Partial success**
+
+        Each signal is validated and stored separately: valid signals are stored even if others in the request fail, and the failures are listed in `failed_signals`.
+        The response is 200 if every signal was stored, 207 if some were, and 422 if none were. See "Partial success and resending" in the introduction for how to resend the failures.
+
         **Signal versions**
 
         New versions are created when signals are resupplied using the same local_ref, e.g. because the client wants to correct a previously published signal.
@@ -3641,65 +3699,36 @@ paths:
   /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search:
     get:
       description: |-
-        Search for signals in private ISNs (authentication required - any account with read or write permission on the ISN can use this endpoint).
+        Search for signals in one private ISN (authentication required).
+        To search without naming the ISN, use *Signal Search (across your ISNs)*.
 
-        Note the endpoint returns the latest version of each signal.
+        The endpoint returns the latest version of each signal (use `include_previous_versions=true` to see earlier versions).
+        Results are ordered by `signal_updated_at` (oldest first).
+
+        Accounts with read access can see all signals on the ISN.
+        Write-only accounts can only see the signals created by their own account, and the signals other accounts have correlated to them (including those returned with `include_correlated=true`).
 
         **Search parameters**
 
-        At least one of these filters is required: start_date and end_date, updated_since, account_id, signal_id, local_ref or correlation_id.
-        start_date and end_date must be used together - they filter on when the latest version of the signal was created (both are inclusive).
-        Results are ordered by signal_updated_at (oldest first).
+        At least one of these is required: `start_date` and `end_date`, `updated_since`, `account_id`, `signal_id`, `local_ref` or `correlation_id`.
+        `start_date` and `end_date` must be used together. They filter on when the signal's latest version was received (`version_created_at`).
 
-        Write-only accounts can only see the signals created by their own account, and the signals other accounts have correlated to them.
-        This also applies to correlated signals returned with include_correlated=true.
+        `updated_since` filters on when the signal last changed (`signal_updated_at`): a new version was received, or the signal was withdrawn.
 
         **Polling for changes**
 
-        Use updated_since with include_withdrawn=true. Polling is at-least-once: start each poll 1 minute before the last signal_updated_at you received, and skip the results you have already seen (the same signal_id and signal_updated_at).
-        See *Polling for changes* in the API overview for why the overlap is needed.
+        Polling is at-least-once: use `updated_since` as a cursor, start each poll 1 minute before the last `signal_updated_at` you received, and skip the results you have already seen (the same `signal_id` and `signal_updated_at`).
+        Use `include_withdrawn=true`, so signals withdrawn since your last poll are returned with `is_withdrawn: true` rather than left out of the results.
+        See *Polling for changes* in the API overview for more details.
 
-        **Retrieving a signal from the search results**
+        **Documents**
 
-        For json signals (content_kind=json) and events (content_kind=event) the signal is returned in the content field.
-
-        For document signals (content_kind=document) the content field holds the document metadata (name, mime_type, size_bytes and sha256) and the document is downloaded from the signal's content endpoint:
+        For json signals and events, the signal data is returned in the `content` field.
+        Documents are files, so they are not included directly in the search results, instead the `content` field holds the document's metadata (`name`, `mime_type`, `size_bytes` and `sha256`), and the file is downloaded separately with *Download a Document*:
         ```
         GET /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}/content?version={version_number}
         ```
-        Build the URL from the signal_type_slug, sem_ver, signal_id and version_number in the search result, not from the search URL:
-        correlated signals (include_correlated=true) are often a different signal type from the one searched.
-        The isn_slug is the ISN that was searched (correlated signals are in the same ISN).
-
-        For example, searching for a shipment with its correlated signals:
-        ```
-        GET /api/isn/sample-isn/signal-types/shipment/v1.0.0/signals/search?local_ref=SHIP-0042&include_correlated=true
-
-        [{
-        "signal_id": "def87f89-dab6-4607-95f7-593d61cb5742",
-        "signal_type_slug": "shipment",
-        "sem_ver": "1.0.0",
-        "content_kind": "json",
-        "correlation_id": null,
-        "content": {...},
-        "correlated_signals": [{
-        "signal_id": "4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19",
-        "version_number": 2,
-        "signal_type_slug": "bill-of-lading",
-        "sem_ver": "1.0.0",
-        "content_kind": "document",
-        "correlation_id": "def87f89-dab6-4607-95f7-593d61cb5742",
-        "content": {"name": "BL-2026-0042.pdf", "mime_type": "application/pdf", ...},
-        ...
-        }],
-        ...
-        }]
-        ```
-        the correlated bill of lading is downloaded with:
-        ```
-        GET /api/isn/sample-isn/signal-types/bill-of-lading/v1.0.0/signals/4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19/content?version=2
-        ```
-        Omit version to download the latest version, and add include_withdrawn=true if the signal is withdrawn.
+        The URL is built from the search result's `signal_type_slug`, `sem_ver`, `signal_id` and `version_number` (correlated documents are generally a different signal type from the one you searched).
       parameters:
       - description: Signals whose latest version was created at or after this time
           (use with end_date)
@@ -3713,9 +3742,9 @@ paths:
         in: query
         name: end_date
         type: string
-      - description: Signals created, given a new version, recorrelated or withdrawn
-          since this time (to poll for changes, use with include_withdrawn=true and
-          set it 1 minute before the last signal_updated_at you received)
+      - description: Signals that changed (a new version was received, or the signal
+          was withdrawn) since this time (to poll for changes, use with include_withdrawn=true
+          and set it 1 minute before the last signal_updated_at you received)
         example: "2006-01-02T15:05:00Z"
         in: query
         name: updated_since
@@ -4081,25 +4110,27 @@ paths:
       description: |-
         Search for signals in public ISNs (no authentication required).
 
-        Note the endpoint returns the latest version of each signal.
+        The endpoint returns the latest version of each signal (use `include_previous_versions=true` to see earlier versions).
+        Results are ordered by `signal_updated_at` (oldest first).
 
         **Search parameters**
 
-        At least one of these filters is required: start_date and end_date, updated_since, account_id, signal_id, local_ref or correlation_id.
-        start_date and end_date must be used together - they filter on when the latest version of the signal was created (both are inclusive).
-        Results are ordered by signal_updated_at (oldest first).
+        At least one of these is required: `start_date` and `end_date`, `updated_since`, `account_id`, `signal_id`, `local_ref` or `correlation_id`.
+        `start_date` and `end_date` must be used together. They filter on when the signal's latest version was received (`version_created_at`).
+
+        `updated_since` filters on when the signal last changed (`signal_updated_at`): a new version was received, or the signal was withdrawn.
 
         **Polling for changes**
 
-        Use updated_since with include_withdrawn=true. Polling is at-least-once: start each poll 1 minute before the last signal_updated_at you received, and skip the results you have already seen (the same signal_id and signal_updated_at).
-        See *Polling for changes* in the API overview for why the overlap is needed.
+        Polling is at-least-once: use `updated_since` as a cursor, start each poll 1 minute before the last `signal_updated_at` you received, and skip the results you have already seen (the same `signal_id` and `signal_updated_at`).
+        Use `include_withdrawn=true`, so signals withdrawn since your last poll are returned with `is_withdrawn: true` rather than left out of the results.
+        See *Polling for changes* in the API overview for more details.
 
-        **Retrieving a signal from the search results**
+        **Documents**
 
-        For json signals (content_kind=json) and events (content_kind=event) the signal is returned in the content field.
-
-        For document signals (content_kind=document) the content field holds the document metadata (name, mime_type, size_bytes and sha256).
-        Downloading the document requires an account on the ISN and an access token - see the private signal search endpoint for how to download a document from the search results.
+        For json signals and events, the signal is returned in the `content` field.
+        Documents are files, so they are not included in the search results: the `content` field holds the document's metadata (`name`, `mime_type`, `size_bytes` and `sha256`).
+        Downloading the file requires an account on the ISN and an access token (see *Download a Document*).
       parameters:
       - description: Signals whose latest version was created at or after this time
           (use with end_date)
@@ -4113,9 +4144,9 @@ paths:
         in: query
         name: end_date
         type: string
-      - description: Signals created, given a new version, recorrelated or withdrawn
-          since this time (to poll for changes, use with include_withdrawn=true and
-          set it 1 minute before the last signal_updated_at you received)
+      - description: Signals that changed (a new version was received, or the signal
+          was withdrawn) since this time (to poll for changes, use with include_withdrawn=true
+          and set it 1 minute before the last signal_updated_at you received)
         example: "2006-01-02T15:05:00Z"
         in: query
         name: updated_since
@@ -4185,13 +4216,14 @@ paths:
     post:
       description: |-
         Submit JSON or event signals without specifying a target ISN - the router resolves the ISN for each signal
-        (documents are sent to document signal types with _Upload a Document via Router_).
-        Events always have a correlation ID, so they are always routed to the ISN of the correlated signal.
+        (use _Upload a Document via Router_ to route documents).
 
         **ISN resolution by correlation ID**
 
         Where a _correlation ID_ is supplied, the routing rules do not apply and the signal
         is routed to the ISN that received the correlated signal.
+
+        Events always have a correlation ID, so they are always routed to the ISN of the correlated signal.
 
         **ISN resolution by pattern match**
 
@@ -4200,7 +4232,7 @@ paths:
 
         **Resubmissions**
 
-        local_ref is unique per ISN, so a resubmitted signal only updates the original if it resolves to the same ISN.
+        local_ref is unique per account/ISN, so a resubmitted signal only updates the original if it resolves to the same ISN.
         If it resolves to a different ISN (e.g. because the routing field changed) it is stored as a new signal on that ISN, and the original signal is not changed - withdraw it if it is no longer needed.
 
         **Resolution failures**
@@ -4214,6 +4246,9 @@ paths:
 
         Signals that resolve to an ISN where the account lacks access or write permission (`forbidden`), or where the ISN or signal type is not in use (`resource_not_found`),
         are rejected and listed in the `failed_signals` of that ISN's result.
+
+        Unroutable and rejected signals don't stop the other signals in the request from being stored.
+        The response is 200 if every signal was stored, 207 if some were, and 422 if none were. See "Partial success and resending" in the introduction for how to resend the failures.
 
         **Usage**
 
@@ -4375,6 +4410,216 @@ paths:
       security:
       - BearerAccessToken: []
       summary: Upload a Document via Router
+      tags:
+      - Signal Exchange
+  /api/signal-types/{signal_type_slug}/v{sem_ver}/signals/search:
+    get:
+      description: |-
+        Search for signals in every ISN your account is a member of, without naming the ISN (authentication required).
+        This is the preferred way to search: you don't need to know which ISN a signal is in (for example, when signals are sent through the router).
+
+        There are two routes:
+        - `/api/signal-types/{signal_type_slug}/v{sem_ver}/signals/search` searches one signal type
+        - `/api/signals/search` searches every signal type (e.g. to look up a `signal_id` whose type you don't know)
+
+        They take the same search parameters as *Signal Search (private ISNs)*.
+        Each result includes its `isn_slug`, `signal_type_slug` and `sem_ver`. Results are ordered by `signal_updated_at` (oldest first) across all the ISNs, so polling works as for a single ISN.
+
+        The visibility rules are the same as for a single ISN, and are applied separately in each ISN: if you have read access to one ISN and write-only access to another, you see every signal in the first, and only your own signals and the signals correlated to them in the second.
+
+        A `signal_id` in an ISN you are not a member of returns no results, the same as a `signal_id` that doesn't exist.
+        A signal type that isn't used in any of your ISNs also returns no results.
+
+        The ISNs searched are the ones in your access token, so an ISN you have just been added to is searched once you next get an access token.
+
+        At least one of these is required: `start_date` and `end_date`, `updated_since`, `account_id`, `signal_id`, `local_ref` or `correlation_id`.
+        See *Following signals* and *Polling for changes* in the API overview for more details.
+      parameters:
+      - description: Signals whose latest version was created at or after this time
+          (use with end_date)
+        example: "2006-01-02T15:05:00Z"
+        in: query
+        name: start_date
+        type: string
+      - description: Signals whose latest version was created at or before this time
+          (use with start_date)
+        example: "2006-01-02T15:15:00Z"
+        in: query
+        name: end_date
+        type: string
+      - description: Signals that changed (a new version was received, or the signal
+          was withdrawn) since this time (to poll for changes, use with include_withdrawn=true
+          and set it 1 minute before the last signal_updated_at you received)
+        example: "2006-01-02T15:05:00Z"
+        in: query
+        name: updated_since
+        type: string
+      - description: Account ID
+        example: def87f89-dab6-4607-95f7-593d61cb5742
+        in: query
+        name: account_id
+        type: string
+      - description: Return the signal with this signal_id (e.g. the correlation_id
+          of another signal)
+        example: 4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19
+        in: query
+        name: signal_id
+        type: string
+      - description: Local reference
+        example: item_id_#1
+        in: query
+        name: local_ref
+        type: string
+      - description: Return the signals that are linked to the signal with this signal_id
+          (those whose correlation_id is this value)
+        example: 4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19
+        in: query
+        name: correlation_id
+        type: string
+      - description: 'Include withdrawn signals (default: false)'
+        example: "true"
+        in: query
+        name: include_withdrawn
+        type: string
+      - description: 'Include signals that link to each returned signal (default:
+          false)'
+        example: "true"
+        in: query
+        name: include_correlated
+        type: string
+      - description: 'Include previous versions of each returned signal (default:
+          false)'
+        example: "true"
+        in: query
+        name: include_previous_versions
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.SearchSignalWithCorrelationsAndVersions'
+            type: array
+        "400":
+          description: invalid_url_param
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: authorization_error | access_token_expired
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Signal Search (across your ISNs)
+      tags:
+      - Signal Exchange
+  /api/signals/search:
+    get:
+      description: |-
+        Search for signals in every ISN your account is a member of, without naming the ISN (authentication required).
+        This is the preferred way to search: you don't need to know which ISN a signal is in (for example, when signals are sent through the router).
+
+        There are two routes:
+        - `/api/signal-types/{signal_type_slug}/v{sem_ver}/signals/search` searches one signal type
+        - `/api/signals/search` searches every signal type (e.g. to look up a `signal_id` whose type you don't know)
+
+        They take the same search parameters as *Signal Search (private ISNs)*.
+        Each result includes its `isn_slug`, `signal_type_slug` and `sem_ver`. Results are ordered by `signal_updated_at` (oldest first) across all the ISNs, so polling works as for a single ISN.
+
+        The visibility rules are the same as for a single ISN, and are applied separately in each ISN: if you have read access to one ISN and write-only access to another, you see every signal in the first, and only your own signals and the signals correlated to them in the second.
+
+        A `signal_id` in an ISN you are not a member of returns no results, the same as a `signal_id` that doesn't exist.
+        A signal type that isn't used in any of your ISNs also returns no results.
+
+        The ISNs searched are the ones in your access token, so an ISN you have just been added to is searched once you next get an access token.
+
+        At least one of these is required: `start_date` and `end_date`, `updated_since`, `account_id`, `signal_id`, `local_ref` or `correlation_id`.
+        See *Following signals* and *Polling for changes* in the API overview for more details.
+      parameters:
+      - description: Signals whose latest version was created at or after this time
+          (use with end_date)
+        example: "2006-01-02T15:05:00Z"
+        in: query
+        name: start_date
+        type: string
+      - description: Signals whose latest version was created at or before this time
+          (use with start_date)
+        example: "2006-01-02T15:15:00Z"
+        in: query
+        name: end_date
+        type: string
+      - description: Signals that changed (a new version was received, or the signal
+          was withdrawn) since this time (to poll for changes, use with include_withdrawn=true
+          and set it 1 minute before the last signal_updated_at you received)
+        example: "2006-01-02T15:05:00Z"
+        in: query
+        name: updated_since
+        type: string
+      - description: Account ID
+        example: def87f89-dab6-4607-95f7-593d61cb5742
+        in: query
+        name: account_id
+        type: string
+      - description: Return the signal with this signal_id (e.g. the correlation_id
+          of another signal)
+        example: 4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19
+        in: query
+        name: signal_id
+        type: string
+      - description: Local reference
+        example: item_id_#1
+        in: query
+        name: local_ref
+        type: string
+      - description: Return the signals that are linked to the signal with this signal_id
+          (those whose correlation_id is this value)
+        example: 4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19
+        in: query
+        name: correlation_id
+        type: string
+      - description: 'Include withdrawn signals (default: false)'
+        example: "true"
+        in: query
+        name: include_withdrawn
+        type: string
+      - description: 'Include signals that link to each returned signal (default:
+          false)'
+        example: "true"
+        in: query
+        name: include_correlated
+        type: string
+      - description: 'Include previous versions of each returned signal (default:
+          false)'
+        example: "true"
+        in: query
+        name: include_previous_versions
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/handlers.SearchSignalWithCorrelationsAndVersions'
+            type: array
+        "400":
+          description: invalid_url_param
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "401":
+          description: authorization_error | access_token_expired
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: database_error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      security:
+      - BearerAccessToken: []
+      summary: Signal Search (across your ISNs)
       tags:
       - Signal Exchange
   /health/live:

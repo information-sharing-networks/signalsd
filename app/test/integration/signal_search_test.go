@@ -5,6 +5,8 @@ package integration
 // Signal search tests:
 //   GET /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search         (private ISNs)
 //   GET /api/public/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search  (public ISNs)
+//   GET /api/signal-types/{signal_type_slug}/v{sem_ver}/signals/search                        (every ISN the caller is a member of)
+//   GET /api/signals/search                                                                   (every ISN the caller is a member of, every signal type)
 //
 // - TestSignalSearchAccess: who can search which ISNs
 // - TestWithdrawnSignalSearch: withdrawn signals are only returned with include_withdrawn=true
@@ -12,6 +14,7 @@ package integration
 // - TestWriteOnlyAccountVisibility: write-only accounts only see their own signals (see TestCorrelationSearch for correlated signals)
 // - TestPreviousVersionsSearch: include_previous_versions
 // - TestCorrelationSearch: include_correlated and the correlation_id filter
+// - TestCrossIsnSearch: searching across every ISN the caller is a member of
 
 import (
 	"context"
@@ -20,6 +23,7 @@ import (
 	"time"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
+	"github.com/information-sharing-networks/signalsd/app/internal/database"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 )
 
@@ -667,5 +671,289 @@ func TestCorrelationSearch(t *testing.T) {
 		if email, ok := correlated[0].(map[string]any)["email"]; ok && email != "" {
 			t.Errorf("Found email %v on a correlated signal in a public ISN search", email)
 		}
+	})
+}
+
+// TestCrossIsnSearch checks the search across every ISN the caller is a member of
+// (GET /api/signals/search for every signal type, and GET /api/signal-types/{signal_type_slug}/v{sem_ver}/signals/search for one type):
+// - results come from every ISN the caller is a member of (and no others), merged in signal_updated_at order, each with its isn_slug
+// - each ISN gets its own visibility rule: an account with read access to one ISN and write-only access to another sees everything
+//   in the first, and only its own signals and the signals correlated to them in the second - including the correlated signals
+//   returned with include_correlated=true
+// - signal_id finds a signal without its ISN or type; a signal in an ISN the caller isn't a member of looks the same as an unknown id
+// - correlation_id returns the signals linked to a signal, without its ISN (with the write-only rule)
+// - updated_since polls every ISN with one cursor
+func TestCrossIsnSearch(t *testing.T) {
+	ctx := context.Background()
+
+	testEnv := startInProcessServer(t, "")
+
+	adminAccount := createTestAccount(t, ctx, testEnv.queries, "siteadmin", "user", "admin@cross-isn-search.com")
+	readerAccount := createTestAccount(t, ctx, testEnv.queries, "member", "user", "reader@cross-isn-search.com")
+	writer1Account := createTestAccount(t, ctx, testEnv.queries, "member", "user", "writer1@cross-isn-search.com")
+	writer2Account := createTestAccount(t, ctx, testEnv.queries, "member", "user", "writer2@cross-isn-search.com")
+	mixedAccount := createTestAccount(t, ctx, testEnv.queries, "member", "user", "mixed@cross-isn-search.com")
+
+	// two port ISNs that share their signal types, an ISN the reader isn't a member of, and an ISN that is no longer in use
+	portA := createTestISN(t, ctx, testEnv.queries, "port-a-isn", "Port A ISN", adminAccount.ID, "private")
+	portB := createTestISN(t, ctx, testEnv.queries, "port-b-isn", "Port B ISN", adminAccount.ID, "private")
+	otherISN := createTestISN(t, ctx, testEnv.queries, "other-isn", "Other ISN", adminAccount.ID, "private")
+	notInUseISN := createTestISN(t, ctx, testEnv.queries, "not-in-use-isn", "Not in use ISN", adminAccount.ID, "private")
+
+	consignmentType := createTestSignalType(t, ctx, testEnv.queries, portA.ID, "consignment", "", signalsd.ContentKindJSON)
+	adviceType := createTestSignalType(t, ctx, testEnv.queries, portA.ID, "advice", "", signalsd.ContentKindJSON)
+	noteType := createTestSignalType(t, ctx, testEnv.queries, portA.ID, "note", "", signalsd.ContentKindJSON)
+	addSignalTypeToIsn(t, ctx, testEnv.queries, portB.ID, consignmentType.ID)
+	addSignalTypeToIsn(t, ctx, testEnv.queries, portB.ID, adviceType.ID)
+	addSignalTypeToIsn(t, ctx, testEnv.queries, portB.ID, noteType.ID)
+	otherSignalType := createTestSignalType(t, ctx, testEnv.queries, otherISN.ID, "other ISN signal", "", signalsd.ContentKindJSON)
+	notInUseSignalType := createTestSignalType(t, ctx, testEnv.queries, notInUseISN.ID, "not in use ISN signal", "", signalsd.ContentKindJSON)
+
+	grantPermission(t, ctx, testEnv.queries, portA.ID, readerAccount.ID, "read")
+	grantPermission(t, ctx, testEnv.queries, portB.ID, readerAccount.ID, "read")
+	grantPermission(t, ctx, testEnv.queries, portA.ID, writer1Account.ID, "write")
+	grantPermission(t, ctx, testEnv.queries, portA.ID, writer2Account.ID, "write")
+	grantPermission(t, ctx, testEnv.queries, portA.ID, mixedAccount.ID, "read")
+	grantPermission(t, ctx, testEnv.queries, portB.ID, mixedAccount.ID, "write")
+
+	if err := testEnv.schemaCache.Load(ctx); err != nil {
+		t.Fatalf("Failed to refresh schema cache: %v", err)
+	}
+
+	adminToken := testEnv.getAccessToken(t, adminAccount.ID)
+	readerToken := testEnv.getAccessToken(t, readerAccount.ID)
+	writer1Token := testEnv.getAccessToken(t, writer1Account.ID)
+	writer2Token := testEnv.getAccessToken(t, writer2Account.ID)
+	mixedToken := testEnv.getAccessToken(t, mixedAccount.ID)
+
+	// port A: writer 1's consignment, writer 2's advice linked to it, and the admin's note linked to the advice
+	consignmentAID := submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayload("consignment-a"), writer1Token, newTestSignalEndpoint(portA, consignmentType))
+	adviceAID := submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayloadWithCorrelatedID("advice-a", consignmentAID), writer2Token, newTestSignalEndpoint(portA, adviceType))
+	submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayloadWithCorrelatedID("note-a", adviceAID), adminToken, newTestSignalEndpoint(portA, noteType))
+
+	// port B: the mixed account's consignment, the admin's advice linked to it and the admin's note linked to the advice,
+	// and a consignment and advice that have nothing to do with the mixed account
+	consignmentBID := submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayload("consignment-b"), mixedToken, newTestSignalEndpoint(portB, consignmentType))
+	adviceBID := submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayloadWithCorrelatedID("advice-b", consignmentBID), adminToken, newTestSignalEndpoint(portB, adviceType))
+	submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayloadWithCorrelatedID("note-b", adviceBID), adminToken, newTestSignalEndpoint(portB, noteType))
+	consignmentBAdminID := submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayload("consignment-b-admin"), adminToken, newTestSignalEndpoint(portB, consignmentType))
+	submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayloadWithCorrelatedID("advice-b-admin", consignmentBAdminID), adminToken, newTestSignalEndpoint(portB, adviceType))
+
+	otherISNSignalID := submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayload("other-isn-001"), adminToken, newTestSignalEndpoint(otherISN, otherSignalType))
+	submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayload("not-in-use-isn-001"), adminToken, newTestSignalEndpoint(notInUseISN, notInUseSignalType))
+
+	expectedIsnSlugs := map[string]string{
+		"consignment-a":       portA.Slug,
+		"advice-a":            portA.Slug,
+		"note-a":              portA.Slug,
+		"consignment-b":       portB.Slug,
+		"advice-b":            portB.Slug,
+		"note-b":              portB.Slug,
+		"consignment-b-admin": portB.Slug,
+		"advice-b-admin":      portB.Slug,
+	}
+
+	t.Run("returns the signals in every ISN the caller is a member of, ordered by signal_updated_at, with their isn_slug", func(t *testing.T) {
+		signals := expectSearchResults(t, searchAcrossIsns(t, testEnv.baseURL, readerToken, lastHourSearchParams()))
+		if len(signals) != len(expectedIsnSlugs) {
+			t.Fatalf("Expected the %d signals in port A and port B, got %v", len(expectedIsnSlugs), signals)
+		}
+		for localRef, isnSlug := range expectedIsnSlugs {
+			if signal := findSignalByLocalRef(signals, localRef); signal == nil || signal["isn_slug"] != isnSlug {
+				t.Errorf("Expected %s with isn_slug %s, got %v", localRef, isnSlug, signal)
+			}
+		}
+		for i := 1; i < len(signals); i++ {
+			if signals[i]["signal_updated_at"].(string) < signals[i-1]["signal_updated_at"].(string) {
+				t.Errorf("Expected results ordered by signal_updated_at, got %v before %v", signals[i-1]["signal_updated_at"], signals[i]["signal_updated_at"])
+			}
+		}
+	})
+
+	t.Run("the one-type route returns the signals of that type in every ISN", func(t *testing.T) {
+		signals := expectSearchResults(t, searchSignalTypeAcrossIsns(t, testEnv.baseURL, adviceType.Slug, adviceType.SemVer, readerToken, lastHourSearchParams()))
+		if len(signals) != 3 || findSignalByLocalRef(signals, "advice-a") == nil || findSignalByLocalRef(signals, "advice-b") == nil || findSignalByLocalRef(signals, "advice-b-admin") == nil {
+			t.Errorf("Expected advice-a, advice-b and advice-b-admin, got %v", signals)
+		}
+	})
+
+	t.Run("a signal type that isn't in any of the caller's ISNs returns no results", func(t *testing.T) {
+		signals := expectSearchResults(t, searchSignalTypeAcrossIsns(t, testEnv.baseURL, "no-such-signal-type", "1.0.0", readerToken, lastHourSearchParams()))
+		if len(signals) != 0 {
+			t.Errorf("Expected no results, got %v", signals)
+		}
+	})
+
+	t.Run("each ISN gets its own visibility rule: read access in port A, write-only in port B", func(t *testing.T) {
+		signals := expectSearchResults(t, searchAcrossIsns(t, testEnv.baseURL, mixedToken, lastHourSearchParams()))
+
+		// everything in port A, and in port B only its own consignment and the advice linked to it
+		expected := []string{"consignment-a", "advice-a", "note-a", "consignment-b", "advice-b"}
+		if len(signals) != len(expected) {
+			t.Fatalf("Expected %v, got %v", expected, signals)
+		}
+		for _, localRef := range expected {
+			if findSignalByLocalRef(signals, localRef) == nil {
+				t.Errorf("Expected %s to be visible, got %v", localRef, signals)
+			}
+		}
+	})
+
+	t.Run("correlated signals get the visibility rule of their ISN", func(t *testing.T) {
+		signals := expectSearchResults(t, searchSignalTypeAcrossIsns(t, testEnv.baseURL, adviceType.Slug, adviceType.SemVer, mixedToken, map[string]string{
+			"updated_since":      "2000-01-01T00:00:00Z",
+			"include_correlated": "true",
+		}))
+		if len(signals) != 2 {
+			t.Fatalf("Expected advice-a and advice-b, got %v", signals)
+		}
+
+		// read access in port A: the admin's note is linked to the advice
+		adviceA := findSignalByLocalRef(signals, "advice-a")
+		if adviceA == nil {
+			t.Fatalf("Expected advice-a, got %v", signals)
+		}
+		if linked := correlatedSignalsOf(adviceA); len(linked) != 1 || linked[0]["local_ref"] != "note-a" || linked[0]["isn_slug"] != portA.Slug {
+			t.Errorf("Expected note-a linked to advice-a, got %v", linked)
+		}
+
+		// write-only in port B: the admin's note is linked to the admin's advice, not to the mixed account's signals, so it isn't shown
+		adviceB := findSignalByLocalRef(signals, "advice-b")
+		if adviceB == nil {
+			t.Fatalf("Expected advice-b, got %v", signals)
+		}
+		if linked := correlatedSignalsOf(adviceB); len(linked) != 0 {
+			t.Errorf("Expected no signals linked to advice-b to be visible, got %v", linked)
+		}
+	})
+
+	t.Run("write-only account sees its own signals and the signals correlated to them", func(t *testing.T) {
+		signals := expectSearchResults(t, searchAcrossIsns(t, testEnv.baseURL, writer1Token, lastHourSearchParams()))
+		if len(signals) != 2 || findSignalByLocalRef(signals, "consignment-a") == nil || findSignalByLocalRef(signals, "advice-a") == nil {
+			t.Errorf("Expected consignment-a and advice-a, got %v", signals)
+		}
+
+		signals = expectSearchResults(t, searchAcrossIsns(t, testEnv.baseURL, writer2Token, lastHourSearchParams()))
+		if len(signals) != 2 || findSignalByLocalRef(signals, "advice-a") == nil || findSignalByLocalRef(signals, "note-a") == nil {
+			t.Errorf("Expected advice-a and note-a, got %v", signals)
+		}
+	})
+
+	t.Run("signal_id finds a signal without its ISN or type, with the signals linked to it", func(t *testing.T) {
+		signals := expectSearchResults(t, searchAcrossIsns(t, testEnv.baseURL, readerToken, map[string]string{
+			"signal_id":          consignmentBID,
+			"include_correlated": "true",
+		}))
+		if len(signals) != 1 || signals[0]["isn_slug"] != portB.Slug || signals[0]["signal_type_slug"] != consignmentType.Slug {
+			t.Fatalf("Expected consignment-b in port B, got %v", signals)
+		}
+		if linked := correlatedSignalsOf(signals[0]); len(linked) != 1 || linked[0]["local_ref"] != "advice-b" {
+			t.Errorf("Expected advice-b linked to consignment-b, got %v", linked)
+		}
+
+		// the one-type route only returns the signal if it is that type
+		signals = expectSearchResults(t, searchSignalTypeAcrossIsns(t, testEnv.baseURL, adviceType.Slug, adviceType.SemVer, readerToken, map[string]string{
+			"signal_id": consignmentBID,
+		}))
+		if len(signals) != 0 {
+			t.Errorf("Expected no results for a consignment on the advice route, got %v", signals)
+		}
+	})
+
+	t.Run("a signal in an ISN the caller isn't a member of looks the same as an unknown id", func(t *testing.T) {
+		for _, signalID := range []string{otherISNSignalID, "00000000-0000-0000-0000-000000000001"} {
+			signals := expectSearchResults(t, searchAcrossIsns(t, testEnv.baseURL, readerToken, map[string]string{
+				"signal_id": signalID,
+			}))
+			if len(signals) != 0 {
+				t.Errorf("Expected no results for %s, got %v", signalID, signals)
+			}
+		}
+
+		// a write-only account can't look up another account's signal that isn't linked to its own
+		signals := expectSearchResults(t, searchAcrossIsns(t, testEnv.baseURL, mixedToken, map[string]string{
+			"signal_id": consignmentBAdminID,
+		}))
+		if len(signals) != 0 {
+			t.Errorf("Expected no results for consignment-b-admin, got %v", signals)
+		}
+	})
+
+	t.Run("correlation_id returns the signals linked to a signal, without its ISN", func(t *testing.T) {
+		signals := expectSearchResults(t, searchAcrossIsns(t, testEnv.baseURL, readerToken, map[string]string{
+			"correlation_id": consignmentAID,
+		}))
+		if len(signals) != 1 || signals[0]["local_ref"] != "advice-a" || signals[0]["isn_slug"] != portA.Slug {
+			t.Errorf("Expected only advice-a in port A, got %v", signals)
+		}
+
+		// write-only in port B: the admin's advice is linked to the mixed account's own consignment, so it is visible,
+		// but the admin's note is linked to the admin's advice, so it isn't
+		signals = expectSearchResults(t, searchAcrossIsns(t, testEnv.baseURL, mixedToken, map[string]string{
+			"correlation_id": consignmentBID,
+		}))
+		if len(signals) != 1 || signals[0]["local_ref"] != "advice-b" {
+			t.Errorf("Expected only advice-b, got %v", signals)
+		}
+		signals = expectSearchResults(t, searchAcrossIsns(t, testEnv.baseURL, mixedToken, map[string]string{
+			"correlation_id": adviceBID,
+		}))
+		if len(signals) != 0 {
+			t.Errorf("Expected no signals (note-b is linked to another account's signal), got %v", signals)
+		}
+	})
+
+	t.Run("updated_since polls every ISN with one cursor", func(t *testing.T) {
+		signals := expectSearchResults(t, searchAcrossIsns(t, testEnv.baseURL, readerToken, map[string]string{
+			"updated_since": "2000-01-01T00:00:00Z",
+		}))
+		cursor, err := time.Parse(time.RFC3339Nano, signals[len(signals)-1]["signal_updated_at"].(string))
+		if err != nil {
+			t.Fatalf("Could not parse signal_updated_at: %v", err)
+		}
+		// the next poll starts just after the cursor, so it excludes the signals already seen
+		updatedSince := cursor.Add(time.Microsecond).Format(time.RFC3339Nano)
+
+		// a new advice is linked to the consignment in port A, and the consignment in port B gets a new version
+		submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayloadWithCorrelatedID("advice-a-late", consignmentAID), writer2Token, newTestSignalEndpoint(portA, adviceType))
+		submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayloadWithContent("consignment-b", "amended content"), mixedToken, newTestSignalEndpoint(portB, consignmentType))
+
+		signals = expectSearchResults(t, searchAcrossIsns(t, testEnv.baseURL, readerToken, map[string]string{
+			"updated_since":     updatedSince,
+			"include_withdrawn": "true",
+		}))
+		if len(signals) != 2 || signals[0]["local_ref"] != "advice-a-late" || signals[1]["local_ref"] != "consignment-b" {
+			t.Fatalf("Expected advice-a-late then consignment-b, got %v", signals)
+		}
+		if signals[1]["version_number"] != float64(2) {
+			t.Errorf("Expected version 2 of consignment-b, got %v", signals[1])
+		}
+	})
+
+	t.Run("a site admin searches every ISN that is in use", func(t *testing.T) {
+		_, err := testEnv.queries.UpdateIsn(ctx, database.UpdateIsnParams{
+			ID:         notInUseISN.ID,
+			Detail:     notInUseISN.Detail,
+			IsInUse:    false,
+			Visibility: notInUseISN.Visibility,
+		})
+		if err != nil {
+			t.Fatalf("Failed to disable the ISN: %v", err)
+		}
+		// the token is created after the change because the ISN in-use status is included in the claims
+		adminToken := testEnv.getAccessToken(t, adminAccount.ID)
+
+		signals := expectSearchResults(t, searchAcrossIsns(t, testEnv.baseURL, adminToken, lastHourSearchParams()))
+		if findSignalByLocalRef(signals, "consignment-a") == nil || findSignalByLocalRef(signals, "consignment-b-admin") == nil || findSignalByLocalRef(signals, "other-isn-001") == nil {
+			t.Errorf("Expected signals from port A, port B and the other ISN, got %v", signals)
+		}
+		if findSignalByLocalRef(signals, "not-in-use-isn-001") != nil {
+			t.Errorf("Expected the signal in the ISN that isn't in use to be left out, got %v", signals)
+		}
+	})
+
+	t.Run("a search parameter is required", func(t *testing.T) {
+		response := searchAcrossIsns(t, testEnv.baseURL, readerToken, map[string]string{})
+		expectErrorCode(t, response, http.StatusBadRequest, apperrors.ErrCodeInvalidURLParam)
 	})
 }

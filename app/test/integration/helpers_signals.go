@@ -188,6 +188,64 @@ func searchPrivateSignals(t *testing.T, baseURL string, endpoint testSignalEndpo
 	return response
 }
 
+// searchAcrossIsns calls GET /api/signals/search (every signal type, in every ISN the caller is a member of) with the supplied query params
+func searchAcrossIsns(t *testing.T, baseURL string, token string, params map[string]string) *http.Response {
+	t.Helper()
+
+	url := fmt.Sprintf("%s/api/signals/search", baseURL)
+
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+	q := req.URL.Query()
+	for k, v := range params {
+		q.Add(k, v)
+	}
+	req.URL.RawQuery = q.Encode()
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	response, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Failed to search signals across ISNs: %v", err)
+	}
+	return response
+}
+
+// searchSignalTypeAcrossIsns calls GET /api/signal-types/{signal_type_slug}/v{sem_ver}/signals/search (one signal type, in every ISN the caller is a member of) with the supplied query params
+func searchSignalTypeAcrossIsns(t *testing.T, baseURL string, signalTypeSlug, semVer string, token string, params map[string]string) *http.Response {
+	t.Helper()
+
+	url := fmt.Sprintf("%s/api/signal-types/%s/v%s/signals/search", baseURL, signalTypeSlug, semVer)
+
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		t.Fatalf("Failed to create request: %v", err)
+	}
+	q := req.URL.Query()
+	for k, v := range params {
+		q.Add(k, v)
+	}
+	req.URL.RawQuery = q.Encode()
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	response, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Failed to search a signal type across ISNs: %v", err)
+	}
+	return response
+}
+
+// correlatedSignalsOf returns the correlated_signals of a search result (include_correlated=true) - empty if it has none
+func correlatedSignalsOf(signal map[string]any) []map[string]any {
+	correlated, _ := signal["correlated_signals"].([]any)
+	signals := make([]map[string]any, 0, len(correlated))
+	for _, c := range correlated {
+		signals = append(signals, c.(map[string]any))
+	}
+	return signals
+}
+
 // searchPublicSignals calls the public ISN search endpoint (no authentication) with the supplied query params
 func searchPublicSignals(t *testing.T, baseURL string, endpoint testSignalEndpoint, params map[string]string) *http.Response {
 	t.Helper()

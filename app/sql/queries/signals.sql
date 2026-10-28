@@ -226,13 +226,15 @@ WHERE account_id = sqlc.arg(account_id)
     AND local_ref = sqlc.arg(local_ref);
 
 -- name: GetSignalsWithOptionalFilters :many
--- you must supply the isn_slug,signal_type_slug & sem_ver params - other filters are optional
+-- you must supply the isn_slugs to search - other filters are optional.
+-- signal_type_slug and sem_ver restrict the results to one signal type - leave them null to search every signal type
 -- signals for inactive isns or signal_types are not returned (is_in_use = false)
 -- supply viewer_account_id to restrict the results to the signals that account can see (used for write-only accounts):
 -- its own signals and the signals correlated to its own signals
--- updated_since returns the signals that were created, given a new version, recorrelated or withdrawn since that time
+-- updated_since returns the signals that changed (a new version was received, or the signal was withdrawn) since that time
 SELECT
- a.id AS account_id,
+    i.slug AS isn_slug,
+    a.id AS account_id,
     a.account_type,
     COALESCE(u.email, si.client_contact_email) AS email,
     s.id as signal_id,
@@ -268,10 +270,10 @@ LEFT OUTER JOIN
 LEFT OUTER JOIN
     service_accounts si ON si.account_id = a.id
 WHERE
-    i.slug = sqlc.arg(isn_slug)
+    i.slug = ANY(sqlc.slice(isn_slugs))
     AND s.isn_id = i.id
-    AND st.slug = sqlc.arg(signal_type_slug)
-    AND st.sem_ver = sqlc.arg(sem_ver)
+    AND (sqlc.narg('signal_type_slug')::text IS NULL OR st.slug = sqlc.narg('signal_type_slug')::text)
+    AND (sqlc.narg('sem_ver')::text IS NULL OR st.sem_ver = sqlc.narg('sem_ver')::text)
     AND i.is_in_use = true
     AND ist.is_in_use = true
     AND (sqlc.narg('include_withdrawn')::boolean = true OR s.is_withdrawn = false)
@@ -336,6 +338,7 @@ WHERE s.account_id = sqlc.arg(account_id)
 -- supply viewer_account_id to restrict the results to the signals that account can see (used for write-only accounts):
 -- its own signals, and all the signals correlated to its own signals
 SELECT
+    i.slug AS isn_slug,
     a.id AS account_id,
     a.account_type,
     COALESCE(u.email, si.client_contact_email) AS email,

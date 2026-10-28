@@ -706,6 +706,7 @@ func (q *Queries) GetSignalVersion(ctx context.Context, arg GetSignalVersionPara
 
 const GetSignalsByCorrelationIDs = `-- name: GetSignalsByCorrelationIDs :many
 SELECT
+    i.slug AS isn_slug,
     a.id AS account_id,
     a.account_type,
     COALESCE(u.email, si.client_contact_email) AS email,
@@ -763,6 +764,7 @@ type GetSignalsByCorrelationIDsParams struct {
 }
 
 type GetSignalsByCorrelationIDsRow struct {
+	IsnSlug          string          `json:"isn_slug"`
 	AccountID        uuid.UUID       `json:"account_id"`
 	AccountType      string          `json:"account_type"`
 	Email            string          `json:"email"`
@@ -796,6 +798,7 @@ func (q *Queries) GetSignalsByCorrelationIDs(ctx context.Context, arg GetSignals
 	for rows.Next() {
 		var i GetSignalsByCorrelationIDsRow
 		if err := rows.Scan(
+			&i.IsnSlug,
 			&i.AccountID,
 			&i.AccountType,
 			&i.Email,
@@ -825,7 +828,8 @@ func (q *Queries) GetSignalsByCorrelationIDs(ctx context.Context, arg GetSignals
 
 const GetSignalsWithOptionalFilters = `-- name: GetSignalsWithOptionalFilters :many
 SELECT
- a.id AS account_id,
+    i.slug AS isn_slug,
+    a.id AS account_id,
     a.account_type,
     COALESCE(u.email, si.client_contact_email) AS email,
     s.id as signal_id,
@@ -860,10 +864,10 @@ LEFT OUTER JOIN
 LEFT OUTER JOIN
     service_accounts si ON si.account_id = a.id
 WHERE
-    i.slug = $1
+    i.slug = ANY($1)
     AND s.isn_id = i.id
-    AND st.slug = $2
-    AND st.sem_ver = $3
+    AND ($2::text IS NULL OR st.slug = $2::text)
+    AND ($3::text IS NULL OR st.sem_ver = $3::text)
     AND i.is_in_use = true
     AND ist.is_in_use = true
     AND ($4::boolean = true OR s.is_withdrawn = false)
@@ -881,9 +885,9 @@ ORDER BY
 `
 
 type GetSignalsWithOptionalFiltersParams struct {
-	IsnSlug          string     `json:"isn_slug"`
-	SignalTypeSlug   string     `json:"signal_type_slug"`
-	SemVer           string     `json:"sem_ver"`
+	IsnSlugs         []string   `json:"isn_slugs"`
+	SignalTypeSlug   *string    `json:"signal_type_slug"`
+	SemVer           *string    `json:"sem_ver"`
 	IncludeWithdrawn *bool      `json:"include_withdrawn"`
 	ViewerAccountID  *uuid.UUID `json:"viewer_account_id"`
 	AccountID        *uuid.UUID `json:"account_id"`
@@ -896,6 +900,7 @@ type GetSignalsWithOptionalFiltersParams struct {
 }
 
 type GetSignalsWithOptionalFiltersRow struct {
+	IsnSlug          string          `json:"isn_slug"`
 	AccountID        uuid.UUID       `json:"account_id"`
 	AccountType      string          `json:"account_type"`
 	Email            string          `json:"email"`
@@ -914,15 +919,16 @@ type GetSignalsWithOptionalFiltersRow struct {
 	Content          json.RawMessage `json:"content"`
 }
 
-// you must supply the isn_slug,signal_type_slug & sem_ver params - other filters are optional
+// you must supply the isn_slugs to search - other filters are optional.
+// signal_type_slug and sem_ver restrict the results to one signal type - leave them null to search every signal type
 // signals for inactive isns or signal_types are not returned (is_in_use = false)
 // supply viewer_account_id to restrict the results to the signals that account can see (used for write-only accounts):
 // its own signals and the signals correlated to its own signals
-// updated_since returns the signals that were created, given a new version, recorrelated or withdrawn since that time
+// updated_since returns the signals that changed (a new version was received, or the signal was withdrawn) since that time
 // the signal this signal is correlated to (uncorrelated signals are correlated to themselves)
 func (q *Queries) GetSignalsWithOptionalFilters(ctx context.Context, arg GetSignalsWithOptionalFiltersParams) ([]GetSignalsWithOptionalFiltersRow, error) {
 	rows, err := q.db.Query(ctx, GetSignalsWithOptionalFilters,
-		arg.IsnSlug,
+		arg.IsnSlugs,
 		arg.SignalTypeSlug,
 		arg.SemVer,
 		arg.IncludeWithdrawn,
@@ -943,6 +949,7 @@ func (q *Queries) GetSignalsWithOptionalFilters(ctx context.Context, arg GetSign
 	for rows.Next() {
 		var i GetSignalsWithOptionalFiltersRow
 		if err := rows.Scan(
+			&i.IsnSlug,
 			&i.AccountID,
 			&i.AccountType,
 			&i.Email,
