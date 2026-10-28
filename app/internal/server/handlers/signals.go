@@ -57,7 +57,7 @@ type WithdrawSignalRequest struct {
 //	@Description	To reactivate a json signal, resubmit it with the same local_ref using the *Submit Signals* endpoint. To reactivate a document, upload it again with the same local_ref using *Upload a Document*.
 //	@Description	Withdrawn events cannot be reactivated - send a new event with a new local_ref instead.
 //
-//	@Tags			Signal Exchange
+//	@Tags			Submit Signals
 //
 //	@Param			isn_slug			path	string							true	"ISN slug"			example(sample-isn)
 //	@Param			signal_type_slug	path	string							true	"Signal type slug"	example(signal-type-1)

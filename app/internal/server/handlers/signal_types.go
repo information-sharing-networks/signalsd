@@ -949,7 +949,7 @@ func (s *SignalTypeHandler) GetSignalTypes(w http.ResponseWriter, r *http.Reques
 //	@Description
 //	@Description	This endpoint can be used by any authenticated account.
 //
-//	@Tags			ISN Configuration
+//	@Tags			ISN Discovery
 //
 //	@Param			isn_slug			path		string	true	"ISN slug"											example(sample-isn)
 //	@Param			include_inactive	query		bool	false	"Include signal types that are disabled on the ISN"	default(false)
@@ -1030,7 +1030,7 @@ func (s *SignalTypeHandler) GetIsnSignalTypes(w http.ResponseWriter, r *http.Req
 //	@Description
 //	@Description	This endpoint can be used by any authenticated account.
 //
-//	@Tags			ISN Configuration
+//	@Tags			ISN Discovery
 //
 //	@Param			isn_slug			path		string	true	"ISN slug"			example(sample-isn)
 //	@Param			signal_type_slug	path		string	true	"signal type slug"	example(sample-signal-type)

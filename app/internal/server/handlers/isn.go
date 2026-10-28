@@ -334,7 +334,7 @@ func (i *IsnHandler) UpdateIsn(w http.ResponseWriter, r *http.Request) error {
 //	@Summary		Get ISN configurations
 //	@Description	get a list of the configured ISNs (any authenticated account can use this endpoint - private ISNs are included)
 //	@Param			include_inactive	query	bool	false	"Include inactive ISNs"	default(false)
-//	@Tags			ISN Configuration
+//	@Tags			ISN Discovery
 //
 //	@Success		200	{array}		handlers.Isn
 //	@Failure		401	{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
@@ -384,7 +384,7 @@ func (s *IsnHandler) GetIsns(w http.ResponseWriter, r *http.Request) error {
 //	@Description	Returns details about the ISN (any authenticated account can use this endpoint)
 //	@Param			isn_slug	path	string	true	"ISN slug"	example(sample-isn)
 //
-//	@Tags			ISN Configuration
+//	@Tags			ISN Discovery
 //
 //	@Success		200	{object}	handlers.IsnAndLinkedInfo
 //	@Failure		401	{object}	responses.ErrorResponse	"authorization_error | access_token_expired"

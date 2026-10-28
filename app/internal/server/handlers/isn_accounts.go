@@ -48,7 +48,7 @@ type IsnAccount struct {
 // UpdateIsnAccountPermission godocs
 //
 //	@Summary		Grant/Revoke ISN Access
-//	@Tags			Account Management
+//	@Tags			ISN Permissions
 //
 //	@Description	Update an account's access permission for an ISN. Set both can_read and can_write to false to revoke all access.
 //	@Description
@@ -181,7 +181,7 @@ func (i *IsnAccountHandler) UpdateIsnAccountPermission(w http.ResponseWriter, r 
 // GetIsnAccounts godoc
 //
 //	@Summary		Get ISN Account Membership
-//	@Tags			ISN Configuration
+//	@Tags			ISN Permissions
 //	@Description	Get a list of all accounts (users and service accounts) that have had permissions on the specified ISN.
 //	@Description	Accounts whose access has been revoked are included (with can_read and can_write both false).
 //	@Description	Only ISN admins (for the ISNs they own) and site admins can view this information

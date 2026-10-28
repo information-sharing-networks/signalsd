@@ -94,7 +94,7 @@ type BatchSearchParams struct {
 //	@Description	Accounts can view their own batches. Site admins can supply ?account_id= to view another account's batch.
 //	@Description
 //
-//	@Tags		Signal Exchange
+//	@Tags		Batches
 //	@Param		batch_ref	path		string	true	"Batch reference"	example(daily-sync-2026-04-02)
 //	@Param		account_id	query		string	false	"Account ID (site admins only)"
 //
@@ -229,7 +229,7 @@ func (s *SignalsBatchHandler) getBatchStatusDetails(ctx context.Context, batchID
 // SearchBatches godoc
 //
 //	@Summary		Search For Batches
-//	@Tags			Signal Exchange
+//	@Tags			Batches
 //
 //	@Description	Returns the full status for all matching batches. Accounts see their own batches; site admins see all.
 //	@Description	Both created_after and created_before must be provided.

@@ -39,7 +39,7 @@
 // with the signalsd API, then sets new httpOnly cookies in the response. The browser
 // passively holds and transmits the cookies but has no visibility into the exchange.
 //
-// See [auth.RequireAuth] for the middleware and [auth.SetAuthCookies] for cookie settings.
+// See [auth.AuthService.RequireAuth] for the middleware and [auth.SetAuthCookies] for cookie settings.
 //
 // # CSRF Protection
 //
@@ -71,6 +71,20 @@
 // and hx-swap attributes in the page — this avoids full page refreshes when updating the page contents.
 //
 // Handlers that return HTML fragments are routed under internal /ui-api/* urls.
+//
+// # Access Control
+//
+// Who can use a route is set by the router group it is registered in (see registerRoutes).
+// Each group adds a middleware from the auth package:
+//
+//   - public routes (/login, /register) are registered outside the groups
+//   - [auth.AuthService.RequireAuth]: any logged-in user (the dashboard and settings)
+//   - [auth.AuthService.RequireIsnAccess]: accounts with access to at least one ISN (search)
+//   - [auth.AuthService.RequireRole] ("isnadmin", "siteadmin"): the admin dashboard, ISN creation, enabling and disabling ISNs, service account creation
+//   - [auth.AuthService.RequireIsnAdmin]: admins of at least one ISN (ISN access, the ISN's signal types, viewing signal type configuration)
+//   - [auth.AuthService.RequireRole] ("siteadmin"): account management, ISN ownership transfer, role management, signal types and schemas, signal routing
+//
+// Unauthenticated requests are redirected to /login, and requests from accounts without the required access to /access-denied.
 //
 // # Retrieving Data from signalsd
 //

@@ -5,6 +5,11 @@ info:
   description: |-
     Signals ISN service API for managing Information Sharing Networks
 
+    ## API documentation
+    - [/docs](/docs): using the API - authentication, finding ISNs, and submitting and searching signals
+    - [/admin-docs](/admin-docs): administering the service - ISNs and their permissions, signal types, routing, and accounts
+    - [/ui-docs](/ui-docs): the browser-based management interface
+
     ## Common Error Responses
     All endpoints may return:
     - `400` Malformed request (invalid json, missing required fields, etc.)
@@ -227,27 +232,6 @@ info:
     - a `signal_id` that is no longer there: the signal was linked to a different signal (or can no longer be seen)
 
     Each poll returns the whole set, so there is no cursor to keep.
-
-    # UI Endpoints
-
-    UI endpoints serve the browser-based management interface.
-
-    ## Route types
-    - **Page handlers** (`GET /admin/*`, `/search`, etc.): return a full HTML page (`200`)
-    - **HTMX action handlers** (`/ui-api/*`): return an HTML partial (`200`) - either the requested content, or a success or error alert fragment
-
-    - see /ui-docs for more information
-
-    ## Auth
-    All protected routes require a valid session (cookie-based). Unauthenticated requests redirect to `/login`.
-    Requests with insufficient role are redirected to `/access-denied`.
-
-    ## Role requirements
-    - **Public** (`/login`, `/register`): no authentication required
-    - **Authenticated**: any logged-in user (`/dashboard`, `/settings`, and `/search` for accounts with access to an ISN)
-    - **`isnadmin` or `siteadmin`**: the admin dashboard, ISN creation, enabling and disabling ISNs, service account creation
-    - **Admins of at least one ISN**: ISN access, the ISN's signal types, viewing signal type configuration
-    - **`siteadmin` only**: account management (enabling and disabling accounts, password reset links, reissuing service account credentials), ISN ownership transfer, role management, signal type creation and schemas, signal routing rules
   license:
     name: MIT
   title: Signals ISN API

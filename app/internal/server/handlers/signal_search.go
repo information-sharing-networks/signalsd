@@ -320,7 +320,7 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 // SearchPublicSignals godocs
 //
 //	@Summary		Signal Search (public ISNs)
-//	@Tags			Signal Exchange
+//	@Tags			Search Signals
 //
 //	@Description	Search for signals in public ISNs (no authentication required).
 //	@Description
@@ -340,6 +340,9 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 //	@Description	Use `include_withdrawn=true`, so signals withdrawn since your last poll are returned with `is_withdrawn: true` rather than left out of the results.
 //	@Description	See *Polling for changes* in the API overview for more details.
 //
+//	@Param			isn_slug					path		string	true	"ISN slug"																																																					example(sample-isn)
+//	@Param			signal_type_slug			path		string	true	"Signal type slug"																																																			example(signal-type-1)
+//	@Param			sem_ver						path		string	true	"Signal type version"																																																		example(1.0.0)
 //	@Param			start_date					query		string	false	"Signals whose latest version was created at or after this time (use with end_date)"																																		example(2006-01-02T15:05:00Z)
 //	@Param			end_date					query		string	false	"Signals whose latest version was created at or before this time (use with start_date)"																																		example(2006-01-02T15:15:00Z)
 //	@Param			updated_since				query		string	false	"Signals that changed (a new version was received, or the signal was withdrawn) since this time (to poll for changes, use with include_withdrawn=true and set it 1 minute before the last signal_updated_at you received)"	example(2006-01-02T15:05:00Z)
@@ -492,10 +495,10 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 // SearchPrivateSignals godocs
 //
 //	@Summary		Signal Search (private ISNs)
-//	@Tags			Signal Exchange
+//	@Tags			Search Signals
 //
 //	@Description	Search for signals in one private ISN (authentication required).
-//	@Description	To search without naming the ISN, use *Signal Search (across your ISNs)*.
+//	@Description	To search without naming the ISN, use *Signal Search (one signal type, across your ISNs)* or *Signal Search (all signal types, across your ISNs)*.
 //	@Description
 //	@Description	The endpoint returns the latest version of each signal (use `include_previous_versions=true` to see earlier versions).
 //	@Description	Results are ordered by `signal_updated_at` (oldest first).
@@ -525,6 +528,9 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 //	@Description	```
 //	@Description	The URL is built from the search result's `signal_type_slug`, `sem_ver`, `signal_id` and `version_number` (correlated documents are generally a different signal type from the one you searched).
 //
+//	@Param			isn_slug					path		string	true	"ISN slug"																																																					example(sample-isn)
+//	@Param			signal_type_slug			path		string	true	"Signal type slug"																																																			example(signal-type-1)
+//	@Param			sem_ver						path		string	true	"Signal type version"																																																		example(1.0.0)
 //	@Param			start_date					query		string	false	"Signals whose latest version was created at or after this time (use with end_date)"																																		example(2006-01-02T15:05:00Z)
 //	@Param			end_date					query		string	false	"Signals whose latest version was created at or before this time (use with start_date)"																																		example(2006-01-02T15:15:00Z)
 //	@Param			updated_since				query		string	false	"Signals that changed (a new version was received, or the signal was withdrawn) since this time (to poll for changes, use with include_withdrawn=true and set it 1 minute before the last signal_updated_at you received)"	example(2006-01-02T15:05:00Z)
@@ -547,7 +553,7 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 //
 //	@Router			/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search [get]
 //
-// This function serves both the per-ISN route and the routes that search across the caller's ISNs (SearchSignalsAcrossIsns).
+// This function serves both the per-ISN route and the routes that search across the caller's ISNs (SearchSignalTypeAcrossIsns and SearchAllSignalsAcrossIsns).
 func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Request) error {
 
 	// Parse all search parameters
@@ -717,25 +723,71 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 	return responses.JSON(w, http.StatusOK, response)
 }
 
-// SearchSignalsAcrossIsns godocs
+// SearchSignalTypeAcrossIsns godocs
 //
-//	@Summary		Signal Search (across your ISNs)
-//	@Tags			Signal Exchange
+//	@Summary		Signal Search (one signal type, across your ISNs)
+//	@Tags			Search Signals
 //
-//	@Description	Search for signals in every ISN your account is a member of, without naming the ISN (authentication required).
+//	@Description	Search for signals of one signal type in every ISN your account is a member of, without naming the ISN (authentication required).
 //	@Description	This is the preferred way to search: you don't need to know which ISN a signal is in (for example, when signals are sent through the router).
+//	@Description	To search every signal type, use *Signal Search (all signal types, across your ISNs)*.
 //	@Description
-//	@Description	There are two routes:
-//	@Description	- `/api/signal-types/{signal_type_slug}/v{sem_ver}/signals/search` searches one signal type
-//	@Description	- `/api/signals/search` searches every signal type (e.g. to look up a `signal_id` whose type you don't know)
-//	@Description
-//	@Description	They take the same search parameters as *Signal Search (private ISNs)*.
+//	@Description	It takes the same search parameters as *Signal Search (private ISNs)*.
 //	@Description	Each result includes its `isn_slug`, `signal_type_slug` and `sem_ver`. Results are ordered by `signal_updated_at` (oldest first) across all the ISNs, so polling works as for a single ISN.
 //	@Description
 //	@Description	The visibility rules are the same as for a single ISN, and are applied separately in each ISN: if you have read access to one ISN and write-only access to another, you see every signal in the first, and only your own signals and the signals correlated to them in the second.
 //	@Description
 //	@Description	A `signal_id` in an ISN you are not a member of returns no results, the same as a `signal_id` that doesn't exist.
 //	@Description	A signal type that isn't used in any of your ISNs also returns no results.
+//	@Description
+//	@Description	The ISNs searched are the ones in your access token, so an ISN you have just been added to is searched once you next get an access token.
+//	@Description
+//	@Description	At least one of these is required: `start_date` and `end_date`, `updated_since`, `account_id`, `signal_id`, `local_ref` or `correlation_id`.
+//	@Description	See *Polling for changes* in the API overview for more details.
+//
+//	@Param			signal_type_slug			path		string	true	"Signal type slug"																																																			example(signal-type-1)
+//	@Param			sem_ver						path		string	true	"Signal type version"																																																		example(1.0.0)
+//	@Param			start_date					query		string	false	"Signals whose latest version was created at or after this time (use with end_date)"																																		example(2006-01-02T15:05:00Z)
+//	@Param			end_date					query		string	false	"Signals whose latest version was created at or before this time (use with start_date)"																																		example(2006-01-02T15:15:00Z)
+//	@Param			updated_since				query		string	false	"Signals that changed (a new version was received, or the signal was withdrawn) since this time (to poll for changes, use with include_withdrawn=true and set it 1 minute before the last signal_updated_at you received)"	example(2006-01-02T15:05:00Z)
+//	@Param			account_id					query		string	false	"Account ID"																																																				example(def87f89-dab6-4607-95f7-593d61cb5742)
+//	@Param			signal_id					query		string	false	"Return the signal with this signal_id (e.g. the correlation_id of a signal of another type)"																																example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
+//	@Param			local_ref					query		string	false	"Local reference"																																																			example(item_id_#1)
+//	@Param			correlation_id				query		string	false	"Return the signals of this type that are linked to the signal with this signal_id (those whose correlation_id is this value)"																								example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
+//	@Param			include_withdrawn			query		string	false	"Include withdrawn signals (default: false)"																																												example(true)
+//	@Param			include_correlated			query		string	false	"Include signals that link to each returned signal (default: false)"																																						example(true)
+//	@Param			include_previous_versions	query		string	false	"Include previous versions of each returned signal (default: false)"																																						example(true)
+//
+//	@Success		200							{array}		handlers.SearchSignalWithCorrelationsAndVersions
+//	@Failure		400							{object}	responses.ErrorResponse	"invalid_url_param"
+//	@Failure		401							{object}	responses.ErrorResponse	"authorization_error | access_token_expired"
+//	@Failure		500							{object}	responses.ErrorResponse	"database_error"
+//
+//	@Security		BearerAccessToken
+//
+//	@Router			/api/signal-types/{signal_type_slug}/v{sem_ver}/signals/search [get]
+//
+// The search is done by SearchPrivateSignals: the route has no ISN in the path, so every ISN in the caller's access token is searched.
+func (s *SignalsHandler) SearchSignalTypeAcrossIsns(w http.ResponseWriter, r *http.Request) error {
+	return s.SearchPrivateSignals(w, r)
+}
+
+// SearchAllSignalsAcrossIsns godocs
+//
+//	@Summary		Signal Search (all signal types, across your ISNs)
+//	@Tags			Search Signals
+//
+//	@Description	Search for signals of every signal type in every ISN your account is a member of (authentication required).
+//	@Description	Use it to look up a `signal_id` whose type and ISN you don't know (e.g. the `correlation_id` of an event), or to poll for changes to every signal type with one cursor.
+//	@Description	To search one signal type, use *Signal Search (one signal type, across your ISNs)*.
+//	@Description
+//	@Description	It takes the same search parameters as *Signal Search (private ISNs)*.
+//	@Description	Each result includes its `isn_slug`, `signal_type_slug` and `sem_ver`, so you can build further URLs (e.g. *Download a Document*) from it. Results are ordered by `signal_updated_at` (oldest first) across all the ISNs and signal types, so polling works as for a single ISN.
+//	@Description	Signals of signal types that are added to your ISNs later are returned too, so skip the types you don't need.
+//	@Description
+//	@Description	The visibility rules are the same as for a single ISN, and are applied separately in each ISN: if you have read access to one ISN and write-only access to another, you see every signal in the first, and only your own signals and the signals correlated to them in the second.
+//	@Description
+//	@Description	A `signal_id` in an ISN you are not a member of returns no results, the same as a `signal_id` that doesn't exist.
 //	@Description
 //	@Description	The ISNs searched are the ones in your access token, so an ISN you have just been added to is searched once you next get an access token.
 //	@Description
@@ -760,10 +812,9 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 //
 //	@Security		BearerAccessToken
 //
-//	@Router			/api/signal-types/{signal_type_slug}/v{sem_ver}/signals/search [get]
 //	@Router			/api/signals/search [get]
 //
-// The search is done by SearchPrivateSignals: these routes have no ISN in the path, so every ISN in the caller's access token is searched.
-func (s *SignalsHandler) SearchSignalsAcrossIsns(w http.ResponseWriter, r *http.Request) error {
+// The search is done by SearchPrivateSignals: the route has no ISN or signal type in the path, so every signal type in every ISN in the caller's access token is searched.
+func (s *SignalsHandler) SearchAllSignalsAcrossIsns(w http.ResponseWriter, r *http.Request) error {
 	return s.SearchPrivateSignals(w, r)
 }

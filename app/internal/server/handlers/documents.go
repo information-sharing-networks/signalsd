@@ -98,7 +98,7 @@ type DocumentUploadResponse struct {
 // UploadDocument godoc
 //
 //	@Summary		Upload a Document
-//	@Tags			Signal Exchange
+//	@Tags			Submit Signals
 //
 //	@Description	Upload a document (e.g. a PDF bill of lading) to a document signal type (JSON signals are sent with Submit Signals).
 //	@Description
@@ -211,7 +211,7 @@ func (h *DocumentsHandler) UploadDocument(w http.ResponseWriter, r *http.Request
 // RouteDocument godoc
 //
 //	@Summary		Upload a Document via Router
-//	@Tags			Signal Exchange
+//	@Tags			Submit Signals
 //
 //	@Description	Upload a document without specifying the target ISN: the document is sent to the ISN of the signal it is correlated with
 //	@Description	(e.g. a bill of lading is sent to the ISN that received its consignment).
@@ -646,7 +646,7 @@ func (h *DocumentsHandler) storeDocumentSignal(w http.ResponseWriter, r *http.Re
 // DownloadDocument godoc
 //
 //	@Summary		Download a Document
-//	@Tags			Signal Exchange
+//	@Tags			Search Signals
 //
 //	@Description	Download the document stored with a document signal. The latest version is returned unless a version is requested.
 //	@Description

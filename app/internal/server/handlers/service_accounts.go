@@ -81,7 +81,7 @@ type SetupPageData struct {
 //	@Description
 //	@Description	Only site admins and ISN admins can use this endpoint
 //	@Description
-//	@Tags		Service Accounts
+//	@Tags		Service Account Admin
 //
 //	@Param		request	body		handlers.CreateServiceAccountRequest	true	"service account details"
 //
@@ -224,7 +224,7 @@ func (s *ServiceAccountHandler) RegisterServiceAccount(w http.ResponseWriter, r 
 //	@Description
 //	@Description	Only site admins can use this endpoint.
 //	@Description
-//	@Tags		Service Accounts
+//	@Tags		Service Account Admin
 //
 //	@Param		request	body		handlers.ReissueServiceAccountCredentialsRequest	true	"service account details"
 //

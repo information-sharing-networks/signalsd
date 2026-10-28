@@ -162,7 +162,7 @@ func (u *UserHandler) RegisterUser(w http.ResponseWriter, r *http.Request) error
 //	@Description
 //	@Description	On success all the user's sessions are ended (their refresh tokens are revoked), including the current one, so they will need to log in again when their access token expires.
 //	@Description
-//	@Description	Users who have forgotten their password can't use this endpoint, since they have no current password to supply - an admin has to issue them a one-time reset link instead (see *Generate Password Reset Link* under Account Management).
+//	@Description	Users who have forgotten their password can't use this endpoint, since they have no current password to supply - an admin has to issue them a one-time reset link instead (see *Generate Password Reset Link* in the admin API docs).
 //	@Description
 //	@Tags		User Authentication
 //
@@ -721,7 +721,7 @@ func (u *UserHandler) PasswordResetTokenPage(w http.ResponseWriter, r *http.Requ
 //	@Description
 //	@Description	On success the token is deleted so the link can't be reused, the user's existing sessions are ended (their refresh tokens are revoked), and the user can log in with the new password.
 //	@Description
-//	@Description	Note that no access token is required - possession of the reset token is what authorises the change. Reset tokens can only be issued by site admins (see *Generate Password Reset Link* under Account Management).
+//	@Description	Note that no access token is required - possession of the reset token is what authorises the change. Reset tokens can only be issued by site admins (see *Generate Password Reset Link* in the admin API docs).
 //
 //	@Tags			One-time Links (browser pages)
 //

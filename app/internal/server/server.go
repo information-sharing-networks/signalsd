@@ -462,8 +462,8 @@ func (s *Server) registerSignalReadRoutes() {
 	// and the handler applies each ISN's visibility rule.
 	s.router.Group(func(r chi.Router) {
 		r.Use(s.authService.RequireValidAccessToken)
-		r.Get("/api/signal-types/{signal_type_slug}/v{sem_ver}/signals/search", responses.Wrap(signals.SearchSignalsAcrossIsns))
-		r.Get("/api/signals/search", responses.Wrap(signals.SearchSignalsAcrossIsns))
+		r.Get("/api/signal-types/{signal_type_slug}/v{sem_ver}/signals/search", responses.Wrap(signals.SearchSignalTypeAcrossIsns))
+		r.Get("/api/signals/search", responses.Wrap(signals.SearchAllSignalsAcrossIsns))
 	})
 
 	// document download - any ISN member may call this endpoint (write-only accounts can only download the documents they
@@ -538,6 +538,16 @@ func (s *Server) registerApiDocoRoutes() {
 		// OpenAPI specification for API clients and tools
 		r.Get("/swagger.json", func(w http.ResponseWriter, r *http.Request) {
 			http.ServeFile(w, r, "./docs/swagger.json")
+		})
+
+		// Admin api documentation
+		r.Get("/admin-docs", func(w http.ResponseWriter, r *http.Request) {
+			http.ServeFile(w, r, "./docs/admin/rapidoc.html")
+		})
+
+		// Admin OpenAPI specification
+		r.Get("/admin-swagger.json", func(w http.ResponseWriter, r *http.Request) {
+			http.ServeFile(w, r, "./docs/admin/swagger.json")
 		})
 
 		// UI api documentation

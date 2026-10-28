@@ -101,7 +101,7 @@ logs:
 # Generate swagger documentation
 docs:
 	@echo "🔄 Generating swagger documentation..."
-	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && go tool swag init -g ./cmd/signalsd/main.go --tags '!HTMX Actions,!UI Pages' --outputTypes json,yaml && go tool swag init -g ./cmd/signalsd/main.go --tags 'HTMX Actions,UI Pages' -o ./docs/ui --outputTypes json,yaml"
+	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && sh ./scripts/generate-swagger.sh"
 
 # Generate swagger documentation
 swag-fmt:

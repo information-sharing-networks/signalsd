@@ -178,7 +178,7 @@ type CreateSignalsSummary struct {
 // CreateSignals godocs
 //
 //	@Summary		Submit Signals
-//	@Tags			Signal Exchange
+//	@Tags			Submit Signals
 //
 //	@Description	Submit JSON or event signals to an ISN (documents are sent to document signal types with Upload a Document)
 //	@Description	- payloads must not mix signals of different types and are subject to the size limits defined on the site.
@@ -354,7 +354,7 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) e
 // RouteSignals godoc
 //
 //	@Summary		Submit Signals via Router
-//	@Tags			Signal Exchange
+//	@Tags			Submit Signals
 //
 //	@Description	Submit JSON or event signals without specifying a target ISN - the router resolves the ISN for each signal
 //	@Description	(use _Upload a Document via Router_ to route documents).
