@@ -5,6 +5,13 @@ info:
   description: |-
     Signals ISN service API for managing Information Sharing Networks
 
+    ## Key concepts
+    - **Information Sharing Network (ISN)**: a network set up for one purpose, such as sharing consignment data between traders and ports. Its members are accounts, each with its own access to the ISN (see _Who can see signals_), and it has the _signal types_ its members exchange.
+    - **Signal**: one piece of information shared through an ISN. There are three kinds (see _Content kinds_): a **json** record about something (e.g. a consignment), a **document** (e.g. a certificate PDF), and an **event** recording that something happened to another signal (e.g. a certificate was approved for a consignment). json signals and documents can be updated as more information becomes available, while events never change. Signals can be linked to each other, e.g. a consignment's documents and events are linked to the consignment (see _Correlation_).
+    - **Signal type**: one type of signal, identified by a slug and a version (e.g. `consignment/v1.0.0`). Each signal type has one content kind, and json and event signal types usually have a JSON schema that the content is checked against. New signal types can be added at any time without affecting existing ones.
+
+    The examples in these docs use consignments moving through ports, but the service is generic: the ISNs, signal types and schemas are defined by each network, so signals can carry any data the participants want to share.
+
     ## API documentation
     - [/docs](/docs): using the API - authentication, finding ISNs, and submitting and searching signals
     - [/admin-docs](/admin-docs): administering the service - ISNs and their permissions, signal types, routing, and accounts
@@ -108,7 +115,7 @@ info:
 
     ## Content kinds
     Each signal type has a `content_kind`, which determines how its signals are sent:
-    - **json**: JSON content, validated against the signal type's schema. Sent with *Submit Signals* (or *Submit Signals via Router*).
+    - **json**: JSON content, validated against the signal type's schema (unless the signal type was set up to skip validation). Sent with *Submit Signals* (or *Submit Signals via Router*).
     - **document**: a file (PDF, JPEG, PNG or XML). Sent with *Upload a Document* and retrieved with *Download a Document*. Search results contain the document's metadata, not the file.
     - **event**: an immutable JSON record that a process waypoint has been reached for another signal (e.g. an export health certificate was approved for a consignment). Sent with *Submit Signals* (see Events below).
 
@@ -142,6 +149,15 @@ info:
     **Correlating is sharing.** Correlating your signal to a signal created by another account is like emailing that account a copy, but with the extra controls that you can withdraw it or send new versions, and they see those changes. Unlike email:
     - withdrawing a signal stops further access through the service
     - if a new version changes the correlation_id, access moves with it: the owner of the newly correlated signal can see every version, and the previous owner can no longer access it through the service
+
+    ## Routing
+    Some networks have one ISN per destination, e.g. one per port. Instead of choosing the ISN yourself, you can send signals to the router (*Submit Signals via Router* or *Upload a Document via Router*), which chooses the ISN for each signal:
+    - **A signal with a `correlation_id`** goes to the ISN of the signal it is linked to. Events always have one, and routed documents must have one, so they always go to the ISN of the signal they are about.
+    - **A json signal without one** is matched against its signal type's routing rules, e.g. on a port code in its content. The rules are set up by the service administrators (see [/admin-docs](/admin-docs)).
+
+    The response gives the `isn_slug` each signal was sent to. Combined with *Searching without naming the ISN*, this means your code doesn't need to know which ISNs exist: when a new port joins and your account is given access to its ISN, signals are routed to it and your searches find the responses, with no change to your code.
+
+    A `local_ref` is unique within an ISN, so a resent signal only updates the original if it is routed to the same ISN (see *Submit Signals via Router*).
 
     ## Partial success and resending
     Signals in a request are validated and stored one at a time: the valid signals are stored and the ones that fail (e.g. content that doesn't match the schema, or an unknown `correlation_id`) are listed in the response with an error code. The response status tells you whether all, some or none of the signals were stored (see each endpoint for the details).
