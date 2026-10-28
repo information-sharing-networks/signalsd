@@ -648,12 +648,12 @@ func (q *Queries) GetSignalCorrelationDetails(ctx context.Context, arg GetSignal
 const GetSignalVersion = `-- name: GetSignalVersion :one
 SELECT
     s.account_id,
-    c.account_id AS correlated_to_account_id,
+    correlated_to.account_id AS correlated_to_account_id,
     s.is_withdrawn,
     sv.version_number,
     sv.content
 FROM signals s
-JOIN signals c ON c.id = s.correlation_id
+JOIN signals correlated_to ON correlated_to.id = s.correlation_id
 JOIN isn i ON i.id = s.isn_id
 JOIN signal_types st ON st.id = s.signal_type_id
 JOIN signal_versions sv ON sv.signal_id = s.id
@@ -728,7 +728,7 @@ FROM
 JOIN
     signals s ON s.id = lsv.signal_id
 JOIN
-    signals c ON c.id = s.correlation_id
+    signals correlated_to ON correlated_to.id = s.correlation_id
 JOIN
     accounts a ON a.id = s.account_id
 JOIN
@@ -745,11 +745,17 @@ WHERE
     s.correlation_id = ANY($1)
     AND s.correlation_id != s.id  -- exclude self-referencing signals
     AND s.isn_id = i.id
-    AND s.isn_id = c.isn_id -- signals can only be correlated within an ISN (defence in depth - submissions check this)
+    AND s.isn_id = correlated_to.isn_id -- signals can only be correlated within an ISN (defence in depth - submissions check this)
     AND i.is_in_use = true
     AND ist.is_in_use = true
     AND ($2::boolean = true OR s.is_withdrawn = false)
-    AND ($3::uuid IS NULL OR s.account_id = $3::uuid OR c.account_id = $3::uuid)
+    -- visibility: every signal in a readable ISN; otherwise (write-only) the signal is returned if the viewer
+    -- sent it, or if it is correlated to a signal the viewer sent (it can be sent by any account)
+    AND (
+        i.slug = ANY($3)
+        OR s.account_id = $4::uuid
+        OR correlated_to.account_id = $4::uuid
+    )
 ORDER BY
     s.correlation_id,
     s.local_ref,
@@ -760,6 +766,7 @@ ORDER BY
 type GetSignalsByCorrelationIDsParams struct {
 	CorrelationIds   []uuid.UUID `json:"correlation_ids"`
 	IncludeWithdrawn *bool       `json:"include_withdrawn"`
+	ReadableIsnSlugs []string    `json:"readable_isn_slugs"`
 	ViewerAccountID  *uuid.UUID  `json:"viewer_account_id"`
 }
 
@@ -785,11 +792,16 @@ type GetSignalsByCorrelationIDsRow struct {
 
 // Get all signals that correlate to the provided signal IDs (for embedding correlated signals)
 // Signals for inactive isns or signal types (is_in_use = false) are not returned
-// supply viewer_account_id to restrict the results to the signals that account can see (used for write-only accounts):
-// its own signals, and all the signals correlated to its own signals
+// visibility is decided per ISN, as in GetSignalsWithOptionalFilters: every correlated signal is returned in the readable_isn_slugs ISNs,
+// and in the other (write-only) ISNs only the signals viewer_account_id can see: its own signals, and all the signals correlated to its own signals
 // the signal this signal is correlated to
 func (q *Queries) GetSignalsByCorrelationIDs(ctx context.Context, arg GetSignalsByCorrelationIDsParams) ([]GetSignalsByCorrelationIDsRow, error) {
-	rows, err := q.db.Query(ctx, GetSignalsByCorrelationIDs, arg.CorrelationIds, arg.IncludeWithdrawn, arg.ViewerAccountID)
+	rows, err := q.db.Query(ctx, GetSignalsByCorrelationIDs,
+		arg.CorrelationIds,
+		arg.IncludeWithdrawn,
+		arg.ReadableIsnSlugs,
+		arg.ViewerAccountID,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -850,7 +862,7 @@ FROM
 JOIN
     signals s ON s.id = lsv.signal_id
 JOIN
-    signals c ON c.id = s.correlation_id
+    signals correlated_to ON correlated_to.id = s.correlation_id
 JOIN
     accounts a ON a.id = s.account_id
 JOIN
@@ -871,15 +883,21 @@ WHERE
     AND i.is_in_use = true
     AND ist.is_in_use = true
     AND ($4::boolean = true OR s.is_withdrawn = false)
-    AND ($5::uuid IS NULL OR s.account_id = $5::uuid OR c.account_id = $5::uuid)
-    AND ($6::uuid IS NULL OR a.id = $6::uuid)
-    AND ($7::uuid IS NULL OR s.id = $7::uuid)
-    AND ($8::text IS NULL OR s.local_ref = $8::text)
+    -- visibility: every signal in a readable ISN; otherwise (write-only) the signal is returned if the viewer
+    -- sent it, or if it is correlated to a signal the viewer sent (it can be sent by any account)
+    AND (
+        i.slug = ANY($5)
+        OR s.account_id = $6::uuid
+        OR correlated_to.account_id = $6::uuid
+    )
+    AND ($7::uuid IS NULL OR a.id = $7::uuid)
+    AND ($8::uuid IS NULL OR s.id = $8::uuid)
+    AND ($9::text IS NULL OR s.local_ref = $9::text)
     -- signals correlated to the supplied signal (excluding the signal itself)
-    AND ($9::uuid IS NULL OR (s.correlation_id = $9::uuid AND s.id != $9::uuid))
-    AND ($10::timestamptz IS NULL OR lsv.created_at >= $10::timestamptz)
-    AND ($11::timestamptz IS NULL OR lsv.created_at <= $11::timestamptz)
-    AND ($12::timestamptz IS NULL OR s.updated_at >= $12::timestamptz)
+    AND ($10::uuid IS NULL OR (s.correlation_id = $10::uuid AND s.id != $10::uuid))
+    AND ($11::timestamptz IS NULL OR lsv.created_at >= $11::timestamptz)
+    AND ($12::timestamptz IS NULL OR lsv.created_at <= $12::timestamptz)
+    AND ($13::timestamptz IS NULL OR s.updated_at >= $13::timestamptz)
 ORDER BY
     s.updated_at ASC
 `
@@ -889,6 +907,7 @@ type GetSignalsWithOptionalFiltersParams struct {
 	SignalTypeSlug   *string    `json:"signal_type_slug"`
 	SemVer           *string    `json:"sem_ver"`
 	IncludeWithdrawn *bool      `json:"include_withdrawn"`
+	ReadableIsnSlugs []string   `json:"readable_isn_slugs"`
 	ViewerAccountID  *uuid.UUID `json:"viewer_account_id"`
 	AccountID        *uuid.UUID `json:"account_id"`
 	SignalID         *uuid.UUID `json:"signal_id"`
@@ -922,8 +941,9 @@ type GetSignalsWithOptionalFiltersRow struct {
 // you must supply the isn_slugs to search - other filters are optional.
 // signal_type_slug and sem_ver restrict the results to one signal type - leave them null to search every signal type
 // signals for inactive isns or signal_types are not returned (is_in_use = false)
-// supply viewer_account_id to restrict the results to the signals that account can see (used for write-only accounts):
-// its own signals and the signals correlated to its own signals
+// visibility is decided per ISN: every signal is returned in the readable_isn_slugs ISNs (the ISNs the caller can read).
+// In the other ISNs (write-only), only the signals viewer_account_id can see are returned: its own signals and the signals correlated to its own signals
+// (an ISN missing from readable_isn_slugs gets the write-only rule, and returns nothing when viewer_account_id is null)
 // updated_since returns the signals that changed (a new version was received, or the signal was withdrawn) since that time
 // the signal this signal is correlated to (uncorrelated signals are correlated to themselves)
 func (q *Queries) GetSignalsWithOptionalFilters(ctx context.Context, arg GetSignalsWithOptionalFiltersParams) ([]GetSignalsWithOptionalFiltersRow, error) {
@@ -932,6 +952,7 @@ func (q *Queries) GetSignalsWithOptionalFilters(ctx context.Context, arg GetSign
 		arg.SignalTypeSlug,
 		arg.SemVer,
 		arg.IncludeWithdrawn,
+		arg.ReadableIsnSlugs,
 		arg.ViewerAccountID,
 		arg.AccountID,
 		arg.SignalID,

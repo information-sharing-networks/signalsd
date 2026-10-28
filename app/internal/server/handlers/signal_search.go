@@ -5,7 +5,6 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -20,7 +19,6 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/responses"
 	"github.com/information-sharing-networks/signalsd/app/internal/utils"
-	"github.com/jackc/pgx/v5"
 )
 
 // structs used by the search endpoint
@@ -242,9 +240,6 @@ func (s *SignalsHandler) getPreviousSignalVersions(ctx context.Context, signalID
 
 	previousSignalVersions, err := s.queries.GetPreviousSignalVersions(ctx, signalIDs)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return make(map[uuid.UUID][]PreviousSignalVersion), nil // not all signals have versions
-		}
 		return nil, fmt.Errorf("error retrieving signal versions %v", err)
 	}
 
@@ -265,10 +260,10 @@ func (s *SignalsHandler) getPreviousSignalVersions(ctx context.Context, signalID
 
 // getCorrelatedSignals fetches all signals that have a correlated_id that references one of the provided signal IDs - returns a map of signal_id to correlated signals
 //
-// viewerAccountID limits the results to the signals that account can see (used for write-only accounts, nil = no restriction):
-// its own signals, and all the signals correlated to its own signals.
+// Visibility is decided per ISN: every correlated signal is returned in the readableIsnSlugs ISNs.
+// In the other (write-only) ISNs only the signals viewerAccountID can see are returned: its own signals, and all the signals correlated to its own signals.
 // Email addresses are only included when includeEmail is true (they are not shown in public ISNs).
-func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []uuid.UUID, params SearchParams, viewerAccountID *uuid.UUID, includeEmail bool) (map[uuid.UUID][]SearchSignal, error) {
+func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []uuid.UUID, params SearchParams, readableIsnSlugs []string, viewerAccountID *uuid.UUID, includeEmail bool) (map[uuid.UUID][]SearchSignal, error) {
 	if len(signalIDs) == 0 {
 		return make(map[uuid.UUID][]SearchSignal), nil
 	}
@@ -276,12 +271,10 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 	correlatedSignals, err := s.queries.GetSignalsByCorrelationIDs(ctx, database.GetSignalsByCorrelationIDsParams{
 		CorrelationIds:   signalIDs,
 		IncludeWithdrawn: &params.includeWithdrawn,
+		ReadableIsnSlugs: readableIsnSlugs,
 		ViewerAccountID:  viewerAccountID,
 	})
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, err // not all signals have correlated signals
-		}
 		return nil, fmt.Errorf("error retrieving correlated signals %v", err)
 	}
 
@@ -394,8 +387,10 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 		return apperrors.InvalidURLParam("invalid search parameters", err)
 	}
 
+	// everyone can read every signal in a public ISN
 	returnedSignals, err := s.queries.GetSignalsWithOptionalFilters(r.Context(), database.GetSignalsWithOptionalFiltersParams{
 		IsnSlugs:         []string{searchParams.isnSlug},
+		ReadableIsnSlugs: []string{searchParams.isnSlug},
 		SignalTypeSlug:   &searchParams.signalTypeSlug,
 		SemVer:           &searchParams.semVer,
 		StartDate:        searchParams.startDate,
@@ -432,7 +427,7 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 	if searchParams.includeCorrelated {
 
 		// create a map of signal_id to their correlated signals
-		correlatedSignalBySignalID, err = s.getCorrelatedSignals(r.Context(), signalIDs, searchParams, nil, false)
+		correlatedSignalBySignalID, err = s.getCorrelatedSignals(r.Context(), signalIDs, searchParams, []string{searchParams.isnSlug}, nil, false)
 		if err != nil {
 			return apperrors.DatabaseError("database error", err)
 		}
@@ -553,7 +548,8 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 //
 //	@Router			/api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search [get]
 //
-// This function serves both the per-ISN route and the routes that search across the caller's ISNs (SearchSignalTypeAcrossIsns and SearchAllSignalsAcrossIsns).
+// This function serves the per-ISN route and the routes that search across the caller's ISNs (SearchSignalTypeAcrossIsns and SearchAllSignalsAcrossIsns):
+// the routes without an ISN in the path search every ISN in the caller's access token, and the routes without a signal type in the path search every signal type.
 func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Request) error {
 
 	// Parse all search parameters
@@ -577,32 +573,28 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 		return apperrors.InvalidURLParam("invalid search parameters", err)
 	}
 
-	// Split the ISNs to search by what the caller can see in them
-	// (on the per-ISN route, only the ISN in the path - the middleware has checked the caller is a member of it):
-	// - read access: every signal in the ISN
-	// - write-only: the signals it created, and the signals correlated to them
+	// Choose the ISNs to search:
+	// the per-ISN route searches the ISN in the path (the middleware has checked the caller is a member of it),
+	// the routes without an ISN in the path search every ISN in the caller's access token.
 	// ISNs that aren't in use are not removed here - the queries leave them out.
-	var readableIsnSlugs, writeOnlyIsnSlugs []string
-	for isnSlug, isnPerms := range claims.IsnPerms {
-		if searchParams.isnSlug != "" && isnSlug != searchParams.isnSlug {
-			continue
-		}
-		if isnPerms.CanRead {
-			readableIsnSlugs = append(readableIsnSlugs, isnSlug)
-		} else if isnPerms.CanWrite {
-			writeOnlyIsnSlugs = append(writeOnlyIsnSlugs, isnSlug)
-		}
+	isnSlugsInScope := slices.Collect(maps.Keys(claims.IsnPerms))
+	if searchParams.isnSlug != "" {
+		isnSlugsInScope = []string{searchParams.isnSlug}
 	}
 
-	// Each group of ISNs is searched with its own viewer setting, so every row gets the visibility rule of the ISN it is in:
-	// no viewer for the readable ISNs, and the caller's account for the write-only ISNs.
+	// Note what the caller can see in each ISN - the queries apply the rule per ISN:
+	// - read access: every signal in the ISN (readableIsnSlugs)
+	// - write-only: the signals the caller created, and the signals correlated to them (the viewer account rule applies to every ISN not in readableIsnSlugs)
 	// (the account_id filter still means "created by": filtering on another account returns that account's signals correlated to the viewer's signals)
-	searches := []struct {
-		isnSlugs        []string
-		viewerAccountID *uuid.UUID
-	}{
-		{isnSlugs: readableIsnSlugs, viewerAccountID: nil},
-		{isnSlugs: writeOnlyIsnSlugs, viewerAccountID: &accountID},
+	var isnSlugs, readableIsnSlugs []string
+	for _, isnSlug := range isnSlugsInScope {
+		isnPerms := claims.IsnPerms[isnSlug]
+		if isnPerms.CanRead {
+			readableIsnSlugs = append(readableIsnSlugs, isnSlug)
+		}
+		if isnPerms.CanRead || isnPerms.CanWrite {
+			isnSlugs = append(isnSlugs, isnSlug)
+		}
 	}
 
 	// the routes without a signal type in the path search every signal type
@@ -612,63 +604,49 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 		semVer = &searchParams.semVer
 	}
 
-	returnedSignals := []database.GetSignalsWithOptionalFiltersRow{}
-	correlatedSignalBySignalID := make(map[uuid.UUID][]SearchSignal)
-	for _, search := range searches {
-		if len(search.isnSlugs) == 0 {
-			continue
-		}
+	returnedSignals, err := s.queries.GetSignalsWithOptionalFilters(r.Context(), database.GetSignalsWithOptionalFiltersParams{
+		IsnSlugs:         isnSlugs,
+		ReadableIsnSlugs: readableIsnSlugs,
+		ViewerAccountID:  &accountID,
+		SignalTypeSlug:   signalTypeSlug,
+		SemVer:           semVer,
+		StartDate:        searchParams.startDate,
+		EndDate:          searchParams.endDate,
+		UpdatedSince:     searchParams.updatedSince,
+		AccountID:        searchParams.accountID,
+		SignalID:         searchParams.signalID,
+		CorrelationID:    searchParams.correlationID,
+		LocalRef:         searchParams.localRef,
+		IncludeWithdrawn: &searchParams.includeWithdrawn,
+	})
+	if err != nil {
+		logger.AddLogAttrs(r.Context(),
+			slog.Any("isn_slugs", isnSlugs),
+		)
 
-		signals, err := s.queries.GetSignalsWithOptionalFilters(r.Context(), database.GetSignalsWithOptionalFiltersParams{
-			IsnSlugs:         search.isnSlugs,
-			SignalTypeSlug:   signalTypeSlug,
-			SemVer:           semVer,
-			StartDate:        searchParams.startDate,
-			EndDate:          searchParams.endDate,
-			UpdatedSince:     searchParams.updatedSince,
-			ViewerAccountID:  search.viewerAccountID,
-			AccountID:        searchParams.accountID,
-			SignalID:         searchParams.signalID,
-			CorrelationID:    searchParams.correlationID,
-			LocalRef:         searchParams.localRef,
-			IncludeWithdrawn: &searchParams.includeWithdrawn,
-		})
-		if err != nil {
-			return apperrors.DatabaseError("database error", err)
-		}
-		returnedSignals = append(returnedSignals, signals...)
+		return apperrors.DatabaseError("database error", err)
+	}
 
-		// Get correlated signals if requested.
-		// They are fetched with the same viewer as the signals they are linked to (correlation is within one ISN, so they get that ISN's rule).
-		// Fetching them for both groups at once would show write-only accounts correlated signals they can't see.
-		if searchParams.includeCorrelated {
-			signalIDs := make([]uuid.UUID, 0, len(signals))
-			for _, signal := range signals {
-				signalIDs = append(signalIDs, signal.SignalID)
-			}
-
-			correlatedSignals, err := s.getCorrelatedSignals(r.Context(), signalIDs, searchParams, search.viewerAccountID, true)
-			if err != nil {
-				return apperrors.DatabaseError("database error", err)
-			}
-			// each signal is returned by only one of the two searches, so the keys never clash
-			maps.Copy(correlatedSignalBySignalID, correlatedSignals)
+	// the (optional) signal_versions and correlated_signals fields are populated using separate queries and then merged into the response
+	signalIDs := make([]uuid.UUID, 0, len(returnedSignals))
+	if searchParams.includeCorrelated || searchParams.includePreviousSignalVersions {
+		for _, row := range returnedSignals {
+			signalIDs = append(signalIDs, row.SignalID)
 		}
 	}
 
-	// combine the results of the two searches, ordered by signal_updated_at
-	slices.SortStableFunc(returnedSignals, func(a, b database.GetSignalsWithOptionalFiltersRow) int {
-		return a.SignalUpdatedAt.Compare(b.SignalUpdatedAt)
-	})
+	// Get correlated signals if requested (correlation is within one ISN, so each correlated signal gets the visibility rule of the ISN it is in)
+	var correlatedSignalBySignalID map[uuid.UUID][]SearchSignal
+	if searchParams.includeCorrelated {
+		correlatedSignalBySignalID, err = s.getCorrelatedSignals(r.Context(), signalIDs, searchParams, readableIsnSlugs, &accountID, true)
+		if err != nil {
+			return apperrors.DatabaseError("database error", err)
+		}
+	}
 
 	// Get previous versions if requested (these don't depend on the viewer: they are only fetched for signals the caller can see)
 	var previousVersionsBySignalID map[uuid.UUID][]PreviousSignalVersion
 	if searchParams.includePreviousSignalVersions {
-		signalIDs := make([]uuid.UUID, 0, len(returnedSignals))
-		for _, signal := range returnedSignals {
-			signalIDs = append(signalIDs, signal.SignalID)
-		}
-
 		previousVersionsBySignalID, err = s.getPreviousSignalVersions(r.Context(), signalIDs)
 		if err != nil {
 			return apperrors.DatabaseError("database error", err)
@@ -767,7 +745,8 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 //
 //	@Router			/api/signal-types/{signal_type_slug}/v{sem_ver}/signals/search [get]
 //
-// The search is done by SearchPrivateSignals: the route has no ISN in the path, so every ISN in the caller's access token is searched.
+// This function exists to give the route its own API docs - the search is done by SearchPrivateSignals:
+// the route has no ISN in the path, so every ISN in the caller's access token is searched.
 func (s *SignalsHandler) SearchSignalTypeAcrossIsns(w http.ResponseWriter, r *http.Request) error {
 	return s.SearchPrivateSignals(w, r)
 }
@@ -814,7 +793,8 @@ func (s *SignalsHandler) SearchSignalTypeAcrossIsns(w http.ResponseWriter, r *ht
 //
 //	@Router			/api/signals/search [get]
 //
-// The search is done by SearchPrivateSignals: the route has no ISN or signal type in the path, so every signal type in every ISN in the caller's access token is searched.
+// This function exists to give the route its own API docs - the search is done by SearchPrivateSignals:
+// the route has no ISN or signal type in the path, so every signal type in every ISN in the caller's access token is searched.
 func (s *SignalsHandler) SearchAllSignalsAcrossIsns(w http.ResponseWriter, r *http.Request) error {
 	return s.SearchPrivateSignals(w, r)
 }

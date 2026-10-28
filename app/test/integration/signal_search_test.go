@@ -676,13 +676,13 @@ func TestCorrelationSearch(t *testing.T) {
 
 // TestCrossIsnSearch checks the search across every ISN the caller is a member of
 // (GET /api/signals/search for every signal type, and GET /api/signal-types/{signal_type_slug}/v{sem_ver}/signals/search for one type):
-// - results come from every ISN the caller is a member of (and no others), merged in signal_updated_at order, each with its isn_slug
-// - each ISN gets its own visibility rule: an account with read access to one ISN and write-only access to another sees everything
-//   in the first, and only its own signals and the signals correlated to them in the second - including the correlated signals
-//   returned with include_correlated=true
-// - signal_id finds a signal without its ISN or type; a signal in an ISN the caller isn't a member of looks the same as an unknown id
-// - correlation_id returns the signals linked to a signal, without its ISN (with the write-only rule)
-// - updated_since polls every ISN with one cursor
+//   - results come from every ISN the caller is a member of (and no others), merged in signal_updated_at order, each with its isn_slug
+//   - each ISN gets its own visibility rule: an account with read access to one ISN and write-only access to another sees everything
+//     in the first, and only its own signals and the signals correlated to them in the second - including the correlated signals
+//     returned with include_correlated=true
+//   - signal_id finds a signal without its ISN or type; a signal in an ISN the caller isn't a member of looks the same as an unknown id
+//   - correlation_id returns the signals linked to a signal, without its ISN (with the write-only rule)
+//   - updated_since polls every ISN with one cursor
 func TestCrossIsnSearch(t *testing.T) {
 	ctx := context.Background()
 

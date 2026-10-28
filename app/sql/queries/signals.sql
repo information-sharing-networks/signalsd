@@ -229,8 +229,9 @@ WHERE account_id = sqlc.arg(account_id)
 -- you must supply the isn_slugs to search - other filters are optional.
 -- signal_type_slug and sem_ver restrict the results to one signal type - leave them null to search every signal type
 -- signals for inactive isns or signal_types are not returned (is_in_use = false)
--- supply viewer_account_id to restrict the results to the signals that account can see (used for write-only accounts):
--- its own signals and the signals correlated to its own signals
+-- visibility is decided per ISN: every signal is returned in the readable_isn_slugs ISNs (the ISNs the caller can read).
+-- In the other ISNs (write-only), only the signals viewer_account_id can see are returned: its own signals and the signals correlated to its own signals
+-- (an ISN missing from readable_isn_slugs gets the write-only rule, and returns nothing when viewer_account_id is null)
 -- updated_since returns the signals that changed (a new version was received, or the signal was withdrawn) since that time
 SELECT
     i.slug AS isn_slug,
@@ -256,7 +257,7 @@ JOIN
     signals s ON s.id = lsv.signal_id
 -- the signal this signal is correlated to (uncorrelated signals are correlated to themselves)
 JOIN
-    signals c ON c.id = s.correlation_id
+    signals correlated_to ON correlated_to.id = s.correlation_id
 JOIN
     accounts a ON a.id = s.account_id
 JOIN
@@ -277,7 +278,13 @@ WHERE
     AND i.is_in_use = true
     AND ist.is_in_use = true
     AND (sqlc.narg('include_withdrawn')::boolean = true OR s.is_withdrawn = false)
-    AND (sqlc.narg('viewer_account_id')::uuid IS NULL OR s.account_id = sqlc.narg('viewer_account_id')::uuid OR c.account_id = sqlc.narg('viewer_account_id')::uuid)
+    -- visibility: every signal in a readable ISN; otherwise (write-only) the signal is returned if the viewer
+    -- sent it, or if it is correlated to a signal the viewer sent (it can be sent by any account)
+    AND (
+        i.slug = ANY(sqlc.slice(readable_isn_slugs))
+        OR s.account_id = sqlc.narg('viewer_account_id')::uuid
+        OR correlated_to.account_id = sqlc.narg('viewer_account_id')::uuid
+    )
     AND (sqlc.narg('account_id')::uuid IS NULL OR a.id = sqlc.narg('account_id')::uuid)
     AND (sqlc.narg('signal_id')::uuid IS NULL OR s.id = sqlc.narg('signal_id')::uuid)
     AND (sqlc.narg('local_ref')::text IS NULL OR s.local_ref = sqlc.narg('local_ref')::text)
@@ -335,8 +342,8 @@ WHERE s.account_id = sqlc.arg(account_id)
 -- name: GetSignalsByCorrelationIDs :many
 -- Get all signals that correlate to the provided signal IDs (for embedding correlated signals)
 -- Signals for inactive isns or signal types (is_in_use = false) are not returned
--- supply viewer_account_id to restrict the results to the signals that account can see (used for write-only accounts):
--- its own signals, and all the signals correlated to its own signals
+-- visibility is decided per ISN, as in GetSignalsWithOptionalFilters: every correlated signal is returned in the readable_isn_slugs ISNs,
+-- and in the other (write-only) ISNs only the signals viewer_account_id can see: its own signals, and all the signals correlated to its own signals
 SELECT
     i.slug AS isn_slug,
     a.id AS account_id,
@@ -361,7 +368,7 @@ JOIN
     signals s ON s.id = lsv.signal_id
 -- the signal this signal is correlated to
 JOIN
-    signals c ON c.id = s.correlation_id
+    signals correlated_to ON correlated_to.id = s.correlation_id
 JOIN
     accounts a ON a.id = s.account_id
 JOIN
@@ -378,11 +385,17 @@ WHERE
     s.correlation_id = ANY(sqlc.slice(correlation_ids))
     AND s.correlation_id != s.id  -- exclude self-referencing signals
     AND s.isn_id = i.id
-    AND s.isn_id = c.isn_id -- signals can only be correlated within an ISN (defence in depth - submissions check this)
+    AND s.isn_id = correlated_to.isn_id -- signals can only be correlated within an ISN (defence in depth - submissions check this)
     AND i.is_in_use = true
     AND ist.is_in_use = true
     AND (sqlc.narg('include_withdrawn')::boolean = true OR s.is_withdrawn = false)
-    AND (sqlc.narg('viewer_account_id')::uuid IS NULL OR s.account_id = sqlc.narg('viewer_account_id')::uuid OR c.account_id = sqlc.narg('viewer_account_id')::uuid)
+    -- visibility: every signal in a readable ISN; otherwise (write-only) the signal is returned if the viewer
+    -- sent it, or if it is correlated to a signal the viewer sent (it can be sent by any account)
+    AND (
+        i.slug = ANY(sqlc.slice(readable_isn_slugs))
+        OR s.account_id = sqlc.narg('viewer_account_id')::uuid
+        OR correlated_to.account_id = sqlc.narg('viewer_account_id')::uuid
+    )
 ORDER BY
     s.correlation_id,
     s.local_ref,
@@ -448,12 +461,12 @@ WHERE s.account_id = sqlc.arg(account_id)
 -- correlated_to_account_id is the account that created the signal this signal is correlated to (used to check what write-only accounts can see)
 SELECT
     s.account_id,
-    c.account_id AS correlated_to_account_id,
+    correlated_to.account_id AS correlated_to_account_id,
     s.is_withdrawn,
     sv.version_number,
     sv.content
 FROM signals s
-JOIN signals c ON c.id = s.correlation_id
+JOIN signals correlated_to ON correlated_to.id = s.correlation_id
 JOIN isn i ON i.id = s.isn_id
 JOIN signal_types st ON st.id = s.signal_type_id
 JOIN signal_versions sv ON sv.signal_id = s.id
