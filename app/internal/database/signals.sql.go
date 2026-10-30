@@ -148,9 +148,9 @@ WITH ids AS (
     FROM signal_types st
     JOIN isn_signal_types ist ON st.id = ist.signal_type_id
     JOIN isn i ON i.id = ist.isn_id
-    WHERE i.slug = $4
-        AND st.slug = $5
-        AND st.sem_ver = $6
+    WHERE i.slug = $5
+        AND st.slug = $6
+        AND st.sem_ver = $7
         AND i.is_in_use = true
         AND ist.is_in_use = true
 )
@@ -162,6 +162,7 @@ INSERT INTO signals (
     isn_id,
     signal_type_id,
     local_ref,
+    issuer_ref,
     correlation_id,
     is_withdrawn,
     is_archived)
@@ -174,6 +175,7 @@ SELECT
     ids.signal_type_id,
     $2,
     $3,
+    $4,
     false,
     false
 FROM ids
@@ -187,6 +189,7 @@ DO UPDATE SET
         WHEN signals.is_withdrawn = true THEN false
         ELSE signals.is_withdrawn
     END,
+    issuer_ref = EXCLUDED.issuer_ref,
     updated_at = now()
 RETURNING id
 `
@@ -194,6 +197,7 @@ RETURNING id
 type CreateOrUpdateSignalWithCorrelationIDParams struct {
 	AccountID      uuid.UUID `json:"account_id"`
 	LocalRef       string    `json:"local_ref"`
+	IssuerRef      *string   `json:"issuer_ref"`
 	CorrelationID  uuid.UUID `json:"correlation_id"`
 	IsnSlug        string    `json:"isn_slug"`
 	SignalTypeSlug string    `json:"signal_type_slug"`
@@ -203,11 +207,13 @@ type CreateOrUpdateSignalWithCorrelationIDParams struct {
 // note if there is already a master record for this local_ref, then:
 // 1. correlation_id is updated with the supplied value (assuming it is different to the existing value)
 // 2. if the signal was withdrawn it is reactivated (is_withdrawn = false).
+// 3. issuer_ref is replaced with the supplied value (it is currently only supported for documents - json signals are submitted without one, so it stays null)
 // Only creates/updates signals if ISN and signal type are in use (this is a defence against stale access tokens).
 func (q *Queries) CreateOrUpdateSignalWithCorrelationID(ctx context.Context, arg CreateOrUpdateSignalWithCorrelationIDParams) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, CreateOrUpdateSignalWithCorrelationID,
 		arg.AccountID,
 		arg.LocalRef,
+		arg.IssuerRef,
 		arg.CorrelationID,
 		arg.IsnSlug,
 		arg.SignalTypeSlug,
@@ -226,9 +232,9 @@ WITH ids AS (
     FROM signal_types st
     JOIN isn_signal_types ist ON st.id = ist.signal_type_id
     JOIN isn i ON i.id = ist.isn_id
-    WHERE i.slug = $3
-        AND st.slug = $4
-        AND st.sem_ver = $5
+    WHERE i.slug = $4
+        AND st.slug = $5
+        AND st.sem_ver = $6
         AND i.is_in_use = true
         AND ist.is_in_use = true
 )
@@ -240,6 +246,7 @@ INSERT INTO signals (
     isn_id,
     signal_type_id,
     local_ref,
+    issuer_ref,
     correlation_id,
     is_withdrawn,
     is_archived)
@@ -251,6 +258,7 @@ SELECT
     ids.isn_id,
     ids.signal_type_id,
     $2,
+    $3,
     ids.signal_id,
     false,
     false
@@ -258,6 +266,7 @@ FROM ids
 ON CONFLICT (account_id, isn_id, signal_type_id, local_ref)
 DO UPDATE SET
     is_withdrawn = false,
+    issuer_ref = EXCLUDED.issuer_ref,
     updated_at = now()
 RETURNING id
 `
@@ -265,6 +274,7 @@ RETURNING id
 type CreateSignalParams struct {
 	AccountID      uuid.UUID `json:"account_id"`
 	LocalRef       string    `json:"local_ref"`
+	IssuerRef      *string   `json:"issuer_ref"`
 	IsnSlug        string    `json:"isn_slug"`
 	SignalTypeSlug string    `json:"signal_type_slug"`
 	SemVer         string    `json:"sem_ver"`
@@ -276,11 +286,13 @@ type CreateSignalParams struct {
 // Returns the new signal_id.
 // deactivated records (is_withdrawn = true) are reactivated by resubmitting them.
 // updated_at is changed on every resubmission, since a new version is created (search uses it to find the signals that changed since a given time - updated_since)
+// issuer_ref is replaced on every resubmission (it is currently only supported for documents - json signals are submitted without one, so it stays null)
 // the only other signals field that can be updated is the correlation_id (handled by CreateOrUpdateSignalWithCorrelationID)
 func (q *Queries) CreateSignal(ctx context.Context, arg CreateSignalParams) (uuid.UUID, error) {
 	row := q.db.QueryRow(ctx, CreateSignal,
 		arg.AccountID,
 		arg.LocalRef,
+		arg.IssuerRef,
 		arg.IsnSlug,
 		arg.SignalTypeSlug,
 		arg.SemVer,
@@ -367,6 +379,7 @@ const GetLatestSignalVersionByLocalRef = `-- name: GetLatestSignalVersionByLocal
 SELECT
     s.id AS signal_id,
     s.correlation_id,
+    s.issuer_ref,
     s.is_withdrawn,
     lsv.id AS signal_version_id,
     lsv.version_number,
@@ -393,6 +406,7 @@ type GetLatestSignalVersionByLocalRefParams struct {
 type GetLatestSignalVersionByLocalRefRow struct {
 	SignalID        uuid.UUID       `json:"signal_id"`
 	CorrelationID   uuid.UUID       `json:"correlation_id"`
+	IssuerRef       *string         `json:"issuer_ref"`
 	IsWithdrawn     bool            `json:"is_withdrawn"`
 	SignalVersionID uuid.UUID       `json:"signal_version_id"`
 	VersionNumber   int32           `json:"version_number"`
@@ -412,6 +426,7 @@ func (q *Queries) GetLatestSignalVersionByLocalRef(ctx context.Context, arg GetL
 	err := row.Scan(
 		&i.SignalID,
 		&i.CorrelationID,
+		&i.IssuerRef,
 		&i.IsWithdrawn,
 		&i.SignalVersionID,
 		&i.VersionNumber,
@@ -523,7 +538,7 @@ func (q *Queries) GetRecentSignalVersionsBySignalTypeID(ctx context.Context, arg
 }
 
 const GetSignalByAccountAndLocalRef = `-- name: GetSignalByAccountAndLocalRef :one
-SELECT s.id, s.created_at, s.updated_at, s.account_id, s.isn_id, s.signal_type_id, s.local_ref, s.correlation_id, s.is_withdrawn, s.is_archived, i.slug as isn_slug, st.slug as signal_type_slug, st.sem_ver
+SELECT s.id, s.created_at, s.updated_at, s.account_id, s.isn_id, s.signal_type_id, s.local_ref, s.correlation_id, s.is_withdrawn, s.is_archived, s.issuer_ref, i.slug as isn_slug, st.slug as signal_type_slug, st.sem_ver
 FROM signals s
 JOIN signal_types st ON st.id = s.signal_type_id
 JOIN isn i ON i.id = s.isn_id
@@ -553,6 +568,7 @@ type GetSignalByAccountAndLocalRefRow struct {
 	CorrelationID  uuid.UUID `json:"correlation_id"`
 	IsWithdrawn    bool      `json:"is_withdrawn"`
 	IsArchived     bool      `json:"is_archived"`
+	IssuerRef      *string   `json:"issuer_ref"`
 	IsnSlug        string    `json:"isn_slug"`
 	SignalTypeSlug string    `json:"signal_type_slug"`
 	SemVer         string    `json:"sem_ver"`
@@ -578,6 +594,7 @@ func (q *Queries) GetSignalByAccountAndLocalRef(ctx context.Context, arg GetSign
 		&i.CorrelationID,
 		&i.IsWithdrawn,
 		&i.IsArchived,
+		&i.IssuerRef,
 		&i.IsnSlug,
 		&i.SignalTypeSlug,
 		&i.SemVer,
@@ -712,6 +729,7 @@ SELECT
     COALESCE(u.email, si.client_contact_email) AS email,
     s.id as signal_id,
     s.local_ref,
+    s.issuer_ref,
     st.slug AS signal_type_slug,
     st.sem_ver,
     st.content_kind,
@@ -777,6 +795,7 @@ type GetSignalsByCorrelationIDsRow struct {
 	Email            string          `json:"email"`
 	SignalID         uuid.UUID       `json:"signal_id"`
 	LocalRef         string          `json:"local_ref"`
+	IssuerRef        *string         `json:"issuer_ref"`
 	SignalTypeSlug   string          `json:"signal_type_slug"`
 	SemVer           string          `json:"sem_ver"`
 	ContentKind      string          `json:"content_kind"`
@@ -816,6 +835,7 @@ func (q *Queries) GetSignalsByCorrelationIDs(ctx context.Context, arg GetSignals
 			&i.Email,
 			&i.SignalID,
 			&i.LocalRef,
+			&i.IssuerRef,
 			&i.SignalTypeSlug,
 			&i.SemVer,
 			&i.ContentKind,
@@ -846,6 +866,7 @@ SELECT
     COALESCE(u.email, si.client_contact_email) AS email,
     s.id as signal_id,
     s.local_ref,
+    s.issuer_ref,
     st.slug AS signal_type_slug,
     st.sem_ver,
     st.content_kind,
@@ -893,11 +914,12 @@ WHERE
     AND ($7::uuid IS NULL OR a.id = $7::uuid)
     AND ($8::uuid IS NULL OR s.id = $8::uuid)
     AND ($9::text IS NULL OR s.local_ref = $9::text)
+    AND ($10::text IS NULL OR s.issuer_ref = $10::text)
     -- signals correlated to the supplied signal (excluding the signal itself)
-    AND ($10::uuid IS NULL OR (s.correlation_id = $10::uuid AND s.id != $10::uuid))
-    AND ($11::timestamptz IS NULL OR lsv.created_at >= $11::timestamptz)
-    AND ($12::timestamptz IS NULL OR lsv.created_at <= $12::timestamptz)
-    AND ($13::timestamptz IS NULL OR s.updated_at >= $13::timestamptz)
+    AND ($11::uuid IS NULL OR (s.correlation_id = $11::uuid AND s.id != $11::uuid))
+    AND ($12::timestamptz IS NULL OR lsv.created_at >= $12::timestamptz)
+    AND ($13::timestamptz IS NULL OR lsv.created_at <= $13::timestamptz)
+    AND ($14::timestamptz IS NULL OR s.updated_at >= $14::timestamptz)
 ORDER BY
     s.updated_at ASC
 `
@@ -912,6 +934,7 @@ type GetSignalsWithOptionalFiltersParams struct {
 	AccountID        *uuid.UUID `json:"account_id"`
 	SignalID         *uuid.UUID `json:"signal_id"`
 	LocalRef         *string    `json:"local_ref"`
+	IssuerRef        *string    `json:"issuer_ref"`
 	CorrelationID    *uuid.UUID `json:"correlation_id"`
 	StartDate        *time.Time `json:"start_date"`
 	EndDate          *time.Time `json:"end_date"`
@@ -925,6 +948,7 @@ type GetSignalsWithOptionalFiltersRow struct {
 	Email            string          `json:"email"`
 	SignalID         uuid.UUID       `json:"signal_id"`
 	LocalRef         string          `json:"local_ref"`
+	IssuerRef        *string         `json:"issuer_ref"`
 	SignalTypeSlug   string          `json:"signal_type_slug"`
 	SemVer           string          `json:"sem_ver"`
 	ContentKind      string          `json:"content_kind"`
@@ -957,6 +981,7 @@ func (q *Queries) GetSignalsWithOptionalFilters(ctx context.Context, arg GetSign
 		arg.AccountID,
 		arg.SignalID,
 		arg.LocalRef,
+		arg.IssuerRef,
 		arg.CorrelationID,
 		arg.StartDate,
 		arg.EndDate,
@@ -976,6 +1001,7 @@ func (q *Queries) GetSignalsWithOptionalFilters(ctx context.Context, arg GetSign
 			&i.Email,
 			&i.SignalID,
 			&i.LocalRef,
+			&i.IssuerRef,
 			&i.SignalTypeSlug,
 			&i.SemVer,
 			&i.ContentKind,

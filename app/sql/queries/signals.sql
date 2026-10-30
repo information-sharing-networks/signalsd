@@ -24,6 +24,7 @@ INSERT INTO signals (
     isn_id,
     signal_type_id,
     local_ref,
+    issuer_ref,
     correlation_id,
     is_withdrawn,
     is_archived)
@@ -35,16 +36,19 @@ SELECT
     ids.isn_id,
     ids.signal_type_id,
     sqlc.arg(local_ref),
+    sqlc.narg(issuer_ref),
     ids.signal_id,
     false,
     false
 FROM ids
 -- deactivated records (is_withdrawn = true) are reactivated by resubmitting them.
 -- updated_at is changed on every resubmission, since a new version is created (search uses it to find the signals that changed since a given time - updated_since)
+-- issuer_ref is replaced on every resubmission (it is currently only supported for documents - json signals are submitted without one, so it stays null)
 -- the only other signals field that can be updated is the correlation_id (handled by CreateOrUpdateSignalWithCorrelationID)
 ON CONFLICT (account_id, isn_id, signal_type_id, local_ref)
 DO UPDATE SET
     is_withdrawn = false,
+    issuer_ref = EXCLUDED.issuer_ref,
     updated_at = now()
 RETURNING id;
 
@@ -52,6 +56,7 @@ RETURNING id;
 -- note if there is already a master record for this local_ref, then:
 -- 1. correlation_id is updated with the supplied value (assuming it is different to the existing value)
 -- 2. if the signal was withdrawn it is reactivated (is_withdrawn = false).
+-- 3. issuer_ref is replaced with the supplied value (it is currently only supported for documents - json signals are submitted without one, so it stays null)
 -- Only creates/updates signals if ISN and signal type are in use (this is a defence against stale access tokens).
 WITH ids AS (
     SELECT st.id AS signal_type_id,
@@ -74,6 +79,7 @@ INSERT INTO signals (
     isn_id,
     signal_type_id,
     local_ref,
+    issuer_ref,
     correlation_id,
     is_withdrawn,
     is_archived)
@@ -85,6 +91,7 @@ SELECT
     ids.isn_id,
     ids.signal_type_id,
     sqlc.arg(local_ref),
+    sqlc.narg(issuer_ref),
     sqlc.arg(correlation_id),
     false,
     false
@@ -99,6 +106,7 @@ DO UPDATE SET
         WHEN signals.is_withdrawn = true THEN false
         ELSE signals.is_withdrawn
     END,
+    issuer_ref = EXCLUDED.issuer_ref,
     updated_at = now()
 RETURNING id;
 
@@ -240,6 +248,7 @@ SELECT
     COALESCE(u.email, si.client_contact_email) AS email,
     s.id as signal_id,
     s.local_ref,
+    s.issuer_ref,
     st.slug AS signal_type_slug,
     st.sem_ver,
     st.content_kind,
@@ -288,6 +297,7 @@ WHERE
     AND (sqlc.narg('account_id')::uuid IS NULL OR a.id = sqlc.narg('account_id')::uuid)
     AND (sqlc.narg('signal_id')::uuid IS NULL OR s.id = sqlc.narg('signal_id')::uuid)
     AND (sqlc.narg('local_ref')::text IS NULL OR s.local_ref = sqlc.narg('local_ref')::text)
+    AND (sqlc.narg('issuer_ref')::text IS NULL OR s.issuer_ref = sqlc.narg('issuer_ref')::text)
     -- signals correlated to the supplied signal (excluding the signal itself)
     AND (sqlc.narg('correlation_id')::uuid IS NULL OR (s.correlation_id = sqlc.narg('correlation_id')::uuid AND s.id != sqlc.narg('correlation_id')::uuid))
     AND (sqlc.narg('start_date')::timestamptz IS NULL OR lsv.created_at >= sqlc.narg('start_date')::timestamptz)
@@ -351,6 +361,7 @@ SELECT
     COALESCE(u.email, si.client_contact_email) AS email,
     s.id as signal_id,
     s.local_ref,
+    s.issuer_ref,
     st.slug AS signal_type_slug,
     st.sem_ver,
     st.content_kind,
@@ -442,6 +453,7 @@ LIMIT sqlc.arg(sample_size);
 SELECT
     s.id AS signal_id,
     s.correlation_id,
+    s.issuer_ref,
     s.is_withdrawn,
     lsv.id AS signal_version_id,
     lsv.version_number,

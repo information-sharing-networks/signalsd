@@ -141,7 +141,7 @@ import (
 //	@description	## Content kinds
 //	@description	Each signal type has a `content_kind`, which determines how its signals are sent:
 //	@description	- **json**: JSON content, validated against the signal type's schema (unless the signal type was set up to skip validation). Sent with *Submit Signals* (or *Submit Signals via Router*).
-//	@description	- **document**: a file (PDF, JPEG, PNG or XML). Sent with *Upload a Document* and retrieved with *Download a Document*. Search results contain the document's metadata, not the file.
+//	@description	- **document**: a file (PDF, JPEG, PNG or XML). Sent with *Upload a Document* and retrieved with *Download a Document*. Search results contain the document's metadata, not the file. A document can also have an `issuer_ref`, the reference its issuer gave it (e.g. an export health certificate number), which recipients can use to find it with the `issuer_ref` search filter (`issuer_ref` is currently only supported for documents).
 //	@description	- **event**: an immutable JSON record that a process waypoint has been reached for another signal (e.g. an export health certificate was approved for a consignment). Sent with *Submit Signals* (see Events below).
 //	@description
 //	@description	Search, withdrawal and batches work the same way for every kind, and search results include each signal's `content_kind`.
@@ -155,7 +155,7 @@ import (
 //	@description
 //	@description	When a `local_ref` is sent to the same ISN again:
 //	@description	- **If something changed**, a new version of the signal is stored (json and document signals).
-//	@description	- **If nothing changed** (the same content, and the same or no `correlation_id`), nothing is stored. The response contains the `signal_id`, `signal_version_id` and `version_number` of the existing latest version, with `unchanged: true`, so requests can be safely retried. JSON content is compared as JSON (key order and whitespace are ignored). Documents compare the file and its filename.
+//	@description	- **If nothing changed** (the same content, and the same or no `correlation_id`), nothing is stored. The response contains the `signal_id`, `signal_version_id` and `version_number` of the existing latest version, with `unchanged: true`, so requests can be safely retried. JSON content is compared as JSON (key order and whitespace are ignored). Documents compare the file, its filename and its `issuer_ref`.
 //	@description	- **If the signal was withdrawn**, it is reactivated with a new version (json and document signals).
 //	@description	- **Events are never changed**: resubmitting an event with different content or a different `correlation_id`, or after it was withdrawn, fails with `resource_already_exists`. To correct an event, withdraw it and send a new event with a new `local_ref`.
 //	@description

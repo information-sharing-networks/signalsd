@@ -32,7 +32,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// maxFormFieldSize is the maximum size of the form fields sent with a document (batch_ref, local_ref, correlation_id, sha256).
+// maxFormFieldSize is the maximum size of the form fields sent with a document (batch_ref, local_ref, issuer_ref, correlation_id, sha256).
 // Each field is read into memory, so this stops a malicious client using large field values to exhaust the server's memory
 const maxFormFieldSize = 1024
 
@@ -88,6 +88,7 @@ type DocumentUploadResponse struct {
 	IsnSlug         string    `json:"isn_slug" example:"sample-isn"` // the ISN the document was stored on
 	BatchRef        string    `json:"batch_ref" example:"daily-sync-2026-04-02"`
 	LocalRef        string    `json:"local_ref" example:"bol-2026-0042"`
+	IssuerRef       *string   `json:"issuer_ref,omitempty" example:"EHC-2026-000123"` // the issuer_ref sent with the upload (omitted if there isn't one)
 	SignalID        uuid.UUID `json:"signal_id" example:"b8ded113-ac0e-4a2c-a89f-0876fe97b440"`
 	SignalVersionID uuid.UUID `json:"signal_version_id" example:"835788bd-789d-4091-96e3-db0f51ccbabc"`
 	VersionNumber   int32     `json:"version_number" example:"1"`
@@ -110,7 +111,7 @@ type DocumentUploadResponse struct {
 //	@Description	The request is multipart/form-data with one document per request:
 //	@Description	- send the form fields first (batch_ref, local_ref and any optional fields) - **the file must be the last part**
 //	@Description	- the file part must be named `file` and must include a filename - the filename (without any directory path) is stored as the document's name
-//	@Description	- only the batch_ref, local_ref, correlation_id, sha256 and file fields are accepted (other fields are rejected with 400 malformed_body), and each form field value can be up to 1024 bytes
+//	@Description	- only the batch_ref, local_ref, issuer_ref, correlation_id, sha256 and file fields are accepted (other fields are rejected with 400 malformed_body), and each form field value can be up to 1024 bytes
 //	@Description	- documents can be up to 20MB by default (the `Signalsd-Max-Request-Size` response header gives the request limit, which allows an extra 64KB for the form fields). Larger uploads are rejected with 413 request_too_large
 //	@Description
 //	@Description	The request body looks like this:
@@ -143,7 +144,8 @@ type DocumentUploadResponse struct {
 //	@Description
 //	@Description	Uploads for a local_ref you have already used for this signal type version on the ISN are compared with its latest version (the same local_ref uploaded to another ISN is a separate document):
 //	@Description	- the same file with the same filename creates no new version: the response contains the signal_id, signal_version_id and version_number of the existing latest version, with unchanged=true - so uploads can be safely retried
-//	@Description	- a different file, or the same file with a different filename, creates a new version (including a file that matches an older version)
+//	@Description	- a different file, or the same file with a different filename or issuer_ref, creates a new version (including a file that matches an older version)
+//	@Description	- each upload sets the issuer_ref: omitting it when the document has one creates a new version without an issuer_ref
 //	@Description	- re-uploading a withdrawn document creates a new version and reactivates it
 //	@Description	- supplying a different correlation_id creates a new version with the new link (omitting correlation_id keeps the existing link)
 //	@Description
@@ -156,11 +158,14 @@ type DocumentUploadResponse struct {
 //	@Description	**Retries**
 //	@Description
 //	@Description	An upload either stores a new version or stores nothing, so if an upload fails or times out, send it again.
-//	@Description	If the first attempt was stored, the retry returns that version with unchanged=true, provided it uses the same file, the same filename and the same (or no) correlation_id.
+//	@Description	If the first attempt was stored, the retry returns that version with unchanged=true, provided it uses the same file, the same filename, the same issuer_ref and the same (or no) correlation_id.
 //	@Description	A retry sent while the original upload is still being processed can occasionally store an extra, identical version - this is harmless, but pollers will see one more update.
 //	@Description	Uploads can take up to 2 minutes on the server (by default), so to avoid this set your client timeout above that.
 //	@Description
 //	@Description	**Optional fields**
+//	@Description	- issuer_ref: the reference given to the document by the organization that issued it (e.g. the certificate number of an export health certificate).
+//	@Description	It is returned with the document in search results, and recipients can find the document with the issuer_ref search filter.
+//	@Description	Unlike local_ref it does not need to be unique, so a search by issuer_ref can return more than one document.
 //	@Description	- correlation_id: the ID of a signal of any type in the same ISN that this document relates to (e.g. the consignment a bill of lading belongs to).
 //	@Description	The upload is rejected with 422 invalid_correlation_id if the signal does not exist in the ISN.
 //	@Description	(To send a document to the ISN of the signal it relates to without specifying the ISN, use _Upload a Document via Router_.)
@@ -173,6 +178,7 @@ type DocumentUploadResponse struct {
 //	@Param			sem_ver				path		string	true	"version"			example(1.0.0)
 //	@Param			batch_ref			formData	string	true	"label used to track uploads with Get Batch Status (up to 128 alphanumeric characters, hyphens and underscores)"
 //	@Param			local_ref			formData	string	true	"your ID for the document - upload with the same local_ref to store a new version"
+//	@Param			issuer_ref			formData	string	false	"the reference given to the document by its issuer (e.g. an export health certificate number)"
 //	@Param			correlation_id		formData	string	false	"the ID of a signal in the same ISN that this document relates to"
 //	@Param			sha256				formData	string	false	"the sha256 of the document (lowercase hex) - the upload is rejected if it does not match"
 //	@Param			file				formData	file	true	"the document (must be the last part of the request)"
@@ -221,7 +227,7 @@ func (h *DocumentsHandler) UploadDocument(w http.ResponseWriter, r *http.Request
 //	@Description	and with 403 forbidden if the account does not have write permission on the correlated signal's ISN.
 //	@Description
 //	@Description	Other than the ISN resolution, this endpoint behaves the same way as the standard _Upload a Document_ endpoint
-//	@Description	(request format, supported formats, versions and the optional sha256 field).
+//	@Description	(request format, supported formats, versions and the optional issuer_ref and sha256 fields).
 //	@Description
 //	@Description	The response includes the isn_slug of the ISN the document was sent to.
 //
@@ -230,6 +236,7 @@ func (h *DocumentsHandler) UploadDocument(w http.ResponseWriter, r *http.Request
 //	@Param			sem_ver				path		string	true	"version"			example(1.0.0)
 //	@Param			batch_ref			formData	string	true	"label used to track uploads with Get Batch Status (up to 128 alphanumeric characters, hyphens and underscores)"
 //	@Param			local_ref			formData	string	true	"your ID for the document - upload with the same local_ref to store a new version"
+//	@Param			issuer_ref			formData	string	false	"the reference given to the document by its issuer (e.g. an export health certificate number)"
 //	@Param			correlation_id		formData	string	true	"the ID of the signal this document relates to - the document is sent to the same ISN"
 //	@Param			sha256				formData	string	false	"the sha256 of the document (lowercase hex) - the upload is rejected if it does not match"
 //	@Param			file				formData	file	true	"the document (must be the last part of the request)"
@@ -306,6 +313,7 @@ type documentUpload struct {
 	semVer         string
 	batchRef       string
 	localRef       string
+	issuerRef      *string
 	correlationID  *uuid.UUID
 	declaredSHA256 string
 
@@ -350,7 +358,7 @@ func (h *DocumentsHandler) readUploadFields(r *http.Request) (*documentUpload, e
 	upload.multipartReader = multipartReader
 
 	// read the form fields until the file part (or the end of the request) is reached
-	var correlationIDValue string
+	var correlationIDValue, issuerRefValue string
 	for {
 		part, err := multipartReader.NextPart()
 		if errors.Is(err, io.EOF) {
@@ -384,6 +392,8 @@ func (h *DocumentsHandler) readUploadFields(r *http.Request) (*documentUpload, e
 			upload.batchRef = string(value)
 		case "local_ref":
 			upload.localRef = string(value)
+		case "issuer_ref":
+			issuerRefValue = string(value)
 		case "correlation_id":
 			correlationIDValue = string(value)
 		case "sha256":
@@ -403,6 +413,10 @@ func (h *DocumentsHandler) readUploadFields(r *http.Request) (*documentUpload, e
 
 	if upload.localRef == "" {
 		return nil, apperrors.MalformedBody("local_ref is required (form fields must be sent before the file)", nil)
+	}
+
+	if issuerRefValue != "" {
+		upload.issuerRef = &issuerRefValue
 	}
 
 	if correlationIDValue != "" {
@@ -540,7 +554,7 @@ func (h *DocumentsHandler) storeDocumentSignal(w http.ResponseWriter, r *http.Re
 
 	queries := h.queries.WithTx(tx)
 
-	// if the upload is the same as the latest version (the same file with the same name), return that version rather than creating a new one.
+	// if the upload is the same as the latest version (the same file with the same name and issuer_ref), return that version rather than creating a new one.
 	// Withdrawn signals and changes to the correlation_id always create a new version (as with json signals).
 	latest, err := queries.GetLatestSignalVersionByLocalRef(ctx, database.GetLatestSignalVersionByLocalRefParams{
 		AccountID:      upload.accountID,
@@ -558,11 +572,14 @@ func (h *DocumentsHandler) storeDocumentSignal(w http.ResponseWriter, r *http.Re
 			return reject(apperrors.InternalError("could not read the latest version of the document", err))
 		}
 		// the mime type and size are determined by the content, so this compares the sha256 and name
-		if latestDocumentMetadata == documentMetadata {
+		sameIssuerRef := (latest.IssuerRef == nil && upload.issuerRef == nil) ||
+			(latest.IssuerRef != nil && upload.issuerRef != nil && *latest.IssuerRef == *upload.issuerRef)
+		if latestDocumentMetadata == documentMetadata && sameIssuerRef {
 			return responses.JSON(w, http.StatusOK, DocumentUploadResponse{
 				IsnSlug:          isnSlug,
 				BatchRef:         upload.batch.BatchRef,
 				LocalRef:         upload.localRef,
+				IssuerRef:        latest.IssuerRef,
 				SignalID:         latest.SignalID,
 				SignalVersionID:  latest.SignalVersionID,
 				VersionNumber:    latest.VersionNumber,
@@ -578,6 +595,7 @@ func (h *DocumentsHandler) storeDocumentSignal(w http.ResponseWriter, r *http.Re
 		signalID, err = queries.CreateSignal(ctx, database.CreateSignalParams{
 			AccountID:      upload.accountID,
 			LocalRef:       upload.localRef,
+			IssuerRef:      upload.issuerRef,
 			IsnSlug:        isnSlug,
 			SignalTypeSlug: upload.signalTypeSlug,
 			SemVer:         upload.semVer,
@@ -597,6 +615,7 @@ func (h *DocumentsHandler) storeDocumentSignal(w http.ResponseWriter, r *http.Re
 		signalID, err = queries.CreateOrUpdateSignalWithCorrelationID(ctx, database.CreateOrUpdateSignalWithCorrelationIDParams{
 			AccountID:      upload.accountID,
 			LocalRef:       upload.localRef,
+			IssuerRef:      upload.issuerRef,
 			CorrelationID:  *upload.correlationID,
 			IsnSlug:        isnSlug,
 			SignalTypeSlug: upload.signalTypeSlug,
@@ -635,6 +654,7 @@ func (h *DocumentsHandler) storeDocumentSignal(w http.ResponseWriter, r *http.Re
 		IsnSlug:          isnSlug,
 		BatchRef:         upload.batch.BatchRef,
 		LocalRef:         upload.localRef,
+		IssuerRef:        upload.issuerRef,
 		SignalID:         signalID,
 		SignalVersionID:  version.ID,
 		VersionNumber:    version.VersionNumber,
