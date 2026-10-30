@@ -399,6 +399,7 @@ func getBatchStatusRequest(t *testing.T, baseURL, token, batchRef string) *http.
 type documentUpload struct {
 	batchRef      string
 	localRef      string
+	issuerRef     string
 	correlationID string
 	sha256        string
 
@@ -453,6 +454,7 @@ func uploadDocumentRequestBody(t *testing.T, upload documentUpload) multipartReq
 	for _, field := range []struct{ name, value string }{
 		{"batch_ref", upload.batchRef},
 		{"local_ref", upload.localRef},
+		{"issuer_ref", upload.issuerRef},
 		{"correlation_id", upload.correlationID},
 		{"sha256", upload.sha256},
 	} {

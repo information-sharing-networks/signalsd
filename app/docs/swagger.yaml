@@ -269,6 +269,10 @@ definitions:
         description: the ISN the document was stored on
         example: sample-isn
         type: string
+      issuer_ref:
+        description: the issuer_ref sent with the upload (omitted if there isn't one)
+        example: EHC-2026-000123
+        type: string
       local_ref:
         example: bol-2026-0042
         type: string
@@ -519,6 +523,12 @@ definitions:
         description: the ISN the signal is in
         example: sample-isn
         type: string
+      issuer_ref:
+        description: |-
+          the reference given by the organization that issued the thing the signal represents (e.g. an export health certificate number), if the sender supplied one.
+          Not unique - use it with the issuer_ref search filter. Currently only supported for documents
+        example: EHC-2026-000123
+        type: string
       local_ref:
         description: the sender's reference for the signal - unique for the sending
           account, ISN and signal type
@@ -619,6 +629,12 @@ definitions:
       isn_slug:
         description: the ISN the signal is in
         example: sample-isn
+        type: string
+      issuer_ref:
+        description: |-
+          the reference given by the organization that issued the thing the signal represents (e.g. an export health certificate number), if the sender supplied one.
+          Not unique - use it with the issuer_ref search filter. Currently only supported for documents
+        example: EHC-2026-000123
         type: string
       local_ref:
         description: the sender's reference for the signal - unique for the sending
@@ -964,7 +980,7 @@ info:
     ## Content kinds
     Each signal type has a `content_kind`, which determines how its signals are sent:
     - **json**: JSON content, validated against the signal type's schema (unless the signal type was set up to skip validation). Sent with *Submit Signals* (or *Submit Signals via Router*).
-    - **document**: a file (PDF, JPEG, PNG or XML). Sent with *Upload a Document* and retrieved with *Download a Document*. Search results contain the document's metadata, not the file.
+    - **document**: a file (PDF, JPEG, PNG or XML). Sent with *Upload a Document* and retrieved with *Download a Document*. Search results contain the document's metadata, not the file. A document can also have an `issuer_ref`, the reference its issuer gave it (e.g. an export health certificate number), which recipients can use to find it with the `issuer_ref` search filter (`issuer_ref` is currently only supported for documents).
     - **event**: an immutable JSON record that a process waypoint has been reached for another signal (e.g. an export health certificate was approved for a consignment). Sent with *Submit Signals* (see Events below).
 
     Search, withdrawal and batches work the same way for every kind, and search results include each signal's `content_kind`.
@@ -978,7 +994,7 @@ info:
 
     When a `local_ref` is sent to the same ISN again:
     - **If something changed**, a new version of the signal is stored (json and document signals).
-    - **If nothing changed** (the same content, and the same or no `correlation_id`), nothing is stored. The response contains the `signal_id`, `signal_version_id` and `version_number` of the existing latest version, with `unchanged: true`, so requests can be safely retried. JSON content is compared as JSON (key order and whitespace are ignored). Documents compare the file and its filename.
+    - **If nothing changed** (the same content, and the same or no `correlation_id`), nothing is stored. The response contains the `signal_id`, `signal_version_id` and `version_number` of the existing latest version, with `unchanged: true`, so requests can be safely retried. JSON content is compared as JSON (key order and whitespace are ignored). Documents compare the file, its filename and its `issuer_ref`.
     - **If the signal was withdrawn**, it is reactivated with a new version (json and document signals).
     - **Events are never changed**: resubmitting an event with different content or a different `correlation_id`, or after it was withdrawn, fails with `resource_already_exists`. To correct an event, withdraw it and send a new event with a new `local_ref`.
 
@@ -1781,7 +1797,7 @@ paths:
 
         **Search parameters**
 
-        At least one of these is required: `start_date` and `end_date`, `updated_since`, `account_id`, `signal_id`, `local_ref` or `correlation_id`.
+        At least one of these is required: `start_date` and `end_date`, `updated_since`, `account_id`, `signal_id`, `local_ref`, `issuer_ref` or `correlation_id`.
         `start_date` and `end_date` must be used together. They filter on when the signal's latest version was received (`version_created_at`).
 
         `updated_since` filters on when the signal last changed (`signal_updated_at`): a new version was received, or the signal was withdrawn.
@@ -1854,6 +1870,13 @@ paths:
         in: query
         name: local_ref
         type: string
+      - description: Signals with this issuer_ref (the reference given by the issuer
+          of the thing the signal represents, e.g. an export health certificate number
+          - currently only supported for documents)
+        example: EHC-2026-000123
+        in: query
+        name: issuer_ref
+        type: string
       - description: Return the signals of this type that are linked to the signal
           with this signal_id (those whose correlation_id is this value)
         example: 4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19
@@ -1924,7 +1947,7 @@ paths:
         The request is multipart/form-data with one document per request:
         - send the form fields first (batch_ref, local_ref and any optional fields) - **the file must be the last part**
         - the file part must be named `file` and must include a filename - the filename (without any directory path) is stored as the document's name
-        - only the batch_ref, local_ref, correlation_id, sha256 and file fields are accepted (other fields are rejected with 400 malformed_body), and each form field value can be up to 1024 bytes
+        - only the batch_ref, local_ref, issuer_ref, correlation_id, sha256 and file fields are accepted (other fields are rejected with 400 malformed_body), and each form field value can be up to 1024 bytes
         - documents can be up to 20MB by default (the `Signalsd-Max-Request-Size` response header gives the request limit, which allows an extra 64KB for the form fields). Larger uploads are rejected with 413 request_too_large
 
         The request body looks like this:
@@ -1957,7 +1980,8 @@ paths:
 
         Uploads for a local_ref you have already used for this signal type version on the ISN are compared with its latest version (the same local_ref uploaded to another ISN is a separate document):
         - the same file with the same filename creates no new version: the response contains the signal_id, signal_version_id and version_number of the existing latest version, with unchanged=true - so uploads can be safely retried
-        - a different file, or the same file with a different filename, creates a new version (including a file that matches an older version)
+        - a different file, or the same file with a different filename or issuer_ref, creates a new version (including a file that matches an older version)
+        - each upload sets the issuer_ref: omitting it when the document has one creates a new version without an issuer_ref
         - re-uploading a withdrawn document creates a new version and reactivates it
         - supplying a different correlation_id creates a new version with the new link (omitting correlation_id keeps the existing link)
 
@@ -1970,11 +1994,14 @@ paths:
         **Retries**
 
         An upload either stores a new version or stores nothing, so if an upload fails or times out, send it again.
-        If the first attempt was stored, the retry returns that version with unchanged=true, provided it uses the same file, the same filename and the same (or no) correlation_id.
+        If the first attempt was stored, the retry returns that version with unchanged=true, provided it uses the same file, the same filename, the same issuer_ref and the same (or no) correlation_id.
         A retry sent while the original upload is still being processed can occasionally store an extra, identical version - this is harmless, but pollers will see one more update.
         Uploads can take up to 2 minutes on the server (by default), so to avoid this set your client timeout above that.
 
         **Optional fields**
+        - issuer_ref: the reference given to the document by the organization that issued it (e.g. the certificate number of an export health certificate).
+        It is returned with the document in search results, and recipients can find the document with the issuer_ref search filter.
+        Unlike local_ref it does not need to be unique, so a search by issuer_ref can return more than one document.
         - correlation_id: the ID of a signal of any type in the same ISN that this document relates to (e.g. the consignment a bill of lading belongs to).
         The upload is rejected with 422 invalid_correlation_id if the signal does not exist in the ISN.
         (To send a document to the ISN of the signal it relates to without specifying the ISN, use _Upload a Document via Router_.)
@@ -2010,6 +2037,11 @@ paths:
         in: formData
         name: local_ref
         required: true
+        type: string
+      - description: the reference given to the document by its issuer (e.g. an export
+          health certificate number)
+        in: formData
+        name: issuer_ref
         type: string
       - description: the ID of a signal in the same ISN that this document relates
           to
@@ -2154,7 +2186,7 @@ paths:
 
         **Search parameters**
 
-        At least one of these is required: `start_date` and `end_date`, `updated_since`, `account_id`, `signal_id`, `local_ref` or `correlation_id`.
+        At least one of these is required: `start_date` and `end_date`, `updated_since`, `account_id`, `signal_id`, `local_ref`, `issuer_ref` or `correlation_id`.
         `start_date` and `end_date` must be used together. They filter on when the signal's latest version was received (`version_created_at`).
 
         `updated_since` filters on when the signal last changed (`signal_updated_at`): a new version was received, or the signal was withdrawn.
@@ -2223,6 +2255,13 @@ paths:
         example: item_id_#1
         in: query
         name: local_ref
+        type: string
+      - description: Signals with this issuer_ref (the reference given by the issuer
+          of the thing the signal represents, e.g. an export health certificate number
+          - currently only supported for documents)
+        example: EHC-2026-000123
+        in: query
+        name: issuer_ref
         type: string
       - description: Return the signals of this type that are linked to the signal
           with this signal_id (those whose correlation_id is this value)
@@ -2379,7 +2418,7 @@ paths:
         and with 403 forbidden if the account does not have write permission on the correlated signal's ISN.
 
         Other than the ISN resolution, this endpoint behaves the same way as the standard _Upload a Document_ endpoint
-        (request format, supported formats, versions and the optional sha256 field).
+        (request format, supported formats, versions and the optional issuer_ref and sha256 fields).
 
         The response includes the isn_slug of the ISN the document was sent to.
       parameters:
@@ -2406,6 +2445,11 @@ paths:
         in: formData
         name: local_ref
         required: true
+        type: string
+      - description: the reference given to the document by its issuer (e.g. an export
+          health certificate number)
+        in: formData
+        name: issuer_ref
         type: string
       - description: the ID of the signal this document relates to - the document
           is sent to the same ISN
@@ -2486,7 +2530,7 @@ paths:
 
         The ISNs searched are the ones in your access token, so an ISN you have just been added to is searched once you next get an access token.
 
-        At least one of these is required: `start_date` and `end_date`, `updated_since`, `account_id`, `signal_id`, `local_ref` or `correlation_id`.
+        At least one of these is required: `start_date` and `end_date`, `updated_since`, `account_id`, `signal_id`, `local_ref`, `issuer_ref` or `correlation_id`.
         See *Polling for changes* in the API overview for more details.
       parameters:
       - description: Signal type slug
@@ -2535,6 +2579,13 @@ paths:
         example: item_id_#1
         in: query
         name: local_ref
+        type: string
+      - description: Signals with this issuer_ref (the reference given by the issuer
+          of the thing the signal represents, e.g. an export health certificate number
+          - currently only supported for documents)
+        example: EHC-2026-000123
+        in: query
+        name: issuer_ref
         type: string
       - description: Return the signals of this type that are linked to the signal
           with this signal_id (those whose correlation_id is this value)
@@ -2600,7 +2651,7 @@ paths:
 
         The ISNs searched are the ones in your access token, so an ISN you have just been added to is searched once you next get an access token.
 
-        At least one of these is required: `start_date` and `end_date`, `updated_since`, `account_id`, `signal_id`, `local_ref` or `correlation_id`.
+        At least one of these is required: `start_date` and `end_date`, `updated_since`, `account_id`, `signal_id`, `local_ref`, `issuer_ref` or `correlation_id`.
         See *Following signals* and *Polling for changes* in the API overview for more details.
       parameters:
       - description: Signals whose latest version was created at or after this time
@@ -2637,6 +2688,13 @@ paths:
         example: item_id_#1
         in: query
         name: local_ref
+        type: string
+      - description: Signals with this issuer_ref (the reference given by the issuer
+          of the thing the signal represents, e.g. an export health certificate number
+          - currently only supported for documents)
+        example: EHC-2026-000123
+        in: query
+        name: issuer_ref
         type: string
       - description: Return the signals that are linked to the signal with this signal_id
           (those whose correlation_id is this value)

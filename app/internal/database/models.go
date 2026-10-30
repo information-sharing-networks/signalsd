@@ -132,6 +132,7 @@ type Signal struct {
 	CorrelationID uuid.UUID `json:"correlation_id"`
 	IsWithdrawn   bool      `json:"is_withdrawn"`
 	IsArchived    bool      `json:"is_archived"`
+	IssuerRef     *string   `json:"issuer_ref"`
 }
 
 type SignalBatch struct {

@@ -31,6 +31,7 @@ type SearchParams struct {
 	endDate                       *time.Time
 	updatedSince                  *time.Time
 	localRef                      *string
+	issuerRef                     *string
 	signalID                      *uuid.UUID
 	correlationID                 *uuid.UUID
 	includeWithdrawn              bool
@@ -61,6 +62,10 @@ type SearchSignal struct {
 
 	// the sender's reference for the signal - unique for the sending account, ISN and signal type
 	LocalRef string `json:"local_ref" example:"item_id_#1"`
+
+	// the reference given by the organization that issued the thing the signal represents (e.g. an export health certificate number), if the sender supplied one.
+	// Not unique - use it with the issuer_ref search filter. Currently only supported for documents
+	IssuerRef *string `json:"issuer_ref,omitempty" example:"EHC-2026-000123"`
 
 	// the signal type (use signal_type_slug and sem_ver, not the search URL, to build the URLs of correlated signals - they are often a different type)
 	SignalTypeSlug string `json:"signal_type_slug" example:"sample-signal-type"`
@@ -194,6 +199,11 @@ func parseSearchParams(r *http.Request) (SearchParams, error) {
 		searchParams.localRef = &localRef
 	}
 
+	// issuer_ref
+	if issuerRef := r.URL.Query().Get("issuer_ref"); issuerRef != "" {
+		searchParams.issuerRef = &issuerRef
+	}
+
 	// include_withdrawn
 	if includeWithdrawnString := r.URL.Query().Get("include_withdrawn"); includeWithdrawnString != "" {
 		searchParams.includeWithdrawn = includeWithdrawnString == "true"
@@ -222,10 +232,11 @@ func validateSearchParams(params SearchParams) error {
 	hasAccount := params.accountID != nil
 	hasSignalID := params.signalID != nil
 	hasLocalRef := params.localRef != nil
+	hasIssuerRef := params.issuerRef != nil
 	hasCorrelationID := params.correlationID != nil
 	hasUpdatedSince := params.updatedSince != nil
 
-	if !hasDateRange && !hasAccount && !hasSignalID && !hasLocalRef && !hasCorrelationID && !hasUpdatedSince {
+	if !hasDateRange && !hasAccount && !hasSignalID && !hasLocalRef && !hasIssuerRef && !hasCorrelationID && !hasUpdatedSince {
 		return fmt.Errorf("you must supply a search parameter")
 	}
 
@@ -292,6 +303,7 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 			Email:            email,
 			SignalID:         signal.SignalID,
 			LocalRef:         signal.LocalRef,
+			IssuerRef:        signal.IssuerRef,
 			SignalTypeSlug:   signal.SignalTypeSlug,
 			SemVer:           signal.SemVer,
 			ContentKind:      signal.ContentKind,
@@ -322,7 +334,7 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 //	@Description
 //	@Description	**Search parameters**
 //	@Description
-//	@Description	At least one of these is required: `start_date` and `end_date`, `updated_since`, `account_id`, `signal_id`, `local_ref` or `correlation_id`.
+//	@Description	At least one of these is required: `start_date` and `end_date`, `updated_since`, `account_id`, `signal_id`, `local_ref`, `issuer_ref` or `correlation_id`.
 //	@Description	`start_date` and `end_date` must be used together. They filter on when the signal's latest version was received (`version_created_at`).
 //	@Description
 //	@Description	`updated_since` filters on when the signal last changed (`signal_updated_at`): a new version was received, or the signal was withdrawn.
@@ -342,6 +354,7 @@ func (s *SignalsHandler) getCorrelatedSignals(ctx context.Context, signalIDs []u
 //	@Param			account_id					query		string	false	"Account ID"																																																				example(def87f89-dab6-4607-95f7-593d61cb5742)
 //	@Param			signal_id					query		string	false	"Return the signal with this signal_id (e.g. the correlation_id of a signal of another type)"																																example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
 //	@Param			local_ref					query		string	false	"Local reference"																																																			example(item_id_#1)
+//	@Param			issuer_ref					query		string	false	"Signals with this issuer_ref (the reference given by the issuer of the thing the signal represents, e.g. an export health certificate number - currently only supported for documents)"									example(EHC-2026-000123)
 //	@Param			correlation_id				query		string	false	"Return the signals of this type that are linked to the signal with this signal_id (those whose correlation_id is this value)"																								example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
 //	@Param			include_withdrawn			query		string	false	"Include withdrawn signals (default: false)"																																												example(true)
 //	@Param			include_correlated			query		string	false	"Include signals that link to each returned signal (default: false)"																																						example(true)
@@ -400,6 +413,7 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 		SignalID:         searchParams.signalID,
 		CorrelationID:    searchParams.correlationID,
 		LocalRef:         searchParams.localRef,
+		IssuerRef:        searchParams.issuerRef,
 		IncludeWithdrawn: &searchParams.includeWithdrawn,
 	})
 	if err != nil {
@@ -455,6 +469,7 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 				Email:            "", // do not show email addresses in public ISNs
 				SignalID:         returnedSignal.SignalID,
 				LocalRef:         returnedSignal.LocalRef,
+				IssuerRef:        returnedSignal.IssuerRef,
 				SignalTypeSlug:   returnedSignal.SignalTypeSlug,
 				SemVer:           returnedSignal.SemVer,
 				ContentKind:      returnedSignal.ContentKind,
@@ -503,7 +518,7 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 //	@Description
 //	@Description	**Search parameters**
 //	@Description
-//	@Description	At least one of these is required: `start_date` and `end_date`, `updated_since`, `account_id`, `signal_id`, `local_ref` or `correlation_id`.
+//	@Description	At least one of these is required: `start_date` and `end_date`, `updated_since`, `account_id`, `signal_id`, `local_ref`, `issuer_ref` or `correlation_id`.
 //	@Description	`start_date` and `end_date` must be used together. They filter on when the signal's latest version was received (`version_created_at`).
 //	@Description
 //	@Description	`updated_since` filters on when the signal last changed (`signal_updated_at`): a new version was received, or the signal was withdrawn.
@@ -532,6 +547,7 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 //	@Param			account_id					query		string	false	"Account ID"																																																				example(def87f89-dab6-4607-95f7-593d61cb5742)
 //	@Param			signal_id					query		string	false	"Return the signal with this signal_id (e.g. the correlation_id of a signal of another type)"																																example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
 //	@Param			local_ref					query		string	false	"Local reference"																																																			example(item_id_#1)
+//	@Param			issuer_ref					query		string	false	"Signals with this issuer_ref (the reference given by the issuer of the thing the signal represents, e.g. an export health certificate number - currently only supported for documents)"									example(EHC-2026-000123)
 //	@Param			correlation_id				query		string	false	"Return the signals of this type that are linked to the signal with this signal_id (those whose correlation_id is this value)"																								example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
 //	@Param			include_withdrawn			query		string	false	"Include withdrawn signals (default: false)"																																												example(true)
 //	@Param			include_correlated			query		string	false	"Include signals that link to each returned signal (default: false)"																																						example(true)
@@ -617,6 +633,7 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 		SignalID:         searchParams.signalID,
 		CorrelationID:    searchParams.correlationID,
 		LocalRef:         searchParams.localRef,
+		IssuerRef:        searchParams.issuerRef,
 		IncludeWithdrawn: &searchParams.includeWithdrawn,
 	})
 	if err != nil {
@@ -669,6 +686,7 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 				Email:            returnedSignal.Email,
 				SignalID:         returnedSignal.SignalID,
 				LocalRef:         returnedSignal.LocalRef,
+				IssuerRef:        returnedSignal.IssuerRef,
 				SignalTypeSlug:   returnedSignal.SignalTypeSlug,
 				SemVer:           returnedSignal.SemVer,
 				ContentKind:      returnedSignal.ContentKind,
@@ -720,7 +738,7 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 //	@Description
 //	@Description	The ISNs searched are the ones in your access token, so an ISN you have just been added to is searched once you next get an access token.
 //	@Description
-//	@Description	At least one of these is required: `start_date` and `end_date`, `updated_since`, `account_id`, `signal_id`, `local_ref` or `correlation_id`.
+//	@Description	At least one of these is required: `start_date` and `end_date`, `updated_since`, `account_id`, `signal_id`, `local_ref`, `issuer_ref` or `correlation_id`.
 //	@Description	See *Polling for changes* in the API overview for more details.
 //
 //	@Param			signal_type_slug			path		string	true	"Signal type slug"																																																			example(signal-type-1)
@@ -731,6 +749,7 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 //	@Param			account_id					query		string	false	"Account ID"																																																				example(def87f89-dab6-4607-95f7-593d61cb5742)
 //	@Param			signal_id					query		string	false	"Return the signal with this signal_id (e.g. the correlation_id of a signal of another type)"																																example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
 //	@Param			local_ref					query		string	false	"Local reference"																																																			example(item_id_#1)
+//	@Param			issuer_ref					query		string	false	"Signals with this issuer_ref (the reference given by the issuer of the thing the signal represents, e.g. an export health certificate number - currently only supported for documents)"									example(EHC-2026-000123)
 //	@Param			correlation_id				query		string	false	"Return the signals of this type that are linked to the signal with this signal_id (those whose correlation_id is this value)"																								example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
 //	@Param			include_withdrawn			query		string	false	"Include withdrawn signals (default: false)"																																												example(true)
 //	@Param			include_correlated			query		string	false	"Include signals that link to each returned signal (default: false)"																																						example(true)
@@ -770,7 +789,7 @@ func (s *SignalsHandler) SearchSignalTypeAcrossIsns(w http.ResponseWriter, r *ht
 //	@Description
 //	@Description	The ISNs searched are the ones in your access token, so an ISN you have just been added to is searched once you next get an access token.
 //	@Description
-//	@Description	At least one of these is required: `start_date` and `end_date`, `updated_since`, `account_id`, `signal_id`, `local_ref` or `correlation_id`.
+//	@Description	At least one of these is required: `start_date` and `end_date`, `updated_since`, `account_id`, `signal_id`, `local_ref`, `issuer_ref` or `correlation_id`.
 //	@Description	See *Following signals* and *Polling for changes* in the API overview for more details.
 //
 //	@Param			start_date					query		string	false	"Signals whose latest version was created at or after this time (use with end_date)"																																		example(2006-01-02T15:05:00Z)
@@ -779,6 +798,7 @@ func (s *SignalsHandler) SearchSignalTypeAcrossIsns(w http.ResponseWriter, r *ht
 //	@Param			account_id					query		string	false	"Account ID"																																																				example(def87f89-dab6-4607-95f7-593d61cb5742)
 //	@Param			signal_id					query		string	false	"Return the signal with this signal_id (e.g. the correlation_id of another signal)"																																			example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
 //	@Param			local_ref					query		string	false	"Local reference"																																																			example(item_id_#1)
+//	@Param			issuer_ref					query		string	false	"Signals with this issuer_ref (the reference given by the issuer of the thing the signal represents, e.g. an export health certificate number - currently only supported for documents)"									example(EHC-2026-000123)
 //	@Param			correlation_id				query		string	false	"Return the signals that are linked to the signal with this signal_id (those whose correlation_id is this value)"																											example(4cedf4fa-2a01-4cbf-8668-6b44f8ac6e19)
 //	@Param			include_withdrawn			query		string	false	"Include withdrawn signals (default: false)"																																												example(true)
 //	@Param			include_correlated			query		string	false	"Include signals that link to each returned signal (default: false)"																																						example(true)

@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"testing"
 	"uuid"
 
@@ -35,6 +36,7 @@ func TestDocumentUpload(t *testing.T) {
 	isn := createTestISN(t, ctx, testEnv.queries, "document-upload-isn", "Document upload ISN", adminAccount.ID, "private")
 	billOfLadingType := createTestSignalType(t, ctx, testEnv.queries, isn.ID, "bill of lading", "", signalsd.ContentKindDocument)
 	consignmentType := createTestSignalType(t, ctx, testEnv.queries, isn.ID, "consignment", "", signalsd.ContentKindJSON)
+	ehcAvailableType := createTestSignalType(t, ctx, testEnv.queries, isn.ID, "ehc available", "", signalsd.ContentKindEvent)
 
 	grantPermission(t, ctx, testEnv.queries, isn.ID, writerAccount.ID, "read-write")
 	grantPermission(t, ctx, testEnv.queries, isn.ID, readerAccount.ID, "read")
@@ -48,6 +50,7 @@ func TestDocumentUpload(t *testing.T) {
 
 	billOfLadingEndpoint := newTestSignalEndpoint(isn, billOfLadingType)
 	consignmentEndpoint := newTestSignalEndpoint(isn, consignmentType)
+	ehcAvailableEndpoint := newTestSignalEndpoint(isn, ehcAvailableType)
 
 	// note pdf headers start %PDF-
 	pdfContent := []byte("%PDF-BL-2026")
@@ -119,6 +122,76 @@ func TestDocumentUpload(t *testing.T) {
 		for field, expected := range expectedContent {
 			if content[field] != expected {
 				t.Errorf("Expected content %s %v, got %v", field, expected, content[field])
+			}
+		}
+		if _, ok := signals[0]["issuer_ref"]; ok {
+			t.Errorf("Expected no issuer_ref for a document uploaded without one, got %v", signals[0]["issuer_ref"])
+		}
+	})
+
+	t.Run("documents can be found by their issuer_ref", func(t *testing.T) {
+		uploaded := expectUploadResponse(t, uploadDocumentRequest(t, testEnv.baseURL, writerToken, billOfLadingEndpoint, documentUpload{
+			batchRef: "upload-batch", localRef: "bol-issuer-ref", issuerRef: "EHC-0001", fileName: "bl.pdf", contentType: "application/pdf", content: pdfContent,
+		}), http.StatusOK)
+		if uploaded.IssuerRef == nil || *uploaded.IssuerRef != "EHC-0001" {
+			t.Errorf("Expected issuer_ref EHC-0001 in the upload response, got %v", uploaded.IssuerRef)
+		}
+
+		// issuer_ref is not unique - another document with the same issuer_ref is also found
+		expectUploadResponse(t, uploadDocumentRequest(t, testEnv.baseURL, writerToken, billOfLadingEndpoint, documentUpload{
+			batchRef: "upload-batch", localRef: "bol-issuer-ref-copy", issuerRef: "EHC-0001", fileName: "bl-copy.pdf", contentType: "application/pdf", content: pdfContent,
+		}), http.StatusOK)
+
+		// a json signal whose content happens to have an issuer_ref field is not matched
+		consignmentID := submitSignalAndGetID(t, testEnv.baseURL, createValidSignalPayload("consignment-issuer-ref"), writerToken, consignmentEndpoint)
+		expectStatus(t, submitCreateSignalRequest(t, testEnv.baseURL, createEventPayload("ehc-available-issuer-ref", consignmentID,
+			map[string]any{"occurred_at": "2026-09-27T14:02:00Z", "certificate_no": "EHC-0001", "issuer_ref": "EHC-0001"}), writerToken, ehcAvailableEndpoint), http.StatusOK)
+
+		// issuer_ref is enough on its own to search every ISN the caller can read
+		signals := expectSearchResults(t, searchAcrossIsns(t, testEnv.baseURL, readerToken, map[string]string{"issuer_ref": "EHC-0001"}))
+		localRefs := []string{}
+		for _, signal := range signals {
+			localRefs = append(localRefs, signal["local_ref"].(string))
+		}
+		slices.Sort(localRefs)
+		if !slices.Equal(localRefs, []string{"bol-issuer-ref", "bol-issuer-ref-copy"}) {
+			t.Fatalf("Expected the two documents with issuer_ref EHC-0001, got %v", localRefs)
+		}
+		if signals[0]["issuer_ref"] != "EHC-0001" {
+			t.Errorf("Expected issuer_ref EHC-0001, got %v", signals[0]["issuer_ref"])
+		}
+	})
+
+	t.Run("re-uploading with the same issuer_ref is unchanged, a different or omitted issuer_ref creates a new version", func(t *testing.T) {
+		for i, expected := range []struct {
+			issuerRef string
+			version   int32
+			unchanged bool
+		}{
+			{"EHC-0002", 1, false},
+			{"EHC-0002", 1, true},
+			{"EHC-0003", 2, false},
+			{"", 3, false}, // omitting issuer_ref clears it
+		} {
+			result := expectUploadResponse(t, uploadDocumentRequest(t, testEnv.baseURL, writerToken, billOfLadingEndpoint, documentUpload{
+				batchRef: "upload-batch", localRef: "bol-issuer-ref-versions", issuerRef: expected.issuerRef, fileName: "bl.pdf", contentType: "application/pdf", content: pdfContent,
+			}), http.StatusOK)
+
+			issuerRef := ""
+			if result.IssuerRef != nil {
+				issuerRef = *result.IssuerRef
+			}
+			if result.VersionNumber != expected.version || result.Unchanged != expected.unchanged || issuerRef != expected.issuerRef {
+				t.Errorf("Upload %d: expected version %d, unchanged=%v and issuer_ref %q, got version %d, unchanged=%v and issuer_ref %q",
+					i+1, expected.version, expected.unchanged, expected.issuerRef, result.VersionNumber, result.Unchanged, issuerRef)
+			}
+		}
+
+		// the issuer_ref was cleared, so the earlier issuer_refs no longer match
+		for _, issuerRef := range []string{"EHC-0002", "EHC-0003"} {
+			signals := expectSearchResults(t, searchPrivateSignals(t, testEnv.baseURL, billOfLadingEndpoint, readerToken, map[string]string{"issuer_ref": issuerRef}))
+			if len(signals) != 0 {
+				t.Errorf("Expected no documents with issuer_ref %s (the latest version has no issuer_ref), got %d", issuerRef, len(signals))
 			}
 		}
 	})
