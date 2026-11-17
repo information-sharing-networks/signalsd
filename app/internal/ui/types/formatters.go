@@ -22,9 +22,9 @@ func FormatFileSize(sizeBytes int64) string {
 		return fmt.Sprintf("%d bytes", sizeBytes)
 	}
 
-	size := float64(sizeBytes)
+	size := float64(sizeBytes) / unit
 	units := []string{"KB", "MB", "GB"}
-	i := -1
+	i := 0
 	for size >= unit && i < len(units)-1 {
 		size /= unit
 		i++

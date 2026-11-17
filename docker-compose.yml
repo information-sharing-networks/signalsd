@@ -45,7 +45,9 @@ services:
         COPY app/go.mod app/go.sum ./
 
         # tool versions are pinned via go.mod/go.sum — this layer only rebuilds when they change.
-        RUN go install tool && cd / && rm -rf /build
+        # -p 2 limits parallel package builds: compiling all the tools at once (sqlc and goose
+        # in particular pull in very large dependency trees) can exhaust the Docker VM's memory.
+        RUN go install -p 2 tool && cd / && rm -rf /build
 
         WORKDIR /signalsd
 
@@ -87,6 +89,8 @@ services:
     command: >
       sh -c "
         cd /signalsd/app &&
+        echo 'Compiling go tools...' &&
+        go install -p 1 tool &&
         echo 'Generating sqlc files...' &&
         go tool sqlc generate &&
         echo 'Creating swagger documentation...' &&
@@ -102,8 +106,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1'
-          memory: 1024M
+          cpus: '2'
+          # staticcheck/gosec/govulncheck/go test load the whole module and run alongside air,
+          # so 1G is not enough
+          memory: 3072M
 
 networks:
   app-network:
