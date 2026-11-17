@@ -29,6 +29,7 @@ type SearchSignal struct {
 	Email            string          `json:"email,omitempty"`
 	SignalID         string          `json:"signal_id"`
 	LocalRef         string          `json:"local_ref"`
+	IssuerRef        string          `json:"issuer_ref,omitempty"` // empty if the sender did not supply one (currently only supported for documents)
 	SignalTypeSlug   string          `json:"signal_type_slug"`
 	SemVer           string          `json:"sem_ver"`
 	ContentKind      string          `json:"content_kind"`

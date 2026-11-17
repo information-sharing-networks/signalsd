@@ -83,6 +83,9 @@ templ SearchResults(signals []client.SearchSignalWithCorrelationsAndVersions, pa
 						<div class="signal-metadata">
 							@SignalMetadataItem("Created", types.FormatDateTime(signal.SignalCreatedAt))
 							@SignalMetadataItem("Created by", signal.Email)
+							if signal.IssuerRef != "" {
+								@SignalMetadataItem("Issuer ref", signal.IssuerRef)
+							}
 						</div>
 						<!-- Signal Content -->
 						<div class="json-container">
@@ -197,6 +200,9 @@ templ CorrelatedSignalsTable(isnSlug string, signal client.SearchSignalWithCorre
 							<button class="open-modal-btn btn btn-primary" data-correlated-signal-id={ correlated.SignalID }>View</button>
 							<dialog class="modal" id={ fmt.Sprintf("modal-%s", correlated.SignalID) }>
 								<h3>{ correlated.LocalRef }</h3>
+								if correlated.IssuerRef != "" {
+									@SignalMetadataSimple("Issuer ref", correlated.IssuerRef)
+								}
 								if correlated.ContentKind == signalsd.ContentKindDocument {
 									@DocumentMetadataDetails(correlated.Content)
 									@DownloadDocumentButton(isnSlug, correlated)
