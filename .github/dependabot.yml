@@ -5,28 +5,27 @@
 
 version: 2
 updates:
-  - package-ecosystem: "gomod" 
-    directory: "/app" 
+  # app/tools is a separate module for the go tools (sqlc, goose, staticcheck etc), so their
+  # dependencies stay out of app/go.mod. Both modules are in one entry so that the templ group can
+  # update templ in both in a single PR: the templ cli (app/tools) must match the templ runtime (app).
+  - package-ecosystem: "gomod"
+    directories:
+      - "/app"
+      - "/app/tools"
     schedule:
       interval: "weekly"
     commit-message:
       prefix: "deps"
       include: "scope"
-    open-pull-requests-limit: 10 
+    open-pull-requests-limit: 10
     groups:
-      tools:
+      templ:
         patterns:
-          - "golang.org/x/vuln"
-          - "honnef.co/go/tools/*"
-          - "github.com/a-h/templ/*"
-          - "github.com/air-verse/air"
-          - "github.com/pressly/goose/v3"
-          - "github.com/sqlc-dev/sqlc"
-          - "github.com/swaggo/swag"
-          - "github.com/securego/gosec/*"
+          - "github.com/a-h/templ"
+        group-by: dependency-name
       golang-x:
         patterns:
-          - "golang.org/x/*" 
+          - "golang.org/x/*"
       dependencies:
         patterns:
-          - "*"  
+          - "*"

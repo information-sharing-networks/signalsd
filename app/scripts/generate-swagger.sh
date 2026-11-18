@@ -18,6 +18,6 @@ CLIENT_API_TAGS='OAuth 2.0,User Authentication,Service Accounts,ISN Discovery,Su
 ADMIN_API_TAGS='!HTMX Actions,!UI Pages,!Service Accounts,!ISN Discovery,!Submit Signals,!Search Signals,!Batches'
 UI_TAGS='HTMX Actions,UI Pages'
 
-go tool swag init -g ./cmd/signalsd/main.go --tags "$CLIENT_API_TAGS" --outputTypes json,yaml
-go tool swag init -g ./cmd/signalsd/main.go --tags "$ADMIN_API_TAGS" -o ./docs/admin --outputTypes json,yaml
-go tool swag init -g ./cmd/signalsd/main.go --tags "$UI_TAGS" -o ./docs/ui --outputTypes json,yaml
+go tool -modfile=tools/go.mod swag init -g ./cmd/signalsd/main.go --tags "$CLIENT_API_TAGS" --outputTypes json,yaml
+go tool -modfile=tools/go.mod swag init -g ./cmd/signalsd/main.go --tags "$ADMIN_API_TAGS" -o ./docs/admin --outputTypes json,yaml
+go tool -modfile=tools/go.mod swag init -g ./cmd/signalsd/main.go --tags "$UI_TAGS" -o ./docs/ui --outputTypes json,yaml

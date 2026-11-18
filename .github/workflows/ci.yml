@@ -49,7 +49,9 @@ jobs:
         with:
           go-version-file: app/go.mod
           cache: true                                
-          cache-dependency-path: app/go.sum    
+          cache-dependency-path: |
+            app/go.sum
+            app/tools/go.sum    
 
       - name: Download Go modules
         run: go mod download
@@ -78,7 +80,9 @@ jobs:
         with:
           go-version-file: app/go.mod
           cache: true                                
-          cache-dependency-path: app/go.sum    
+          cache-dependency-path: |
+            app/go.sum
+            app/tools/go.sum    
 
       - name: Download Go modules
         run: go mod download
@@ -90,7 +94,7 @@ jobs:
         run: go vet ./... || exit 1
 
       - name: Run staticcheck
-        run: go tool staticcheck ./... || exit 1
+        run: go tool -modfile=tools/go.mod staticcheck ./... || exit 1
 
   security:
     name: Security analysis
@@ -110,7 +114,9 @@ jobs:
         with:
           go-version-file: app/go.mod
           cache: true                                
-          cache-dependency-path: app/go.sum    
+          cache-dependency-path: |
+            app/go.sum
+            app/tools/go.sum    
 
       - name: Download Go modules
         run: go mod download
@@ -118,10 +124,10 @@ jobs:
       # exclude G120 - FormValue is used extensively in the UI handlers
       # and the size is limited by MaxBytesReader middleware (not detected by gosec)
       - name: Run gosec
-        run: go tool gosec -exclude-generated -exclude=G120 ./...
+        run: go tool -modfile=tools/go.mod gosec -exclude-generated -exclude=G120 ./...
 
       - name: Run govulncheck
-        run: go tool govulncheck ./...
+        run: go tool -modfile=tools/go.mod govulncheck ./...
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4

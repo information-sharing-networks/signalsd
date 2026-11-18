@@ -13,7 +13,8 @@ DB_NAME = signalsd_admin
 # go tool recompiles a tool when go.mod changes (e.g. after a dependabot bump). Some tool
 # dependencies (gosec's AI SDKs in particular) need >2GB each to compile, so building them in
 # parallel exhausts the Docker VM's memory - limit the build to one package at a time.
-GO_TOOL = GOFLAGS=-p=1 go tool
+# the tools are defined in a separate module (app/tools/go.mod) so their dependencies stay out of app/go.mod
+GO_TOOL = GOFLAGS=-p=1 go tool -modfile=tools/go.mod
 
 # Default target - show available commands
 help:
@@ -47,7 +48,7 @@ help:
 	@echo "  make lint            - Run staticcheck"
 	@echo "  make security        - Run gosec security analysis"
 	@echo "  make vuln            - Run govulncheck vulnerability scan"
-	@echo "  make update-tools    - Upgrade the go tools in app/go.mod (run after bumping the Go version)"
+	@echo "  make update-tools    - Upgrade the go tools in app/tools/go.mod (run after bumping the Go version)"
 	@echo "  make restart         - restart the docker app"
 	@echo "  make logs            - follow docker logs"
 	@echo "  make psql            - run psql agaist the dev database"
@@ -152,12 +153,13 @@ vuln:
 	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && $(GO_TOOL) govulncheck ./..."
 
 
-# Upgrade the go tools listed in app/go.mod (staticcheck, govulncheck, sqlc etc).
+# Upgrade the go tools listed in app/tools/go.mod (staticcheck, govulncheck, sqlc etc) and set its go
+# version to match app/go.mod. The templ runtime in app/go.mod is then set to the same version as the templ cli.
 # Run after bumping the go version in app/go.mod and rebuilding the image (make docker-build) -
-# the tools must support the new Go version. Then run make check and commit app/go.mod and app/go.sum.
+# the tools must support the new Go version. Then run make check and commit the go.mod and go.sum files in app and app/tools.
 update-tools:
 	@echo "🔧 Updating go tools..."
-	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && go get tool && go mod tidy"
+	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app/tools && go mod edit -go=$(GO_VERSION) && go get tool && go mod tidy && cd .. && go get github.com/a-h/templ@$$(go list -modfile=tools/go.mod -m -f '{{.Version}}' github.com/a-h/templ) && go mod tidy"
 
 # Clean build artifacts
 clean:

@@ -84,15 +84,15 @@ services:
       sh -c "
         cd /signalsd/app &&
         echo 'Compiling go tools (slow on first start or after go.mod changes)...' &&
-        go install -p 1 tool &&
+        go install -p 1 -modfile=tools/go.mod tool &&
         echo 'Generating sqlc files...' &&
-        go tool sqlc generate &&
+        go tool -modfile=tools/go.mod sqlc generate &&
         echo 'Creating swagger documentation...' &&
         sh ./scripts/generate-swagger.sh &&
         echo 'Running database migrations...' &&
-        go tool goose -dir sql/schema postgres $$DATABASE_URL -env=none up &&
+        go tool -modfile=tools/go.mod goose -dir sql/schema postgres $$DATABASE_URL -env=none up &&
         echo 'Starting signalsd service (live reload)...' &&
-        go tool air 
+        go tool -modfile=tools/go.mod air 
       "
     networks:
         #go run -mod=readonly cmd/signalsd/main.go run all

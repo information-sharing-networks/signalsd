@@ -51,7 +51,9 @@ jobs:
         with:
           go-version-file: app/go.mod
           cache: true
-          cache-dependency-path: app/go.sum
+          cache-dependency-path: |
+            app/go.sum
+            app/tools/go.sum
 
       - name: Download Go modules
         run: cd app && go mod download
@@ -93,7 +95,7 @@ jobs:
       
       - name: Run migrations
         working-directory: app
-        run: go tool goose -dir sql/schema postgres "${{ env.STAGING_DATABASE_URL }}" up
+        run: go tool -modfile=tools/go.mod goose -dir sql/schema postgres "${{ env.STAGING_DATABASE_URL }}" up
 
       - name: Deploy to Cloud Run
         run: |

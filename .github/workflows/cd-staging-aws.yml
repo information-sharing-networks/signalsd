@@ -39,7 +39,9 @@ jobs:
         with:
           go-version-file: app/go.mod
           cache: true
-          cache-dependency-path: app/go.sum
+          cache-dependency-path: |
+            app/go.sum
+            app/tools/go.sum
 
       - name: Download Go modules
         run: cd app && go mod download
@@ -95,7 +97,7 @@ jobs:
           DATABASE_URL=$(aws secretsmanager get-secret-value \
             --secret-id "signalsd/staging/database-url" \
             --query SecretString --output text)
-          go tool goose -dir sql/schema postgres "$DATABASE_URL" up
+          go tool -modfile=tools/go.mod goose -dir sql/schema postgres "$DATABASE_URL" up
 
       - name: Close RDS access for runner
         if: always()
