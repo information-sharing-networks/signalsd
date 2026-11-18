@@ -29,3 +29,12 @@ updates:
       dependencies:
         patterns:
           - "*"
+
+  # base image of the production image (app/Dockerfile)
+  - package-ecosystem: "docker"
+    directory: "/app"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "deps"
+      include: "scope"

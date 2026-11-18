@@ -15,7 +15,6 @@ require (
 	github.com/tidwall/gjson v1.20.3
 	github.com/tidwall/match v1.2.0
 	golang.org/x/crypto v0.59.0
-	golang.org/x/crypto/x509roots/fallback v0.0.0-20250803194717-c247dead11de
 	golang.org/x/text v0.44.0
 	golang.org/x/time v0.16.0
 )

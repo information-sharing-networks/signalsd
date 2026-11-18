@@ -102,7 +102,7 @@ re-tag the matching staging image as `<sha>` and `latest` rather than rebuilding
 
 ECR basic image scanning is enabled on the repository (`scanOnPush=true`).
 
-The application image contains only a statically compiled Go binary in a scratch image (no operating system or shell) — so basic scanning (which looks for OS-package CVEs) is not expected to return any useful information.
+The application image contains a statically compiled Go binary on the [distroless](https://github.com/GoogleContainerTools/distroless) static base image (no shell or package manager; just CA certificates, timezone data and a non-root user) — so basic scanning (which looks for OS-package CVEs) is not expected to return much useful information.
 
 The configuration is in place in case different image configs are loaded at a later date.  Today's vulnerability checks on the go app come from CI: `govulncheck` and `gosec` run on every build before the image is created.
 

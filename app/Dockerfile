@@ -1,12 +1,11 @@
 # check=skip=InvalidDefaultArgInFrom
 # (GO_VERSION has no default by design - see below)
 #
-# build the signalsd service image for prod using scratch base.
+# build the signalsd service image for prod using the distroless static base.
 #
-# Note that the historical need to copy ca-certificates and tzdata from builder images do not apply in Go 1.25+
-# - CA root certificates: Go's crypto/x509 package includes embedded root certificates for TLS connections (required by signalsd when it validates JSON schemas from github)
-# - Timezone data: Go's time/tzdata package can embed timezone data when needed (not required for signalsd)
-# - Static compilation (CGO_ENABLED=0) ensures all dependencies are embedded in the binary 
+# distroless static (https://github.com/GoogleContainerTools/distroless) contains no shell or package manager,
+# only CA root certificates (required by signalsd when it validates JSON schemas from github), timezone data and
+# a non-root user. Static compilation (CGO_ENABLED=0) ensures all the go dependencies are embedded in the binary.
 
 
 # GO_VERSION must be supplied as a build arg - the github workflows pass the version in app/go.mod.
@@ -44,13 +43,17 @@ COPY /app/docs runtime/docs/
 COPY /app/assets runtime/assets/
 COPY /app/web runtime/web
 
-# --- Create a minimal runtime image using scratch ---
-FROM scratch
+# --- Create a minimal runtime image using distroless static ---
+# pinned by digest - dependabot updates it
+FROM gcr.io/distroless/static-debian13:nonroot@sha256:aafe993665bf6200db38a02c11a9351e782a84b6a45e7f33b6695638c88e3931
 
 # Copy application files
 COPY --from=builder /app/runtime /app/
 
 WORKDIR /app
+
+# run as the distroless non-root user (uid 65532)
+USER nonroot
 
 EXPOSE 8080
 

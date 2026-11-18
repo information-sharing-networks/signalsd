@@ -22,9 +22,6 @@ import (
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/version"
 	"github.com/jackc/pgx/v5/pgxpool"
-
-	// the fallback CA certs are required since the service deploys to a scratch docker image that does not include them (the certs are used when the app does external https requests to validate github hosted schemas)
-	_ "golang.org/x/crypto/x509roots/fallback"
 )
 
 //	@title			Signals ISN API
