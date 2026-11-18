@@ -4,7 +4,8 @@ tmp_dir = "tmp"
 [build]
   args_bin = ["run", "all"]
   bin = "./bin/signalsd"
-  cmd = "sh ./scripts/generate-swagger.sh && go tool -modfile=tools/go.mod swag fmt -g ./cmd/signalsd/main.go && go tool -modfile=tools/go.mod sqlc generate && go tool -modfile=tools/go.mod templ generate && go build -o ./bin/signalsd ./cmd/signalsd/main.go"
+  # swag fmt excludes the generated templ files: it would regroup their imports (templ does not regenerate them until the .templ files change)
+  cmd = "sh ./scripts/generate-swagger.sh && go tool -modfile=tools/go.mod swag fmt -g ./cmd/signalsd/main.go --exclude ./internal/templates,./internal/ui/templates && go tool -modfile=tools/go.mod sqlc generate && go tool -modfile=tools/go.mod templ generate && go build -o ./bin/signalsd ./cmd/signalsd/main.go"
   delay = 1000
   exclude_dir = ["tmp", "internal/database", "docs"]
   exclude_file = []

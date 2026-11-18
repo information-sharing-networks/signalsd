@@ -109,10 +109,12 @@ docs:
 	@echo "🔄 Generating swagger documentation..."
 	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && sh ./scripts/generate-swagger.sh"
 
-# Generate swagger documentation
+# Format swag comments
+# The generated templ files are excluded: swag fmt would regroup their imports (and templ does not regenerate
+# them until the .templ files change), leaving the generated files dependent on which tool ran last
 swag-fmt:
 	@echo "🔄 Formatting swag comments..."
-	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && $(GO_TOOL) swag fmt"
+	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && $(GO_TOOL) swag fmt --exclude ./internal/templates,./internal/ui/templates"
 
 # Generate type-safe SQL code
 sqlc:
