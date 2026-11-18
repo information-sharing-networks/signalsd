@@ -30,6 +30,9 @@ func (s *SignalsHandler) storeEventSignal(ctx context.Context, submission *signa
 	failed := func(code apperrors.ErrorCode, message string) (StoredSignal, *FailedSignal) {
 		return StoredSignal{}, &FailedSignal{LocalRef: signal.LocalRef, ErrorCode: code.String(), ErrorMessage: message}
 	}
+	dbFailed := func(err error, message string) (StoredSignal, *FailedSignal) {
+		return StoredSignal{}, newDatabaseFailure(signal.LocalRef, err, message)
+	}
 
 	// readSignalsRequest rejects events without a correlation_id
 	if signal.CorrelationID == nil {
@@ -43,7 +46,7 @@ func (s *SignalsHandler) storeEventSignal(ctx context.Context, submission *signa
 
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return failed(apperrors.ErrCodeDatabaseError, "failed to begin transaction")
+		return dbFailed(err, "failed to begin transaction")
 	}
 	defer tx.Rollback(ctx) // no-op once the transaction is committed
 
@@ -55,7 +58,7 @@ func (s *SignalsHandler) storeEventSignal(ctx context.Context, submission *signa
 		IsnSlug:       isnSlug,
 	})
 	if err != nil {
-		return failed(apperrors.ErrCodeDatabaseError, "failed to validate correlation_id")
+		return dbFailed(err, "failed to validate correlation_id")
 	}
 	if !isValid {
 		return failed(apperrors.ErrCodeInvalidCorrelationID, fmt.Sprintf("invalid correlation_id %v - signal does not exist in this ISN", correlationID))
@@ -74,7 +77,7 @@ func (s *SignalsHandler) storeEventSignal(ctx context.Context, submission *signa
 		return s.resubmittedEvent(ctx, queries, submission, signal, isnSlug)
 	}
 	if err != nil {
-		return failed(apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to create signal master record: %v", err))
+		return dbFailed(err, fmt.Sprintf("failed to create signal master record: %v", err))
 	}
 
 	version, err := queries.CreateSignalVersion(ctx, database.CreateSignalVersionParams{
@@ -84,11 +87,11 @@ func (s *SignalsHandler) storeEventSignal(ctx context.Context, submission *signa
 		Content:       signal.Content,
 	})
 	if err != nil {
-		return failed(apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to create signal version: %v", err))
+		return dbFailed(err, fmt.Sprintf("failed to create signal version: %v", err))
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return failed(apperrors.ErrCodeDatabaseError, "failed to commit transaction")
+		return dbFailed(err, "failed to commit transaction")
 	}
 
 	return StoredSignal{
@@ -107,6 +110,9 @@ func (s *SignalsHandler) resubmittedEvent(ctx context.Context, queries *database
 	failed := func(code apperrors.ErrorCode, message string) (StoredSignal, *FailedSignal) {
 		return StoredSignal{}, &FailedSignal{LocalRef: signal.LocalRef, ErrorCode: code.String(), ErrorMessage: message}
 	}
+	dbFailed := func(err error, message string) (StoredSignal, *FailedSignal) {
+		return StoredSignal{}, newDatabaseFailure(signal.LocalRef, err, message)
+	}
 
 	existing, err := queries.CompareWithLatestSignalVersion(ctx, database.CompareWithLatestSignalVersionParams{
 		Content:        signal.Content,
@@ -122,7 +128,7 @@ func (s *SignalsHandler) resubmittedEvent(ctx context.Context, queries *database
 		return failed(apperrors.ErrCodeResourceNotFound, "the ISN or signal type is not in use")
 	}
 	if err != nil {
-		return failed(apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to get the existing event: %v", err))
+		return dbFailed(err, fmt.Sprintf("failed to get the existing event: %v", err))
 	}
 
 	switch {

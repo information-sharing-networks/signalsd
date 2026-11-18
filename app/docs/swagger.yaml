@@ -966,7 +966,7 @@ info:
     - **Resend the whole request.** Signals that were already stored are returned with `unchanged: true`, and only the fixed signals are stored. Note that any json signal in the request that has been withdrawn since it was sent is reactivated (withdrawn events fail with `resource_already_exists`).
     - **Resend only the failures.** *Get Batch Status* lists the batch's unresolved failures.
 
-    If the whole request fails (an error status such as 400, 401, 403, 404, 413 or 500), or you get no response, nothing is recorded in the batch, so resend the whole request once the problem is fixed. If the server's request timeout is reached partway through, the signals already processed stay stored and the rest are returned as `database_error` failures (which may not be recorded in the batch), so resend the whole request.
+    If the whole request fails (an error status such as 400, 401, 403, 404, 413 or 500), or you get no response, nothing is recorded in the batch, so resend the whole request once the problem is fixed. If the request times out partway through, the signals already stored stay stored and the rest are returned as `timeout` failures (not recorded in the batch). Resend the whole request, or just the signals that timed out.
 
     # Searching
     There are three search routes for private ISNs. The ISN and signal type in the path limit every filter, so e.g. a `local_ref` search on `consignment/v1.0.0` only finds consignments.

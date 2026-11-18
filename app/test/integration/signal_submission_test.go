@@ -9,6 +9,7 @@ package integration
 // - TestUnchangedSignalResubmission: resubmissions that don't change a signal return the latest version (no new version is created)
 // - TestIsInUseStatus: signals can't be written or read when the ISN or signal type is disabled
 // - TestWritesWithTokenIssuedBeforeSignalTypeDisabled: the write queries reject signals when the claims in the access token are out of date
+// - TestSignalSubmissionTimeout: signals not stored before the request times out are returned as timeout failures
 
 import (
 	"context"
@@ -17,6 +18,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 	"uuid"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
@@ -644,4 +646,57 @@ func TestWritesWithTokenIssuedBeforeSignalTypeDisabled(t *testing.T) {
 		})
 		expectErrorCode(t, response, http.StatusNotFound, apperrors.ErrCodeResourceNotFound)
 	})
+}
+
+// TestSignalSubmissionTimeout checks that when the request times out partway through a submission,
+// the signals already stored are reported as stored and the rest are returned as timeout failures (not database_error)
+func TestSignalSubmissionTimeout(t *testing.T) {
+	ctx := context.Background()
+
+	// RequestTimeout cancels the request context at WRITE_TIMEOUT - 1s, so requests time out after 1s
+	testEnv := startInProcessServerWithConfig(t, "", func(cfg *signalsd.ServerEnvironment) {
+		cfg.WriteTimeout = 2 * time.Second
+	})
+
+	adminAccount := createTestAccount(t, ctx, testEnv.queries, "isnadmin", "user", "admin@submission-timeout.com")
+	isn := createTestISN(t, ctx, testEnv.queries, "submission-timeout-isn", "Submission timeout ISN", adminAccount.ID, "private")
+	signalType := createTestSignalType(t, ctx, testEnv.queries, isn.ID, "timeout signal", "", signalsd.ContentKindJSON)
+
+	if err := testEnv.schemaCache.Load(ctx); err != nil {
+		t.Fatalf("Failed to refresh schema cache: %v", err)
+	}
+	adminToken := testEnv.getAccessToken(t, adminAccount.ID)
+
+	// far more signals than can be stored in 1s (each signal is stored in its own transaction)
+	const signalCount = 20000
+	signals := make([]map[string]any, signalCount)
+	for i := range signals {
+		signals[i] = map[string]any{
+			"local_ref": fmt.Sprintf("timeout-%05d", i),
+			"content":   map[string]any{"test": "valid content for simple schema"},
+		}
+	}
+	payload := map[string]any{"batch_ref": "timeout-batch", "signals": signals}
+
+	response := submitCreateSignalRequest(t, testEnv.baseURL, payload, adminToken, newTestSignalEndpoint(isn, signalType))
+	submission := expectSubmissionResponse(t, response, http.StatusMultiStatus)
+
+	result := submission.Results[0]
+	timeoutCount := 0
+	for _, failed := range result.FailedSignals {
+		if failed.ErrorCode != apperrors.ErrCodeTimeout.String() {
+			t.Fatalf("Expected only timeout failures, got %s for %s: %s", failed.ErrorCode, failed.LocalRef, failed.ErrorMessage)
+		}
+		timeoutCount++
+	}
+	if timeoutCount == 0 {
+		t.Fatal("Expected the request to time out before all the signals were stored")
+	}
+	if len(result.StoredSignals)+timeoutCount != signalCount {
+		t.Errorf("Expected every signal to be stored or returned as a timeout failure: %d stored + %d timeouts != %d",
+			len(result.StoredSignals), timeoutCount, signalCount)
+	}
+	if submission.Summary.StoredCount != len(result.StoredSignals) || submission.Summary.RejectedCount != timeoutCount {
+		t.Errorf("Expected summary of %d stored and %d rejected, got %+v", len(result.StoredSignals), timeoutCount, submission.Summary)
+	}
 }

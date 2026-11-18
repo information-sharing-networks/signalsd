@@ -119,7 +119,8 @@ type StoredSignal struct {
 
 // FailedSignal describes a signal that could not be stored.
 // ErrorCode is one of: malformed_body (e.g. schema validation errors), invalid_correlation_id, resource_not_found,
-// resource_already_exists (events), database_error, and for the Signals Router: forbidden and invalid_request (the signal could not be routed)
+// resource_already_exists (events), database_error, timeout (the request timed out before the signal was stored),
+// and for the Signals Router: forbidden and invalid_request (the signal could not be routed)
 type FailedSignal struct {
 	LocalRef     string `json:"local_ref" example:"item_id_#2"`
 	ErrorCode    string `json:"error_code" example:"malformed_body"`
@@ -134,7 +135,13 @@ type FailedSignal struct {
 // The signals in the batch have already been processed by the time this is called, so a failure to write
 // the detail is logged rather than returned - the caller still reports the outcome to the client.
 // Used by the direct signal post, the signals router and the document upload.
+//
+// Nothing is recorded once the request has timed out (or the client has disconnected): the request context is done, so the writes would fail.
 func recordSignalProcessingFailures(ctx context.Context, queries *database.Queries, batchID uuid.UUID, isnSlug *string, signalTypeSlug string, semVer string, failedSignals []FailedSignal) {
+	if len(failedSignals) > 0 && ctx.Err() != nil {
+		logger.AddLogAttrs(ctx, slog.String("batch_failures_not_recorded", ctx.Err().Error()))
+		return
+	}
 	for _, failed := range failedSignals {
 		_, err := queries.CreateSignalProcessingFailureDetail(ctx, database.CreateSignalProcessingFailureDetailParams{
 			SignalBatchID:    batchID,
@@ -308,7 +315,13 @@ func (s *SignalsHandler) CreateSignals(w http.ResponseWriter, r *http.Request) e
 		FailedSignals:  make([]FailedSignal, 0),
 	}
 
-	for _, signal := range submission.signals {
+	for i, signal := range submission.signals {
+		// once the request has timed out the remaining signals are not processed
+		if ctx.Err() != nil {
+			result.FailedSignals = append(result.FailedSignals, timedOutSignals(submission.signals[i:])...)
+			break
+		}
+
 		if err := s.schemaCache.ValidateJSONSignal(submission.signalTypePath(), signal.Content); err != nil {
 			result.FailedSignals = append(result.FailedSignals, FailedSignal{
 				LocalRef:     signal.LocalRef,
@@ -441,7 +454,13 @@ func (s *SignalsHandler) RouteSignals(w http.ResponseWriter, r *http.Request) er
 	unroutable := make([]FailedSignal, 0)
 	totalStored, totalRejected := 0, 0
 
-	for _, signal := range submission.signals {
+	for i, signal := range submission.signals {
+		// once the request has timed out the remaining signals are not processed (they are returned with the unroutable signals, as they have no ISN)
+		if ctx.Err() != nil {
+			unroutable = append(unroutable, timedOutSignals(submission.signals[i:])...)
+			break
+		}
+
 		// validate before routing
 		if err := s.schemaCache.ValidateJSONSignal(signalTypePath, signal.Content); err != nil {
 			unroutable = append(unroutable, FailedSignal{
@@ -466,6 +485,11 @@ func (s *SignalsHandler) RouteSignals(w http.ResponseWriter, r *http.Request) er
 				continue
 			}
 			if err != nil {
+				// the request timed out while the ISN was being resolved: the signals already stored are still reported
+				if ctx.Err() != nil {
+					unroutable = append(unroutable, timedOutSignals(submission.signals[i:])...)
+					break
+				}
 				return apperrors.DatabaseError("database error", err)
 			}
 			isnSlug = isn.Slug
@@ -667,10 +691,13 @@ func (s *SignalsHandler) storeJSONSignal(ctx context.Context, submission *signal
 	failed := func(code apperrors.ErrorCode, message string) (StoredSignal, *FailedSignal) {
 		return StoredSignal{}, &FailedSignal{LocalRef: signal.LocalRef, ErrorCode: code.String(), ErrorMessage: message}
 	}
+	dbFailed := func(err error, message string) (StoredSignal, *FailedSignal) {
+		return StoredSignal{}, newDatabaseFailure(signal.LocalRef, err, message)
+	}
 
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return failed(apperrors.ErrCodeDatabaseError, "failed to begin transaction")
+		return dbFailed(err, "failed to begin transaction")
 	}
 	defer tx.Rollback(ctx) // no-op once the transaction is committed
 
@@ -687,7 +714,7 @@ func (s *SignalsHandler) storeJSONSignal(ctx context.Context, submission *signal
 		LocalRef:       signal.LocalRef,
 	})
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return failed(apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to get the latest version of the signal: %v", err))
+		return dbFailed(err, fmt.Sprintf("failed to get the latest version of the signal: %v", err))
 	}
 	if err == nil && latest.ContentMatches && !latest.IsWithdrawn && (signal.CorrelationID == nil || *signal.CorrelationID == latest.CorrelationID) {
 		return StoredSignal{
@@ -716,7 +743,7 @@ func (s *SignalsHandler) storeJSONSignal(ctx context.Context, submission *signal
 			IsnSlug:       isnSlug,
 		})
 		if validateErr != nil {
-			return failed(apperrors.ErrCodeDatabaseError, "failed to validate correlation_id")
+			return dbFailed(validateErr, "failed to validate correlation_id")
 		}
 		if !isValid {
 			return failed(apperrors.ErrCodeInvalidCorrelationID, fmt.Sprintf("invalid correlation_id %v - signal does not exist in this ISN", *signal.CorrelationID))
@@ -737,7 +764,7 @@ func (s *SignalsHandler) storeJSONSignal(ctx context.Context, submission *signal
 		if errors.Is(err, pgx.ErrNoRows) {
 			return failed(apperrors.ErrCodeResourceNotFound, "the ISN or signal type is not in use")
 		}
-		return failed(apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to create signal master record: %v", err))
+		return dbFailed(err, fmt.Sprintf("failed to create signal master record: %v", err))
 	}
 
 	// create the signal version, which holds the content
@@ -748,11 +775,11 @@ func (s *SignalsHandler) storeJSONSignal(ctx context.Context, submission *signal
 		Content:       signal.Content,
 	})
 	if err != nil {
-		return failed(apperrors.ErrCodeDatabaseError, fmt.Sprintf("failed to create signal version: %v", err))
+		return dbFailed(err, fmt.Sprintf("failed to create signal version: %v", err))
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return failed(apperrors.ErrCodeDatabaseError, "failed to commit transaction")
+		return dbFailed(err, "failed to commit transaction")
 	}
 
 	return StoredSignal{
@@ -761,6 +788,27 @@ func (s *SignalsHandler) storeJSONSignal(ctx context.Context, submission *signal
 		SignalVersionID: version.ID,
 		VersionNumber:   version.VersionNumber,
 	}, nil
+}
+
+// timedOutMessage is the error message for signals that were not stored because the request timed out
+const timedOutMessage = "the request timed out before the signal was stored"
+
+// newDatabaseFailure returns the failure for a signal that could not be stored because a database operation failed.
+// The failure is a timeout if the operation failed because the request timed out.
+func newDatabaseFailure(localRef string, err error, message string) *FailedSignal {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return &FailedSignal{LocalRef: localRef, ErrorCode: apperrors.ErrCodeTimeout.String(), ErrorMessage: timedOutMessage}
+	}
+	return &FailedSignal{LocalRef: localRef, ErrorCode: apperrors.ErrCodeDatabaseError.String(), ErrorMessage: message}
+}
+
+// timedOutSignals returns timeout failures for the signals that were not processed because the request timed out
+func timedOutSignals(signals []SubmittedSignal) []FailedSignal {
+	failures := make([]FailedSignal, 0, len(signals))
+	for _, signal := range signals {
+		failures = append(failures, FailedSignal{LocalRef: signal.LocalRef, ErrorCode: apperrors.ErrCodeTimeout.String(), ErrorMessage: timedOutMessage})
+	}
+	return failures
 }
 
 // submissionStatus returns the response status for a submission:
