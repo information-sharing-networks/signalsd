@@ -7,12 +7,12 @@ require (
 	github.com/caarlos0/env/v11 v11.4.2
 	github.com/go-chi/chi/v5 v5.5.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/jackc/pgx/v5 v5.12.0
+	github.com/jackc/pgx/v5 v5.13.0
 	github.com/jub0bs/cors v1.3.0
 	github.com/lmittmann/tint v1.2.1
 	github.com/pressly/goose/v3 v3.30.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
-	github.com/tidwall/gjson v1.20.1
+	github.com/tidwall/gjson v1.20.3
 	github.com/tidwall/match v1.2.0
 	golang.org/x/crypto v0.58.0
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20250803194717-c247dead11de
@@ -137,7 +137,7 @@ require (
 	github.com/swaggo/swag v1.16.6 // indirect
 	github.com/tdewolff/parse/v2 v2.8.12 // indirect
 	github.com/tetratelabs/wazero v1.12.0 // indirect
-	github.com/tidwall/pretty v1.2.2 // indirect
+	github.com/tidwall/pretty v1.3.0 // indirect
 	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/tursodatabase/libsql-client-go v0.0.0-20260528064733-9d5d30a29a60 // indirect
 	github.com/urfave/cli/v2 v2.3.0 // indirect
