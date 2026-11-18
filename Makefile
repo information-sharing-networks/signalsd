@@ -10,6 +10,11 @@ APP_SERVICE = app
 DB_ACCOUNT = signalsd-dev 
 DB_NAME = signalsd_admin
 
+# go tool recompiles a tool when go.mod changes (e.g. after a dependabot bump). Some tool
+# dependencies (gosec's AI SDKs in particular) need >2GB each to compile, so building them in
+# parallel exhausts the Docker VM's memory - limit the build to one package at a time.
+GO_TOOL = GOFLAGS=-p=1 go tool
+
 # Default target - show available commands
 help:
 	@echo 'Usage: make [target]'
@@ -106,17 +111,17 @@ docs:
 # Generate swagger documentation
 swag-fmt:
 	@echo "🔄 Formatting swag comments..."
-	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && go tool swag fmt"
+	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && $(GO_TOOL) swag fmt"
 
 # Generate type-safe SQL code
 sqlc:
 	@echo "🔄 Generating sqlc code..."
-	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && go tool sqlc generate"
+	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && $(GO_TOOL) sqlc generate"
 
 # Generate templ templates
 templ:
 	@echo "🔄 Generating templ templates..."
-	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && go tool templ generate"
+	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && $(GO_TOOL) templ generate"
 
 # Format code
 fmt:
@@ -131,20 +136,20 @@ vet:
 # Run staticcheck linter
 lint:
 	@echo "🔄 Running staticcheck..."
-	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && go tool staticcheck ./..."
+	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && $(GO_TOOL) staticcheck ./..."
 
 # Run security analysis
 # exclude G120 - FormValue is used extensively in the UI handlers
 # and the size is limited by MaxBytesReader middleware (not detected by gosec)
 security:
 	@echo "🔄 Running security analysis..."
-	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && go tool gosec -exclude-generated -exclude=G120 ./..."
+	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && $(GO_TOOL) gosec -exclude-generated -exclude=G120 ./..."
 
 
 # Run vulnerability scan
 vuln:
 	@echo "🔍 Running vulnerability scan..."
-	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && go tool govulncheck ./..."
+	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && $(GO_TOOL) govulncheck ./..."
 
 
 # Upgrade the go tools listed in app/go.mod (staticcheck, govulncheck, sqlc etc).
@@ -163,13 +168,13 @@ clean:
 # Database migrations (bonus commands using Docker)
 db-migrate-up:
 	@echo "🔄 Running database migrations..."
-	@docker compose exec $(APP_SERVICE) bash -c 'cd /signalsd/app && go tool goose -dir sql/schema postgres "$$DATABASE_URL" up'
+	@docker compose exec $(APP_SERVICE) bash -c 'cd /signalsd/app && $(GO_TOOL) goose -dir sql/schema postgres "$$DATABASE_URL" up'
 
 
 # Reset database and reapply migrations
 db-migrate-down:
 	@echo "🔄 Resetting database..."
-	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && go tool goose -dir sql/schema postgres \$$DATABASE_URL -env=none down-to 0"
+	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && $(GO_TOOL) goose -dir sql/schema postgres \$$DATABASE_URL -env=none down-to 0"
 	@$(MAKE) db-migrate-up
 
 # Check if containers are running

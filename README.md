@@ -169,7 +169,7 @@ The app uses the following go tools:
 - govulncheck - vulnerability scanner
 - Air - live reload
 
-These tools are defined in the tool section of `app/go.mod` and installed as part of the docker image.
+These tools are defined in the tool section of `app/go.mod` and compiled when the app container starts.
 
 #### Upgrading Go
 The Go version is set by the `go` line in `app/go.mod` (the docker image and the CI builds use the same version). To upgrade:
