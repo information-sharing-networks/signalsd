@@ -31,9 +31,10 @@ import (
 //	@description	Share signals - records, documents and events - between the members of Information Sharing Networks.
 //	@description
 //	@description	## Key concepts
-//	@description	- **Information Sharing Network (ISN)**: An ISN is a single-purpose network, such as sharing consignment data between traders and government agencies. Its members are accounts, each with its own access rights, and it defines the signal types those members can exchange.
-//	@description	- **Signal type**: identified by a slug and a version (e.g. `consignment/v1.0.0`). Signal types must be one of three content kinds (json, document, event).  A **json** record typically describes an entity (e.g. a consignment), a **document** is a binary representation (e.g. a certificate PDF), and an **event** records that something happened to another signal (e.g. a certificate was approved). **json** and **event** types usually have a JSON schema that the content is checked against. New signal types can be added at any time without affecting existing ones.
-//	@description	- **Signal**: one piece of information shared through an ISN: Signals specify their type and can be linked to each other, e.g. a consignment's documents and events are linked to the consignment (see *Correlation*).
+//	@description	- **Information Sharing Network (ISN)**: a network set up for one purpose, such as sharing consignment data between traders, ports and government agencies. Its members are accounts, each with its own access rights (see *Who can see signals*), and it defines the signal types those members can exchange.
+//	@description	- **Signal type**: identified by a slug and a version (e.g. `consignment/v1.0.0`). Each signal type has one of three content kinds: a **json** record typically describes an entity (e.g. a consignment), a **document** is a file (e.g. a certificate PDF), and an **event** records that something happened to another signal (e.g. a certificate was approved). json and event types usually have a JSON schema that the content is checked against. New signal types can be added at any time without affecting existing ones.
+//	@description	- **Signal**: one piece of information shared through an ISN. Each signal belongs to one signal type. json signals and documents can be updated with new versions, while events never change. Signals can be linked to each other, e.g. a consignment's documents and events are linked to the consignment (see *Correlation*).
+//	@description
 //	@description	The examples below use consignments moving through ports, but the service is generic: each network defines its own ISNs, signal types and schemas.
 //	@description
 //	@description	## API documentation
@@ -47,22 +48,26 @@ import (
 //	@description	Authorization: Bearer <access-token>
 //	@description	```
 //	@description
-//	@description	| | Service accounts | Web users |
-//	@description	|---|---|---|
-//	@description	| **Get a token** | `POST /oauth/token` with `grant_type=client_credentials`, and the client ID and secret as form fields or HTTP Basic auth | `POST /api/auth/login` with email and password. The access token is in the response body, and a refresh token is set as an HTTP-only cookie |
-//	@description	| **Renew it** | Request a new token in the same way | `POST /oauth/token` with `grant_type=refresh_token` (the cookie is sent automatically). The refresh token is rotated |
-//	@description	| **Lifetimes** | Access token: 30 minutes | Access token: 30 minutes. Refresh token: 30 days from the last refresh, so users only log in again after 30 days without using the service |
+//	@description	**Service accounts**
+//	@description	- **Get a token**: `POST /oauth/token` with `grant_type=client_credentials`, and the client ID and secret as form fields or HTTP Basic auth.
+//	@description	- **Renew it**: request a new token in the same way.
+//	@description	- **Lifetime**: access tokens last 30 minutes.
 //	@description
-//	@description	- Each login or refresh revokes the user's other refresh tokens, so a user has one session at a time. Changing or resetting a password ends all the user's sessions.
-//	@description	- The access token holds the account's role and ISN permissions when it was issued, so permission changes and disabled accounts take effect when the account next gets a token (within 30 minutes). The admin endpoints check the account's current role and status on every request, so changes apply to them straight away.
+//	@description	**Web users**
+//	@description	- **Get a token**: `POST /api/auth/login` with email and password. The access token is in the response body, and a refresh token is set as an HTTP-only cookie.
+//	@description	- **Renew it**: `POST /oauth/token` with `grant_type=refresh_token` (the cookie is sent automatically). The refresh token is rotated.
+//	@description	- **Lifetime**: access tokens last 30 minutes. Refresh tokens last 30 days from the last refresh, so users only log in again after 30 days without using the service.
+//	@description	- **Sessions**: each login or refresh revokes the user's other refresh tokens, so a user has one session at a time. Changing or resetting a password ends the session (the refresh token is revoked), so the user needs to log in again.
+//	@description
+//	@description	For both kinds of account, the access token holds the account's role and ISN permissions when it was issued, so permission changes and disabled accounts take effect when the account next gets a token (within 30 minutes). The admin endpoints check the account's current role and status on every request, so changes apply to them straight away.
 //	@description
 //	@description	# Signals
 //	@description
 //	@description	## Content kinds
-//	@description	Each signal type has a `content_kind`, which decides how its signals are sent:
-//	@description	- **json**: JSON content, validated against the signal type's schema (unless the type was set up to skip validation). Sent with *Submit Signals* or *Submit Signals via Router*.
-//	@description	- **document**: a file (PDF, JPEG, PNG or XML). Sent with *Upload a Document* or *Upload a Document via Router*, and fetched with *Download a Document*. Search results contain the document's metadata, not the file.
-//	@description	- **event**: an immutable JSON record that something happened to another signal. Sent with *Submit Signals* (see *Events*).
+//	@description	Each signal type's `content_kind` decides how its signals are sent:
+//	@description	- **json**: sent with *Submit Signals* or *Submit Signals via Router*. The content is validated against the signal type's schema (unless the type was set up to skip validation).
+//	@description	- **document**: a PDF, JPEG, PNG or XML file, sent with *Upload a Document* or *Upload a Document via Router* and fetched with *Download a Document*. Search results contain the document's metadata, not the file.
+//	@description	- **event**: sent with *Submit Signals*, and validated like json (see *Events* for the extra rules).
 //	@description
 //	@description	Search, withdrawal and batches work the same way for every kind.
 //	@description
@@ -80,7 +85,7 @@ import (
 //	@description
 //	@description	## Correlation
 //	@description	Link a signal to another signal in the same ISN by setting its `correlation_id` to the other signal's `signal_id`. Search results include each signal's `correlation_id` (null if it isn't linked to another signal).
-//	@description	- **Link to the entity directly**: e.g. link a consignment's documents and events to the consignment, not to each other. Correlation is one level deep: `include_correlated=true` only returns the signals linked directly to each result.
+//	@description	- **Link to the entity directly**: e.g. link a consignment's documents and events to the consignment, not to each other. Correlation is one level deep.
 //	@description	- **Linking is sharing**: linking your signal to another account's signal is like emailing that account a copy, except that they see your later versions, and withdrawing the signal stops their access through the service. If a new version changes the `correlation_id`, access moves with it: the owner of the newly linked signal can see every version, and the previous owner can no longer see it.
 //	@description
 //	@description	## Events
@@ -106,10 +111,10 @@ import (
 //	@description
 //	@description	## Routing
 //	@description	Some networks have one ISN per destination, e.g. one per port. Instead of choosing the ISN yourself, you can send signals to the router (*Submit Signals via Router* or *Upload a Document via Router*), which chooses the ISN for each signal:
-//	@description	- **A signal with a `correlation_id`** goes to the ISN of the signal it is linked to. Events always have one and routed documents must have one, so they always go to the ISN of the signal they are about.
+//	@description	- **A signal with a `correlation_id`** goes to the ISN of the signal it is linked to.
 //	@description	- **A json signal without one** is matched against its signal type's routing rules, e.g. on a port code in its content. The rules are set up by the service administrators (see [/admin-docs](/admin-docs)).
 //	@description
-//	@description	The response gives the `isn_slug` each signal was sent to. As a `local_ref` is unique within an ISN, a resent signal only updates the original if it is routed to the same ISN.
+//	@description	The response gives the `isn_slug` each signal was sent to.
 //	@description
 //	@description	Combined with the searches across your ISNs (see *Searching*), this means your code doesn't need to know which ISNs exist: when a new port joins and your account is given access to its ISN, signals are routed to it and your searches find the responses.
 //	@description
@@ -127,11 +132,20 @@ import (
 //	@description	# Searching
 //	@description	There are three search routes for private ISNs. The ISN and signal type in the path limit every filter, so e.g. a `local_ref` search on `consignment/v1.0.0` only finds consignments.
 //	@description
-//	@description	| Route | ISNs searched | Signal types searched |
-//	@description	|---|---|---|
-//	@description	| `GET /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search` | the ISN in the path | the type in the path |
-//	@description	| `GET /api/signal-types/{signal_type_slug}/v{sem_ver}/signals/search` | every ISN your account is a member of | the type in the path |
-//	@description	| `GET /api/signals/search` | every ISN your account is a member of | all types |
+//	@description	**One ISN, one signal type:**
+//	@description	```
+//	@description	GET /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/search
+//	@description	```
+//	@description
+//	@description	**Every ISN you are a member of, one signal type:**
+//	@description	```
+//	@description	GET /api/signal-types/{signal_type_slug}/v{sem_ver}/signals/search
+//	@description	```
+//	@description
+//	@description	**Every ISN you are a member of, all signal types:**
+//	@description	```
+//	@description	GET /api/signals/search
+//	@description	```
 //	@description
 //	@description	Each result includes its `isn_slug`, `signal_type_slug` and `sem_ver`, so you can build further URLs from it (e.g. *Download a Document*). To search one ISN across all signal types, use `/api/signals/search` and filter the results on `isn_slug`.
 //	@description
