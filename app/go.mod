@@ -14,7 +14,7 @@ require (
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
 	github.com/tidwall/gjson v1.20.1
 	github.com/tidwall/match v1.2.0
-	golang.org/x/crypto v0.58.0
+	golang.org/x/crypto v0.59.0
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20250803194717-c247dead11de
 	golang.org/x/text v0.44.0
 	golang.org/x/time v0.16.0
