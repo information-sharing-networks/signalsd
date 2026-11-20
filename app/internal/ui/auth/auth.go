@@ -157,7 +157,7 @@ func (a *AuthService) CheckAccessTokenStatus(accessTokenDetails *types.AccessTok
 	claims := &jwt.RegisteredClaims{}
 
 	_, _, err := parser.ParseUnverified(accessTokenDetails.AccessToken, claims)
-	if err != nil {
+	if err != nil || claims.ExpiresAt == nil {
 		return TokenInvalid
 	}
 
