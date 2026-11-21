@@ -3,6 +3,7 @@ package schemas
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -13,6 +14,12 @@ import (
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
+
+// ErrNotInCache is returned when a signal type is not in the cache.
+//
+// The cache is refreshed by polling, so a signal type created in the last CachePollInterval
+// (or on another instance) can exist in the database before it is in the cache.
+var ErrNotInCache = errors.New("signal type not found in schema cache")
 
 // SkipValidation returns true if the registered schema is the pre-defined SkipValidationURL
 func SkipValidation(url string) bool {
@@ -180,14 +187,14 @@ func ValidateContent(schema *jsonschema.Schema, rawJSON json.RawMessage) error {
 // Returns (true, nil) when the path resolves successfully, or when the signal
 // type uses skip-validation (no schema to check against).
 // Returns (false, nil) when a schema is present but the path cannot be resolved.
-// Returns (false, error) when the signal type is not in the cache at all (unexpected err)
+// Returns (false, ErrNotInCache) when the signal type is not in the cache at all.
 func (c *Cache) FieldPathExistsInSchema(signalTypePath, fieldPath string) (bool, error) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	schemaURL, ok := c.schemaURLs[signalTypePath]
 	if !ok {
-		return false, fmt.Errorf("signal type %q not found in schema cache", signalTypePath)
+		return false, fmt.Errorf("%w: %q", ErrNotInCache, signalTypePath)
 	}
 	if SkipValidation(schemaURL) {
 		return true, nil // no schema to validate against

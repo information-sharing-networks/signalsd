@@ -239,6 +239,17 @@ func TestSignalRoutingConfig(t *testing.T) {
 				}
 			})
 		}
+
+		// a signal type created after the schema cache was last loaded (before the next poll) must not cause an error
+		t.Run("signal_type_not_yet_in_schema_cache", func(t *testing.T) {
+			uncached := createTestSignalType(t, ctx, testEnv.queries, isn.ID, "uncached signal type", "", signalsd.ContentKindJSON)
+
+			resp := updateSignalRoutingConfig(t, testEnv.baseURL, siteAdminToken, uncached.Slug, uncached.SemVer, validRequest)
+			defer resp.Body.Close()
+			if resp.StatusCode != http.StatusNoContent {
+				t.Errorf("Expected status %d, got %d", http.StatusNoContent, resp.StatusCode)
+			}
+		})
 	})
 
 	t.Run("Get", func(t *testing.T) {

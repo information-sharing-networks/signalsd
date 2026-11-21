@@ -221,10 +221,16 @@ func (h *RoutingConfigHandler) UpdateSignalRoutingConfig(w http.ResponseWriter, 
 	}
 
 	// Validate the routing field against the cached schema for this signal type.
-	// The cache is guaranteed to be populated for any existing signal type, so a
-	// miss here is an unexpected internal error rather than a user error.
 	signalTypePath := fmt.Sprintf("%s/v%s", slug, semVer)
 	fieldExists, err := h.schemaCache.FieldPathExistsInSchema(signalTypePath, req.RoutingField)
+	if errors.Is(err, schemas.ErrNotInCache) {
+		// The signal type exists (checked above), so the cache has not picked it up yet - it was created
+		// less than CachePollInterval ago or on another instance. Reload the cache and try again.
+		if err := h.schemaCache.Load(r.Context()); err != nil {
+			return apperrors.InternalError("failed to reload the schema cache", err)
+		}
+		fieldExists, err = h.schemaCache.FieldPathExistsInSchema(signalTypePath, req.RoutingField)
+	}
 	if err != nil {
 		return apperrors.InternalError("schema cache error", err)
 	}
