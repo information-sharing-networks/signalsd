@@ -1,7 +1,7 @@
 # Docker-based Makefile for signalsd
 # Uses tools installed in Docker containers instead of local installations
 
-.PHONY: help psql check generate docs swag-fmt sqlc fmt vet lint security vuln update-tools test clean docker-up docker-down docker-reset templ go-api go-ui db-migrate-up db-migrate-down check-containers go-all
+.PHONY: help psql check generate docs swag-fmt sqlc fmt vet lint security vuln update-tools test clean docker-up docker-down docker-reset test-race templ go-api go-ui db-migrate-up db-migrate-down check-containers go-all
 
 export GO_VERSION := $(shell grep '^go ' app/go.mod | awk '{print $$2}')
 
@@ -37,6 +37,7 @@ help:
 	@echo "  make go-api          - Start signalsd backend locally (expects docker db to be running)"
 	@echo "  make go-ui           - Start ui in standalone mode (expects signalsd to be running on 8080)"
 	@echo "  make test            - Run tests"
+	@echo "  make test-race       - Run tests with the race detector (as make check and CI do)"
 	@echo "  make generate        - Generate docs and code (swagger + sqlc + templ)"
 	@echo "  make docs            - Generate swagger documentation"
 	@echo "  make swag-fmt        - format swag comments"
@@ -211,7 +212,7 @@ go-all:
 generate: docs sqlc swag-fmt templ
 
 # Main target: run all checks before committing
-check: generate fmt swag-fmt vet lint security vuln test
+check: generate fmt swag-fmt vet lint security vuln test-race
 	@echo ""
 	@echo "✅ All checks passed! Ready to commit."
 
@@ -220,3 +221,9 @@ test:
 	@echo "🔄 Running tests..."
 	@sh -c "cd app && go test ./..."
 	@sh -c "cd app && go test -v -count=1 -tags=integration ./test/integration/"
+
+# Run tests with the data race detector (slower - used by make check and CI)
+test-race:
+	@echo "🔄 Running tests with the race detector..."
+	@sh -c "cd app && go test -race ./..."
+	@sh -c "cd app && go test -race -v -count=1 -tags=integration ./test/integration/"
