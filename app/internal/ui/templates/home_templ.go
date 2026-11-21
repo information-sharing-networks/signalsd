@@ -29,20 +29,33 @@ func LoginPageWithEnvironment(environment string) templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Login - Signals</title><script src=\"https://unpkg.com/htmx.org@2.0.4\"></script><link href=\"/static/css/app.css\" rel=\"stylesheet\"></head><body data-environment=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<!doctype html><html lang=\"en\"><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><title>Login - Signals</title><script src=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var2 string
-		templ_7745c5c3_Var2, templ_7745c5c3_Err = templruntime.NewAttributeExpression(environment).Resolve(ctx)
+		templ_7745c5c3_Var2, templ_7745c5c3_Err = templruntime.NewAttributeExpression(htmxScriptPath).ResolveURL(ctx)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 17, Col: 38}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 14, Col: 31}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var2)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\"><div class=\"form-container\"><div class=\"form-card\"><h2 class=\"form-title login-title\">Sign in to Signals</h2><!-- Error message area - positioned prominently above the form --><div id=\"login-error\"></div><form hx-post=\"/login\" hx-target=\"#login-error\"><div class=\"form-group\"><div class=\"form-group-stacked\"><label for=\"email\" class=\"form-label-sr\">Email address</label> <input id=\"email\" name=\"email\" type=\"email\" required class=\"form-input form-input-stacked\" placeholder=\"Email address\"></div><div class=\"form-group-stacked\"><label for=\"password\" class=\"form-label-sr\">Password</label> <input id=\"password\" name=\"password\" type=\"password\" required class=\"form-input form-input-stacked\" placeholder=\"Password\"></div></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary btn-full\">Sign in</button></div></form><div class=\"form-group\"><p class=\"card-description text-muted\">Don't have an account?</p><button hx-get=\"/register\" hx-target=\"body\" hx-swap=\"outerHTML\" class=\"btn btn-secondary\">Create Account</button></div></div></div></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\"></script><link href=\"/static/css/app.css\" rel=\"stylesheet\"></head><body data-environment=\"")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var3 string
+		templ_7745c5c3_Var3, templ_7745c5c3_Err = templruntime.NewAttributeExpression(environment).Resolve(ctx)
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/ui/templates/home.templ`, Line: 17, Col: 38}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var3)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\"><div class=\"form-container\"><div class=\"form-card\"><h2 class=\"form-title login-title\">Sign in to Signals</h2><!-- Error message area - positioned prominently above the form --><div id=\"login-error\"></div><form hx-post=\"/login\" hx-target=\"#login-error\"><div class=\"form-group\"><div class=\"form-group-stacked\"><label for=\"email\" class=\"form-label-sr\">Email address</label> <input id=\"email\" name=\"email\" type=\"email\" required class=\"form-input form-input-stacked\" placeholder=\"Email address\"></div><div class=\"form-group-stacked\"><label for=\"password\" class=\"form-label-sr\">Password</label> <input id=\"password\" name=\"password\" type=\"password\" required class=\"form-input form-input-stacked\" placeholder=\"Password\"></div></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary btn-full\">Sign in</button></div></form><div class=\"form-group\"><p class=\"card-description text-muted\">Don't have an account?</p><button hx-get=\"/register\" hx-target=\"body\" hx-swap=\"outerHTML\" class=\"btn btn-secondary\">Create Account</button></div></div></div></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -68,7 +81,7 @@ func RegisterPage() templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var4 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var5 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -80,13 +93,13 @@ func RegisterPage() templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<div class=\"form-container\"><div class=\"form-card\"><h2 class=\"form-title\">Create Account</h2><form hx-post=\"/register\" hx-target=\"#register-error\"><div class=\"form-group\"><div class=\"form-group-stacked\"><label for=\"reg-email\" class=\"form-label-sr\">Email address</label> <input id=\"reg-email\" name=\"email\" type=\"email\" required class=\"form-input form-input-stacked\" placeholder=\"Email address\"></div><div class=\"form-group-stacked\"><label for=\"reg-password\" class=\"form-label-sr\">Password</label> <input id=\"reg-password\" name=\"password\" type=\"password\" required minlength=\"11\" class=\"form-input form-input-stacked\" placeholder=\"Password (minimum 11 characters)\"></div><div class=\"form-group-stacked\"><label for=\"reg-confirm-password\" class=\"form-label-sr\">Confirm Password</label> <input id=\"reg-confirm-password\" name=\"confirm-password\" type=\"password\" required class=\"form-input form-input-stacked\" placeholder=\"Confirm Password\"></div></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary btn-full\">Create Account</button></div></form><div id=\"register-error\"></div><div class=\"form-group\"><p class=\"card-description text-muted\">Already have an account?</p><button hx-get=\"/login\" hx-target=\"body\" hx-swap=\"outerHTML\" class=\"btn btn-secondary\">Sign In</button></div></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"form-container\"><div class=\"form-card\"><h2 class=\"form-title\">Create Account</h2><form hx-post=\"/register\" hx-target=\"#register-error\"><div class=\"form-group\"><div class=\"form-group-stacked\"><label for=\"reg-email\" class=\"form-label-sr\">Email address</label> <input id=\"reg-email\" name=\"email\" type=\"email\" required class=\"form-input form-input-stacked\" placeholder=\"Email address\"></div><div class=\"form-group-stacked\"><label for=\"reg-password\" class=\"form-label-sr\">Password</label> <input id=\"reg-password\" name=\"password\" type=\"password\" required minlength=\"11\" class=\"form-input form-input-stacked\" placeholder=\"Password (minimum 11 characters)\"></div><div class=\"form-group-stacked\"><label for=\"reg-confirm-password\" class=\"form-label-sr\">Confirm Password</label> <input id=\"reg-confirm-password\" name=\"confirm-password\" type=\"password\" required class=\"form-input form-input-stacked\" placeholder=\"Confirm Password\"></div></div><div class=\"form-group\"><button type=\"submit\" class=\"btn btn-primary btn-full\">Create Account</button></div></form><div id=\"register-error\"></div><div class=\"form-group\"><p class=\"card-description text-muted\">Already have an account?</p><button hx-get=\"/login\" hx-target=\"body\" hx-swap=\"outerHTML\" class=\"btn btn-secondary\">Sign In</button></div></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = BaseLayout("Register").Render(templ.WithChildren(ctx, templ_7745c5c3_Var4), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = BaseLayout("Register").Render(templ.WithChildren(ctx, templ_7745c5c3_Var5), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -112,7 +125,7 @@ func RegistrationSuccess() templ.Component {
 		}
 		ctx = templ.InitializeContext(ctx)
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"alert alert-success\" data-auto-redirect-to-login=\"true\"><strong>Account created!</strong> You can now sign in.<div class=\"form-group\" style=\"margin-top: 1rem;\"><button hx-get=\"/login\" hx-target=\"body\" hx-swap=\"outerHTML\" class=\"btn btn-primary\">Continue to Sign In</button></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div class=\"alert alert-success\" data-auto-redirect-to-login=\"true\"><strong>Account created!</strong> You can now sign in.<div class=\"form-group\" style=\"margin-top: 1rem;\"><button hx-get=\"/login\" hx-target=\"body\" hx-swap=\"outerHTML\" class=\"btn btn-primary\">Continue to Sign In</button></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

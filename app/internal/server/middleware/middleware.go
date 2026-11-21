@@ -53,6 +53,12 @@ func NoCache(next http.Handler) http.Handler {
 	})
 }
 
+// contentSecurityPolicy only allows scripts served from this origin: the third-party scripts used by the UI (htmx)
+// and the API docs (RapiDoc) are bundled locally.
+// Inline styles are allowed because the UI templates use style attributes,
+// and data: images because RapiDoc draws its icons as inline SVGs.
+const contentSecurityPolicy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none';"
+
 func SecurityHeaders(environment string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -63,7 +69,7 @@ func SecurityHeaders(environment string) func(http.Handler) http.Handler {
 			// for legacy support
 			w.Header().Set("X-Frame-Options", "DENY")
 
-			w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self' https://unpkg.com; style-src 'self' 'unsafe-inline'; frame-ancestors 'none';")
+			w.Header().Set("Content-Security-Policy", contentSecurityPolicy)
 
 			w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 
