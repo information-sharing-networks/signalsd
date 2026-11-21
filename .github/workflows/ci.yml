@@ -87,8 +87,16 @@ jobs:
       - name: Download Go modules
         run: go mod download
 
+      # gofmt -l lists files that need formatting without changing them (go fmt rewrites files and exits 0)
       - name: Check formatting
-        run: go fmt ./... || exit 1
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files are not gofmt formatted (run 'make fmt'):"
+            echo "$unformatted"
+            gofmt -d $unformatted
+            exit 1
+          fi
 
       - name: Run vet
         run: go vet ./... || exit 1
