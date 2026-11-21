@@ -49,17 +49,17 @@ type signalRoutingConfig struct {
 // Cache holds all the routing configs defined on the server.
 // The isn route configs are loaded from the database at startup and refreshed periodically by polling.
 //
-// The key for SignalRoutingConfigs is the signal type path: "{signal-type-slug}/v{semver}".
+// The key for signalRoutingConfigs is the signal type path: "{signal-type-slug}/v{semver}".
 type Cache struct {
 	mu                   sync.RWMutex
-	SignalRoutingConfigs map[string]signalRoutingConfig
+	signalRoutingConfigs map[string]signalRoutingConfig
 	db                   *database.Queries
 }
 
 func NewCache(db *database.Queries) *Cache {
 	return &Cache{
 		db:                   db,
-		SignalRoutingConfigs: make(map[string]signalRoutingConfig),
+		signalRoutingConfigs: make(map[string]signalRoutingConfig),
 	}
 }
 
@@ -102,7 +102,7 @@ func (c *Cache) Load(ctx context.Context) error {
 	}
 
 	c.mu.Lock()
-	c.SignalRoutingConfigs = configs
+	c.signalRoutingConfigs = configs
 	c.mu.Unlock()
 
 	return nil
@@ -130,8 +130,12 @@ func (c *Cache) StartPolling(ctx context.Context, interval time.Duration) {
 	}()
 }
 
+// Len returns the number of signal types with routing configs in the cache
 func (c *Cache) Len() int {
-	return len(c.SignalRoutingConfigs)
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	return len(c.signalRoutingConfigs)
 }
 
 // the reasons a signal can't be routed (returned by Resolve)
@@ -153,7 +157,7 @@ var (
 // Both isnID and isnSlug are returned from the cache to avoid DB lookups during signal processing.
 func (c *Cache) Resolve(signalTypePath string, content json.RawMessage) (isnID uuid.UUID, isnSlug string, err error) {
 	c.mu.RLock()
-	SignalRoutingConfig, exists := c.SignalRoutingConfigs[signalTypePath]
+	routingConfig, exists := c.signalRoutingConfigs[signalTypePath]
 	c.mu.RUnlock()
 
 	if !exists {
@@ -167,23 +171,23 @@ func (c *Cache) Resolve(signalTypePath string, content json.RawMessage) (isnID u
 	// on '.' and escape each key before rejoining them with '.' separators.
 	// The admin API only accepts letters, digits, '_', '-', ':' and '@' in a routing field, but escaping
 	// every char means routing configs saved before that check was added are also matched literally.
-	segs := strings.Split(SignalRoutingConfig.routingField, ".")
+	segs := strings.Split(routingConfig.routingField, ".")
 	for i, seg := range segs {
 		segs[i] = gjson.Escape(seg)
 	}
 
 	result := gjson.GetBytes(content, strings.Join(segs, "."))
 	if !result.Exists() {
-		return uuid.Nil(), "", fmt.Errorf("%w: %s", ErrRoutingFieldNotFound, SignalRoutingConfig.routingField)
+		return uuid.Nil(), "", fmt.Errorf("%w: %s", ErrRoutingFieldNotFound, routingConfig.routingField)
 	}
 
-	for _, rule := range SignalRoutingConfig.routingRules {
+	for _, rule := range routingConfig.routingRules {
 		if matchesResult(rule, result) {
 			return rule.isnID, rule.isnSlug, nil
 		}
 	}
 
-	return uuid.Nil(), "", fmt.Errorf("%w: %s", ErrNoRuleMatched, SignalRoutingConfig.routingField)
+	return uuid.Nil(), "", fmt.Errorf("%w: %s", ErrNoRuleMatched, routingConfig.routingField)
 }
 
 // matchesResult returns true if the route's criteria match the gjson result.

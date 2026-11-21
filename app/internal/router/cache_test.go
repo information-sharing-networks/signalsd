@@ -122,7 +122,7 @@ func TestResolveAtSignKeys(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			c := &Cache{SignalRoutingConfigs: map[string]signalRoutingConfig{
+			c := &Cache{signalRoutingConfigs: map[string]signalRoutingConfig{
 				"test/v1.0.0": {
 					routingField: tt.field,
 					routingRules: []routingRule{{matchPattern: "*", operator: "matches"}},
@@ -138,7 +138,7 @@ func TestResolveAtSignKeys(t *testing.T) {
 
 // TestResolveErrors checks that Resolve reports why a signal can't be routed
 func TestResolveErrors(t *testing.T) {
-	c := &Cache{SignalRoutingConfigs: map[string]signalRoutingConfig{
+	c := &Cache{signalRoutingConfigs: map[string]signalRoutingConfig{
 		"test/v1.0.0": {
 			routingField: "port",
 			routingRules: []routingRule{{matchPattern: "Felixstowe", operator: "equals"}},

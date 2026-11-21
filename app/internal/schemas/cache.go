@@ -118,6 +118,9 @@ func (c *Cache) StartPolling(ctx context.Context, interval time.Duration) {
 
 // Len returns the number of schemas loaded to the schema cache
 func (c *Cache) Len() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
 	return len(c.schemas)
 }
 
