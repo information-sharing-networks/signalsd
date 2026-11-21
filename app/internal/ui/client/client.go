@@ -10,15 +10,24 @@ import (
 
 // Client handles communication with signalsd API
 type Client struct {
-	baseURL    string
-	httpClient *http.Client
+	baseURL        string
+	httpClient     *http.Client
+	downloadClient *http.Client
 }
 
 func NewClient(baseURL string) *Client {
+	downloadTransport := http.DefaultTransport.(*http.Transport).Clone()
+	downloadTransport.ResponseHeaderTimeout = 30 * time.Second
+
 	return &Client{
 		baseURL: baseURL,
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
+		},
+		// Document downloads can take up to DOCUMENT_TRANSFER_TIMEOUT, so no overall Timeout is set here;
+		// the transfer is bounded by the incoming request context (ExtendRequestTimeout).
+		downloadClient: &http.Client{
+			Transport: downloadTransport,
 		},
 	}
 }

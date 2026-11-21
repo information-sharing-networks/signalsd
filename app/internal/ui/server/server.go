@@ -10,6 +10,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
+	"github.com/information-sharing-networks/signalsd/app/internal/server/middleware"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/config"
@@ -18,7 +19,20 @@ import (
 const (
 	// ServerShutdownTimeout is the timeout for graceful server shutdown
 	ServerShutdownTimeout = 10 * time.Second
+
+	// maxRequestBodySize caps UI request bodies - the UI forms are small, and without a cap
+	// r.ParseForm (and FormValue) will read up to 10MB into memory, including on the unauthenticated /login and /register routes.
+	maxRequestBodySize = 64 << 10
 )
+
+// limitRequestBody caps the request body at maxRequestBodySize.
+// Oversized form bodies fail to parse, so the handlers see empty form values.
+func limitRequestBody(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, maxRequestBodySize)
+		next.ServeHTTP(w, r)
+	})
+}
 
 type Server struct {
 	router      *chi.Mux
@@ -65,18 +79,19 @@ func (s *Server) registerRoutes() {
 	// Public routes (no auth required)
 	s.router.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("./web/static/"))))
 	s.router.Get("/login", s.LoginPage)
-	s.router.Post("/login", s.Login)
+	s.router.With(limitRequestBody).Post("/login", s.Login)
 	s.router.Post("/logout", s.Logout)
 	s.router.Get("/register", s.RegisterPage)
-	s.router.Post("/register", s.Register)
-
-	// redirects to dashboard if authenticated, login if not
-	s.router.Get("/", s.HomePage)
+	s.router.With(limitRequestBody).Post("/register", s.Register)
 
 	// Protected routes - require valid access token
 	s.router.Group(func(r chi.Router) {
+		r.Use(limitRequestBody)
 		r.Use(s.authService.RequireAuth)
 		r.Use(s.authService.AddAccountIDToLogContext)
+
+		// redirects to dashboard if authenticated (RequireAuth redirects to login if not)
+		r.Get("/", s.HomePage)
 
 		// entry point after login
 		r.Get("/dashboard", s.DashboardPage)
@@ -107,7 +122,12 @@ func (s *Server) registerRoutes() {
 			r.Get("/search", s.SearchSignalsPage)
 			r.Get("/ui-api/signals/search", s.SearchSignals)
 			r.Get("/ui-api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}/correlated-count/{count}", s.GetLatestCorrelatedSignals)
-			r.Get("/ui-api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}/content", s.DownloadDocument)
+
+			// document downloads are given DOCUMENT_TRANSFER_TIMEOUT (matching the API download endpoint)
+			r.Group(func(r chi.Router) {
+				r.Use(middleware.ExtendRequestTimeout(s.config.DocumentTransferTimeout))
+				r.Get("/ui-api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver}/signals/{signal_id}/content", s.DownloadDocument)
+			})
 		})
 
 		// admin routes (isnadmin or siteadmin)
@@ -200,15 +220,16 @@ func (s *Server) registerRoutes() {
 
 // setupMiddleware creates the routes when running the ui in standalone mode.
 func (s *Server) setupMiddleware() {
+	s.router.Use(chimiddleware.Recoverer)
 	s.router.Use(chimiddleware.RequestID)
 	s.router.Use(chimiddleware.ClientIPFromXFFTrustedProxies(s.config.TrustedProxies))
 	s.router.Use(logger.RequestLogging(s.logger))
-	s.router.Use(chimiddleware.Recoverer)
+	s.router.Use(middleware.SecurityHeaders(s.config.Environment))
 	// CSRF protection: reject cross-origin POST/PUT/DELETE requests (see doc.go)
 	s.router.Use(http.NewCrossOriginProtection().Handler)
 	// Cancel r.Context() just before WriteTimeout drops the TCP connection,
-	// so in-flight work is abandoned cleanly.
-	s.router.Use(chimiddleware.Timeout(s.config.WriteTimeout - time.Second))
+	// so in-flight work is abandoned cleanly (document downloads use ExtendRequestTimeout).
+	s.router.Use(middleware.RequestTimeout(s.config.WriteTimeout))
 
 }
 

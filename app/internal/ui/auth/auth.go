@@ -140,33 +140,76 @@ func (a *AuthService) RevokeToken(refreshTokenCookie *http.Cookie) error {
 	return nil
 }
 
-// CheckAccessTokenStatus checks the status of an access token from context
-func (a *AuthService) CheckAccessTokenStatus(accessTokenDetails *types.AccessTokenDetails) AccessTokenStatus {
+// authCookiePayload is the minimal payload stored in the access_details_token cookie.
+// Account identity, role, and ISN permissions are derived from the JWT claims on read
+// rather than duplicated in the cookie, keeping it well under the 4KB browser cookie limit.
+type authCookiePayload struct {
+	AccessToken string `json:"access_token"`
+	Email       string `json:"email"`
+}
 
-	if accessTokenDetails == nil {
+// accessTokenClaims mirrors the claims emitted by the signalsd API in JWT access tokens.
+type accessTokenClaims struct {
+	jwt.RegisteredClaims
+	AccountID   string                   `json:"account_id"`
+	AccountType string                   `json:"account_type"`
+	Role        string                   `json:"role"`
+	IsnPerms    map[string]types.IsnPerm `json:"isn_perms,omitempty"`
+}
 
-		return TokenMissing
+// ParseAuthCookie decodes the access_details_token cookie, extracts account identity and ISN permissions
+// from the embedded JWT claims (without signature verification — the signalsd API verifies the token
+// on every API call), and reports the token's status.
+func (a *AuthService) ParseAuthCookie(cookieValue string) (*types.AccessTokenDetails, AccessTokenStatus, error) {
+	decoded, err := base64.StdEncoding.DecodeString(cookieValue)
+	if err != nil {
+		return nil, TokenInvalid, fmt.Errorf("could not decode access token detail cookie: %w", err)
 	}
 
-	if accessTokenDetails.AccessToken == "" {
-		return TokenInvalid
+	var payload authCookiePayload
+	if err := json.Unmarshal(decoded, &payload); err != nil {
+		return nil, TokenInvalid, fmt.Errorf("could not unmarshal access token detail cookie: %w", err)
 	}
 
-	// Parse token without validation to check expiry
+	if payload.AccessToken == "" {
+		return nil, TokenInvalid, nil
+	}
+
 	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
-	claims := &jwt.RegisteredClaims{}
+	claims := &accessTokenClaims{}
 
-	_, _, err := parser.ParseUnverified(accessTokenDetails.AccessToken, claims)
-	if err != nil || claims.ExpiresAt == nil {
-		return TokenInvalid
+	if _, _, err := parser.ParseUnverified(payload.AccessToken, claims); err != nil || claims.ExpiresAt == nil {
+		return nil, TokenInvalid, nil
 	}
 
-	// Check if token is expired (in normal operations the browser will remove the expired cookie and this code will not be reached)
 	if claims.ExpiresAt.Before(time.Now()) {
-		return TokenExpired
+		return nil, TokenExpired, nil
 	}
 
-	return TokenValid
+	// Reconstruct each signal type's path, slug, and sem_ver from the map key ("{slug}/v{sem_ver}").
+	// The JWT stores only {in_use} per key to keep tokens compact.
+	for isnSlug, perm := range claims.IsnPerms {
+		for path, st := range perm.SignalTypes {
+			st.Path = path
+			if slug, semVer, ok := strings.Cut(path, "/v"); ok {
+				st.Slug = slug
+				st.SemVer = semVer
+			}
+			perm.SignalTypes[path] = st
+		}
+		claims.IsnPerms[isnSlug] = perm
+	}
+
+	details := &types.AccessTokenDetails{
+		AccessToken: payload.AccessToken,
+		AccountID:   claims.AccountID,
+		Email:       payload.Email,
+		AccountType: claims.AccountType,
+		Role:        claims.Role,
+		IsnPerms:    claims.IsnPerms,
+	}
+
+	return details, TokenValid, nil
 }
 
 // SetAuthCookies sets the authentication-related cookies in the UI HTTP response after authentication
@@ -175,11 +218,16 @@ func (a *AuthService) CheckAccessTokenStatus(accessTokenDetails *types.AccessTok
 //
 // The following cookies are set:
 //   - refresh token cookie (forwarded from signalsd API)
-//   - a cookie containing the access token and account information returned from the access token provided by the server,
+//   - a compact cookie containing the JWT access token and email (role and ISN permissions are read from the JWT claims)
 func (a *AuthService) SetAuthCookies(w http.ResponseWriter, accessTokenDetails *types.AccessTokenDetails, refreshTokenCookie *http.Cookie) error {
 	isProdOrStaging := a.environment == "prod" || a.environment == "staging" //secure flag only true on prod and staging
 
-	accessTokenDetailsJSON, err := json.Marshal(accessTokenDetails) // #nosec G117 - legitimate API call, not logging secrets
+	cookiePayload := authCookiePayload{
+		AccessToken: accessTokenDetails.AccessToken,
+		Email:       accessTokenDetails.Email,
+	}
+
+	accessTokenDetailsJSON, err := json.Marshal(cookiePayload) // #nosec G117 - storing access token in httpOnly cookie, not logging secrets
 	if err != nil {
 		return fmt.Errorf("failed to marshal access token details: %v", err)
 	}

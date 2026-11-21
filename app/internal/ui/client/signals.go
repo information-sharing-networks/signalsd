@@ -170,7 +170,7 @@ func (c *Client) DownloadDocument(ctx context.Context, accessToken string, param
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", accessToken))
 	setRequestID(req, ctx)
 
-	res, err := c.httpClient.Do(req)
+	res, err := c.downloadClient.Do(req)
 	if err != nil {
 		return nil, NewClientConnectionError(err)
 	}

@@ -85,19 +85,18 @@ When running as a separate service, the UI has its own configuration:
 - `API_BASE_URL`: Base URL of the signalsd API (default: http://localhost:8080)
 - `READ_TIMEOUT`: HTTP read timeout (default: 15s)
 - `WRITE_TIMEOUT`: HTTP write timeout (default: 15s)
-- `IDLE_TIMEOUT`: HTTP idle timeout (default: 60s)
+- `IDLE_TIMEOUT`: HTTP idle timeout (default: 65s)
+- `DOCUMENT_TRANSFER_TIMEOUT`: Timeout for streaming document downloads (default: 2m)
 
 **No database or secret configuration required** - the UI calls the signalsd API for all data operations.
 
 
 ## Auth
-All authentication and authorization is handled by the signalsd API.  
+All authentication and authorization is handled by the signalsd API.
 
-Authorization is via the server supplied JWT access tokens.  The UI does not read the claims in the token, it just decodes the token to establish the expiry time so that it can refresh the token before it expires. 
+Authorization is via the server-supplied JWT access tokens. The UI stores only the JWT and the user's email in an `HttpOnly`, `SameSite=Strict` cookie (keeping the cookie compact and well within browser size limits) and reads the JWT claims without verifying the signature to check expiry and tailor the UI (e.g., hiding pages that the user does not have access to).
 
-The UI uses the AccessTokenDetails struct that is returned by the signalsd login and refresh token APIs.  The struct contains information about the user's role and permissions so that the UI can improve the UX (e.g., hiding pages that the user does not have access to). This struct is a more detailed version of the claims contained in the token.
-
-The UI does not need to create its own tokens and does not need to know the SECRET_KEY used by the server (the key never leaves the server - it is only used to verify the token was not tampered with)
+The UI does not need to create its own tokens and does not need to know the SECRET_KEY used by the server (the key never leaves the server - the API verifies the token signature on every request).
 
 ## Production Setup
 

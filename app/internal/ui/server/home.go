@@ -6,29 +6,15 @@ import (
 
 	"github.com/a-h/templ"
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
-	"github.com/information-sharing-networks/signalsd/app/internal/ui/auth"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/client"
 	uiconfig "github.com/information-sharing-networks/signalsd/app/internal/ui/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/templates"
 )
 
-// HomePage handles the root path and redirects to the dashboard if authenticated, login if not
+// HomePage handles the root path: RequireAuth redirects unauthenticated requests to /login
+// (and refreshes expired tokens if a refresh cookie is present), so authenticated requests land on /dashboard.
 func (s *Server) HomePage(w http.ResponseWriter, r *http.Request) {
-
-	accessTokenDetails, ok := auth.ContextAccessTokenDetails(r.Context())
-	if !ok {
-		s.RedirectToLogin(w, r)
-		return
-	}
-
-	status := s.authService.CheckAccessTokenStatus(accessTokenDetails)
-
-	switch status {
-	case auth.TokenValid:
-		http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
-	case auth.TokenExpired, auth.TokenInvalid, auth.TokenMissing:
-		s.RedirectToLogin(w, r)
-	}
+	http.Redirect(w, r, "/dashboard", http.StatusSeeOther)
 }
 
 // LoginPage godoc
@@ -39,16 +25,6 @@ func (s *Server) HomePage(w http.ResponseWriter, r *http.Request) {
 //	@Router		/login [get]
 func (s *Server) LoginPage(w http.ResponseWriter, r *http.Request) {
 	templ.Handler(templates.LoginPageWithEnvironment(s.config.Environment)).ServeHTTP(w, r)
-}
-
-// Helper method for redirecting to login
-func (s *Server) RedirectToLogin(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("HX-Request") == "true" {
-		w.Header().Set("HX-Redirect", "/login")
-		w.WriteHeader(http.StatusOK)
-	} else {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-	}
 }
 
 // Login godoc

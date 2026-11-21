@@ -122,7 +122,7 @@ jobs:
         run: go mod download
 
       # exclude G120 - FormValue is used extensively in the UI handlers
-      # and the size is limited by MaxBytesReader middleware (not detected by gosec)
+      # and the size is limited by MaxBytesReader middleware on the UI routes (not detected by gosec)
       - name: Run gosec
         run: go tool -modfile=tools/go.mod gosec -exclude-generated -exclude=G120 ./...
 

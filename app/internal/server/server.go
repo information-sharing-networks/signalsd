@@ -566,14 +566,15 @@ func (s *Server) registerApiDocoRoutes() {
 func (s *Server) setupUIServer() {
 	// Create UI configuration based on signalsd configuration
 	uiConfig := &config.Config{
-		Environment:  s.config.Environment,
-		Host:         s.config.Host,
-		Port:         s.config.Port, // Same port as API
-		LogLevel:     s.config.LogLevel,
-		ReadTimeout:  s.config.ReadTimeout,
-		WriteTimeout: s.config.WriteTimeout,
-		IdleTimeout:  s.config.IdleTimeout,
-		APIBaseURL:   fmt.Sprintf("http://localhost:%d", s.config.Port), // use the API port
+		Environment:             s.config.Environment,
+		Host:                    s.config.Host,
+		Port:                    s.config.Port, // Same port as API
+		LogLevel:                s.config.LogLevel,
+		ReadTimeout:             s.config.ReadTimeout,
+		WriteTimeout:            s.config.WriteTimeout,
+		IdleTimeout:             s.config.IdleTimeout,
+		DocumentTransferTimeout: s.config.DocumentTransferTimeout,
+		APIBaseURL:              fmt.Sprintf("http://localhost:%d", s.config.Port), // use the API port
 	}
 
 	// Create UI server and register its routes on the signalsd router

@@ -1,8 +1,6 @@
 package auth
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -10,7 +8,6 @@ import (
 
 	"github.com/information-sharing-networks/signalsd/app/internal/logger"
 	"github.com/information-sharing-networks/signalsd/app/internal/ui/config"
-	"github.com/information-sharing-networks/signalsd/app/internal/ui/types"
 )
 
 // RequireAuth is middleware that checks authentication and attempts token refresh if needed.
@@ -33,27 +30,17 @@ func (a *AuthService) RequireAuth(next http.Handler) http.Handler {
 			tokenStatus = TokenMissing
 
 		} else {
-
-			// Decode the access token details cookie
-			decodedAccessTokenDetails, err := base64.StdEncoding.DecodeString(accessTokenDetailsCookie.Value)
-			if err != nil {
-				reqLogger.Error("could not decode access token detail cookie ", slog.String("error", err.Error()), slog.String("component", "ui.RequireAuth"))
+			accessTokenDetails, status, parseErr := a.ParseAuthCookie(accessTokenDetailsCookie.Value)
+			if parseErr != nil {
+				reqLogger.Error("could not parse access token detail cookie", slog.String("error", parseErr.Error()), slog.String("component", "ui.RequireAuth"))
 				redirectToLogin(w, r)
 				return
 			}
 
-			accessTokenDetails := &types.AccessTokenDetails{}
-			if err := json.Unmarshal(decodedAccessTokenDetails, accessTokenDetails); err != nil {
-				reqLogger.Error("could not unmarshal access token detail", slog.String("error", err.Error()), slog.String("component", "ui.RequireAuth"))
-				redirectToLogin(w, r)
-				return
+			tokenStatus = status
+			if accessTokenDetails != nil {
+				ctx = ContextWithAccessTokenDetails(ctx, accessTokenDetails)
 			}
-
-			// check the access token status
-			tokenStatus = a.CheckAccessTokenStatus(accessTokenDetails)
-
-			// create context with access token details
-			ctx = ContextWithAccessTokenDetails(ctx, accessTokenDetails)
 		}
 
 		switch tokenStatus {

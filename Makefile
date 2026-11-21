@@ -143,7 +143,7 @@ lint:
 
 # Run security analysis
 # exclude G120 - FormValue is used extensively in the UI handlers
-# and the size is limited by MaxBytesReader middleware (not detected by gosec)
+# and the size is limited by MaxBytesReader middleware on the UI routes (not detected by gosec)
 security:
 	@echo "🔄 Running security analysis..."
 	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && $(GO_TOOL) gosec -exclude-generated -exclude=G120 ./..."

@@ -9,15 +9,16 @@ import (
 
 // UI server config - used when the ui is run in standalone mode
 type Config struct {
-	Environment    string        `env:"ENVIRONMENT" envDefault:"dev"`
-	Host           string        `env:"HOST"         envDefault:"0.0.0.0"`
-	Port           int           `env:"PORT"         envDefault:"3000"`
-	LogLevel       string        `env:"LOG_LEVEL"    envDefault:"debug"`
-	ReadTimeout    time.Duration `env:"READ_TIMEOUT"  envDefault:"15s"`
-	WriteTimeout   time.Duration `env:"WRITE_TIMEOUT" envDefault:"15s"`
-	IdleTimeout    time.Duration `env:"IDLE_TIMEOUT"  envDefault:"65s"` // must exceed ALB idle timeout (default 60s) so ALB closes first
-	APIBaseURL     string        `env:"API_BASE_URL"      envDefault:"http://localhost:8080"`
-	TrustedProxies int           `env:"TRUSTED_PROXIES"   envDefault:"1"` // number of reverse proxies in front of the service (e.g. 1 for a single ALB)
+	Environment             string        `env:"ENVIRONMENT"               envDefault:"dev"`
+	Host                    string        `env:"HOST"                      envDefault:"0.0.0.0"`
+	Port                    int           `env:"PORT"                      envDefault:"3000"`
+	LogLevel                string        `env:"LOG_LEVEL"                 envDefault:"debug"`
+	ReadTimeout             time.Duration `env:"READ_TIMEOUT"              envDefault:"15s"`
+	WriteTimeout            time.Duration `env:"WRITE_TIMEOUT"             envDefault:"15s"`
+	IdleTimeout             time.Duration `env:"IDLE_TIMEOUT"              envDefault:"65s"` // must exceed ALB idle timeout (default 60s) so ALB closes first
+	DocumentTransferTimeout time.Duration `env:"DOCUMENT_TRANSFER_TIMEOUT" envDefault:"2m"`  // replaces READ_TIMEOUT and WRITE_TIMEOUT for document downloads
+	APIBaseURL              string        `env:"API_BASE_URL"              envDefault:"http://localhost:8080"`
+	TrustedProxies          int           `env:"TRUSTED_PROXIES"           envDefault:"1"` // number of reverse proxies in front of the service (e.g. 1 for a single ALB)
 }
 
 var validEnvs = map[string]bool{
@@ -59,11 +60,17 @@ func validateUIConfig(cfg *Config) error {
 	if cfg.ReadTimeout <= 0 {
 		return fmt.Errorf("read timeout must be positive, got %v", cfg.ReadTimeout)
 	}
-	if cfg.WriteTimeout <= 0 {
-		return fmt.Errorf("write timeout must be positive, got %v", cfg.WriteTimeout)
+	if cfg.WriteTimeout <= time.Second {
+		return fmt.Errorf("write timeout must be more than 1s, got %v", cfg.WriteTimeout)
 	}
 	if cfg.IdleTimeout <= 0 {
 		return fmt.Errorf("idle timeout must be positive, got %v", cfg.IdleTimeout)
+	}
+	if cfg.DocumentTransferTimeout <= time.Second {
+		return fmt.Errorf("DOCUMENT_TRANSFER_TIMEOUT must be more than 1s, got %v", cfg.DocumentTransferTimeout)
+	}
+	if cfg.TrustedProxies < 1 {
+		return fmt.Errorf("TRUSTED_PROXIES must be at least 1, got %d", cfg.TrustedProxies)
 	}
 
 	if cfg.APIBaseURL == "" {
