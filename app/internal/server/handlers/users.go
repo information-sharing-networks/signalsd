@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 	"uuid"
 
 	"github.com/information-sharing-networks/signalsd/app/internal/apperrors"
@@ -87,7 +88,7 @@ func (u *UserHandler) RegisterUser(w http.ResponseWriter, r *http.Request) error
 		return apperrors.AlreadyExists("a user already exists with this email address", nil)
 	}
 
-	if len(req.Password) < signalsd.MinimumPasswordLength {
+	if utf8.RuneCountInString(req.Password) < signalsd.MinimumPasswordLength {
 		return apperrors.PasswordTooShort(fmt.Sprintf("password must be at least %d characters", signalsd.MinimumPasswordLength), nil)
 	}
 
@@ -211,7 +212,7 @@ func (u *UserHandler) UpdatePassword(w http.ResponseWriter, r *http.Request) err
 		return apperrors.AuthenticationFailure("Current password is incorrect", nil)
 	}
 
-	if len(req.NewPassword) < signalsd.MinimumPasswordLength {
+	if utf8.RuneCountInString(req.NewPassword) < signalsd.MinimumPasswordLength {
 		return apperrors.PasswordTooShort(fmt.Sprintf("password must be at least %d characters", signalsd.MinimumPasswordLength), nil)
 	}
 
@@ -745,8 +746,14 @@ func (u *UserHandler) PasswordResetToken(w http.ResponseWriter, r *http.Request)
 		return apperrors.MalformedBody("new_password is required", nil)
 	}
 
-	if len(req.NewPassword) < signalsd.MinimumPasswordLength {
+	if utf8.RuneCountInString(req.NewPassword) < signalsd.MinimumPasswordLength {
 		return apperrors.PasswordTooShort(fmt.Sprintf("password must be at least %d characters", signalsd.MinimumPasswordLength), nil)
+	}
+
+	// hash the password
+	hashedPassword, err := u.authService.HashPassword(req.NewPassword)
+	if err != nil {
+		return apperrors.InternalError("internal server error", err)
 	}
 
 	tx, err := u.pool.BeginTx(r.Context(), pgx.TxOptions{})
@@ -778,12 +785,6 @@ func (u *UserHandler) PasswordResetToken(w http.ResponseWriter, r *http.Request)
 		return apperrors.ResourceExpired("password reset token has expired", nil)
 	}
 
-	// Hash the new password
-	hashedPassword, err := u.authService.HashPassword(req.NewPassword)
-	if err != nil {
-		return apperrors.InternalError("internal server error", err)
-	}
-
 	// Update the password in the database
 	rowsAffected, err := txQueries.UpdatePassword(r.Context(), database.UpdatePasswordParams{
 		AccountID:      resetToken.UserAccountID,
@@ -801,10 +802,15 @@ func (u *UserHandler) PasswordResetToken(w http.ResponseWriter, r *http.Request)
 		return apperrors.DatabaseError("password update affected unexpected number of rows", nil)
 	}
 
-	// Delete the password reset token
-	_, err = txQueries.DeletePasswordResetToken(r.Context(), hashedToken)
+	// Delete the password reset token.
+	// If the link is submitted twice at the same time, the second delete waits for the first transaction to commit
+	// and then deletes nothing: reject it so the link can only be used once.
+	deleted, err := txQueries.DeletePasswordResetToken(r.Context(), hashedToken)
 	if err != nil {
 		return apperrors.DatabaseError("database error", err)
+	}
+	if deleted != 1 {
+		return apperrors.NotFound("password reset token not found or already used", nil)
 	}
 
 	// end the user's sessions, so that anyone holding a stolen refresh token loses access
