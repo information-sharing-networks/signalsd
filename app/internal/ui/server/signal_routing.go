@@ -145,6 +145,12 @@ func (s *Server) SaveSignalRoutingConfig(w http.ResponseWriter, r *http.Request)
 	caseInsensitiveFlags := r.Form["case-insensitive"]
 	isnSlugs := r.Form["isn-slugs"]
 
+	// each row sends one value for each field
+	if len(operators) != len(patterns) || len(caseInsensitiveFlags) != len(patterns) || len(isnSlugs) != len(patterns) {
+		templ.Handler(templates.ErrorAlert("Invalid form data.")).ServeHTTP(w, r)
+		return
+	}
+
 	routingRules := make([]client.SignalRoutingRule, 0, len(patterns))
 	var sequence int32
 	for i := range patterns {
