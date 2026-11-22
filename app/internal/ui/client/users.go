@@ -133,7 +133,7 @@ func (c *Client) LookupUserByEmail(ctx context.Context, accessToken, email strin
 type GeneratePasswordResetLinkResponse struct {
 	UserEmail string `json:"user_email" example:"user@example.com"`
 	AccountID string `json:"account_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	ResetURL  string `json:"reset_url" example:"https://api.example.com/api/auth/password-reset/0ce71234-34d5-4fb5-beb8-ad50d8b40c7d"`
+	ResetURL  string `json:"reset_url" example:"https://api.example.com/api/auth/password-reset/l7ny8ASVmB7AyJbi-Ogf5jh3SenxZ1-1ULCwtxa5I6o="`
 	ExpiresAt string `json:"expires_at" example:"2024-12-25T10:30:00Z"`
 	ExpiresIn int    `json:"expires_in" example:"1800"`
 }

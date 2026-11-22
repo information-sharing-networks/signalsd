@@ -76,20 +76,12 @@ type LatestSignalVersion struct {
 	Content       json.RawMessage `json:"content"`
 }
 
-type OneTimeClientSecret struct {
-	ID                      uuid.UUID `json:"id"`
-	CreatedAt               time.Time `json:"created_at"`
-	ServiceAccountAccountID uuid.UUID `json:"service_account_account_id"`
-	PlaintextSecret         string    `json:"plaintext_secret"`
-	ExpiresAt               time.Time `json:"expires_at"`
-}
-
 type PasswordResetToken struct {
-	ID               uuid.UUID `json:"id"`
 	CreatedAt        time.Time `json:"created_at"`
 	UserAccountID    uuid.UUID `json:"user_account_id"`
 	ExpiresAt        time.Time `json:"expires_at"`
 	CreatedByAdminID uuid.UUID `json:"created_by_admin_id"`
+	HashedToken      string    `json:"hashed_token"`
 }
 
 type RefreshToken struct {
@@ -119,6 +111,13 @@ type ServiceAccount struct {
 	ClientID           string    `json:"client_id"`
 	ClientContactEmail string    `json:"client_contact_email"`
 	ClientOrganization string    `json:"client_organization"`
+}
+
+type ServiceAccountSetupToken struct {
+	HashedToken             string    `json:"hashed_token"`
+	CreatedAt               time.Time `json:"created_at"`
+	ServiceAccountAccountID uuid.UUID `json:"service_account_account_id"`
+	ExpiresAt               time.Time `json:"expires_at"`
 }
 
 type Signal struct {

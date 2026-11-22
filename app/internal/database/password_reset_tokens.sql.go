@@ -27,29 +27,27 @@ func (q *Queries) CountActivePasswordResetTokensForUser(ctx context.Context, use
 	return active_tokens, err
 }
 
-const CreatePasswordResetToken = `-- name: CreatePasswordResetToken :one
-INSERT INTO password_reset_tokens (id, user_account_id, created_at, expires_at, created_by_admin_id)
+const CreatePasswordResetToken = `-- name: CreatePasswordResetToken :exec
+INSERT INTO password_reset_tokens (hashed_token, user_account_id, created_at, expires_at, created_by_admin_id)
 VALUES ($1, $2, NOW(), $3, $4)
-RETURNING id
 `
 
 type CreatePasswordResetTokenParams struct {
-	ID               uuid.UUID `json:"id"`
+	HashedToken      string    `json:"hashed_token"`
 	UserAccountID    uuid.UUID `json:"user_account_id"`
 	ExpiresAt        time.Time `json:"expires_at"`
 	CreatedByAdminID uuid.UUID `json:"created_by_admin_id"`
 }
 
-func (q *Queries) CreatePasswordResetToken(ctx context.Context, arg CreatePasswordResetTokenParams) (uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, CreatePasswordResetToken,
-		arg.ID,
+// the token is in the reset link: only its hash (auth.HashToken) is stored
+func (q *Queries) CreatePasswordResetToken(ctx context.Context, arg CreatePasswordResetTokenParams) error {
+	_, err := q.db.Exec(ctx, CreatePasswordResetToken,
+		arg.HashedToken,
 		arg.UserAccountID,
 		arg.ExpiresAt,
 		arg.CreatedByAdminID,
 	)
-	var id uuid.UUID
-	err := row.Scan(&id)
-	return id, err
+	return err
 }
 
 const DeleteExpiredPasswordResetTokens = `-- name: DeleteExpiredPasswordResetTokens :execrows
@@ -67,11 +65,11 @@ func (q *Queries) DeleteExpiredPasswordResetTokens(ctx context.Context) (int64, 
 
 const DeletePasswordResetToken = `-- name: DeletePasswordResetToken :execrows
 DELETE FROM password_reset_tokens 
-WHERE id = $1
+WHERE hashed_token = $1
 `
 
-func (q *Queries) DeletePasswordResetToken(ctx context.Context, id uuid.UUID) (int64, error) {
-	result, err := q.db.Exec(ctx, DeletePasswordResetToken, id)
+func (q *Queries) DeletePasswordResetToken(ctx context.Context, hashedToken string) (int64, error) {
+	result, err := q.db.Exec(ctx, DeletePasswordResetToken, hashedToken)
 	if err != nil {
 		return 0, err
 	}
@@ -94,7 +92,7 @@ func (q *Queries) DeletePasswordResetTokensForUser(ctx context.Context, userAcco
 const GetPasswordResetToken = `-- name: GetPasswordResetToken :one
 SELECT created_at, user_account_id, expires_at, created_by_admin_id
 FROM password_reset_tokens
-WHERE id = $1
+WHERE hashed_token = $1
 `
 
 type GetPasswordResetTokenRow struct {
@@ -104,8 +102,8 @@ type GetPasswordResetTokenRow struct {
 	CreatedByAdminID uuid.UUID `json:"created_by_admin_id"`
 }
 
-func (q *Queries) GetPasswordResetToken(ctx context.Context, id uuid.UUID) (GetPasswordResetTokenRow, error) {
-	row := q.db.QueryRow(ctx, GetPasswordResetToken, id)
+func (q *Queries) GetPasswordResetToken(ctx context.Context, hashedToken string) (GetPasswordResetTokenRow, error) {
+	row := q.db.QueryRow(ctx, GetPasswordResetToken, hashedToken)
 	var i GetPasswordResetTokenRow
 	err := row.Scan(
 		&i.CreatedAt,
@@ -117,14 +115,13 @@ func (q *Queries) GetPasswordResetToken(ctx context.Context, id uuid.UUID) (GetP
 }
 
 const GetPasswordResetTokensCreatedByAdmin = `-- name: GetPasswordResetTokensCreatedByAdmin :many
-SELECT id, created_at, user_account_id, expires_at
+SELECT created_at, user_account_id, expires_at
 FROM password_reset_tokens
 WHERE created_by_admin_id = $1
 ORDER BY created_at DESC
 `
 
 type GetPasswordResetTokensCreatedByAdminRow struct {
-	ID            uuid.UUID `json:"id"`
 	CreatedAt     time.Time `json:"created_at"`
 	UserAccountID uuid.UUID `json:"user_account_id"`
 	ExpiresAt     time.Time `json:"expires_at"`
@@ -140,12 +137,7 @@ func (q *Queries) GetPasswordResetTokensCreatedByAdmin(ctx context.Context, crea
 	var items []GetPasswordResetTokensCreatedByAdminRow
 	for rows.Next() {
 		var i GetPasswordResetTokensCreatedByAdminRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.CreatedAt,
-			&i.UserAccountID,
-			&i.ExpiresAt,
-		); err != nil {
+		if err := rows.Scan(&i.CreatedAt, &i.UserAccountID, &i.ExpiresAt); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

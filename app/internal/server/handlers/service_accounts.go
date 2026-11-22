@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -45,7 +46,7 @@ type CreateServiceAccountRequest struct {
 type CreateServiceAccountResponse struct {
 	ClientID  string    `json:"client_id" example:"sa_example-org_k7j2m9x1"`
 	AccountID uuid.UUID `json:"account_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	SetupURL  string    `json:"setup_url" example:"https://api.example.com/api/auth/service-accounts/setup/550e8400-e29b-41d4-a716-446655440000"`
+	SetupURL  string    `json:"setup_url" example:"https://api.example.com/api/auth/service-accounts/setup/l7ny8ASVmB7AyJbi-Ogf5jh3SenxZ1-1ULCwtxa5I6o="`
 	ExpiresAt time.Time `json:"expires_at" example:"2024-12-25T10:30:00Z"`
 	ExpiresIn int       `json:"expires_in" example:"172800"`
 }
@@ -58,7 +59,7 @@ type ReissueServiceAccountCredentialsResponse struct {
 	ClientID           string    `json:"client_id" example:"sa_example-org_k7j2m9x1"`
 	ClientContactEmail string    `json:"client_contact_email" example:"example@example.com"`
 	AccountID          uuid.UUID `json:"account_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	SetupURL           string    `json:"setup_url" example:"https://api.example.com/api/auth/service-accounts/setup/550e8400-e29b-41d4-a716-446655440000"`
+	SetupURL           string    `json:"setup_url" example:"https://api.example.com/api/auth/service-accounts/setup/l7ny8ASVmB7AyJbi-Ogf5jh3SenxZ1-1ULCwtxa5I6o="`
 	ExpiresAt          time.Time `json:"expires_at" example:"2024-12-25T10:30:00Z"`
 	ExpiresIn          int       `json:"expires_in" example:"172800"`
 }
@@ -165,34 +166,15 @@ func (s *ServiceAccountHandler) RegisterServiceAccount(w http.ResponseWriter, r 
 		return apperrors.DatabaseError("database error", err)
 	}
 
-	// Generate the actual client secret (this gets stored temporarily)
-	clientSecret, err := s.authService.GenerateSecureToken(32)
+	// the client secret is generated when the setup link is used (see SetupServiceAccount)
+	setupURL, expiresAt, err := s.createSetupLink(r.Context(), txQueries, serviceAccountID)
 	if err != nil {
-		return apperrors.InternalError("internal server error", err)
-	}
-
-	// Create one-time secret record (used to complete the set up the service account)
-	id := uuid.NewV7()
-	expiresAt := time.Now().Add(signalsd.OneTimeSecretExpiry)
-	oneTimeSecretID, err := txQueries.CreateOneTimeClientSecret(r.Context(), database.CreateOneTimeClientSecretParams{
-		ID:                      id,
-		ServiceAccountAccountID: serviceAccountID,
-		PlaintextSecret:         clientSecret,
-		ExpiresAt:               expiresAt,
-	})
-	if err != nil {
-		return apperrors.DatabaseError("database error", err)
+		return err
 	}
 
 	if err := tx.Commit(r.Context()); err != nil {
 		return apperrors.DatabaseError("database error", err)
 	}
-
-	// Generate the one-time setup URL using forwarded headers
-	setupURL := fmt.Sprintf("%s/api/auth/service-accounts/setup/%s",
-		s.publicBaseURL,
-		oneTimeSecretID.String(),
-	)
 
 	// add account id to final request log context (the setup url is not logged - anyone who could read the logs could use it to get the client secret)
 	logger.AddLogAttrs(r.Context(),
@@ -292,10 +274,7 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentials(w http.Response
 		return apperrors.DatabaseError("database error", err)
 	}
 
-	_, err = txQueries.DeleteOneTimeClientSecretsByOrgAndEmail(r.Context(), database.DeleteOneTimeClientSecretsByOrgAndEmailParams{
-		ClientContactEmail: serviceAccount.ClientContactEmail,
-		ClientOrganization: serviceAccount.ClientOrganization,
-	})
+	_, err = txQueries.DeleteServiceAccountSetupTokensForAccount(r.Context(), serviceAccountID)
 	if err != nil {
 		logger.AddLogAttrs(r.Context(),
 			slog.String("client_id", clientID),
@@ -305,34 +284,15 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentials(w http.Response
 		return apperrors.DatabaseError("database error", err)
 	}
 
-	// Generate the actual client secret (this gets stored temporarily)
-	clientSecret, err := s.authService.GenerateSecureToken(32)
+	// the client secret is generated when the setup link is used (see SetupServiceAccount)
+	setupURL, expiresAt, err := s.createSetupLink(r.Context(), txQueries, serviceAccountID)
 	if err != nil {
-		return apperrors.InternalError("internal server error", err)
-	}
-
-	// Create one-time secret record
-	expiresAt := time.Now().Add(signalsd.OneTimeSecretExpiry)
-	id := uuid.NewV7()
-	oneTimeSecretID, err := txQueries.CreateOneTimeClientSecret(r.Context(), database.CreateOneTimeClientSecretParams{
-		ID:                      id,
-		ServiceAccountAccountID: serviceAccountID,
-		PlaintextSecret:         clientSecret,
-		ExpiresAt:               expiresAt,
-	})
-	if err != nil {
-		return apperrors.DatabaseError("database error", err)
+		return err
 	}
 
 	if err := tx.Commit(r.Context()); err != nil {
 		return apperrors.DatabaseError("database error", err)
 	}
-
-	// Generate the one-time setup URL using forwarded headers
-	setupURL := fmt.Sprintf("%s/api/auth/service-accounts/setup/%s",
-		s.publicBaseURL,
-		oneTimeSecretID.String(),
-	)
 
 	// add client id and account id to final request log context (the setup url is not logged - anyone who could read the logs could use it to get the client secret)
 	logger.AddLogAttrs(r.Context(),
@@ -353,6 +313,28 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentials(w http.Response
 	return responses.JSON(w, http.StatusOK, response)
 }
 
+// createSetupLink creates a one-time setup token for the service account and returns the setup link and when it expires.
+//
+// The token is only in the link: the database stores its hash (like refresh tokens and client secrets).
+func (s *ServiceAccountHandler) createSetupLink(ctx context.Context, queries *database.Queries, serviceAccountID uuid.UUID) (string, time.Time, error) {
+	token, err := s.authService.GenerateSecureToken(32)
+	if err != nil {
+		return "", time.Time{}, apperrors.InternalError("internal server error", err)
+	}
+
+	expiresAt := time.Now().Add(signalsd.OneTimeSecretExpiry)
+	err = queries.CreateServiceAccountSetupToken(ctx, database.CreateServiceAccountSetupTokenParams{
+		HashedToken:             s.authService.HashToken(token),
+		ServiceAccountAccountID: serviceAccountID,
+		ExpiresAt:               expiresAt,
+	})
+	if err != nil {
+		return "", time.Time{}, apperrors.DatabaseError("database error", err)
+	}
+
+	return fmt.Sprintf("%s/api/auth/service-accounts/setup/%s", s.publicBaseURL, token), expiresAt, nil
+}
+
 // SetupServiceAccountPage godoc
 //
 //	@Summary		Service Account Setup Page
@@ -362,13 +344,13 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentials(w http.Response
 //	@Description
 //	@Tags		One-time Links (browser pages)
 //
-//	@Param		setup_id	path	string	true	"One-time setup ID, taken from the setup link"	example(550e8400-e29b-41d4-a716-446655440000)
+//	@Param		setup_id	path	string	true	"One-time setup token, taken from the setup link"	example(l7ny8ASVmB7AyJbi-Ogf5jh3SenxZ1-1ULCwtxa5I6o=)
 //
 //	@Success	200			"HTML page with a button to generate the client credentials"
 //
 //	@Router		/api/auth/service-accounts/setup/{setup_id} [get]
 func (s *ServiceAccountHandler) SetupServiceAccountPage(w http.ResponseWriter, r *http.Request) {
-	// the setup ID is checked when the form is submitted (SetupServiceAccount)
+	// the setup token is checked when the form is submitted (SetupServiceAccount)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
 	if err := serviceAccountTemplates.ConfirmSetupPage(r.URL.Path).Render(r.Context(), w); err != nil {
@@ -381,31 +363,23 @@ func (s *ServiceAccountHandler) SetupServiceAccountPage(w http.ResponseWriter, r
 // SetupServiceAccount godoc
 //
 //	@Summary		Service Account Setup
-//	@Description	Exchanges a one-time setup ID for client credentials and renders an HTML page where the user can copy them.
+//	@Description	Exchanges a one-time setup token for client credentials and renders an HTML page where the user can copy them.
 //	@Description
 //	@Description	This endpoint is called by the button on the *Service Account Setup Page*.
 //	@Description
-//	@Description	Setup links expire 48 hours after they are issued and can only be used once - this request consumes the setup ID and revokes any client secret the service account was previously using. The client secret shown on the page is valid for one year and is not recoverable afterwards, so it has to be copied at this point.
+//	@Description	Setup links expire 48 hours after they are issued and can only be used once - this request consumes the setup token and revokes any client secret the service account was previously using. The client secret shown on the page is valid for one year and is not recoverable afterwards, so it has to be copied at this point.
 //	@Description
 //	@Tags		One-time Links (browser pages)
 //
-//	@Param		setup_id	path	string	true	"One-time setup ID, taken from the setup link"	example(550e8400-e29b-41d4-a716-446655440000)
+//	@Param		setup_id	path	string	true	"One-time setup token, taken from the setup link"	example(l7ny8ASVmB7AyJbi-Ogf5jh3SenxZ1-1ULCwtxa5I6o=)
 //
 //	@Success	201			"HTML page displaying the client_id and client_secret"
 //	@Failure	400			"HTML error page - if the token is unknown, already used or expired the endpoint returns 400 with an HTML body."
 //
 //	@Router		/api/auth/service-accounts/setup/{setup_id} [post]
 func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *http.Request) {
-	// Extract token from URL path
-	oneTimeSecretIDString := r.PathValue("setup_id")
-
-	// Parse token as UUID
-	oneTimeSecretID, err := uuid.Parse(oneTimeSecretIDString)
-	if err != nil {
-
-		s.renderErrorPage(w, r, "Invalid Setup ID", "The setup ID you provided is not valid. Please check the URL and try again.")
-		return
-	}
+	// the setup token is in the link: the database stores its hash
+	hashedToken := s.authService.HashToken(r.PathValue("setup_id"))
 
 	// Start transaction
 	tx, err := s.pool.BeginTx(r.Context(), pgx.TxOptions{})
@@ -429,15 +403,15 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 
 	txQueries := s.queries.WithTx(tx)
 
-	// Retrieve and validate one-time secret (locks the row, so a concurrent request for the same setup ID can't also use it)
-	oneTimeSecret, err := txQueries.GetOneTimeClientSecret(r.Context(), oneTimeSecretID)
+	// Retrieve and validate the setup token (locks the row, so a concurrent request for the same token can't also use it)
+	setupToken, err := txQueries.GetServiceAccountSetupToken(r.Context(), hashedToken)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			logger.AddLogAttrs(r.Context(),
-				slog.String("reason", "setup id has already been used or is no longer valid"),
+				slog.String("reason", "setup token has already been used or is no longer valid"),
 			)
 
-			s.renderErrorPage(w, r, "set up ID not found ", "The setup ID you provided has already been used or is no longer valid")
+			s.renderErrorPage(w, r, "Setup link not valid", "This setup link has already been used or is no longer valid. Ask your administrator for a new link.")
 			return
 		}
 		logger.AddLogAttrs(r.Context(),
@@ -449,16 +423,16 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 	}
 
 	// Check if token has expired
-	if time.Now().After(oneTimeSecret.ExpiresAt) {
+	if time.Now().After(setupToken.ExpiresAt) {
 		logger.AddLogAttrs(r.Context(),
-			slog.String("reason", "setup id has expired"),
+			slog.String("reason", "setup token has expired"),
 		)
 
-		s.renderErrorPage(w, r, "set up ID not found or already used", "The setup ID you provided has already been used or is no longer valid")
+		s.renderErrorPage(w, r, "Setup link not valid", "This setup link has already been used or is no longer valid. Ask your administrator for a new link.")
 		return
 	}
 
-	serviceAccount, err := txQueries.GetServiceAccountByAccountID(r.Context(), oneTimeSecret.ServiceAccountAccountID)
+	serviceAccount, err := txQueries.GetServiceAccountByAccountID(r.Context(), setupToken.ServiceAccountAccountID)
 	if err != nil {
 		logger.AddLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
@@ -469,7 +443,7 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 	}
 
 	// Revoke any existing client secrets for this service account
-	_, err = txQueries.RevokeAllClientSecretsForAccount(r.Context(), oneTimeSecret.ServiceAccountAccountID)
+	_, err = txQueries.RevokeAllClientSecretsForAccount(r.Context(), setupToken.ServiceAccountAccountID)
 	if err != nil {
 		logger.AddLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
@@ -479,13 +453,21 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 		return
 	}
 
-	// Create long-term client secret
-	hashedSecret := s.authService.HashToken(oneTimeSecret.PlaintextSecret)
+	// Generate the client secret: it is shown on the page below and only its hash is stored
+	clientSecret, err := s.authService.GenerateSecureToken(32)
+	if err != nil {
+		logger.AddLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+
+		s.renderErrorPage(w, r, "Internal Server Error", "Please try again later.")
+		return
+	}
 	expiresAt := time.Now().Add(signalsd.ClientSecretExpiry)
 
 	_, err = txQueries.CreateClientSecret(r.Context(), database.CreateClientSecretParams{
-		HashedSecret:            hashedSecret,
-		ServiceAccountAccountID: oneTimeSecret.ServiceAccountAccountID,
+		HashedSecret:            s.authService.HashToken(clientSecret),
+		ServiceAccountAccountID: setupToken.ServiceAccountAccountID,
 		ExpiresAt:               expiresAt,
 	})
 	if err != nil {
@@ -497,8 +479,8 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 		return
 	}
 
-	// Delete the one-time secret
-	_, err = txQueries.DeleteOneTimeClientSecret(r.Context(), oneTimeSecretID)
+	// Delete the setup token (the link can only be used once)
+	_, err = txQueries.DeleteServiceAccountSetupToken(r.Context(), hashedToken)
 	if err != nil {
 		logger.AddLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
@@ -520,7 +502,7 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 	// Prepare template data
 	data := serviceAccountTemplates.SetupPageData{
 		ClientID:     serviceAccount.ClientID,
-		ClientSecret: oneTimeSecret.PlaintextSecret,
+		ClientSecret: clientSecret,
 		ExpiresAt:    expiresAt,
 	}
 

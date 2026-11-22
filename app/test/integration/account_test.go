@@ -12,6 +12,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -21,6 +22,7 @@ import (
 	"github.com/information-sharing-networks/signalsd/app/internal/auth"
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 	"github.com/information-sharing-networks/signalsd/app/internal/server/handlers"
+	"github.com/jackc/pgx/v5"
 )
 
 type serviceAccountRegistrationRequestBody struct {
@@ -1079,6 +1081,14 @@ func TestPasswordResetFlow(t *testing.T) {
 		// Extract token ID from URL for next steps
 		urlParts := strings.Split(resetResponse.ResetURL, "/")
 		tokenID := urlParts[len(urlParts)-1]
+
+		// only the hash of the reset token is stored, so read access to the database is not enough to use the link
+		if _, err := testEnv.queries.GetPasswordResetToken(ctx, tokenID); !errors.Is(err, pgx.ErrNoRows) {
+			t.Errorf("expected the reset token not to be stored in plain text, got err %v", err)
+		}
+		if _, err := testEnv.queries.GetPasswordResetToken(ctx, testEnv.authService.HashToken(tokenID)); err != nil {
+			t.Errorf("expected the hash of the reset token to be stored: %v", err)
+		}
 
 		// 2: User visits reset link (GET) - should render HTML form
 		t.Run("User visits reset link", func(t *testing.T) {

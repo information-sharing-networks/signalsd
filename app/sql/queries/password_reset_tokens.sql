@@ -1,16 +1,16 @@
--- name: CreatePasswordResetToken :one
-INSERT INTO password_reset_tokens (id, user_account_id, created_at, expires_at, created_by_admin_id)
-VALUES ($1, $2, NOW(), $3, $4)
-RETURNING id;
+-- name: CreatePasswordResetToken :exec
+-- the token is in the reset link: only its hash (auth.HashToken) is stored
+INSERT INTO password_reset_tokens (hashed_token, user_account_id, created_at, expires_at, created_by_admin_id)
+VALUES ($1, $2, NOW(), $3, $4);
 
 -- name: GetPasswordResetToken :one
 SELECT created_at, user_account_id, expires_at, created_by_admin_id
 FROM password_reset_tokens
-WHERE id = $1;
+WHERE hashed_token = $1;
 
 -- name: DeletePasswordResetToken :execrows
 DELETE FROM password_reset_tokens 
-WHERE id = $1;
+WHERE hashed_token = $1;
 
 -- name: DeleteExpiredPasswordResetTokens :execrows
 DELETE FROM password_reset_tokens 
@@ -29,7 +29,7 @@ AND expires_at > NOW();
 
 -- name: GetPasswordResetTokensCreatedByAdmin :many
 -- for admin audit queries
-SELECT id, created_at, user_account_id, expires_at
+SELECT created_at, user_account_id, expires_at
 FROM password_reset_tokens
 WHERE created_by_admin_id = $1
 ORDER BY created_at DESC;

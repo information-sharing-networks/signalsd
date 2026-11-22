@@ -51,31 +51,6 @@ func (q *Queries) CreateClientSecret(ctx context.Context, arg CreateClientSecret
 	return i, err
 }
 
-const CreateOneTimeClientSecret = `-- name: CreateOneTimeClientSecret :one
-INSERT INTO one_time_client_secrets (id, service_account_account_id, plaintext_secret, created_at, expires_at)
-VALUES ( $1, $2, $3, NOW(), $4)
-RETURNING id
-`
-
-type CreateOneTimeClientSecretParams struct {
-	ID                      uuid.UUID `json:"id"`
-	ServiceAccountAccountID uuid.UUID `json:"service_account_account_id"`
-	PlaintextSecret         string    `json:"plaintext_secret"`
-	ExpiresAt               time.Time `json:"expires_at"`
-}
-
-func (q *Queries) CreateOneTimeClientSecret(ctx context.Context, arg CreateOneTimeClientSecretParams) (uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, CreateOneTimeClientSecret,
-		arg.ID,
-		arg.ServiceAccountAccountID,
-		arg.PlaintextSecret,
-		arg.ExpiresAt,
-	)
-	var id uuid.UUID
-	err := row.Scan(&id)
-	return id, err
-}
-
 const CreateServiceAccount = `-- name: CreateServiceAccount :one
 INSERT INTO service_accounts (
     account_id,
@@ -114,35 +89,43 @@ func (q *Queries) CreateServiceAccount(ctx context.Context, arg CreateServiceAcc
 	return i, err
 }
 
-const DeleteOneTimeClientSecret = `-- name: DeleteOneTimeClientSecret :execrows
-DELETE from one_time_client_secrets 
-WHERE id = $1
+const CreateServiceAccountSetupToken = `-- name: CreateServiceAccountSetupToken :exec
+INSERT INTO service_account_setup_tokens (hashed_token, service_account_account_id, created_at, expires_at)
+VALUES ($1, $2, NOW(), $3)
 `
 
-func (q *Queries) DeleteOneTimeClientSecret(ctx context.Context, id uuid.UUID) (int64, error) {
-	result, err := q.db.Exec(ctx, DeleteOneTimeClientSecret, id)
+type CreateServiceAccountSetupTokenParams struct {
+	HashedToken             string    `json:"hashed_token"`
+	ServiceAccountAccountID uuid.UUID `json:"service_account_account_id"`
+	ExpiresAt               time.Time `json:"expires_at"`
+}
+
+// the token is in the setup link: only its hash (auth.HashToken) is stored
+func (q *Queries) CreateServiceAccountSetupToken(ctx context.Context, arg CreateServiceAccountSetupTokenParams) error {
+	_, err := q.db.Exec(ctx, CreateServiceAccountSetupToken, arg.HashedToken, arg.ServiceAccountAccountID, arg.ExpiresAt)
+	return err
+}
+
+const DeleteServiceAccountSetupToken = `-- name: DeleteServiceAccountSetupToken :execrows
+DELETE FROM service_account_setup_tokens
+WHERE hashed_token = $1
+`
+
+func (q *Queries) DeleteServiceAccountSetupToken(ctx context.Context, hashedToken string) (int64, error) {
+	result, err := q.db.Exec(ctx, DeleteServiceAccountSetupToken, hashedToken)
 	if err != nil {
 		return 0, err
 	}
 	return result.RowsAffected(), nil
 }
 
-const DeleteOneTimeClientSecretsByOrgAndEmail = `-- name: DeleteOneTimeClientSecretsByOrgAndEmail :execrows
-DELETE from one_time_client_secrets 
-WHERE service_account_account_id = (SELECT account_id 
-                                    FROM service_accounts 
-                                    WHERE LOWER(client_organization) = LOWER($1)
-                                    AND LOWER(client_contact_email) = LOWER($2))
-AND expires_at > NOW()
+const DeleteServiceAccountSetupTokensForAccount = `-- name: DeleteServiceAccountSetupTokensForAccount :execrows
+DELETE FROM service_account_setup_tokens
+WHERE service_account_account_id = $1
 `
 
-type DeleteOneTimeClientSecretsByOrgAndEmailParams struct {
-	ClientOrganization string `json:"client_organization"`
-	ClientContactEmail string `json:"client_contact_email"`
-}
-
-func (q *Queries) DeleteOneTimeClientSecretsByOrgAndEmail(ctx context.Context, arg DeleteOneTimeClientSecretsByOrgAndEmailParams) (int64, error) {
-	result, err := q.db.Exec(ctx, DeleteOneTimeClientSecretsByOrgAndEmail, arg.ClientOrganization, arg.ClientContactEmail)
+func (q *Queries) DeleteServiceAccountSetupTokensForAccount(ctx context.Context, serviceAccountAccountID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, DeleteServiceAccountSetupTokensForAccount, serviceAccountAccountID)
 	if err != nil {
 		return 0, err
 	}
@@ -196,32 +179,6 @@ func (q *Queries) GetNonRevokedClientSecretByHashedSecret(ctx context.Context, a
 	return i, err
 }
 
-const GetOneTimeClientSecret = `-- name: GetOneTimeClientSecret :one
-SELECT created_at, service_account_account_id, plaintext_secret, expires_at
-FROM one_time_client_secrets
-WHERE id = $1
-FOR UPDATE
-`
-
-type GetOneTimeClientSecretRow struct {
-	CreatedAt               time.Time `json:"created_at"`
-	ServiceAccountAccountID uuid.UUID `json:"service_account_account_id"`
-	PlaintextSecret         string    `json:"plaintext_secret"`
-	ExpiresAt               time.Time `json:"expires_at"`
-}
-
-func (q *Queries) GetOneTimeClientSecret(ctx context.Context, id uuid.UUID) (GetOneTimeClientSecretRow, error) {
-	row := q.db.QueryRow(ctx, GetOneTimeClientSecret, id)
-	var i GetOneTimeClientSecretRow
-	err := row.Scan(
-		&i.CreatedAt,
-		&i.ServiceAccountAccountID,
-		&i.PlaintextSecret,
-		&i.ExpiresAt,
-	)
-	return i, err
-}
-
 const GetServiceAccountByAccountID = `-- name: GetServiceAccountByAccountID :one
 SELECT sa.account_id, sa.created_at, sa.updated_at, sa.client_id, sa.client_contact_email, sa.client_organization FROM service_accounts sa
 WHERE sa.account_id = $1
@@ -257,6 +214,27 @@ func (q *Queries) GetServiceAccountByClientID(ctx context.Context, clientID stri
 		&i.ClientContactEmail,
 		&i.ClientOrganization,
 	)
+	return i, err
+}
+
+const GetServiceAccountSetupToken = `-- name: GetServiceAccountSetupToken :one
+SELECT created_at, service_account_account_id, expires_at
+FROM service_account_setup_tokens
+WHERE hashed_token = $1
+FOR UPDATE
+`
+
+type GetServiceAccountSetupTokenRow struct {
+	CreatedAt               time.Time `json:"created_at"`
+	ServiceAccountAccountID uuid.UUID `json:"service_account_account_id"`
+	ExpiresAt               time.Time `json:"expires_at"`
+}
+
+// locks the row until the transaction ends, so a concurrent request for the same token waits and then finds it deleted
+func (q *Queries) GetServiceAccountSetupToken(ctx context.Context, hashedToken string) (GetServiceAccountSetupTokenRow, error) {
+	row := q.db.QueryRow(ctx, GetServiceAccountSetupToken, hashedToken)
+	var i GetServiceAccountSetupTokenRow
+	err := row.Scan(&i.CreatedAt, &i.ServiceAccountAccountID, &i.ExpiresAt)
 	return i, err
 }
 

@@ -630,25 +630,18 @@ type PasswordResetPageData struct {
 //	@Description	Reset links expire 30 minutes after they are generated and can only be used once.
 //	@Tags			One-time Links (browser pages)
 //
-//	@Param			token_id	path	string	true	"Password reset token ID, taken from the reset link"	example(550e8400-e29b-41d4-a716-446655440000)
+//	@Param			token_id	path	string	true	"Password reset token, taken from the reset link"	example(l7ny8ASVmB7AyJbi-Ogf5jh3SenxZ1-1ULCwtxa5I6o=)
 //
 //	@Success		200			"HTML password reset form"
 //	@Failure		400			"HTML error page - if the token is unknown, already used or expired the endpoint returns 400 with an HTML body."
 //
 //	@Router			/api/auth/password-reset/{token_id} [get]
 func (u *UserHandler) PasswordResetTokenPage(w http.ResponseWriter, r *http.Request) {
-	// Extract token from URL path
-	tokenIDString := r.PathValue("token_id")
-
-	// Parse token as UUID
-	tokenID, err := uuid.Parse(tokenIDString)
-	if err != nil {
-		u.renderErrorPage(w, "Invalid Reset Token", "The password reset token you provided is not valid. Please check the URL and try again.")
-		return
-	}
+	// the reset token is in the link: the database stores its hash
+	hashedToken := u.authService.HashToken(r.PathValue("token_id"))
 
 	// Retrieve and validate password reset token
-	resetToken, err := u.queries.GetPasswordResetToken(r.Context(), tokenID)
+	resetToken, err := u.queries.GetPasswordResetToken(r.Context(), hashedToken)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			logger.AddLogAttrs(r.Context(),
@@ -725,7 +718,7 @@ func (u *UserHandler) PasswordResetTokenPage(w http.ResponseWriter, r *http.Requ
 //
 //	@Tags			One-time Links (browser pages)
 //
-//	@Param			token_id	path	string							true	"Password reset token ID, taken from the reset link"	example(550e8400-e29b-41d4-a716-446655440000)
+//	@Param			token_id	path	string							true	"Password reset token, taken from the reset link"	example(l7ny8ASVmB7AyJbi-Ogf5jh3SenxZ1-1ULCwtxa5I6o=)
 //	@Param			request		body	handlers.PasswordResetRequest	true	"New password"
 //
 //	@Success		200			"Password updated (empty body)"
@@ -736,14 +729,8 @@ func (u *UserHandler) PasswordResetTokenPage(w http.ResponseWriter, r *http.Requ
 //
 //	@Router			/api/auth/password-reset/{token_id} [post]
 func (u *UserHandler) PasswordResetToken(w http.ResponseWriter, r *http.Request) error {
-	// Extract token from URL path
-	tokenIDString := r.PathValue("token_id")
-
-	// Parse token as UUID
-	tokenID, err := uuid.Parse(tokenIDString)
-	if err != nil {
-		return apperrors.InvalidURLParam("invalid token format", nil)
-	}
+	// the reset token is in the link: the database stores its hash
+	hashedToken := u.authService.HashToken(r.PathValue("token_id"))
 
 	// Parse request body
 	var req PasswordResetRequest
@@ -778,7 +765,7 @@ func (u *UserHandler) PasswordResetToken(w http.ResponseWriter, r *http.Request)
 	txQueries := u.queries.WithTx(tx)
 
 	// Retrieve and validate password reset token
-	resetToken, err := txQueries.GetPasswordResetToken(r.Context(), tokenID)
+	resetToken, err := txQueries.GetPasswordResetToken(r.Context(), hashedToken)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apperrors.NotFound("password reset token not found or already used", nil)
@@ -815,7 +802,7 @@ func (u *UserHandler) PasswordResetToken(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Delete the password reset token
-	_, err = txQueries.DeletePasswordResetToken(r.Context(), tokenID)
+	_, err = txQueries.DeletePasswordResetToken(r.Context(), hashedToken)
 	if err != nil {
 		return apperrors.DatabaseError("database error", err)
 	}

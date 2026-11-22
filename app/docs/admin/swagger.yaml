@@ -229,7 +229,7 @@ definitions:
         example: 172800
         type: integer
       setup_url:
-        example: https://api.example.com/api/auth/service-accounts/setup/550e8400-e29b-41d4-a716-446655440000
+        example: https://api.example.com/api/auth/service-accounts/setup/l7ny8ASVmB7AyJbi-Ogf5jh3SenxZ1-1ULCwtxa5I6o=
         type: string
     type: object
   handlers.CreateSignalTypeRequest:
@@ -293,7 +293,7 @@ definitions:
         example: 1800
         type: integer
       reset_url:
-        example: https://api.example.com/api/auth/password-reset/0ce71234-34d5-4fb5-beb8-ad50d8b40c7d
+        example: https://api.example.com/api/auth/password-reset/l7ny8ASVmB7AyJbi-Ogf5jh3SenxZ1-1ULCwtxa5I6o=
         type: string
       user_email:
         example: user@example.com
@@ -439,7 +439,7 @@ definitions:
         example: 172800
         type: integer
       setup_url:
-        example: https://api.example.com/api/auth/service-accounts/setup/550e8400-e29b-41d4-a716-446655440000
+        example: https://api.example.com/api/auth/service-accounts/setup/l7ny8ASVmB7AyJbi-Ogf5jh3SenxZ1-1ULCwtxa5I6o=
         type: string
     type: object
   handlers.ServiceAccountDetails:
@@ -1944,8 +1944,8 @@ paths:
 
         Reset links expire 30 minutes after they are generated and can only be used once.
       parameters:
-      - description: Password reset token ID, taken from the reset link
-        example: 550e8400-e29b-41d4-a716-446655440000
+      - description: Password reset token, taken from the reset link
+        example: l7ny8ASVmB7AyJbi-Ogf5jh3SenxZ1-1ULCwtxa5I6o=
         in: path
         name: token_id
         required: true
@@ -1969,8 +1969,8 @@ paths:
 
         Note that no access token is required - possession of the reset token is what authorises the change. Reset tokens can only be issued by site admins (see *Generate Password Reset Link* in the admin API docs).
       parameters:
-      - description: Password reset token ID, taken from the reset link
-        example: 550e8400-e29b-41d4-a716-446655440000
+      - description: Password reset token, taken from the reset link
+        example: l7ny8ASVmB7AyJbi-Ogf5jh3SenxZ1-1ULCwtxa5I6o=
         in: path
         name: token_id
         required: true
@@ -2178,8 +2178,8 @@ paths:
 
         The page has a button that generates the credentials (see *Service Account Setup*). Opening the page does not use up the setup link, so link scanners and chat link previews that open links automatically do not consume it.
       parameters:
-      - description: One-time setup ID, taken from the setup link
-        example: 550e8400-e29b-41d4-a716-446655440000
+      - description: One-time setup token, taken from the setup link
+        example: l7ny8ASVmB7AyJbi-Ogf5jh3SenxZ1-1ULCwtxa5I6o=
         in: path
         name: setup_id
         required: true
@@ -2192,14 +2192,14 @@ paths:
       - One-time Links (browser pages)
     post:
       description: |
-        Exchanges a one-time setup ID for client credentials and renders an HTML page where the user can copy them.
+        Exchanges a one-time setup token for client credentials and renders an HTML page where the user can copy them.
 
         This endpoint is called by the button on the *Service Account Setup Page*.
 
-        Setup links expire 48 hours after they are issued and can only be used once - this request consumes the setup ID and revokes any client secret the service account was previously using. The client secret shown on the page is valid for one year and is not recoverable afterwards, so it has to be copied at this point.
+        Setup links expire 48 hours after they are issued and can only be used once - this request consumes the setup token and revokes any client secret the service account was previously using. The client secret shown on the page is valid for one year and is not recoverable afterwards, so it has to be copied at this point.
       parameters:
-      - description: One-time setup ID, taken from the setup link
-        example: 550e8400-e29b-41d4-a716-446655440000
+      - description: One-time setup token, taken from the setup link
+        example: l7ny8ASVmB7AyJbi-Ogf5jh3SenxZ1-1ULCwtxa5I6o=
         in: path
         name: setup_id
         required: true

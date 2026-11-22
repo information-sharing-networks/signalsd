@@ -14,23 +14,18 @@ INSERT INTO client_secrets (hashed_secret, service_account_account_id, created_a
 VALUES ( $1,$2, NOW(), NOW(), $3 )
 RETURNING hashed_secret, service_account_account_id;
 
--- name: CreateOneTimeClientSecret :one
-INSERT INTO one_time_client_secrets (id, service_account_account_id, plaintext_secret, created_at, expires_at)
-VALUES ( $1, $2, $3, NOW(), $4)
-RETURNING id;
+-- name: CreateServiceAccountSetupToken :exec
+-- the token is in the setup link: only its hash (auth.HashToken) is stored
+INSERT INTO service_account_setup_tokens (hashed_token, service_account_account_id, created_at, expires_at)
+VALUES ($1, $2, NOW(), $3);
 
+-- name: DeleteServiceAccountSetupToken :execrows
+DELETE FROM service_account_setup_tokens
+WHERE hashed_token = $1;
 
--- name: DeleteOneTimeClientSecret :execrows
-DELETE from one_time_client_secrets 
-WHERE id = $1;
-
--- name: DeleteOneTimeClientSecretsByOrgAndEmail :execrows
-DELETE from one_time_client_secrets 
-WHERE service_account_account_id = (SELECT account_id 
-                                    FROM service_accounts 
-                                    WHERE LOWER(client_organization) = LOWER(sqlc.arg(client_organization))
-                                    AND LOWER(client_contact_email) = LOWER(sqlc.arg(client_contact_email)))
-AND expires_at > NOW();
+-- name: DeleteServiceAccountSetupTokensForAccount :execrows
+DELETE FROM service_account_setup_tokens
+WHERE service_account_account_id = $1;
 
 -- name: GetValidClientSecretByServiceAccountAccountId :one
 -- only returns unrevoked/unexpired secrets (a secret scheduled for revocation remains valid until revoked_at)
@@ -77,10 +72,11 @@ SELECT * FROM service_accounts
     WHERE LOWER(client_organization) = LOWER(sqlc.arg(client_organization))
     AND LOWER(client_contact_email) = LOWER(sqlc.arg(client_contact_email));
 
--- name: GetOneTimeClientSecret :one
-SELECT created_at, service_account_account_id, plaintext_secret, expires_at
-FROM one_time_client_secrets
-WHERE id = $1
+-- name: GetServiceAccountSetupToken :one
+-- locks the row until the transaction ends, so a concurrent request for the same token waits and then finds it deleted
+SELECT created_at, service_account_account_id, expires_at
+FROM service_account_setup_tokens
+WHERE hashed_token = $1
 FOR UPDATE;
 
 -- name: GetValidClientSecretByHashedSecret :one

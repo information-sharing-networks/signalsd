@@ -270,16 +270,8 @@ func (a *AdminHandler) DisableAccount(w http.ResponseWriter, r *http.Request) er
 			return apperrors.DatabaseError("database error", err)
 		}
 
-		// Delete any one-time client secrets
-		serviceAccount, err := txQueries.GetServiceAccountByAccountID(r.Context(), accountID)
-		if err != nil {
-			return apperrors.DatabaseError("database error", err)
-		}
-
-		_, err = txQueries.DeleteOneTimeClientSecretsByOrgAndEmail(r.Context(), database.DeleteOneTimeClientSecretsByOrgAndEmailParams{
-			ClientOrganization: serviceAccount.ClientOrganization,
-			ClientContactEmail: serviceAccount.ClientContactEmail,
-		})
+		// Delete any pending setup links
+		_, err = txQueries.DeleteServiceAccountSetupTokensForAccount(r.Context(), accountID)
 		if err != nil {
 			return apperrors.DatabaseError("database error", err)
 		}
@@ -610,7 +602,7 @@ func (a *AdminHandler) GetServiceAccounts(w http.ResponseWriter, r *http.Request
 type GeneratePasswordResetLinkResponse struct {
 	UserEmail string    `json:"user_email" example:"user@example.com"`
 	AccountID uuid.UUID `json:"account_id" example:"550e8400-e29b-41d4-a716-446655440000"`
-	ResetURL  string    `json:"reset_url" example:"https://api.example.com/api/auth/password-reset/0ce71234-34d5-4fb5-beb8-ad50d8b40c7d"`
+	ResetURL  string    `json:"reset_url" example:"https://api.example.com/api/auth/password-reset/l7ny8ASVmB7AyJbi-Ogf5jh3SenxZ1-1ULCwtxa5I6o="`
 	ExpiresAt time.Time `json:"expires_at" example:"2024-12-25T10:30:00Z"`
 	ExpiresIn int       `json:"expires_in" example:"1800"`
 }
@@ -696,11 +688,15 @@ func (a *AdminHandler) GeneratePasswordResetLink(w http.ResponseWriter, r *http.
 
 		return apperrors.DatabaseError("database error", err)
 	}
-	id := uuid.NewV7()
-	// Create password reset token record
+	// Create password reset token record.
+	// The token is only in the reset link: the database stores its hash (like refresh tokens and client secrets)
+	resetToken, err := a.authService.GenerateSecureToken(32)
+	if err != nil {
+		return apperrors.InternalError("internal server error", err)
+	}
 	expiresAt := time.Now().Add(signalsd.PasswordResetExpiry)
-	tokenID, err := txQueries.CreatePasswordResetToken(r.Context(), database.CreatePasswordResetTokenParams{
-		ID:               id,
+	err = txQueries.CreatePasswordResetToken(r.Context(), database.CreatePasswordResetTokenParams{
+		HashedToken:      a.authService.HashToken(resetToken),
 		UserAccountID:    tagetUserID,
 		ExpiresAt:        expiresAt,
 		CreatedByAdminID: accountID,
@@ -720,7 +716,7 @@ func (a *AdminHandler) GeneratePasswordResetLink(w http.ResponseWriter, r *http.
 	// Generate the one-time password reset URL using forwarded headers
 	resetURL := fmt.Sprintf("%s/api/auth/password-reset/%s",
 		a.publicBaseURL,
-		tokenID.String(),
+		resetToken,
 	)
 
 	// Add user and admin account IDs to final request log context (the reset URL is not logged - anyone who could read the logs could use it to reset the user's password)
