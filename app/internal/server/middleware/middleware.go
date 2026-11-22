@@ -112,6 +112,8 @@ func RequestSizeLimit(maxBytes int64) func(http.Handler) http.Handler {
 }
 
 // RateLimit limits requests per second. If requestsPerSecond <= 0, rate limiting is disabled.
+// The liveness check is not rate limited: if load balancer health checks were rejected during a traffic spike,
+// healthy containers would be replaced. The readiness check is still rate limited because it queries the database.
 func RateLimit(requestsPerSecond int32, burst int32) func(http.Handler) http.Handler {
 	// If rate limiting is disabled, return a no-op middleware
 	if requestsPerSecond <= 0 {
@@ -124,6 +126,10 @@ func RateLimit(requestsPerSecond int32, burst int32) func(http.Handler) http.Han
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/health/live" {
+				next.ServeHTTP(w, r)
+				return
+			}
 			if !limiter.Allow() {
 				logger.AddLogAttrs(r.Context(),
 					slog.String("component", "RateLimit"),
