@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	neturl "net/url"
 	"slices"
 	"strings"
 	"time"
@@ -171,7 +172,7 @@ type ServiceAccountLookupResponse struct {
 func (c *Client) LookupServiceAccountByClientID(ctx context.Context, accessToken, clientID string) (*ServiceAccountLookupResponse, error) {
 	// Use the admin service accounts endpoint to get all service accounts, then filter by client_id
 
-	url := fmt.Sprintf("%s/api/admin/service-accounts?client_id=%s", c.baseURL, clientID)
+	url := fmt.Sprintf("%s/api/admin/service-accounts?client_id=%s", c.baseURL, neturl.QueryEscape(clientID))
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {

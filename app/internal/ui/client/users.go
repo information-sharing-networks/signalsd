@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	neturl "net/url"
 	"time"
 	"uuid"
 )
@@ -94,7 +95,7 @@ type UserLookupResponse struct {
 // LookupUserByEmail looks up a user by email address using the admin endpoint
 // Note: This requires admin permissions
 func (c *Client) LookupUserByEmail(ctx context.Context, accessToken, email string) (*UserLookupResponse, error) {
-	url := fmt.Sprintf("%s/api/admin/users?email=%s", c.baseURL, email)
+	url := fmt.Sprintf("%s/api/admin/users?email=%s", c.baseURL, neturl.QueryEscape(email))
 
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
