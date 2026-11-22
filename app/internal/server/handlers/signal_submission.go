@@ -125,6 +125,7 @@ type FailedSignal struct {
 	LocalRef     string `json:"local_ref" example:"item_id_#2"`
 	ErrorCode    string `json:"error_code" example:"malformed_body"`
 	ErrorMessage string `json:"error_message" example:"field 'name' is required"`
+	err          error  // err is the database error behind a database_error failure: it is logged (see logSubmissionFailures), not sent to the client
 }
 
 // recordSignalProcessingFailures writes the details of the signals that could not be stored to the
@@ -714,7 +715,7 @@ func (s *SignalsHandler) storeJSONSignal(ctx context.Context, submission *signal
 		LocalRef:       signal.LocalRef,
 	})
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return dbFailed(err, fmt.Sprintf("failed to get the latest version of the signal: %v", err))
+		return dbFailed(err, "failed to get the latest version of the signal")
 	}
 	if err == nil && latest.ContentMatches && !latest.IsWithdrawn && (signal.CorrelationID == nil || *signal.CorrelationID == latest.CorrelationID) {
 		return StoredSignal{
@@ -764,7 +765,7 @@ func (s *SignalsHandler) storeJSONSignal(ctx context.Context, submission *signal
 		if errors.Is(err, pgx.ErrNoRows) {
 			return failed(apperrors.ErrCodeResourceNotFound, "the ISN or signal type is not in use")
 		}
-		return dbFailed(err, fmt.Sprintf("failed to create signal master record: %v", err))
+		return dbFailed(err, "failed to create signal master record")
 	}
 
 	// create the signal version, which holds the content
@@ -775,7 +776,7 @@ func (s *SignalsHandler) storeJSONSignal(ctx context.Context, submission *signal
 		Content:       signal.Content,
 	})
 	if err != nil {
-		return dbFailed(err, fmt.Sprintf("failed to create signal version: %v", err))
+		return dbFailed(err, "failed to create signal version")
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -799,7 +800,7 @@ func newDatabaseFailure(localRef string, err error, message string) *FailedSigna
 	if errors.Is(err, context.DeadlineExceeded) {
 		return &FailedSignal{LocalRef: localRef, ErrorCode: apperrors.ErrCodeTimeout.String(), ErrorMessage: timedOutMessage}
 	}
-	return &FailedSignal{LocalRef: localRef, ErrorCode: apperrors.ErrCodeDatabaseError.String(), ErrorMessage: message}
+	return &FailedSignal{LocalRef: localRef, ErrorCode: apperrors.ErrCodeDatabaseError.String(), ErrorMessage: message, err: err}
 }
 
 // timedOutSignals returns timeout failures for the signals that were not processed because the request timed out
@@ -824,15 +825,20 @@ func submissionStatus(summary CreateSignalsSummary) int {
 	}
 }
 
-// logSubmissionFailures logs a summary of the signals that could not be stored (the number of each kind of failure)
+// logSubmissionFailures logs a summary of the signals that could not be stored (the number of each kind of failure).
+// For database failures, the database error of one of the failed signals is included.
 func logSubmissionFailures(ctx context.Context, storedCount int, failures []FailedSignal) {
 	if len(failures) == 0 {
 		return
 	}
 
 	failureCounts := make(map[string]int)
+	exampleErrors := make(map[string]error)
 	for _, failed := range failures {
 		failureCounts[failed.ErrorMessage]++
+		if failed.err != nil && exampleErrors[failed.ErrorMessage] == nil {
+			exampleErrors[failed.ErrorMessage] = failed.err
+		}
 	}
 
 	requestLogger := logger.ContextRequestLogger(ctx)
@@ -842,9 +848,13 @@ func logSubmissionFailures(ctx context.Context, storedCount int, failures []Fail
 		slog.Int("unique_errors", len(failureCounts)),
 	)
 	for errorMessage, count := range failureCounts {
-		requestLogger.Warn("Failure type",
+		attrs := []any{
 			slog.String("error_message", errorMessage),
 			slog.Int("count", count),
-		)
+		}
+		if err := exampleErrors[errorMessage]; err != nil {
+			attrs = append(attrs, slog.String("error", err.Error()))
+		}
+		requestLogger.Warn("Failure type", attrs...)
 	}
 }

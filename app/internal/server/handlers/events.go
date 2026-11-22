@@ -77,7 +77,7 @@ func (s *SignalsHandler) storeEventSignal(ctx context.Context, submission *signa
 		return s.resubmittedEvent(ctx, queries, submission, signal, isnSlug)
 	}
 	if err != nil {
-		return dbFailed(err, fmt.Sprintf("failed to create signal master record: %v", err))
+		return dbFailed(err, "failed to create signal master record")
 	}
 
 	version, err := queries.CreateSignalVersion(ctx, database.CreateSignalVersionParams{
@@ -87,7 +87,7 @@ func (s *SignalsHandler) storeEventSignal(ctx context.Context, submission *signa
 		Content:       signal.Content,
 	})
 	if err != nil {
-		return dbFailed(err, fmt.Sprintf("failed to create signal version: %v", err))
+		return dbFailed(err, "failed to create signal version")
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -128,7 +128,7 @@ func (s *SignalsHandler) resubmittedEvent(ctx context.Context, queries *database
 		return failed(apperrors.ErrCodeResourceNotFound, "the ISN or signal type is not in use")
 	}
 	if err != nil {
-		return dbFailed(err, fmt.Sprintf("failed to get the existing event: %v", err))
+		return dbFailed(err, "failed to get the existing event")
 	}
 
 	switch {
