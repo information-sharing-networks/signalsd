@@ -23,7 +23,7 @@ import (
 	signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 )
 
-// TestGetSignalType checks site admins can get the details of a signal type and other accounts can't
+// TestGetSignalType checks site admins and ISN admins can get the details of a signal type and members can't
 func TestGetSignalType(t *testing.T) {
 	ctx := context.Background()
 
@@ -31,6 +31,7 @@ func TestGetSignalType(t *testing.T) {
 
 	siteAdminAccount := createTestAccount(t, ctx, testEnv.queries, "siteadmin", "user", "siteadmin@get-signal-type.com")
 	adminAccount := createTestAccount(t, ctx, testEnv.queries, "isnadmin", "user", "admin@get-signal-type.com")
+	memberAccount := createTestAccount(t, ctx, testEnv.queries, "member", "user", "member@get-signal-type.com")
 
 	isn := createTestISN(t, ctx, testEnv.queries, "get-signal-type-isn", "Get signal type ISN", adminAccount.ID, "private")
 	jsonSignalType := createTestSignalType(t, ctx, testEnv.queries, isn.ID, "json signal type", "", signalsd.ContentKindJSON)
@@ -38,6 +39,7 @@ func TestGetSignalType(t *testing.T) {
 
 	siteAdminToken := testEnv.getAccessToken(t, siteAdminAccount.ID)
 	adminToken := testEnv.getAccessToken(t, adminAccount.ID)
+	memberToken := testEnv.getAccessToken(t, memberAccount.ID)
 
 	t.Run("site admin can get a json signal type", func(t *testing.T) {
 		response := getSignalTypeRequest(t, testEnv.baseURL, siteAdminToken, jsonSignalType.Slug, jsonSignalType.SemVer)
@@ -75,8 +77,18 @@ func TestGetSignalType(t *testing.T) {
 		expectErrorCode(t, response, http.StatusNotFound, apperrors.ErrCodeResourceNotFound)
 	})
 
-	t.Run("accounts that are not site admins are forbidden", func(t *testing.T) {
+	// ISN admins use the signal type details to choose the signal types to add to their ISNs
+	t.Run("isn admin can get a signal type", func(t *testing.T) {
 		response := getSignalTypeRequest(t, testEnv.baseURL, adminToken, jsonSignalType.Slug, jsonSignalType.SemVer)
+		signalType := expectJSONResponse(t, response, http.StatusOK)
+
+		if signalType["slug"] != jsonSignalType.Slug {
+			t.Errorf("Expected slug %s, got %v", jsonSignalType.Slug, signalType["slug"])
+		}
+	})
+
+	t.Run("members are forbidden", func(t *testing.T) {
+		response := getSignalTypeRequest(t, testEnv.baseURL, memberToken, jsonSignalType.Slug, jsonSignalType.SemVer)
 		expectErrorCode(t, response, http.StatusForbidden, apperrors.ErrCodeForbidden)
 	})
 

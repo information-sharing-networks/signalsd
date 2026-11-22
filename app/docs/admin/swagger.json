@@ -548,7 +548,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Get details for all the signal types registered on the site.\n\nUse GET /api/isn/{isn_slug}/signal-types to get the signal types that have been added to an ISN.\n\nNote: this endpoint can only be used by site admins",
+                "description": "Get details for all the signal types registered on the site.\n\nUse GET /api/isn/{isn_slug}/signal-types to get the signal types that have been added to an ISN.\n\nNote: this endpoint can only be used by site admins and ISN admins",
                 "tags": [
                     "Signal Types"
                 ],
@@ -729,7 +729,7 @@
                         "BearerAccessToken": []
                     }
                 ],
-                "description": "Returns the signal type details.\n\nUse GET /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver} to see how a signal type is used on an ISN.\n\nNote: this endpoint can only be used by site admins",
+                "description": "Returns the signal type details.\n\nUse GET /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver} to see how a signal type is used on an ISN.\n\nNote: this endpoint can only be used by site admins and ISN admins",
                 "tags": [
                     "Signal Types"
                 ],

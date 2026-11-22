@@ -816,7 +816,7 @@ func (s *SignalTypeHandler) DeleteSignalType(w http.ResponseWriter, r *http.Requ
 //	@Description
 //	@Description	Use GET /api/isn/{isn_slug}/signal-types/{signal_type_slug}/v{sem_ver} to see how a signal type is used on an ISN.
 //	@Description
-//	@Description	Note: this endpoint can only be used by site admins
+//	@Description	Note: this endpoint can only be used by site admins and ISN admins
 //
 //	@Tags			Signal Types
 //
@@ -833,7 +833,7 @@ func (s *SignalTypeHandler) DeleteSignalType(w http.ResponseWriter, r *http.Requ
 //
 //	@Router			/api/admin/signal-types/{signal_type_slug}/v{sem_ver} [get]
 //
-// Should only be used with RequireAdminRole (siteadmin) middleware
+// Should only be used with RequireAdminRole (siteadmin, isnadmin) middleware
 func (s *SignalTypeHandler) GetSignalType(w http.ResponseWriter, r *http.Request) error {
 
 	signalTypeSlug := r.PathValue("signal_type_slug")
@@ -887,7 +887,7 @@ func (s *SignalTypeHandler) GetSignalType(w http.ResponseWriter, r *http.Request
 //	@Description
 //	@Description	Use GET /api/isn/{isn_slug}/signal-types to get the signal types that have been added to an ISN.
 //	@Description
-//	@Description	Note: this endpoint can only be used by site admins
+//	@Description	Note: this endpoint can only be used by site admins and ISN admins
 //
 //	@Tags			Signal Types
 //
@@ -900,7 +900,7 @@ func (s *SignalTypeHandler) GetSignalType(w http.ResponseWriter, r *http.Request
 //
 //	@Router			/api/admin/signal-types [get]
 //
-// Should only be used with RequireAdminRole (siteadmin) middleware
+// Should only be used with RequireAdminRole (siteadmin, isnadmin) middleware
 func (s *SignalTypeHandler) GetSignalTypes(w http.ResponseWriter, r *http.Request) error {
 
 	var dbSignalTypes []database.SignalType

@@ -353,8 +353,6 @@ func (s *Server) registerAdminRoutes() {
 				r.Put("/isn/{isn_slug}/transfer-ownership", responses.Wrap(isn.TransferIsnOwnership))
 
 				// signal types management
-				r.Get("/signal-types", responses.Wrap(signalTypes.GetSignalTypes))
-				r.Get("/signal-types/{signal_type_slug}/v{sem_ver}", responses.Wrap(signalTypes.GetSignalType))
 				r.Post("/signal-types", responses.Wrap(signalTypes.CreateSignalType))
 				r.Post("/signal-types/{signal_type_slug}/schemas", responses.Wrap(signalTypes.RegisterNewSignalTypeSchema))
 				r.Put("/signal-types/{signal_type_slug}/v{sem_ver}", responses.Wrap(signalTypes.UpdateSignalType))
@@ -376,6 +374,10 @@ func (s *Server) registerAdminRoutes() {
 				// account lists (used by ISN admins to find the accounts to grant ISN access to)
 				r.Get("/users", responses.Wrap(admin.GetUsers))
 				r.Get("/service-accounts", responses.Wrap(admin.GetServiceAccounts))
+
+				// signal type definitions (used by ISN admins to choose the signal types to add to their ISNs)
+				r.Get("/signal-types", responses.Wrap(signalTypes.GetSignalTypes))
+				r.Get("/signal-types/{signal_type_slug}/v{sem_ver}", responses.Wrap(signalTypes.GetSignalType))
 			})
 		})
 	})
