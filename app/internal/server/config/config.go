@@ -49,7 +49,7 @@ const (
 	OneTimeSecretExpiry   = 48 * time.Hour       // Service account setup tokens
 	PasswordResetExpiry   = 30 * time.Minute     // Password reset tokens
 	ClientSecretExpiry    = 365 * 24 * time.Hour // Client secret expiration (1 year)
-	MinimumPasswordLength = 11
+	MinimumPasswordLength = 11                   // characters
 
 	// Operational timeouts
 	ServerShutdownTimeout = 10 * time.Second // Server graceful shutdown timeout
@@ -231,6 +231,13 @@ func validateConfig(cfg *ServerEnvironment) error {
 	}
 	if cfg.MaxDocumentSize < 1 {
 		return fmt.Errorf("MAX_DOCUMENT_SIZE must be at least 1")
+	}
+	// The RequestTimeout middleware cancels the request context 1s before WRITE_TIMEOUT. The 1s leaves the handler time
+	// to stop its database work and send an error response (e.g. timeout failures for the signals not yet stored)
+	// before the connection is dropped and the client gets no response at all.
+	// With WRITE_TIMEOUT of 1s or less the context would be cancelled as soon as the request started.
+	if cfg.WriteTimeout <= time.Second {
+		return fmt.Errorf("WRITE_TIMEOUT must be more than 1s")
 	}
 	if cfg.DocumentTransferTimeout <= time.Second {
 		return fmt.Errorf("DOCUMENT_TRANSFER_TIMEOUT must be more than 1s")
