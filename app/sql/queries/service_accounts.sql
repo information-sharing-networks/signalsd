@@ -80,7 +80,8 @@ SELECT * FROM service_accounts
 -- name: GetOneTimeClientSecret :one
 SELECT created_at, service_account_account_id, plaintext_secret, expires_at
 FROM one_time_client_secrets
-WHERE id = $1;
+WHERE id = $1
+FOR UPDATE;
 
 -- name: GetValidClientSecretByHashedSecret :one
 -- used for authentication: does not return expired or revoked credentials

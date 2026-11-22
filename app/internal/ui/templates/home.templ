@@ -1,5 +1,6 @@
 package templates
 
+import signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 
 // =============================================================================
 // LOGIN & REGISTRATION
@@ -11,7 +12,7 @@ templ LoginPageWithEnvironment(environment string) {
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 			<title>Login - Signals</title>
-			<script src={ htmxScriptPath }></script>
+			<script src={ signalsd.HTMXScriptPath }></script>
 			<link href="/static/css/app.css" rel="stylesheet"/>
 		</head>
 		<body data-environment={ environment }>

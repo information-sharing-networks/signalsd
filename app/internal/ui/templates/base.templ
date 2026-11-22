@@ -1,5 +1,6 @@
 package templates
 
+import signalsd "github.com/information-sharing-networks/signalsd/app/internal/server/config"
 
 // =============================================================================
 // BASE LAYOUT & STRUCTURE
@@ -11,7 +12,7 @@ templ BaseLayout(title string) {
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 			<title>{ title } - Signals</title>
-			<script src={ htmxScriptPath }></script>
+			<script src={ signalsd.HTMXScriptPath }></script>
 			<link href="/static/css/app.css" rel="stylesheet"/>
 		</head>
 		<body>

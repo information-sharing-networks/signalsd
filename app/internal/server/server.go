@@ -274,7 +274,9 @@ func (s *Server) registerAdminRoutes() {
 				r.Post("/login", responses.Wrap(login.Login))
 
 				// one-time links
-				r.Get("/service-accounts/setup/{setup_id}", serviceAccounts.SetupServiceAccount)
+				// GET only renders a page: the link is used up by the POST (link scanners and chat previews only send GETs)
+				r.Get("/service-accounts/setup/{setup_id}", serviceAccounts.SetupServiceAccountPage)
+				r.Post("/service-accounts/setup/{setup_id}", serviceAccounts.SetupServiceAccount)
 				r.Get("/password-reset/{token_id}", users.PasswordResetTokenPage)
 				r.Post("/password-reset/{token_id}", responses.Wrap(users.PasswordResetToken))
 			})

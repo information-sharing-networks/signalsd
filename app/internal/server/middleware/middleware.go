@@ -43,8 +43,8 @@ func PublicCORS(next http.Handler) http.Handler {
 
 // NoCache requires browsers to revalidate before reusing a cached response.
 //
-// Used for the API documentation and the OpenAPI specs, which are baked into the container image and
-// therefore change with every deployment
+// Used for the API documentation, the OpenAPI specs and the UI's static files, which are include in the container image
+// and therefore can change with every deployment
 func NoCache(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", "no-cache")

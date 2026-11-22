@@ -77,7 +77,8 @@ func NewIntegratedServer(router *chi.Mux, cfg *config.Config, logger *slog.Logge
 // note: dynamic HMTX handlers are registered with routes starting /ui-api
 func (s *Server) registerRoutes() {
 	// Public routes (no auth required)
-	s.router.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("./web/static/"))))
+	// NoCache: without it browsers can reuse a stale copy of an unversioned file such as app.css after a deployment
+	s.router.With(middleware.NoCache).Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.Dir("./web/static/"))))
 	s.router.Get("/login", s.LoginPage)
 	s.router.With(limitRequestBody).Post("/login", s.Login)
 	s.router.Post("/logout", s.Logout)

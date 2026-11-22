@@ -59,6 +59,13 @@ const (
 	// CachePollInterval is how often each instance checks the DB for cache changes
 	CachePollInterval = 30 * time.Second
 
+	// HTMXScriptPath is the locally bundled copy of htmx (app/web/static/js), used by the UI and the one-time link pages.
+	//
+	// To upgrade: download dist/htmx.min.js for the new version from the npm registry (check the tarball against the
+	// registry's published integrity hash), save it as web/static/js/htmx-<version>.min.js, delete the old file and update
+	// this path. The version in the file name ensures browsers do not keep using a cached copy of the old version.
+	HTMXScriptPath = "/static/js/htmx-2.0.7.min.js"
+
 	// SkipValidationURL is used to indicate schema validation should be skipped
 	SkipValidationURL = "https://github.com/skip/validation/main/schema.json"
 

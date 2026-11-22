@@ -733,12 +733,12 @@ table tbody tr:hover {
   gap: 0.5rem;
 }
 
-/* service account one-time setup page */
+/* service account one-time setup page: the credentials, shown in the setup-confirm card (see below) */
 
-.container.setup-complete {
-    max-width: 750px;
-    margin: 50px auto;
-    padding: 20px
+.container.setup-confirm {
+    p {
+        margin: 0 0 12px;
+    }
     .success {
         color: #28a745;
         font-size: 24px;
@@ -789,8 +789,9 @@ table tbody tr:hover {
     }
 } 
 
-/* password reset form */
-.container.reset-password {
+/* password reset form and service account setup confirmation page */
+.container.reset-password,
+.container.setup-confirm {
     max-width: 500px;
     margin: 0 auto;
     background: white;
@@ -819,7 +820,7 @@ table tbody tr:hover {
         font-size: 16px;
         box-sizing: border-box;
     }
-    button {
+    button[type="submit"] {
         width: 100%;
         padding: 12px;
         background-color: #1976d2;
@@ -829,7 +830,7 @@ table tbody tr:hover {
         font-size: 16px;
         cursor: pointer;
     }
-    button:hover {
+    button[type="submit"]:hover {
         background-color: #1565c0;
     }
     .info {
@@ -850,4 +851,9 @@ table tbody tr:hover {
         text-align: center;
         margin-top: 20px;
     }
+}
+
+/* wide enough for the client secret and its copy button on one line */
+.container.setup-confirm {
+    max-width: 640px;
 }

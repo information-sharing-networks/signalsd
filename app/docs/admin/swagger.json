@@ -1669,11 +1669,33 @@
         },
         "/api/auth/service-accounts/setup/{setup_id}": {
             "get": {
-                "description": "Exchanges a one-time setup ID for client credentials and renders an HTML page where the user can copy them.\n\nThis is the page reached by opening the link returned by *Register Service Account* or *Reissue Service Account Credentials*.\n\nSetup links expire 48 hours after they are issued and can only be used once - opening the page consumes the setup ID and revokes any client secret the service account was previously using. The client secret shown on the page is valid for one year and is not recoverable afterwards, so it has to be copied at this point.\n",
+                "description": "The page reached by opening the link returned by *Register Service Account* or *Reissue Service Account Credentials*.\n\nThe page has a button that generates the credentials (see *Service Account Setup*). Opening the page does not use up the setup link, so link scanners and chat link previews that open links automatically do not consume it.\n",
                 "tags": [
                     "One-time Links (browser pages)"
                 ],
                 "summary": "Service Account Setup Page",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "550e8400-e29b-41d4-a716-446655440000",
+                        "description": "One-time setup ID, taken from the setup link",
+                        "name": "setup_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "HTML page with a button to generate the client credentials"
+                    }
+                }
+            },
+            "post": {
+                "description": "Exchanges a one-time setup ID for client credentials and renders an HTML page where the user can copy them.\n\nThis endpoint is called by the button on the *Service Account Setup Page*.\n\nSetup links expire 48 hours after they are issued and can only be used once - this request consumes the setup ID and revokes any client secret the service account was previously using. The client secret shown on the page is valid for one year and is not recoverable afterwards, so it has to be copied at this point.\n",
+                "tags": [
+                    "One-time Links (browser pages)"
+                ],
+                "summary": "Service Account Setup",
                 "parameters": [
                     {
                         "type": "string",

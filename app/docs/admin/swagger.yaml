@@ -2174,11 +2174,29 @@ paths:
   /api/auth/service-accounts/setup/{setup_id}:
     get:
       description: |
+        The page reached by opening the link returned by *Register Service Account* or *Reissue Service Account Credentials*.
+
+        The page has a button that generates the credentials (see *Service Account Setup*). Opening the page does not use up the setup link, so link scanners and chat link previews that open links automatically do not consume it.
+      parameters:
+      - description: One-time setup ID, taken from the setup link
+        example: 550e8400-e29b-41d4-a716-446655440000
+        in: path
+        name: setup_id
+        required: true
+        type: string
+      responses:
+        "200":
+          description: HTML page with a button to generate the client credentials
+      summary: Service Account Setup Page
+      tags:
+      - One-time Links (browser pages)
+    post:
+      description: |
         Exchanges a one-time setup ID for client credentials and renders an HTML page where the user can copy them.
 
-        This is the page reached by opening the link returned by *Register Service Account* or *Reissue Service Account Credentials*.
+        This endpoint is called by the button on the *Service Account Setup Page*.
 
-        Setup links expire 48 hours after they are issued and can only be used once - opening the page consumes the setup ID and revokes any client secret the service account was previously using. The client secret shown on the page is valid for one year and is not recoverable afterwards, so it has to be copied at this point.
+        Setup links expire 48 hours after they are issued and can only be used once - this request consumes the setup ID and revokes any client secret the service account was previously using. The client secret shown on the page is valid for one year and is not recoverable afterwards, so it has to be copied at this point.
       parameters:
       - description: One-time setup ID, taken from the setup link
         example: 550e8400-e29b-41d4-a716-446655440000
@@ -2192,7 +2210,7 @@ paths:
         "400":
           description: HTML error page - if the token is unknown, already used or
             expired the endpoint returns 400 with an HTML body.
-      summary: Service Account Setup Page
+      summary: Service Account Setup
       tags:
       - One-time Links (browser pages)
   /api/isn/:

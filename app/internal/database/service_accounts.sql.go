@@ -200,6 +200,7 @@ const GetOneTimeClientSecret = `-- name: GetOneTimeClientSecret :one
 SELECT created_at, service_account_account_id, plaintext_secret, expires_at
 FROM one_time_client_secrets
 WHERE id = $1
+FOR UPDATE
 `
 
 type GetOneTimeClientSecretRow struct {

@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -353,14 +352,39 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentials(w http.Response
 	return responses.JSON(w, http.StatusOK, response)
 }
 
-// SetupServiceAccount godoc
+// SetupServiceAccountPage godoc
 //
 //	@Summary		Service Account Setup Page
+//	@Description	The page reached by opening the link returned by *Register Service Account* or *Reissue Service Account Credentials*.
+//	@Description
+//	@Description	The page has a button that generates the credentials (see *Service Account Setup*). Opening the page does not use up the setup link, so link scanners and chat link previews that open links automatically do not consume it.
+//	@Description
+//	@Tags		One-time Links (browser pages)
+//
+//	@Param		setup_id	path	string	true	"One-time setup ID, taken from the setup link"	example(550e8400-e29b-41d4-a716-446655440000)
+//
+//	@Success	200			"HTML page with a button to generate the client credentials"
+//
+//	@Router		/api/auth/service-accounts/setup/{setup_id} [get]
+func (s *ServiceAccountHandler) SetupServiceAccountPage(w http.ResponseWriter, r *http.Request) {
+	// the setup ID is checked when the form is submitted (SetupServiceAccount)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+
+	if err := serviceAccountTemplates.ConfirmSetupPage(r.URL.Path).Render(r.Context(), w); err != nil {
+		logger.AddLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+	}
+}
+
+// SetupServiceAccount godoc
+//
+//	@Summary		Service Account Setup
 //	@Description	Exchanges a one-time setup ID for client credentials and renders an HTML page where the user can copy them.
 //	@Description
-//	@Description	This is the page reached by opening the link returned by *Register Service Account* or *Reissue Service Account Credentials*.
+//	@Description	This endpoint is called by the button on the *Service Account Setup Page*.
 //	@Description
-//	@Description	Setup links expire 48 hours after they are issued and can only be used once - opening the page consumes the setup ID and revokes any client secret the service account was previously using. The client secret shown on the page is valid for one year and is not recoverable afterwards, so it has to be copied at this point.
+//	@Description	Setup links expire 48 hours after they are issued and can only be used once - this request consumes the setup ID and revokes any client secret the service account was previously using. The client secret shown on the page is valid for one year and is not recoverable afterwards, so it has to be copied at this point.
 //	@Description
 //	@Tags		One-time Links (browser pages)
 //
@@ -369,7 +393,7 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentials(w http.Response
 //	@Success	201			"HTML page displaying the client_id and client_secret"
 //	@Failure	400			"HTML error page - if the token is unknown, already used or expired the endpoint returns 400 with an HTML body."
 //
-//	@Router		/api/auth/service-accounts/setup/{setup_id} [get]
+//	@Router		/api/auth/service-accounts/setup/{setup_id} [post]
 func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *http.Request) {
 	// Extract token from URL path
 	oneTimeSecretIDString := r.PathValue("setup_id")
@@ -378,7 +402,7 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 	oneTimeSecretID, err := uuid.Parse(oneTimeSecretIDString)
 	if err != nil {
 
-		s.renderErrorPage(w, "Invalid Setup ID", "The setup ID you provided is not valid. Please check the URL and try again.")
+		s.renderErrorPage(w, r, "Invalid Setup ID", "The setup ID you provided is not valid. Please check the URL and try again.")
 		return
 	}
 
@@ -389,24 +413,22 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 			slog.String("error", err.Error()),
 		)
 
-		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
+		s.renderErrorPage(w, r, "Internal Server Error", "Please try again later.")
 		return
 	}
 
 	defer func() {
+		// the response has already been written when this runs, so only log the error
 		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
 			logger.AddLogAttrs(r.Context(),
 				slog.String("rollback_error", err.Error()),
 			)
-
-			s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
-			return
 		}
 	}()
 
 	txQueries := s.queries.WithTx(tx)
 
-	// Retrieve and validate one-time secret
+	// Retrieve and validate one-time secret (locks the row, so a concurrent request for the same setup ID can't also use it)
 	oneTimeSecret, err := txQueries.GetOneTimeClientSecret(r.Context(), oneTimeSecretID)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -414,14 +436,14 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 				slog.String("reason", "setup id has already been used or is no longer valid"),
 			)
 
-			s.renderErrorPage(w, "set up ID not found ", "The setup ID you provided has already been used or is no longer valid")
+			s.renderErrorPage(w, r, "set up ID not found ", "The setup ID you provided has already been used or is no longer valid")
 			return
 		}
 		logger.AddLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
 		)
 
-		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
+		s.renderErrorPage(w, r, "Internal Server Error", "Please try again later.")
 		return
 	}
 
@@ -431,7 +453,7 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 			slog.String("reason", "setup id has expired"),
 		)
 
-		s.renderErrorPage(w, "set up ID not found or already used", "The setup ID you provided has already been used or is no longer valid")
+		s.renderErrorPage(w, r, "set up ID not found or already used", "The setup ID you provided has already been used or is no longer valid")
 		return
 	}
 
@@ -441,7 +463,7 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 			slog.String("error", err.Error()),
 		)
 
-		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
+		s.renderErrorPage(w, r, "Internal Server Error", "Please try again later.")
 		return
 	}
 
@@ -452,7 +474,7 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 			slog.String("error", err.Error()),
 		)
 
-		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
+		s.renderErrorPage(w, r, "Internal Server Error", "Please try again later.")
 		return
 	}
 
@@ -470,7 +492,7 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 			slog.String("error", err.Error()),
 		)
 
-		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
+		s.renderErrorPage(w, r, "Internal Server Error", "Please try again later.")
 		return
 	}
 
@@ -481,7 +503,7 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 			slog.String("error", err.Error()),
 		)
 
-		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
+		s.renderErrorPage(w, r, "Internal Server Error", "Please try again later.")
 		return
 	}
 
@@ -490,7 +512,7 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 			slog.String("error", err.Error()),
 		)
 
-		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
+		s.renderErrorPage(w, r, "Internal Server Error", "Please try again later.")
 		return
 	}
 
@@ -506,30 +528,46 @@ func (s *ServiceAccountHandler) SetupServiceAccount(w http.ResponseWriter, r *ht
 		slog.String("account_id", serviceAccount.AccountID.String()),
 	)
 
-	// Render service account setup page using templ
+	// Render service account setup page using templ.
+	// The page contains the client secret, so browsers and proxies must not store it.
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(http.StatusCreated)
 
-	if err := serviceAccountTemplates.SetupPage(data).Render(r.Context(), w); err != nil {
+	// htmx requests (from the button on the confirmation page) only need the credentials
+	var renderErr error
+	if isHTMXRequest(r) {
+		renderErr = serviceAccountTemplates.SetupCredentials(data).Render(r.Context(), w)
+	} else {
+		renderErr = serviceAccountTemplates.SetupPage(data).Render(r.Context(), w)
+	}
+	if err := renderErr; err != nil {
+		// the status and part of the page may already have been sent, so only log the error
 		logger.AddLogAttrs(r.Context(),
 			slog.String("error", err.Error()),
 		)
-
-		s.renderErrorPage(w, "Internal Server Error", "Please try again later.")
-		return
 	}
 }
 
-func (s *ServiceAccountHandler) renderErrorPage(w http.ResponseWriter, title, message string) {
-	data := errorTemplates.ErrorPageData{
-		Title:   title,
-		Message: message,
-	}
-
+func (s *ServiceAccountHandler) renderErrorPage(w http.ResponseWriter, r *http.Request, title, message string) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusBadRequest)
 
-	if err := errorTemplates.ErrorPage(data).Render(context.Background(), w); err != nil {
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+	// htmx requests replace the confirmation page content, so they get the error without the page around it
+	var err error
+	if isHTMXRequest(r) {
+		err = serviceAccountTemplates.SetupError(title, message).Render(r.Context(), w)
+	} else {
+		err = errorTemplates.ErrorPage(errorTemplates.ErrorPageData{Title: title, Message: message}).Render(r.Context(), w)
 	}
+	if err != nil {
+		logger.AddLogAttrs(r.Context(),
+			slog.String("error", err.Error()),
+		)
+	}
+}
+
+// isHTMXRequest reports whether the request was sent by htmx
+func isHTMXRequest(r *http.Request) bool {
+	return r.Header.Get("HX-Request") == "true"
 }
