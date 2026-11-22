@@ -135,7 +135,8 @@ func RequestLogging(logger *slog.Logger) func(http.Handler) http.Handler {
 			var req_type string
 			switch {
 			case strings.HasPrefix(r.URL.Path, "/docs"), strings.HasPrefix(r.URL.Path, "/swagger.json"),
-				strings.HasPrefix(r.URL.Path, "/admin-docs"), strings.HasPrefix(r.URL.Path, "/admin-swagger.json"):
+				strings.HasPrefix(r.URL.Path, "/admin-docs"), strings.HasPrefix(r.URL.Path, "/admin-swagger.json"),
+				strings.HasPrefix(r.URL.Path, "/ui-docs"), strings.HasPrefix(r.URL.Path, "/ui-swagger.json"):
 				req_type = "docs"
 			case strings.HasPrefix(r.URL.Path, "/api/"):
 				req_type = "api"

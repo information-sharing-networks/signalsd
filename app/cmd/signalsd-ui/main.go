@@ -44,6 +44,8 @@ func run() error {
 	}
 
 	appLogger := logger.InitLogger(logger.ParseLogLevel(cfg.LogLevel), cfg.Environment)
+	// fallback for code with no logger to hand (e.g. the logger package warnings), so that it logs in the same format
+	slog.SetDefault(appLogger)
 
 	appLogger.Info("Starting UI server", slog.String("version", version.Get().Version))
 

@@ -365,6 +365,8 @@ func run(mode string) error {
 	}
 
 	appLogger := logger.InitLogger(logger.ParseLogLevel(cfg.LogLevel), cfg.Environment)
+	// fallback for code with no logger to hand (e.g. the logger package warnings), so that it logs in the same format
+	slog.SetDefault(appLogger)
 
 	appLogger.Info("Configuration loaded",
 		slog.String("ENVIRONMENT", cfg.Environment),
@@ -426,7 +428,7 @@ func run(mode string) error {
 	queries := database.New(pool)
 
 	// set up the signal schema cache - these schemas are stored on the database and used to validate the incoming signals (they are cached to avoid database roundtrips when validating signals)
-	schemaCache := schemas.NewCache(queries)
+	schemaCache := schemas.NewCache(queries, appLogger)
 	if err := schemaCache.Load(dbCtx); err != nil {
 		appLogger.Error("Failed to load schema cache", slog.String("error", err.Error()))
 		os.Exit(1)
@@ -435,7 +437,7 @@ func run(mode string) error {
 	appLogger.Info("Loaded signal schema cache", slog.Int("count", schemaCache.Len()))
 
 	// set up the public ISN cache - this is used by the public signal search endpoint (this endpoint can be used by unauthenticated users)
-	publicIsnCache := publicisns.NewCache(queries)
+	publicIsnCache := publicisns.NewCache(queries, appLogger)
 	if err := publicIsnCache.Load(dbCtx); err != nil {
 		appLogger.Error("Failed to load public ISN cache", slog.String("error", err.Error()))
 		os.Exit(1)
@@ -444,7 +446,7 @@ func run(mode string) error {
 	appLogger.Info("Loaded public ISN cache", slog.Int("count", publicIsnCache.Len()))
 
 	// set up the router cache - holds compiled ISN routing config, polled for changes every CachePollInterval
-	signalRouterCache := router.NewCache(queries)
+	signalRouterCache := router.NewCache(queries, appLogger)
 	if err := signalRouterCache.Load(dbCtx); err != nil {
 		appLogger.Error("Failed to load router cache", slog.String("error", err.Error()))
 		os.Exit(1)

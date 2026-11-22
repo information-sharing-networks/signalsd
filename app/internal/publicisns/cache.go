@@ -13,15 +13,17 @@ import (
 // Cache stores public ISN data for quick lookup
 type Cache struct {
 	db          *database.Queries
+	logger      *slog.Logger
 	mu          sync.RWMutex
 	isnSlugs    map[string]bool
 	signalTypes map[string]map[string]bool // ISN slug -> signal type path -> exists
 }
 
 // NewCache creates a new public ISN cache instance
-func NewCache(db *database.Queries) *Cache {
+func NewCache(db *database.Queries, logger *slog.Logger) *Cache {
 	return &Cache{
 		db:          db,
+		logger:      logger,
 		isnSlugs:    make(map[string]bool),
 		signalTypes: make(map[string]map[string]bool),
 	}
@@ -70,7 +72,7 @@ func (c *Cache) StartPolling(ctx context.Context, interval time.Duration) {
 			select {
 			case <-ticker.C:
 				if err := c.Load(ctx); err != nil {
-					slog.Error("public isn cache: poll refresh failed", slog.String("error", err.Error()))
+					c.logger.Error("public isn cache: poll refresh failed", slog.String("error", err.Error()))
 				}
 			case <-ctx.Done():
 				return

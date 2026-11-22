@@ -29,7 +29,8 @@ func SkipValidation(url string) bool {
 // Cache stores compiled JSON schemas indexed by signal type path: {signal_type_slug}/v{sem_ver}
 // Initialised on startup and refreshed by polling (see server.go)
 type Cache struct {
-	db *database.Queries
+	db     *database.Queries
+	logger *slog.Logger
 	// mu protects the cache from concurrent access when multiple http go routines are validating signals
 	mu sync.RWMutex
 	// schemas the compiled schema by path
@@ -41,9 +42,10 @@ type Cache struct {
 }
 
 // NewCache creates a new schema cache instance
-func NewCache(db *database.Queries) *Cache {
+func NewCache(db *database.Queries, logger *slog.Logger) *Cache {
 	return &Cache{
 		db:           db,
+		logger:       logger,
 		schemas:      make(map[string]*jsonschema.Schema),
 		schemaURLs:   make(map[string]string),
 		contentKinds: make(map[string]string),
@@ -107,7 +109,7 @@ func (c *Cache) StartPolling(ctx context.Context, interval time.Duration) {
 			select {
 			case <-ticker.C:
 				if err := c.Load(ctx); err != nil {
-					slog.Error("routing cache: poll refresh failed", slog.String("error", err.Error()))
+					c.logger.Error("schema cache: poll refresh failed", slog.String("error", err.Error()))
 				}
 			case <-ctx.Done():
 				return

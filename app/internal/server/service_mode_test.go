@@ -123,6 +123,7 @@ func routeGroup(route string) string {
 func registeredRoutes(t *testing.T, mode string) map[string]bool {
 	t.Helper()
 
+	discardLogger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	server := NewServer(
 		nil,
 		nil,
@@ -133,10 +134,10 @@ func registeredRoutes(t *testing.T, mode string) map[string]bool {
 			TrustedProxies: 1,
 			WriteTimeout:   30 * time.Second,
 		},
-		slog.New(slog.NewTextHandler(io.Discard, nil)),
-		schemas.NewCache(nil),
-		publicisns.NewCache(nil),
-		router.NewCache(nil),
+		discardLogger,
+		schemas.NewCache(nil, discardLogger),
+		publicisns.NewCache(nil, discardLogger),
+		router.NewCache(nil, discardLogger),
 		documents.NewPostgresStore(nil),
 	)
 

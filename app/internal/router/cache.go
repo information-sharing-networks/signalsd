@@ -54,11 +54,13 @@ type Cache struct {
 	mu                   sync.RWMutex
 	signalRoutingConfigs map[string]signalRoutingConfig
 	db                   *database.Queries
+	logger               *slog.Logger
 }
 
-func NewCache(db *database.Queries) *Cache {
+func NewCache(db *database.Queries, logger *slog.Logger) *Cache {
 	return &Cache{
 		db:                   db,
+		logger:               logger,
 		signalRoutingConfigs: make(map[string]signalRoutingConfig),
 	}
 }
@@ -82,7 +84,7 @@ func (c *Cache) Load(ctx context.Context) error {
 		}
 
 		if !signalsd.ValidRouteMatchingOperators[row.Operator] {
-			slog.Warn("routing cache: skipping mapping with invalid operator",
+			c.logger.Warn("routing cache: skipping mapping with invalid operator",
 				slog.String("signal_type", key),
 				slog.String("operator", row.Operator),
 				slog.String("pattern", row.MatchPattern),
@@ -121,7 +123,7 @@ func (c *Cache) StartPolling(ctx context.Context, interval time.Duration) {
 			select {
 			case <-ticker.C:
 				if err := c.Load(ctx); err != nil {
-					slog.Error("routing cache: poll refresh failed", slog.String("error", err.Error()))
+					c.logger.Error("routing cache: poll refresh failed", slog.String("error", err.Error()))
 				}
 			case <-ctx.Done():
 				return

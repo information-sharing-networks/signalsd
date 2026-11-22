@@ -130,24 +130,24 @@ func startInProcessServerWithConfig(t *testing.T, publicBaseURL string, updateCo
 
 	testEnv.authService = auth.NewAuthService(testSecretKey, environment, testEnv.queries)
 
-	testEnv.schemaCache = schemas.NewCache(testEnv.queries)
+	appLogger := logger.InitLogger(logLevel, environment)
+
+	testEnv.schemaCache = schemas.NewCache(testEnv.queries, appLogger)
 	if err := testEnv.schemaCache.Load(ctx); err != nil {
 		t.Logf("Warning: Failed to load schema cache: %v", err)
 	}
 
-	testEnv.publicIsnCache = publicisns.NewCache(testEnv.queries)
+	testEnv.publicIsnCache = publicisns.NewCache(testEnv.queries, appLogger)
 	if err := testEnv.publicIsnCache.Load(ctx); err != nil {
 		t.Logf("Warning: Failed to load public ISN cache: %v", err)
 	}
 
-	testEnv.routerCache = router.NewCache(testEnv.queries)
+	testEnv.routerCache = router.NewCache(testEnv.queries, appLogger)
 	if err := testEnv.routerCache.Load(ctx); err != nil {
 		t.Logf("Warning: Failed to load router cache: %v", err)
 	}
 
 	testEnv.documentStore = documents.NewPostgresStore(testEnv.queries)
-
-	appLogger := logger.InitLogger(logLevel, environment)
 
 	serverInstance := server.NewServer(
 		testEnv.pool,
