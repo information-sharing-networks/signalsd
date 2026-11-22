@@ -263,31 +263,8 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentials(w http.Response
 	clientID := serviceAccount.ClientID
 	serviceAccountID := serviceAccount.AccountID
 
-	// Revoke existing client secrets and one-time secrets
-	_, err = s.queries.RevokeAllClientSecretsForAccount(r.Context(), serviceAccount.AccountID)
-	if err != nil {
-		logger.AddLogAttrs(r.Context(),
-			slog.String("client_id", clientID),
-			slog.String("account_id", serviceAccountID.String()),
-		)
-
-		return apperrors.DatabaseError("database error", err)
-	}
-
-	_, err = s.queries.DeleteOneTimeClientSecretsByOrgAndEmail(r.Context(), database.DeleteOneTimeClientSecretsByOrgAndEmailParams{
-		ClientContactEmail: serviceAccount.ClientContactEmail,
-		ClientOrganization: serviceAccount.ClientOrganization,
-	})
-	if err != nil {
-		logger.AddLogAttrs(r.Context(),
-			slog.String("client_id", clientID),
-			slog.String("account_id", serviceAccountID.String()),
-		)
-
-		return apperrors.DatabaseError("database error", err)
-	}
-
-	// transaction
+	// revoke the existing credentials and create the new setup link in one transaction,
+	// so a failure can't leave the account with its credentials revoked and no way to set up new ones
 	tx, err := s.pool.BeginTx(r.Context(), pgx.TxOptions{})
 	if err != nil {
 		return apperrors.DatabaseError("database error", err)
@@ -303,6 +280,30 @@ func (s *ServiceAccountHandler) ReissueServiceAccountCredentials(w http.Response
 	}()
 
 	txQueries := s.queries.WithTx(tx)
+
+	// Revoke existing client secrets and one-time secrets
+	_, err = txQueries.RevokeAllClientSecretsForAccount(r.Context(), serviceAccount.AccountID)
+	if err != nil {
+		logger.AddLogAttrs(r.Context(),
+			slog.String("client_id", clientID),
+			slog.String("account_id", serviceAccountID.String()),
+		)
+
+		return apperrors.DatabaseError("database error", err)
+	}
+
+	_, err = txQueries.DeleteOneTimeClientSecretsByOrgAndEmail(r.Context(), database.DeleteOneTimeClientSecretsByOrgAndEmailParams{
+		ClientContactEmail: serviceAccount.ClientContactEmail,
+		ClientOrganization: serviceAccount.ClientOrganization,
+	})
+	if err != nil {
+		logger.AddLogAttrs(r.Context(),
+			slog.String("client_id", clientID),
+			slog.String("account_id", serviceAccountID.String()),
+		)
+
+		return apperrors.DatabaseError("database error", err)
+	}
 
 	// Generate the actual client secret (this gets stored temporarily)
 	clientSecret, err := s.authService.GenerateSecureToken(32)

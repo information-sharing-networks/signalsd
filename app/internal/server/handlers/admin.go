@@ -672,8 +672,23 @@ func (a *AdminHandler) GeneratePasswordResetLink(w http.ResponseWriter, r *http.
 		return apperrors.DatabaseError("database error", err)
 	}
 
-	// Delete any existing password reset tokens for this user (following service account pattern)
-	_, err = a.queries.DeletePasswordResetTokensForUser(r.Context(), tagetUserID)
+	// replace any existing password reset tokens for this user with a new one in one transaction
+	tx, err := a.pool.BeginTx(r.Context(), pgx.TxOptions{})
+	if err != nil {
+		return apperrors.DatabaseError("database error", err)
+	}
+
+	defer func() {
+		if err := tx.Rollback(r.Context()); err != nil && !errors.Is(err, pgx.ErrTxClosed) {
+			logger.AddLogAttrs(r.Context(),
+				slog.String("rollback_error", err.Error()),
+			)
+		}
+	}()
+
+	txQueries := a.queries.WithTx(tx)
+
+	_, err = txQueries.DeletePasswordResetTokensForUser(r.Context(), tagetUserID)
 	if err != nil {
 		logger.AddLogAttrs(r.Context(),
 			slog.String("user_id", tagetUserID.String()),
@@ -684,7 +699,7 @@ func (a *AdminHandler) GeneratePasswordResetLink(w http.ResponseWriter, r *http.
 	id := uuid.NewV7()
 	// Create password reset token record
 	expiresAt := time.Now().Add(signalsd.PasswordResetExpiry)
-	tokenID, err := a.queries.CreatePasswordResetToken(r.Context(), database.CreatePasswordResetTokenParams{
+	tokenID, err := txQueries.CreatePasswordResetToken(r.Context(), database.CreatePasswordResetTokenParams{
 		ID:               id,
 		UserAccountID:    tagetUserID,
 		ExpiresAt:        expiresAt,
@@ -695,6 +710,10 @@ func (a *AdminHandler) GeneratePasswordResetLink(w http.ResponseWriter, r *http.
 			slog.String("user_id", tagetUserID.String()),
 		)
 
+		return apperrors.DatabaseError("database error", err)
+	}
+
+	if err := tx.Commit(r.Context()); err != nil {
 		return apperrors.DatabaseError("database error", err)
 	}
 

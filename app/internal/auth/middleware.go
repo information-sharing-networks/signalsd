@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -46,11 +45,13 @@ func (a *AuthService) RequireValidAccessToken(next http.Handler) http.Handler {
 		// extract the claims from the jwt and validate the signature
 		// WithValidMethods ensures only HS256 tokens are accepted, preventing algorithm confusion attacks
 		// WithIssuer rejects tokens not issued by this service
+		// WithExpirationRequired rejects tokens without an exp claim (by default they never expire)
 		_, err = jwt.ParseWithClaims(accessToken, claims, func(token *jwt.Token) (any, error) {
 			return []byte(a.secretKey), nil
 		},
 			jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}),
 			jwt.WithIssuer(signalsd.TokenIssuerName),
+			jwt.WithExpirationRequired(),
 		)
 		if err != nil {
 			if errors.Is(err, jwt.ErrTokenExpired) {
@@ -220,7 +221,7 @@ func (a *AuthService) RequireValidClientCredentials(next http.Handler) http.Hand
 		// get account
 		account, err := a.queries.GetAccountByID(r.Context(), serviceAccount.AccountID)
 		if err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Is(err, pgx.ErrNoRows) {
 				logger.AddLogAttrs(r.Context(),
 					slog.String("client_id", clientID),
 				)
@@ -318,7 +319,7 @@ func (a *AuthService) RequireNonRevokedClientCredentials(next http.Handler) http
 
 		account, err := a.queries.GetAccountByID(r.Context(), serviceAccount.AccountID)
 		if err != nil {
-			if err == sql.ErrNoRows {
+			if errors.Is(err, pgx.ErrNoRows) {
 				logger.AddLogAttrs(r.Context(),
 					slog.String("client_id", clientID),
 				)
