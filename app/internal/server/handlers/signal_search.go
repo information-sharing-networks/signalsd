@@ -10,6 +10,7 @@ import (
 	"maps"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 	"uuid"
 
@@ -129,6 +130,21 @@ type SearchSignalWithCorrelationsAndVersions struct {
 	PreviousSignalVersions []PreviousSignalVersion `json:"previous_signal_versions,omitempty"`
 }
 
+// searchQueryParams are the query parameters accepted by the signal search endpoints
+var searchQueryParams = []string{
+	"account_id",
+	"start_date",
+	"end_date",
+	"updated_since",
+	"signal_id",
+	"correlation_id",
+	"local_ref",
+	"issuer_ref",
+	"include_withdrawn",
+	"include_correlated",
+	"include_previous_versions",
+}
+
 // parseSearchParams parses all search parameters from the signal search request
 func parseSearchParams(r *http.Request) (SearchParams, error) {
 	searchParams := SearchParams{
@@ -138,6 +154,18 @@ func parseSearchParams(r *http.Request) (SearchParams, error) {
 		includeWithdrawn:              false,
 		includeCorrelated:             false,
 		includePreviousSignalVersions: false,
+	}
+
+	// reject unknown parameters - otherwise a misspelt filter is silently ignored and the search returns more signals than the caller asked for
+	unknownParams := []string{}
+	for name := range r.URL.Query() {
+		if !slices.Contains(searchQueryParams, name) {
+			unknownParams = append(unknownParams, fmt.Sprintf("%q", name))
+		}
+	}
+	if len(unknownParams) > 0 {
+		slices.Sort(unknownParams)
+		return searchParams, fmt.Errorf("unknown search parameter(s): %s", strings.Join(unknownParams, ", "))
 	}
 
 	// account_id
