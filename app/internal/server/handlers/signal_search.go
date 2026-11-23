@@ -153,7 +153,7 @@ func parseSearchParams(r *http.Request) (SearchParams, error) {
 	if startDateString := r.URL.Query().Get("start_date"); startDateString != "" {
 		startDate, err := utils.ParseDateTime(startDateString)
 		if err != nil {
-			return searchParams, err
+			return searchParams, fmt.Errorf("start_date: %w", err)
 		}
 		searchParams.startDate = &startDate
 	}
@@ -162,7 +162,7 @@ func parseSearchParams(r *http.Request) (SearchParams, error) {
 	if endDateString := r.URL.Query().Get("end_date"); endDateString != "" {
 		endDate, err := utils.ParseDateTime(endDateString)
 		if err != nil {
-			return searchParams, err
+			return searchParams, fmt.Errorf("end_date: %w", err)
 		}
 		searchParams.endDate = &endDate
 	}
@@ -171,7 +171,7 @@ func parseSearchParams(r *http.Request) (SearchParams, error) {
 	if updatedSinceString := r.URL.Query().Get("updated_since"); updatedSinceString != "" {
 		updatedSince, err := utils.ParseDateTime(updatedSinceString)
 		if err != nil {
-			return searchParams, err
+			return searchParams, fmt.Errorf("updated_since: %w", err)
 		}
 		searchParams.updatedSince = &updatedSince
 	}
@@ -380,7 +380,7 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 	// Parse all search parameters
 	searchParams, err := parseSearchParams(r)
 	if err != nil {
-		return apperrors.InvalidURLParam("invalid search parameters", err)
+		return apperrors.InvalidURLParam(fmt.Sprintf("invalid search parameters: %v", err), err)
 	}
 
 	signalTypePath := fmt.Sprintf("%v/v%v", searchParams.signalTypeSlug, searchParams.semVer)
@@ -397,7 +397,7 @@ func (s *SignalsHandler) SearchPublicSignals(w http.ResponseWriter, r *http.Requ
 
 	// Validate search parameters
 	if err := validateSearchParams(searchParams); err != nil {
-		return apperrors.InvalidURLParam("invalid search parameters", err)
+		return apperrors.InvalidURLParam(fmt.Sprintf("invalid search parameters: %v", err), err)
 	}
 
 	// everyone can read every signal in a public ISN
@@ -571,7 +571,7 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 	// Parse all search parameters
 	searchParams, err := parseSearchParams(r)
 	if err != nil {
-		return apperrors.InvalidURLParam("invalid search parameters", err)
+		return apperrors.InvalidURLParam(fmt.Sprintf("invalid search parameters: %v", err), err)
 	}
 
 	claims, ok := auth.ContextClaims(r.Context())
@@ -586,7 +586,7 @@ func (s *SignalsHandler) SearchPrivateSignals(w http.ResponseWriter, r *http.Req
 
 	// Validate search parameters
 	if err := validateSearchParams(searchParams); err != nil {
-		return apperrors.InvalidURLParam("invalid search parameters", err)
+		return apperrors.InvalidURLParam(fmt.Sprintf("invalid search parameters: %v", err), err)
 	}
 
 	// Choose the ISNs to search:
