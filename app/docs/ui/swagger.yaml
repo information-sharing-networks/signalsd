@@ -48,7 +48,7 @@ info:
 
     ## References and versions
     A signal describes one thing, such as a consignment or a certificate. When it changes, you send it again and the service stores a new version of the same signal, so recipients see the latest version and its history.
-    - **`local_ref`**: your reference for the signal, usually its ID in your own system. Send the same `local_ref` every time you send the signal. It is unique for your account, the ISN and the signal type version, so sending the same `local_ref` to two ISNs or two signal types creates two separate signals.
+    - **`local_ref`**: your reference for the signal, usually its ID in your own system. Send the same `local_ref` every time you send the signal. It is unique for your account, the ISN and the signal type and version (`sem_ver`), so sending the same `local_ref` to two ISNs, two signal types or two versions of a signal type creates two separate signals.
     - **`signal_id`**: the service's ID for the signal, given when it is first stored. Other participants use it to refer to your signal, e.g. to link to it (see *Correlation*).
     - **`issuer_ref`** (optional, documents only): the reference given by whoever issued the thing the document represents, e.g. an export health certificate number. It doesn't need to be unique. Recipients can find documents with the `issuer_ref` search filter.
 
@@ -99,7 +99,7 @@ info:
     Signals in a request are validated and stored one at a time: the valid signals are stored, and the ones that fail (e.g. content that doesn't match the schema, or an unknown `correlation_id`) are listed in the response with an error code. The response status tells you whether all, some or none of the signals were stored (see each endpoint).
 
     Fix the failed signals and resend them in either of these ways:
-    - **Resend the whole request.** Signals that were already stored are returned with `unchanged: true`, and only the fixed signals are stored. Note that any json signal in the request that has been withdrawn since it was sent is reactivated (withdrawn events fail with `resource_already_exists`).
+    - **Resend the whole request.** Signals that were already stored are returned with `unchanged: true`, and only the fixed signals are stored.
     - **Resend only the failures.** *Get Batch Status* lists the batch's unresolved failures.
 
     If the whole request fails (an error status such as 400, 401, 403, 404, 413 or 500), or you get no response, nothing is recorded in the batch, so resend the whole request once the problem is fixed. If the request times out partway through, the signals already stored stay stored and the rest are returned as `timeout` failures (not recorded in the batch). Resend the whole request, or just the signals that timed out.

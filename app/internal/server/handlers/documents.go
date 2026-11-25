@@ -101,76 +101,64 @@ type DocumentUploadResponse struct {
 //	@Summary		Upload a Document
 //	@Tags			Submit Signals
 //
-//	@Description	Upload a document (e.g. a PDF bill of lading) to a document signal type (JSON signals are sent with Submit Signals).
+//	@Description	Upload one document (e.g. a PDF bill of lading) to a document signal type. JSON signals are sent with _Submit Signals_.
 //	@Description
-//	@Description	Documents are signals: they have a local_ref, versions, can be correlated with other signals and withdrawn.
-//	@Description	The document details (name, mime_type, size_bytes and sha256) are returned as the signal content by the signal search endpoints.
+//	@Description	A document is a signal: it has a local_ref, can have new versions, can be correlated with other signals and can be withdrawn.
+//	@Description	The signal search endpoints return the document's details (name, mime_type, size_bytes and sha256) as the signal content - use _Download a Document_ to fetch the file.
 //	@Description
 //	@Description	**Request format**
 //	@Description
-//	@Description	The request is multipart/form-data with one document per request:
-//	@Description	- send the form fields first (batch_ref, local_ref and any optional fields) - **the file must be the last part**
-//	@Description	- the file part must be named `file` and must include a filename - the filename (without any directory path) is stored as the document's name
-//	@Description	- only the batch_ref, local_ref, issuer_ref, correlation_id, sha256 and file fields are accepted (other fields are rejected with 400 malformed_body), and each form field value can be up to 1024 bytes
-//	@Description	- documents can be up to 20MB by default (the `Signalsd-Max-Request-Size` response header gives the request limit, which allows an extra 64KB for the form fields). Larger uploads are rejected with 413 request_too_large
+//	@Description	Send a multipart/form-data request containing one document:
+//	@Description	- send the form fields first (batch_ref, local_ref and any optional fields) - the file must be the last part
+//	@Description	- the accepted fields are batch_ref, local_ref, issuer_ref, correlation_id, sha256 and file - any other field is rejected with 400 malformed_body
+//	@Description	- each form field value can be up to 1024 bytes
+//	@Description	- the file part must be named `file` and include a filename. The filename (without any directory path) is stored as the document's name
 //	@Description
-//	@Description	The request body looks like this:
+//	@Description	Most libraries send the parts in the order you add them, so add the file last. For example, with curl:
 //	@Description	```
-//	@Description	--boundary
-//	@Description	Content-Disposition: form-data; name="batch_ref"
-//	@Description
-//	@Description	daily-2026-09-26
-//	@Description	--boundary
-//	@Description	Content-Disposition: form-data; name="local_ref"
-//	@Description
-//	@Description	bol-0042
-//	@Description	--boundary
-//	@Description	Content-Disposition: form-data; name="file"; filename="BL-0042.pdf"
-//	@Description	Content-Type: application/pdf
-//	@Description
-//	@Description	(the document bytes)
-//	@Description	--boundary--
+//	@Description	curl -H "Authorization: Bearer $ACCESS_TOKEN" -F batch_ref=daily-2026-09-26 -F local_ref=bol-0042 -F file=@BL-0042.pdf https://example.com/api/isn/sample-isn/signal-types/bill-of-lading/v1.0.0/signals/upload
 //	@Description	```
 //	@Description
 //	@Description	**Supported formats**
 //	@Description
-//	@Description	Only common business document formats can be uploaded: PDF, JPEG, PNG and XML. Other files are rejected with 415 unsupported_media_type.
-//	@Description	The format is detected from the content of the file - the Content-Type of the file part is ignored.
-//	@Description	XML documents must start with an XML declaration (<?xml ...?>).
+//	@Description	PDF (.pdf), JPEG (.jpg or .jpeg), PNG (.png) and XML (.xml). XML documents must start with an XML declaration.
 //	@Description
-//	@Description	The filename extension must match the format (.pdf, .jpg or .jpeg, .png, .xml - in any case), otherwise the upload is rejected with 400 malformed_body.
+//	@Description	The format is detected from the file's content - the Content-Type of the file part is ignored. Other formats are rejected with 415 unsupported_media_type.
+//	@Description	The filename extension must match the detected format, otherwise the upload is rejected with 400 malformed_body.
 //	@Description
-//	@Description	**Versions**
-//	@Description
-//	@Description	Uploads for a local_ref you have already used for this signal type version on the ISN are compared with its latest version (the same local_ref uploaded to another ISN is a separate document):
-//	@Description	- the same file with the same filename creates no new version: the response contains the signal_id, signal_version_id and version_number of the existing latest version, with unchanged=true - so uploads can be safely retried
-//	@Description	- a different file, or the same file with a different filename or issuer_ref, creates a new version (including a file that matches an older version)
-//	@Description	- each upload sets the issuer_ref: omitting it when the document has one creates a new version without an issuer_ref
-//	@Description	- re-uploading a withdrawn document creates a new version and reactivates it
-//	@Description	- supplying a different correlation_id creates a new version with the new link (omitting correlation_id keeps the existing link)
-//	@Description
-//	@Description	Unchanged uploads are not counted in the batch they were sent in - the existing version belongs to the batch that stored it.
-//	@Description	The same file uploaded with a different local_ref is a separate document.
-//	@Description
-//	@Description	Uploads rejected after the form fields have been read (e.g. unsupported format, a filename extension or sha256 mismatch, an invalid correlation_id, too large, no permission) are recorded against the batch (see the batch status endpoint).
-//	@Description	Requests with missing or invalid form fields are not recorded.
-//	@Description
-//	@Description	**Retries**
-//	@Description
-//	@Description	An upload either stores a new version or stores nothing, so if an upload fails or times out, send it again.
-//	@Description	If the first attempt was stored, the retry returns that version with unchanged=true, provided it uses the same file, the same filename, the same issuer_ref and the same (or no) correlation_id.
-//	@Description	A retry sent while the original upload is still being processed can occasionally store an extra, identical version - this is harmless, but pollers will see one more update.
-//	@Description	Uploads can take up to 2 minutes on the server (by default), so to avoid this set your client timeout above that.
+//	@Description	**Limits**
+//	@Description	- documents can be up to 20MB (the default). The `Signalsd-Max-Request-Size` response header gives the limit for the whole request, which is the document limit plus 64KB for the form fields. Larger requests are rejected with 413 request_too_large
+//	@Description	- the server allows up to 2 minutes for an upload (the default), so set your client timeout above that
 //	@Description
 //	@Description	**Optional fields**
 //	@Description	- issuer_ref: the reference given to the document by the organization that issued it (e.g. the certificate number of an export health certificate).
-//	@Description	It is returned with the document in search results, and recipients can find the document with the issuer_ref search filter.
+//	@Description	Search results return it as a field of the signal, next to local_ref (it is not part of the document details), and recipients can find the document with the issuer_ref search filter.
 //	@Description	Unlike local_ref it does not need to be unique, so a search by issuer_ref can return more than one document.
 //	@Description	- correlation_id: the ID of a signal of any type in the same ISN that this document relates to (e.g. the consignment a bill of lading belongs to).
 //	@Description	The upload is rejected with 422 invalid_correlation_id if the signal does not exist in the ISN.
-//	@Description	(To send a document to the ISN of the signal it relates to without specifying the ISN, use _Upload a Document via Router_.)
-//	@Description	- sha256: the sha256 of the document as lowercase hex, computed by the sender before uploading. If it does not match the uploaded file the upload is rejected with 400 malformed_body and no version is created.
-//	@Description	Use it to confirm the document stored is exactly the one you sent. If it is omitted, the sha256 computed by the server is returned in the response and can be used to check the upload afterwards.
+//	@Description	To send the document to the ISN of the correlated signal without naming the ISN, use _Upload a Document via Router_.
+//	@Description	- sha256: the sha256 of the document in hex, computed before uploading. If it does not match the uploaded file, the upload is rejected with 400 malformed_body and nothing is stored.
+//	@Description	If you omit it, you can compare the sha256 in the response with your own to check the upload.
+//	@Description
+//	@Description	**Versions**
+//	@Description
+//	@Description	A local_ref identifies one of your documents on this ISN, for this signal type and version (sem_ver). The same local_ref sent to another ISN or another version of the signal type is a separate document.
+//	@Description
+//	@Description	When you upload with a local_ref you have used before, the upload is compared with the document's latest version.
+//	@Description	No new version is created if the file, filename and issuer_ref are all the same, the correlation_id is the same or omitted, and the document has not been withdrawn.
+//	@Description	The response then returns the latest version with unchanged=true, and the upload is not counted in the batch it was sent in (so uploads can be safely retried).
+//	@Description
+//	@Description	Any other upload creates a new version.
+//	@Description
+//	@Description	**Retries**
+//	@Description
+//	@Description	An upload either stores a new version or stores nothing. If an upload fails or times out, send the same request again:
+//	@Description	if the first attempt was stored, the retry returns that version with unchanged=true.
+//	@Description
+//	@Description	**Batch status**
+//	@Description
+//	@Description	Uploads rejected while the file is being checked or stored (e.g. an unsupported format, an extension or sha256 mismatch, an invalid correlation_id or a file that is too large) are recorded against the batch and reported by _Get Batch Status_.
+//	@Description	Requests rejected before that (missing or invalid form fields, a signal type that is not a document type, or no write permission on the ISN) are not recorded.
 //
 //	@Accept			multipart/form-data
 //	@Param			isn_slug			path		string	true	"ISN slug"			example(sample-isn)
@@ -227,7 +215,8 @@ func (h *DocumentsHandler) UploadDocument(w http.ResponseWriter, r *http.Request
 //	@Description	and with 403 forbidden if the account does not have write permission on the correlated signal's ISN.
 //	@Description
 //	@Description	Other than the ISN resolution, this endpoint behaves the same way as the standard _Upload a Document_ endpoint
-//	@Description	(request format, supported formats, versions and the optional issuer_ref and sha256 fields).
+//	@Description	(request format, supported formats, limits, the optional issuer_ref and sha256 fields, versions, retries and batch status).
+//	@Description	The one difference in batch status is that uploads rejected because the correlated signal is not found, or because the account cannot write to its ISN, are recorded against the batch.
 //	@Description
 //	@Description	The response includes the isn_slug of the ISN the document was sent to.
 //

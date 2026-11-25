@@ -93,7 +93,7 @@ type SearchSignal struct {
 	VersionCreatedAt time.Time `json:"version_created_at" example:"2026-09-27T14:02:00.123456Z"`
 
 	// the signal_id of the signal this signal is linked to (the correlation_id it was submitted with). Null if the signal is not linked to another signal.
-	// To fetch the linked signal, use GET /api/signals/search?signal_id=<correlation_id> (the linked signal is often a different type)
+	// To fetch the linked signal, use `GET /api/signals/search?signal_id=<correlation_id>` (the linked signal is often a different type)
 	CorrelationID *uuid.UUID `json:"correlation_id" example:"75b45fe1-ecc2-4629-946b-fd9058c3b2ca" extensions:"x-nullable"`
 
 	// true if the signal has been withdrawn (withdrawn signals are only returned when include_withdrawn=true)

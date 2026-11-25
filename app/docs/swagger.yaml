@@ -504,7 +504,7 @@ definitions:
       correlation_id:
         description: |-
           the signal_id of the signal this signal is linked to (the correlation_id it was submitted with). Null if the signal is not linked to another signal.
-          To fetch the linked signal, use GET /api/signals/search?signal_id=<correlation_id> (the linked signal is often a different type)
+          To fetch the linked signal, use `GET /api/signals/search?signal_id=<correlation_id>` (the linked signal is often a different type)
         example: 75b45fe1-ecc2-4629-946b-fd9058c3b2ca
         type: string
         x-nullable: true
@@ -611,7 +611,7 @@ definitions:
       correlation_id:
         description: |-
           the signal_id of the signal this signal is linked to (the correlation_id it was submitted with). Null if the signal is not linked to another signal.
-          To fetch the linked signal, use GET /api/signals/search?signal_id=<correlation_id> (the linked signal is often a different type)
+          To fetch the linked signal, use `GET /api/signals/search?signal_id=<correlation_id>` (the linked signal is often a different type)
         example: 75b45fe1-ecc2-4629-946b-fd9058c3b2ca
         type: string
         x-nullable: true
@@ -912,7 +912,7 @@ info:
 
     ## References and versions
     A signal describes one thing, such as a consignment or a certificate. When it changes, you send it again and the service stores a new version of the same signal, so recipients see the latest version and its history.
-    - **`local_ref`**: your reference for the signal, usually its ID in your own system. Send the same `local_ref` every time you send the signal. It is unique for your account, the ISN and the signal type version, so sending the same `local_ref` to two ISNs or two signal types creates two separate signals.
+    - **`local_ref`**: your reference for the signal, usually its ID in your own system. Send the same `local_ref` every time you send the signal. It is unique for your account, the ISN and the signal type and version (`sem_ver`), so sending the same `local_ref` to two ISNs, two signal types or two versions of a signal type creates two separate signals.
     - **`signal_id`**: the service's ID for the signal, given when it is first stored. Other participants use it to refer to your signal, e.g. to link to it (see *Correlation*).
     - **`issuer_ref`** (optional, documents only): the reference given by whoever issued the thing the document represents, e.g. an export health certificate number. It doesn't need to be unique. Recipients can find documents with the `issuer_ref` search filter.
 
@@ -963,7 +963,7 @@ info:
     Signals in a request are validated and stored one at a time: the valid signals are stored, and the ones that fail (e.g. content that doesn't match the schema, or an unknown `correlation_id`) are listed in the response with an error code. The response status tells you whether all, some or none of the signals were stored (see each endpoint).
 
     Fix the failed signals and resend them in either of these ways:
-    - **Resend the whole request.** Signals that were already stored are returned with `unchanged: true`, and only the fixed signals are stored. Note that any json signal in the request that has been withdrawn since it was sent is reactivated (withdrawn events fail with `resource_already_exists`).
+    - **Resend the whole request.** Signals that were already stored are returned with `unchanged: true`, and only the fixed signals are stored.
     - **Resend only the failures.** *Get Batch Status* lists the batch's unresolved failures.
 
     If the whole request fails (an error status such as 400, 401, 403, 404, 413 or 500), or you get no response, nothing is recorded in the batch, so resend the whole request once the problem is fixed. If the request times out partway through, the signals already stored stay stored and the rest are returned as `timeout` failures (not recorded in the batch). Resend the whole request, or just the signals that timed out.
@@ -1885,76 +1885,64 @@ paths:
       consumes:
       - multipart/form-data
       description: |-
-        Upload a document (e.g. a PDF bill of lading) to a document signal type (JSON signals are sent with Submit Signals).
+        Upload one document (e.g. a PDF bill of lading) to a document signal type. JSON signals are sent with _Submit Signals_.
 
-        Documents are signals: they have a local_ref, versions, can be correlated with other signals and withdrawn.
-        The document details (name, mime_type, size_bytes and sha256) are returned as the signal content by the signal search endpoints.
+        A document is a signal: it has a local_ref, can have new versions, can be correlated with other signals and can be withdrawn.
+        The signal search endpoints return the document's details (name, mime_type, size_bytes and sha256) as the signal content - use _Download a Document_ to fetch the file.
 
         **Request format**
 
-        The request is multipart/form-data with one document per request:
-        - send the form fields first (batch_ref, local_ref and any optional fields) - **the file must be the last part**
-        - the file part must be named `file` and must include a filename - the filename (without any directory path) is stored as the document's name
-        - only the batch_ref, local_ref, issuer_ref, correlation_id, sha256 and file fields are accepted (other fields are rejected with 400 malformed_body), and each form field value can be up to 1024 bytes
-        - documents can be up to 20MB by default (the `Signalsd-Max-Request-Size` response header gives the request limit, which allows an extra 64KB for the form fields). Larger uploads are rejected with 413 request_too_large
+        Send a multipart/form-data request containing one document:
+        - send the form fields first (batch_ref, local_ref and any optional fields) - the file must be the last part
+        - the accepted fields are batch_ref, local_ref, issuer_ref, correlation_id, sha256 and file - any other field is rejected with 400 malformed_body
+        - each form field value can be up to 1024 bytes
+        - the file part must be named `file` and include a filename. The filename (without any directory path) is stored as the document's name
 
-        The request body looks like this:
+        Most libraries send the parts in the order you add them, so add the file last. For example, with curl:
         ```
-        --boundary
-        Content-Disposition: form-data; name="batch_ref"
-
-        daily-2026-09-26
-        --boundary
-        Content-Disposition: form-data; name="local_ref"
-
-        bol-0042
-        --boundary
-        Content-Disposition: form-data; name="file"; filename="BL-0042.pdf"
-        Content-Type: application/pdf
-
-        (the document bytes)
-        --boundary--
+        curl -H "Authorization: Bearer $ACCESS_TOKEN" -F batch_ref=daily-2026-09-26 -F local_ref=bol-0042 -F file=@BL-0042.pdf https://example.com/api/isn/sample-isn/signal-types/bill-of-lading/v1.0.0/signals/upload
         ```
 
         **Supported formats**
 
-        Only common business document formats can be uploaded: PDF, JPEG, PNG and XML. Other files are rejected with 415 unsupported_media_type.
-        The format is detected from the content of the file - the Content-Type of the file part is ignored.
-        XML documents must start with an XML declaration (<?xml ...?>).
+        PDF (.pdf), JPEG (.jpg or .jpeg), PNG (.png) and XML (.xml). XML documents must start with an XML declaration.
 
-        The filename extension must match the format (.pdf, .jpg or .jpeg, .png, .xml - in any case), otherwise the upload is rejected with 400 malformed_body.
+        The format is detected from the file's content - the Content-Type of the file part is ignored. Other formats are rejected with 415 unsupported_media_type.
+        The filename extension must match the detected format, otherwise the upload is rejected with 400 malformed_body.
 
-        **Versions**
-
-        Uploads for a local_ref you have already used for this signal type version on the ISN are compared with its latest version (the same local_ref uploaded to another ISN is a separate document):
-        - the same file with the same filename creates no new version: the response contains the signal_id, signal_version_id and version_number of the existing latest version, with unchanged=true - so uploads can be safely retried
-        - a different file, or the same file with a different filename or issuer_ref, creates a new version (including a file that matches an older version)
-        - each upload sets the issuer_ref: omitting it when the document has one creates a new version without an issuer_ref
-        - re-uploading a withdrawn document creates a new version and reactivates it
-        - supplying a different correlation_id creates a new version with the new link (omitting correlation_id keeps the existing link)
-
-        Unchanged uploads are not counted in the batch they were sent in - the existing version belongs to the batch that stored it.
-        The same file uploaded with a different local_ref is a separate document.
-
-        Uploads rejected after the form fields have been read (e.g. unsupported format, a filename extension or sha256 mismatch, an invalid correlation_id, too large, no permission) are recorded against the batch (see the batch status endpoint).
-        Requests with missing or invalid form fields are not recorded.
-
-        **Retries**
-
-        An upload either stores a new version or stores nothing, so if an upload fails or times out, send it again.
-        If the first attempt was stored, the retry returns that version with unchanged=true, provided it uses the same file, the same filename, the same issuer_ref and the same (or no) correlation_id.
-        A retry sent while the original upload is still being processed can occasionally store an extra, identical version - this is harmless, but pollers will see one more update.
-        Uploads can take up to 2 minutes on the server (by default), so to avoid this set your client timeout above that.
+        **Limits**
+        - documents can be up to 20MB (the default). The `Signalsd-Max-Request-Size` response header gives the limit for the whole request, which is the document limit plus 64KB for the form fields. Larger requests are rejected with 413 request_too_large
+        - the server allows up to 2 minutes for an upload (the default), so set your client timeout above that
 
         **Optional fields**
         - issuer_ref: the reference given to the document by the organization that issued it (e.g. the certificate number of an export health certificate).
-        It is returned with the document in search results, and recipients can find the document with the issuer_ref search filter.
+        Search results return it as a field of the signal, next to local_ref (it is not part of the document details), and recipients can find the document with the issuer_ref search filter.
         Unlike local_ref it does not need to be unique, so a search by issuer_ref can return more than one document.
         - correlation_id: the ID of a signal of any type in the same ISN that this document relates to (e.g. the consignment a bill of lading belongs to).
         The upload is rejected with 422 invalid_correlation_id if the signal does not exist in the ISN.
-        (To send a document to the ISN of the signal it relates to without specifying the ISN, use _Upload a Document via Router_.)
-        - sha256: the sha256 of the document as lowercase hex, computed by the sender before uploading. If it does not match the uploaded file the upload is rejected with 400 malformed_body and no version is created.
-        Use it to confirm the document stored is exactly the one you sent. If it is omitted, the sha256 computed by the server is returned in the response and can be used to check the upload afterwards.
+        To send the document to the ISN of the correlated signal without naming the ISN, use _Upload a Document via Router_.
+        - sha256: the sha256 of the document in hex, computed before uploading. If it does not match the uploaded file, the upload is rejected with 400 malformed_body and nothing is stored.
+        If you omit it, you can compare the sha256 in the response with your own to check the upload.
+
+        **Versions**
+
+        A local_ref identifies one of your documents on this ISN, for this signal type and version (sem_ver). The same local_ref sent to another ISN or another version of the signal type is a separate document.
+
+        When you upload with a local_ref you have used before, the upload is compared with the document's latest version.
+        No new version is created if the file, filename and issuer_ref are all the same, the correlation_id is the same or omitted, and the document has not been withdrawn.
+        The response then returns the latest version with unchanged=true, and the upload is not counted in the batch it was sent in (so uploads can be safely retried).
+
+        Any other upload creates a new version.
+
+        **Retries**
+
+        An upload either stores a new version or stores nothing. If an upload fails or times out, send the same request again:
+        if the first attempt was stored, the retry returns that version with unchanged=true.
+
+        **Batch status**
+
+        Uploads rejected while the file is being checked or stored (e.g. an unsupported format, an extension or sha256 mismatch, an invalid correlation_id or a file that is too large) are recorded against the batch and reported by _Get Batch Status_.
+        Requests rejected before that (missing or invalid form fields, a signal type that is not a document type, or no write permission on the ISN) are not recorded.
       parameters:
       - description: ISN slug
         example: sample-isn
@@ -2366,7 +2354,8 @@ paths:
         and with 403 forbidden if the account does not have write permission on the correlated signal's ISN.
 
         Other than the ISN resolution, this endpoint behaves the same way as the standard _Upload a Document_ endpoint
-        (request format, supported formats, versions and the optional issuer_ref and sha256 fields).
+        (request format, supported formats, limits, the optional issuer_ref and sha256 fields, versions, retries and batch status).
+        The one difference in batch status is that uploads rejected because the correlated signal is not found, or because the account cannot write to its ISN, are recorded against the batch.
 
         The response includes the isn_slug of the ISN the document was sent to.
       parameters:
