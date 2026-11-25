@@ -12,7 +12,7 @@ require (
 	github.com/lmittmann/tint v1.2.1
 	github.com/pressly/goose/v3 v3.30.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3
-	github.com/tidwall/gjson v1.20.3
+	github.com/tidwall/gjson v1.20.6
 	github.com/tidwall/match v1.2.0
 	golang.org/x/crypto v0.59.0
 	golang.org/x/text v0.44.0
