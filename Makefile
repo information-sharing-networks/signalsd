@@ -1,7 +1,7 @@
 # Docker-based Makefile for signalsd
 # Uses tools installed in Docker containers instead of local installations
 
-.PHONY: help psql check generate docs swag-fmt sqlc fmt vet lint security vuln update-tools test clean docker-up docker-down docker-reset test-race templ go-api go-ui db-migrate-up db-migrate-down check-containers go-all
+.PHONY: help psql check generate docs swag-fmt sqlc fmt vet lint security vuln update-tools test clean docker-up docker-down docker-reset test-race templ go-api go-ui db-migrate-up db-migrate-down db-migrate-redo check-containers go-all
 
 export GO_VERSION := $(shell grep '^go ' app/go.mod | awk '{print $$2}')
 
@@ -32,7 +32,8 @@ help:
 	@echo "  make docker-up-app   - Start the app container (detached mode)"
 	@echo "  make docker-down-app - Stop the app container"
 	@echo "  make db-migrate-up   - Run database migrations (up)"
-	@echo "  make db-migrate-down - Reset database and reapply migrations (goose down-to 0 > up)"
+	@echo "  make db-migrate-down - Roll back all migrations (goose down-to 0) - deletes all data"
+	@echo "  make db-migrate-redo - Roll back the latest migration and reapply it (goose redo)"
 	@echo "  make go-all          - Start signalsd backend and integrated ui locally (expects docker db to be running)"
 	@echo "  make go-api          - Start signalsd backend locally (expects docker db to be running)"
 	@echo "  make go-ui           - Start ui in standalone mode (expects signalsd to be running on 8080)"
@@ -176,11 +177,15 @@ db-migrate-up:
 	@docker compose exec $(APP_SERVICE) bash -c 'cd /signalsd/app && $(GO_TOOL) goose -dir sql/schema postgres "$$DATABASE_URL" up'
 
 
-# Reset database and reapply migrations
+# Roll back all migrations (deletes all data). To reset the database, run: make db-migrate-down db-migrate-up
 db-migrate-down:
-	@echo "🔄 Resetting database..."
+	@echo "🔄 Rolling back all migrations..."
 	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && $(GO_TOOL) goose -dir sql/schema postgres \$$DATABASE_URL -env=none down-to 0"
-	@$(MAKE) db-migrate-up
+
+# Roll back the latest migration and reapply it - use when working on a new migration
+db-migrate-redo:
+	@echo "🔄 Redoing latest migration..."
+	@docker compose exec $(APP_SERVICE) sh -c "cd /signalsd/app && $(GO_TOOL) goose -dir sql/schema postgres \$$DATABASE_URL -env=none redo"
 
 # Check if containers are running
 check-containers:
