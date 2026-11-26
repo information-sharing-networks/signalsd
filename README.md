@@ -1,5 +1,6 @@
 [Intro](#information-sharing-networks) |
-[Developer Guide](#developer-guide) |
+[Running signalsd](#running-signalsd) |
+[Contributing](CONTRIBUTING.md) |
 [Technical Overview](#technical-overview)
 
 ![ci](https://github.com/information-sharing-networks/signalsd/actions/workflows/ci.yml/badge.svg)
@@ -16,7 +17,7 @@ Members of a network exchange information through 'signals' - lightweight messag
 
 A signal is a notification: something happened in your business and you want to let other people know about it. For instance, when an order ships, a decision gets made or a review completes a signal goes out to whoever's been given access.
 
-Each signal type contains only what's needed - there are no complex payloads carrrying data that might never be used. Signals can be chained together to build up a timeline of related events and - if more detail becomes available later - you can add it to a signal that's already been sent.
+Each signal type contains only what's needed - there are no complex payloads carrying data that might never be used. Signals can be chained together to build up a timeline of related events and - if more detail becomes available later - you can add it to a signal that's already been sent.
 
 Organisations can use signals to share things like:
 
@@ -46,24 +47,19 @@ The [initial implementation](https://github.com/information-sharing-networks/isn
 This repo contains the second version of the service, which develops the ISN administration facilities and is designed to scale to higher volumes of data.
 
 There are three components:
-- an [API](https://signalsd.corridorone.uk/docs) used to configure ISNs, register participants and deploy the data sharing infrastructure
+- an [API](https://signalsd-staging.corridorone.uk/docs) used to configure ISNs, register participants and deploy the data sharing infrastructure
 - an admin [UI](app/internal/ui/README.md)
 - an associated [framework agreement](https://github.com/information-sharing-networks/Framework) that establishes the responsibilities of the participants in an ISN
 
 ## Credits
 Many thanks to [Ross McDonald](https://github.com/rossajmcd) who came up with the concept and created the initial reference implementation.
 
-# Developer Guide
+# Running signalsd
 
 ## Quick Start (Docker)
 
-**Prerequisites**:
+**Prerequisites**: [Docker Desktop](https://docs.docker.com/get-docker)
 
-to run the service you need [Docker Desktop](https://docs.docker.com/get-docker)
-
-If you are planning to change the software you will also need to install [Go](https://go.dev/doc/install)
-
-**Running the app**:
 ```bash
 # Clone the repo
 git clone https://github.com/information-sharing-networks/signalsd.git
@@ -76,33 +72,22 @@ The service starts on [http://localhost:8080](http://localhost:8080) by default.
 
 The docker compose file in the root of the repo (`docker-compose.yml`) starts the service and a PostgreSQL database (the containers are called `app` and `db` respectively).
 
-The docker compose file mounts the local repo directory into the app container, so you can edit code locally and see the changes in the container.  The app container has all the tools you need to test and run the service.
-
-the `make` commands below are a shortcut for the corresponding `docker compose` commands.  They are defined in the `Makefile` in the root of the repo.  If you prefer you can use `docker compose` directly.
+The `make` commands below are defined in the `Makefile` in the root of the repo and wrap `docker compose` (setting `GO_VERSION` automatically from `app/go.mod`).
 
 ```bash
-# you can override default environment variables by setting them in your shell before running the command, for example:
+# Override default environment variables by setting them in your shell before running the command, for example:
 PORT=8081 make docker-up
-
-# start the database container only
-make docker-up-db 
-
-# start the app container only
-make docker-up-app 
-
-# Rebuild the image when there is a change to:
-# - Dockerfile
-# - go.mod/go.sum (new dependencies)
-make docker-build
 
 # Stop the service and database
 make docker-down
 
-# see all available make targets
+# See all available make targets
 make help
 ```
 
-The API documentation is hosted as part of the service or you can refer to the [docs](https://signals.corridorone.uk/docs) for the current release.
+The API documentation is hosted as part of the service (at `/docs`) or you can refer to the [docs](https://signalsd.corridorone.uk/docs) for the current release.
+
+If you want to change the code, see [CONTRIBUTING.md](CONTRIBUTING.md) for the development setup, tooling and workflow.
 
 ## Environment Variables
 The service has sensible defaults for all configuration values when running locally.
@@ -157,78 +142,8 @@ For a single load balancer (e.g. AWS ALB) the default of `1` is correct.
 Add `1` for each additional proxy layer (e.g. a CDN in front of the ALB would require `2`).
 This is used by the [chi](https://github.com/go-chi/chi) router's `ClientIPFromXFFTrustedProxies` middleware for correct client IP extraction from the `X-Forwarded-For` header
 
-### Development Tools
-
-The app uses the following go tools:
-- goose - database migrations
-- sqlc - type safe SQL queries
-- swag - OpenAPI from go comments
-- staticcheck - linter
-- gosec - security analysis
-- templ - ui templates
-- govulncheck - vulnerability scanner
-- Air - live reload
-
-These tools are defined in a separate module, `app/tools/go.mod`, so that their dependency trees stay out of the app's `app/go.mod`. They are run from the `app` directory with `go tool -modfile=tools/go.mod <tool>` (the Makefile targets do this for you) and are compiled when the app container starts.
-
-The Go version is set by the `go` line in `app/go.mod` (the docker image and the CI builds use the same version). To upgrade:
-
-1. Update the `go` line in `app/go.mod`
-2. `make docker-build` - rebuild the image with the new toolchain
-3. `make update-tools` - upgrade the go tools (older versions may not support the new Go release)
-4. `make check` - confirm everything passes
-5. Commit changes
-
-Other developers will need to rebuild their image (`make docker-build`) and upgrade their local Go installation.
-
-The Docker app is started with Air which will restart the service whenever you save changes to the code. 
-Air is configured to automatically run code generation (templ, sqlc and swag) and applies any pending database migrations before restarting the signalsd server.
-You can customise the air config by editing `.air.toml` (see the [air docs](https://github.com/cosmtrek/air) for more information).
-
-If you need to run these tools individually, you can use the Makefile for common tasks:
-
-```bash
-# Start containers first
-make docker-up
-
-# Then...
-make check    # Run all pre-commit checks and generate sqlc code and api docs
-make generate # Generate sqlc code and api docs
-make migrate  # Run database migrations
-...
-```
-## Database Schema Management
-database schema migration is managed using [goose](https://github.com/pressly/goose).  
-
-Schema changes are made by adding files to `app/sql/schema`:
-```
-001_foo.sql
-002_bar.sql
-...
-```
-For docker users the migration are applied automatically whenever you restart the app container (use `make migrate` to run mannually). 
-
-## API Documentation
-To generate the OpenAPI docs:
-```bash
-make docs
-```
-For docker users, the docs are automatically created when Air live reload restarts the app container.
-
-## SQL Queries
-SQL queries are kept in `app/sql/queries`.
-
-Run `make sqlc` to regenerate the type safe Go code after adding or altering any queries (runs automatically for docker users)
-
-## Testing
-`make test` will run the unit and integration tests.
-
-`make check` will run all the security, linting, unit and integration tests.
-
-For information about the testing strategy and how to run indvidual tests, see the [Integration Testing Documentation](app/test/integration/README.md).
-
 ## User Interface
-By default the signalsd service starts with a basic web interface. If you want to modify, replace or disable the UI see the [UI Documentation](app/internal/ui/README.md).
+By default the signalsd service serves a basic web interface alongside the API. To run API-only, see [Service Configuration](#service-configuration); to modify or replace the UI, see the [UI Documentation](app/internal/ui/README.md).
 
 ## Getting Help
 - Check the [API documentation](https://signalsd.corridorone.uk/docs)
@@ -290,17 +205,17 @@ PORT=8081 go run cmd/signalsd/main.go run signals-read
 PORT=8082 go run cmd/signalsd/main.go run signals-write
 ```
 
-The simplest configuration is to run containers that serve all endpoints.  This is the configuration used by the github actions CD pipeline - high volume implementations might benefit from splitting the admin and signals handling accross muitlpe containers.
+The simplest configuration is to run containers that serve all endpoints.  This is the configuration used by the github actions CD pipeline - high volume implementations might benefit from splitting the admin and signals handling across multiple containers.
 
 example of a more elaborate configuration
 ![advanced config (v0 7 2)](https://github.com/user-attachments/assets/88b8fe9b-1329-45d9-b96c-fd4dde831026)
 
 
 # Cloud Deployment
-The app currently deploys to AWS - the containers run on ECS Fargate and the database is RDS Posgtres.
+The app currently deploys to AWS - the containers run on ECS Fargate and the database is RDS Postgres.
 
-The app was deployed on GCP (CloudRun) and Neon Postgress until April 2026.  The Github Workflows are retained for reference but no longer run.
+The app was deployed on GCP (CloudRun) and Neon Postgres until April 2026.  The Github Workflows are retained for reference but no longer run.
 
-Overviews of the process to create the GCP and AWS infrastruture are here
+Overviews of the process to create the GCP and AWS infrastructure are here
 - [AWS Deploy](deploy-AWS.md)
 - [GCP Deploy](deploy-GCP.md)
